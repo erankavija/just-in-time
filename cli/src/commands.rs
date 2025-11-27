@@ -473,6 +473,22 @@ impl CommandExecutor {
 
         Ok(filtered.into_iter().rev().collect())
     }
+
+    // Graph export
+    pub fn export_graph(&self, format: &str) -> Result<String> {
+        let issues = self.storage.list_issues()?;
+        let issue_refs: Vec<&Issue> = issues.iter().collect();
+        let graph = DependencyGraph::new(&issue_refs);
+
+        match format.to_lowercase().as_str() {
+            "dot" => Ok(graph.export_dot()),
+            "mermaid" => Ok(graph.export_mermaid()),
+            _ => Err(anyhow!(
+                "Unsupported format: {}. Use 'dot' or 'mermaid'",
+                format
+            )),
+        }
+    }
 }
 
 pub fn parse_priority(s: &str) -> Result<Priority> {

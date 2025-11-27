@@ -209,6 +209,15 @@ pub enum GraphCommands {
 
     /// Show root issues (no dependencies)
     Roots,
+
+    /// Export dependency graph in various formats
+    Export {
+        #[arg(short, long, default_value = "dot")]
+        format: String,
+
+        #[arg(short, long)]
+        output: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]

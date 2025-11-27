@@ -124,6 +124,80 @@ impl<'a> DependencyGraph<'a> {
             .collect()
     }
 
+    /// Export graph as DOT format for Graphviz
+    pub fn export_dot(&self) -> String {
+        let mut output = String::from("digraph issues {\n");
+        output.push_str("  rankdir=LR;\n");
+        output.push_str("  node [shape=box, style=rounded];\n\n");
+
+        // Add nodes with labels
+        for issue in self.issues.values() {
+            let label = format!("{}\\n{}", issue.id, issue.title.replace('"', "\\\""));
+            let color = match issue.state {
+                crate::domain::State::Open => "lightgray",
+                crate::domain::State::Ready => "lightblue",
+                crate::domain::State::InProgress => "yellow",
+                crate::domain::State::Done => "lightgreen",
+                crate::domain::State::Archived => "gray",
+            };
+            output.push_str(&format!(
+                "  \"{}\" [label=\"{}\", fillcolor={}, style=\"rounded,filled\"];\n",
+                issue.id, label, color
+            ));
+        }
+
+        output.push('\n');
+
+        // Add edges
+        for issue in self.issues.values() {
+            for dep in &issue.dependencies {
+                output.push_str(&format!("  \"{}\" -> \"{}\";\n", issue.id, dep));
+            }
+        }
+
+        output.push_str("}\n");
+        output
+    }
+
+    /// Export graph as Mermaid format
+    pub fn export_mermaid(&self) -> String {
+        let mut output = String::from("graph LR\n");
+
+        // Add nodes with state styling
+        for issue in self.issues.values() {
+            let label = format!("{}:<br/>{}", issue.id, issue.title);
+            let style_class = match issue.state {
+                crate::domain::State::Open => "open",
+                crate::domain::State::Ready => "ready",
+                crate::domain::State::InProgress => "inprogress",
+                crate::domain::State::Done => "done",
+                crate::domain::State::Archived => "archived",
+            };
+            output.push_str(&format!(
+                "  {}[\"{}\"]:::{}\n",
+                issue.id, label, style_class
+            ));
+        }
+
+        output.push('\n');
+
+        // Add edges
+        for issue in self.issues.values() {
+            for dep in &issue.dependencies {
+                output.push_str(&format!("  {} --> {}\n", issue.id, dep));
+            }
+        }
+
+        // Add style classes
+        output.push_str("\n  classDef open fill:#e0e0e0,stroke:#333\n");
+        output.push_str("  classDef ready fill:#add8e6,stroke:#333\n");
+        output.push_str("  classDef inprogress fill:#ffff99,stroke:#333\n");
+        output.push_str("  classDef done fill:#90ee90,stroke:#333\n");
+        output.push_str("  classDef archived fill:#808080,stroke:#333\n");
+
+        output
+    }
+
     /// Validate that the graph is a DAG (no cycles)
     pub fn validate_dag(&self) -> Result<(), GraphError> {
         // Check for cycles using DFS
@@ -312,5 +386,76 @@ mod tests {
         let graph = DependencyGraph::new(&issues);
 
         assert_eq!(graph.validate_dag(), Err(GraphError::CycleDetected));
+    }
+
+    #[test]
+    fn test_export_dot_format() {
+        let issue1 = Issue::new("API Design".to_string(), "Design REST API".to_string());
+        let mut issue2 = Issue::new("Backend".to_string(), "Implement backend".to_string());
+        issue2.dependencies.push(issue1.id.clone());
+
+        let issues = vec![&issue1, &issue2];
+        let graph = DependencyGraph::new(&issues);
+
+        let dot = graph.export_dot();
+
+        assert!(dot.contains("digraph issues"));
+        assert!(dot.contains("rankdir=LR"));
+        assert!(dot.contains(&issue1.id));
+        assert!(dot.contains(&issue2.id));
+        assert!(dot.contains("API Design"));
+        assert!(dot.contains("Backend"));
+        assert!(dot.contains(&format!("\"{}\" -> \"{}\"", issue2.id, issue1.id)));
+    }
+
+    #[test]
+    fn test_export_mermaid_format() {
+        let issue1 = Issue::new("Setup".to_string(), "Initial setup".to_string());
+        let mut issue2 = Issue::new("Deploy".to_string(), "Deploy to prod".to_string());
+        issue2.dependencies.push(issue1.id.clone());
+
+        let issues = vec![&issue1, &issue2];
+        let graph = DependencyGraph::new(&issues);
+
+        let mermaid = graph.export_mermaid();
+
+        assert!(mermaid.contains("graph LR"));
+        assert!(mermaid.contains(&issue1.id));
+        assert!(mermaid.contains(&issue2.id));
+        assert!(mermaid.contains("Setup"));
+        assert!(mermaid.contains("Deploy"));
+        assert!(mermaid.contains(&format!("{} --> {}", issue2.id, issue1.id)));
+        assert!(mermaid.contains("classDef open"));
+    }
+
+    #[test]
+    fn test_export_dot_with_different_states() {
+        use crate::domain::State;
+
+        let mut issue1 = Issue::new("Done Task".to_string(), "Completed".to_string());
+        issue1.state = State::Done;
+
+        let mut issue2 = Issue::new("In Progress".to_string(), "Working on it".to_string());
+        issue2.state = State::InProgress;
+
+        let issues = vec![&issue1, &issue2];
+        let graph = DependencyGraph::new(&issues);
+
+        let dot = graph.export_dot();
+
+        assert!(dot.contains("lightgreen")); // Done state
+        assert!(dot.contains("yellow")); // InProgress state
+    }
+
+    #[test]
+    fn test_export_handles_special_characters() {
+        let issue = Issue::new("Title with \"quotes\"".to_string(), "Test".to_string());
+        let issues = vec![&issue];
+        let graph = DependencyGraph::new(&issues);
+
+        let dot = graph.export_dot();
+
+        assert!(dot.contains("\\\""));
+        assert!(!dot.contains("Title with \"quotes\""));
     }
 }

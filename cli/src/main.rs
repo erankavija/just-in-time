@@ -158,6 +158,16 @@ fn main() -> Result<()> {
                     println!("  {} | {}", issue.id, issue.title);
                 }
             }
+            GraphCommands::Export { format, output } => {
+                let graph_output = executor.export_graph(&format)?;
+
+                if let Some(path) = output {
+                    std::fs::write(&path, graph_output)?;
+                    println!("Graph exported to: {}", path);
+                } else {
+                    println!("{}", graph_output);
+                }
+            }
         },
         Commands::Registry(registry_cmd) => match registry_cmd {
             RegistryCommands::List => {

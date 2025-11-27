@@ -354,10 +354,7 @@ impl Coordinator {
         for issue in &all_issues {
             if let Some(ref assignee) = issue.assignee {
                 if issue.state == State::InProgress {
-                    agent_map
-                        .entry(assignee.clone())
-                        .or_default()
-                        .push(issue);
+                    agent_map.entry(assignee.clone()).or_default().push(issue);
                 }
             }
         }
