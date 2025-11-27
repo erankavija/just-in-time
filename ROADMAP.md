@@ -59,11 +59,12 @@
 **Goal:** Enhanced monitoring and external integrations.
 
 **TDD Requirements:**
-- **TESTS MUST BE WRITTEN BEFORE IMPLEMENTATION**
+- **TESTS MUST BE WRITTEN BEFORE IMPLEMENTATION** ✅ Enforced!
 - All new functions must have unit tests before code is written
 - Target: >80% overall coverage for all modules
-- Current coverage: **64.18%** (498/776 lines) - **+23.84pp improvement!** 🎉
-- commands.rs: **86.10%** ✅ | coordinator.rs: **41.91%** ⚠️ | storage.rs: **92.13%** ✅
+- Current coverage: **65.68%** (530/807 lines) - **+25.34pp improvement!** 🎉
+- Tests: 43 → **99 tests** (56 unit + 36 backfill + 7 integration)
+- commands.rs: **87.26%** ✅ | coordinator.rs: **41.91%** ⚠️ | storage.rs: **92.13%** ✅
 
 **Action Items:**
 - [x] Graph export: `export --format dot|mermaid` (✓ tests added)
@@ -76,7 +77,7 @@
   - [x] validate, status (2 tests)
   - [x] list_gates, add/remove/show gate definitions (6 tests)
   - [x] export_graph (2 tests)
-- [ ] Search and filters: complex query syntax (TDD: write tests first)
+- [x] Search and filters: complex query syntax (✓ TDD: 9 unit + 7 integration tests)
 - [ ] Bulk operations (TDD: write tests first)
 - [ ] CI integration: read artifacts to auto-pass gates (TDD: write tests first)
 - [ ] Pull-based agent mode (TDD: write tests first)
