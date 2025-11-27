@@ -255,3 +255,425 @@ fn test_export_mermaid_format() {
     assert!(stdout.contains("graph LR"));
     assert!(stdout.contains("classDef"));
 }
+
+// Test issue lifecycle
+#[test]
+fn test_issue_create_list_show() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    let output = Command::new(&jit)
+        .args(&["issue", "create", "-t", "Test Issue", "-d", "Test description", "--priority", "high"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Created issue:"));
+    let id = stdout.trim().split_whitespace().last().unwrap();
+
+    // List issues
+    let output = Command::new(&jit)
+        .args(&["issue", "list"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains(id));
+    assert!(stdout.contains("Test Issue"));
+
+    // Show issue details
+    let output = Command::new(&jit)
+        .args(&["issue", "show", id])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Title: Test Issue"));
+    assert!(stdout.contains("Description: Test description"));
+    assert!(stdout.contains("Priority: High"));
+}
+
+#[test]
+fn test_issue_update_and_delete() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    let output = Command::new(&jit)
+        .args(&["issue", "create", "-t", "Old Title", "-d", "Desc"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    let id = String::from_utf8_lossy(&output.stdout)
+        .trim()
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+
+    // Update issue
+    Command::new(&jit)
+        .args(&["issue", "update", &id, "-t", "New Title"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    let output = Command::new(&jit)
+        .args(&["issue", "show", &id])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Title: New Title"));
+
+    // Delete issue
+    Command::new(&jit)
+        .args(&["issue", "delete", &id])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    let output = Command::new(&jit)
+        .args(&["issue", "list"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(!stdout.contains(&id));
+}
+
+#[test]
+fn test_dependencies() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    let output1 = Command::new(&jit)
+        .args(&["issue", "create", "-t", "Dependency", "-d", "Desc"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let id1 = String::from_utf8_lossy(&output1.stdout)
+        .trim()
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+
+    let output2 = Command::new(&jit)
+        .args(&["issue", "create", "-t", "Dependent", "-d", "Desc"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let id2 = String::from_utf8_lossy(&output2.stdout)
+        .trim()
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+
+    // Add dependency
+    let output = Command::new(&jit)
+        .args(&["dep", "add", &id2, "--on", &id1])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+
+    // Show graph
+    let output = Command::new(&jit)
+        .args(&["graph", "show", &id2])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains(&id1));
+
+    // Show downstream
+    let output = Command::new(&jit)
+        .args(&["graph", "downstream", &id1])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains(&id2));
+}
+
+#[test]
+fn test_cycle_detection() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    let output1 = Command::new(&jit)
+        .args(&["issue", "create", "-t", "Issue 1", "-d", "Desc"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let id1 = String::from_utf8_lossy(&output1.stdout)
+        .trim()
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+
+    let output2 = Command::new(&jit)
+        .args(&["issue", "create", "-t", "Issue 2", "-d", "Desc"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let id2 = String::from_utf8_lossy(&output2.stdout)
+        .trim()
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+
+    // Add dependency: id2 depends on id1
+    Command::new(&jit)
+        .args(&["dep", "add", &id2, "--on", &id1])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    // Try to create cycle: id1 depends on id2 (should fail)
+    let output = Command::new(&jit)
+        .args(&["dep", "add", &id1, "--on", &id2])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("cycle") || stderr.contains("Cycle"));
+}
+
+#[test]
+fn test_gates() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    // Add gate definition
+    Command::new(&jit)
+        .args(&["registry", "add", "tests", "-t", "Unit Tests", "-d", "Run tests", "-a"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    // List gates
+    let output = Command::new(&jit)
+        .args(&["registry", "list"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("tests"));
+    assert!(stdout.contains("Unit Tests"));
+
+    // Create issue with gate
+    let output = Command::new(&jit)
+        .args(&["issue", "create", "-t", "Task", "-d", "Desc", "--gate", "tests"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    let id = String::from_utf8_lossy(&output.stdout)
+        .trim()
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+
+    // Pass gate
+    let output = Command::new(&jit)
+        .args(&["gate", "pass", &id, "tests", "-b", "ci"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+
+    // Verify gate status
+    let output = Command::new(&jit)
+        .args(&["issue", "show", &id])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("tests"));
+}
+
+#[test]
+fn test_assignment_workflow() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    let output = Command::new(&jit)
+        .args(&["issue", "create", "-t", "Task", "-d", "Desc"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    let id = String::from_utf8_lossy(&output.stdout)
+        .trim()
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+
+    // Assign issue
+    Command::new(&jit)
+        .args(&["issue", "assign", &id, "-t", "alice"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    let output = Command::new(&jit)
+        .args(&["issue", "show", &id])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("alice"));
+
+    // Unassign issue
+    Command::new(&jit)
+        .args(&["issue", "unassign", &id])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    let output = Command::new(&jit)
+        .args(&["issue", "show", &id])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Assignee: None"));
+}
+
+#[test]
+fn test_events() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    // Create issues to generate events
+    Command::new(&jit)
+        .args(&["issue", "create", "-t", "Task 1", "-d", "Desc"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    Command::new(&jit)
+        .args(&["issue", "create", "-t", "Task 2", "-d", "Desc"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    // Tail events
+    let output = Command::new(&jit)
+        .args(&["events", "tail", "-n", "2"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // Should have JSON events
+    assert!(stdout.contains("issue_created") || stdout.contains("{"));
+
+    // Query events
+    let output = Command::new(&jit)
+        .args(&["events", "query", "-e", "issue_created"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+}
+
+#[test]
+fn test_validate_repository() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    Command::new(&jit)
+        .args(&["issue", "create", "-t", "Task 1", "-d", "Desc"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    Command::new(&jit)
+        .args(&["issue", "create", "-t", "Task 2", "-d", "Desc"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    // Validate should succeed
+    let output = Command::new(&jit)
+        .args(&["validate"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+}
+
+#[test]
+fn test_graph_roots() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    let output1 = Command::new(&jit)
+        .args(&["issue", "create", "-t", "Root", "-d", "Desc"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let id1 = String::from_utf8_lossy(&output1.stdout)
+        .trim()
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+
+    let output2 = Command::new(&jit)
+        .args(&["issue", "create", "-t", "Child", "-d", "Desc"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let id2 = String::from_utf8_lossy(&output2.stdout)
+        .trim()
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+
+    // Add dependency
+    Command::new(&jit)
+        .args(&["dep", "add", &id2, "--on", &id1])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    // Get roots
+    let output = Command::new(&jit)
+        .args(&["graph", "roots"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains(&id1));
+    assert!(!stdout.contains(&id2));
+}
