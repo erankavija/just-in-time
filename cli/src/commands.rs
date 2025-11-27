@@ -156,12 +156,25 @@ impl CommandExecutor {
             return Err(anyhow!("Issue is already assigned"));
         }
 
+        let old_state = issue.state;
         issue.assignee = Some(assignee.clone());
+
+        // Transition to InProgress if Ready
+        if issue.state == State::Ready {
+            issue.state = State::InProgress;
+        }
+
         self.storage.save_issue(&issue)?;
 
         // Log event
         let event = Event::new_issue_claimed(issue.id.clone(), assignee);
         self.storage.append_event(&event)?;
+
+        // Log state change if needed
+        if old_state != issue.state {
+            let event = Event::new_issue_state_changed(issue.id.clone(), old_state, issue.state);
+            self.storage.append_event(&event)?;
+        }
 
         Ok(())
     }

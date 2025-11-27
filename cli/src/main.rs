@@ -13,6 +13,7 @@
 
 mod cli;
 mod commands;
+mod coordinator;
 mod domain;
 mod graph;
 mod storage;
@@ -20,10 +21,11 @@ mod storage;
 use anyhow::Result;
 use clap::Parser;
 use cli::{
-    Cli, Commands, DepCommands, EventCommands, GateCommands, GraphCommands, IssueCommands,
-    RegistryCommands,
+    Cli, Commands, CoordinatorCommands, DepCommands, EventCommands, GateCommands, GraphCommands,
+    IssueCommands, RegistryCommands,
 };
 use commands::{parse_priority, parse_state, CommandExecutor};
+use coordinator::{AgentConfig, Coordinator, CoordinatorConfig, DispatchRules};
 use std::env;
 use storage::Storage;
 
@@ -32,7 +34,7 @@ fn main() -> Result<()> {
 
     let current_dir = env::current_dir()?;
     let storage = Storage::new(&current_dir);
-    let executor = CommandExecutor::new(storage);
+    let executor = CommandExecutor::new(storage.clone());
 
     match cli.command {
         Commands::Init => {
@@ -203,6 +205,52 @@ fn main() -> Result<()> {
                 for event in events {
                     println!("{}", serde_json::to_string(&event)?);
                 }
+            }
+        },
+        Commands::Coordinator(coord_cmd) => match coord_cmd {
+            CoordinatorCommands::Start { config } => {
+                let coord_config = if let Some(config_path) = config {
+                    let content = std::fs::read_to_string(&config_path)?;
+                    serde_json::from_str(&content)?
+                } else {
+                    Coordinator::load_config(&storage)?
+                };
+
+                let mut coordinator = Coordinator::new(storage, coord_config);
+                coordinator.start()?;
+            }
+            CoordinatorCommands::Stop => {
+                Coordinator::stop(&storage)?;
+            }
+            CoordinatorCommands::Status => {
+                Coordinator::status(&storage)?;
+            }
+            CoordinatorCommands::Agents => {
+                Coordinator::list_agents(&storage)?;
+            }
+            CoordinatorCommands::InitConfig => {
+                let config = CoordinatorConfig {
+                    agent_pool: vec![
+                        AgentConfig {
+                            id: "copilot-1".to_string(),
+                            agent_type: "copilot".to_string(),
+                            command: "echo Processing issue".to_string(),
+                            max_concurrent: 2,
+                        },
+                        AgentConfig {
+                            id: "copilot-2".to_string(),
+                            agent_type: "copilot".to_string(),
+                            command: "echo Processing issue".to_string(),
+                            max_concurrent: 2,
+                        },
+                    ],
+                    dispatch_rules: DispatchRules::default(),
+                    poll_interval_secs: 5,
+                };
+
+                Coordinator::save_config(&storage, &config)?;
+                println!("Created example coordinator config at data/coordinator.json");
+                println!("Edit the config to customize agent commands and settings");
             }
         },
         Commands::Status => {

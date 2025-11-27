@@ -39,11 +39,36 @@ pub enum Commands {
     #[command(subcommand)]
     Graph(GraphCommands),
 
+    /// Coordinator daemon management
+    #[command(subcommand)]
+    Coordinator(CoordinatorCommands),
+
     /// Show overall status
     Status,
 
     /// Validate repository integrity
     Validate,
+}
+
+#[derive(Subcommand)]
+pub enum CoordinatorCommands {
+    /// Start the coordinator daemon
+    Start {
+        #[arg(short, long)]
+        config: Option<String>,
+    },
+
+    /// Stop the coordinator daemon
+    Stop,
+
+    /// Show coordinator status
+    Status,
+
+    /// List active agents and their assignments
+    Agents,
+
+    /// Initialize coordinator config with example agents
+    InitConfig,
 }
 
 #[derive(Subcommand)]
