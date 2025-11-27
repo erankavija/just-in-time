@@ -865,4 +865,583 @@ mod tests {
         assert_eq!(specific[0].get_type(), "issue_claimed");
         assert_eq!(specific[0].get_issue_id(), id1);
     }
+
+    #[test]
+    fn test_delete_issue() {
+        let (_temp, executor) = setup();
+
+        let id = executor
+            .create_issue(
+                "To Delete".to_string(),
+                "Desc".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+
+        // Verify it exists
+        assert!(executor.show_issue(&id).is_ok());
+
+        // Delete it
+        executor.delete_issue(&id).unwrap();
+
+        // Verify it's gone
+        assert!(executor.show_issue(&id).is_err());
+
+        // Verify it's not in the list
+        let issues = executor.list_issues(None, None, None).unwrap();
+        assert!(!issues.iter().any(|i| i.id == id));
+    }
+
+    #[test]
+    fn test_delete_nonexistent_issue() {
+        let (_temp, executor) = setup();
+
+        let result = executor.delete_issue("nonexistent");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_assign_issue() {
+        let (_temp, executor) = setup();
+
+        let id = executor
+            .create_issue(
+                "Task".to_string(),
+                "Desc".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+
+        executor.assign_issue(&id, "alice".to_string()).unwrap();
+
+        let issue = executor.show_issue(&id).unwrap();
+        assert_eq!(issue.assignee, Some("alice".to_string()));
+    }
+
+    #[test]
+    fn test_assign_already_assigned_issue() {
+        let (_temp, executor) = setup();
+
+        let id = executor
+            .create_issue(
+                "Task".to_string(),
+                "Desc".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+
+        executor.assign_issue(&id, "alice".to_string()).unwrap();
+        // assign_issue allows reassignment (unlike claim_issue)
+        executor.assign_issue(&id, "bob".to_string()).unwrap();
+
+        let issue = executor.show_issue(&id).unwrap();
+        assert_eq!(issue.assignee, Some("bob".to_string()));
+    }
+
+    #[test]
+    fn test_unassign_issue() {
+        let (_temp, executor) = setup();
+
+        let id = executor
+            .create_issue(
+                "Task".to_string(),
+                "Desc".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+
+        executor.assign_issue(&id, "alice".to_string()).unwrap();
+        let issue = executor.show_issue(&id).unwrap();
+        assert_eq!(issue.assignee, Some("alice".to_string()));
+
+        executor.unassign_issue(&id).unwrap();
+        let issue = executor.show_issue(&id).unwrap();
+        assert_eq!(issue.assignee, None);
+    }
+
+    #[test]
+    fn test_unassign_unassigned_issue() {
+        let (_temp, executor) = setup();
+
+        let id = executor
+            .create_issue(
+                "Task".to_string(),
+                "Desc".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+
+        // Should not error when unassigning unassigned issue
+        executor.unassign_issue(&id).unwrap();
+    }
+
+    #[test]
+    fn test_add_dependency() {
+        let (_temp, executor) = setup();
+
+        let id1 = executor
+            .create_issue(
+                "Issue 1".to_string(),
+                "D1".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+        let id2 = executor
+            .create_issue(
+                "Issue 2".to_string(),
+                "D2".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+
+        executor.add_dependency(&id2, &id1).unwrap();
+
+        let issue2 = executor.show_issue(&id2).unwrap();
+        assert!(issue2.dependencies.contains(&id1));
+    }
+
+    #[test]
+    fn test_remove_dependency() {
+        let (_temp, executor) = setup();
+
+        let id1 = executor
+            .create_issue(
+                "Issue 1".to_string(),
+                "D1".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+        let id2 = executor
+            .create_issue(
+                "Issue 2".to_string(),
+                "D2".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+
+        executor.add_dependency(&id2, &id1).unwrap();
+        executor.remove_dependency(&id2, &id1).unwrap();
+
+        let issue2 = executor.show_issue(&id2).unwrap();
+        assert!(!issue2.dependencies.contains(&id1));
+    }
+
+    #[test]
+    fn test_remove_nonexistent_dependency() {
+        let (_temp, executor) = setup();
+
+        let id1 = executor
+            .create_issue(
+                "Issue 1".to_string(),
+                "D1".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+        let id2 = executor
+            .create_issue(
+                "Issue 2".to_string(),
+                "D2".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+
+        // Removing non-existent dependency should not error
+        executor.remove_dependency(&id2, &id1).unwrap();
+    }
+
+    #[test]
+    fn test_add_gate() {
+        let (_temp, executor) = setup();
+
+        let id = executor
+            .create_issue(
+                "Issue".to_string(),
+                "Desc".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+
+        executor.add_gate(&id, "review".to_string()).unwrap();
+
+        let issue = executor.show_issue(&id).unwrap();
+        assert!(issue.gates_required.contains(&"review".to_string()));
+    }
+
+    #[test]
+    fn test_pass_gate() {
+        let (_temp, executor) = setup();
+
+        let id = executor
+            .create_issue(
+                "Issue".to_string(),
+                "Desc".to_string(),
+                Priority::Normal,
+                vec!["review".to_string()],
+            )
+            .unwrap();
+
+        executor
+            .pass_gate(&id, "review".to_string(), Some("alice".to_string()))
+            .unwrap();
+
+        let issue = executor.show_issue(&id).unwrap();
+        let gate_state = issue.gates_status.get("review").unwrap();
+        assert_eq!(gate_state.status, GateStatus::Passed);
+        assert_eq!(gate_state.updated_by, Some("alice".to_string()));
+    }
+
+    #[test]
+    fn test_pass_gate_not_required() {
+        let (_temp, executor) = setup();
+
+        let id = executor
+            .create_issue(
+                "Issue".to_string(),
+                "Desc".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+
+        // Passing a gate not required should error
+        let result = executor.pass_gate(&id, "review".to_string(), None);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_fail_gate() {
+        let (_temp, executor) = setup();
+
+        let id = executor
+            .create_issue(
+                "Issue".to_string(),
+                "Desc".to_string(),
+                Priority::Normal,
+                vec!["tests".to_string()],
+            )
+            .unwrap();
+
+        executor
+            .fail_gate(&id, "tests".to_string(), Some("ci".to_string()))
+            .unwrap();
+
+        let issue = executor.show_issue(&id).unwrap();
+        let gate_state = issue.gates_status.get("tests").unwrap();
+        assert_eq!(gate_state.status, GateStatus::Failed);
+        assert_eq!(gate_state.updated_by, Some("ci".to_string()));
+    }
+
+    #[test]
+    fn test_show_graph() {
+        let (_temp, executor) = setup();
+
+        let id1 = executor
+            .create_issue(
+                "Root".to_string(),
+                "D1".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+        let id2 = executor
+            .create_issue(
+                "Child".to_string(),
+                "D2".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+
+        executor.add_dependency(&id2, &id1).unwrap();
+
+        let graph = executor.show_graph(&id2).unwrap();
+        // Should include the issue itself + its dependency
+        assert_eq!(graph.len(), 2);
+        assert!(graph.iter().any(|i| i.id == id1));
+        assert!(graph.iter().any(|i| i.id == id2));
+    }
+
+    #[test]
+    fn test_show_downstream() {
+        let (_temp, executor) = setup();
+
+        let id1 = executor
+            .create_issue(
+                "Root".to_string(),
+                "D1".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+        let id2 = executor
+            .create_issue(
+                "Dependent".to_string(),
+                "D2".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+
+        executor.add_dependency(&id2, &id1).unwrap();
+
+        let downstream = executor.show_downstream(&id1).unwrap();
+        assert_eq!(downstream.len(), 1);
+        assert!(downstream.iter().any(|i| i.id == id2));
+    }
+
+    #[test]
+    fn test_show_roots() {
+        let (_temp, executor) = setup();
+
+        let id1 = executor
+            .create_issue(
+                "Root".to_string(),
+                "D1".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+        let id2 = executor
+            .create_issue(
+                "Child".to_string(),
+                "D2".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+
+        executor.add_dependency(&id2, &id1).unwrap();
+
+        let roots = executor.show_roots().unwrap();
+        assert_eq!(roots.len(), 1);
+        assert_eq!(roots[0].id, id1);
+    }
+
+    #[test]
+    fn test_validate_success() {
+        let (_temp, executor) = setup();
+
+        let id1 = executor
+            .create_issue(
+                "Issue 1".to_string(),
+                "D1".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+        let id2 = executor
+            .create_issue(
+                "Issue 2".to_string(),
+                "D2".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+
+        executor.add_dependency(&id2, &id1).unwrap();
+
+        // Should not error on valid DAG
+        executor.validate().unwrap();
+    }
+
+    #[test]
+    fn test_list_gates() {
+        let (_temp, executor) = setup();
+
+        executor
+            .add_gate_definition(
+                "tests".to_string(),
+                "Unit Tests".to_string(),
+                "Run test suite".to_string(),
+                true,
+                None,
+            )
+            .unwrap();
+
+        let gates = executor.list_gates().unwrap();
+        assert!(gates.iter().any(|g| g.key == "tests"));
+    }
+
+    #[test]
+    fn test_add_gate_definition() {
+        let (_temp, executor) = setup();
+
+        executor
+            .add_gate_definition(
+                "review".to_string(),
+                "Code Review".to_string(),
+                "Peer review required".to_string(),
+                false,
+                Some("GitHub PR".to_string()),
+            )
+            .unwrap();
+
+        let gate = executor.show_gate_definition("review").unwrap();
+        assert_eq!(gate.title, "Code Review");
+        assert!(!gate.auto);
+    }
+
+    #[test]
+    fn test_add_duplicate_gate_definition() {
+        let (_temp, executor) = setup();
+
+        executor
+            .add_gate_definition(
+                "review".to_string(),
+                "Code Review".to_string(),
+                "Description".to_string(),
+                false,
+                None,
+            )
+            .unwrap();
+
+        let result = executor.add_gate_definition(
+            "review".to_string(),
+            "Another".to_string(),
+            "Desc".to_string(),
+            false,
+            None,
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_remove_gate_definition() {
+        let (_temp, executor) = setup();
+
+        executor
+            .add_gate_definition(
+                "temp".to_string(),
+                "Temporary".to_string(),
+                "Desc".to_string(),
+                false,
+                None,
+            )
+            .unwrap();
+
+        executor.remove_gate_definition("temp").unwrap();
+
+        let result = executor.show_gate_definition("temp");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_show_gate_definition() {
+        let (_temp, executor) = setup();
+
+        executor
+            .add_gate_definition(
+                "security".to_string(),
+                "Security Scan".to_string(),
+                "Run security checks".to_string(),
+                true,
+                Some("snyk".to_string()),
+            )
+            .unwrap();
+
+        let gate = executor.show_gate_definition("security").unwrap();
+        assert_eq!(gate.key, "security");
+        assert_eq!(gate.title, "Security Scan");
+        assert!(gate.auto);
+        assert_eq!(gate.example_integration, Some("snyk".to_string()));
+    }
+
+    #[test]
+    fn test_show_nonexistent_gate_definition() {
+        let (_temp, executor) = setup();
+
+        let result = executor.show_gate_definition("nonexistent");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_export_graph() {
+        let (_temp, executor) = setup();
+
+        let id1 = executor
+            .create_issue(
+                "API".to_string(),
+                "Design API".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+        let id2 = executor
+            .create_issue(
+                "Backend".to_string(),
+                "Implement".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+
+        executor.add_dependency(&id2, &id1).unwrap();
+
+        let dot = executor.export_graph("dot").unwrap();
+        assert!(dot.contains("digraph"));
+        assert!(dot.contains(&id1));
+        assert!(dot.contains(&id2));
+
+        let mermaid = executor.export_graph("mermaid").unwrap();
+        assert!(mermaid.contains("graph LR"));
+        assert!(mermaid.contains(&id1));
+        assert!(mermaid.contains(&id2));
+    }
+
+    #[test]
+    fn test_export_graph_invalid_format() {
+        let (_temp, executor) = setup();
+
+        executor
+            .create_issue(
+                "Issue".to_string(),
+                "Desc".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+
+        let result = executor.export_graph("invalid");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_status() {
+        let (_temp, executor) = setup();
+
+        // Create some issues in different states
+        executor
+            .create_issue(
+                "Open".to_string(),
+                "Desc".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+        let id2 = executor
+            .create_issue(
+                "InProgress".to_string(),
+                "Desc".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+
+        executor.claim_issue(&id2, "alice".to_string()).unwrap();
+
+        // Status should not error
+        executor.status().unwrap();
+    }
 }
