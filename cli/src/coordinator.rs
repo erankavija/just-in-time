@@ -375,3 +375,265 @@ impl Coordinator {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::Priority;
+    use tempfile::TempDir;
+
+    fn setup() -> (TempDir, Storage) {
+        let temp_dir = TempDir::new().unwrap();
+        let storage = Storage::new(temp_dir.path());
+        storage.init().unwrap();
+        (temp_dir, storage)
+    }
+
+    #[test]
+    fn test_default_dispatch_rules() {
+        let rules = DispatchRules::default();
+        assert_eq!(rules.priority_order.len(), 4);
+        assert_eq!(rules.priority_order[0], "critical");
+        assert_eq!(rules.priority_order[1], "high");
+        assert_eq!(rules.priority_order[2], "normal");
+        assert_eq!(rules.priority_order[3], "low");
+        assert_eq!(rules.stall_timeout_minutes, 30);
+    }
+
+    #[test]
+    fn test_default_coordinator_config() {
+        let config = CoordinatorConfig::default();
+        assert_eq!(config.agent_pool.len(), 0);
+        assert_eq!(config.poll_interval_secs, 5);
+        assert_eq!(config.dispatch_rules.priority_order.len(), 4);
+    }
+
+    #[test]
+    fn test_load_config_returns_default_when_missing() {
+        let (_temp, storage) = setup();
+
+        let config = Coordinator::load_config(&storage).unwrap();
+        assert_eq!(config.agent_pool.len(), 0);
+        assert_eq!(config.poll_interval_secs, 5);
+    }
+
+    #[test]
+    fn test_save_and_load_config() {
+        let (_temp, storage) = setup();
+
+        let mut config = CoordinatorConfig::default();
+        config.agent_pool.push(AgentConfig {
+            id: "test-agent".to_string(),
+            agent_type: "copilot".to_string(),
+            command: "echo test".to_string(),
+            max_concurrent: 3,
+        });
+        config.poll_interval_secs = 10;
+
+        Coordinator::save_config(&storage, &config).unwrap();
+
+        let loaded = Coordinator::load_config(&storage).unwrap();
+        assert_eq!(loaded.agent_pool.len(), 1);
+        assert_eq!(loaded.agent_pool[0].id, "test-agent");
+        assert_eq!(loaded.agent_pool[0].max_concurrent, 3);
+        assert_eq!(loaded.poll_interval_secs, 10);
+    }
+
+    #[test]
+    fn test_priority_index() {
+        let (_temp, storage) = setup();
+        let config = CoordinatorConfig::default();
+        let coordinator = Coordinator::new(storage, config);
+
+        assert_eq!(coordinator.priority_index(Priority::Critical), 0);
+        assert_eq!(coordinator.priority_index(Priority::High), 1);
+        assert_eq!(coordinator.priority_index(Priority::Normal), 2);
+        assert_eq!(coordinator.priority_index(Priority::Low), 3);
+    }
+
+    #[test]
+    fn test_priority_index_custom_order() {
+        let (_temp, storage) = setup();
+        let mut config = CoordinatorConfig::default();
+        config.dispatch_rules.priority_order = vec![
+            "low".to_string(),
+            "normal".to_string(),
+            "high".to_string(),
+            "critical".to_string(),
+        ];
+        let coordinator = Coordinator::new(storage, config);
+
+        // Reversed priority order
+        assert_eq!(coordinator.priority_index(Priority::Low), 0);
+        assert_eq!(coordinator.priority_index(Priority::Normal), 1);
+        assert_eq!(coordinator.priority_index(Priority::High), 2);
+        assert_eq!(coordinator.priority_index(Priority::Critical), 3);
+    }
+
+    #[test]
+    fn test_find_ready_issues_filters_correctly() {
+        let (_temp, storage) = setup();
+        let config = CoordinatorConfig::default();
+        let coordinator = Coordinator::new(storage.clone(), config);
+
+        // Create issues in different states
+        let mut issue1 = crate::domain::Issue::new("Ready 1".to_string(), "Desc".to_string());
+        issue1.state = State::Ready;
+        storage.save_issue(&issue1).unwrap();
+
+        let mut issue2 = crate::domain::Issue::new("Ready 2".to_string(), "Desc".to_string());
+        issue2.state = State::Ready;
+        storage.save_issue(&issue2).unwrap();
+
+        let mut issue3 = crate::domain::Issue::new("In Progress".to_string(), "Desc".to_string());
+        issue3.state = State::InProgress;
+        storage.save_issue(&issue3).unwrap();
+
+        let mut issue4 = crate::domain::Issue::new("Open".to_string(), "Desc".to_string());
+        issue4.state = State::Open;
+        storage.save_issue(&issue4).unwrap();
+
+        let ready = coordinator.find_ready_issues().unwrap();
+        assert_eq!(ready.len(), 2);
+        assert!(ready.iter().any(|i| i.title == "Ready 1"));
+        assert!(ready.iter().any(|i| i.title == "Ready 2"));
+    }
+
+    #[test]
+    fn test_find_ready_issues_excludes_assigned() {
+        let (_temp, storage) = setup();
+        let config = CoordinatorConfig::default();
+        let coordinator = Coordinator::new(storage.clone(), config);
+
+        let mut issue1 =
+            crate::domain::Issue::new("Ready Unassigned".to_string(), "Desc".to_string());
+        issue1.state = State::Ready;
+        storage.save_issue(&issue1).unwrap();
+
+        let mut issue2 =
+            crate::domain::Issue::new("Ready Assigned".to_string(), "Desc".to_string());
+        issue2.state = State::Ready;
+        issue2.assignee = Some("alice".to_string());
+        storage.save_issue(&issue2).unwrap();
+
+        let ready = coordinator.find_ready_issues().unwrap();
+        assert_eq!(ready.len(), 1);
+        assert_eq!(ready[0].title, "Ready Unassigned");
+    }
+
+    #[test]
+    fn test_find_ready_issues_sorts_by_priority() {
+        let (_temp, storage) = setup();
+        let config = CoordinatorConfig::default();
+        let coordinator = Coordinator::new(storage.clone(), config);
+
+        let mut low = crate::domain::Issue::new("Low".to_string(), "Desc".to_string());
+        low.state = State::Ready;
+        low.priority = Priority::Low;
+        storage.save_issue(&low).unwrap();
+
+        let mut critical = crate::domain::Issue::new("Critical".to_string(), "Desc".to_string());
+        critical.state = State::Ready;
+        critical.priority = Priority::Critical;
+        storage.save_issue(&critical).unwrap();
+
+        let mut normal = crate::domain::Issue::new("Normal".to_string(), "Desc".to_string());
+        normal.state = State::Ready;
+        normal.priority = Priority::Normal;
+        storage.save_issue(&normal).unwrap();
+
+        let mut high = crate::domain::Issue::new("High".to_string(), "Desc".to_string());
+        high.state = State::Ready;
+        high.priority = Priority::High;
+        storage.save_issue(&high).unwrap();
+
+        let ready = coordinator.find_ready_issues().unwrap();
+        assert_eq!(ready.len(), 4);
+        // Should be sorted: critical, high, normal, low
+        assert_eq!(ready[0].title, "Critical");
+        assert_eq!(ready[1].title, "High");
+        assert_eq!(ready[2].title, "Normal");
+        assert_eq!(ready[3].title, "Low");
+    }
+
+    #[test]
+    fn test_agent_config_serialization() {
+        let agent = AgentConfig {
+            id: "agent-1".to_string(),
+            agent_type: "copilot".to_string(),
+            command: "gh copilot".to_string(),
+            max_concurrent: 2,
+        };
+
+        let json = serde_json::to_string(&agent).unwrap();
+        let deserialized: AgentConfig = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(deserialized.id, "agent-1");
+        assert_eq!(deserialized.agent_type, "copilot");
+        assert_eq!(deserialized.command, "gh copilot");
+        assert_eq!(deserialized.max_concurrent, 2);
+    }
+
+    #[test]
+    fn test_coordinator_config_serialization() {
+        let config = CoordinatorConfig {
+            agent_pool: vec![AgentConfig {
+                id: "test".to_string(),
+                agent_type: "ci".to_string(),
+                command: "run".to_string(),
+                max_concurrent: 1,
+            }],
+            dispatch_rules: DispatchRules::default(),
+            poll_interval_secs: 15,
+        };
+
+        let json = serde_json::to_string(&config).unwrap();
+        let deserialized: CoordinatorConfig = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(deserialized.agent_pool.len(), 1);
+        assert_eq!(deserialized.poll_interval_secs, 15);
+        assert_eq!(deserialized.dispatch_rules.stall_timeout_minutes, 30);
+    }
+
+    #[test]
+    fn test_list_agents_with_no_active() {
+        let (_temp, storage) = setup();
+
+        // Should not error with no active agents
+        let result = Coordinator::list_agents(&storage);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_list_agents_with_active() {
+        let (_temp, storage) = setup();
+
+        let mut issue1 = crate::domain::Issue::new("Task 1".to_string(), "Desc".to_string());
+        issue1.state = State::InProgress;
+        issue1.assignee = Some("agent-1".to_string());
+        storage.save_issue(&issue1).unwrap();
+
+        let mut issue2 = crate::domain::Issue::new("Task 2".to_string(), "Desc".to_string());
+        issue2.state = State::InProgress;
+        issue2.assignee = Some("agent-1".to_string());
+        storage.save_issue(&issue2).unwrap();
+
+        let mut issue3 = crate::domain::Issue::new("Task 3".to_string(), "Desc".to_string());
+        issue3.state = State::InProgress;
+        issue3.assignee = Some("agent-2".to_string());
+        storage.save_issue(&issue3).unwrap();
+
+        // Should not error
+        let result = Coordinator::list_agents(&storage);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_status_with_no_coordinator() {
+        let (_temp, storage) = setup();
+
+        // Should handle missing PID gracefully
+        let result = Coordinator::status(&storage);
+        assert!(result.is_ok());
+    }
+}
