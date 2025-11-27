@@ -1,0 +1,11 @@
+# artifacts
+*.tmp
+*.lock
+.build/
+dist/
+node_modules/
+
+# editor cruft
+.vscode/
+.idea/
+*.swp
