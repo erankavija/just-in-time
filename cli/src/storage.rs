@@ -1,3 +1,7 @@
+//! Storage layer for persisting issues, gates, and events to disk.
+//!
+//! All data is stored as JSON files in a `data/` directory with atomic writes.
+
 use crate::domain::{Event, Gate, Issue};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -11,9 +15,12 @@ const INDEX_FILE: &str = "data/index.json";
 const GATES_FILE: &str = "data/gates.json";
 const EVENTS_FILE: &str = "data/events.jsonl";
 
+/// Index of all issues in the repository
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Index {
+    /// Schema version for future migrations
     pub schema_version: u32,
+    /// List of all issue IDs
     pub all_ids: Vec<String>,
 }
 
@@ -26,22 +33,27 @@ impl Default for Index {
     }
 }
 
+/// Registry of all gate definitions
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct GateRegistry {
+    /// Map of gate key to gate definition
     pub gates: HashMap<String, Gate>,
 }
 
+/// File-based storage for issues, gates, and events
 pub struct Storage {
     root: PathBuf,
 }
 
 impl Storage {
+    /// Create a new storage instance at the given root path
     pub fn new<P: AsRef<Path>>(root: P) -> Self {
         Self {
             root: root.as_ref().to_path_buf(),
         }
     }
 
+    /// Initialize the repository structure (idempotent)
     pub fn init(&self) -> Result<()> {
         let issues_dir = self.root.join(ISSUES_DIR);
 
@@ -70,6 +82,7 @@ impl Storage {
         Ok(())
     }
 
+    /// Save an issue to disk (creates or updates)
     pub fn save_issue(&self, issue: &Issue) -> Result<()> {
         let issue_path = self.issue_path(&issue.id);
         self.write_json(&issue_path, issue)?;
@@ -85,11 +98,13 @@ impl Storage {
         Ok(())
     }
 
+    /// Load an issue from disk by ID
     pub fn load_issue(&self, id: &str) -> Result<Issue> {
         let issue_path = self.issue_path(id);
         self.read_json(&issue_path)
     }
 
+    /// Delete an issue from disk
     pub fn delete_issue(&self, id: &str) -> Result<()> {
         let issue_path = self.issue_path(id);
         fs::remove_file(&issue_path).context("Failed to delete issue file")?;
@@ -103,26 +118,31 @@ impl Storage {
         Ok(())
     }
 
+    /// List all issues in the repository
     pub fn list_issues(&self) -> Result<Vec<Issue>> {
         let index = self.load_index()?;
         index.all_ids.iter().map(|id| self.load_issue(id)).collect()
     }
 
+    /// Load the repository index
     pub fn load_index(&self) -> Result<Index> {
         let index_path = self.root.join(INDEX_FILE);
         self.read_json(&index_path)
     }
 
+    /// Load the gate registry
     pub fn load_gate_registry(&self) -> Result<GateRegistry> {
         let gates_path = self.root.join(GATES_FILE);
         self.read_json(&gates_path)
     }
 
+    /// Save the gate registry to disk
     pub fn save_gate_registry(&self, registry: &GateRegistry) -> Result<()> {
         let gates_path = self.root.join(GATES_FILE);
         self.write_json(&gates_path, registry)
     }
 
+    /// Append an event to the event log
     pub fn append_event(&self, event: &Event) -> Result<()> {
         let events_path = self.root.join(EVENTS_FILE);
         let mut file = OpenOptions::new()
@@ -136,6 +156,7 @@ impl Storage {
         Ok(())
     }
 
+    /// Read all events from the event log
     pub fn read_events(&self) -> Result<Vec<Event>> {
         let events_path = self.root.join(EVENTS_FILE);
         if !events_path.exists() {

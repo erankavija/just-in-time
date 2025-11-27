@@ -1,57 +1,93 @@
+//! Core domain types for the issue tracker.
+//!
+//! This module defines the fundamental data structures used throughout the system:
+//! issues, gates, events, and their associated states and priorities.
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 
+/// Issue lifecycle state
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum State {
+    /// Newly created, may have unmet dependencies or gates
     Open,
+    /// All dependencies done and gates passed, ready for work
     Ready,
+    /// Currently being worked on
     InProgress,
+    /// Completed
     Done,
+    /// No longer relevant
     Archived,
 }
 
+/// Issue priority level
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Priority {
+    /// Low priority
     Low,
+    /// Normal priority (default)
     Normal,
+    /// High priority
     High,
+    /// Critical priority
     Critical,
 }
 
+/// Quality gate status
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum GateStatus {
+    /// Gate not yet evaluated
     Pending,
+    /// Gate passed successfully
     Passed,
+    /// Gate failed
     Failed,
 }
 
+/// State of a quality gate for a specific issue
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GateState {
+    /// Current status of the gate
     pub status: GateStatus,
+    /// Who updated the gate status (e.g., "human:alice", "ci:github-actions")
     pub updated_by: Option<String>,
+    /// When the gate was last updated
     pub updated_at: DateTime<Utc>,
 }
 
+/// An issue representing a unit of work
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Issue {
+    /// Unique identifier (UUID)
     pub id: String,
+    /// Short summary of the issue
     pub title: String,
+    /// Detailed description and acceptance criteria
     pub description: String,
+    /// Current lifecycle state
     pub state: State,
+    /// Priority level
     pub priority: Priority,
+    /// Assigned agent or person (format: "type:identifier")
     pub assignee: Option<String>,
+    /// IDs of issues that must be done first
     pub dependencies: Vec<String>,
+    /// Gate keys that must pass before ready/done
     pub gates_required: Vec<String>,
+    /// Current status of each required gate
     pub gates_status: HashMap<String, GateState>,
+    /// Flexible key-value storage for agent-specific data
     pub context: HashMap<String, String>,
 }
 
 impl Issue {
+    /// Create a new issue with default values
     pub fn new(title: String, description: String) -> Self {
         Self {
             id: Uuid::new_v4().to_string(),
@@ -67,6 +103,9 @@ impl Issue {
         }
     }
 
+    /// Check if this issue is blocked by dependencies or unpassed gates
+    ///
+    /// Returns true if any dependency is not done or any required gate hasn't passed.
     pub fn is_blocked(&self, resolved_issues: &HashMap<String, &Issue>) -> bool {
         // Check if any dependency is not done
         let has_incomplete_deps = self
@@ -85,60 +124,101 @@ impl Issue {
     }
 }
 
+/// A quality gate definition in the registry
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Gate {
+    /// Unique identifier for this gate type
     pub key: String,
+    /// Human-readable name
     pub title: String,
+    /// Explanation of what this gate checks
     pub description: String,
+    /// Whether automation can pass this gate
     pub auto: bool,
+    /// Example of how to integrate with this gate
     pub example_integration: Option<String>,
 }
 
+/// System event types for audit log
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Event {
+    /// A new issue was created
     IssueCreated {
+        /// Event ID
         id: String,
+        /// Issue that was created
         issue_id: String,
+        /// When this occurred
         timestamp: DateTime<Utc>,
+        /// Issue title
         title: String,
+        /// Issue priority
         priority: Priority,
     },
+    /// An issue was claimed by an agent
     IssueClaimed {
+        /// Event ID
         id: String,
+        /// Issue that was claimed
         issue_id: String,
+        /// When this occurred
         timestamp: DateTime<Utc>,
+        /// Who claimed it
         assignee: String,
     },
+    /// Issue state transitioned
     IssueStateChanged {
+        /// Event ID
         id: String,
+        /// Issue that changed
         issue_id: String,
+        /// When this occurred
         timestamp: DateTime<Utc>,
+        /// Previous state
         from: State,
+        /// New state
         to: State,
     },
+    /// A quality gate passed
     GatePassed {
+        /// Event ID
         id: String,
+        /// Issue with the gate
         issue_id: String,
+        /// When this occurred
         timestamp: DateTime<Utc>,
+        /// Gate that passed
         gate_key: String,
+        /// Who marked it as passed
         updated_by: Option<String>,
     },
+    /// A quality gate failed
     GateFailed {
+        /// Event ID
         id: String,
+        /// Issue with the gate
         issue_id: String,
+        /// When this occurred
         timestamp: DateTime<Utc>,
+        /// Gate that failed
         gate_key: String,
+        /// Who marked it as failed
         updated_by: Option<String>,
     },
+    /// Issue was completed
     IssueCompleted {
+        /// Event ID
         id: String,
+        /// Issue that completed
         issue_id: String,
+        /// When this occurred
         timestamp: DateTime<Utc>,
     },
 }
 
 impl Event {
+    /// Create an issue created event
     pub fn new_issue_created(issue: &Issue) -> Self {
         Event::IssueCreated {
             id: Uuid::new_v4().to_string(),
@@ -149,6 +229,7 @@ impl Event {
         }
     }
 
+    /// Create an issue claimed event
     pub fn new_issue_claimed(issue_id: String, assignee: String) -> Self {
         Event::IssueClaimed {
             id: Uuid::new_v4().to_string(),
@@ -158,6 +239,7 @@ impl Event {
         }
     }
 
+    /// Create an issue state changed event
     pub fn new_issue_state_changed(issue_id: String, from: State, to: State) -> Self {
         Event::IssueStateChanged {
             id: Uuid::new_v4().to_string(),
@@ -168,6 +250,7 @@ impl Event {
         }
     }
 
+    /// Create a gate passed event
     pub fn new_gate_passed(issue_id: String, gate_key: String, updated_by: Option<String>) -> Self {
         Event::GatePassed {
             id: Uuid::new_v4().to_string(),
@@ -178,6 +261,7 @@ impl Event {
         }
     }
 
+    /// Create a gate failed event
     pub fn new_gate_failed(issue_id: String, gate_key: String, updated_by: Option<String>) -> Self {
         Event::GateFailed {
             id: Uuid::new_v4().to_string(),
@@ -188,6 +272,7 @@ impl Event {
         }
     }
 
+    /// Create an issue completed event
     pub fn new_issue_completed(issue_id: String) -> Self {
         Event::IssueCompleted {
             id: Uuid::new_v4().to_string(),
@@ -196,6 +281,7 @@ impl Event {
         }
     }
 
+    /// Get the issue ID associated with this event
     pub fn get_issue_id(&self) -> &str {
         match self {
             Event::IssueCreated { issue_id, .. } => issue_id,
@@ -207,6 +293,7 @@ impl Event {
         }
     }
 
+    /// Get the event type as a string
     pub fn get_type(&self) -> &str {
         match self {
             Event::IssueCreated { .. } => "issue_created",

@@ -1,20 +1,29 @@
+//! Dependency graph operations and validation.
+//!
+//! Provides DAG enforcement, cycle detection, and graph traversal operations.
+
 use crate::domain::Issue;
 use std::collections::{HashMap, HashSet};
 use thiserror::Error;
 
+/// Errors that can occur during graph operations
 #[derive(Debug, Error, PartialEq)]
 pub enum GraphError {
+    /// A cycle was detected in the dependency graph
     #[error("Cycle detected: adding dependency would create a cycle")]
     CycleDetected,
+    /// Referenced issue does not exist
     #[error("Issue not found: {0}")]
     IssueNotFound(String),
 }
 
+/// Dependency graph for issues with cycle detection and traversal
 pub struct DependencyGraph<'a> {
     issues: HashMap<String, &'a Issue>,
 }
 
 impl<'a> DependencyGraph<'a> {
+    /// Create a new dependency graph from a list of issues
     pub fn new(issues: &[&'a Issue]) -> Self {
         let issues_map = issues
             .iter()
@@ -24,6 +33,7 @@ impl<'a> DependencyGraph<'a> {
         Self { issues: issues_map }
     }
 
+    /// Validate that adding a dependency would not create a cycle
     pub fn validate_add_dependency(&self, issue_id: &str, dep_id: &str) -> Result<(), GraphError> {
         if !self.issues.contains_key(issue_id) {
             return Err(GraphError::IssueNotFound(issue_id.to_string()));
@@ -71,6 +81,7 @@ impl<'a> DependencyGraph<'a> {
         false
     }
 
+    /// Get all root issues (issues with no dependencies)
     pub fn get_roots(&self) -> Vec<&'a Issue> {
         self.issues
             .values()
@@ -79,6 +90,7 @@ impl<'a> DependencyGraph<'a> {
             .collect()
     }
 
+    /// Get all issues that directly depend on the given issue
     pub fn get_dependents(&self, issue_id: &str) -> Vec<&'a Issue> {
         self.issues
             .values()
@@ -87,6 +99,7 @@ impl<'a> DependencyGraph<'a> {
             .collect()
     }
 
+    /// Get all issues that transitively depend on the given issue
     pub fn get_transitive_dependents(&self, issue_id: &str) -> Vec<&'a Issue> {
         let mut result = HashSet::new();
         let mut stack = vec![issue_id];
@@ -111,6 +124,7 @@ impl<'a> DependencyGraph<'a> {
             .collect()
     }
 
+    /// Validate that the graph is a DAG (no cycles)
     pub fn validate_dag(&self) -> Result<(), GraphError> {
         // Check for cycles using DFS
         let mut visited = HashSet::new();

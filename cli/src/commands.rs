@@ -1,3 +1,8 @@
+//! Command execution logic for all CLI operations.
+//!
+//! The `CommandExecutor` handles all business logic for issue management,
+//! dependency manipulation, gate operations, and event logging.
+
 use crate::domain::{Event, Gate, GateState, GateStatus, Issue, Priority, State};
 use crate::graph::DependencyGraph;
 use crate::storage::Storage;
@@ -5,15 +10,18 @@ use anyhow::{anyhow, Result};
 use chrono::Utc;
 use std::collections::HashMap;
 
+/// Executes CLI commands with business logic and validation
 pub struct CommandExecutor {
     storage: Storage,
 }
 
 impl CommandExecutor {
+    /// Create a new command executor with the given storage
     pub fn new(storage: Storage) -> Self {
         Self { storage }
     }
 
+    /// Initialize a new jit repository in the current directory
     pub fn init(&self) -> Result<()> {
         self.storage.init()?;
         println!("Initialized jit repository");

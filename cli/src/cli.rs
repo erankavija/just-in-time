@@ -1,3 +1,5 @@
+//! Command-line interface definitions using clap.
+
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]

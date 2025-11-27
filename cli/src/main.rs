@@ -1,3 +1,16 @@
+//! Just-In-Time Issue Tracker
+//!
+//! A repository-local CLI issue tracker with dependency graph enforcement and quality gating.
+//! Designed for deterministic, machine-friendly outputs and process automation.
+//!
+//! # Features
+//!
+//! - Dependency graph modeling with cycle detection
+//! - Quality gate enforcement before state transitions
+//! - Event logging for full audit trail
+//! - Priority-based issue management
+//! - Agent coordination support
+
 mod cli;
 mod commands;
 mod domain;
