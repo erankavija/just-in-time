@@ -700,4 +700,169 @@ mod tests {
         let result = executor.update_issue(&id, None, None, None, Some(State::Done));
         assert!(result.is_err());
     }
+
+    #[test]
+    fn test_tail_events() {
+        let (_temp, executor) = setup();
+
+        // Create several issues to generate events
+        executor
+            .create_issue(
+                "Issue 1".to_string(),
+                "D1".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+        executor
+            .create_issue(
+                "Issue 2".to_string(),
+                "D2".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+        executor
+            .create_issue(
+                "Issue 3".to_string(),
+                "D3".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+
+        // Tail last 2 events
+        let events = executor.tail_events(2).unwrap();
+        assert_eq!(events.len(), 2);
+
+        // Tail more than exist
+        let all_events = executor.tail_events(100).unwrap();
+        assert_eq!(all_events.len(), 3);
+    }
+
+    #[test]
+    fn test_query_events_by_type() {
+        let (_temp, executor) = setup();
+
+        let id = executor
+            .create_issue(
+                "Test Issue".to_string(),
+                "Desc".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+
+        executor.claim_issue(&id, "alice".to_string()).unwrap();
+
+        // Query for issue_created events
+        let created_events = executor
+            .query_events(Some("issue_created".to_string()), None, 100)
+            .unwrap();
+        assert_eq!(created_events.len(), 1);
+
+        // Query for issue_claimed events
+        let claimed_events = executor
+            .query_events(Some("issue_claimed".to_string()), None, 100)
+            .unwrap();
+        assert_eq!(claimed_events.len(), 1);
+
+        // Query for non-existent event type
+        let no_events = executor
+            .query_events(Some("issue_deleted".to_string()), None, 100)
+            .unwrap();
+        assert_eq!(no_events.len(), 0);
+    }
+
+    #[test]
+    fn test_query_events_by_issue_id() {
+        let (_temp, executor) = setup();
+
+        let id1 = executor
+            .create_issue(
+                "Issue 1".to_string(),
+                "D1".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+        let id2 = executor
+            .create_issue(
+                "Issue 2".to_string(),
+                "D2".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+
+        executor.claim_issue(&id1, "alice".to_string()).unwrap();
+
+        // Query events for id1 - should have created + claimed
+        let events_id1 = executor.query_events(None, Some(id1.clone()), 100).unwrap();
+        assert_eq!(events_id1.len(), 2);
+
+        // Query events for id2 - should have only created
+        let events_id2 = executor.query_events(None, Some(id2.clone()), 100).unwrap();
+        assert_eq!(events_id2.len(), 1);
+    }
+
+    #[test]
+    fn test_query_events_with_limit() {
+        let (_temp, executor) = setup();
+
+        // Create 5 issues
+        for i in 1..=5 {
+            executor
+                .create_issue(
+                    format!("Issue {}", i),
+                    "Desc".to_string(),
+                    Priority::Normal,
+                    vec![],
+                )
+                .unwrap();
+        }
+
+        // Query with limit
+        let limited = executor.query_events(None, None, 3).unwrap();
+        assert_eq!(limited.len(), 3);
+
+        // Verify all events exist
+        let all = executor.query_events(None, None, 100).unwrap();
+        assert_eq!(all.len(), 5);
+    }
+
+    #[test]
+    fn test_query_events_combined_filters() {
+        let (_temp, executor) = setup();
+
+        let id1 = executor
+            .create_issue(
+                "Issue 1".to_string(),
+                "D1".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+        let id2 = executor
+            .create_issue(
+                "Issue 2".to_string(),
+                "D2".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+
+        executor.claim_issue(&id1, "alice".to_string()).unwrap();
+        executor.claim_issue(&id2, "bob".to_string()).unwrap();
+
+        // Query for specific event type on specific issue
+        let specific = executor
+            .query_events(Some("issue_claimed".to_string()), Some(id1.clone()), 100)
+            .unwrap();
+        assert_eq!(specific.len(), 1);
+
+        // Verify it's the correct event
+        assert_eq!(specific[0].get_type(), "issue_claimed");
+        assert_eq!(specific[0].get_issue_id(), id1);
+    }
 }

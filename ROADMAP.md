@@ -60,7 +60,7 @@
 
 **Action Items:**
 - [x] Graph export: `export --format dot|mermaid`
-- [ ] Event queries: `events tail`, `events query`
+- [x] Event queries: `events tail`, `events query`
 - [ ] Search and filters: complex query syntax
 - [ ] Bulk operations
 - [ ] CI integration: read artifacts to auto-pass gates
