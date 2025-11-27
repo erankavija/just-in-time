@@ -1,13 +1,15 @@
-use crate::domain::{Gate, Issue};
+use crate::domain::{Event, Gate, Issue};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fs;
+use std::fs::{self, OpenOptions};
+use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 
 const ISSUES_DIR: &str = "data/issues";
 const INDEX_FILE: &str = "data/index.json";
 const GATES_FILE: &str = "data/gates.json";
+const EVENTS_FILE: &str = "data/events.jsonl";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Index {
@@ -24,17 +26,9 @@ impl Default for Index {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct GateRegistry {
     pub gates: HashMap<String, Gate>,
-}
-
-impl Default for GateRegistry {
-    fn default() -> Self {
-        Self {
-            gates: HashMap::new(),
-        }
-    }
 }
 
 pub struct Storage {
@@ -65,6 +59,12 @@ impl Storage {
         if !gates_path.exists() {
             let registry = GateRegistry::default();
             self.write_json(&gates_path, &registry)?;
+        }
+
+        // Create events.jsonl if it doesn't exist
+        let events_path = self.root.join(EVENTS_FILE);
+        if !events_path.exists() {
+            fs::File::create(&events_path).context("Failed to create events file")?;
         }
 
         Ok(())
@@ -123,6 +123,42 @@ impl Storage {
         self.write_json(&gates_path, registry)
     }
 
+    pub fn append_event(&self, event: &Event) -> Result<()> {
+        let events_path = self.root.join(EVENTS_FILE);
+        let mut file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&events_path)
+            .context("Failed to open events file")?;
+
+        let json = serde_json::to_string(event).context("Failed to serialize event")?;
+        writeln!(file, "{}", json).context("Failed to write event")?;
+        Ok(())
+    }
+
+    pub fn read_events(&self) -> Result<Vec<Event>> {
+        let events_path = self.root.join(EVENTS_FILE);
+        if !events_path.exists() {
+            return Ok(Vec::new());
+        }
+
+        let file = fs::File::open(&events_path).context("Failed to open events file")?;
+        let reader = BufReader::new(file);
+
+        let mut events = Vec::new();
+        for line in reader.lines() {
+            let line = line.context("Failed to read line from events file")?;
+            if line.trim().is_empty() {
+                continue;
+            }
+            let event: Event =
+                serde_json::from_str(&line).context("Failed to deserialize event")?;
+            events.push(event);
+        }
+
+        Ok(events)
+    }
+
     fn issue_path(&self, id: &str) -> PathBuf {
         self.root.join(ISSUES_DIR).join(format!("{}.json", id))
     }
@@ -148,7 +184,6 @@ impl Storage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{Priority, State};
     use tempfile::TempDir;
 
     fn setup_storage() -> (TempDir, Storage) {

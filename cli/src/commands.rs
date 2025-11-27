@@ -1,4 +1,4 @@
-use crate::domain::{GateState, GateStatus, Issue, Priority, State};
+use crate::domain::{Event, Gate, GateState, GateStatus, Issue, Priority, State};
 use crate::graph::DependencyGraph;
 use crate::storage::Storage;
 use anyhow::{anyhow, Result};
@@ -32,6 +32,11 @@ impl CommandExecutor {
         issue.gates_required = gates;
 
         self.storage.save_issue(&issue)?;
+
+        // Log event
+        let event = Event::new_issue_created(&issue);
+        self.storage.append_event(&event)?;
+
         Ok(issue.id)
     }
 
@@ -91,6 +96,8 @@ impl CommandExecutor {
         if let Some(p) = priority {
             issue.priority = p;
         }
+        let old_state = issue.state;
+
         if let Some(s) = state {
             // Validate state transition
             if s == State::Ready || s == State::Done {
@@ -104,6 +111,19 @@ impl CommandExecutor {
                 }
             }
             issue.state = s;
+
+            // Log state change event
+            if old_state != issue.state {
+                let event =
+                    Event::new_issue_state_changed(issue.id.clone(), old_state, issue.state);
+                self.storage.append_event(&event)?;
+
+                // Log completion event if transitioning to Done
+                if issue.state == State::Done {
+                    let event = Event::new_issue_completed(issue.id.clone());
+                    self.storage.append_event(&event)?;
+                }
+            }
         }
 
         self.storage.save_issue(&issue)?;
@@ -128,8 +148,13 @@ impl CommandExecutor {
             return Err(anyhow!("Issue is already assigned"));
         }
 
-        issue.assignee = Some(assignee);
+        issue.assignee = Some(assignee.clone());
         self.storage.save_issue(&issue)?;
+
+        // Log event
+        let event = Event::new_issue_claimed(issue.id.clone(), assignee);
+        self.storage.append_event(&event)?;
+
         Ok(())
     }
 
@@ -214,15 +239,20 @@ impl CommandExecutor {
         }
 
         issue.gates_status.insert(
-            gate_key,
+            gate_key.clone(),
             GateState {
                 status: GateStatus::Passed,
-                updated_by: by,
+                updated_by: by.clone(),
                 updated_at: Utc::now(),
             },
         );
 
         self.storage.save_issue(&issue)?;
+
+        // Log event
+        let event = Event::new_gate_passed(issue.id.clone(), gate_key, by);
+        self.storage.append_event(&event)?;
+
         Ok(())
     }
 
@@ -237,15 +267,20 @@ impl CommandExecutor {
         }
 
         issue.gates_status.insert(
-            gate_key,
+            gate_key.clone(),
             GateState {
                 status: GateStatus::Failed,
-                updated_by: by,
+                updated_by: by.clone(),
                 updated_at: Utc::now(),
             },
         );
 
         self.storage.save_issue(&issue)?;
+
+        // Log event
+        let event = Event::new_gate_failed(issue.id.clone(), gate_key, by);
+        self.storage.append_event(&event)?;
+
         Ok(())
     }
 
@@ -323,6 +358,99 @@ impl CommandExecutor {
         println!("  Blocked: {}", blocked);
 
         Ok(())
+    }
+
+    // Registry commands
+    pub fn list_gates(&self) -> Result<Vec<Gate>> {
+        let registry = self.storage.load_gate_registry()?;
+        Ok(registry.gates.into_values().collect())
+    }
+
+    pub fn add_gate_definition(
+        &self,
+        key: String,
+        title: String,
+        description: String,
+        auto: bool,
+        example_integration: Option<String>,
+    ) -> Result<()> {
+        let mut registry = self.storage.load_gate_registry()?;
+
+        if registry.gates.contains_key(&key) {
+            return Err(anyhow!("Gate '{}' already exists", key));
+        }
+
+        registry.gates.insert(
+            key.clone(),
+            Gate {
+                key,
+                title,
+                description,
+                auto,
+                example_integration,
+            },
+        );
+
+        self.storage.save_gate_registry(&registry)?;
+        Ok(())
+    }
+
+    pub fn remove_gate_definition(&self, key: &str) -> Result<()> {
+        let mut registry = self.storage.load_gate_registry()?;
+
+        if !registry.gates.contains_key(key) {
+            return Err(anyhow!("Gate '{}' not found", key));
+        }
+
+        registry.gates.remove(key);
+        self.storage.save_gate_registry(&registry)?;
+        Ok(())
+    }
+
+    pub fn show_gate_definition(&self, key: &str) -> Result<Gate> {
+        let registry = self.storage.load_gate_registry()?;
+        registry
+            .gates
+            .get(key)
+            .cloned()
+            .ok_or_else(|| anyhow!("Gate '{}' not found", key))
+    }
+
+    // Event commands
+    pub fn tail_events(&self, n: usize) -> Result<Vec<Event>> {
+        let events = self.storage.read_events()?;
+        let start = events.len().saturating_sub(n);
+        Ok(events[start..].to_vec())
+    }
+
+    pub fn query_events(
+        &self,
+        event_type: Option<String>,
+        issue_id: Option<String>,
+        limit: usize,
+    ) -> Result<Vec<Event>> {
+        let events = self.storage.read_events()?;
+
+        let filtered: Vec<Event> = events
+            .into_iter()
+            .rev()
+            .filter(|e| {
+                if let Some(ref et) = event_type {
+                    if e.get_type() != et {
+                        return false;
+                    }
+                }
+                if let Some(ref iid) = issue_id {
+                    if e.get_issue_id() != iid {
+                        return false;
+                    }
+                }
+                true
+            })
+            .take(limit)
+            .collect();
+
+        Ok(filtered.into_iter().rev().collect())
     }
 }
 

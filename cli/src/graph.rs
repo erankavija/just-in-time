@@ -117,10 +117,10 @@ impl<'a> DependencyGraph<'a> {
         let mut rec_stack = HashSet::new();
 
         for id in self.issues.keys() {
-            if !visited.contains(id.as_str()) {
-                if self.has_cycle_dfs(id, &mut visited, &mut rec_stack) {
-                    return Err(GraphError::CycleDetected);
-                }
+            if !visited.contains(id.as_str())
+                && self.has_cycle_dfs(id, &mut visited, &mut rec_stack)
+            {
+                return Err(GraphError::CycleDetected);
             }
         }
 

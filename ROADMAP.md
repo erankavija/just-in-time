@@ -36,12 +36,12 @@
 **Goal:** Gate enforcement and coordinator daemon for agent dispatch.
 
 **Action Items:**
-- [ ] Gate registry management (`data/gates.json`)
-- [ ] Gate operations: `gate add`, `gate pass`, `gate fail`
-- [ ] Blocked state: consider gates + dependencies
-- [ ] State transitions with gate validation
-- [ ] Event log: append-only `data/events.jsonl`
-- [ ] Event types: issue.created, issue.claimed, gate.passed, gate.failed, issue.completed
+- [x] Gate registry management (`data/gates.json`)
+- [x] Gate operations: `gate add`, `gate pass`, `gate fail`
+- [x] Blocked state: consider gates + dependencies
+- [x] State transitions with gate validation
+- [x] Event log: append-only `data/events.jsonl`
+- [x] Event types: issue.created, issue.claimed, gate.passed, gate.failed, issue.completed
 - [ ] Coordinator daemon: `coordinator start`, `stop`, `status`
 - [ ] Agent pool configuration (`data/coordinator.json`)
 - [ ] Dispatch logic: priority-based work assignment

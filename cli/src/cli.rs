@@ -25,6 +25,14 @@ pub enum Commands {
     #[command(subcommand)]
     Gate(GateCommands),
 
+    /// Gate registry management commands
+    #[command(subcommand)]
+    Registry(RegistryCommands),
+
+    /// Event log commands
+    #[command(subcommand)]
+    Events(EventCommands),
+
     /// Graph query commands
     #[command(subcommand)]
     Graph(GraphCommands),
@@ -174,4 +182,55 @@ pub enum GraphCommands {
 
     /// Show root issues (no dependencies)
     Roots,
+}
+
+#[derive(Subcommand)]
+pub enum RegistryCommands {
+    /// List all gate definitions
+    List,
+
+    /// Add a gate definition to the registry
+    Add {
+        /// Unique gate key
+        key: String,
+
+        #[arg(short, long)]
+        title: String,
+
+        #[arg(short, long, default_value = "")]
+        desc: String,
+
+        #[arg(short, long)]
+        auto: bool,
+
+        #[arg(short, long)]
+        example: Option<String>,
+    },
+
+    /// Remove a gate definition
+    Remove { key: String },
+
+    /// Show gate definition details
+    Show { key: String },
+}
+
+#[derive(Subcommand)]
+pub enum EventCommands {
+    /// Tail recent events
+    Tail {
+        #[arg(short, long, default_value = "10")]
+        n: usize,
+    },
+
+    /// Query events by type or issue
+    Query {
+        #[arg(short, long)]
+        event_type: Option<String>,
+
+        #[arg(short, long)]
+        issue_id: Option<String>,
+
+        #[arg(short, long, default_value = "50")]
+        limit: usize,
+    },
 }

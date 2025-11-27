@@ -94,6 +94,131 @@ pub struct Gate {
     pub example_integration: Option<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum Event {
+    IssueCreated {
+        id: String,
+        issue_id: String,
+        timestamp: DateTime<Utc>,
+        title: String,
+        priority: Priority,
+    },
+    IssueClaimed {
+        id: String,
+        issue_id: String,
+        timestamp: DateTime<Utc>,
+        assignee: String,
+    },
+    IssueStateChanged {
+        id: String,
+        issue_id: String,
+        timestamp: DateTime<Utc>,
+        from: State,
+        to: State,
+    },
+    GatePassed {
+        id: String,
+        issue_id: String,
+        timestamp: DateTime<Utc>,
+        gate_key: String,
+        updated_by: Option<String>,
+    },
+    GateFailed {
+        id: String,
+        issue_id: String,
+        timestamp: DateTime<Utc>,
+        gate_key: String,
+        updated_by: Option<String>,
+    },
+    IssueCompleted {
+        id: String,
+        issue_id: String,
+        timestamp: DateTime<Utc>,
+    },
+}
+
+impl Event {
+    pub fn new_issue_created(issue: &Issue) -> Self {
+        Event::IssueCreated {
+            id: Uuid::new_v4().to_string(),
+            issue_id: issue.id.clone(),
+            timestamp: Utc::now(),
+            title: issue.title.clone(),
+            priority: issue.priority,
+        }
+    }
+
+    pub fn new_issue_claimed(issue_id: String, assignee: String) -> Self {
+        Event::IssueClaimed {
+            id: Uuid::new_v4().to_string(),
+            issue_id,
+            timestamp: Utc::now(),
+            assignee,
+        }
+    }
+
+    pub fn new_issue_state_changed(issue_id: String, from: State, to: State) -> Self {
+        Event::IssueStateChanged {
+            id: Uuid::new_v4().to_string(),
+            issue_id,
+            timestamp: Utc::now(),
+            from,
+            to,
+        }
+    }
+
+    pub fn new_gate_passed(issue_id: String, gate_key: String, updated_by: Option<String>) -> Self {
+        Event::GatePassed {
+            id: Uuid::new_v4().to_string(),
+            issue_id,
+            timestamp: Utc::now(),
+            gate_key,
+            updated_by,
+        }
+    }
+
+    pub fn new_gate_failed(issue_id: String, gate_key: String, updated_by: Option<String>) -> Self {
+        Event::GateFailed {
+            id: Uuid::new_v4().to_string(),
+            issue_id,
+            timestamp: Utc::now(),
+            gate_key,
+            updated_by,
+        }
+    }
+
+    pub fn new_issue_completed(issue_id: String) -> Self {
+        Event::IssueCompleted {
+            id: Uuid::new_v4().to_string(),
+            issue_id,
+            timestamp: Utc::now(),
+        }
+    }
+
+    pub fn get_issue_id(&self) -> &str {
+        match self {
+            Event::IssueCreated { issue_id, .. } => issue_id,
+            Event::IssueClaimed { issue_id, .. } => issue_id,
+            Event::IssueStateChanged { issue_id, .. } => issue_id,
+            Event::GatePassed { issue_id, .. } => issue_id,
+            Event::GateFailed { issue_id, .. } => issue_id,
+            Event::IssueCompleted { issue_id, .. } => issue_id,
+        }
+    }
+
+    pub fn get_type(&self) -> &str {
+        match self {
+            Event::IssueCreated { .. } => "issue_created",
+            Event::IssueClaimed { .. } => "issue_claimed",
+            Event::IssueStateChanged { .. } => "issue_state_changed",
+            Event::GatePassed { .. } => "gate_passed",
+            Event::GateFailed { .. } => "gate_failed",
+            Event::IssueCompleted { .. } => "issue_completed",
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -212,6 +337,4 @@ mod tests {
 
         assert!(!issue.is_blocked(&resolved));
     }
-
-
 }

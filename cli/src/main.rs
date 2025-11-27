@@ -6,7 +6,10 @@ mod storage;
 
 use anyhow::Result;
 use clap::Parser;
-use cli::{Cli, Commands, DepCommands, GateCommands, GraphCommands, IssueCommands};
+use cli::{
+    Cli, Commands, DepCommands, EventCommands, GateCommands, GraphCommands, IssueCommands,
+    RegistryCommands,
+};
 use commands::{parse_priority, parse_state, CommandExecutor};
 use std::env;
 use storage::Storage;
@@ -138,6 +141,54 @@ fn main() -> Result<()> {
                 println!("Root issues (no dependencies):");
                 for issue in issues {
                     println!("  {} | {}", issue.id, issue.title);
+                }
+            }
+        },
+        Commands::Registry(registry_cmd) => match registry_cmd {
+            RegistryCommands::List => {
+                let gates = executor.list_gates()?;
+                for gate in gates {
+                    println!("{} | {} | auto:{}", gate.key, gate.title, gate.auto);
+                }
+            }
+            RegistryCommands::Add {
+                key,
+                title,
+                desc,
+                auto,
+                example,
+            } => {
+                executor.add_gate_definition(key.clone(), title, desc, auto, example)?;
+                println!("Added gate definition: {}", key);
+            }
+            RegistryCommands::Remove { key } => {
+                executor.remove_gate_definition(&key)?;
+                println!("Removed gate definition: {}", key);
+            }
+            RegistryCommands::Show { key } => {
+                let gate = executor.show_gate_definition(&key)?;
+                println!("Key: {}", gate.key);
+                println!("Title: {}", gate.title);
+                println!("Description: {}", gate.description);
+                println!("Auto: {}", gate.auto);
+                println!("Example Integration: {:?}", gate.example_integration);
+            }
+        },
+        Commands::Events(event_cmd) => match event_cmd {
+            EventCommands::Tail { n } => {
+                let events = executor.tail_events(n)?;
+                for event in events {
+                    println!("{}", serde_json::to_string(&event)?);
+                }
+            }
+            EventCommands::Query {
+                event_type,
+                issue_id,
+                limit,
+            } => {
+                let events = executor.query_events(event_type, issue_id, limit)?;
+                for event in events {
+                    println!("{}", serde_json::to_string(&event)?);
                 }
             }
         },
