@@ -12,17 +12,17 @@
 **Goal:** Basic issue tracker with dependency graph enforcement.
 
 **Action Items:**
-- [ ] Initialize Rust project (`cargo init`, add dependencies)
-- [ ] Implement `jit init` - create `data/` structure
-- [ ] Core domain types (Issue, State, Priority, Gate)
-- [ ] Storage layer with atomic writes
-- [ ] Issue CRUD: `create`, `list`, `show`, `update`, `delete`
-- [ ] Dependency graph with cycle detection (DFS)
-- [ ] Commands: `dep add`, `dep rm`
-- [ ] Derived state: compute blocked from dependencies
-- [ ] Assignment: `assign`, `claim`, `unassign`, `claim-next`
-- [ ] Graph queries: `graph show`, `graph roots`, `graph downstream`
-- [ ] Validation: `jit validate` (DAG integrity check)
+- [x] Initialize Rust project (`cargo init`, add dependencies)
+- [x] Implement `jit init` - create `data/` structure
+- [x] Core domain types (Issue, State, Priority, Gate)
+- [x] Storage layer with atomic writes
+- [x] Issue CRUD: `create`, `list`, `show`, `update`, `delete`
+- [x] Dependency graph with cycle detection (DFS)
+- [x] Commands: `dep add`, `dep rm`
+- [x] Derived state: compute blocked from dependencies
+- [x] Assignment: `assign`, `claim`, `unassign`, `claim-next`
+- [x] Graph queries: `graph show`, `graph roots`, `graph downstream`
+- [x] Validation: `jit validate` (DAG integrity check)
 
 **Tests:**
 - Unit tests for cycle detection
