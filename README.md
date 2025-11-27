@@ -1,43 +1,92 @@
 # Just-In-Time Issue Tracker
 
-A repository-local CLI issue tracker designed for agent orchestration with dependency graph enforcement and quality gating.
+**Enable AI agents to orchestrate their own work.** A repository-local CLI issue tracker that lets a lead agent break down complex tasks and coordinate multiple worker agents—with dependency management, quality gates, and full observability.
 
-## Features
+## Why JIT?
 
-- **Dependency Graph Management**: Issues form a directed acyclic graph (DAG) with cycle detection
-- **Quality Gates**: Enforce process requirements (tests, reviews, scans) before state transitions
-- **Agent Orchestration**: Coordinator daemon dispatches work to multiple agents (Copilot, CI, custom)
-- **Event Logging**: Full audit trail of all operations in append-only log
-- **Priority-based Dispatch**: Intelligent work assignment based on priority and agent availability
-- **Machine-first Design**: Deterministic, versionable plain-text storage for automation
+Traditional issue trackers are designed for humans. JIT is designed for **AI agents**:
+
+- 🤖 **Agent-First**: Copilot agents can create issues, claim work, and coordinate with each other
+- 🔗 **Dependency DAG**: Express "Task B needs Task A" with automatic blocking and cycle detection  
+- ✅ **Quality Gates**: Enforce tests, reviews, scans before work can proceed
+- 📊 **Full Observability**: Event log tracks every action for debugging agent behavior
+- 🎯 **Priority Dispatch**: Coordinator automatically assigns critical work first
+- 📁 **Git-Friendly**: All state in plain JSON—version, diff, and merge like code
+
+## Use Cases
+
+- **Multi-agent software development**: Lead agent architects, workers implement, another tests
+- **CI/CD orchestration**: Gate progression through build → test → deploy pipeline
+- **Research projects**: Break down analysis into parallel tasks with dependencies
+- **Any workflow** where you want agents to discover and create work dynamically
 
 ## Quick Start
 
 ```bash
-# Install (assuming Rust is installed)
-cd cli
-cargo build --release
+# 1. Install (requires Rust)
+cd cli && cargo build --release
 
-# Initialize repository
+# 2. Initialize in your project
 ./target/release/jit init
 
-# Create your first issue
-jit issue create --title "Setup project" --priority high
+# 3. Create your first issue
+jit issue create --title "Implement login feature" --priority high
 
-# Add gate definitions
-jit registry add unit-tests --title "Unit Tests" --auto true
-jit registry add review --title "Code Review" --auto false
+# 4. Setup coordinator for agent orchestration  
+jit coordinator init-config
 
-# Add gates to an issue
-jit gate add <issue-id> unit-tests
-jit gate add <issue-id> review
+# That's it! Now agents can create issues, claim work, and coordinate.
 ```
 
-## Agent Orchestration Workflow
+See [EXAMPLE.md](EXAMPLE.md) for complete workflows.
 
-### Scenario: Lead Agent Orchestrating Multiple Agents
+## How It Works
 
-This example shows a lead Copilot agent that breaks down work and orchestrates other agents to complete it.
+### 1. Lead Agent Breaks Down Work
+
+```bash
+# Lead agent creates an epic
+EPIC=$(jit issue create --title "User authentication" --priority high)
+
+# Analyzes and creates sub-tasks
+TASK1=$(jit issue create --title "Create user model" --priority high)
+TASK2=$(jit issue create --title "Implement login endpoint" --priority high)
+
+# Defines dependencies
+jit dep add $EPIC --on $TASK1
+jit dep add $EPIC --on $TASK2
+```
+
+### 2. Worker Agents Execute Tasks
+
+```bash
+# Workers claim ready tasks
+jit issue claim $TASK1 --to copilot:worker-1
+jit issue claim $TASK2 --to copilot:worker-2
+
+# Work on them, pass quality gates
+jit gate pass $TASK1 unit-tests
+jit issue update $TASK1 --state done
+```
+
+### 3. Dynamic Issue Creation
+
+```bash
+# Agent discovers new work while executing
+NEW=$(jit issue create --title "Add rate limiting" --priority critical)
+jit dep add $EPIC --on $NEW  # Epic now waits for this too
+```
+
+### 4. Monitor Everything
+
+```bash
+jit status                  # Overview of work state
+jit coordinator agents      # See what each agent is doing
+jit events tail             # Full audit trail
+jit graph show $EPIC        # Visualize dependencies
+```
+
+## Complete Example Workflow
 
 #### 1. Setup: Initialize Coordinator with Agent Pool
 
@@ -239,21 +288,102 @@ jit issue update $EPIC_ID --state done
 jit coordinator stop
 ```
 
-## Key Capabilities for Agent Orchestration
+**See the full step-by-step workflow in [EXAMPLE.md](EXAMPLE.md)** showing:
+- Lead agent orchestrating multiple workers
+- Dynamic issue creation during execution  
+- Dependency management and gate passing
+- Monitoring and observability
 
-1. **Dynamic Issue Creation**: Agents can create new issues on-demand as they discover work
-2. **Dependency Management**: Express prerequisites and blocked states automatically
-3. **Quality Gates**: Enforce process (tests, reviews) before transitions
-4. **Priority Queuing**: Critical work automatically dispatched first
-5. **Event Sourcing**: Full audit trail of who did what when
-6. **Atomic Operations**: `claim-next` ensures no race conditions
-7. **Graph Queries**: Understand relationships and impact
+## Key Features
+
+| Feature | Description |
+|---------|-------------|
+| **Dependency DAG** | Issues form a directed acyclic graph with automatic cycle detection |
+| **Quality Gates** | Tests, reviews, scans must pass before state transitions |
+| **Coordinator Daemon** | Automatically dispatches ready work to available agents |
+| **Priority Dispatch** | Critical work gets assigned first |
+| **Event Log** | Full audit trail—every action logged to `data/events.jsonl` |
+| **Git-Friendly Storage** | Plain JSON files you can version, diff, and merge |
+| **Atomic Operations** | `claim` ensures no race conditions between agents |
+| **Graph Queries** | Understand upstream/downstream dependencies |
+
+## Commands
+
+```bash
+# Issue Management
+jit issue create --title "..." --priority high
+jit issue list --state ready
+jit issue claim <id> --to agent:worker-1
+jit issue update <id> --state done
+
+# Dependencies
+jit dep add <issue> --on <prerequisite>
+jit graph show <issue>
+
+# Quality Gates  
+jit gate add <issue> unit-tests
+jit gate pass <issue> unit-tests
+
+# Coordination
+jit coordinator start
+jit coordinator agents
+jit coordinator status
+
+# Monitoring
+jit status
+jit events tail -n 20
+```
+
+## Project Status
+
+✅ **Phase 0**: Design and architecture  
+✅ **Phase 1**: Core issue management with dependency graph  
+✅ **Phase 2**: Quality gates and coordinator daemon  
+🚧 **Phase 3**: Advanced observability (graph export, webhooks)  
+📋 **Phase 4**: Production readiness (locking, plugins, metrics)
+
+See [ROADMAP.md](ROADMAP.md) for details.
+
+## Documentation
+
+- [EXAMPLE.md](EXAMPLE.md) - Complete agent orchestration walkthrough
+- [docs/design.md](docs/design.md) - Detailed design specifications
+- [ROADMAP.md](ROADMAP.md) - Development phases and progress
 
 ## Architecture
 
-- **Storage**: Plain JSON files in `data/` directory (versionable, transparent)
-- **Coordinator**: Push-based daemon that monitors and dispatches work
-- **Agents**: Any process that can execute `jit` commands
-- **Events**: Append-only log for audit and debugging
+```
+┌─────────────┐
+│ Coordinator │ ← Monitors ready issues, dispatches to agents
+└──────┬──────┘
+       │
+   ┌───┴────┬────────┬─────────┐
+   │        │        │         │
+┌──▼───┐ ┌─▼────┐ ┌─▼────┐ ┌──▼────┐
+│Agent1│ │Agent2│ │Agent3│ │CI/CD  │
+└──┬───┘ └──┬───┘ └──┬───┘ └───┬───┘
+   │        │        │         │
+   └────────┴────────┴─────────┘
+            │
+    ┌───────▼────────┐
+    │  data/         │
+    │  ├─ issues/    │ ← One JSON file per issue
+    │  ├─ gates.json │ ← Gate definitions
+    │  └─ events.jsonl│ ← Append-only audit log
+    └────────────────┘
+```
 
-See [docs/design.md](docs/design.md) for detailed design specifications.
+## Contributing
+
+Built with Rust. Requires Rust 1.70+.
+
+```bash
+cargo build
+cargo test
+cargo clippy
+cargo fmt
+```
+
+## License
+
+MIT
