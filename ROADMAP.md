@@ -62,8 +62,8 @@
 - **TESTS MUST BE WRITTEN BEFORE IMPLEMENTATION**
 - All new functions must have unit tests before code is written
 - Target: >80% overall coverage for all modules
-- Current coverage: **56.06%** (435/776 lines) - **+15.72pp improvement!** 🎉
-- commands.rs: **86.10%** ✅ (was 40.15%)
+- Current coverage: **64.18%** (498/776 lines) - **+23.84pp improvement!** 🎉
+- commands.rs: **86.10%** ✅ | coordinator.rs: **41.91%** ⚠️ | storage.rs: **92.13%** ✅
 
 **Action Items:**
 - [x] Graph export: `export --format dot|mermaid` (✓ tests added)

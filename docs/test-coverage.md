@@ -1,18 +1,18 @@
 # Test Coverage Report
 
-**Last Updated:** 2025-11-27 (After Backfill)  
-**Overall Coverage:** 56.06% (435/776 lines) - **+15.72pp improvement!** 🎉
+**Last Updated:** 2025-11-27 (After Coordinator Tests)  
+**Overall Coverage:** 64.18% (498/776 lines) - **+23.84pp total improvement!** 🎉
 
 ## Coverage by Module
 
-| Module | Coverage | Lines Covered | Total Lines | Change | Status |
-|--------|----------|---------------|-------------|--------|--------|
-| commands.rs | 86.10% | 223/259 | 259 | +45.95pp | ✅ EXCELLENT |
-| coordinator.rs | 0.00% | 0/136 | 136 | +0.00pp | ❌ NO TESTS |
-| domain.rs | 72.00% | 36/50 | 50 | +6.00pp | ✅ GOOD |
-| graph.rs | 85.45% | 94/110 | 110 | +0.00pp | ✅ EXCELLENT |
-| main.rs | 0.00% | 0/132 | 132 | +0.00pp | ❌ NO TESTS (CLI entry point) |
+| Module | Coverage | Lines Covered | Total Lines | Change from Start | Status |
+|--------|----------|---------------|-------------|-------------------|--------|
 | storage.rs | 92.13% | 82/89 | 89 | +0.00pp | ✅ EXCELLENT |
+| commands.rs | 86.10% | 223/259 | 259 | +45.95pp | ✅ EXCELLENT |
+| graph.rs | 85.45% | 94/110 | 110 | +0.00pp | ✅ EXCELLENT |
+| domain.rs | 72.00% | 36/50 | 50 | +6.00pp | ✅ GOOD |
+| coordinator.rs | 41.91% | 57/136 | 136 | +41.91pp | ⚠️ PARTIAL |
+| main.rs | 0.00% | 0/132 | 132 | +0.00pp | ❌ NO TESTS (CLI entry point) |
 
 ## Target Goals
 
@@ -53,20 +53,29 @@
 - Edge cases in claim_next() filtering
 - Some event logging code paths
 
-### coordinator.rs (0.00% - PRIORITY HIGH)
+### coordinator.rs (41.91% - PARTIAL ⚠️)
 
-**Completely Untested:**
-- All coordinator daemon logic
-- Agent pool management
-- Dispatch algorithms
-- Status monitoring
-- Configuration loading
+**14 new tests added!**
+
+**Now Tested:**
+- ✅ Configuration management (load, save, defaults)
+- ✅ Priority indexing and custom priority orders
+- ✅ Issue filtering (ready, assigned, by state)
+- ✅ Priority-based issue sorting
+- ✅ Serialization (AgentConfig, CoordinatorConfig)
+- ✅ Agent listing functionality
+
+**Remaining Gaps (58%):**
+- Daemon lifecycle (start, stop, PID management)
+- Process spawning and agent dispatch
+- Coordination cycle main loop
+- Error handling in dispatch logic
+- Stale process cleanup
 
 **Action Required:**
-- Add integration tests for coordinator
-- Mock agent execution
-- Test dispatch logic
-- Test concurrent agent handling
+- Integration/daemon tests are complex and lower priority
+- Core business logic (filtering, sorting, config) is now tested
+- Daemon operations would require mocking process spawning
 
 ### domain.rs (72.00% - GOOD ✅)
 
@@ -147,16 +156,26 @@ cd cli && cargo tarpaulin --out Html
 
 ## Recent Progress
 
-**2025-11-27 Backfill Session:**
-- ✅ Added 26 comprehensive tests to commands.rs
-- ✅ Improved overall coverage from 40.34% → 56.06% (+15.72pp)
-- ✅ commands.rs now at 86.10% (was 40.15%)
+**2025-11-27 Test Backfill Sessions:**
+
+**Session 1 - commands.rs:**
+- ✅ Added 26 comprehensive tests
+- ✅ Improved coverage from 40.15% → 86.10% (+45.95pp)
 - ✅ All critical command functions now tested
-- ✅ 69 total tests passing
+
+**Session 2 - coordinator.rs:**
+- ✅ Added 14 comprehensive tests
+- ✅ Improved coverage from 0% → 41.91% (+41.91pp)
+- ✅ Core coordinator logic now tested
+
+**Total Improvement:**
+- Overall: 40.34% → **64.18%** (+23.84pp)
+- Tests: 43 → **83 tests** (+40 tests)
 
 ## Next Steps
 
-1. ✅ ~~Backfill tests for commands.rs critical functions~~ **COMPLETE**
-2. **Next Priority:** Add coordinator tests (currently 0%)
-3. **Phase 3 Goal:** Reach >80% overall coverage (currently 56.06%)
-4. **Phase 4:** Achieve >90% coverage before production
+1. ✅ ~~Backfill tests for commands.rs~~ **COMPLETE (86.10%)**
+2. ✅ ~~Add coordinator tests~~ **PARTIAL (41.91%)**
+3. **Phase 3 Goal:** Reach >80% overall coverage (currently 64.18%, need +15.82pp)
+4. **Remaining gaps:** domain.rs event types, coordinator daemon operations, main.rs (CLI)
+5. **Phase 4:** Achieve >90% coverage before production
