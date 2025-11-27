@@ -31,7 +31,7 @@
 
 **Reference:** See `docs/design.md` sections: Core Domain Model, Dependency Graph, CLI Surface
 
-## Phase 2: Quality Gates & Orchestration
+## Phase 2: Quality Gates & Orchestration ✅
 
 **Goal:** Gate enforcement and coordinator daemon for agent dispatch.
 
@@ -42,10 +42,10 @@
 - [x] State transitions with gate validation
 - [x] Event log: append-only `data/events.jsonl`
 - [x] Event types: issue.created, issue.claimed, gate.passed, gate.failed, issue.completed
-- [ ] Coordinator daemon: `coordinator start`, `stop`, `status`
-- [ ] Agent pool configuration (`data/coordinator.json`)
-- [ ] Dispatch logic: priority-based work assignment
-- [ ] Monitoring: `status`, `agent list`, `metrics`
+- [x] Coordinator daemon: `coordinator start`, `stop`, `status`
+- [x] Agent pool configuration (`data/coordinator.json`)
+- [x] Dispatch logic: priority-based work assignment
+- [x] Monitoring: `status`, `agent list`, `metrics`
 
 **Tests:**
 - Gate blocking logic
