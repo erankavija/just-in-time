@@ -67,6 +67,29 @@ fn main() -> Result<()> {
                     );
                 }
             }
+            IssueCommands::Search {
+                query,
+                state,
+                assignee,
+                priority,
+            } => {
+                let state_filter = state.map(|s| parse_state(&s)).transpose()?;
+                let priority_filter = priority.map(|p| parse_priority(&p)).transpose()?;
+                let issues = executor.search_issues_with_filters(
+                    &query,
+                    priority_filter,
+                    state_filter,
+                    assignee,
+                )?;
+
+                println!("Found {} issue(s):", issues.len());
+                for issue in issues {
+                    println!(
+                        "{} | {} | {:?} | {:?}",
+                        issue.id, issue.title, issue.state, issue.priority
+                    );
+                }
+            }
             IssueCommands::Show { id } => {
                 let issue = executor.show_issue(&id)?;
                 println!("ID: {}", issue.id);

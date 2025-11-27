@@ -474,6 +474,60 @@ impl CommandExecutor {
         Ok(filtered.into_iter().rev().collect())
     }
 
+    // Search and filter
+    pub fn search_issues(&self, query: &str) -> Result<Vec<Issue>> {
+        let issues = self.storage.list_issues()?;
+        let query_lower = query.to_lowercase();
+
+        let results = issues
+            .into_iter()
+            .filter(|issue| {
+                if query.is_empty() {
+                    return true;
+                }
+
+                // Search in title, description, and ID
+                issue.title.to_lowercase().contains(&query_lower)
+                    || issue.description.to_lowercase().contains(&query_lower)
+                    || issue.id.to_lowercase().starts_with(&query_lower)
+            })
+            .collect();
+
+        Ok(results)
+    }
+
+    pub fn search_issues_with_filters(
+        &self,
+        query: &str,
+        priority_filter: Option<Priority>,
+        state_filter: Option<State>,
+        assignee_filter: Option<String>,
+    ) -> Result<Vec<Issue>> {
+        let mut results = self.search_issues(query)?;
+
+        // Apply additional filters
+        results.retain(|issue| {
+            if let Some(ref priority) = priority_filter {
+                if &issue.priority != priority {
+                    return false;
+                }
+            }
+            if let Some(ref state) = state_filter {
+                if &issue.state != state {
+                    return false;
+                }
+            }
+            if let Some(ref assignee) = assignee_filter {
+                if issue.assignee.as_ref() != Some(assignee) {
+                    return false;
+                }
+            }
+            true
+        });
+
+        Ok(results)
+    }
+
     // Graph export
     pub fn export_graph(&self, format: &str) -> Result<String> {
         let issues = self.storage.list_issues()?;
@@ -1443,5 +1497,238 @@ mod tests {
 
         // Status should not error
         executor.status().unwrap();
+    }
+
+    // TDD: Search and filter tests - written BEFORE implementation
+    #[test]
+    fn test_search_by_title_substring() {
+        let (_temp, executor) = setup();
+
+        executor
+            .create_issue(
+                "Fix bug in parser".to_string(),
+                "Desc".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+        executor
+            .create_issue(
+                "Add new feature".to_string(),
+                "Desc".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+        executor
+            .create_issue(
+                "Fix bug in lexer".to_string(),
+                "Desc".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+
+        let results = executor.search_issues("bug").unwrap();
+        assert_eq!(results.len(), 2);
+        assert!(results.iter().all(|i| i.title.contains("bug")));
+    }
+
+    #[test]
+    fn test_search_by_description() {
+        let (_temp, executor) = setup();
+
+        executor
+            .create_issue(
+                "Task 1".to_string(),
+                "Contains security vulnerability".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+        executor
+            .create_issue(
+                "Task 2".to_string(),
+                "Regular task".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+
+        let results = executor.search_issues("security").unwrap();
+        assert_eq!(results.len(), 1);
+        assert!(results[0].description.contains("security"));
+    }
+
+    #[test]
+    fn test_search_case_insensitive() {
+        let (_temp, executor) = setup();
+
+        executor
+            .create_issue(
+                "Fix BUG".to_string(),
+                "Desc".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+
+        let results = executor.search_issues("bug").unwrap();
+        assert_eq!(results.len(), 1);
+    }
+
+    #[test]
+    fn test_search_with_filters() {
+        let (_temp, executor) = setup();
+
+        let id1 = executor
+            .create_issue(
+                "Critical bug".to_string(),
+                "Desc".to_string(),
+                Priority::Critical,
+                vec![],
+            )
+            .unwrap();
+        executor
+            .create_issue(
+                "Normal bug".to_string(),
+                "Desc".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+
+        // Search with priority filter
+        let results = executor
+            .search_issues_with_filters("bug", Some(Priority::Critical), None, None)
+            .unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, id1);
+    }
+
+    #[test]
+    fn test_search_with_state_filter() {
+        let (_temp, executor) = setup();
+
+        let id1 = executor
+            .create_issue(
+                "Ready task".to_string(),
+                "Desc".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+        executor
+            .create_issue(
+                "Open task".to_string(),
+                "Desc".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+
+        // Update first to Ready state (assuming it has no deps)
+        executor
+            .update_issue(&id1, None, None, None, Some(State::Ready))
+            .unwrap();
+
+        let results = executor
+            .search_issues_with_filters("task", None, Some(State::Ready), None)
+            .unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].state, State::Ready);
+    }
+
+    #[test]
+    fn test_search_with_assignee_filter() {
+        let (_temp, executor) = setup();
+
+        let id1 = executor
+            .create_issue(
+                "Alice work".to_string(),
+                "Desc".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+        let id2 = executor
+            .create_issue(
+                "Bob work".to_string(),
+                "Desc".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+
+        executor.assign_issue(&id1, "alice".to_string()).unwrap();
+        executor.assign_issue(&id2, "bob".to_string()).unwrap();
+
+        let results = executor
+            .search_issues_with_filters("work", None, None, Some("alice".to_string()))
+            .unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].assignee, Some("alice".to_string()));
+    }
+
+    #[test]
+    fn test_search_empty_query_returns_all() {
+        let (_temp, executor) = setup();
+
+        executor
+            .create_issue(
+                "Task 1".to_string(),
+                "Desc".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+        executor
+            .create_issue(
+                "Task 2".to_string(),
+                "Desc".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+
+        let results = executor.search_issues("").unwrap();
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn test_search_no_matches() {
+        let (_temp, executor) = setup();
+
+        executor
+            .create_issue(
+                "Task".to_string(),
+                "Desc".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+
+        let results = executor.search_issues("nonexistent").unwrap();
+        assert_eq!(results.len(), 0);
+    }
+
+    #[test]
+    fn test_search_by_id_prefix() {
+        let (_temp, executor) = setup();
+
+        let id = executor
+            .create_issue(
+                "Task".to_string(),
+                "Desc".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+
+        // Search by first 8 chars of UUID
+        let prefix = &id[..8];
+        let results = executor.search_issues(prefix).unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, id);
     }
 }

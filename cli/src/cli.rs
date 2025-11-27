@@ -100,6 +100,21 @@ pub enum IssueCommands {
         priority: Option<String>,
     },
 
+    /// Search issues by text query
+    Search {
+        /// Search query (searches title, description, and ID)
+        query: String,
+
+        #[arg(short, long)]
+        state: Option<String>,
+
+        #[arg(short, long)]
+        assignee: Option<String>,
+
+        #[arg(short, long)]
+        priority: Option<String>,
+    },
+
     /// Show issue details
     Show { id: String },
 
