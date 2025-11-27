@@ -61,20 +61,21 @@
 **TDD Requirements:**
 - **TESTS MUST BE WRITTEN BEFORE IMPLEMENTATION**
 - All new functions must have unit tests before code is written
-- Target: >80% code coverage for all modules
-- Current coverage: 40.34% (313/776 lines) - NEEDS IMPROVEMENT
+- Target: >80% overall coverage for all modules
+- Current coverage: **56.06%** (435/776 lines) - **+15.72pp improvement!** 🎉
+- commands.rs: **86.10%** ✅ (was 40.15%)
 
 **Action Items:**
 - [x] Graph export: `export --format dot|mermaid` (✓ tests added)
 - [x] Event queries: `events tail`, `events query` (✓ tests added)
-- [ ] **BACKFILL MISSING TESTS** for existing functions:
-  - [ ] delete_issue, assign_issue, unassign_issue
-  - [ ] add_dependency, remove_dependency (cycle detection tested)
-  - [ ] add_gate, pass_gate, fail_gate (basic ops tested, need comprehensive)
-  - [ ] show_graph, show_downstream, show_roots (need comprehensive)
-  - [ ] validate, status (not tested)
-  - [ ] list_gates, add/remove/show gate definitions (registry tested, not commands)
-  - [ ] export_graph (not tested at command level)
+- [x] **BACKFILL MISSING TESTS** for existing functions (✓ 26 tests added):
+  - [x] delete_issue, assign_issue, unassign_issue (6 tests)
+  - [x] add_dependency, remove_dependency (3 tests)
+  - [x] add_gate, pass_gate, fail_gate (4 tests)
+  - [x] show_graph, show_downstream, show_roots (3 tests)
+  - [x] validate, status (2 tests)
+  - [x] list_gates, add/remove/show gate definitions (6 tests)
+  - [x] export_graph (2 tests)
 - [ ] Search and filters: complex query syntax (TDD: write tests first)
 - [ ] Bulk operations (TDD: write tests first)
 - [ ] CI integration: read artifacts to auto-pass gates (TDD: write tests first)
