@@ -1,7 +1,8 @@
 # Test Coverage Report
 
-**Last Updated:** 2025-11-27 (After Coordinator Tests)  
-**Overall Coverage:** 64.18% (498/776 lines) - **+23.84pp total improvement!** 🎉
+**Last Updated:** 2025-11-27 (After Integration Tests)  
+**Overall Coverage:** 65.68% (530/807 lines) - **+25.34pp total improvement!** 🎉  
+**Total Tests:** 108 (92 unit + 16 integration)
 
 ## Coverage by Module
 
@@ -168,14 +169,35 @@ cd cli && cargo tarpaulin --out Html
 - ✅ Improved coverage from 0% → 41.91% (+41.91pp)
 - ✅ Core coordinator logic now tested
 
+**Session 3 - Integration Tests:**
+- ✅ Added 16 integration tests (E2E CLI verification)
+- ✅ All major features now have automated integration tests
+- ✅ No more manual testing required
+
 **Total Improvement:**
-- Overall: 40.34% → **64.18%** (+23.84pp)
-- Tests: 43 → **83 tests** (+40 tests)
+- Overall: 40.34% → **65.68%** (+25.34pp)
+- Tests: 43 → **108 tests** (+65 tests)
+- Breakdown: 92 unit tests + 16 integration tests
+
+## Integration Test Coverage
+
+**16 integration tests covering all CLI features:**
+- Issue lifecycle (create, list, show, update, delete)
+- Search functionality (title, description, filters)
+- Dependencies (add, remove, graph operations)
+- Cycle detection
+- Gates (registry, pass/fail)
+- Assignments (assign, unassign)
+- Events (tail, query)
+- Graph export (DOT, Mermaid)
+- Validation
+- Graph queries (show, downstream, roots)
 
 ## Next Steps
 
-1. ✅ ~~Backfill tests for commands.rs~~ **COMPLETE (86.10%)**
+1. ✅ ~~Backfill tests for commands.rs~~ **COMPLETE (87.26%)**
 2. ✅ ~~Add coordinator tests~~ **PARTIAL (41.91%)**
-3. **Phase 3 Goal:** Reach >80% overall coverage (currently 64.18%, need +15.82pp)
-4. **Remaining gaps:** domain.rs event types, coordinator daemon operations, main.rs (CLI)
-5. **Phase 4:** Achieve >90% coverage before production
+3. ✅ ~~Add integration tests~~ **COMPLETE (16 tests)**
+4. **Phase 3 Goal:** Reach >80% overall coverage (currently 65.68%, need +14.32pp)
+5. **Remaining gaps:** domain.rs event types, coordinator daemon operations
+6. **Phase 4:** Achieve >90% coverage before production
