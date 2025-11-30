@@ -31,26 +31,26 @@ fn test_search_by_title() {
 
     // Create issues
     Command::new(&jit)
-        .args(&["issue", "create", "-t", "Fix bug in parser", "-d", "Desc"])
+        .args(["issue", "create", "-t", "Fix bug in parser", "-d", "Desc"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     Command::new(&jit)
-        .args(&["issue", "create", "-t", "Add feature", "-d", "Desc"])
+        .args(["issue", "create", "-t", "Add feature", "-d", "Desc"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     Command::new(&jit)
-        .args(&["issue", "create", "-t", "Fix bug in lexer", "-d", "Desc"])
+        .args(["issue", "create", "-t", "Fix bug in lexer", "-d", "Desc"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     // Search for "bug"
     let output = Command::new(&jit)
-        .args(&["issue", "search", "bug"])
+        .args(["issue", "search", "bug"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -69,7 +69,7 @@ fn test_search_by_description() {
     let jit = jit_binary();
 
     Command::new(&jit)
-        .args(&[
+        .args([
             "issue",
             "create",
             "-t",
@@ -82,13 +82,13 @@ fn test_search_by_description() {
         .unwrap();
 
     Command::new(&jit)
-        .args(&["issue", "create", "-t", "Task 2", "-d", "Regular task"])
+        .args(["issue", "create", "-t", "Task 2", "-d", "Regular task"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     let output = Command::new(&jit)
-        .args(&["issue", "search", "security"])
+        .args(["issue", "search", "security"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -105,13 +105,13 @@ fn test_search_case_insensitive() {
     let jit = jit_binary();
 
     Command::new(&jit)
-        .args(&["issue", "create", "-t", "Fix BUG", "-d", "Desc"])
+        .args(["issue", "create", "-t", "Fix BUG", "-d", "Desc"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     let output = Command::new(&jit)
-        .args(&["issue", "search", "bug"])
+        .args(["issue", "search", "bug"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -128,7 +128,7 @@ fn test_search_with_priority_filter() {
     let jit = jit_binary();
 
     Command::new(&jit)
-        .args(&[
+        .args([
             "issue",
             "create",
             "-t",
@@ -143,7 +143,7 @@ fn test_search_with_priority_filter() {
         .unwrap();
 
     Command::new(&jit)
-        .args(&[
+        .args([
             "issue",
             "create",
             "-t",
@@ -158,7 +158,7 @@ fn test_search_with_priority_filter() {
         .unwrap();
 
     let output = Command::new(&jit)
-        .args(&["issue", "search", "bug", "--priority", "critical"])
+        .args(["issue", "search", "bug", "--priority", "critical"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -176,13 +176,13 @@ fn test_search_no_results() {
     let jit = jit_binary();
 
     Command::new(&jit)
-        .args(&["issue", "create", "-t", "Task", "-d", "Desc"])
+        .args(["issue", "create", "-t", "Task", "-d", "Desc"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     let output = Command::new(&jit)
-        .args(&["issue", "search", "nonexistent"])
+        .args(["issue", "search", "nonexistent"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -199,29 +199,29 @@ fn test_export_dot_format() {
 
     // Create issues with dependencies
     let output1 = Command::new(&jit)
-        .args(&["issue", "create", "-t", "API", "-d", "Design API"])
+        .args(["issue", "create", "-t", "API", "-d", "Design API"])
         .current_dir(temp.path())
         .output()
         .unwrap();
     let stdout1 = String::from_utf8_lossy(&output1.stdout);
-    let id1 = stdout1.trim().split_whitespace().last().unwrap();
+    let id1 = stdout1.split_whitespace().last().unwrap();
 
     let output2 = Command::new(&jit)
-        .args(&["issue", "create", "-t", "Backend", "-d", "Implement"])
+        .args(["issue", "create", "-t", "Backend", "-d", "Implement"])
         .current_dir(temp.path())
         .output()
         .unwrap();
     let stdout2 = String::from_utf8_lossy(&output2.stdout);
-    let id2 = stdout2.trim().split_whitespace().last().unwrap();
+    let id2 = stdout2.split_whitespace().last().unwrap();
 
     Command::new(&jit)
-        .args(&["dep", "add", id2, "--on", id1])
+        .args(["dep", "add", id2, "--on", id1])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     let output = Command::new(&jit)
-        .args(&["graph", "export", "--format", "dot"])
+        .args(["graph", "export", "--format", "dot"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -239,13 +239,13 @@ fn test_export_mermaid_format() {
     let jit = jit_binary();
 
     Command::new(&jit)
-        .args(&["issue", "create", "-t", "Task", "-d", "Desc"])
+        .args(["issue", "create", "-t", "Task", "-d", "Desc"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     let output = Command::new(&jit)
-        .args(&["graph", "export", "--format", "mermaid"])
+        .args(["graph", "export", "--format", "mermaid"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -263,7 +263,16 @@ fn test_issue_create_list_show() {
     let jit = jit_binary();
 
     let output = Command::new(&jit)
-        .args(&["issue", "create", "-t", "Test Issue", "-d", "Test description", "--priority", "high"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Test Issue",
+            "-d",
+            "Test description",
+            "--priority",
+            "high",
+        ])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -271,11 +280,11 @@ fn test_issue_create_list_show() {
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("Created issue:"));
-    let id = stdout.trim().split_whitespace().last().unwrap();
+    let id = stdout.split_whitespace().last().unwrap();
 
     // List issues
     let output = Command::new(&jit)
-        .args(&["issue", "list"])
+        .args(["issue", "list"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -286,7 +295,7 @@ fn test_issue_create_list_show() {
 
     // Show issue details
     let output = Command::new(&jit)
-        .args(&["issue", "show", id])
+        .args(["issue", "show", id])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -303,13 +312,12 @@ fn test_issue_update_and_delete() {
     let jit = jit_binary();
 
     let output = Command::new(&jit)
-        .args(&["issue", "create", "-t", "Old Title", "-d", "Desc"])
+        .args(["issue", "create", "-t", "Old Title", "-d", "Desc"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     let id = String::from_utf8_lossy(&output.stdout)
-        .trim()
         .split_whitespace()
         .last()
         .unwrap()
@@ -317,13 +325,13 @@ fn test_issue_update_and_delete() {
 
     // Update issue
     Command::new(&jit)
-        .args(&["issue", "update", &id, "-t", "New Title"])
+        .args(["issue", "update", &id, "-t", "New Title"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     let output = Command::new(&jit)
-        .args(&["issue", "show", &id])
+        .args(["issue", "show", &id])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -333,13 +341,13 @@ fn test_issue_update_and_delete() {
 
     // Delete issue
     Command::new(&jit)
-        .args(&["issue", "delete", &id])
+        .args(["issue", "delete", &id])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     let output = Command::new(&jit)
-        .args(&["issue", "list"])
+        .args(["issue", "list"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -354,24 +362,22 @@ fn test_dependencies() {
     let jit = jit_binary();
 
     let output1 = Command::new(&jit)
-        .args(&["issue", "create", "-t", "Dependency", "-d", "Desc"])
+        .args(["issue", "create", "-t", "Dependency", "-d", "Desc"])
         .current_dir(temp.path())
         .output()
         .unwrap();
     let id1 = String::from_utf8_lossy(&output1.stdout)
-        .trim()
         .split_whitespace()
         .last()
         .unwrap()
         .to_string();
 
     let output2 = Command::new(&jit)
-        .args(&["issue", "create", "-t", "Dependent", "-d", "Desc"])
+        .args(["issue", "create", "-t", "Dependent", "-d", "Desc"])
         .current_dir(temp.path())
         .output()
         .unwrap();
     let id2 = String::from_utf8_lossy(&output2.stdout)
-        .trim()
         .split_whitespace()
         .last()
         .unwrap()
@@ -379,7 +385,7 @@ fn test_dependencies() {
 
     // Add dependency
     let output = Command::new(&jit)
-        .args(&["dep", "add", &id2, "--on", &id1])
+        .args(["dep", "add", &id2, "--on", &id1])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -388,7 +394,7 @@ fn test_dependencies() {
 
     // Show graph
     let output = Command::new(&jit)
-        .args(&["graph", "show", &id2])
+        .args(["graph", "show", &id2])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -398,7 +404,7 @@ fn test_dependencies() {
 
     // Show downstream
     let output = Command::new(&jit)
-        .args(&["graph", "downstream", &id1])
+        .args(["graph", "downstream", &id1])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -413,24 +419,22 @@ fn test_cycle_detection() {
     let jit = jit_binary();
 
     let output1 = Command::new(&jit)
-        .args(&["issue", "create", "-t", "Issue 1", "-d", "Desc"])
+        .args(["issue", "create", "-t", "Issue 1", "-d", "Desc"])
         .current_dir(temp.path())
         .output()
         .unwrap();
     let id1 = String::from_utf8_lossy(&output1.stdout)
-        .trim()
         .split_whitespace()
         .last()
         .unwrap()
         .to_string();
 
     let output2 = Command::new(&jit)
-        .args(&["issue", "create", "-t", "Issue 2", "-d", "Desc"])
+        .args(["issue", "create", "-t", "Issue 2", "-d", "Desc"])
         .current_dir(temp.path())
         .output()
         .unwrap();
     let id2 = String::from_utf8_lossy(&output2.stdout)
-        .trim()
         .split_whitespace()
         .last()
         .unwrap()
@@ -438,14 +442,14 @@ fn test_cycle_detection() {
 
     // Add dependency: id2 depends on id1
     Command::new(&jit)
-        .args(&["dep", "add", &id2, "--on", &id1])
+        .args(["dep", "add", &id2, "--on", &id1])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     // Try to create cycle: id1 depends on id2 (should fail)
     let output = Command::new(&jit)
-        .args(&["dep", "add", &id1, "--on", &id2])
+        .args(["dep", "add", &id1, "--on", &id2])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -462,14 +466,23 @@ fn test_gates() {
 
     // Add gate definition
     Command::new(&jit)
-        .args(&["registry", "add", "tests", "-t", "Unit Tests", "-d", "Run tests", "-a"])
+        .args([
+            "registry",
+            "add",
+            "tests",
+            "-t",
+            "Unit Tests",
+            "-d",
+            "Run tests",
+            "-a",
+        ])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     // List gates
     let output = Command::new(&jit)
-        .args(&["registry", "list"])
+        .args(["registry", "list"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -480,13 +493,14 @@ fn test_gates() {
 
     // Create issue with gate
     let output = Command::new(&jit)
-        .args(&["issue", "create", "-t", "Task", "-d", "Desc", "--gate", "tests"])
+        .args([
+            "issue", "create", "-t", "Task", "-d", "Desc", "--gate", "tests",
+        ])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     let id = String::from_utf8_lossy(&output.stdout)
-        .trim()
         .split_whitespace()
         .last()
         .unwrap()
@@ -494,7 +508,7 @@ fn test_gates() {
 
     // Pass gate
     let output = Command::new(&jit)
-        .args(&["gate", "pass", &id, "tests", "-b", "ci"])
+        .args(["gate", "pass", &id, "tests", "-b", "ci"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -503,7 +517,7 @@ fn test_gates() {
 
     // Verify gate status
     let output = Command::new(&jit)
-        .args(&["issue", "show", &id])
+        .args(["issue", "show", &id])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -518,13 +532,12 @@ fn test_assignment_workflow() {
     let jit = jit_binary();
 
     let output = Command::new(&jit)
-        .args(&["issue", "create", "-t", "Task", "-d", "Desc"])
+        .args(["issue", "create", "-t", "Task", "-d", "Desc"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     let id = String::from_utf8_lossy(&output.stdout)
-        .trim()
         .split_whitespace()
         .last()
         .unwrap()
@@ -532,13 +545,13 @@ fn test_assignment_workflow() {
 
     // Assign issue
     Command::new(&jit)
-        .args(&["issue", "assign", &id, "-t", "alice"])
+        .args(["issue", "assign", &id, "-t", "alice"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     let output = Command::new(&jit)
-        .args(&["issue", "show", &id])
+        .args(["issue", "show", &id])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -548,13 +561,13 @@ fn test_assignment_workflow() {
 
     // Unassign issue
     Command::new(&jit)
-        .args(&["issue", "unassign", &id])
+        .args(["issue", "unassign", &id])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     let output = Command::new(&jit)
-        .args(&["issue", "show", &id])
+        .args(["issue", "show", &id])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -570,20 +583,20 @@ fn test_events() {
 
     // Create issues to generate events
     Command::new(&jit)
-        .args(&["issue", "create", "-t", "Task 1", "-d", "Desc"])
+        .args(["issue", "create", "-t", "Task 1", "-d", "Desc"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     Command::new(&jit)
-        .args(&["issue", "create", "-t", "Task 2", "-d", "Desc"])
+        .args(["issue", "create", "-t", "Task 2", "-d", "Desc"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     // Tail events
     let output = Command::new(&jit)
-        .args(&["events", "tail", "-n", "2"])
+        .args(["events", "tail", "-n", "2"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -595,7 +608,7 @@ fn test_events() {
 
     // Query events
     let output = Command::new(&jit)
-        .args(&["events", "query", "-e", "issue_created"])
+        .args(["events", "query", "-e", "issue_created"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -609,20 +622,20 @@ fn test_validate_repository() {
     let jit = jit_binary();
 
     Command::new(&jit)
-        .args(&["issue", "create", "-t", "Task 1", "-d", "Desc"])
+        .args(["issue", "create", "-t", "Task 1", "-d", "Desc"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     Command::new(&jit)
-        .args(&["issue", "create", "-t", "Task 2", "-d", "Desc"])
+        .args(["issue", "create", "-t", "Task 2", "-d", "Desc"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     // Validate should succeed
     let output = Command::new(&jit)
-        .args(&["validate"])
+        .args(["validate"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -636,24 +649,22 @@ fn test_graph_roots() {
     let jit = jit_binary();
 
     let output1 = Command::new(&jit)
-        .args(&["issue", "create", "-t", "Root", "-d", "Desc"])
+        .args(["issue", "create", "-t", "Root", "-d", "Desc"])
         .current_dir(temp.path())
         .output()
         .unwrap();
     let id1 = String::from_utf8_lossy(&output1.stdout)
-        .trim()
         .split_whitespace()
         .last()
         .unwrap()
         .to_string();
 
     let output2 = Command::new(&jit)
-        .args(&["issue", "create", "-t", "Child", "-d", "Desc"])
+        .args(["issue", "create", "-t", "Child", "-d", "Desc"])
         .current_dir(temp.path())
         .output()
         .unwrap();
     let id2 = String::from_utf8_lossy(&output2.stdout)
-        .trim()
         .split_whitespace()
         .last()
         .unwrap()
@@ -661,14 +672,14 @@ fn test_graph_roots() {
 
     // Add dependency
     Command::new(&jit)
-        .args(&["dep", "add", &id2, "--on", &id1])
+        .args(["dep", "add", &id2, "--on", &id1])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     // Get roots
     let output = Command::new(&jit)
-        .args(&["graph", "roots"])
+        .args(["graph", "roots"])
         .current_dir(temp.path())
         .output()
         .unwrap();

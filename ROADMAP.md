@@ -31,9 +31,9 @@
 
 **Reference:** See `docs/design.md` sections: Core Domain Model, Dependency Graph, CLI Surface
 
-## Phase 2: Quality Gates & Orchestration ✅
+## Phase 2: Quality Gates & Query Interface ✅
 
-**Goal:** Gate enforcement and coordinator daemon for agent dispatch.
+**Goal:** Gate enforcement and clean query interface for external orchestrators.
 
 **Action Items:**
 - [x] Gate registry management (`data/gates.json`)
@@ -42,47 +42,55 @@
 - [x] State transitions with gate validation
 - [x] Event log: append-only `data/events.jsonl`
 - [x] Event types: issue.created, issue.claimed, gate.passed, gate.failed, issue.completed
-- [x] Coordinator daemon: `coordinator start`, `stop`, `status`
-- [x] Agent pool configuration (`data/coordinator.json`)
-- [x] Dispatch logic: priority-based work assignment
-- [x] Monitoring: `status`, `agent list`, `metrics`
+- [x] Query interface: `query ready`, `query blocked`, `query assignee`, `query state`, `query priority`
+- [x] **CLI Consistency** (2025-11-30):
+  - All mutation commands support `--json` flag for machine-readable output
+  - Consistent argument order: `<id>` first, then flags
+  - Human-readable text output without `--json`
+- [x] **Coordinator removal** (2025-11-30):
+  - Removed coordinator daemon from core (732 lines)
+  - Extracted to separate `jit-dispatch` orchestrator
+  - Clean architectural separation
+- [x] Test infrastructure: TestHarness for fast in-process testing (10-100x faster)
+- [x] **Tests:** 115 → 123 tests (8 new CLI consistency tests)
 
 **Tests:**
-- Gate blocking logic
-- State transition validation
-- Event log integrity
+- Gate blocking logic ✓
+- State transition validation ✓
+- Event log integrity ✓
+- Query interface validation ✓
+- CLI consistency (JSON output, argument order) ✓
 
-**Reference:** See `docs/design.md` sections: Quality Gating, Agent Coordination & Orchestration, Monitoring & Observability
+**Reference:** See `docs/design.md` sections: Quality Gating, Monitoring & Observability, `TESTING.md` for test strategy
 
-## Phase 3: Advanced Observability & Automation
+## Phase 3: Orchestrator & External Integrations (In Progress)
 
-**Goal:** Enhanced monitoring and external integrations.
+**Goal:** Separate orchestrator tool and enhanced monitoring.
 
 **TDD Requirements:**
 - **TESTS MUST BE WRITTEN BEFORE IMPLEMENTATION** ✅ Enforced!
 - All new functions must have unit tests before code is written
 - Target: >80% overall coverage for all modules
-- Current coverage: **65.68%** (530/807 lines) - **+25.34pp improvement!** 🎉
-- Tests: 43 → **99 tests** (56 unit + 36 backfill + 7 integration)
-- commands.rs: **87.26%** ✅ | coordinator.rs: **41.91%** ⚠️ | storage.rs: **92.13%** ✅
+- Current: **132 tests** (78 unit + 8 harness + 16 integration + 7 query + 8 CLI consistency + 6 no-coordinator + 9 orchestrator)
 
 **Action Items:**
 - [x] Graph export: `export --format dot|mermaid` (✓ tests added)
 - [x] Event queries: `events tail`, `events query` (✓ tests added)
-- [x] **BACKFILL MISSING TESTS** for existing functions (✓ 26 tests added):
-  - [x] delete_issue, assign_issue, unassign_issue (6 tests)
-  - [x] add_dependency, remove_dependency (3 tests)
-  - [x] add_gate, pass_gate, fail_gate (4 tests)
-  - [x] show_graph, show_downstream, show_roots (3 tests)
-  - [x] validate, status (2 tests)
-  - [x] list_gates, add/remove/show gate definitions (6 tests)
-  - [x] export_graph (2 tests)
 - [x] Search and filters: complex query syntax (✓ TDD: 9 unit + 7 integration tests)
+- [x] **jit-dispatch orchestrator** (2025-11-30):
+  - [x] Config file loading (dispatch.toml)
+  - [x] Agent pool management with capacity tracking
+  - [x] Periodic polling of `jit query ready`
+  - [x] Priority-based dispatch (critical > high > normal > low)
+  - [x] Multi-agent coordination
+  - [x] CLI: `start` (daemon mode), `once` (single cycle)
+  - [x] **Tests:** 9 orchestrator tests (6 unit + 3 integration)
+  - [ ] Stalled work detection (future)
 - [ ] Bulk operations (TDD: write tests first)
 - [ ] CI integration: read artifacts to auto-pass gates (TDD: write tests first)
 - [ ] Pull-based agent mode (TDD: write tests first)
 - [ ] Metrics reporting: `metrics report --format csv` (TDD: write tests first)
-- [ ] Webhooks for coordinator events (TDD: write tests first)
+- [ ] Webhooks for orchestrator events (TDD: write tests first)
 
 **Tests:**
 - Export format validation ✓

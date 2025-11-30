@@ -186,6 +186,24 @@ impl CommandExecutor {
         Ok(())
     }
 
+    /// Release an issue from its assignee (for timeout/error recovery)
+    pub fn release_issue(&self, id: &str, reason: &str) -> Result<()> {
+        let mut issue = self.storage.load_issue(id)?;
+        let old_assignee = issue.assignee.clone();
+        issue.assignee = None;
+        self.storage.save_issue(&issue)?;
+
+        // Log event
+        let event = Event::new_issue_released(
+            id.to_string(),
+            old_assignee.unwrap_or_default(),
+            reason.to_string(),
+        );
+        self.storage.append_event(&event)?;
+
+        Ok(())
+    }
+
     pub fn claim_next(&self, assignee: String, _filter: Option<String>) -> Result<String> {
         let issues = self.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
@@ -542,6 +560,99 @@ impl CommandExecutor {
                 format
             )),
         }
+    }
+
+    /// Query ready issues (unassigned, state=ready, unblocked)
+    pub fn query_ready(&self) -> Result<Vec<Issue>> {
+        let issues = self.storage.list_issues()?;
+        let issue_refs: Vec<&Issue> = issues.iter().collect();
+        let resolved: HashMap<String, &Issue> =
+            issue_refs.iter().map(|i| (i.id.clone(), *i)).collect();
+
+        let ready: Vec<Issue> = issues
+            .iter()
+            .filter(|i| i.state == State::Ready && i.assignee.is_none() && !i.is_blocked(&resolved))
+            .cloned()
+            .collect();
+
+        Ok(ready)
+    }
+
+    /// Query blocked issues with reasons
+    pub fn query_blocked(&self) -> Result<Vec<(Issue, Vec<String>)>> {
+        let issues = self.storage.list_issues()?;
+        let issue_refs: Vec<&Issue> = issues.iter().collect();
+        let resolved: HashMap<String, &Issue> =
+            issue_refs.iter().map(|i| (i.id.clone(), *i)).collect();
+
+        let mut blocked = Vec::new();
+
+        for issue in &issues {
+            if issue.is_blocked(&resolved) {
+                let mut reasons = Vec::new();
+
+                // Check dependencies
+                for dep_id in &issue.dependencies {
+                    if let Some(dep) = resolved.get(dep_id) {
+                        if dep.state != State::Done {
+                            reasons.push(format!(
+                                "dependency:{} ({}:{:?})",
+                                dep_id, dep.title, dep.state
+                            ));
+                        }
+                    }
+                }
+
+                // Check gates
+                for gate_key in &issue.gates_required {
+                    let gate_state = issue.gates_status.get(gate_key);
+                    let is_passed = gate_state
+                        .map(|gs| gs.status == GateStatus::Passed)
+                        .unwrap_or(false);
+
+                    if !is_passed {
+                        let status_str = gate_state
+                            .map(|gs| format!("{:?}", gs.status))
+                            .unwrap_or_else(|| "Pending".to_string());
+                        reasons.push(format!("gate:{} ({})", gate_key, status_str));
+                    }
+                }
+
+                blocked.push((issue.clone(), reasons));
+            }
+        }
+
+        Ok(blocked)
+    }
+
+    /// Query issues by assignee
+    pub fn query_by_assignee(&self, assignee: &str) -> Result<Vec<Issue>> {
+        let issues = self.storage.list_issues()?;
+        let filtered: Vec<Issue> = issues
+            .into_iter()
+            .filter(|i| i.assignee.as_deref() == Some(assignee))
+            .collect();
+
+        Ok(filtered)
+    }
+
+    /// Query issues by state
+    pub fn query_by_state(&self, state: State) -> Result<Vec<Issue>> {
+        let issues = self.storage.list_issues()?;
+        let filtered: Vec<Issue> = issues.into_iter().filter(|i| i.state == state).collect();
+
+        Ok(filtered)
+    }
+
+    /// Query issues by priority
+    pub fn query_by_priority(&self, priority: Priority) -> Result<Vec<Issue>> {
+        let issues = self.storage.list_issues()?;
+        let filtered: Vec<Issue> = issues
+            .into_iter()
+            .filter(|i| i.priority == priority)
+            .collect();
+
+        Ok(filtered)
     }
 }
 

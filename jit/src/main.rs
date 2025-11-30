@@ -1,0 +1,418 @@
+//! Just-In-Time Issue Tracker
+//!
+//! A repository-local CLI issue tracker with dependency graph enforcement and quality gating.
+//! Designed for deterministic, machine-friendly outputs and process automation.
+//!
+//! # Features
+//!
+//! - Dependency graph modeling with cycle detection
+//! - Quality gate enforcement before state transitions
+//! - Event logging for full audit trail
+//! - Priority-based issue management
+//! - Agent coordination support
+
+mod cli;
+mod commands;
+mod domain;
+mod graph;
+mod storage;
+
+use anyhow::Result;
+use clap::Parser;
+use cli::{
+    Cli, Commands, DepCommands, EventCommands, GateCommands, GraphCommands, IssueCommands,
+    RegistryCommands,
+};
+use commands::{parse_priority, parse_state, CommandExecutor};
+use std::env;
+use storage::Storage;
+
+fn main() -> Result<()> {
+    let cli = Cli::parse();
+
+    let current_dir = env::current_dir()?;
+    let storage = Storage::new(&current_dir);
+    let executor = CommandExecutor::new(storage.clone());
+
+    match cli.command {
+        Commands::Init => {
+            executor.init()?;
+        }
+        Commands::Issue(issue_cmd) => match issue_cmd {
+            IssueCommands::Create {
+                title,
+                desc,
+                priority,
+                gate,
+                json,
+            } => {
+                let prio = parse_priority(&priority)?;
+                let id = executor.create_issue(title, desc, prio, gate)?;
+
+                if json {
+                    let issue = storage.load_issue(&id)?;
+                    println!("{}", serde_json::to_string_pretty(&issue)?);
+                } else {
+                    println!("Created issue: {}", id);
+                }
+            }
+            IssueCommands::List {
+                state,
+                assignee,
+                priority,
+            } => {
+                let state_filter = state.map(|s| parse_state(&s)).transpose()?;
+                let priority_filter = priority.map(|p| parse_priority(&p)).transpose()?;
+                let issues = executor.list_issues(state_filter, assignee, priority_filter)?;
+
+                for issue in issues {
+                    println!(
+                        "{} | {} | {:?} | {:?}",
+                        issue.id, issue.title, issue.state, issue.priority
+                    );
+                }
+            }
+            IssueCommands::Search {
+                query,
+                state,
+                assignee,
+                priority,
+            } => {
+                let state_filter = state.map(|s| parse_state(&s)).transpose()?;
+                let priority_filter = priority.map(|p| parse_priority(&p)).transpose()?;
+                let issues = executor.search_issues_with_filters(
+                    &query,
+                    priority_filter,
+                    state_filter,
+                    assignee,
+                )?;
+
+                println!("Found {} issue(s):", issues.len());
+                for issue in issues {
+                    println!(
+                        "{} | {} | {:?} | {:?}",
+                        issue.id, issue.title, issue.state, issue.priority
+                    );
+                }
+            }
+            IssueCommands::Show { id, json } => {
+                let issue = executor.show_issue(&id)?;
+                if json {
+                    println!("{}", serde_json::to_string_pretty(&issue)?);
+                } else {
+                    println!("ID: {}", issue.id);
+                    println!("Title: {}", issue.title);
+                    println!("Description: {}", issue.description);
+                    println!("State: {:?}", issue.state);
+                    println!("Priority: {:?}", issue.priority);
+                    println!("Assignee: {:?}", issue.assignee);
+                    println!("Dependencies: {:?}", issue.dependencies);
+                    println!("Gates Required: {:?}", issue.gates_required);
+                    println!("Gates Status: {:?}", issue.gates_status);
+                }
+            }
+            IssueCommands::Update {
+                id,
+                title,
+                desc,
+                priority,
+                state,
+                json,
+            } => {
+                let prio = priority.map(|p| parse_priority(&p)).transpose()?;
+                let st = state.map(|s| parse_state(&s)).transpose()?;
+                executor.update_issue(&id, title, desc, prio, st)?;
+
+                if json {
+                    let issue = storage.load_issue(&id)?;
+                    println!("{}", serde_json::to_string_pretty(&issue)?);
+                } else {
+                    println!("Updated issue: {}", id);
+                }
+            }
+            IssueCommands::Delete { id, json } => {
+                executor.delete_issue(&id)?;
+
+                if json {
+                    let result = serde_json::json!({
+                        "id": id,
+                        "deleted": true
+                    });
+                    println!("{}", serde_json::to_string_pretty(&result)?);
+                } else {
+                    println!("Deleted issue: {}", id);
+                }
+            }
+            IssueCommands::Assign { id, to, json } => {
+                executor.assign_issue(&id, to)?;
+
+                if json {
+                    let issue = storage.load_issue(&id)?;
+                    println!("{}", serde_json::to_string_pretty(&issue)?);
+                } else {
+                    println!("Assigned issue: {}", id);
+                }
+            }
+            IssueCommands::Claim { id, to, json } => {
+                executor.claim_issue(&id, to)?;
+
+                if json {
+                    let issue = storage.load_issue(&id)?;
+                    println!("{}", serde_json::to_string_pretty(&issue)?);
+                } else {
+                    println!("Claimed issue: {}", id);
+                }
+            }
+            IssueCommands::Unassign { id, json } => {
+                executor.unassign_issue(&id)?;
+
+                if json {
+                    let issue = storage.load_issue(&id)?;
+                    println!("{}", serde_json::to_string_pretty(&issue)?);
+                } else {
+                    println!("Unassigned issue: {}", id);
+                }
+            }
+            IssueCommands::Release { id, reason, json } => {
+                executor.release_issue(&id, &reason)?;
+
+                if json {
+                    let issue = storage.load_issue(&id)?;
+                    println!("{}", serde_json::to_string_pretty(&issue)?);
+                } else {
+                    println!("Released issue: {} (reason: {})", id, reason);
+                }
+            }
+            IssueCommands::ClaimNext { to, filter } => {
+                let id = executor.claim_next(to, filter)?;
+                println!("Claimed issue: {}", id);
+            }
+        },
+        Commands::Dep(dep_cmd) => match dep_cmd {
+            DepCommands::Add { id, on } => {
+                executor.add_dependency(&id, &on)?;
+                println!("Added dependency: {} depends on {}", id, on);
+            }
+            DepCommands::Rm { id, on } => {
+                executor.remove_dependency(&id, &on)?;
+                println!("Removed dependency: {} no longer depends on {}", id, on);
+            }
+        },
+        Commands::Gate(gate_cmd) => match gate_cmd {
+            GateCommands::Add { id, gate_key } => {
+                executor.add_gate(&id, gate_key.clone())?;
+                println!("Added gate '{}' to issue {}", gate_key, id);
+            }
+            GateCommands::Pass { id, gate_key, by } => {
+                executor.pass_gate(&id, gate_key.clone(), by)?;
+                println!("Passed gate '{}' for issue {}", gate_key, id);
+            }
+            GateCommands::Fail { id, gate_key, by } => {
+                executor.fail_gate(&id, gate_key.clone(), by)?;
+                println!("Failed gate '{}' for issue {}", gate_key, id);
+            }
+        },
+        Commands::Graph(graph_cmd) => match graph_cmd {
+            GraphCommands::Show { id } => {
+                let issues = executor.show_graph(&id)?;
+                println!("Dependency tree for {}:", id);
+                for issue in issues {
+                    println!("  {} | {}", issue.id, issue.title);
+                }
+            }
+            GraphCommands::Downstream { id } => {
+                let issues = executor.show_downstream(&id)?;
+                println!("Downstream dependents of {}:", id);
+                for issue in issues {
+                    println!("  {} | {}", issue.id, issue.title);
+                }
+            }
+            GraphCommands::Roots => {
+                let issues = executor.show_roots()?;
+                println!("Root issues (no dependencies):");
+                for issue in issues {
+                    println!("  {} | {}", issue.id, issue.title);
+                }
+            }
+            GraphCommands::Export { format, output } => {
+                let graph_output = executor.export_graph(&format)?;
+
+                if let Some(path) = output {
+                    std::fs::write(&path, graph_output)?;
+                    println!("Graph exported to: {}", path);
+                } else {
+                    println!("{}", graph_output);
+                }
+            }
+        },
+        Commands::Registry(registry_cmd) => match registry_cmd {
+            RegistryCommands::List => {
+                let gates = executor.list_gates()?;
+                for gate in gates {
+                    println!("{} | {} | auto:{}", gate.key, gate.title, gate.auto);
+                }
+            }
+            RegistryCommands::Add {
+                key,
+                title,
+                desc,
+                auto,
+                example,
+            } => {
+                executor.add_gate_definition(key.clone(), title, desc, auto, example)?;
+                println!("Added gate definition: {}", key);
+            }
+            RegistryCommands::Remove { key } => {
+                executor.remove_gate_definition(&key)?;
+                println!("Removed gate definition: {}", key);
+            }
+            RegistryCommands::Show { key } => {
+                let gate = executor.show_gate_definition(&key)?;
+                println!("Key: {}", gate.key);
+                println!("Title: {}", gate.title);
+                println!("Description: {}", gate.description);
+                println!("Auto: {}", gate.auto);
+                println!("Example Integration: {:?}", gate.example_integration);
+            }
+        },
+        Commands::Events(event_cmd) => match event_cmd {
+            EventCommands::Tail { n } => {
+                let events = executor.tail_events(n)?;
+                for event in events {
+                    println!("{}", serde_json::to_string(&event)?);
+                }
+            }
+            EventCommands::Query {
+                event_type,
+                issue_id,
+                limit,
+            } => {
+                let events = executor.query_events(event_type, issue_id, limit)?;
+                for event in events {
+                    println!("{}", serde_json::to_string(&event)?);
+                }
+            }
+        },
+        Commands::Query(query_cmd) => match query_cmd {
+            cli::QueryCommands::Ready { json } => {
+                let issues = executor.query_ready()?;
+                if json {
+                    let response = serde_json::json!({
+                        "issues": issues,
+                        "count": issues.len(),
+                        "timestamp": chrono::Utc::now(),
+                    });
+                    println!("{}", serde_json::to_string_pretty(&response)?);
+                } else {
+                    println!("Ready issues (unassigned, unblocked):");
+                    for issue in &issues {
+                        println!("  {} | {} | {:?}", issue.id, issue.title, issue.priority);
+                    }
+                    println!("\nTotal: {}", issues.len());
+                }
+            }
+            cli::QueryCommands::Blocked { json } => {
+                let blocked = executor.query_blocked()?;
+                if json {
+                    let issues_with_reasons: Vec<serde_json::Value> = blocked
+                        .iter()
+                        .map(|(issue, reasons)| {
+                            serde_json::json!({
+                                "id": issue.id,
+                                "title": issue.title,
+                                "state": issue.state,
+                                "priority": issue.priority,
+                                "blocked_reasons": reasons.iter().map(|r| {
+                                    let parts: Vec<&str> = r.splitn(2, ':').collect();
+                                    serde_json::json!({
+                                        "type": parts[0],
+                                        "detail": parts.get(1).unwrap_or(&""),
+                                    })
+                                }).collect::<Vec<_>>()
+                            })
+                        })
+                        .collect();
+                    let response = serde_json::json!({
+                        "issues": issues_with_reasons,
+                        "count": blocked.len(),
+                        "timestamp": chrono::Utc::now(),
+                    });
+                    println!("{}", serde_json::to_string_pretty(&response)?);
+                } else {
+                    println!("Blocked issues:");
+                    for (issue, reasons) in &blocked {
+                        println!("  {} | {} | {:?}", issue.id, issue.title, issue.priority);
+                        for reason in reasons {
+                            println!("    - {}", reason);
+                        }
+                    }
+                    println!("\nTotal: {}", blocked.len());
+                }
+            }
+            cli::QueryCommands::Assignee { assignee, json } => {
+                let issues = executor.query_by_assignee(&assignee)?;
+                if json {
+                    let response = serde_json::json!({
+                        "issues": issues,
+                        "count": issues.len(),
+                        "timestamp": chrono::Utc::now(),
+                    });
+                    println!("{}", serde_json::to_string_pretty(&response)?);
+                } else {
+                    println!("Issues assigned to {}:", assignee);
+                    for issue in &issues {
+                        println!(
+                            "  {} | {} | {:?} | {:?}",
+                            issue.id, issue.title, issue.state, issue.priority
+                        );
+                    }
+                    println!("\nTotal: {}", issues.len());
+                }
+            }
+            cli::QueryCommands::State { state, json } => {
+                let parsed_state = parse_state(&state)?;
+                let issues = executor.query_by_state(parsed_state)?;
+                if json {
+                    let response = serde_json::json!({
+                        "issues": issues,
+                        "count": issues.len(),
+                        "timestamp": chrono::Utc::now(),
+                    });
+                    println!("{}", serde_json::to_string_pretty(&response)?);
+                } else {
+                    println!("Issues with state '{}':", state);
+                    for issue in &issues {
+                        println!("  {} | {} | {:?}", issue.id, issue.title, issue.priority);
+                    }
+                    println!("\nTotal: {}", issues.len());
+                }
+            }
+            cli::QueryCommands::Priority { priority, json } => {
+                let parsed_priority = parse_priority(&priority)?;
+                let issues = executor.query_by_priority(parsed_priority)?;
+                if json {
+                    let response = serde_json::json!({
+                        "issues": issues,
+                        "count": issues.len(),
+                        "timestamp": chrono::Utc::now(),
+                    });
+                    println!("{}", serde_json::to_string_pretty(&response)?);
+                } else {
+                    println!("Issues with priority '{}':", priority);
+                    for issue in &issues {
+                        println!("  {} | {} | {:?}", issue.id, issue.title, issue.state);
+                    }
+                    println!("\nTotal: {}", issues.len());
+                }
+            }
+        },
+        Commands::Status => {
+            executor.status()?;
+        }
+        Commands::Validate => {
+            executor.validate()?;
+        }
+    }
+
+    Ok(())
+}

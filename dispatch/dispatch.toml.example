@@ -1,0 +1,27 @@
+# jit-dispatch configuration example
+#
+# Copy this file to `dispatch.toml` and customize for your setup
+
+# How often to poll jit for ready issues (seconds)
+poll_interval_secs = 5
+
+# Agent pool configuration
+# Each agent can handle multiple concurrent tasks
+
+[[agents]]
+id = "copilot-1"
+type = "copilot"
+max_concurrent = 2
+command = "gh copilot work {issue_id}"
+
+[[agents]]
+id = "copilot-2"  
+type = "copilot"
+max_concurrent = 2
+command = "gh copilot work {issue_id}"
+
+[[agents]]
+id = "ci-runner"
+type = "ci"
+max_concurrent = 5
+command = "run-ci-job {issue_id}"

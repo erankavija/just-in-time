@@ -1,0 +1,24 @@
+[package]
+name = "jit"
+version = "0.2.0"
+edition = "2021"
+
+[lib]
+name = "jit"
+path = "src/lib.rs"
+
+[[bin]]
+name = "jit"
+path = "src/main.rs"
+
+[dependencies]
+clap = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

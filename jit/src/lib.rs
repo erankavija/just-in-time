@@ -1,0 +1,14 @@
+//! Just-In-Time Issue Tracker Library
+//!
+//! This library provides the core functionality for JIT issue tracking.
+//! It is primarily used for testing, but can also be embedded in other applications.
+
+pub mod commands;
+pub mod domain;
+pub mod graph;
+pub mod storage;
+
+// Re-export commonly used types
+pub use commands::CommandExecutor;
+pub use domain::{Issue, Priority, State};
+pub use storage::Storage;

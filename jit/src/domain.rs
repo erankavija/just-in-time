@@ -215,6 +215,19 @@ pub enum Event {
         /// When this occurred
         timestamp: DateTime<Utc>,
     },
+    /// Issue was released from assignee
+    IssueReleased {
+        /// Event ID
+        id: String,
+        /// Issue that was released
+        issue_id: String,
+        /// When this occurred
+        timestamp: DateTime<Utc>,
+        /// Previous assignee
+        assignee: String,
+        /// Reason for release
+        reason: String,
+    },
 }
 
 impl Event {
@@ -281,6 +294,17 @@ impl Event {
         }
     }
 
+    /// Create an issue released event
+    pub fn new_issue_released(issue_id: String, assignee: String, reason: String) -> Self {
+        Event::IssueReleased {
+            id: Uuid::new_v4().to_string(),
+            issue_id,
+            timestamp: Utc::now(),
+            assignee,
+            reason,
+        }
+    }
+
     /// Get the issue ID associated with this event
     pub fn get_issue_id(&self) -> &str {
         match self {
@@ -290,6 +314,7 @@ impl Event {
             Event::GatePassed { issue_id, .. } => issue_id,
             Event::GateFailed { issue_id, .. } => issue_id,
             Event::IssueCompleted { issue_id, .. } => issue_id,
+            Event::IssueReleased { issue_id, .. } => issue_id,
         }
     }
 
@@ -302,6 +327,7 @@ impl Event {
             Event::GatePassed { .. } => "gate_passed",
             Event::GateFailed { .. } => "gate_failed",
             Event::IssueCompleted { .. } => "issue_completed",
+            Event::IssueReleased { .. } => "issue_released",
         }
     }
 }

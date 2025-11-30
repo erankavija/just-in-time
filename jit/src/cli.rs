@@ -39,36 +39,15 @@ pub enum Commands {
     #[command(subcommand)]
     Graph(GraphCommands),
 
-    /// Coordinator daemon management
+    /// Query issues for orchestrators
     #[command(subcommand)]
-    Coordinator(CoordinatorCommands),
+    Query(QueryCommands),
 
     /// Show overall status
     Status,
 
     /// Validate repository integrity
     Validate,
-}
-
-#[derive(Subcommand)]
-pub enum CoordinatorCommands {
-    /// Start the coordinator daemon
-    Start {
-        #[arg(short, long)]
-        config: Option<String>,
-    },
-
-    /// Stop the coordinator daemon
-    Stop,
-
-    /// Show coordinator status
-    Status,
-
-    /// List active agents and their assignments
-    Agents,
-
-    /// Initialize coordinator config with example agents
-    InitConfig,
 }
 
 #[derive(Subcommand)]
@@ -86,6 +65,9 @@ pub enum IssueCommands {
 
         #[arg(short, long)]
         gate: Vec<String>,
+
+        #[arg(long)]
+        json: bool,
     },
 
     /// List issues
@@ -116,7 +98,12 @@ pub enum IssueCommands {
     },
 
     /// Show issue details
-    Show { id: String },
+    Show {
+        id: String,
+
+        #[arg(long)]
+        json: bool,
+    },
 
     /// Update an issue
     Update {
@@ -133,10 +120,18 @@ pub enum IssueCommands {
 
         #[arg(short, long)]
         state: Option<String>,
+
+        #[arg(long)]
+        json: bool,
     },
 
     /// Delete an issue
-    Delete { id: String },
+    Delete {
+        id: String,
+
+        #[arg(long)]
+        json: bool,
+    },
 
     /// Assign issue to someone
     Assign {
@@ -144,6 +139,9 @@ pub enum IssueCommands {
 
         #[arg(short, long)]
         to: String,
+
+        #[arg(long)]
+        json: bool,
     },
 
     /// Claim an unassigned issue (atomic)
@@ -152,10 +150,29 @@ pub enum IssueCommands {
 
         #[arg(short, long)]
         to: String,
+
+        #[arg(long)]
+        json: bool,
     },
 
     /// Unassign an issue
-    Unassign { id: String },
+    Unassign {
+        id: String,
+
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Release an issue from its assignee (for timeout recovery)
+    Release {
+        id: String,
+
+        #[arg(short, long)]
+        reason: String,
+
+        #[arg(long)]
+        json: bool,
+    },
 
     /// Claim the next available ready issue
     ClaimNext {
@@ -283,5 +300,44 @@ pub enum EventCommands {
 
         #[arg(short, long, default_value = "50")]
         limit: usize,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum QueryCommands {
+    /// Query ready issues (unassigned, state=ready, unblocked)
+    Ready {
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Query blocked issues with reasons
+    Blocked {
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Query issues by assignee
+    Assignee {
+        assignee: String,
+
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Query issues by state
+    State {
+        state: String,
+
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Query issues by priority
+    Priority {
+        priority: String,
+
+        #[arg(long)]
+        json: bool,
     },
 }

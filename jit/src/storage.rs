@@ -14,8 +14,6 @@ const ISSUES_DIR: &str = "data/issues";
 const INDEX_FILE: &str = "data/index.json";
 const GATES_FILE: &str = "data/gates.json";
 const EVENTS_FILE: &str = "data/events.jsonl";
-const COORDINATOR_CONFIG_FILE: &str = "data/coordinator.json";
-const COORDINATOR_PID_FILE: &str = "data/coordinator.pid";
 
 /// Index of all issues in the repository
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -181,21 +179,6 @@ impl Storage {
         }
 
         Ok(events)
-    }
-
-    /// Get path to coordinator configuration file
-    pub fn coordinator_config_path(&self) -> PathBuf {
-        self.root.join(COORDINATOR_CONFIG_FILE)
-    }
-
-    /// Get path to coordinator PID file
-    pub fn coordinator_pid_path(&self) -> PathBuf {
-        self.root.join(COORDINATOR_PID_FILE)
-    }
-
-    /// Load all issues (alias for list_issues for coordinator)
-    pub fn load_all_issues(&self) -> Result<Vec<Issue>> {
-        self.list_issues()
     }
 
     fn issue_path(&self, id: &str) -> PathBuf {

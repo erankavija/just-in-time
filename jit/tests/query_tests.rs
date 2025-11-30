@@ -1,0 +1,422 @@
+use std::process::Command;
+use tempfile::TempDir;
+
+fn jit_binary() -> String {
+    let mut path = std::env::current_exe().unwrap();
+    path.pop();
+    if path.ends_with("deps") {
+        path.pop();
+    }
+    path.push("jit");
+    path.to_str().unwrap().to_string()
+}
+
+fn setup_test_repo() -> TempDir {
+    let temp = TempDir::new().unwrap();
+    let jit = jit_binary();
+    Command::new(&jit)
+        .args(["init"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    temp
+}
+
+#[test]
+fn test_query_ready_returns_unblocked_issues() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    // Create multiple issues with different states
+    let output1 = Command::new(&jit)
+        .args(["issue", "create", "-t", "Task 1", "-d", "Ready task"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let id1 = String::from_utf8_lossy(&output1.stdout)
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+
+    let output2 = Command::new(&jit)
+        .args(["issue", "create", "-t", "Task 2", "-d", "In progress task"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let id2 = String::from_utf8_lossy(&output2.stdout)
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+
+    let output3 = Command::new(&jit)
+        .args(["issue", "create", "-t", "Task 3", "-d", "Blocked task"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let _id3 = String::from_utf8_lossy(&output3.stdout)
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+
+    // Set states
+    Command::new(&jit)
+        .args(["issue", "update", &id1, "--state", "ready"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    Command::new(&jit)
+        .args(["issue", "update", &id2, "--state", "in_progress"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    // id3 stays in open state
+
+    // Query ready issues
+    let output = Command::new(&jit)
+        .args(["query", "ready", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+
+    // Should return only the ready issue
+    assert_eq!(json["count"], 1);
+    assert_eq!(json["issues"][0]["id"], id1);
+    assert_eq!(json["issues"][0]["state"], "ready");
+}
+
+#[test]
+fn test_query_ready_excludes_assigned_issues() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    // Create two ready issues
+    let output1 = Command::new(&jit)
+        .args(["issue", "create", "-t", "Task 1", "-d", "Unassigned"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let id1 = String::from_utf8_lossy(&output1.stdout)
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+
+    let output2 = Command::new(&jit)
+        .args(["issue", "create", "-t", "Task 2", "-d", "Assigned"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let id2 = String::from_utf8_lossy(&output2.stdout)
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+
+    // Set both to ready
+    Command::new(&jit)
+        .args(["issue", "update", &id1, "--state", "ready"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    Command::new(&jit)
+        .args(["issue", "update", &id2, "--state", "ready"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    // Assign id2
+    Command::new(&jit)
+        .args(["issue", "claim", &id2, "--to", "agent:worker-1"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    // Query ready issues
+    let output = Command::new(&jit)
+        .args(["query", "ready", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+
+    // Should return only unassigned ready issue
+    assert_eq!(json["count"], 1);
+    assert_eq!(json["issues"][0]["id"], id1);
+}
+
+#[test]
+fn test_query_blocked_returns_issues_with_reasons() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    // Create parent and child issues
+    let output1 = Command::new(&jit)
+        .args(["issue", "create", "-t", "Parent", "-d", "Dependency"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let parent_id = String::from_utf8_lossy(&output1.stdout)
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+
+    let output2 = Command::new(&jit)
+        .args(["issue", "create", "-t", "Child", "-d", "Depends on parent"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let child_id = String::from_utf8_lossy(&output2.stdout)
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+
+    // Add dependency
+    Command::new(&jit)
+        .args(["dep", "add", &child_id, "--on", &parent_id])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    // Query blocked issues
+    let output = Command::new(&jit)
+        .args(["query", "blocked", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+
+    // Child should be blocked
+    assert!(json["count"].as_u64().unwrap() >= 1);
+    let child_issue = json["issues"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|i| i["id"] == child_id)
+        .unwrap();
+
+    assert!(!child_issue["blocked_reasons"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+    assert_eq!(child_issue["blocked_reasons"][0]["type"], "dependency");
+}
+
+#[test]
+fn test_query_by_assignee() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    // Create issues with different assignees
+    let output1 = Command::new(&jit)
+        .args(["issue", "create", "-t", "Task 1", "-d", "For worker 1"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let id1 = String::from_utf8_lossy(&output1.stdout)
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+
+    let output2 = Command::new(&jit)
+        .args(["issue", "create", "-t", "Task 2", "-d", "For worker 2"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let id2 = String::from_utf8_lossy(&output2.stdout)
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+
+    // Assign to different agents
+    Command::new(&jit)
+        .args(["issue", "claim", &id1, "--to", "agent:worker-1"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    Command::new(&jit)
+        .args(["issue", "claim", &id2, "--to", "agent:worker-2"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    // Query by assignee
+    let output = Command::new(&jit)
+        .args(["query", "assignee", "agent:worker-1", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+
+    assert_eq!(json["count"], 1);
+    assert_eq!(json["issues"][0]["id"], id1);
+    assert_eq!(json["issues"][0]["assignee"], "agent:worker-1");
+}
+
+#[test]
+fn test_issue_release() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    // Create and assign issue
+    let output = Command::new(&jit)
+        .args(["issue", "create", "-t", "Task", "-d", "Test release"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let id = String::from_utf8_lossy(&output.stdout)
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+
+    Command::new(&jit)
+        .args(["issue", "claim", &id, "--to", "agent:worker-1"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    // Release the issue
+    let output = Command::new(&jit)
+        .args(["issue", "release", &id, "--reason", "timeout"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+
+    // Verify issue is unassigned
+    let output = Command::new(&jit)
+        .args(["issue", "show", &id, "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert!(json["assignee"].is_null());
+}
+
+#[test]
+fn test_query_by_state() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    // Create issues with different states
+    let output1 = Command::new(&jit)
+        .args(["issue", "create", "-t", "Task 1", "-d", "Open"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let _id1 = String::from_utf8_lossy(&output1.stdout)
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+
+    let output2 = Command::new(&jit)
+        .args(["issue", "create", "-t", "Task 2", "-d", "Done"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let id2 = String::from_utf8_lossy(&output2.stdout)
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+
+    Command::new(&jit)
+        .args(["issue", "update", &id2, "--state", "done"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    // Query by state
+    let output = Command::new(&jit)
+        .args(["query", "state", "done", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+
+    assert_eq!(json["count"], 1);
+    assert_eq!(json["issues"][0]["id"], id2);
+    assert_eq!(json["issues"][0]["state"], "done");
+}
+
+#[test]
+fn test_query_by_priority() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    // Create issues with different priorities
+    Command::new(&jit)
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Critical",
+            "-d",
+            "Urgent",
+            "--priority",
+            "critical",
+        ])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    Command::new(&jit)
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Low",
+            "-d",
+            "Not urgent",
+            "--priority",
+            "low",
+        ])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    // Query by priority
+    let output = Command::new(&jit)
+        .args(["query", "priority", "critical", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+
+    assert_eq!(json["count"], 1);
+    assert_eq!(json["issues"][0]["priority"], "critical");
+}
