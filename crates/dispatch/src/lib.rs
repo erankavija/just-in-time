@@ -200,7 +200,7 @@ impl Orchestrator {
         let jit_binary = self.find_jit_binary()?;
 
         let status = Command::new(jit_binary)
-            .args(["issue", "claim", issue_id, "--to", agent_id])
+            .args(["issue", "claim", issue_id, agent_id])
             .current_dir(&self.repo_path)
             .status()
             .context("Failed to execute jit issue claim")?;

@@ -207,14 +207,14 @@ fn test_harness_complex_workflow() {
 fn test_harness_scales_with_many_issues() {
     let h = TestHarness::new();
 
-    // Create many issues quickly
+    // Create many issues quickly (all auto-transition to Ready since no blockers)
     for i in 0..100 {
         h.create_issue(&format!("Task {}", i));
     }
 
     assert_eq!(h.all_issues().len(), 100);
 
-    // Query should be fast
+    // Query should be fast - all are ready since no blockers
     let ready = h.executor.query_ready().unwrap();
-    assert_eq!(ready.len(), 0); // All are open, not ready
+    assert_eq!(ready.len(), 100); // All auto-transitioned to Ready
 }

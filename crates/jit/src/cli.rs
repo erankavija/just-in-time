@@ -63,7 +63,8 @@ pub enum IssueCommands {
         #[arg(short, long, default_value = "normal")]
         priority: String,
 
-        #[arg(short, long)]
+        /// Gate keys (comma-separated or multiple --gate flags)
+        #[arg(short, long, value_delimiter = ',')]
         gate: Vec<String>,
 
         #[arg(long)]
@@ -135,10 +136,11 @@ pub enum IssueCommands {
 
     /// Assign issue to someone
     Assign {
+        /// Issue ID
         id: String,
 
-        #[arg(short, long)]
-        to: String,
+        /// Assignee (format: type:identifier, e.g., agent:worker-1)
+        assignee: String,
 
         #[arg(long)]
         json: bool,
@@ -146,10 +148,11 @@ pub enum IssueCommands {
 
     /// Claim an unassigned issue (atomic)
     Claim {
+        /// Issue ID
         id: String,
 
-        #[arg(short, long)]
-        to: String,
+        /// Assignee (format: type:identifier, e.g., agent:worker-1)
+        assignee: String,
 
         #[arg(long)]
         json: bool,
@@ -157,6 +160,7 @@ pub enum IssueCommands {
 
     /// Unassign an issue
     Unassign {
+        /// Issue ID
         id: String,
 
         #[arg(long)]
@@ -165,9 +169,10 @@ pub enum IssueCommands {
 
     /// Release an issue from its assignee (for timeout recovery)
     Release {
+        /// Issue ID
         id: String,
 
-        #[arg(short, long)]
+        /// Reason for release (e.g., timeout, error)
         reason: String,
 
         #[arg(long)]
@@ -176,8 +181,8 @@ pub enum IssueCommands {
 
     /// Claim the next available ready issue
     ClaimNext {
-        #[arg(short, long)]
-        to: String,
+        /// Assignee (format: type:identifier, e.g., agent:worker-1)
+        assignee: String,
 
         #[arg(short, long)]
         filter: Option<String>,
@@ -186,46 +191,58 @@ pub enum IssueCommands {
 
 #[derive(Subcommand)]
 pub enum DepCommands {
-    /// Add a dependency
+    /// Add a dependency (FROM depends on TO)
     Add {
-        /// Issue that depends on another
-        id: String,
+        /// Issue that depends on another (FROM)
+        from_id: String,
 
-        /// Dependency to add
-        #[arg(short, long)]
-        on: String,
+        /// Dependency required (TO)
+        to_id: String,
     },
 
     /// Remove a dependency
     Rm {
-        /// Issue to modify
-        id: String,
+        /// Issue to modify (FROM)
+        from_id: String,
 
-        /// Dependency to remove
-        #[arg(short, long)]
-        on: String,
+        /// Dependency to remove (TO)
+        to_id: String,
     },
 }
 
 #[derive(Subcommand)]
 pub enum GateCommands {
     /// Add a gate requirement to an issue
-    Add { id: String, gate_key: String },
+    Add {
+        /// Issue ID
+        id: String,
+
+        /// Gate key (from registry)
+        gate_key: String,
+    },
 
     /// Mark a gate as passed
     Pass {
+        /// Issue ID
         id: String,
+
+        /// Gate key
         gate_key: String,
 
+        /// Who passed the gate (optional)
         #[arg(short, long)]
         by: Option<String>,
     },
 
     /// Mark a gate as failed
     Fail {
+        /// Issue ID
         id: String,
+
+        /// Gate key
         gate_key: String,
 
+        /// Who failed the gate (optional)
         #[arg(short, long)]
         by: Option<String>,
     },
@@ -234,19 +251,27 @@ pub enum GateCommands {
 #[derive(Subcommand)]
 pub enum GraphCommands {
     /// Show dependency tree for an issue
-    Show { id: String },
+    Show {
+        /// Issue ID (optional - shows all if omitted)
+        id: Option<String>,
+    },
 
     /// Show issues that depend on this issue
-    Downstream { id: String },
+    Downstream {
+        /// Issue ID
+        id: String,
+    },
 
     /// Show root issues (no dependencies)
     Roots,
 
     /// Export dependency graph in various formats
     Export {
+        /// Output format (dot, mermaid)
         #[arg(short, long, default_value = "dot")]
         format: String,
 
+        /// Output file (optional - prints to stdout if omitted)
         #[arg(short, long)]
         output: Option<String>,
     },

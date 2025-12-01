@@ -106,7 +106,7 @@ fn test_dispatch_claims_issues_for_agents() {
 
     // Simulate dispatch claiming issue for agent
     let status = std::process::Command::new(jit_binary())
-        .args(["issue", "claim", "--to", "agent:test-worker", &id])
+        .args(["issue", "claim", &id, "agent:test-worker"])
         .current_dir(repo.path())
         .status()
         .unwrap();

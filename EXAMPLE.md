@@ -58,9 +58,9 @@ TASK3=$(jit issue create \
   --gate unit-tests --gate review | grep -oP 'Created issue: \K.*')
 
 # Setup dependency graph: epic depends on all tasks
-jit dep add $EPIC --on $TASK1
-jit dep add $EPIC --on $TASK2
-jit dep add $EPIC --on $TASK3
+jit dep add $EPIC $TASK1
+jit dep add $EPIC $TASK2
+jit dep add $EPIC $TASK3
 
 # View the dependency tree
 jit graph show $EPIC
@@ -92,8 +92,8 @@ jit status
 
 ```bash
 # Worker agents claim tasks (could be automated by coordinator)
-jit issue claim $TASK1 --to copilot:worker-1
-jit issue claim $TASK2 --to copilot:worker-2
+jit issue claim $TASK1 copilot:worker-1
+jit issue claim $TASK2 copilot:worker-2
 
 # Check active agents
 jit coordinator agents
@@ -118,7 +118,7 @@ TASK4=$(jit issue create \
   --gate unit-tests --gate security-scan | grep -oP 'Created issue: \K.*')
 
 # Add as dependency to epic
-jit dep add $EPIC --on $TASK4
+jit dep add $EPIC $TASK4
 
 # Pass gates and mark ready
 jit gate pass $TASK4 unit-tests --by "ci:github-actions"
@@ -126,7 +126,7 @@ jit gate pass $TASK4 security-scan --by "ci:snyk"
 jit issue update $TASK4 --state ready
 
 # Another agent can claim it
-jit issue claim $TASK4 --to copilot:worker-1
+jit issue claim $TASK4 copilot:worker-1
 ```
 
 ### 5. Complete Tasks
@@ -151,7 +151,7 @@ jit gate pass $EPIC integration-tests --by "ci:github-actions"
 
 # Mark epic ready and claim it
 jit issue update $EPIC --state ready
-jit issue claim $EPIC --to copilot:lead
+jit issue claim $EPIC copilot:lead
 
 # Lead agent does final integration and marks complete
 jit issue update $EPIC --state done
@@ -218,8 +218,8 @@ FEATURE_B=$(jit issue create --title "Feature B" --priority high ...)
 
 # But both needed for integration
 INTEGRATION=$(jit issue create --title "Integration tests" --priority normal ...)
-jit dep add $INTEGRATION --on $FEATURE_A
-jit dep add $INTEGRATION --on $FEATURE_B
+jit dep add $INTEGRATION $FEATURE_A
+jit dep add $INTEGRATION $FEATURE_B
 
 # Features can be worked on in parallel
 # Integration automatically blocked until both complete

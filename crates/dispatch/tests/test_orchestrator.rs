@@ -42,12 +42,7 @@ fn create_ready_issue(repo_path: &Path, title: &str, priority: &str) -> String {
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     let id = json["id"].as_str().unwrap().to_string();
 
-    // Set to ready
-    Command::new(jit_binary())
-        .args(["issue", "update", &id, "--state", "ready"])
-        .current_dir(repo_path)
-        .status()
-        .unwrap();
+    // No need to set to ready - auto-transitions when no blockers
 
     id
 }

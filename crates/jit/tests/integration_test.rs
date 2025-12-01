@@ -222,7 +222,7 @@ fn test_export_dot_format() {
     let id2 = stdout2.split_whitespace().last().unwrap();
 
     Command::new(&jit)
-        .args(["dep", "add", id2, "--on", id1])
+        .args(["dep", "add", id2, id1])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -392,7 +392,7 @@ fn test_dependencies() {
 
     // Add dependency
     let output = Command::new(&jit)
-        .args(["dep", "add", &id2, "--on", &id1])
+        .args(["dep", "add", &id2, &id1])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -449,14 +449,14 @@ fn test_cycle_detection() {
 
     // Add dependency: id2 depends on id1
     Command::new(&jit)
-        .args(["dep", "add", &id2, "--on", &id1])
+        .args(["dep", "add", &id2, &id1])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     // Try to create cycle: id1 depends on id2 (should fail)
     let output = Command::new(&jit)
-        .args(["dep", "add", &id1, "--on", &id2])
+        .args(["dep", "add", &id1, &id2])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -552,7 +552,7 @@ fn test_assignment_workflow() {
 
     // Assign issue
     Command::new(&jit)
-        .args(["issue", "assign", &id, "-t", "alice"])
+        .args(["issue", "assign", &id, "alice"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -679,7 +679,7 @@ fn test_graph_roots() {
 
     // Add dependency
     Command::new(&jit)
-        .args(["dep", "add", &id2, "--on", &id1])
+        .args(["dep", "add", &id2, &id1])
         .current_dir(temp.path())
         .output()
         .unwrap();

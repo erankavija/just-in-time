@@ -143,8 +143,8 @@ fn main() -> Result<()> {
                     println!("Deleted issue: {}", id);
                 }
             }
-            IssueCommands::Assign { id, to, json } => {
-                executor.assign_issue(&id, to)?;
+            IssueCommands::Assign { id, assignee, json } => {
+                executor.assign_issue(&id, assignee)?;
 
                 if json {
                     let issue = storage.load_issue(&id)?;
@@ -153,8 +153,8 @@ fn main() -> Result<()> {
                     println!("Assigned issue: {}", id);
                 }
             }
-            IssueCommands::Claim { id, to, json } => {
-                executor.claim_issue(&id, to)?;
+            IssueCommands::Claim { id, assignee, json } => {
+                executor.claim_issue(&id, assignee)?;
 
                 if json {
                     let issue = storage.load_issue(&id)?;
@@ -183,19 +183,19 @@ fn main() -> Result<()> {
                     println!("Released issue: {} (reason: {})", id, reason);
                 }
             }
-            IssueCommands::ClaimNext { to, filter } => {
-                let id = executor.claim_next(to, filter)?;
+            IssueCommands::ClaimNext { assignee, filter } => {
+                let id = executor.claim_next(assignee, filter)?;
                 println!("Claimed issue: {}", id);
             }
         },
         Commands::Dep(dep_cmd) => match dep_cmd {
-            DepCommands::Add { id, on } => {
-                executor.add_dependency(&id, &on)?;
-                println!("Added dependency: {} depends on {}", id, on);
+            DepCommands::Add { from_id, to_id } => {
+                executor.add_dependency(&from_id, &to_id)?;
+                println!("Added dependency: {} depends on {}", from_id, to_id);
             }
-            DepCommands::Rm { id, on } => {
-                executor.remove_dependency(&id, &on)?;
-                println!("Removed dependency: {} no longer depends on {}", id, on);
+            DepCommands::Rm { from_id, to_id } => {
+                executor.remove_dependency(&from_id, &to_id)?;
+                println!("Removed dependency: {} no longer depends on {}", from_id, to_id);
             }
         },
         Commands::Gate(gate_cmd) => match gate_cmd {
@@ -214,10 +214,21 @@ fn main() -> Result<()> {
         },
         Commands::Graph(graph_cmd) => match graph_cmd {
             GraphCommands::Show { id } => {
-                let issues = executor.show_graph(&id)?;
-                println!("Dependency tree for {}:", id);
-                for issue in issues {
-                    println!("  {} | {}", issue.id, issue.title);
+                if let Some(issue_id) = id {
+                    let issues = executor.show_graph(&issue_id)?;
+                    println!("Dependency tree for {}:", issue_id);
+                    for issue in issues {
+                        println!("  {} | {}", issue.id, issue.title);
+                    }
+                } else {
+                    // Show all dependencies as a graph
+                    let all_issues = executor.list_issues(None, None, None)?;
+                    println!("All dependencies:");
+                    for issue in all_issues {
+                        if !issue.dependencies.is_empty() {
+                            println!("  {} depends on: {:?}", issue.id, issue.dependencies);
+                        }
+                    }
                 }
             }
             GraphCommands::Downstream { id } => {

@@ -135,7 +135,7 @@ fn test_issue_claim_takes_id_first() {
 
     // Claim with ID first (NEW ORDER)
     let output = Command::new(jit_binary())
-        .args(["issue", "claim", id, "--to", "agent:test", "--json"])
+        .args(["issue", "claim", id, "agent:test", "--json"])
         .current_dir(repo.path())
         .output()
         .unwrap();
@@ -172,7 +172,7 @@ fn test_issue_claim_supports_json() {
 
     // Claim without --json should be human-readable
     let output_text = Command::new(jit_binary())
-        .args(["issue", "claim", id, "--to", "agent:test"])
+        .args(["issue", "claim", id, "agent:test"])
         .current_dir(repo.path())
         .output()
         .unwrap();
@@ -237,14 +237,14 @@ fn test_issue_release_supports_json() {
         .unwrap();
 
     Command::new(jit_binary())
-        .args(["issue", "claim", id, "--to", "agent:test"])
+        .args(["issue", "claim", id, "agent:test"])
         .current_dir(repo.path())
         .status()
         .unwrap();
 
     // Release with JSON
     let output = Command::new(jit_binary())
-        .args(["issue", "release", id, "--reason", "Test", "--json"])
+        .args(["issue", "release", id, "Test", "--json"])
         .current_dir(repo.path())
         .output()
         .unwrap();

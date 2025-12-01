@@ -63,8 +63,15 @@ fn test_query_ready_returns_unblocked_issues() {
         .unwrap()
         .to_string();
 
+    // Create task 3 with a gate to keep it in Open state
+    Command::new(&jit)
+        .args(["registry", "add", "test-gate", "--title", "Test", "--desc", "Test"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    
     let output3 = Command::new(&jit)
-        .args(["issue", "create", "-t", "Task 3", "-d", "Blocked task"])
+        .args(["issue", "create", "-t", "Task 3", "-d", "Blocked task", "--gate", "test-gate"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -74,20 +81,12 @@ fn test_query_ready_returns_unblocked_issues() {
         .unwrap()
         .to_string();
 
-    // Set states
-    Command::new(&jit)
-        .args(["issue", "update", &id1, "--state", "ready"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-
+    // id1 is auto-ready (no blockers), id2 move to in_progress, id3 stays in Open (has pending gate)
     Command::new(&jit)
         .args(["issue", "update", &id2, "--state", "in_progress"])
         .current_dir(temp.path())
         .output()
         .unwrap();
-
-    // id3 stays in open state
 
     // Query ready issues
     let output = Command::new(&jit)
@@ -109,6 +108,14 @@ fn test_query_ready_returns_unblocked_issues() {
 #[test]
 fn test_query_ready_excludes_assigned_issues() {
     let temp = setup_test_repo();
+    let jit = jit_binary();
+    
+    // Add gate for blocking
+    Command::new(&jit)
+        .args(["registry", "add", "block", "--title", "Block", "--desc", "Block"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
     let jit = jit_binary();
 
     // Create two ready issues
@@ -134,22 +141,11 @@ fn test_query_ready_excludes_assigned_issues() {
         .unwrap()
         .to_string();
 
-    // Set both to ready
-    Command::new(&jit)
-        .args(["issue", "update", &id1, "--state", "ready"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
+    // Both auto-transition to ready since no blockers
 
+    // Claim id2
     Command::new(&jit)
-        .args(["issue", "update", &id2, "--state", "ready"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-
-    // Assign id2
-    Command::new(&jit)
-        .args(["issue", "claim", &id2, "--to", "agent:worker-1"])
+        .args(["issue", "claim", &id2, "agent:worker-1"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -200,7 +196,7 @@ fn test_query_blocked_returns_issues_with_reasons() {
 
     // Add dependency
     Command::new(&jit)
-        .args(["dep", "add", &child_id, "--on", &parent_id])
+        .args(["dep", "add", &child_id, &parent_id])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -262,13 +258,13 @@ fn test_query_by_assignee() {
 
     // Assign to different agents
     Command::new(&jit)
-        .args(["issue", "claim", &id1, "--to", "agent:worker-1"])
+        .args(["issue", "claim", &id1, "agent:worker-1"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     Command::new(&jit)
-        .args(["issue", "claim", &id2, "--to", "agent:worker-2"])
+        .args(["issue", "claim", &id2, "agent:worker-2"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -307,14 +303,14 @@ fn test_issue_release() {
         .to_string();
 
     Command::new(&jit)
-        .args(["issue", "claim", &id, "--to", "agent:worker-1"])
+        .args(["issue", "claim", &id, "agent:worker-1"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     // Release the issue
     let output = Command::new(&jit)
-        .args(["issue", "release", &id, "--reason", "timeout"])
+        .args(["issue", "release", &id, "timeout"])
         .current_dir(temp.path())
         .output()
         .unwrap();

@@ -39,6 +39,11 @@ impl CommandExecutor {
         issue.priority = priority;
         issue.gates_required = gates;
 
+        // Auto-transition to Ready if no blockers
+        if issue.dependencies.is_empty() && issue.gates_required.is_empty() {
+            issue.state = State::Ready;
+        }
+
         self.storage.save_issue(&issue)?;
 
         // Log event
@@ -135,6 +140,14 @@ impl CommandExecutor {
         }
 
         self.storage.save_issue(&issue)?;
+        
+        // Check if any dependent issues can now transition to ready (after save!)
+        if let Some(s) = state {
+            if s == State::Done {
+                self.check_auto_transitions()?;
+            }
+        }
+        
         Ok(())
     }
 
@@ -190,7 +203,15 @@ impl CommandExecutor {
     pub fn release_issue(&self, id: &str, reason: &str) -> Result<()> {
         let mut issue = self.storage.load_issue(id)?;
         let old_assignee = issue.assignee.clone();
+        let old_state = issue.state;
+        
         issue.assignee = None;
+        
+        // If in progress, transition back to ready
+        if issue.state == State::InProgress {
+            issue.state = State::Ready;
+        }
+        
         self.storage.save_issue(&issue)?;
 
         // Log event
@@ -200,6 +221,12 @@ impl CommandExecutor {
             reason.to_string(),
         );
         self.storage.append_event(&event)?;
+        
+        // Log state change if it occurred
+        if old_state != issue.state {
+            let event = Event::new_issue_state_changed(id.to_string(), old_state, issue.state);
+            self.storage.append_event(&event)?;
+        }
 
         Ok(())
     }
@@ -245,7 +272,20 @@ impl CommandExecutor {
         let mut issue = self.storage.load_issue(issue_id)?;
         if !issue.dependencies.contains(&dep_id.to_string()) {
             issue.dependencies.push(dep_id.to_string());
-            self.storage.save_issue(&issue)?;
+            
+            // If issue becomes blocked by this dependency, transition to Open
+            let dep_issue = self.storage.load_issue(dep_id)?;
+            if issue.state == State::Ready && dep_issue.state != State::Done {
+                let old_state = issue.state;
+                issue.state = State::Open;
+                self.storage.save_issue(&issue)?;
+                
+                // Log state change
+                let event = Event::new_issue_state_changed(issue.id.clone(), old_state, State::Open);
+                self.storage.append_event(&event)?;
+            } else {
+                self.storage.save_issue(&issue)?;
+            }
         }
 
         Ok(())
@@ -255,14 +295,30 @@ impl CommandExecutor {
         let mut issue = self.storage.load_issue(issue_id)?;
         issue.dependencies.retain(|d| d != dep_id);
         self.storage.save_issue(&issue)?;
+        
+        // Check if this issue can now transition to ready
+        self.auto_transition_to_ready(issue_id)?;
+        
         Ok(())
     }
 
     pub fn add_gate(&self, issue_id: &str, gate_key: String) -> Result<()> {
         let mut issue = self.storage.load_issue(issue_id)?;
         if !issue.gates_required.contains(&gate_key) {
-            issue.gates_required.push(gate_key);
-            self.storage.save_issue(&issue)?;
+            issue.gates_required.push(gate_key.clone());
+            
+            // If issue was Ready, transition to Open since gate is pending
+            if issue.state == State::Ready {
+                let old_state = issue.state;
+                issue.state = State::Open;
+                self.storage.save_issue(&issue)?;
+                
+                // Log state change
+                let event = Event::new_issue_state_changed(issue.id.clone(), old_state, State::Open);
+                self.storage.append_event(&event)?;
+            } else {
+                self.storage.save_issue(&issue)?;
+            }
         }
         Ok(())
     }
@@ -292,6 +348,9 @@ impl CommandExecutor {
         let event = Event::new_gate_passed(issue.id.clone(), gate_key, by);
         self.storage.append_event(&event)?;
 
+        // Check if this issue can now transition to ready
+        self.auto_transition_to_ready(issue_id)?;
+
         Ok(())
     }
 
@@ -320,6 +379,44 @@ impl CommandExecutor {
         let event = Event::new_gate_failed(issue.id.clone(), gate_key, by);
         self.storage.append_event(&event)?;
 
+        Ok(())
+    }
+
+    /// Check if issue should auto-transition to Ready and do so if needed
+    /// Returns true if transition occurred
+    fn auto_transition_to_ready(&self, issue_id: &str) -> Result<bool> {
+        let issues = self.storage.list_issues()?;
+        let resolved: HashMap<String, &Issue> = issues.iter().map(|i| (i.id.clone(), i)).collect();
+        
+        let mut issue = self.storage.load_issue(issue_id)?;
+        
+        if issue.should_auto_transition_to_ready(&resolved) {
+            let old_state = issue.state;
+            issue.state = State::Ready;
+            self.storage.save_issue(&issue)?;
+            
+            // Log state change event
+            let event = Event::new_issue_state_changed(issue.id.clone(), old_state, State::Ready);
+            self.storage.append_event(&event)?;
+            
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    /// Check and auto-transition all Open issues that are now unblocked
+    fn check_auto_transitions(&self) -> Result<()> {
+        let issues = self.storage.list_issues()?;
+        let open_issues: Vec<_> = issues.iter()
+            .filter(|i| i.state == State::Open)
+            .map(|i| i.id.clone())
+            .collect();
+        
+        for issue_id in open_issues {
+            self.auto_transition_to_ready(&issue_id)?;
+        }
+        
         Ok(())
     }
 
@@ -962,13 +1059,13 @@ mod tests {
 
         executor.claim_issue(&id1, "alice".to_string()).unwrap();
 
-        // Query events for id1 - should have created + claimed
+        // Query events for id1 - should have: created, claimed, state_changed (Ready->InProgress)
         let events_id1 = executor.query_events(None, Some(id1.clone()), 100).unwrap();
-        assert_eq!(events_id1.len(), 2);
+        assert_eq!(events_id1.len(), 3); // created + claimed + state_changed
 
-        // Query events for id2 - should have only created
+        // Query events for id2 - should have only: created (created as Ready)
         let events_id2 = executor.query_events(None, Some(id2.clone()), 100).unwrap();
-        assert_eq!(events_id2.len(), 1);
+        assert_eq!(events_id2.len(), 1); // created only
     }
 
     #[test]
@@ -1721,6 +1818,7 @@ mod tests {
     fn test_search_with_state_filter() {
         let (_temp, executor) = setup();
 
+        // Create issue with no blockers (auto-transitions to Ready)
         let id1 = executor
             .create_issue(
                 "Ready task".to_string(),
@@ -1729,24 +1827,22 @@ mod tests {
                 vec![],
             )
             .unwrap();
+            
+        // Create issue with a gate (stays Open)
         executor
             .create_issue(
                 "Open task".to_string(),
                 "Desc".to_string(),
                 Priority::Normal,
-                vec![],
+                vec!["some-gate".to_string()],
             )
-            .unwrap();
-
-        // Update first to Ready state (assuming it has no deps)
-        executor
-            .update_issue(&id1, None, None, None, Some(State::Ready))
             .unwrap();
 
         let results = executor
             .search_issues_with_filters("task", None, Some(State::Ready), None)
             .unwrap();
         assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, id1);
         assert_eq!(results[0].state, State::Ready);
     }
 

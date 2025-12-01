@@ -53,16 +53,16 @@ TASK1=$(jit issue create --title "Create user model" --priority high)
 TASK2=$(jit issue create --title "Implement login endpoint" --priority high)
 
 # Defines dependencies
-jit dep add $EPIC --on $TASK1
-jit dep add $EPIC --on $TASK2
+jit dep add $EPIC $TASK1
+jit dep add $EPIC $TASK2
 ```
 
 ### 2. Worker Agents Execute Tasks
 
 ```bash
 # Workers claim ready tasks
-jit issue claim $TASK1 --to copilot:worker-1
-jit issue claim $TASK2 --to copilot:worker-2
+jit issue claim $TASK1 copilot:worker-1
+jit issue claim $TASK2 copilot:worker-2
 
 # Work on them, pass quality gates
 jit gate pass $TASK1 unit-tests
@@ -74,7 +74,7 @@ jit issue update $TASK1 --state done
 ```bash
 # Agent discovers new work while executing
 NEW=$(jit issue create --title "Add rate limiting" --priority critical)
-jit dep add $EPIC --on $NEW  # Epic now waits for this too
+jit dep add $EPIC $NEW  # Epic now waits for this too
 ```
 
 ### 4. Monitor Everything
@@ -157,15 +157,15 @@ TASK4=$(jit issue create --title "Write integration tests" \
   --gate review)
 
 # Set up dependencies: epic depends on all tasks
-jit dep add $EPIC_ID --on $TASK1
-jit dep add $EPIC_ID --on $TASK2
-jit dep add $EPIC_ID --on $TASK3
-jit dep add $EPIC_ID --on $TASK4
+jit dep add $EPIC_ID $TASK1
+jit dep add $EPIC_ID $TASK2
+jit dep add $EPIC_ID $TASK3
+jit dep add $EPIC_ID $TASK4
 
 # Task 4 depends on tasks 1-3 being complete
-jit dep add $TASK4 --on $TASK1
-jit dep add $TASK4 --on $TASK2
-jit dep add $TASK4 --on $TASK3
+jit dep add $TASK4 $TASK1
+jit dep add $TASK4 $TASK2
+jit dep add $TASK4 $TASK3
 ```
 
 #### 3. Worker Agents: Execute Tasks
@@ -218,7 +218,7 @@ TASK5=$(jit issue create --title "Add rate limiting to login" \
   --gate unit-tests --gate security-scan)
 
 # Add as dependency to epic
-jit dep add $EPIC_ID --on $TASK5
+jit dep add $EPIC_ID $TASK5
 
 # Mark ready and coordinator will dispatch it
 jit issue update $TASK5 --state ready
@@ -275,7 +275,7 @@ jit events tail -n 20
 ```bash
 # Once all tasks done, epic becomes unblocked
 # Lead agent can claim and finalize
-jit issue claim $EPIC_ID --to copilot:copilot-lead
+jit issue claim $EPIC_ID copilot:copilot-lead
 
 # Run final integration tests, pass gates
 jit gate pass $EPIC_ID integration-tests --by "ci:github-actions"
@@ -313,11 +313,11 @@ jit coordinator stop
 # Issue Management
 jit issue create --title "..." --priority high
 jit issue list --state ready
-jit issue claim <id> --to agent:worker-1
+jit issue claim <id> agent:worker-1
 jit issue update <id> --state done
 
 # Dependencies
-jit dep add <issue> --on <prerequisite>
+jit dep add <from-issue> <to-dependency>
 jit graph show <issue>
 
 # Quality Gates  
