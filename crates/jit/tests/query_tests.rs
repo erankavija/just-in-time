@@ -2,6 +2,19 @@ use std::process::Command;
 use tempfile::TempDir;
 
 fn jit_binary() -> String {
+    let manifest_dir = env!("CARGO_MANIFEST_DIR");
+    std::path::Path::new(manifest_dir)
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("target/debug/jit")
+        .to_string_lossy()
+        .to_string()
+}
+
+#[allow(dead_code)]
+fn jit_binary_old() -> String {
     let mut path = std::env::current_exe().unwrap();
     path.pop();
     if path.ends_with("deps") {

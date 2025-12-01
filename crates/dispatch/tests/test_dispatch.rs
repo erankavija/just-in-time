@@ -16,6 +16,8 @@ fn jit_binary() -> std::path::PathBuf {
     std::path::Path::new(manifest_dir)
         .parent()
         .unwrap()
+        .parent()
+        .unwrap()
         .join("target/debug/jit")
 }
 

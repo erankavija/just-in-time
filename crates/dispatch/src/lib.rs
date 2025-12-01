@@ -272,6 +272,8 @@ impl Orchestrator {
         let binary = Path::new(manifest_dir)
             .parent()
             .unwrap()
+            .parent()
+            .unwrap()
             .join("target/debug/jit");
 
         if binary.exists() {

@@ -7,7 +7,14 @@ use tempfile::TempDir;
 
 fn jit_binary() -> String {
     let manifest_dir = env!("CARGO_MANIFEST_DIR");
-    format!("{}/target/debug/jit", manifest_dir)
+    std::path::Path::new(manifest_dir)
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("target/debug/jit")
+        .to_string_lossy()
+        .to_string()
 }
 
 fn setup_test_repo() -> TempDir {

@@ -1,14 +1,16 @@
 [package]
-name = "jit-dispatch"
-version = "0.1.0"
-edition = "2021"
+name = "jit"
+version = "0.2.0"
+edition.workspace = true
+license.workspace = true
+description = "CLI-first issue tracker with dependency graphs and quality gates"
 
 [lib]
-name = "jit_dispatch"
+name = "jit"
 path = "src/lib.rs"
 
 [[bin]]
-name = "jit-dispatch"
+name = "jit"
 path = "src/main.rs"
 
 [dependencies]
@@ -17,8 +19,8 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 anyhow = { workspace = true }
 thiserror = { workspace = true }
-tokio = { version = "1.40", features = ["full"] }
-toml = "0.8"
+uuid = { workspace = true }
+chrono = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
