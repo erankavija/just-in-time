@@ -6,12 +6,14 @@
 pub mod commands;
 pub mod domain;
 pub mod graph;
+pub mod output;
 pub mod storage;
 pub mod visualization;
 
 // Re-export commonly used types
 pub use commands::CommandExecutor;
 pub use domain::{Issue, Priority, State};
+pub use output::{JsonError, JsonOutput};
 pub use storage::{InMemoryStorage, IssueStore, JsonFileStorage};
 
 // Backwards compatibility alias

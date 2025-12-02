@@ -15,6 +15,7 @@ mod cli;
 mod commands;
 mod domain;
 mod graph;
+mod output;
 mod storage;
 mod visualization;
 
