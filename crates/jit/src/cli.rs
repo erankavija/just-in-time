@@ -301,7 +301,10 @@ pub enum GraphCommands {
 #[derive(Subcommand)]
 pub enum RegistryCommands {
     /// List all gate definitions
-    List,
+    List {
+        #[arg(long)]
+        json: bool,
+    },
 
     /// Add a gate definition to the registry
     Add {
@@ -325,7 +328,12 @@ pub enum RegistryCommands {
     Remove { key: String },
 
     /// Show gate definition details
-    Show { key: String },
+    Show {
+        key: String,
+
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Subcommand)]

@@ -238,6 +238,27 @@ pub struct GraphRootsResponse {
     pub count: usize,
 }
 
+// ============================================================================
+// Registry Response Types
+// ============================================================================
+
+/// Response for `registry list` command
+#[derive(Debug, Serialize)]
+pub struct RegistryListResponse {
+    pub gates: Vec<GateDefinition>,
+    pub count: usize,
+}
+
+/// Gate definition structure (for registry responses)
+#[derive(Debug, Serialize)]
+pub struct GateDefinition {
+    pub key: String,
+    pub title: String,
+    pub description: String,
+    pub auto: bool,
+    pub example_integration: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

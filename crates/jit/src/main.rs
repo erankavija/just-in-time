@@ -362,10 +362,32 @@ fn main() -> Result<()> {
             }
         },
         Commands::Registry(registry_cmd) => match registry_cmd {
-            RegistryCommands::List => {
+            RegistryCommands::List { json } => {
                 let gates = executor.list_gates()?;
-                for gate in gates {
-                    println!("{} | {} | auto:{}", gate.key, gate.title, gate.auto);
+                if json {
+                    use output::{GateDefinition, JsonOutput, RegistryListResponse};
+
+                    let gate_defs: Vec<GateDefinition> = gates
+                        .iter()
+                        .map(|g| GateDefinition {
+                            key: g.key.clone(),
+                            title: g.title.clone(),
+                            description: g.description.clone(),
+                            auto: g.auto,
+                            example_integration: g.example_integration.clone(),
+                        })
+                        .collect();
+
+                    let response = RegistryListResponse {
+                        count: gate_defs.len(),
+                        gates: gate_defs,
+                    };
+                    let output = JsonOutput::success(response);
+                    println!("{}", output.to_json_string()?);
+                } else {
+                    for gate in gates {
+                        println!("{} | {} | auto:{}", gate.key, gate.title, gate.auto);
+                    }
                 }
             }
             RegistryCommands::Add {
@@ -382,13 +404,27 @@ fn main() -> Result<()> {
                 executor.remove_gate_definition(&key)?;
                 println!("Removed gate definition: {}", key);
             }
-            RegistryCommands::Show { key } => {
+            RegistryCommands::Show { key, json } => {
                 let gate = executor.show_gate_definition(&key)?;
-                println!("Key: {}", gate.key);
-                println!("Title: {}", gate.title);
-                println!("Description: {}", gate.description);
-                println!("Auto: {}", gate.auto);
-                println!("Example Integration: {:?}", gate.example_integration);
+                if json {
+                    use output::{GateDefinition, JsonOutput};
+
+                    let gate_def = GateDefinition {
+                        key: gate.key.clone(),
+                        title: gate.title.clone(),
+                        description: gate.description.clone(),
+                        auto: gate.auto,
+                        example_integration: gate.example_integration.clone(),
+                    };
+                    let output = JsonOutput::success(gate_def);
+                    println!("{}", output.to_json_string()?);
+                } else {
+                    println!("Key: {}", gate.key);
+                    println!("Title: {}", gate.title);
+                    println!("Description: {}", gate.description);
+                    println!("Auto: {}", gate.auto);
+                    println!("Example Integration: {:?}", gate.example_integration);
+                }
             }
         },
         Commands::Events(event_cmd) => match event_cmd {
