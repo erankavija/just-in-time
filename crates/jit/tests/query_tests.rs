@@ -117,9 +117,9 @@ fn test_query_ready_returns_unblocked_issues() {
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
     // Should return only the ready issue
-    assert_eq!(json["count"], 1);
-    assert_eq!(json["issues"][0]["id"], id1);
-    assert_eq!(json["issues"][0]["state"], "ready");
+    assert_eq!(json["data"]["count"], 1);
+    assert_eq!(json["data"]["issues"][0]["id"], id1);
+    assert_eq!(json["data"]["issues"][0]["state"], "ready");
 }
 
 #[test]
@@ -181,8 +181,8 @@ fn test_query_ready_excludes_assigned_issues() {
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
     // Should return only unassigned ready issue
-    assert_eq!(json["count"], 1);
-    assert_eq!(json["issues"][0]["id"], id1);
+    assert_eq!(json["data"]["count"], 1);
+    assert_eq!(json["data"]["issues"][0]["id"], id1);
 }
 
 #[test]
@@ -232,8 +232,8 @@ fn test_query_blocked_returns_issues_with_reasons() {
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
     // Child should be blocked
-    assert!(json["count"].as_u64().unwrap() >= 1);
-    let child_issue = json["issues"]
+    assert!(json["data"]["count"].as_u64().unwrap() >= 1);
+    let child_issue = json["data"]["issues"]
         .as_array()
         .unwrap()
         .iter()
@@ -299,9 +299,9 @@ fn test_query_by_assignee() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
-    assert_eq!(json["count"], 1);
-    assert_eq!(json["issues"][0]["id"], id1);
-    assert_eq!(json["issues"][0]["assignee"], "agent:worker-1");
+    assert_eq!(json["data"]["count"], 1);
+    assert_eq!(json["data"]["issues"][0]["id"], id1);
+    assert_eq!(json["data"]["issues"][0]["assignee"], "agent:worker-1");
 }
 
 #[test]
@@ -393,9 +393,9 @@ fn test_query_by_state() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
-    assert_eq!(json["count"], 1);
-    assert_eq!(json["issues"][0]["id"], id2);
-    assert_eq!(json["issues"][0]["state"], "done");
+    assert_eq!(json["data"]["count"], 1);
+    assert_eq!(json["data"]["issues"][0]["id"], id2);
+    assert_eq!(json["data"]["issues"][0]["state"], "done");
 }
 
 #[test]
@@ -445,6 +445,6 @@ fn test_query_by_priority() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
-    assert_eq!(json["count"], 1);
-    assert_eq!(json["issues"][0]["priority"], "critical");
+    assert_eq!(json["data"]["count"], 1);
+    assert_eq!(json["data"]["issues"][0]["priority"], "critical");
 }

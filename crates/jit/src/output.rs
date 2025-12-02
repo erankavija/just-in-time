@@ -8,6 +8,8 @@ use chrono::Utc;
 use serde::{Serialize, Serializer};
 use serde_json::Value;
 
+use crate::domain::{Issue, Priority, State};
+
 /// Version of the JSON output format
 const OUTPUT_VERSION: &str = "0.2.0";
 
@@ -36,6 +38,7 @@ impl<T: Serialize> JsonOutput<T> {
 }
 
 /// Wrapper for error output with suggestions
+#[allow(dead_code)]
 #[derive(Debug, Serialize)]
 pub struct JsonError {
     pub success: bool,
@@ -43,6 +46,7 @@ pub struct JsonError {
     pub metadata: Metadata,
 }
 
+#[allow(dead_code)]
 impl JsonError {
     /// Create a new error output
     pub fn new(code: impl Into<String>, message: impl Into<String>) -> Self {
@@ -83,6 +87,7 @@ impl JsonError {
 }
 
 /// Error details including code, message, and suggestions
+#[allow(dead_code)]
 #[derive(Debug, Serialize)]
 pub struct ErrorDetail {
     /// Error code (e.g., "ISSUE_NOT_FOUND", "CYCLE_DETECTED")
@@ -122,6 +127,72 @@ where
     S: Serializer,
 {
     serializer.serialize_str(&dt.to_rfc3339())
+}
+
+// ============================================================================
+// Query Response Types
+// ============================================================================
+
+/// Response for `query ready` command
+#[derive(Debug, Serialize)]
+pub struct ReadyQueryResponse {
+    pub issues: Vec<Issue>,
+    pub count: usize,
+}
+
+/// Response for `query blocked` command
+#[derive(Debug, Serialize)]
+pub struct BlockedQueryResponse {
+    pub issues: Vec<BlockedIssue>,
+    pub count: usize,
+}
+
+/// Issue with blocking reasons
+#[derive(Debug, Serialize)]
+pub struct BlockedIssue {
+    #[serde(flatten)]
+    pub issue: Issue,
+    pub blocked_reasons: Vec<BlockedReason>,
+}
+
+/// Reason why an issue is blocked
+#[derive(Debug, Serialize)]
+pub struct BlockedReason {
+    #[serde(rename = "type")]
+    pub reason_type: BlockedReasonType,
+    pub detail: String,
+}
+
+/// Type of blocking reason
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum BlockedReasonType {
+    Dependency,
+    Gate,
+}
+
+/// Response for `query assignee` command
+#[derive(Debug, Serialize)]
+pub struct AssigneeQueryResponse {
+    pub assignee: String,
+    pub issues: Vec<Issue>,
+    pub count: usize,
+}
+
+/// Response for `query state` command
+#[derive(Debug, Serialize)]
+pub struct StateQueryResponse {
+    pub state: State,
+    pub issues: Vec<Issue>,
+    pub count: usize,
+}
+
+/// Response for `query priority` command
+#[derive(Debug, Serialize)]
+pub struct PriorityQueryResponse {
+    pub priority: Priority,
+    pub issues: Vec<Issue>,
+    pub count: usize,
 }
 
 #[cfg(test)]
@@ -202,5 +273,120 @@ mod tests {
         let now = Utc::now();
         let diff = now.signed_duration_since(metadata.timestamp);
         assert!(diff.num_seconds() < 5);
+    }
+
+    // ========================================================================
+    // Query Response Tests
+    // ========================================================================
+
+    #[test]
+    fn test_ready_query_response_serialization() {
+        let issues = vec![Issue::new("Issue 1".to_string(), "".to_string())];
+        let response = ReadyQueryResponse {
+            issues: issues.clone(),
+            count: 1,
+        };
+
+        let json_output = JsonOutput::success(response);
+        let serialized = json_output.to_json_string().unwrap();
+
+        assert!(serialized.contains("\"success\": true"));
+        assert!(serialized.contains("\"count\": 1"));
+        assert!(serialized.contains("\"metadata\""));
+    }
+
+    #[test]
+    fn test_blocked_query_response_serialization() {
+        let issue = Issue::new("Issue 1".to_string(), "".to_string());
+        let reasons = vec![BlockedReason {
+            reason_type: BlockedReasonType::Dependency,
+            detail: "Waiting on ABC123".to_string(),
+        }];
+
+        let blocked_issue = BlockedIssue {
+            issue,
+            blocked_reasons: reasons,
+        };
+
+        let response = BlockedQueryResponse {
+            issues: vec![blocked_issue],
+            count: 1,
+        };
+
+        let json_output = JsonOutput::success(response);
+        let serialized = json_output.to_json_string().unwrap();
+
+        assert!(serialized.contains("\"success\": true"));
+        assert!(serialized.contains("\"blocked_reasons\""));
+        assert!(serialized.contains("\"dependency\""));
+    }
+
+    #[test]
+    fn test_assignee_query_response() {
+        let issues = vec![Issue::new("Issue 1".to_string(), "".to_string())];
+
+        let response = AssigneeQueryResponse {
+            assignee: "copilot:session-1".to_string(),
+            issues: issues.clone(),
+            count: 1,
+        };
+
+        let json_output = JsonOutput::success(response);
+        let serialized = json_output.to_json_string().unwrap();
+
+        assert!(serialized.contains("\"assignee\""));
+        assert!(serialized.contains("copilot:session-1"));
+    }
+
+    #[test]
+    fn test_state_query_response() {
+        let issues = vec![Issue::new("Issue 1".to_string(), "".to_string())];
+
+        let response = StateQueryResponse {
+            state: State::Ready,
+            issues: issues.clone(),
+            count: 1,
+        };
+
+        let json_output = JsonOutput::success(response);
+        let serialized = json_output.to_json_string().unwrap();
+
+        assert!(serialized.contains("\"state\""));
+        assert!(serialized.contains("\"ready\""));
+    }
+
+    #[test]
+    fn test_priority_query_response() {
+        let issues = vec![Issue::new("Issue 1".to_string(), "".to_string())];
+
+        let response = PriorityQueryResponse {
+            priority: Priority::High,
+            issues: issues.clone(),
+            count: 1,
+        };
+
+        let json_output = JsonOutput::success(response);
+        let serialized = json_output.to_json_string().unwrap();
+
+        assert!(serialized.contains("\"priority\""));
+        assert!(serialized.contains("\"high\""));
+    }
+
+    #[test]
+    fn test_blocked_reason_types() {
+        let dep = BlockedReason {
+            reason_type: BlockedReasonType::Dependency,
+            detail: "ABC".to_string(),
+        };
+        let gate = BlockedReason {
+            reason_type: BlockedReasonType::Gate,
+            detail: "test-gate".to_string(),
+        };
+
+        let dep_json = serde_json::to_value(&dep).unwrap();
+        let gate_json = serde_json::to_value(&gate).unwrap();
+
+        assert_eq!(dep_json["type"], "dependency");
+        assert_eq!(gate_json["type"], "gate");
     }
 }

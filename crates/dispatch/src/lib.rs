@@ -157,7 +157,7 @@ impl Orchestrator {
         let json: serde_json::Value =
             serde_json::from_slice(&output.stdout).context("Failed to parse jit query output")?;
 
-        let issues: Vec<ReadyIssue> = json["issues"]
+        let issues: Vec<ReadyIssue> = json["data"]["issues"]
             .as_array()
             .ok_or_else(|| anyhow::anyhow!("Expected 'issues' array in response"))?
             .iter()

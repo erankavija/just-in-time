@@ -350,12 +350,14 @@ fn main() -> Result<()> {
             cli::QueryCommands::Ready { json } => {
                 let issues = executor.query_ready()?;
                 if json {
-                    let response = serde_json::json!({
-                        "issues": issues,
-                        "count": issues.len(),
-                        "timestamp": chrono::Utc::now(),
-                    });
-                    println!("{}", serde_json::to_string_pretty(&response)?);
+                    use output::{JsonOutput, ReadyQueryResponse};
+
+                    let response = ReadyQueryResponse {
+                        issues: issues.clone(),
+                        count: issues.len(),
+                    };
+                    let output = JsonOutput::success(response);
+                    println!("{}", output.to_json_string()?);
                 } else {
                     println!("Ready issues (unassigned, unblocked):");
                     for issue in &issues {
@@ -367,30 +369,41 @@ fn main() -> Result<()> {
             cli::QueryCommands::Blocked { json } => {
                 let blocked = executor.query_blocked()?;
                 if json {
-                    let issues_with_reasons: Vec<serde_json::Value> = blocked
+                    use output::{
+                        BlockedIssue, BlockedQueryResponse, BlockedReason, BlockedReasonType,
+                        JsonOutput,
+                    };
+
+                    let blocked_issues: Vec<BlockedIssue> = blocked
                         .iter()
                         .map(|(issue, reasons)| {
-                            serde_json::json!({
-                                "id": issue.id,
-                                "title": issue.title,
-                                "state": issue.state,
-                                "priority": issue.priority,
-                                "blocked_reasons": reasons.iter().map(|r| {
+                            let blocked_reasons = reasons
+                                .iter()
+                                .map(|r| {
                                     let parts: Vec<&str> = r.splitn(2, ':').collect();
-                                    serde_json::json!({
-                                        "type": parts[0],
-                                        "detail": parts.get(1).unwrap_or(&""),
-                                    })
-                                }).collect::<Vec<_>>()
-                            })
+                                    let reason_type = match parts[0] {
+                                        "gate" => BlockedReasonType::Gate,
+                                        _ => BlockedReasonType::Dependency,
+                                    };
+                                    BlockedReason {
+                                        reason_type,
+                                        detail: parts.get(1).unwrap_or(&"").to_string(),
+                                    }
+                                })
+                                .collect();
+                            BlockedIssue {
+                                issue: (*issue).clone(),
+                                blocked_reasons,
+                            }
                         })
                         .collect();
-                    let response = serde_json::json!({
-                        "issues": issues_with_reasons,
-                        "count": blocked.len(),
-                        "timestamp": chrono::Utc::now(),
-                    });
-                    println!("{}", serde_json::to_string_pretty(&response)?);
+
+                    let response = BlockedQueryResponse {
+                        issues: blocked_issues,
+                        count: blocked.len(),
+                    };
+                    let output = JsonOutput::success(response);
+                    println!("{}", output.to_json_string()?);
                 } else {
                     println!("Blocked issues:");
                     for (issue, reasons) in &blocked {
@@ -405,12 +418,15 @@ fn main() -> Result<()> {
             cli::QueryCommands::Assignee { assignee, json } => {
                 let issues = executor.query_by_assignee(&assignee)?;
                 if json {
-                    let response = serde_json::json!({
-                        "issues": issues,
-                        "count": issues.len(),
-                        "timestamp": chrono::Utc::now(),
-                    });
-                    println!("{}", serde_json::to_string_pretty(&response)?);
+                    use output::{AssigneeQueryResponse, JsonOutput};
+
+                    let response = AssigneeQueryResponse {
+                        assignee: assignee.clone(),
+                        issues: issues.clone(),
+                        count: issues.len(),
+                    };
+                    let output = JsonOutput::success(response);
+                    println!("{}", output.to_json_string()?);
                 } else {
                     println!("Issues assigned to {}:", assignee);
                     for issue in &issues {
@@ -426,12 +442,15 @@ fn main() -> Result<()> {
                 let parsed_state = parse_state(&state)?;
                 let issues = executor.query_by_state(parsed_state)?;
                 if json {
-                    let response = serde_json::json!({
-                        "issues": issues,
-                        "count": issues.len(),
-                        "timestamp": chrono::Utc::now(),
-                    });
-                    println!("{}", serde_json::to_string_pretty(&response)?);
+                    use output::{JsonOutput, StateQueryResponse};
+
+                    let response = StateQueryResponse {
+                        state: parsed_state,
+                        issues: issues.clone(),
+                        count: issues.len(),
+                    };
+                    let output = JsonOutput::success(response);
+                    println!("{}", output.to_json_string()?);
                 } else {
                     println!("Issues with state '{}':", state);
                     for issue in &issues {
@@ -444,12 +463,15 @@ fn main() -> Result<()> {
                 let parsed_priority = parse_priority(&priority)?;
                 let issues = executor.query_by_priority(parsed_priority)?;
                 if json {
-                    let response = serde_json::json!({
-                        "issues": issues,
-                        "count": issues.len(),
-                        "timestamp": chrono::Utc::now(),
-                    });
-                    println!("{}", serde_json::to_string_pretty(&response)?);
+                    use output::{JsonOutput, PriorityQueryResponse};
+
+                    let response = PriorityQueryResponse {
+                        priority: parsed_priority,
+                        issues: issues.clone(),
+                        count: issues.len(),
+                    };
+                    let output = JsonOutput::success(response);
+                    println!("{}", output.to_json_string()?);
                 } else {
                     println!("Issues with priority '{}':", priority);
                     for issue in &issues {

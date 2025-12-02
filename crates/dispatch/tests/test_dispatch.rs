@@ -83,7 +83,7 @@ fn query_ready_issues(repo_path: &Path) -> Vec<serde_json::Value> {
     assert!(output.status.success(), "Failed to query ready issues");
 
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    json["issues"].as_array().unwrap().to_vec()
+    json["data"]["issues"].as_array().unwrap().to_vec()
 }
 
 #[test]
@@ -125,7 +125,7 @@ fn test_dispatch_claims_issues_for_agents() {
         .unwrap();
 
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["issues"].as_array().unwrap().len(), 1);
+    assert_eq!(json["data"]["issues"].as_array().unwrap().len(), 1);
 }
 
 #[test]
@@ -152,7 +152,7 @@ fn test_dispatch_respects_priority() {
         .unwrap();
 
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["issues"].as_array().unwrap().len(), 1);
+    assert_eq!(json["data"]["issues"].as_array().unwrap().len(), 1);
 }
 
 // TODO: Add tests for:
