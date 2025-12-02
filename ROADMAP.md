@@ -160,6 +160,47 @@
 
 **Reference:** See `docs/design.md` sections: Monitoring & Observability, Extensibility Hooks
 
+## Code Quality & Housekeeping (Ongoing)
+
+**Goal:** Maintain clean, well-documented, maintainable codebase.
+
+**Current Status (2025-12-02):**
+- ✅ All 11 modules have module-level docs
+- ✅ Zero rustdoc warnings in default mode
+- ✅ Zero clippy warnings
+- ✅ 312 tests passing
+- ⚠️ `main.rs` at 807 lines (trending up due to JSON error handling)
+- ⚠️ `commands.rs` at 1,980 lines (acceptable but monitor)
+- ⚠️ 99 items missing docs in strict mode (mostly `commands.rs` methods)
+
+**Action Items:**
+- [ ] **Refactor main.rs** (Priority: Medium, Before: 1,000 lines)
+  - [ ] Extract JSON output helpers/macros to reduce boilerplate
+  - [ ] Consider `handle_json_result!(expr, json_flag)` macro
+  - [ ] Alternative: Split into command handler modules if >1,000 lines
+  - [ ] **Estimated:** 2-3 hours
+- [ ] **Document CommandExecutor public API** (Priority: Medium, Before: Phase 4)
+  - [ ] Add doc comments to all 40 public methods in `commands.rs`
+  - [ ] Include examples for complex methods
+  - [ ] Document error cases and edge conditions
+  - [ ] **Estimated:** 2-3 hours
+  - [ ] **Target:** Zero warnings with `cargo rustdoc -- -D missing_docs`
+- [ ] **Monitor code growth** (Priority: Low, Ongoing)
+  - [ ] Keep `main.rs` under 1,000 lines
+  - [ ] Consider splitting `commands.rs` if >2,500 lines
+  - [ ] Track: `find crates -name "*.rs" -exec wc -l {} + | sort -rn | head -5`
+- [ ] **Documentation audit** (Priority: Low, Before: v1.0)
+  - [ ] Ensure all public APIs have doc comments with examples
+  - [ ] Add usage examples to module docs
+  - [ ] Update `README.md` with latest features
+  - [ ] **Estimated:** 3-4 hours
+
+**Benefits:**
+- Easier onboarding for contributors
+- Reduces technical debt accumulation
+- Prevents future refactoring efforts (2-3 hours now vs 10+ hours later)
+- Better IDE support and discoverability
+
 ## Phase 4: Production Readiness
 
 **Goal:** Concurrency safety and production features.
