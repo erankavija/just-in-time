@@ -102,7 +102,7 @@
   - [x] Prepare for future web UI (clean graph data structure)
   - [x] Added 5 new generic graph tests (102 total tests)
   - [x] **See:** `docs/generic-dag-refactoring.md` for detailed plan
-- [x] **CLI Consistency & MCP Integration - Phase 1.1** (2025-12-02) ✅ **COMPLETED**
+- [x] **CLI Consistency - Phase 1.1** (2025-12-02) ✅ **COMPLETED**
   - [x] Phase 1.1: Universal JSON output for all commands
   - [x] JsonOutput<T> and JsonError foundation types
   - [x] Add --json to: issue commands (list, show, search)
@@ -115,14 +115,21 @@
   - [x] **308 tests passing** (was 293, +15 new tests)
   - [x] 3 commits: query, graph, registry JSON support
   - [x] **Time invested:** ~4 hours
-- [ ] **CLI Consistency - Phase 1.2** (2025-12-02+) 🚧 **NEXT**
-  - [ ] Structured error responses with suggestions
-  - [ ] JsonError usage in command handlers
-  - [ ] Error codes (ISSUE_NOT_FOUND, CYCLE_DETECTED, etc.)
-  - [ ] Suggestions for common errors
-  - [ ] **Estimated:** 6-8 hours
-- [ ] **CLI Consistency - Phase 1.3** (Future)
+- [x] **CLI Consistency - Phase 1.2** (2025-12-02) ✅ **COMPLETED**
+  - [x] Structured error responses with suggestions
+  - [x] JsonError usage in command handlers (issue show, dep add/rm, gate add/pass/fail, query state/priority)
+  - [x] Error codes (ISSUE_NOT_FOUND, GATE_NOT_FOUND, CYCLE_DETECTED, INVALID_STATE, INVALID_ARGUMENT, etc.)
+  - [x] Suggestions for common errors (with helpful commands)
+  - [x] --json flag added to dep commands (add, rm)
+  - [x] --json flag added to gate commands (add, pass, fail)
+  - [x] Exit code 1 for errors with JSON output
+  - [x] **312 tests passing** (was 308, +4 error handling tests)
+  - [x] 1 commit: structured error handling
+  - [x] **Time invested:** ~2 hours (faster than estimated 6-8 hours!)
+- [ ] **CLI Consistency - Phase 1.3** (Future) 🚧 **NEXT**
   - [ ] Standardized exit codes for automation
+  - [ ] Exit code enum with clear mappings
+  - [ ] Document exit codes in --help
   - [ ] **Estimated:** 4-6 hours
 - [ ] **CLI Consistency - Phase 1.4** (Future)
   - [ ] Command schema export (`--schema json`)
