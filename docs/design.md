@@ -1,7 +1,7 @@
 # Design: CLI Issue Tracker (Just-In-Time)
 
-Version: 0.1
-Date: 2025-11-27
+Version: 0.2
+Date: 2025-12-01
 
 ## Goal
 Provide a compact, robust design for a repository-local CLI issue tracker emphasizing:
@@ -26,6 +26,7 @@ This document captures the domain model, file layout, behaviors, CLI surface, va
 - Repository-local store: one file per issue under data/issues/<id>.json plus small global files.
 - CLI tool ('jit') performs CRUD, dependency edits, validation, gate operations, and shows dependency trees.
 - System enforces DAG property for dependencies and enforces that issues cannot be marked ready/done while gates or dependencies block them.
+- Separate orchestrator tool ('jit-dispatch') handles agent coordination and work distribution.
 
 ---
 
@@ -133,16 +134,18 @@ Graph commands
 - jit graph show <id>         (upstream tree)
 - jit graph downstream <id>   (issues that depend on <id>)
 - jit graph roots             (issues with no dependencies)
-Monitoring & observability
-- jit status                  (overview: X open, Y in-progress, Z blocked with reasons)
-- jit agent list              (show active agents and their assignments)
-- jit metrics [--since 1h]    (issues completed, gates passed/failed, cycle time)
+Query interface
+- jit query ready             (issues ready for work: state=ready, unassigned, no blocks)
+- jit query blocked           (issues blocked by dependencies or gates)
+- jit query assignee <name>   (issues assigned to specific agent)
+- jit query state <state>     (filter by state)
+- jit query priority <level>  (filter by priority)
+Events
+- jit events tail             (live event stream)
+- jit events query            (historical event search)
 Validation & tooling
 - jit validate                (full integrity check; returns non-zero on errors)
 - jit export --format dot|mermaid
-Orchestration (Phase 2+)
-- jit coordinator start       (launch coordinator daemon)
-- jit coordinator stop        (stop coordinator daemon)
 Machine outputs
 - All commands support --json to return structured output for automation.
 
@@ -169,27 +172,39 @@ Phase 1: Core Issue Management
 - Issue assignment commands (assign, claim, unassign)
 - Derived-state evaluation (compute blocked status from dependencies/gates)
 
-Phase 2: Quality Gates & Orchestration
+Phase 2: Quality Gates & Query Interface
 - Implement gate assignment and status transitions (pass/fail)
 - Event log: append-only data/events.jsonl for audit trail
   - Events: issue.created, issue.claimed, gate.passed, gate.failed, issue.completed
-- Coordinator daemon: monitors ready issues, spawns/dispatches agents
-  - Coordinator config: data/coordinator.json (agent pool, dispatch rules)
-- Basic monitoring commands: status, agent list, metrics
+- Query interface for ready/blocked/filtered issues
+- CLI consistency: all commands support --json for machine-readable output
+- Test infrastructure: TestHarness for fast in-process testing
 
-Phase 3: Advanced Observability & Automation
+Phase 3: Orchestrator & External Integrations
+- Separate jit-dispatch orchestrator tool (extracted from core)
+  - Config file loading (dispatch.toml)
+  - Agent pool management with capacity tracking
+  - Priority-based dispatch algorithm
+  - Commands: start (daemon), once (single cycle)
 - Graph export (dot, mermaid)
-- Event streaming and webhooks for external integrations
+- Event queries and tail commands
+- **Storage abstraction (NEXT)**: Trait-based backend system for pluggable storage
+  - Extract IssueStore trait for multiple backend support
+  - Refactor current Storage to JsonFileStorage
+  - Enable future SQLite, in-memory, or custom backends
+  - See docs/storage-abstraction.md for detailed plan
+- Bulk operations for batch updates
 - Automation integration: read CI artifacts to auto-pass gates
-- Search expressions and bulk operations
-- Web dashboard (optional): simple UI to visualize issue state and dependencies
+- Pull-based agent mode (polling alternative)
 
 Phase 4: Production Readiness
 - File locking and concurrency controls for multi-agent safety
-- Plugin hooks for custom gates and integrations
+- Plugin system for custom gates
 - Prometheus metrics export
-- Cross-repository workflows and issue linking
+- Web dashboard (optional): simple UI to visualize issue state and dependencies
 - Alert system: notify on blocked issues, failed gates, stalled work
+- Cross-repository workflows and issue linking
+- Stalled work detection for jit-dispatch
 
 ---
 
@@ -213,54 +228,58 @@ Recommendation: Rust (clap for CLI, serde for JSON) for type safety and performa
 
 ## Agent Coordination & Orchestration
 
-### Coordinator Architecture (Phase 2)
-The coordinator is a push-based orchestrator that monitors issue state and dispatches agents on-demand.
+### Architecture Overview (Updated 2025-11-30)
+Agent orchestration is handled by a **separate tool** (`jit-dispatch`) to maintain clean architectural separation.
+The core `jit` CLI focuses on issue tracking and querying, while `jit-dispatch` handles work distribution.
 
-**Coordinator responsibilities:**
-- Watch for state changes (new issues, dependencies resolved, gates passed)
-- Identify ready-to-work issues (state=ready, assignee=null, all deps done, no blocking gates)
-- Spawn/dispatch agents from configured pool
-- Monitor agent health and reassign stalled work
-- Record events to audit log
+### jit-dispatch Orchestrator (Phase 3)
+Push-based orchestrator that monitors issue state and dispatches agents on-demand.
 
-**Coordinator configuration (data/coordinator.json):**
-```json
-{
-  "agent_pool": [
-    {
-      "id": "copilot-1",
-      "type": "copilot",
-      "command": "github-copilot-cli work-on",
-      "max_concurrent": 2
-    },
-    {
-      "id": "ci-runner",
-      "type": "ci",
-      "command": "scripts/ci-agent.sh",
-      "max_concurrent": 5
-    }
-  ],
-  "dispatch_rules": {
-    "priority_order": ["critical", "high", "normal", "low"],
-    "stall_timeout_minutes": 30
-  }
-}
+**Orchestrator responsibilities:**
+- Poll `jit query ready` to identify available work
+- Dispatch work to agents based on priority and capacity
+- Track agent assignments and capacity limits
+- Support multiple concurrent agents
+- Respect agent max_concurrent limits
+
+**Configuration (dispatch.toml):**
+```toml
+[dispatch]
+poll_interval_secs = 10
+
+[[agents]]
+id = "copilot-1"
+type = "copilot"
+command = "github-copilot-cli"
+args = ["work-on"]
+max_concurrent = 2
+
+[[agents]]
+id = "ci-runner"
+type = "ci"
+command = "./scripts/ci-agent.sh"
+max_concurrent = 5
 ```
 
-**Coordinator lifecycle:**
+**Orchestrator commands:**
 ```bash
-# Start coordinator daemon
-jit coordinator start [--daemon] [--config data/coordinator.json]
+# Run single dispatch cycle
+jit-dispatch once --config dispatch.toml --jit-path ./jit
 
-# Stop coordinator
-jit coordinator stop
-
-# Coordinator status
-jit coordinator status  # Show running agents, pending work queue
+# Start daemon (continuous polling)
+jit-dispatch start --config dispatch.toml --jit-path ./jit [--daemon]
 ```
+
+**How jit-dispatch works:**
+1. Reads configuration (agent pool, capacity limits)
+2. Polls `jit query ready --json` to find available work
+3. Sorts by priority (critical → high → normal → low)
+4. Dispatches to agents respecting max_concurrent limits
+5. Uses `jit issue claim <id> --to <agent-id>` to assign work
+6. Repeats based on poll_interval
 
 **Event log format (data/events.jsonl):**
-Append-only newline-delimited JSON for audit trail and event sourcing.
+The core `jit` CLI writes append-only events for audit trail:
 ```json
 {"ts":"2025-11-27T19:00:00Z","event":"issue.created","id":"01JD...","title":"..."}
 {"ts":"2025-11-27T19:00:05Z","event":"issue.claimed","id":"01JD...","assignee":"copilot-1"}
@@ -268,8 +287,8 @@ Append-only newline-delimited JSON for audit trail and event sourcing.
 {"ts":"2025-11-27T19:10:00Z","event":"issue.completed","id":"01JD...","assignee":"copilot-1"}
 ```
 
-### Alternative: Pull-based Agents (Phase 3)
-For environments without coordinator infrastructure, agents can poll for work:
+### Pull-based Agents (Phase 3 Alternative)
+For simpler environments, agents can poll for work directly:
 ```bash
 # Agent polling loop
 while true; do
@@ -286,33 +305,27 @@ done
 
 ## Monitoring & Observability
 
-### Built-in Commands (Phase 2)
+### Query Interface (Phase 2 - Implemented)
 ```bash
-# System overview
-jit status
-# Output:
-# Open: 12  Ready: 3  In Progress: 5  Blocked: 4  Done: 23
-# Top blockers:
-#   - 01JD123: waiting on dep 01JD456 (in_progress)
-#   - 01JD789: gate 'security-scan' failed
+# Find ready work
+jit query ready [--json]
+# Returns: unassigned issues with state=ready, no blocking deps/gates
 
-# Agent status
-jit agent list
-# Output:
-# AGENT         STATUS    ASSIGNED       STARTED
-# copilot-1     active    01JD123        5m ago
-# copilot-2     idle      -              -
-# ci-runner     active    01JD456        12m ago
+# Find blocked issues
+jit query blocked [--json]
+# Returns: issues blocked by dependencies or failed gates
 
-# Metrics
-jit metrics --since 1h
-# Output:
-# Completed: 5 issues
-# Gates passed: 23  Gates failed: 2
-# Avg cycle time: 15m
+# Filter by assignee
+jit query assignee copilot-1 [--json]
+
+# Filter by state
+jit query state in_progress [--json]
+
+# Filter by priority
+jit query priority critical [--json]
 ```
 
-### Event Log Queries (Phase 3)
+### Event Log Queries (Phase 3 - Implemented)
 ```bash
 # Tail live events
 jit events tail
@@ -320,13 +333,20 @@ jit events tail
 # Query event history
 jit events query --since 1h --event gate.failed
 jit events query --assignee copilot-1
+```
 
-# Generate reports
+### Advanced Monitoring (Phase 3+)
+```bash
+# Graph visualization
+jit export --format dot > graph.dot
+jit export --format mermaid > graph.md
+
+# Metrics reporting (Future)
 jit metrics report --format csv --output metrics.csv
 ```
 
-### Advanced Monitoring (Phase 4)
-- Prometheus metrics endpoint: `jit metrics export --prometheus`
+### Production Monitoring (Phase 4)
+- Prometheus metrics export: `jit metrics export --prometheus`
 - Web dashboard: `jit dashboard start --port 8080`
 - Alerting: `jit alert add --condition "blocked_count > 5" --notify webhook:https://...`
 
@@ -346,24 +366,33 @@ jit metrics report --format csv --output metrics.csv
 3. **Ready state**: explicit but auto-evaluated from dependencies + gate statuses
 4. **Gate registry**: global registry (data/gates.json) to prevent typos and provide metadata
 5. **Assignee format**: `{type}:{identifier}` (e.g., "copilot:session-1", "human:alice")
-6. **Orchestration**: Push-based coordinator (Phase 2) with pull-based fallback (Phase 3)
-7. **Event log**: Append-only JSONL for audit trail and event sourcing
-8. **Timestamps**: minimal metadata; rely on git history where possible
+6. **Architecture**: Separate core tracker (`jit`) from orchestrator (`jit-dispatch`) for clean boundaries
+7. **Orchestration**: Push-based via jit-dispatch (Phase 3) with pull-based fallback available
+8. **Event log**: Append-only JSONL for audit trail and event sourcing
+9. **Timestamps**: minimal metadata; rely on git history where possible
+10. **CLI consistency**: All mutation commands support `--json` for machine-readable output
+11. **Testing**: Three-layer strategy (unit/harness/integration) with TestHarness for fast iteration
 
 Open questions for later phases:
 - Locking strategy: cross-platform lock vs advisory locks (implement in Phase 4)
-- Coordinator persistence: In-memory vs durable queue for dispatch state
+- Stalled work detection: timeout thresholds and reassignment policies
 
 ---
 
-## Review checklist for this PR
-- [x] Language choice agreed (Rust)
-- [ ] File layout accepted
-- [ ] Core entity attributes approved
-- [ ] Dependency cycle policy accepted
-- [x] ID strategy decided (ULID)
-- [ ] Gate model approved
-- [ ] Phase plan accepted
+## Status (as of 2025-12-01)
+
+**Completed Phases:**
+- ✅ Phase 0: Design
+- ✅ Phase 1: Core Issue Management (full CRUD, dependencies, DAG enforcement)
+- ✅ Phase 2: Quality Gates & Query Interface (gates, events, queries, TestHarness)
+
+**Current Phase:**
+- 🔄 Phase 3: Orchestrator & External Integrations (jit-dispatch extracted, graph export done)
+
+**Test Coverage:**
+- 132 total tests (78 unit + 8 harness + 16 integration + 7 query + 8 CLI consistency + 6 refactor + 9 orchestrator)
+- TestHarness provides 10-100x faster testing vs process-based tests
+- See `TESTING.md` for detailed test strategy
 
 ---
 

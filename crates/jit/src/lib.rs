@@ -11,4 +11,7 @@ pub mod storage;
 // Re-export commonly used types
 pub use commands::CommandExecutor;
 pub use domain::{Issue, Priority, State};
-pub use storage::Storage;
+pub use storage::{InMemoryStorage, IssueStore, JsonFileStorage};
+
+// Backwards compatibility alias
+pub type Storage = JsonFileStorage;

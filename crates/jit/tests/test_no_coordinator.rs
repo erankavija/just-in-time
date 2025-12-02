@@ -9,6 +9,7 @@
 mod harness;
 use harness::TestHarness;
 use jit::domain::{Priority, State};
+use jit::storage::IssueStore;
 
 #[test]
 fn test_query_interface_works_without_coordinator() {

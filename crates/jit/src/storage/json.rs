@@ -1,11 +1,11 @@
-//! Storage layer for persisting issues, gates, and events to disk.
+//! JSON file-based storage implementation.
 //!
 //! All data is stored as JSON files in a `data/` directory with atomic writes.
 
-use crate::domain::{Event, Gate, Issue};
+use crate::domain::{Event, Issue};
+use crate::storage::{GateRegistry, IssueStore};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::fs::{self, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
@@ -17,11 +17,11 @@ const EVENTS_FILE: &str = "data/events.jsonl";
 
 /// Index of all issues in the repository
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Index {
+struct Index {
     /// Schema version for future migrations
-    pub schema_version: u32,
+    schema_version: u32,
     /// List of all issue IDs
-    pub all_ids: Vec<String>,
+    all_ids: Vec<String>,
 }
 
 impl Default for Index {
@@ -33,29 +33,58 @@ impl Default for Index {
     }
 }
 
-/// Registry of all gate definitions
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct GateRegistry {
-    /// Map of gate key to gate definition
-    pub gates: HashMap<String, Gate>,
-}
-
-/// File-based storage for issues, gates, and events
+/// JSON file-based storage for issues, gates, and events.
+///
+/// This implementation stores each issue as a separate JSON file in `data/issues/`,
+/// gate definitions in `data/gates.json`, and events in `data/events.jsonl`.
+/// All file writes are atomic (write to temp file, then rename).
 #[derive(Clone)]
-pub struct Storage {
+pub struct JsonFileStorage {
     root: PathBuf,
 }
 
-impl Storage {
-    /// Create a new storage instance at the given root path
+impl JsonFileStorage {
+    /// Create a new JSON file storage instance at the given root path
     pub fn new<P: AsRef<Path>>(root: P) -> Self {
         Self {
             root: root.as_ref().to_path_buf(),
         }
     }
 
-    /// Initialize the repository structure (idempotent)
-    pub fn init(&self) -> Result<()> {
+    fn issue_path(&self, id: &str) -> PathBuf {
+        self.root.join(ISSUES_DIR).join(format!("{}.json", id))
+    }
+
+    fn write_json<T: Serialize>(&self, path: &Path, data: &T) -> Result<()> {
+        let json = serde_json::to_string_pretty(data).context("Failed to serialize data")?;
+
+        // Atomic write: write to temp file, then rename
+        let temp_path = path.with_extension("json.tmp");
+        fs::write(&temp_path, json).context("Failed to write temporary file")?;
+        fs::rename(&temp_path, path).context("Failed to rename temporary file")?;
+
+        Ok(())
+    }
+
+    fn read_json<T: for<'de> Deserialize<'de>>(&self, path: &Path) -> Result<T> {
+        let contents = fs::read_to_string(path)
+            .with_context(|| format!("Failed to read file: {}", path.display()))?;
+        serde_json::from_str(&contents).context("Failed to deserialize data")
+    }
+
+    fn load_index(&self) -> Result<Index> {
+        let index_path = self.root.join(INDEX_FILE);
+        self.read_json(&index_path)
+    }
+
+    fn save_index(&self, index: &Index) -> Result<()> {
+        let index_path = self.root.join(INDEX_FILE);
+        self.write_json(&index_path, index)
+    }
+}
+
+impl IssueStore for JsonFileStorage {
+    fn init(&self) -> Result<()> {
         let issues_dir = self.root.join(ISSUES_DIR);
 
         fs::create_dir_all(&issues_dir).context("Failed to create issues directory")?;
@@ -83,8 +112,7 @@ impl Storage {
         Ok(())
     }
 
-    /// Save an issue to disk (creates or updates)
-    pub fn save_issue(&self, issue: &Issue) -> Result<()> {
+    fn save_issue(&self, issue: &Issue) -> Result<()> {
         let issue_path = self.issue_path(&issue.id);
         self.write_json(&issue_path, issue)?;
 
@@ -92,59 +120,45 @@ impl Storage {
         let mut index = self.load_index()?;
         if !index.all_ids.contains(&issue.id) {
             index.all_ids.push(issue.id.clone());
-            let index_path = self.root.join(INDEX_FILE);
-            self.write_json(&index_path, &index)?;
+            self.save_index(&index)?;
         }
 
         Ok(())
     }
 
-    /// Load an issue from disk by ID
-    pub fn load_issue(&self, id: &str) -> Result<Issue> {
+    fn load_issue(&self, id: &str) -> Result<Issue> {
         let issue_path = self.issue_path(id);
         self.read_json(&issue_path)
     }
 
-    /// Delete an issue from disk
-    pub fn delete_issue(&self, id: &str) -> Result<()> {
+    fn delete_issue(&self, id: &str) -> Result<()> {
         let issue_path = self.issue_path(id);
         fs::remove_file(&issue_path).context("Failed to delete issue file")?;
 
         // Update index
         let mut index = self.load_index()?;
         index.all_ids.retain(|i| i != id);
-        let index_path = self.root.join(INDEX_FILE);
-        self.write_json(&index_path, &index)?;
+        self.save_index(&index)?;
 
         Ok(())
     }
 
-    /// List all issues in the repository
-    pub fn list_issues(&self) -> Result<Vec<Issue>> {
+    fn list_issues(&self) -> Result<Vec<Issue>> {
         let index = self.load_index()?;
         index.all_ids.iter().map(|id| self.load_issue(id)).collect()
     }
 
-    /// Load the repository index
-    pub fn load_index(&self) -> Result<Index> {
-        let index_path = self.root.join(INDEX_FILE);
-        self.read_json(&index_path)
-    }
-
-    /// Load the gate registry
-    pub fn load_gate_registry(&self) -> Result<GateRegistry> {
+    fn load_gate_registry(&self) -> Result<GateRegistry> {
         let gates_path = self.root.join(GATES_FILE);
         self.read_json(&gates_path)
     }
 
-    /// Save the gate registry to disk
-    pub fn save_gate_registry(&self, registry: &GateRegistry) -> Result<()> {
+    fn save_gate_registry(&self, registry: &GateRegistry) -> Result<()> {
         let gates_path = self.root.join(GATES_FILE);
         self.write_json(&gates_path, registry)
     }
 
-    /// Append an event to the event log
-    pub fn append_event(&self, event: &Event) -> Result<()> {
+    fn append_event(&self, event: &Event) -> Result<()> {
         let events_path = self.root.join(EVENTS_FILE);
         let mut file = OpenOptions::new()
             .create(true)
@@ -157,8 +171,7 @@ impl Storage {
         Ok(())
     }
 
-    /// Read all events from the event log
-    pub fn read_events(&self) -> Result<Vec<Event>> {
+    fn read_events(&self) -> Result<Vec<Event>> {
         let events_path = self.root.join(EVENTS_FILE);
         if !events_path.exists() {
             return Ok(Vec::new());
@@ -180,37 +193,18 @@ impl Storage {
 
         Ok(events)
     }
-
-    fn issue_path(&self, id: &str) -> PathBuf {
-        self.root.join(ISSUES_DIR).join(format!("{}.json", id))
-    }
-
-    fn write_json<T: Serialize>(&self, path: &Path, data: &T) -> Result<()> {
-        let json = serde_json::to_string_pretty(data).context("Failed to serialize data")?;
-
-        // Atomic write: write to temp file, then rename
-        let temp_path = path.with_extension("json.tmp");
-        fs::write(&temp_path, json).context("Failed to write temporary file")?;
-        fs::rename(&temp_path, path).context("Failed to rename temporary file")?;
-
-        Ok(())
-    }
-
-    fn read_json<T: for<'de> Deserialize<'de>>(&self, path: &Path) -> Result<T> {
-        let contents = fs::read_to_string(path)
-            .with_context(|| format!("Failed to read file: {}", path.display()))?;
-        serde_json::from_str(&contents).context("Failed to deserialize JSON")
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::Gate;
+    use crate::storage::IssueStore;
     use tempfile::TempDir;
 
-    fn setup_storage() -> (TempDir, Storage) {
+    fn setup_storage() -> (TempDir, JsonFileStorage) {
         let temp_dir = TempDir::new().unwrap();
-        let storage = Storage::new(temp_dir.path());
+        let storage = JsonFileStorage::new(temp_dir.path());
         (temp_dir, storage)
     }
 

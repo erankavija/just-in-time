@@ -4,22 +4,22 @@
 
 use jit::commands::CommandExecutor;
 use jit::domain::{Issue, Priority, State};
-use jit::storage::Storage;
+use jit::storage::{IssueStore, JsonFileStorage};
 use std::path::PathBuf;
 use tempfile::TempDir;
 
 /// Test harness that provides isolated environment for each test
 pub struct TestHarness {
     _temp: TempDir,
-    pub executor: CommandExecutor,
-    pub storage: Storage,
+    pub executor: CommandExecutor<JsonFileStorage>,
+    pub storage: JsonFileStorage,
 }
 
 impl TestHarness {
     /// Create a new test harness with isolated storage
     pub fn new() -> Self {
         let temp = TempDir::new().unwrap();
-        let storage = Storage::new(temp.path());
+        let storage = JsonFileStorage::new(temp.path());
         storage.init().unwrap();
         let executor = CommandExecutor::new(storage.clone());
         Self {

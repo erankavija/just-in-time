@@ -25,13 +25,13 @@ use cli::{
 };
 use commands::{parse_priority, parse_state, CommandExecutor};
 use std::env;
-use storage::Storage;
+use storage::{IssueStore, JsonFileStorage};
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
     let current_dir = env::current_dir()?;
-    let storage = Storage::new(&current_dir);
+    let storage = JsonFileStorage::new(&current_dir);
     let executor = CommandExecutor::new(storage.clone());
 
     match cli.command {
@@ -195,7 +195,10 @@ fn main() -> Result<()> {
             }
             DepCommands::Rm { from_id, to_id } => {
                 executor.remove_dependency(&from_id, &to_id)?;
-                println!("Removed dependency: {} no longer depends on {}", from_id, to_id);
+                println!(
+                    "Removed dependency: {} no longer depends on {}",
+                    from_id, to_id
+                );
             }
         },
         Commands::Gate(gate_cmd) => match gate_cmd {

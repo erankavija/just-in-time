@@ -71,7 +71,7 @@
 - **TESTS MUST BE WRITTEN BEFORE IMPLEMENTATION** ✅ Enforced!
 - All new functions must have unit tests before code is written
 - Target: >80% overall coverage for all modules
-- Current: **132 tests** (78 unit + 8 harness + 16 integration + 7 query + 8 CLI consistency + 6 no-coordinator + 9 orchestrator)
+- Current: **258 tests** (97 unit + 8 harness + 16 integration + 7 query + 8 CLI consistency + 6 no-coordinator + 9 orchestrator + 13 memory storage + 94 other)
 
 **Action Items:**
 - [x] Graph export: `export --format dot|mermaid` (✓ tests added)
@@ -86,6 +86,14 @@
   - [x] CLI: `start` (daemon mode), `once` (single cycle)
   - [x] **Tests:** 9 orchestrator tests (6 unit + 3 integration)
   - [ ] Stalled work detection (future)
+- [x] **Storage abstraction** (2025-12-02) ✅ **COMPLETED**
+  - [x] Extract `IssueStore` trait for pluggable backends
+  - [x] Refactor `Storage` → `JsonFileStorage`
+  - [x] Update `CommandExecutor` to use generic storage
+  - [x] Add 6 trait conformance tests
+  - [x] Zero-cost abstraction with generics
+  - [x] Add `InMemoryStorage` for fast testing (27 tests, 10-100x speedup)
+  - [x] **See:** `docs/storage-abstraction.md` for detailed plan
 - [ ] Bulk operations (TDD: write tests first)
 - [ ] CI integration: read artifacts to auto-pass gates (TDD: write tests first)
 - [ ] Pull-based agent mode (TDD: write tests first)

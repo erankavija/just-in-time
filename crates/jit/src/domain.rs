@@ -125,7 +125,10 @@ impl Issue {
 
     /// Check if this issue should auto-transition to Ready state
     /// An Open issue transitions to Ready when it becomes unblocked
-    pub fn should_auto_transition_to_ready(&self, resolved_issues: &HashMap<String, &Issue>) -> bool {
+    pub fn should_auto_transition_to_ready(
+        &self,
+        resolved_issues: &HashMap<String, &Issue>,
+    ) -> bool {
         self.state == State::Open && !self.is_blocked(resolved_issues)
     }
 }

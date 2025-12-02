@@ -65,13 +65,30 @@ fn test_query_ready_returns_unblocked_issues() {
 
     // Create task 3 with a gate to keep it in Open state
     Command::new(&jit)
-        .args(["registry", "add", "test-gate", "--title", "Test", "--desc", "Test"])
+        .args([
+            "registry",
+            "add",
+            "test-gate",
+            "--title",
+            "Test",
+            "--desc",
+            "Test",
+        ])
         .current_dir(temp.path())
         .output()
         .unwrap();
-    
+
     let output3 = Command::new(&jit)
-        .args(["issue", "create", "-t", "Task 3", "-d", "Blocked task", "--gate", "test-gate"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Task 3",
+            "-d",
+            "Blocked task",
+            "--gate",
+            "test-gate",
+        ])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -109,10 +126,12 @@ fn test_query_ready_returns_unblocked_issues() {
 fn test_query_ready_excludes_assigned_issues() {
     let temp = setup_test_repo();
     let jit = jit_binary();
-    
+
     // Add gate for blocking
     Command::new(&jit)
-        .args(["registry", "add", "block", "--title", "Block", "--desc", "Block"])
+        .args([
+            "registry", "add", "block", "--title", "Block", "--desc", "Block",
+        ])
         .current_dir(temp.path())
         .output()
         .unwrap();

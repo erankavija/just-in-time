@@ -349,6 +349,8 @@ See [ROADMAP.md](ROADMAP.md) for details.
 - [EXAMPLE.md](EXAMPLE.md) - Complete agent orchestration walkthrough
 - [docs/design.md](docs/design.md) - Detailed design specifications
 - [ROADMAP.md](ROADMAP.md) - Development phases and progress
+- [TESTING.md](TESTING.md) - Testing strategy and best practices
+- [docs/storage-abstraction.md](docs/storage-abstraction.md) - Pluggable backend design (next priority)
 
 ## Architecture
 

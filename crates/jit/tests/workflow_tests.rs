@@ -37,12 +37,7 @@ fn run_jit(temp: &TempDir, args: &[&str]) -> std::process::Output {
 }
 
 fn extract_id(output: &str) -> String {
-    output
-        .split_whitespace()
-        .last()
-        .unwrap()
-        .trim()
-        .to_string()
+    output.split_whitespace().last().unwrap().trim().to_string()
 }
 
 // ============================================================================
@@ -54,7 +49,10 @@ fn test_workflow_simple_task_completion() {
     let temp = setup_test_repo();
 
     // 1. Create a task (auto-transitions to Ready since no blockers)
-    let output = run_jit(&temp, &["issue", "create", "-t", "Fix bug", "--priority", "high"]);
+    let output = run_jit(
+        &temp,
+        &["issue", "create", "-t", "Fix bug", "--priority", "high"],
+    );
     assert!(output.status.success());
     let id = extract_id(&String::from_utf8_lossy(&output.stdout));
 
@@ -65,12 +63,20 @@ fn test_workflow_simple_task_completion() {
 
     // 3. Claim the task
     let output = run_jit(&temp, &["issue", "claim", &id, "agent:worker-1"]);
-    assert!(output.status.success(), "Failed to claim: {:?}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "Failed to claim: {:?}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 
     // 4. Verify assignment
     let output = run_jit(&temp, &["issue", "show", &id]);
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("agent:worker-1"), "Should contain assignee, got: {}", stdout);
+    assert!(
+        stdout.contains("agent:worker-1"),
+        "Should contain assignee, got: {}",
+        stdout
+    );
     assert!(stdout.contains("State: InProgress"));
 
     // 5. Complete the task
@@ -92,21 +98,51 @@ fn test_workflow_agent_claim_next() {
     let temp = setup_test_repo();
 
     // Create multiple ready tasks with different priorities
-    let output = run_jit(&temp, &["issue", "create", "-t", "Low priority", "--priority", "low"]);
+    let output = run_jit(
+        &temp,
+        &["issue", "create", "-t", "Low priority", "--priority", "low"],
+    );
     let low_id = extract_id(&String::from_utf8_lossy(&output.stdout));
     run_jit(&temp, &["issue", "update", &low_id, "--state", "ready"]);
 
-    let output = run_jit(&temp, &["issue", "create", "-t", "High priority", "--priority", "high"]);
+    let output = run_jit(
+        &temp,
+        &[
+            "issue",
+            "create",
+            "-t",
+            "High priority",
+            "--priority",
+            "high",
+        ],
+    );
     let high_id = extract_id(&String::from_utf8_lossy(&output.stdout));
     run_jit(&temp, &["issue", "update", &high_id, "--state", "ready"]);
 
-    let output = run_jit(&temp, &["issue", "create", "-t", "Critical", "--priority", "critical"]);
+    let output = run_jit(
+        &temp,
+        &[
+            "issue",
+            "create",
+            "-t",
+            "Critical",
+            "--priority",
+            "critical",
+        ],
+    );
     let critical_id = extract_id(&String::from_utf8_lossy(&output.stdout));
-    run_jit(&temp, &["issue", "update", &critical_id, "--state", "ready"]);
+    run_jit(
+        &temp,
+        &["issue", "update", &critical_id, "--state", "ready"],
+    );
 
     // Agent claims next (should get critical)
     let output = run_jit(&temp, &["issue", "claim-next", "agent:worker-1"]);
-    assert!(output.status.success(), "claim-next failed: {:?}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "claim-next failed: {:?}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains(&critical_id));
 
@@ -117,7 +153,11 @@ fn test_workflow_agent_claim_next() {
 
     // Agent claims next again (should get high)
     let output = run_jit(&temp, &["issue", "claim-next", "agent:worker-2"]);
-    assert!(output.status.success(), "claim-next failed: {:?}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "claim-next failed: {:?}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains(&high_id));
 }
@@ -179,36 +219,38 @@ fn test_workflow_gates() {
     let temp = setup_test_repo();
 
     // Add gate definitions
-    run_jit(&temp, &[
-        "registry",
-        "add",
-        "review",
-        "--title",
-        "Code Review",
-        "--desc",
-        "Manual review",
-    ]);
+    run_jit(
+        &temp,
+        &[
+            "registry",
+            "add",
+            "review",
+            "--title",
+            "Code Review",
+            "--desc",
+            "Manual review",
+        ],
+    );
 
-    run_jit(&temp, &[
-        "registry",
-        "add",
-        "tests",
-        "--title",
-        "Tests",
-        "--desc",
-        "Unit tests",
-        "--auto",
-    ]);
+    run_jit(
+        &temp,
+        &[
+            "registry",
+            "add",
+            "tests",
+            "--title",
+            "Tests",
+            "--desc",
+            "Unit tests",
+            "--auto",
+        ],
+    );
 
     // Create issue with both gates
-    let output = run_jit(&temp, &[
-        "issue",
-        "create",
-        "-t",
-        "Feature",
-        "--gate",
-        "review,tests",
-    ]);
+    let output = run_jit(
+        &temp,
+        &["issue", "create", "-t", "Feature", "--gate", "review,tests"],
+    );
     let id = extract_id(&String::from_utf8_lossy(&output.stdout));
 
     // Issue should be blocked
@@ -278,25 +320,50 @@ fn test_workflow_complex_epic() {
     let temp = setup_test_repo();
 
     // Setup gates
-    run_jit(&temp, &[
-        "registry", "add", "tests", "--title", "Tests", "--desc", "Tests", "--auto",
-    ]);
-    run_jit(&temp, &[
-        "registry", "add", "review", "--title", "Review", "--desc", "Review",
-    ]);
+    run_jit(
+        &temp,
+        &[
+            "registry", "add", "tests", "--title", "Tests", "--desc", "Tests", "--auto",
+        ],
+    );
+    run_jit(
+        &temp,
+        &[
+            "registry", "add", "review", "--title", "Review", "--desc", "Review",
+        ],
+    );
 
     // Create feature tasks
-    let output = run_jit(&temp, &["issue", "create", "-t", "Backend API", "--gate", "tests"]);
+    let output = run_jit(
+        &temp,
+        &["issue", "create", "-t", "Backend API", "--gate", "tests"],
+    );
     let backend = extract_id(&String::from_utf8_lossy(&output.stdout));
 
-    let output = run_jit(&temp, &["issue", "create", "-t", "Frontend UI", "--gate", "tests"]);
+    let output = run_jit(
+        &temp,
+        &["issue", "create", "-t", "Frontend UI", "--gate", "tests"],
+    );
     let frontend = extract_id(&String::from_utf8_lossy(&output.stdout));
 
-    let output = run_jit(&temp, &["issue", "create", "-t", "Documentation", "--gate", "review"]);
+    let output = run_jit(
+        &temp,
+        &["issue", "create", "-t", "Documentation", "--gate", "review"],
+    );
     let docs = extract_id(&String::from_utf8_lossy(&output.stdout));
 
     // Create epic that depends on all
-    let output = run_jit(&temp, &["issue", "create", "-t", "Release v1.0", "--priority", "critical"]);
+    let output = run_jit(
+        &temp,
+        &[
+            "issue",
+            "create",
+            "-t",
+            "Release v1.0",
+            "--priority",
+            "critical",
+        ],
+    );
     let epic = extract_id(&String::from_utf8_lossy(&output.stdout));
 
     run_jit(&temp, &["dep", "add", &epic, &backend]);
@@ -390,7 +457,11 @@ fn test_workflow_graph_visualization() {
 
     // Show graph for foundation
     let output = run_jit(&temp, &["graph", "show", &foundation]);
-    assert!(output.status.success(), "graph show failed: {:?}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "graph show failed: {:?}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains(&foundation));
 

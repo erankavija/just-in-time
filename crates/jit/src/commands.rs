@@ -5,19 +5,22 @@
 
 use crate::domain::{Event, Gate, GateState, GateStatus, Issue, Priority, State};
 use crate::graph::DependencyGraph;
-use crate::storage::Storage;
+use crate::storage::IssueStore;
 use anyhow::{anyhow, Result};
 use chrono::Utc;
 use std::collections::HashMap;
 
-/// Executes CLI commands with business logic and validation
-pub struct CommandExecutor {
-    storage: Storage,
+/// Executes CLI commands with business logic and validation.
+///
+/// Generic over storage backend to support different implementations
+/// (JSON files, SQLite, in-memory, etc.).
+pub struct CommandExecutor<S: IssueStore> {
+    storage: S,
 }
 
-impl CommandExecutor {
+impl<S: IssueStore> CommandExecutor<S> {
     /// Create a new command executor with the given storage
-    pub fn new(storage: Storage) -> Self {
+    pub fn new(storage: S) -> Self {
         Self { storage }
     }
 
@@ -140,14 +143,14 @@ impl CommandExecutor {
         }
 
         self.storage.save_issue(&issue)?;
-        
+
         // Check if any dependent issues can now transition to ready (after save!)
         if let Some(s) = state {
             if s == State::Done {
                 self.check_auto_transitions()?;
             }
         }
-        
+
         Ok(())
     }
 
@@ -204,14 +207,14 @@ impl CommandExecutor {
         let mut issue = self.storage.load_issue(id)?;
         let old_assignee = issue.assignee.clone();
         let old_state = issue.state;
-        
+
         issue.assignee = None;
-        
+
         // If in progress, transition back to ready
         if issue.state == State::InProgress {
             issue.state = State::Ready;
         }
-        
+
         self.storage.save_issue(&issue)?;
 
         // Log event
@@ -221,7 +224,7 @@ impl CommandExecutor {
             reason.to_string(),
         );
         self.storage.append_event(&event)?;
-        
+
         // Log state change if it occurred
         if old_state != issue.state {
             let event = Event::new_issue_state_changed(id.to_string(), old_state, issue.state);
@@ -272,16 +275,17 @@ impl CommandExecutor {
         let mut issue = self.storage.load_issue(issue_id)?;
         if !issue.dependencies.contains(&dep_id.to_string()) {
             issue.dependencies.push(dep_id.to_string());
-            
+
             // If issue becomes blocked by this dependency, transition to Open
             let dep_issue = self.storage.load_issue(dep_id)?;
             if issue.state == State::Ready && dep_issue.state != State::Done {
                 let old_state = issue.state;
                 issue.state = State::Open;
                 self.storage.save_issue(&issue)?;
-                
+
                 // Log state change
-                let event = Event::new_issue_state_changed(issue.id.clone(), old_state, State::Open);
+                let event =
+                    Event::new_issue_state_changed(issue.id.clone(), old_state, State::Open);
                 self.storage.append_event(&event)?;
             } else {
                 self.storage.save_issue(&issue)?;
@@ -295,10 +299,10 @@ impl CommandExecutor {
         let mut issue = self.storage.load_issue(issue_id)?;
         issue.dependencies.retain(|d| d != dep_id);
         self.storage.save_issue(&issue)?;
-        
+
         // Check if this issue can now transition to ready
         self.auto_transition_to_ready(issue_id)?;
-        
+
         Ok(())
     }
 
@@ -306,15 +310,16 @@ impl CommandExecutor {
         let mut issue = self.storage.load_issue(issue_id)?;
         if !issue.gates_required.contains(&gate_key) {
             issue.gates_required.push(gate_key.clone());
-            
+
             // If issue was Ready, transition to Open since gate is pending
             if issue.state == State::Ready {
                 let old_state = issue.state;
                 issue.state = State::Open;
                 self.storage.save_issue(&issue)?;
-                
+
                 // Log state change
-                let event = Event::new_issue_state_changed(issue.id.clone(), old_state, State::Open);
+                let event =
+                    Event::new_issue_state_changed(issue.id.clone(), old_state, State::Open);
                 self.storage.append_event(&event)?;
             } else {
                 self.storage.save_issue(&issue)?;
@@ -387,18 +392,18 @@ impl CommandExecutor {
     fn auto_transition_to_ready(&self, issue_id: &str) -> Result<bool> {
         let issues = self.storage.list_issues()?;
         let resolved: HashMap<String, &Issue> = issues.iter().map(|i| (i.id.clone(), i)).collect();
-        
+
         let mut issue = self.storage.load_issue(issue_id)?;
-        
+
         if issue.should_auto_transition_to_ready(&resolved) {
             let old_state = issue.state;
             issue.state = State::Ready;
             self.storage.save_issue(&issue)?;
-            
+
             // Log state change event
             let event = Event::new_issue_state_changed(issue.id.clone(), old_state, State::Ready);
             self.storage.append_event(&event)?;
-            
+
             Ok(true)
         } else {
             Ok(false)
@@ -408,15 +413,16 @@ impl CommandExecutor {
     /// Check and auto-transition all Open issues that are now unblocked
     fn check_auto_transitions(&self) -> Result<()> {
         let issues = self.storage.list_issues()?;
-        let open_issues: Vec<_> = issues.iter()
+        let open_issues: Vec<_> = issues
+            .iter()
             .filter(|i| i.state == State::Open)
             .map(|i| i.id.clone())
             .collect();
-        
+
         for issue_id in open_issues {
             self.auto_transition_to_ready(&issue_id)?;
         }
-        
+
         Ok(())
     }
 
@@ -777,11 +783,12 @@ pub fn parse_state(s: &str) -> Result<State> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::storage::JsonFileStorage;
     use tempfile::TempDir;
 
-    fn setup() -> (TempDir, CommandExecutor) {
+    fn setup() -> (TempDir, CommandExecutor<JsonFileStorage>) {
         let temp_dir = TempDir::new().unwrap();
-        let storage = Storage::new(temp_dir.path());
+        let storage = JsonFileStorage::new(temp_dir.path());
         let executor = CommandExecutor::new(storage);
         executor.init().unwrap();
         (temp_dir, executor)
@@ -1827,7 +1834,7 @@ mod tests {
                 vec![],
             )
             .unwrap();
-            
+
         // Create issue with a gate (stays Open)
         executor
             .create_issue(
