@@ -84,6 +84,11 @@ impl JsonError {
     pub fn to_json_string(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string_pretty(self)
     }
+
+    /// Get the appropriate exit code for this error
+    pub fn exit_code(&self) -> ExitCode {
+        ErrorCode::to_exit_code(&self.error.code)
+    }
 }
 
 /// Error details including code, message, and suggestions
@@ -103,10 +108,104 @@ pub struct ErrorDetail {
 }
 
 // ============================================================================
-// Error Codes
+// Exit Codes
 // ============================================================================
 
-/// Standard error codes for JIT operations
+/// Standardized exit codes for the JIT CLI
+///
+/// These codes follow Unix conventions and provide consistent error reporting
+/// for automation and scripting.
+///
+/// # Examples
+///
+/// ```rust
+/// use jit::ExitCode;
+///
+/// // Success case
+/// std::process::exit(ExitCode::Success.code());
+///
+/// // Error case
+/// std::process::exit(ExitCode::NotFound.code());
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(i32)]
+#[allow(dead_code)] // Part of public API
+pub enum ExitCode {
+    /// Command succeeded (0)
+    Success = 0,
+    
+    /// Generic error (1)
+    GenericError = 1,
+    
+    /// Invalid arguments or usage error (2)
+    InvalidArgument = 2,
+    
+    /// Resource not found - issue, gate, etc. (3)
+    NotFound = 3,
+    
+    /// Validation failed - cycle detected, broken refs, etc. (4)
+    ValidationFailed = 4,
+    
+    /// Permission denied (5)
+    PermissionDenied = 5,
+    
+    /// Resource already exists (6)
+    AlreadyExists = 6,
+    
+    /// External dependency failed - git, file system, etc. (10)
+    ExternalError = 10,
+}
+
+#[allow(dead_code)] // Part of public API
+impl ExitCode {
+    /// Convert exit code to i32 for `std::process::exit`
+    pub fn code(self) -> i32 {
+        self as i32
+    }
+
+    /// Get a description of what this exit code means
+    pub fn description(self) -> &'static str {
+        match self {
+            ExitCode::Success => "Command succeeded",
+            ExitCode::GenericError => "Generic error occurred",
+            ExitCode::InvalidArgument => "Invalid arguments or usage error",
+            ExitCode::NotFound => "Resource not found (issue, gate, etc.)",
+            ExitCode::ValidationFailed => "Validation failed (cycle detected, broken references, etc.)",
+            ExitCode::PermissionDenied => "Permission denied",
+            ExitCode::AlreadyExists => "Resource already exists",
+            ExitCode::ExternalError => "External dependency failed (git, file system, etc.)",
+        }
+    }
+
+    /// Get all exit codes as a formatted string for documentation
+    pub fn all_codes_documentation() -> String {
+        format!(
+            "Exit Codes:\n\
+             {}  - {}\n\
+             {}  - {}\n\
+             {}  - {}\n\
+             {}  - {}\n\
+             {}  - {}\n\
+             {}  - {}\n\
+             {}  - {}\n\
+             {} - {}",
+            ExitCode::Success.code(), ExitCode::Success.description(),
+            ExitCode::GenericError.code(), ExitCode::GenericError.description(),
+            ExitCode::InvalidArgument.code(), ExitCode::InvalidArgument.description(),
+            ExitCode::NotFound.code(), ExitCode::NotFound.description(),
+            ExitCode::ValidationFailed.code(), ExitCode::ValidationFailed.description(),
+            ExitCode::PermissionDenied.code(), ExitCode::PermissionDenied.description(),
+            ExitCode::AlreadyExists.code(), ExitCode::AlreadyExists.description(),
+            ExitCode::ExternalError.code(), ExitCode::ExternalError.description(),
+        )
+    }
+}
+
+// ============================================================================
+// Error Codes (String constants for JSON responses)
+// ============================================================================
+
+/// Standard error codes for JIT operations (JSON format)
 pub struct ErrorCode;
 
 #[allow(dead_code)]
@@ -121,6 +220,20 @@ impl ErrorCode {
     pub const BLOCKED: &'static str = "BLOCKED";
     pub const IO_ERROR: &'static str = "IO_ERROR";
     pub const PARSE_ERROR: &'static str = "PARSE_ERROR";
+}
+
+impl ErrorCode {
+    /// Map error code string to exit code
+    pub fn to_exit_code(code: &str) -> ExitCode {
+        match code {
+            Self::ISSUE_NOT_FOUND | Self::GATE_NOT_FOUND => ExitCode::NotFound,
+            Self::CYCLE_DETECTED | Self::VALIDATION_FAILED => ExitCode::ValidationFailed,
+            Self::INVALID_ARGUMENT | Self::INVALID_STATE => ExitCode::InvalidArgument,
+            Self::ALREADY_EXISTS => ExitCode::AlreadyExists,
+            Self::IO_ERROR => ExitCode::ExternalError,
+            _ => ExitCode::GenericError,
+        }
+    }
 }
 
 /// Helper to create common error responses

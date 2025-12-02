@@ -13,7 +13,7 @@ pub mod visualization;
 // Re-export commonly used types
 pub use commands::CommandExecutor;
 pub use domain::{Issue, Priority, State};
-pub use output::{JsonError, JsonOutput};
+pub use output::{ExitCode, JsonError, JsonOutput};
 pub use storage::{InMemoryStorage, IssueStore, JsonFileStorage};
 
 // Backwards compatibility alias

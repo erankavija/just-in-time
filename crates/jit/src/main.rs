@@ -16,6 +16,7 @@ mod commands;
 mod domain;
 mod graph;
 mod output;
+mod output_macros;
 mod storage;
 mod visualization;
 
@@ -26,10 +27,56 @@ use cli::{
     RegistryCommands,
 };
 use commands::{parse_priority, parse_state, CommandExecutor};
+use output::ExitCode;
 use std::env;
 use storage::{IssueStore, JsonFileStorage};
 
-fn main() -> Result<()> {
+/// Helper to determine exit code from error message
+fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
+    let error_msg = error.to_string().to_lowercase();
+    
+    // Check root cause for IO errors
+    if let Some(io_error) = error.downcast_ref::<std::io::Error>() {
+        return match io_error.kind() {
+            std::io::ErrorKind::NotFound => ExitCode::NotFound,
+            std::io::ErrorKind::PermissionDenied => ExitCode::PermissionDenied,
+            _ => ExitCode::ExternalError,
+        };
+    }
+    
+    // Check error message patterns
+    if error_msg.contains("not found") || error_msg.contains("no such file") {
+        ExitCode::NotFound
+    } else if error_msg.contains("cycle") || error_msg.contains("invalid dependency") {
+        ExitCode::ValidationFailed
+    } else if error_msg.contains("already exists") {
+        ExitCode::AlreadyExists
+    } else if error_msg.contains("invalid") && !error_msg.contains("invalid dependency") {
+        ExitCode::InvalidArgument
+    } else if error_msg.contains("data") && (error_msg.contains("failed to read") || error_msg.contains("io error")) {
+        // File system errors related to data directory
+        ExitCode::ExternalError
+    } else {
+        ExitCode::GenericError
+    }
+}
+
+
+fn main() {
+    let exit_code = match run() {
+        Ok(()) => ExitCode::Success,
+        Err(e) => {
+            eprintln!("Error: {}", e);
+            error_to_exit_code(&e)
+        }
+    };
+    
+    if exit_code != ExitCode::Success {
+        std::process::exit(exit_code.code());
+    }
+}
+
+fn run() -> Result<()> {
     let cli = Cli::parse();
 
     let current_dir = env::current_dir()?;
@@ -133,12 +180,7 @@ fn main() -> Result<()> {
             }
             IssueCommands::Show { id, json } => match executor.show_issue(&id) {
                 Ok(issue) => {
-                    if json {
-                        use output::JsonOutput;
-
-                        let output = JsonOutput::success(&issue);
-                        println!("{}", output.to_json_string()?);
-                    } else {
+                    output_data!(json, issue, {
                         println!("ID: {}", issue.id);
                         println!("Title: {}", issue.title);
                         println!("Description: {}", issue.description);
@@ -148,17 +190,10 @@ fn main() -> Result<()> {
                         println!("Dependencies: {:?}", issue.dependencies);
                         println!("Gates Required: {:?}", issue.gates_required);
                         println!("Gates Status: {:?}", issue.gates_status);
-                    }
+                    });
                 }
                 Err(e) => {
-                    if json {
-                        use output::JsonError;
-                        let json_error = JsonError::issue_not_found(&id);
-                        println!("{}", json_error.to_json_string()?);
-                        std::process::exit(1);
-                    } else {
-                        return Err(e);
-                    }
+                    handle_json_error!(json, e, output::JsonError::issue_not_found(&id));
                 }
             },
             IssueCommands::Update {
@@ -274,7 +309,7 @@ fn main() -> Result<()> {
                             JsonError::new("DEPENDENCY_ERROR", error_str)
                         };
                         println!("{}", json_error.to_json_string()?);
-                        std::process::exit(1);
+                        std::process::exit(json_error.exit_code().code());
                     } else {
                         return Err(e);
                     }
@@ -316,7 +351,7 @@ fn main() -> Result<()> {
                             JsonError::new("DEPENDENCY_ERROR", error_str)
                         };
                         println!("{}", json_error.to_json_string()?);
-                        std::process::exit(1);
+                        std::process::exit(json_error.exit_code().code());
                     } else {
                         return Err(e);
                     }
@@ -355,7 +390,7 @@ fn main() -> Result<()> {
                                 JsonError::new("GATE_ERROR", error_str)
                             };
                             println!("{}", json_error.to_json_string()?);
-                            std::process::exit(1);
+                            std::process::exit(json_error.exit_code().code());
                         } else {
                             return Err(e);
                         }
@@ -388,7 +423,7 @@ fn main() -> Result<()> {
                         use output::JsonError;
                         let json_error = JsonError::new("GATE_ERROR", e.to_string());
                         println!("{}", json_error.to_json_string()?);
-                        std::process::exit(1);
+                        std::process::exit(json_error.exit_code().code());
                     } else {
                         return Err(e);
                     }
@@ -420,7 +455,7 @@ fn main() -> Result<()> {
                         use output::JsonError;
                         let json_error = JsonError::new("GATE_ERROR", e.to_string());
                         println!("{}", json_error.to_json_string()?);
-                        std::process::exit(1);
+                        std::process::exit(json_error.exit_code().code());
                     } else {
                         return Err(e);
                     }
@@ -736,7 +771,7 @@ fn main() -> Result<()> {
                         use output::JsonError;
                         let json_error = JsonError::invalid_state(&state);
                         println!("{}", json_error.to_json_string()?);
-                        std::process::exit(1);
+                        std::process::exit(json_error.exit_code().code());
                     } else {
                         return Err(e);
                     }
@@ -768,7 +803,7 @@ fn main() -> Result<()> {
                         use output::JsonError;
                         let json_error = JsonError::invalid_priority(&priority);
                         println!("{}", json_error.to_json_string()?);
-                        std::process::exit(1);
+                        std::process::exit(json_error.exit_code().code());
                     } else {
                         return Err(e);
                     }

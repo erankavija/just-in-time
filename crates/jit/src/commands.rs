@@ -43,6 +43,35 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(())
     }
 
+    /// Create a new issue with the specified properties.
+    ///
+    /// # Arguments
+    ///
+    /// * `title` - A brief summary of the issue
+    /// * `description` - Detailed description of the issue
+    /// * `priority` - Priority level (Low, Normal, High, Critical)
+    /// * `gates` - List of quality gate keys that must pass before completion
+    ///
+    /// # Returns
+    ///
+    /// The unique ID of the newly created issue
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::{CommandExecutor, Priority};
+    /// use jit::storage::InMemoryStorage;
+    ///
+    /// let storage = InMemoryStorage::new();
+    /// let executor = CommandExecutor::new(storage);
+    ///
+    /// let id = executor.create_issue(
+    ///     "Fix login bug".to_string(),
+    ///     "Users cannot log in with special characters".to_string(),
+    ///     Priority::High,
+    ///     vec!["unit-tests".to_string(), "code-review".to_string()],
+    /// ).unwrap();
+    /// ```
     pub fn create_issue(
         &self,
         title: String,
@@ -68,6 +97,19 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(issue.id)
     }
 
+    /// List issues matching the specified filters.
+    ///
+    /// All filters are optional. If no filters are provided, returns all issues.
+    ///
+    /// # Arguments
+    ///
+    /// * `state_filter` - Filter by issue state (Open, Ready, InProgress, Done)
+    /// * `assignee_filter` - Filter by assignee name
+    /// * `priority_filter` - Filter by priority level
+    ///
+    /// # Returns
+    ///
+    /// Vector of issues matching all specified filters
     pub fn list_issues(
         &self,
         state_filter: Option<State>,
@@ -177,6 +219,33 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(())
     }
 
+    /// Atomically claim an unassigned issue.
+    ///
+    /// This operation is atomic - it only succeeds if the issue is currently unassigned.
+    /// This prevents race conditions when multiple agents try to claim the same issue.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - The issue ID to claim
+    /// * `assignee` - The assignee identifier (format: `type:identifier`, e.g., "copilot:session-1")
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The issue does not exist
+    /// - The issue is already assigned to someone else
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use jit::{CommandExecutor, Priority};
+    /// # use jit::storage::InMemoryStorage;
+    /// let storage = InMemoryStorage::new();
+    /// let executor = CommandExecutor::new(storage);
+    ///
+    /// let id = executor.create_issue("Task".into(), "".into(), Priority::Normal, vec![]).unwrap();
+    /// executor.claim_issue(&id, "agent:worker-1".to_string()).unwrap();
+    /// ```
     pub fn claim_issue(&self, id: &str, assignee: String) -> Result<()> {
         let mut issue = self.storage.load_issue(id)?;
 
@@ -274,6 +343,37 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
     }
 
+    /// Add a dependency between two issues.
+    ///
+    /// Creates a dependency relationship where `issue_id` depends on `dep_id`.
+    /// The issue cannot transition to Ready or Done until the dependency is complete.
+    ///
+    /// # Arguments
+    ///
+    /// * `issue_id` - The issue that depends on another
+    /// * `dep_id` - The issue that must be completed first
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Either issue does not exist
+    /// - Adding the dependency would create a cycle (violates DAG property)
+    /// - The dependency already exists
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use jit::{CommandExecutor, Priority};
+    /// # use jit::storage::InMemoryStorage;
+    /// let storage = InMemoryStorage::new();
+    /// let executor = CommandExecutor::new(storage);
+    ///
+    /// let backend = executor.create_issue("Backend API".into(), "".into(), Priority::Normal, vec![]).unwrap();
+    /// let frontend = executor.create_issue("Frontend UI".into(), "".into(), Priority::Normal, vec![]).unwrap();
+    ///
+    /// // Frontend depends on backend
+    /// executor.add_dependency(&frontend, &backend).unwrap();
+    /// ```
     pub fn add_dependency(&self, issue_id: &str, dep_id: &str) -> Result<()> {
         // Validate both issues exist
         let issues = self.storage.list_issues()?;
@@ -479,13 +579,67 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(roots.into_iter().cloned().collect())
     }
 
-    /// Validate repository integrity (silent, returns Result)
+    /// Validate repository integrity (silent version).
+    ///
+    /// Performs comprehensive validation of the issue repository:
+    /// - Checks all dependency references point to existing issues
+    /// - Validates all required gates are defined in the registry
+    /// - Ensures the dependency graph is acyclic (DAG property)
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` if validation passes, or an error describing the first problem found.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use jit::{CommandExecutor, Priority};
+    /// # use jit::storage::InMemoryStorage;
+    /// let storage = InMemoryStorage::new();
+    /// let executor = CommandExecutor::new(storage);
+    ///
+    /// executor.create_issue("Task".into(), "".into(), Priority::Normal, vec![]).unwrap();
+    /// assert!(executor.validate_silent().is_ok());
+    /// ```
     pub fn validate_silent(&self) -> Result<()> {
         let issues = self.storage.list_issues()?;
+        
+        // Build lookup map of valid issue IDs
+        let valid_ids: std::collections::HashSet<String> = 
+            issues.iter().map(|i| i.id.clone()).collect();
+        
+        // Check for broken dependency references
+        for issue in &issues {
+            for dep in &issue.dependencies {
+                if !valid_ids.contains(dep) {
+                    return Err(anyhow!(
+                        "Invalid dependency: issue '{}' depends on '{}' which does not exist",
+                        issue.id,
+                        dep
+                    ));
+                }
+            }
+        }
+        
+        // Check for invalid gate references
+        let registry = self.storage.load_gate_registry()?;
+        for issue in &issues {
+            for gate_key in &issue.gates_required {
+                if !registry.gates.contains_key(gate_key) {
+                    return Err(anyhow!(
+                        "Gate '{}' required by issue '{}' is not defined in registry",
+                        gate_key,
+                        issue.id
+                    ));
+                }
+            }
+        }
+        
+        // Validate DAG (no cycles)
         let issue_refs: Vec<&Issue> = issues.iter().collect();
         let graph = DependencyGraph::new(&issue_refs);
-
         graph.validate_dag()?;
+        
         Ok(())
     }
 

@@ -2,6 +2,20 @@
 
 use clap::{Parser, Subcommand};
 
+/// Just-In-Time Issue Tracker
+///
+/// A repository-local CLI issue tracker with dependency graph enforcement and quality gating.
+/// Designed for deterministic, machine-friendly outputs and process automation.
+///
+/// Exit Codes:
+///   0  - Command succeeded
+///   1  - Generic error occurred
+///   2  - Invalid arguments or usage error
+///   3  - Resource not found (issue, gate, etc.)
+///   4  - Validation failed (cycle detected, broken references, etc.)
+///   5  - Permission denied
+///   6  - Resource already exists
+///  10  - External dependency failed (git, file system, etc.)
 #[derive(Parser)]
 #[command(name = "jit")]
 #[command(about = "Just-In-Time issue tracker", long_about = None)]
