@@ -648,12 +648,23 @@ AI Agent thinks: "I need to create an issue and add a dependency"
 ## Success Criteria
 
 ### Phase 1 (CLI Consistency)
-- [ ] All commands support `--json` flag
+- [x] JSON output foundation (JsonOutput, JsonError) - **DONE**
+- [x] 5 commands with --json: list, show, search, status, validate - **DONE**
+- [ ] Remaining commands with --json (query, graph, gate, registry)
 - [ ] Structured error responses with suggestions
 - [ ] Standardized exit codes (documented)
 - [ ] `--schema` exports complete API definition
-- [ ] 40+ tests for JSON output correctness
+- [x] 7 tests for output module - **DONE**
+- [ ] Additional tests for JSON correctness (target: 40+ total)
 - [ ] Documentation: `docs/json-api.md`
+
+### Progress (2025-12-02)
+- ✅ Created output.rs module with JsonOutput<T> and JsonError types
+- ✅ Implemented --json for 5 core commands
+- ✅ All outputs follow standardized format: {success, data, metadata}
+- ✅ Metadata includes timestamp and version (0.2.0)
+- ✅ 109 tests passing (102 core + 7 output)
+- ✅ 4 trunk-based commits to main
 
 ### Phase 2 (MCP Server)
 - [ ] MCP server running on stdio transport

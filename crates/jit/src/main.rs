@@ -71,13 +71,13 @@ fn main() -> Result<()> {
                 if json {
                     use output::JsonOutput;
                     use serde_json::json;
-                    
+
                     // Count issues by state
                     let mut state_counts = std::collections::HashMap::new();
                     for issue in &issues {
                         *state_counts.entry(issue.state).or_insert(0) += 1;
                     }
-                    
+
                     let output = JsonOutput::success(json!({
                         "issues": issues,
                         "summary": {
@@ -114,7 +114,7 @@ fn main() -> Result<()> {
                 if json {
                     use output::JsonOutput;
                     use serde_json::json;
-                    
+
                     let output = JsonOutput::success(json!({
                         "query": query,
                         "issues": issues,
@@ -135,7 +135,7 @@ fn main() -> Result<()> {
                 let issue = executor.show_issue(&id)?;
                 if json {
                     use output::JsonOutput;
-                    
+
                     let output = JsonOutput::success(&issue);
                     println!("{}", output.to_json_string()?);
                 } else {
@@ -462,7 +462,7 @@ fn main() -> Result<()> {
         Commands::Status { json } => {
             if json {
                 use output::JsonOutput;
-                
+
                 let summary = executor.get_status()?;
                 let output = JsonOutput::success(&summary);
                 println!("{}", output.to_json_string()?);
@@ -474,7 +474,7 @@ fn main() -> Result<()> {
             if json {
                 use output::JsonOutput;
                 use serde_json::json;
-                
+
                 executor.validate_silent()?;
                 let output = JsonOutput::success(json!({
                     "valid": true,

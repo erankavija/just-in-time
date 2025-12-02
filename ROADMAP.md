@@ -102,15 +102,22 @@
   - [x] Prepare for future web UI (clean graph data structure)
   - [x] Added 5 new generic graph tests (102 total tests)
   - [x] **See:** `docs/generic-dag-refactoring.md` for detailed plan
-- [ ] **CLI Consistency & MCP Integration** (2025-12-02+) 📋 **PLANNED**
-  - [ ] Phase 1: Universal `--json` output on all commands
-  - [ ] Structured error responses with suggestions
-  - [ ] Standardized exit codes for automation
-  - [ ] Command schema export (`--schema json`)
-  - [ ] Batch operations support
+- [ ] **CLI Consistency & MCP Integration** (2025-12-02+) 🚧 **IN PROGRESS**
+  - [x] Phase 1.1: JSON output foundation (JsonOutput, JsonError types)
+  - [x] Add --json to: issue list, show, search
+  - [x] Add --json to: status, validate
+  - [x] Create StatusSummary struct for structured status data
+  - [ ] Add --json to: query commands (ready, blocked, etc.)
+  - [ ] Add --json to: graph commands (show, roots, downstream)
+  - [ ] Add --json to: gate and registry commands
+  - [ ] Phase 1.2: Structured error responses with suggestions
+  - [ ] Phase 1.3: Standardized exit codes for automation
+  - [ ] Phase 1.4: Command schema export (`--schema json`)
+  - [ ] Phase 1.5: Batch operations support
   - [ ] Phase 2: MCP server for AI agents (TypeScript wrapper)
   - [ ] 15-20 MCP tools covering all operations
   - [ ] **See:** `docs/cli-and-mcp-strategy.md` for detailed plan
+  - [ ] **Progress:** 5/15 commands with --json, 109 tests passing
   - [ ] **Timeline:** 2 phases, ~48-64 hours total effort
 - [ ] **Knowledge Management System** (2025-12-02+) 📋 **PLANNED**
   - [ ] Document references in issues (design docs, notes, artifacts)

@@ -523,7 +523,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     pub fn status(&self) -> Result<()> {
         let summary = self.get_status()?;
-        
+
         println!("Status:");
         println!("  Open: {}", summary.open);
         println!("  Ready: {}", summary.ready);
