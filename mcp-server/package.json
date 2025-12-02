@@ -1,0 +1,20 @@
+{
+  "name": "@vkaskivuo/jit-mcp-server",
+  "version": "0.1.0",
+  "description": "MCP server for Just-In-Time issue tracker",
+  "type": "module",
+  "main": "index.js",
+  "bin": {
+    "jit-mcp-server": "./index.js"
+  },
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": ["mcp", "jit", "issue-tracker", "ai"],
+  "author": "",
+  "license": "MIT OR Apache-2.0",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "zod": "^3.24.1"
+  }
+}
