@@ -62,16 +62,37 @@ fn main() -> Result<()> {
                 state,
                 assignee,
                 priority,
+                json,
             } => {
                 let state_filter = state.map(|s| parse_state(&s)).transpose()?;
                 let priority_filter = priority.map(|p| parse_priority(&p)).transpose()?;
                 let issues = executor.list_issues(state_filter, assignee, priority_filter)?;
 
-                for issue in issues {
-                    println!(
-                        "{} | {} | {:?} | {:?}",
-                        issue.id, issue.title, issue.state, issue.priority
-                    );
+                if json {
+                    use output::JsonOutput;
+                    use serde_json::json;
+                    
+                    // Count issues by state
+                    let mut state_counts = std::collections::HashMap::new();
+                    for issue in &issues {
+                        *state_counts.entry(issue.state).or_insert(0) += 1;
+                    }
+                    
+                    let output = JsonOutput::success(json!({
+                        "issues": issues,
+                        "summary": {
+                            "total": issues.len(),
+                            "by_state": state_counts,
+                        }
+                    }));
+                    println!("{}", output.to_json_string()?);
+                } else {
+                    for issue in issues {
+                        println!(
+                            "{} | {} | {:?} | {:?}",
+                            issue.id, issue.title, issue.state, issue.priority
+                        );
+                    }
                 }
             }
             IssueCommands::Search {

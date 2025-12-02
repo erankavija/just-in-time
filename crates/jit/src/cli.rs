@@ -81,6 +81,9 @@ pub enum IssueCommands {
 
         #[arg(short, long)]
         priority: Option<String>,
+
+        #[arg(long)]
+        json: bool,
     },
 
     /// Search issues by text query
