@@ -16,6 +16,7 @@ mod commands;
 mod domain;
 mod graph;
 mod storage;
+mod visualization;
 
 use anyhow::Result;
 use clap::Parser;

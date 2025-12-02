@@ -32,7 +32,7 @@ use std::rc::Rc;
 /// assert_eq!(loaded.title, "Test");
 /// ```
 #[derive(Clone)]
-#[allow(dead_code)]  // Public API used only in tests, not in binary
+#[allow(dead_code)] // Public API used only in tests, not in binary
 pub struct InMemoryStorage {
     issues: Rc<RefCell<HashMap<String, Issue>>>,
     gate_registry: Rc<RefCell<GateRegistry>>,
@@ -41,7 +41,7 @@ pub struct InMemoryStorage {
 
 impl InMemoryStorage {
     /// Create a new in-memory storage instance.
-    #[allow(dead_code)]  // Public API used only in tests, not in binary
+    #[allow(dead_code)] // Public API used only in tests, not in binary
     pub fn new() -> Self {
         Self {
             issues: Rc::new(RefCell::new(HashMap::new())),

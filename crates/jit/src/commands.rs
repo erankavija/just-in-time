@@ -656,8 +656,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         let graph = DependencyGraph::new(&issue_refs);
 
         match format.to_lowercase().as_str() {
-            "dot" => Ok(graph.export_dot()),
-            "mermaid" => Ok(graph.export_mermaid()),
+            "dot" => Ok(crate::visualization::export_dot(&graph)),
+            "mermaid" => Ok(crate::visualization::export_mermaid(&graph)),
             _ => Err(anyhow!(
                 "Unsupported format: {}. Use 'dot' or 'mermaid'",
                 format

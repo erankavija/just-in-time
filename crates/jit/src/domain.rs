@@ -133,6 +133,17 @@ impl Issue {
     }
 }
 
+/// Implement GraphNode for Issue to enable dependency graph operations
+impl crate::graph::GraphNode for Issue {
+    fn id(&self) -> &str {
+        &self.id
+    }
+
+    fn dependencies(&self) -> &[String] {
+        &self.dependencies
+    }
+}
+
 /// A quality gate definition in the registry
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Gate {

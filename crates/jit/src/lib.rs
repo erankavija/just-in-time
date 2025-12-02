@@ -7,6 +7,7 @@ pub mod commands;
 pub mod domain;
 pub mod graph;
 pub mod storage;
+pub mod visualization;
 
 // Re-export commonly used types
 pub use commands::CommandExecutor;

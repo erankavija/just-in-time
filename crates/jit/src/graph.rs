@@ -1,10 +1,25 @@
 //! Dependency graph operations and validation.
 //!
 //! Provides DAG enforcement, cycle detection, and graph traversal operations.
+//!
+//! The graph module provides a generic `DependencyGraph<T>` that works with any
+//! type implementing the `GraphNode` trait. This allows the same DAG algorithms
+//! to be used for issues, tasks, packages, or any other dependency relationships.
 
-use crate::domain::Issue;
 use std::collections::{HashMap, HashSet};
 use thiserror::Error;
+
+/// Trait for types that can participate in a dependency graph
+///
+/// Types implementing this trait can be used with `DependencyGraph` to enforce
+/// DAG properties, detect cycles, and perform graph traversals.
+pub trait GraphNode {
+    /// Unique identifier for this node
+    fn id(&self) -> &str;
+
+    /// IDs of nodes this node depends on
+    fn dependencies(&self) -> &[String];
+}
 
 /// Errors that can occur during graph operations
 #[derive(Debug, Error, PartialEq)]
@@ -12,39 +27,46 @@ pub enum GraphError {
     /// A cycle was detected in the dependency graph
     #[error("Cycle detected: adding dependency would create a cycle")]
     CycleDetected,
-    /// Referenced issue does not exist
-    #[error("Issue not found: {0}")]
-    IssueNotFound(String),
+    /// Referenced node does not exist
+    #[error("Node not found: {id}")]
+    NodeNotFound { id: String },
 }
 
-/// Dependency graph for issues with cycle detection and traversal
-pub struct DependencyGraph<'a> {
-    issues: HashMap<String, &'a Issue>,
+/// Generic dependency graph with cycle detection and traversal
+///
+/// Provides DAG enforcement and graph operations for any type implementing `GraphNode`.
+/// All methods are pure functions that do not modify the graph structure.
+pub struct DependencyGraph<'a, T: GraphNode> {
+    nodes: HashMap<String, &'a T>,
 }
 
-impl<'a> DependencyGraph<'a> {
-    /// Create a new dependency graph from a list of issues
-    pub fn new(issues: &[&'a Issue]) -> Self {
-        let issues_map = issues
+impl<'a, T: GraphNode> DependencyGraph<'a, T> {
+    /// Create a new dependency graph from a list of nodes
+    pub fn new(nodes: &[&'a T]) -> Self {
+        let nodes_map = nodes
             .iter()
-            .map(|issue| (issue.id.clone(), *issue))
+            .map(|node| (node.id().to_string(), *node))
             .collect();
 
-        Self { issues: issues_map }
+        Self { nodes: nodes_map }
     }
 
     /// Validate that adding a dependency would not create a cycle
-    pub fn validate_add_dependency(&self, issue_id: &str, dep_id: &str) -> Result<(), GraphError> {
-        if !self.issues.contains_key(issue_id) {
-            return Err(GraphError::IssueNotFound(issue_id.to_string()));
+    pub fn validate_add_dependency(&self, from_id: &str, to_id: &str) -> Result<(), GraphError> {
+        if !self.nodes.contains_key(from_id) {
+            return Err(GraphError::NodeNotFound {
+                id: from_id.to_string(),
+            });
         }
-        if !self.issues.contains_key(dep_id) {
-            return Err(GraphError::IssueNotFound(dep_id.to_string()));
+        if !self.nodes.contains_key(to_id) {
+            return Err(GraphError::NodeNotFound {
+                id: to_id.to_string(),
+            });
         }
 
         // Check if adding this dependency would create a cycle
         // We simulate adding the edge and check for cycles
-        if self.would_create_cycle(issue_id, dep_id) {
+        if self.would_create_cycle(from_id, to_id) {
             return Err(GraphError::CycleDetected);
         }
 
@@ -71,8 +93,8 @@ impl<'a> DependencyGraph<'a> {
             }
             visited.insert(current);
 
-            if let Some(issue) = self.issues.get(current) {
-                for dep in &issue.dependencies {
+            if let Some(node) = self.nodes.get(current) {
+                for dep in node.dependencies() {
                     stack.push(dep.as_str());
                 }
             }
@@ -81,28 +103,28 @@ impl<'a> DependencyGraph<'a> {
         false
     }
 
-    /// Get all root issues (issues with no dependencies)
-    pub fn get_roots(&self) -> Vec<&'a Issue> {
-        self.issues
+    /// Get all root nodes (nodes with no dependencies)
+    pub fn get_roots(&self) -> Vec<&'a T> {
+        self.nodes
             .values()
-            .filter(|issue| issue.dependencies.is_empty())
+            .filter(|node| node.dependencies().is_empty())
             .copied()
             .collect()
     }
 
-    /// Get all issues that directly depend on the given issue
-    pub fn get_dependents(&self, issue_id: &str) -> Vec<&'a Issue> {
-        self.issues
+    /// Get all nodes that directly depend on the given node
+    pub fn get_dependents(&self, node_id: &str) -> Vec<&'a T> {
+        self.nodes
             .values()
-            .filter(|issue| issue.dependencies.contains(&issue_id.to_string()))
+            .filter(|node| node.dependencies().contains(&node_id.to_string()))
             .copied()
             .collect()
     }
 
-    /// Get all issues that transitively depend on the given issue
-    pub fn get_transitive_dependents(&self, issue_id: &str) -> Vec<&'a Issue> {
+    /// Get all nodes that transitively depend on the given node
+    pub fn get_transitive_dependents(&self, node_id: &str) -> Vec<&'a T> {
         let mut result = HashSet::new();
-        let mut stack = vec![issue_id];
+        let mut stack = vec![node_id];
         let mut visited = HashSet::new();
 
         while let Some(current) = stack.pop() {
@@ -113,89 +135,15 @@ impl<'a> DependencyGraph<'a> {
 
             let dependents = self.get_dependents(current);
             for dependent in dependents {
-                result.insert(dependent.id.as_str());
-                stack.push(&dependent.id);
+                result.insert(dependent.id());
+                stack.push(dependent.id());
             }
         }
 
         result
             .into_iter()
-            .filter_map(|id| self.issues.get(id).copied())
+            .filter_map(|id| self.nodes.get(id).copied())
             .collect()
-    }
-
-    /// Export graph as DOT format for Graphviz
-    pub fn export_dot(&self) -> String {
-        let mut output = String::from("digraph issues {\n");
-        output.push_str("  rankdir=LR;\n");
-        output.push_str("  node [shape=box, style=rounded];\n\n");
-
-        // Add nodes with labels
-        for issue in self.issues.values() {
-            let label = format!("{}\\n{}", issue.id, issue.title.replace('"', "\\\""));
-            let color = match issue.state {
-                crate::domain::State::Open => "lightgray",
-                crate::domain::State::Ready => "lightblue",
-                crate::domain::State::InProgress => "yellow",
-                crate::domain::State::Done => "lightgreen",
-                crate::domain::State::Archived => "gray",
-            };
-            output.push_str(&format!(
-                "  \"{}\" [label=\"{}\", fillcolor={}, style=\"rounded,filled\"];\n",
-                issue.id, label, color
-            ));
-        }
-
-        output.push('\n');
-
-        // Add edges
-        for issue in self.issues.values() {
-            for dep in &issue.dependencies {
-                output.push_str(&format!("  \"{}\" -> \"{}\";\n", issue.id, dep));
-            }
-        }
-
-        output.push_str("}\n");
-        output
-    }
-
-    /// Export graph as Mermaid format
-    pub fn export_mermaid(&self) -> String {
-        let mut output = String::from("graph LR\n");
-
-        // Add nodes with state styling
-        for issue in self.issues.values() {
-            let label = format!("{}:<br/>{}", issue.id, issue.title);
-            let style_class = match issue.state {
-                crate::domain::State::Open => "open",
-                crate::domain::State::Ready => "ready",
-                crate::domain::State::InProgress => "inprogress",
-                crate::domain::State::Done => "done",
-                crate::domain::State::Archived => "archived",
-            };
-            output.push_str(&format!(
-                "  {}[\"{}\"]:::{}\n",
-                issue.id, label, style_class
-            ));
-        }
-
-        output.push('\n');
-
-        // Add edges
-        for issue in self.issues.values() {
-            for dep in &issue.dependencies {
-                output.push_str(&format!("  {} --> {}\n", issue.id, dep));
-            }
-        }
-
-        // Add style classes
-        output.push_str("\n  classDef open fill:#e0e0e0,stroke:#333\n");
-        output.push_str("  classDef ready fill:#add8e6,stroke:#333\n");
-        output.push_str("  classDef inprogress fill:#ffff99,stroke:#333\n");
-        output.push_str("  classDef done fill:#90ee90,stroke:#333\n");
-        output.push_str("  classDef archived fill:#808080,stroke:#333\n");
-
-        output
     }
 
     /// Validate that the graph is a DAG (no cycles)
@@ -204,7 +152,7 @@ impl<'a> DependencyGraph<'a> {
         let mut visited = HashSet::new();
         let mut rec_stack = HashSet::new();
 
-        for id in self.issues.keys() {
+        for id in self.nodes.keys() {
             if !visited.contains(id.as_str())
                 && self.has_cycle_dfs(id, &mut visited, &mut rec_stack)
             {
@@ -224,8 +172,8 @@ impl<'a> DependencyGraph<'a> {
         visited.insert(node.to_string());
         rec_stack.insert(node.to_string());
 
-        if let Some(issue) = self.issues.get(node) {
-            for dep in &issue.dependencies {
+        if let Some(graph_node) = self.nodes.get(node) {
+            for dep in graph_node.dependencies() {
                 if !visited.contains(dep.as_str()) {
                     if self.has_cycle_dfs(dep, visited, rec_stack) {
                         return true;
@@ -244,7 +192,112 @@ impl<'a> DependencyGraph<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::Issue;
 
+    // Dummy node type for testing generic graph functionality
+    #[derive(Debug, Clone)]
+    struct TestNode {
+        id: String,
+        deps: Vec<String>,
+    }
+
+    impl TestNode {
+        fn new(id: &str, deps: Vec<&str>) -> Self {
+            Self {
+                id: id.to_string(),
+                deps: deps.iter().map(|s| s.to_string()).collect(),
+            }
+        }
+    }
+
+    impl GraphNode for TestNode {
+        fn id(&self) -> &str {
+            &self.id
+        }
+
+        fn dependencies(&self) -> &[String] {
+            &self.deps
+        }
+    }
+
+    // Tests with generic TestNode type
+    #[test]
+    fn test_generic_graph_with_test_nodes() {
+        let node1 = TestNode::new("A", vec![]);
+        let node2 = TestNode::new("B", vec!["A"]);
+        let node3 = TestNode::new("C", vec!["B"]);
+
+        let nodes = vec![&node1, &node2, &node3];
+        let graph = DependencyGraph::new(&nodes);
+
+        // C -> B -> A chain exists, so adding C -> A is OK (redundant but valid)
+        assert!(graph.validate_add_dependency("C", "A").is_ok());
+        // But A -> C would create a cycle: A -> C -> B -> A
+        assert_eq!(
+            graph.validate_add_dependency("A", "C"),
+            Err(GraphError::CycleDetected)
+        );
+    }
+
+    #[test]
+    fn test_generic_graph_roots() {
+        let node1 = TestNode::new("root1", vec![]);
+        let node2 = TestNode::new("dep", vec!["root1"]);
+        let node3 = TestNode::new("root2", vec![]);
+
+        let nodes = vec![&node1, &node2, &node3];
+        let graph = DependencyGraph::new(&nodes);
+
+        let roots = graph.get_roots();
+        assert_eq!(roots.len(), 2);
+        assert!(roots.iter().any(|n| n.id() == "root1"));
+        assert!(roots.iter().any(|n| n.id() == "root2"));
+    }
+
+    #[test]
+    fn test_generic_graph_dependents() {
+        let node1 = TestNode::new("base", vec![]);
+        let node2 = TestNode::new("dep1", vec!["base"]);
+        let node3 = TestNode::new("dep2", vec!["base"]);
+
+        let nodes = vec![&node1, &node2, &node3];
+        let graph = DependencyGraph::new(&nodes);
+
+        let dependents = graph.get_dependents("base");
+        assert_eq!(dependents.len(), 2);
+        assert!(dependents.iter().any(|n| n.id() == "dep1"));
+        assert!(dependents.iter().any(|n| n.id() == "dep2"));
+    }
+
+    #[test]
+    fn test_generic_graph_transitive_dependents() {
+        let node1 = TestNode::new("root", vec![]);
+        let node2 = TestNode::new("level1", vec!["root"]);
+        let node3 = TestNode::new("level2", vec!["level1"]);
+
+        let nodes = vec![&node1, &node2, &node3];
+        let graph = DependencyGraph::new(&nodes);
+
+        let transitive = graph.get_transitive_dependents("root");
+        assert_eq!(transitive.len(), 2);
+        assert!(transitive.iter().any(|n| n.id() == "level1"));
+        assert!(transitive.iter().any(|n| n.id() == "level2"));
+    }
+
+    #[test]
+    fn test_generic_graph_cycle_detection() {
+        let mut node1 = TestNode::new("A", vec![]);
+        let mut node2 = TestNode::new("B", vec![]);
+        node1.deps.push("B".to_string());
+        node2.deps.push("A".to_string());
+
+        let nodes = vec![&node1, &node2];
+        let graph = DependencyGraph::new(&nodes);
+
+        assert_eq!(graph.validate_dag(), Err(GraphError::CycleDetected));
+    }
+
+    // Tests with Issue type (existing functionality)
     #[test]
     fn test_validate_add_dependency_success() {
         let issue1 = Issue::new("Issue 1".to_string(), "Desc".to_string());
@@ -268,7 +321,9 @@ mod tests {
         let result = graph.validate_add_dependency(&issue1.id, "nonexistent");
         assert_eq!(
             result,
-            Err(GraphError::IssueNotFound("nonexistent".to_string()))
+            Err(GraphError::NodeNotFound {
+                id: "nonexistent".to_string()
+            })
         );
     }
 
@@ -386,76 +441,5 @@ mod tests {
         let graph = DependencyGraph::new(&issues);
 
         assert_eq!(graph.validate_dag(), Err(GraphError::CycleDetected));
-    }
-
-    #[test]
-    fn test_export_dot_format() {
-        let issue1 = Issue::new("API Design".to_string(), "Design REST API".to_string());
-        let mut issue2 = Issue::new("Backend".to_string(), "Implement backend".to_string());
-        issue2.dependencies.push(issue1.id.clone());
-
-        let issues = vec![&issue1, &issue2];
-        let graph = DependencyGraph::new(&issues);
-
-        let dot = graph.export_dot();
-
-        assert!(dot.contains("digraph issues"));
-        assert!(dot.contains("rankdir=LR"));
-        assert!(dot.contains(&issue1.id));
-        assert!(dot.contains(&issue2.id));
-        assert!(dot.contains("API Design"));
-        assert!(dot.contains("Backend"));
-        assert!(dot.contains(&format!("\"{}\" -> \"{}\"", issue2.id, issue1.id)));
-    }
-
-    #[test]
-    fn test_export_mermaid_format() {
-        let issue1 = Issue::new("Setup".to_string(), "Initial setup".to_string());
-        let mut issue2 = Issue::new("Deploy".to_string(), "Deploy to prod".to_string());
-        issue2.dependencies.push(issue1.id.clone());
-
-        let issues = vec![&issue1, &issue2];
-        let graph = DependencyGraph::new(&issues);
-
-        let mermaid = graph.export_mermaid();
-
-        assert!(mermaid.contains("graph LR"));
-        assert!(mermaid.contains(&issue1.id));
-        assert!(mermaid.contains(&issue2.id));
-        assert!(mermaid.contains("Setup"));
-        assert!(mermaid.contains("Deploy"));
-        assert!(mermaid.contains(&format!("{} --> {}", issue2.id, issue1.id)));
-        assert!(mermaid.contains("classDef open"));
-    }
-
-    #[test]
-    fn test_export_dot_with_different_states() {
-        use crate::domain::State;
-
-        let mut issue1 = Issue::new("Done Task".to_string(), "Completed".to_string());
-        issue1.state = State::Done;
-
-        let mut issue2 = Issue::new("In Progress".to_string(), "Working on it".to_string());
-        issue2.state = State::InProgress;
-
-        let issues = vec![&issue1, &issue2];
-        let graph = DependencyGraph::new(&issues);
-
-        let dot = graph.export_dot();
-
-        assert!(dot.contains("lightgreen")); // Done state
-        assert!(dot.contains("yellow")); // InProgress state
-    }
-
-    #[test]
-    fn test_export_handles_special_characters() {
-        let issue = Issue::new("Title with \"quotes\"".to_string(), "Test".to_string());
-        let issues = vec![&issue];
-        let graph = DependencyGraph::new(&issues);
-
-        let dot = graph.export_dot();
-
-        assert!(dot.contains("\\\""));
-        assert!(!dot.contains("Title with \"quotes\""));
     }
 }

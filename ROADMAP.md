@@ -94,6 +94,35 @@
   - [x] Zero-cost abstraction with generics
   - [x] Add `InMemoryStorage` for fast testing (27 tests, 10-100x speedup)
   - [x] **See:** `docs/storage-abstraction.md` for detailed plan
+- [x] **Generic DAG refactoring** (2025-12-02) ✅ **COMPLETED**
+  - [x] Extract `GraphNode` trait for generic dependency graphs
+  - [x] Make `DependencyGraph<T: GraphNode>` generic
+  - [x] Create `visualization.rs` module for Issue-specific exports
+  - [x] Separate graph algorithms from domain/presentation logic
+  - [x] Prepare for future web UI (clean graph data structure)
+  - [x] Added 5 new generic graph tests (102 total tests)
+  - [x] **See:** `docs/generic-dag-refactoring.md` for detailed plan
+- [ ] **CLI Consistency & MCP Integration** (2025-12-02+) 📋 **PLANNED**
+  - [ ] Phase 1: Universal `--json` output on all commands
+  - [ ] Structured error responses with suggestions
+  - [ ] Standardized exit codes for automation
+  - [ ] Command schema export (`--schema json`)
+  - [ ] Batch operations support
+  - [ ] Phase 2: MCP server for AI agents (TypeScript wrapper)
+  - [ ] 15-20 MCP tools covering all operations
+  - [ ] **See:** `docs/cli-and-mcp-strategy.md` for detailed plan
+  - [ ] **Timeline:** 2 phases, ~48-64 hours total effort
+- [ ] **Knowledge Management System** (2025-12-02+) 📋 **PLANNED**
+  - [ ] Document references in issues (design docs, notes, artifacts)
+  - [ ] Git integration for version-aware references
+  - [ ] Validation of document links and commit hashes
+  - [ ] Web UI with interactive graph visualization
+  - [ ] Inline markdown document rendering
+  - [ ] Historical document viewer (time machine)
+  - [ ] Full-text search across issues and documents
+  - [ ] Archive system for project knowledge preservation
+  - [ ] **See:** `docs/knowledge-management-vision.md` for detailed plan
+  - [ ] **Timeline:** 4 sprints, ~100-120 hours total effort
 - [ ] Bulk operations (TDD: write tests first)
 - [ ] CI integration: read artifacts to auto-pass gates (TDD: write tests first)
 - [ ] Pull-based agent mode (TDD: write tests first)
