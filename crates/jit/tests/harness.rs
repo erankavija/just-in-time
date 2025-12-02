@@ -1,38 +1,25 @@
 //! Test harness for in-process CLI testing
 //!
 //! Provides a fluent API for testing CLI commands without spawning processes.
+//! Uses in-memory storage for 10-100x faster test execution.
 
 use jit::commands::CommandExecutor;
 use jit::domain::{Issue, Priority, State};
-use jit::storage::{IssueStore, JsonFileStorage};
-use std::path::PathBuf;
-use tempfile::TempDir;
+use jit::storage::{InMemoryStorage, IssueStore};
 
 /// Test harness that provides isolated environment for each test
 pub struct TestHarness {
-    _temp: TempDir,
-    pub executor: CommandExecutor<JsonFileStorage>,
-    pub storage: JsonFileStorage,
+    pub executor: CommandExecutor<InMemoryStorage>,
+    pub storage: InMemoryStorage,
 }
 
 impl TestHarness {
-    /// Create a new test harness with isolated storage
+    /// Create a new test harness with isolated in-memory storage
     pub fn new() -> Self {
-        let temp = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(temp.path());
+        let storage = InMemoryStorage::new();
         storage.init().unwrap();
         let executor = CommandExecutor::new(storage.clone());
-        Self {
-            _temp: temp,
-            executor,
-            storage,
-        }
-    }
-
-    /// Get the data directory path
-    #[allow(dead_code)]
-    pub fn data_dir(&self) -> PathBuf {
-        self._temp.path().join("data")
+        Self { executor, storage }
     }
 
     // === Fluent API for common operations ===
