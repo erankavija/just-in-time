@@ -44,10 +44,16 @@ pub enum Commands {
     Query(QueryCommands),
 
     /// Show overall status
-    Status,
+    Status {
+        #[arg(long)]
+        json: bool,
+    },
 
     /// Validate repository integrity
-    Validate,
+    Validate {
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -99,6 +105,9 @@ pub enum IssueCommands {
 
         #[arg(short, long)]
         priority: Option<String>,
+
+        #[arg(long)]
+        json: bool,
     },
 
     /// Show issue details

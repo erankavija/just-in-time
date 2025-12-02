@@ -100,6 +100,7 @@ fn main() -> Result<()> {
                 state,
                 assignee,
                 priority,
+                json,
             } => {
                 let state_filter = state.map(|s| parse_state(&s)).transpose()?;
                 let priority_filter = priority.map(|p| parse_priority(&p)).transpose()?;
@@ -110,18 +111,33 @@ fn main() -> Result<()> {
                     assignee,
                 )?;
 
-                println!("Found {} issue(s):", issues.len());
-                for issue in issues {
-                    println!(
-                        "{} | {} | {:?} | {:?}",
-                        issue.id, issue.title, issue.state, issue.priority
-                    );
+                if json {
+                    use output::JsonOutput;
+                    use serde_json::json;
+                    
+                    let output = JsonOutput::success(json!({
+                        "query": query,
+                        "issues": issues,
+                        "count": issues.len(),
+                    }));
+                    println!("{}", output.to_json_string()?);
+                } else {
+                    println!("Found {} issue(s):", issues.len());
+                    for issue in issues {
+                        println!(
+                            "{} | {} | {:?} | {:?}",
+                            issue.id, issue.title, issue.state, issue.priority
+                        );
+                    }
                 }
             }
             IssueCommands::Show { id, json } => {
                 let issue = executor.show_issue(&id)?;
                 if json {
-                    println!("{}", serde_json::to_string_pretty(&issue)?);
+                    use output::JsonOutput;
+                    
+                    let output = JsonOutput::success(&issue);
+                    println!("{}", output.to_json_string()?);
                 } else {
                     println!("ID: {}", issue.id);
                     println!("Title: {}", issue.title);
@@ -443,11 +459,31 @@ fn main() -> Result<()> {
                 }
             }
         },
-        Commands::Status => {
-            executor.status()?;
+        Commands::Status { json } => {
+            if json {
+                use output::JsonOutput;
+                
+                let summary = executor.get_status()?;
+                let output = JsonOutput::success(&summary);
+                println!("{}", output.to_json_string()?);
+            } else {
+                executor.status()?;
+            }
         }
-        Commands::Validate => {
-            executor.validate()?;
+        Commands::Validate { json } => {
+            if json {
+                use output::JsonOutput;
+                use serde_json::json;
+                
+                executor.validate_silent()?;
+                let output = JsonOutput::success(json!({
+                    "valid": true,
+                    "message": "Repository validation passed"
+                }));
+                println!("{}", output.to_json_string()?);
+            } else {
+                executor.validate()?;
+            }
         }
     }
 

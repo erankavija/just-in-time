@@ -8,7 +8,19 @@ use crate::graph::DependencyGraph;
 use crate::storage::IssueStore;
 use anyhow::{anyhow, Result};
 use chrono::Utc;
+use serde::Serialize;
 use std::collections::HashMap;
+
+/// Status summary for all issues
+#[derive(Debug, Serialize)]
+pub struct StatusSummary {
+    pub open: usize,
+    pub ready: usize,
+    pub in_progress: usize,
+    pub done: usize,
+    pub blocked: usize,
+    pub total: usize,
+}
 
 /// Executes CLI commands with business logic and validation.
 ///
@@ -467,17 +479,24 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(roots.into_iter().cloned().collect())
     }
 
-    pub fn validate(&self) -> Result<()> {
+    /// Validate repository integrity (silent, returns Result)
+    pub fn validate_silent(&self) -> Result<()> {
         let issues = self.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
         let graph = DependencyGraph::new(&issue_refs);
 
         graph.validate_dag()?;
+        Ok(())
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        self.validate_silent()?;
         println!("✓ Repository is valid");
         Ok(())
     }
 
-    pub fn status(&self) -> Result<()> {
+    /// Get status summary
+    pub fn get_status(&self) -> Result<StatusSummary> {
         let issues = self.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
         let resolved: HashMap<String, &Issue> =
@@ -492,12 +511,25 @@ impl<S: IssueStore> CommandExecutor<S> {
         let done = issues.iter().filter(|i| i.state == State::Done).count();
         let blocked = issues.iter().filter(|i| i.is_blocked(&resolved)).count();
 
+        Ok(StatusSummary {
+            open,
+            ready,
+            in_progress,
+            done,
+            blocked,
+            total: issues.len(),
+        })
+    }
+
+    pub fn status(&self) -> Result<()> {
+        let summary = self.get_status()?;
+        
         println!("Status:");
-        println!("  Open: {}", open);
-        println!("  Ready: {}", ready);
-        println!("  In Progress: {}", in_progress);
-        println!("  Done: {}", done);
-        println!("  Blocked: {}", blocked);
+        println!("  Open: {}", summary.open);
+        println!("  Ready: {}", summary.ready);
+        println!("  In Progress: {}", summary.in_progress);
+        println!("  Done: {}", summary.done);
+        println!("  Blocked: {}", summary.blocked);
 
         Ok(())
     }
