@@ -266,16 +266,25 @@ pub enum GraphCommands {
     Show {
         /// Issue ID (optional - shows all if omitted)
         id: Option<String>,
+
+        #[arg(long)]
+        json: bool,
     },
 
     /// Show issues that depend on this issue
     Downstream {
         /// Issue ID
         id: String,
+
+        #[arg(long)]
+        json: bool,
     },
 
     /// Show root issues (no dependencies)
-    Roots,
+    Roots {
+        #[arg(long)]
+        json: bool,
+    },
 
     /// Export dependency graph in various formats
     Export {

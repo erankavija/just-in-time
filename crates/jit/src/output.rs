@@ -195,6 +195,49 @@ pub struct PriorityQueryResponse {
     pub count: usize,
 }
 
+// ============================================================================
+// Graph Response Types
+// ============================================================================
+
+/// Response for `graph show <id>` command
+#[derive(Debug, Serialize)]
+pub struct GraphShowResponse {
+    pub issue_id: String,
+    pub dependencies: Vec<Issue>,
+    pub count: usize,
+}
+
+/// Response for `graph show` (all) command
+#[derive(Debug, Serialize)]
+pub struct GraphShowAllResponse {
+    pub dependencies: Vec<DependencyPair>,
+    pub count: usize,
+}
+
+/// A pair of issues with a dependency relationship
+#[derive(Debug, Serialize)]
+pub struct DependencyPair {
+    pub from_id: String,
+    pub from_title: String,
+    pub to_id: String,
+    pub to_title: String,
+}
+
+/// Response for `graph downstream` command
+#[derive(Debug, Serialize)]
+pub struct GraphDownstreamResponse {
+    pub issue_id: String,
+    pub dependents: Vec<Issue>,
+    pub count: usize,
+}
+
+/// Response for `graph roots` command
+#[derive(Debug, Serialize)]
+pub struct GraphRootsResponse {
+    pub roots: Vec<Issue>,
+    pub count: usize,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
