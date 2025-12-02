@@ -14,6 +14,8 @@ pub mod memory;
 
 // Re-export for convenience
 pub use json::JsonFileStorage;
+
+#[allow(unused_imports)]  // Public API used only in tests, not in binary
 pub use memory::InMemoryStorage;
 
 /// Registry of all gate definitions
