@@ -102,6 +102,79 @@ pub struct ErrorDetail {
     pub suggestions: Vec<String>,
 }
 
+// ============================================================================
+// Error Codes
+// ============================================================================
+
+/// Standard error codes for JIT operations
+pub struct ErrorCode;
+
+#[allow(dead_code)]
+impl ErrorCode {
+    pub const ISSUE_NOT_FOUND: &'static str = "ISSUE_NOT_FOUND";
+    pub const GATE_NOT_FOUND: &'static str = "GATE_NOT_FOUND";
+    pub const CYCLE_DETECTED: &'static str = "CYCLE_DETECTED";
+    pub const INVALID_ARGUMENT: &'static str = "INVALID_ARGUMENT";
+    pub const VALIDATION_FAILED: &'static str = "VALIDATION_FAILED";
+    pub const ALREADY_EXISTS: &'static str = "ALREADY_EXISTS";
+    pub const INVALID_STATE: &'static str = "INVALID_STATE";
+    pub const BLOCKED: &'static str = "BLOCKED";
+    pub const IO_ERROR: &'static str = "IO_ERROR";
+    pub const PARSE_ERROR: &'static str = "PARSE_ERROR";
+}
+
+/// Helper to create common error responses
+#[allow(dead_code)]
+impl JsonError {
+    pub fn issue_not_found(issue_id: &str) -> Self {
+        Self::new(
+            ErrorCode::ISSUE_NOT_FOUND,
+            format!("Issue not found: {}", issue_id),
+        )
+        .with_details(serde_json::json!({"issue_id": issue_id}))
+        .with_suggestion("Run 'jit issue list' to see available issues")
+        .with_suggestion("Check if the issue ID is correct")
+    }
+
+    pub fn gate_not_found(gate_key: &str) -> Self {
+        Self::new(
+            ErrorCode::GATE_NOT_FOUND,
+            format!("Gate not found: {}", gate_key),
+        )
+        .with_details(serde_json::json!({"gate_key": gate_key}))
+        .with_suggestion("Run 'jit registry list' to see available gates")
+        .with_suggestion("Add the gate to the registry first with 'jit registry add'")
+    }
+
+    pub fn cycle_detected(from: &str, to: &str) -> Self {
+        Self::new(
+            ErrorCode::CYCLE_DETECTED,
+            format!("Adding dependency would create a cycle: {} -> {}", from, to),
+        )
+        .with_details(serde_json::json!({"from": from, "to": to}))
+        .with_suggestion("Remove existing dependencies that create the cycle")
+        .with_suggestion("Use 'jit graph show' to visualize the dependency graph")
+    }
+
+    pub fn invalid_state(state: &str) -> Self {
+        Self::new(
+            ErrorCode::INVALID_STATE,
+            format!("Invalid state: {}", state),
+        )
+        .with_details(serde_json::json!({"invalid_state": state}))
+        .with_suggestion("Valid states are: open, ready, in_progress, done")
+    }
+
+    pub fn invalid_priority(priority: &str) -> Self {
+        Self::new(
+            ErrorCode::INVALID_ARGUMENT,
+            format!("Invalid priority: {}", priority),
+        )
+        .with_details(serde_json::json!({"invalid_priority": priority}))
+        .with_suggestion("Valid priorities are: low, normal, high, critical")
+    }
+}
+
 /// Metadata included in all responses
 #[derive(Debug, Serialize)]
 pub struct Metadata {

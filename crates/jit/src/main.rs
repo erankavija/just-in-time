@@ -131,25 +131,36 @@ fn main() -> Result<()> {
                     }
                 }
             }
-            IssueCommands::Show { id, json } => {
-                let issue = executor.show_issue(&id)?;
-                if json {
-                    use output::JsonOutput;
+            IssueCommands::Show { id, json } => match executor.show_issue(&id) {
+                Ok(issue) => {
+                    if json {
+                        use output::JsonOutput;
 
-                    let output = JsonOutput::success(&issue);
-                    println!("{}", output.to_json_string()?);
-                } else {
-                    println!("ID: {}", issue.id);
-                    println!("Title: {}", issue.title);
-                    println!("Description: {}", issue.description);
-                    println!("State: {:?}", issue.state);
-                    println!("Priority: {:?}", issue.priority);
-                    println!("Assignee: {:?}", issue.assignee);
-                    println!("Dependencies: {:?}", issue.dependencies);
-                    println!("Gates Required: {:?}", issue.gates_required);
-                    println!("Gates Status: {:?}", issue.gates_status);
+                        let output = JsonOutput::success(&issue);
+                        println!("{}", output.to_json_string()?);
+                    } else {
+                        println!("ID: {}", issue.id);
+                        println!("Title: {}", issue.title);
+                        println!("Description: {}", issue.description);
+                        println!("State: {:?}", issue.state);
+                        println!("Priority: {:?}", issue.priority);
+                        println!("Assignee: {:?}", issue.assignee);
+                        println!("Dependencies: {:?}", issue.dependencies);
+                        println!("Gates Required: {:?}", issue.gates_required);
+                        println!("Gates Status: {:?}", issue.gates_status);
+                    }
                 }
-            }
+                Err(e) => {
+                    if json {
+                        use output::JsonError;
+                        let json_error = JsonError::issue_not_found(&id);
+                        println!("{}", json_error.to_json_string()?);
+                        std::process::exit(1);
+                    } else {
+                        return Err(e);
+                    }
+                }
+            },
             IssueCommands::Update {
                 id,
                 title,
@@ -228,31 +239,193 @@ fn main() -> Result<()> {
             }
         },
         Commands::Dep(dep_cmd) => match dep_cmd {
-            DepCommands::Add { from_id, to_id } => {
-                executor.add_dependency(&from_id, &to_id)?;
-                println!("Added dependency: {} depends on {}", from_id, to_id);
-            }
-            DepCommands::Rm { from_id, to_id } => {
-                executor.remove_dependency(&from_id, &to_id)?;
-                println!(
-                    "Removed dependency: {} no longer depends on {}",
-                    from_id, to_id
-                );
-            }
+            DepCommands::Add {
+                from_id,
+                to_id,
+                json,
+            } => match executor.add_dependency(&from_id, &to_id) {
+                Ok(_) => {
+                    if json {
+                        use output::JsonOutput;
+                        let response = serde_json::json!({
+                            "from_id": from_id,
+                            "to_id": to_id,
+                            "message": format!("{} now depends on {}", from_id, to_id)
+                        });
+                        let output = JsonOutput::success(response);
+                        println!("{}", output.to_json_string()?);
+                    } else {
+                        println!("Added dependency: {} depends on {}", from_id, to_id);
+                    }
+                }
+                Err(e) => {
+                    if json {
+                        use output::JsonError;
+                        let error_str = e.to_string();
+                        let json_error = if error_str.contains("cycle") {
+                            JsonError::cycle_detected(&from_id, &to_id)
+                        } else if error_str.contains("not found") {
+                            if error_str.contains(&from_id) {
+                                JsonError::issue_not_found(&from_id)
+                            } else {
+                                JsonError::issue_not_found(&to_id)
+                            }
+                        } else {
+                            JsonError::new("DEPENDENCY_ERROR", error_str)
+                        };
+                        println!("{}", json_error.to_json_string()?);
+                        std::process::exit(1);
+                    } else {
+                        return Err(e);
+                    }
+                }
+            },
+            DepCommands::Rm {
+                from_id,
+                to_id,
+                json,
+            } => match executor.remove_dependency(&from_id, &to_id) {
+                Ok(_) => {
+                    if json {
+                        use output::JsonOutput;
+                        let response = serde_json::json!({
+                            "from_id": from_id,
+                            "to_id": to_id,
+                            "message": format!("{} no longer depends on {}", from_id, to_id)
+                        });
+                        let output = JsonOutput::success(response);
+                        println!("{}", output.to_json_string()?);
+                    } else {
+                        println!(
+                            "Removed dependency: {} no longer depends on {}",
+                            from_id, to_id
+                        );
+                    }
+                }
+                Err(e) => {
+                    if json {
+                        use output::JsonError;
+                        let error_str = e.to_string();
+                        let json_error = if error_str.contains("not found") {
+                            if error_str.contains(&from_id) {
+                                JsonError::issue_not_found(&from_id)
+                            } else {
+                                JsonError::issue_not_found(&to_id)
+                            }
+                        } else {
+                            JsonError::new("DEPENDENCY_ERROR", error_str)
+                        };
+                        println!("{}", json_error.to_json_string()?);
+                        std::process::exit(1);
+                    } else {
+                        return Err(e);
+                    }
+                }
+            },
         },
         Commands::Gate(gate_cmd) => match gate_cmd {
-            GateCommands::Add { id, gate_key } => {
-                executor.add_gate(&id, gate_key.clone())?;
-                println!("Added gate '{}' to issue {}", gate_key, id);
+            GateCommands::Add { id, gate_key, json } => {
+                match executor.add_gate(&id, gate_key.clone()) {
+                    Ok(_) => {
+                        if json {
+                            use output::JsonOutput;
+                            let response = serde_json::json!({
+                                "issue_id": id,
+                                "gate_key": gate_key,
+                                "message": format!("Added gate '{}' to issue {}", gate_key, id)
+                            });
+                            let output = JsonOutput::success(response);
+                            println!("{}", output.to_json_string()?);
+                        } else {
+                            println!("Added gate '{}' to issue {}", gate_key, id);
+                        }
+                    }
+                    Err(e) => {
+                        if json {
+                            use output::JsonError;
+                            let error_str = e.to_string();
+                            let json_error = if error_str.contains("Issue")
+                                && error_str.contains("not found")
+                            {
+                                JsonError::issue_not_found(&id)
+                            } else if error_str.contains("Gate") && error_str.contains("not found")
+                            {
+                                JsonError::gate_not_found(&gate_key)
+                            } else {
+                                JsonError::new("GATE_ERROR", error_str)
+                            };
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(1);
+                        } else {
+                            return Err(e);
+                        }
+                    }
+                }
             }
-            GateCommands::Pass { id, gate_key, by } => {
-                executor.pass_gate(&id, gate_key.clone(), by)?;
-                println!("Passed gate '{}' for issue {}", gate_key, id);
-            }
-            GateCommands::Fail { id, gate_key, by } => {
-                executor.fail_gate(&id, gate_key.clone(), by)?;
-                println!("Failed gate '{}' for issue {}", gate_key, id);
-            }
+            GateCommands::Pass {
+                id,
+                gate_key,
+                by,
+                json,
+            } => match executor.pass_gate(&id, gate_key.clone(), by) {
+                Ok(_) => {
+                    if json {
+                        use output::JsonOutput;
+                        let response = serde_json::json!({
+                            "issue_id": id,
+                            "gate_key": gate_key,
+                            "status": "passed",
+                            "message": format!("Passed gate '{}' for issue {}", gate_key, id)
+                        });
+                        let output = JsonOutput::success(response);
+                        println!("{}", output.to_json_string()?);
+                    } else {
+                        println!("Passed gate '{}' for issue {}", gate_key, id);
+                    }
+                }
+                Err(e) => {
+                    if json {
+                        use output::JsonError;
+                        let json_error = JsonError::new("GATE_ERROR", e.to_string());
+                        println!("{}", json_error.to_json_string()?);
+                        std::process::exit(1);
+                    } else {
+                        return Err(e);
+                    }
+                }
+            },
+            GateCommands::Fail {
+                id,
+                gate_key,
+                by,
+                json,
+            } => match executor.fail_gate(&id, gate_key.clone(), by) {
+                Ok(_) => {
+                    if json {
+                        use output::JsonOutput;
+                        let response = serde_json::json!({
+                            "issue_id": id,
+                            "gate_key": gate_key,
+                            "status": "failed",
+                            "message": format!("Failed gate '{}' for issue {}", gate_key, id)
+                        });
+                        let output = JsonOutput::success(response);
+                        println!("{}", output.to_json_string()?);
+                    } else {
+                        println!("Failed gate '{}' for issue {}", gate_key, id);
+                    }
+                }
+                Err(e) => {
+                    if json {
+                        use output::JsonError;
+                        let json_error = JsonError::new("GATE_ERROR", e.to_string());
+                        println!("{}", json_error.to_json_string()?);
+                        std::process::exit(1);
+                    } else {
+                        return Err(e);
+                    }
+                }
+            },
         },
         Commands::Graph(graph_cmd) => match graph_cmd {
             GraphCommands::Show { id, json } => {
@@ -537,48 +710,70 @@ fn main() -> Result<()> {
                     println!("\nTotal: {}", issues.len());
                 }
             }
-            cli::QueryCommands::State { state, json } => {
-                let parsed_state = parse_state(&state)?;
-                let issues = executor.query_by_state(parsed_state)?;
-                if json {
-                    use output::{JsonOutput, StateQueryResponse};
+            cli::QueryCommands::State { state, json } => match parse_state(&state) {
+                Ok(parsed_state) => {
+                    let issues = executor.query_by_state(parsed_state)?;
+                    if json {
+                        use output::{JsonOutput, StateQueryResponse};
 
-                    let response = StateQueryResponse {
-                        state: parsed_state,
-                        issues: issues.clone(),
-                        count: issues.len(),
-                    };
-                    let output = JsonOutput::success(response);
-                    println!("{}", output.to_json_string()?);
-                } else {
-                    println!("Issues with state '{}':", state);
-                    for issue in &issues {
-                        println!("  {} | {} | {:?}", issue.id, issue.title, issue.priority);
+                        let response = StateQueryResponse {
+                            state: parsed_state,
+                            issues: issues.clone(),
+                            count: issues.len(),
+                        };
+                        let output = JsonOutput::success(response);
+                        println!("{}", output.to_json_string()?);
+                    } else {
+                        println!("Issues with state '{}':", state);
+                        for issue in &issues {
+                            println!("  {} | {} | {:?}", issue.id, issue.title, issue.priority);
+                        }
+                        println!("\nTotal: {}", issues.len());
                     }
-                    println!("\nTotal: {}", issues.len());
                 }
-            }
-            cli::QueryCommands::Priority { priority, json } => {
-                let parsed_priority = parse_priority(&priority)?;
-                let issues = executor.query_by_priority(parsed_priority)?;
-                if json {
-                    use output::{JsonOutput, PriorityQueryResponse};
+                Err(e) => {
+                    if json {
+                        use output::JsonError;
+                        let json_error = JsonError::invalid_state(&state);
+                        println!("{}", json_error.to_json_string()?);
+                        std::process::exit(1);
+                    } else {
+                        return Err(e);
+                    }
+                }
+            },
+            cli::QueryCommands::Priority { priority, json } => match parse_priority(&priority) {
+                Ok(parsed_priority) => {
+                    let issues = executor.query_by_priority(parsed_priority)?;
+                    if json {
+                        use output::{JsonOutput, PriorityQueryResponse};
 
-                    let response = PriorityQueryResponse {
-                        priority: parsed_priority,
-                        issues: issues.clone(),
-                        count: issues.len(),
-                    };
-                    let output = JsonOutput::success(response);
-                    println!("{}", output.to_json_string()?);
-                } else {
-                    println!("Issues with priority '{}':", priority);
-                    for issue in &issues {
-                        println!("  {} | {} | {:?}", issue.id, issue.title, issue.state);
+                        let response = PriorityQueryResponse {
+                            priority: parsed_priority,
+                            issues: issues.clone(),
+                            count: issues.len(),
+                        };
+                        let output = JsonOutput::success(response);
+                        println!("{}", output.to_json_string()?);
+                    } else {
+                        println!("Issues with priority '{}':", priority);
+                        for issue in &issues {
+                            println!("  {} | {} | {:?}", issue.id, issue.title, issue.state);
+                        }
+                        println!("\nTotal: {}", issues.len());
                     }
-                    println!("\nTotal: {}", issues.len());
                 }
-            }
+                Err(e) => {
+                    if json {
+                        use output::JsonError;
+                        let json_error = JsonError::invalid_priority(&priority);
+                        println!("{}", json_error.to_json_string()?);
+                        std::process::exit(1);
+                    } else {
+                        return Err(e);
+                    }
+                }
+            },
         },
         Commands::Status { json } => {
             if json {

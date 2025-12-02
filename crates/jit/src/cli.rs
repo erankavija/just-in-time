@@ -210,6 +210,9 @@ pub enum DepCommands {
 
         /// Dependency required (TO)
         to_id: String,
+
+        #[arg(long)]
+        json: bool,
     },
 
     /// Remove a dependency
@@ -219,6 +222,9 @@ pub enum DepCommands {
 
         /// Dependency to remove (TO)
         to_id: String,
+
+        #[arg(long)]
+        json: bool,
     },
 }
 
@@ -231,6 +237,9 @@ pub enum GateCommands {
 
         /// Gate key (from registry)
         gate_key: String,
+
+        #[arg(long)]
+        json: bool,
     },
 
     /// Mark a gate as passed
@@ -244,6 +253,9 @@ pub enum GateCommands {
         /// Who passed the gate (optional)
         #[arg(short, long)]
         by: Option<String>,
+
+        #[arg(long)]
+        json: bool,
     },
 
     /// Mark a gate as failed
@@ -257,6 +269,9 @@ pub enum GateCommands {
         /// Who failed the gate (optional)
         #[arg(short, long)]
         by: Option<String>,
+
+        #[arg(long)]
+        json: bool,
     },
 }
 
