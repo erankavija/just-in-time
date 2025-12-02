@@ -79,11 +79,23 @@ fn main() {
 fn run() -> Result<()> {
     let cli = Cli::parse();
 
+    // Handle --schema flag first
+    if cli.schema {
+        use jit::CommandSchema;
+        let schema = CommandSchema::generate();
+        let json = serde_json::to_string_pretty(&schema)?;
+        println!("{}", json);
+        return Ok(());
+    }
+
+    // Ensure command is provided
+    let command = cli.command.ok_or_else(|| anyhow::anyhow!("No command provided. Use --help for usage."))?;
+
     let current_dir = env::current_dir()?;
     let storage = JsonFileStorage::new(&current_dir);
     let executor = CommandExecutor::new(storage.clone());
 
-    match cli.command {
+    match command {
         Commands::Init => {
             executor.init()?;
         }

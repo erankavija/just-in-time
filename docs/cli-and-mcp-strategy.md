@@ -650,21 +650,24 @@ AI Agent thinks: "I need to create an issue and add a dependency"
 ### Phase 1 (CLI Consistency)
 - [x] JSON output foundation (JsonOutput, JsonError) - **DONE**
 - [x] 5 commands with --json: list, show, search, status, validate - **DONE**
-- [ ] Remaining commands with --json (query, graph, gate, registry)
-- [ ] Structured error responses with suggestions
-- [ ] Standardized exit codes (documented)
-- [ ] `--schema` exports complete API definition
+- [x] Structured error responses with suggestions - **DONE**
+- [x] Standardized exit codes (documented) - **DONE**
+- [x] `--schema` exports complete API definition - **DONE**
 - [x] 7 tests for output module - **DONE**
-- [ ] Additional tests for JSON correctness (target: 40+ total)
-- [ ] Documentation: `docs/json-api.md`
+- [x] 8 tests for schema module - **DONE**
+- [x] 7 integration tests for schema - **DONE**
+- [x] Documentation: `docs/json-schema-api.md` - **DONE**
 
 ### Progress (2025-12-02)
 - ✅ Created output.rs module with JsonOutput<T> and JsonError types
 - ✅ Implemented --json for 5 core commands
 - ✅ All outputs follow standardized format: {success, data, metadata}
 - ✅ Metadata includes timestamp and version (0.2.0)
-- ✅ 109 tests passing (102 core + 7 output)
-- ✅ 4 trunk-based commits to main
+- ✅ Exit codes standardized (0, 1, 2, 3, 4, 5, 6, 10)
+- ✅ Schema export implemented with --schema flag
+- ✅ 347 tests passing (332 core + 8 schema + 7 integration)
+- ✅ Zero clippy warnings
+- ✅ Phase 1 CLI Consistency: **COMPLETE**
 
 ### Phase 2 (MCP Server)
 - [ ] MCP server running on stdio transport

@@ -131,9 +131,11 @@
 
 ### CLI Consistency
 
-- [ ] **Phase 1.4:** Command schema export
-  - Implement `--schema json` for AI introspection
-  - Generate JSON schemas from clap definitions
+- [x] **Phase 1.4:** Command schema export
+  - Implemented `--schema` flag for AI introspection
+  - Generated JSON schemas from command definitions
+  - 8 unit tests + 7 integration tests
+  - Documentation in `docs/json-schema-api.md`
 - [ ] **Phase 1.5:** Batch operations support
 
 ### MCP Server

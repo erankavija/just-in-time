@@ -7,6 +7,7 @@ pub mod commands;
 pub mod domain;
 pub mod graph;
 pub mod output;
+pub mod schema;
 pub mod storage;
 pub mod visualization;
 
@@ -14,6 +15,7 @@ pub mod visualization;
 pub use commands::CommandExecutor;
 pub use domain::{Issue, Priority, State};
 pub use output::{ExitCode, JsonError, JsonOutput};
+pub use schema::CommandSchema;
 pub use storage::{InMemoryStorage, IssueStore, JsonFileStorage};
 
 // Backwards compatibility alias

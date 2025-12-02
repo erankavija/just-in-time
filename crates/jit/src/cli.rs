@@ -20,8 +20,12 @@ use clap::{Parser, Subcommand};
 #[command(name = "jit")]
 #[command(about = "Just-In-Time issue tracker", long_about = None)]
 pub struct Cli {
+    /// Export command schema in JSON format for AI agent introspection
+    #[arg(long)]
+    pub schema: bool,
+
     #[command(subcommand)]
-    pub command: Commands,
+    pub command: Option<Commands>,
 }
 
 #[derive(Subcommand)]
