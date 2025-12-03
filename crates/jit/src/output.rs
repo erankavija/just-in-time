@@ -133,25 +133,25 @@ pub struct ErrorDetail {
 pub enum ExitCode {
     /// Command succeeded (0)
     Success = 0,
-    
+
     /// Generic error (1)
     GenericError = 1,
-    
+
     /// Invalid arguments or usage error (2)
     InvalidArgument = 2,
-    
+
     /// Resource not found - issue, gate, etc. (3)
     NotFound = 3,
-    
+
     /// Validation failed - cycle detected, broken refs, etc. (4)
     ValidationFailed = 4,
-    
+
     /// Permission denied (5)
     PermissionDenied = 5,
-    
+
     /// Resource already exists (6)
     AlreadyExists = 6,
-    
+
     /// External dependency failed - git, file system, etc. (10)
     ExternalError = 10,
 }
@@ -170,7 +170,9 @@ impl ExitCode {
             ExitCode::GenericError => "Generic error occurred",
             ExitCode::InvalidArgument => "Invalid arguments or usage error",
             ExitCode::NotFound => "Resource not found (issue, gate, etc.)",
-            ExitCode::ValidationFailed => "Validation failed (cycle detected, broken references, etc.)",
+            ExitCode::ValidationFailed => {
+                "Validation failed (cycle detected, broken references, etc.)"
+            }
             ExitCode::PermissionDenied => "Permission denied",
             ExitCode::AlreadyExists => "Resource already exists",
             ExitCode::ExternalError => "External dependency failed (git, file system, etc.)",
@@ -189,14 +191,22 @@ impl ExitCode {
              {}  - {}\n\
              {}  - {}\n\
              {} - {}",
-            ExitCode::Success.code(), ExitCode::Success.description(),
-            ExitCode::GenericError.code(), ExitCode::GenericError.description(),
-            ExitCode::InvalidArgument.code(), ExitCode::InvalidArgument.description(),
-            ExitCode::NotFound.code(), ExitCode::NotFound.description(),
-            ExitCode::ValidationFailed.code(), ExitCode::ValidationFailed.description(),
-            ExitCode::PermissionDenied.code(), ExitCode::PermissionDenied.description(),
-            ExitCode::AlreadyExists.code(), ExitCode::AlreadyExists.description(),
-            ExitCode::ExternalError.code(), ExitCode::ExternalError.description(),
+            ExitCode::Success.code(),
+            ExitCode::Success.description(),
+            ExitCode::GenericError.code(),
+            ExitCode::GenericError.description(),
+            ExitCode::InvalidArgument.code(),
+            ExitCode::InvalidArgument.description(),
+            ExitCode::NotFound.code(),
+            ExitCode::NotFound.description(),
+            ExitCode::ValidationFailed.code(),
+            ExitCode::ValidationFailed.description(),
+            ExitCode::PermissionDenied.code(),
+            ExitCode::PermissionDenied.description(),
+            ExitCode::AlreadyExists.code(),
+            ExitCode::AlreadyExists.description(),
+            ExitCode::ExternalError.code(),
+            ExitCode::ExternalError.description(),
         )
     }
 }

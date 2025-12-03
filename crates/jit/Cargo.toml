@@ -21,6 +21,7 @@ anyhow = { workspace = true }
 thiserror = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
+fs4 = { version = "0.13", features = ["sync"] }
 
 [dev-dependencies]
 tempfile = { workspace = true }

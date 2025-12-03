@@ -160,12 +160,18 @@
 ### Production Readiness
 
 - [ ] **File locking for multi-agent safety** (Priority: High - race conditions observed with MCP server)
-  - [ ] Research locking strategy (flock vs advisory locks vs process-based locking)
-  - [ ] Add locking abstraction to storage layer (lock_file/unlock_file methods)
-  - [ ] Implement file-level locking for atomic operations (index.json, individual issues)
+  - [x] Research locking strategy (flock vs advisory locks vs process-based locking) - **Decision: fs4 with advisory locks**
+  - [x] Add locking abstraction to storage layer (lock_file/unlock_file methods) - **FileLocker + LockGuard**
+  - [x] Implement file-level locking for atomic operations (index.json, individual issues) - **Phase 1.1 Complete (2025-12-03)**
+    - Created `FileLocker` with timeout support
+    - Created `LockGuard` with RAII pattern
+    - Exclusive and shared locks implemented
+    - Try-lock non-blocking variants
+    - 6 comprehensive unit tests
+    - All 338 tests passing
   - [ ] Add retry logic with exponential backoff for lock contention
-  - [ ] Add lock timeout configuration
-  - [ ] Update JsonFileStorage to acquire locks before write operations
+  - [ ] Add lock timeout configuration (via environment variables)
+  - [ ] Update JsonFileStorage to acquire locks before write operations - **Phase 1.2 (In Progress)**
   - [ ] Add tests for concurrent access patterns (parallel creates, updates, dependency adds)
   - [ ] Document locking semantics and performance implications
 - [ ] Plugin system for custom gates

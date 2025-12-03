@@ -26,7 +26,7 @@ macro_rules! cmd {
 fn test_schema_flag_outputs_json() {
     let mut cmd = cmd!();
     cmd.arg("--schema");
-    
+
     cmd.assert()
         .success()
         .stdout(predicate::str::contains("version"))
@@ -37,31 +37,25 @@ fn test_schema_flag_outputs_json() {
 
 #[test]
 fn test_schema_is_valid_json() {
-    let output = cmd!()
-        .arg("--schema")
-        .output()
-        .unwrap();
+    let output = cmd!().arg("--schema").output().unwrap();
     assert!(output.status.success());
-    
+
     let json_str = String::from_utf8(output.stdout).unwrap();
     let parsed: Value = serde_json::from_str(&json_str).unwrap();
-    
+
     assert!(parsed.is_object());
     assert_eq!(parsed["version"], "0.2.0");
 }
 
 #[test]
 fn test_schema_has_all_commands() {
-    let output = cmd!()
-        .arg("--schema")
-        .output()
-        .unwrap();
-    
+    let output = cmd!().arg("--schema").output().unwrap();
+
     let json_str = String::from_utf8(output.stdout).unwrap();
     let parsed: Value = serde_json::from_str(&json_str).unwrap();
-    
+
     let commands = parsed["commands"].as_object().unwrap();
-    
+
     // Top-level commands
     assert!(commands.contains_key("init"));
     assert!(commands.contains_key("issue"));
@@ -73,22 +67,23 @@ fn test_schema_has_all_commands() {
 
 #[test]
 fn test_schema_issue_create_details() {
-    let output = cmd!()
-        .arg("--schema")
-        .output()
-        .unwrap();
+    let output = cmd!().arg("--schema").output().unwrap();
     let json_str = String::from_utf8(output.stdout).unwrap();
     let parsed: Value = serde_json::from_str(&json_str).unwrap();
-    
+
     let create = &parsed["commands"]["issue"]["subcommands"]["create"];
-    
+
     assert_eq!(create["description"], "Create a new issue");
-    
+
     // Check args
     let args = create["args"].as_array().unwrap();
-    assert!(args.iter().any(|a| a["name"] == "title" && a["required"] == true));
-    assert!(args.iter().any(|a| a["name"] == "priority" && a["default"] == "normal"));
-    
+    assert!(args
+        .iter()
+        .any(|a| a["name"] == "title" && a["required"] == true));
+    assert!(args
+        .iter()
+        .any(|a| a["name"] == "priority" && a["default"] == "normal"));
+
     // Check flags
     let flags = create["flags"].as_array().unwrap();
     assert!(flags.iter().any(|f| f["name"] == "json"));
@@ -96,16 +91,13 @@ fn test_schema_issue_create_details() {
 
 #[test]
 fn test_schema_includes_exit_codes() {
-    let output = cmd!()
-        .arg("--schema")
-        .output()
-        .unwrap();
-    
+    let output = cmd!().arg("--schema").output().unwrap();
+
     let json_str = String::from_utf8(output.stdout).unwrap();
     let parsed: Value = serde_json::from_str(&json_str).unwrap();
-    
+
     let exit_codes = parsed["exit_codes"].as_array().unwrap();
-    
+
     assert!(exit_codes.iter().any(|e| e["code"] == 0));
     assert!(exit_codes.iter().any(|e| e["code"] == 1));
     assert!(exit_codes.iter().any(|e| e["code"] == 3));
@@ -114,20 +106,17 @@ fn test_schema_includes_exit_codes() {
 
 #[test]
 fn test_schema_includes_type_definitions() {
-    let output = cmd!()
-        .arg("--schema")
-        .output()
-        .unwrap();
+    let output = cmd!().arg("--schema").output().unwrap();
     let json_str = String::from_utf8(output.stdout).unwrap();
     let parsed: Value = serde_json::from_str(&json_str).unwrap();
-    
+
     let types = parsed["types"].as_object().unwrap();
-    
+
     assert!(types.contains_key("State"));
     assert!(types.contains_key("Priority"));
     assert!(types.contains_key("Issue"));
     assert!(types.contains_key("ErrorResponse"));
-    
+
     // Check State enum
     let state = &types["State"];
     assert_eq!(state["type"], "enum");
@@ -140,8 +129,5 @@ fn test_schema_includes_type_definitions() {
 #[test]
 fn test_no_command_with_schema_works() {
     // --schema should work without a subcommand
-    cmd!()
-        .arg("--schema")
-        .assert()
-        .success();
+    cmd!().arg("--schema").assert().success();
 }

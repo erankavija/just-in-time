@@ -10,10 +10,12 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 pub mod json;
+pub mod lock;
 pub mod memory;
 
 // Re-export for convenience
 pub use json::JsonFileStorage;
+pub use lock::{FileLocker, LockGuard};
 
 #[allow(unused_imports)] // Public API used only in tests, not in binary
 pub use memory::InMemoryStorage;

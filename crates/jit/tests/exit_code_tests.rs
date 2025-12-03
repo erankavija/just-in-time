@@ -40,7 +40,7 @@ fn test_exit_code_success() {
         .args(["issue", "create", "--title", "Test issue"])
         .status()
         .unwrap();
-    
+
     assert!(status.success());
     assert_eq!(status.code(), Some(0));
 }
@@ -55,7 +55,7 @@ fn test_exit_code_not_found() {
         .args(["issue", "show", "nonexistent"])
         .output()
         .unwrap();
-    
+
     assert!(!output.status.success());
     assert_eq!(output.status.code(), Some(3));
     // Error message is "Failed to read file" for non-existent issues
@@ -101,7 +101,7 @@ fn test_exit_code_validation_failed_cycle() {
         .args(["dep", "add", id2, id1])
         .output()
         .unwrap();
-    
+
     assert!(!output.status.success());
     assert_eq!(output.status.code(), Some(4));
     assert!(String::from_utf8_lossy(&output.stderr).contains("cycle"));
@@ -114,10 +114,17 @@ fn test_exit_code_invalid_argument() {
     // Invalid priority should return exit code 2
     let output = Command::new(jit_binary())
         .current_dir(&temp_dir)
-        .args(["issue", "create", "--title", "Test", "--priority", "invalid"])
+        .args([
+            "issue",
+            "create",
+            "--title",
+            "Test",
+            "--priority",
+            "invalid",
+        ])
         .output()
         .unwrap();
-    
+
     assert!(!output.status.success());
     assert_eq!(output.status.code(), Some(2));
 }
@@ -127,13 +134,13 @@ fn test_exit_code_io_error() {
     // Try to run command in non-initialized directory
     // This should return exit code 3 (not found) because data directory doesn't exist
     let temp_dir = TempDir::new().unwrap();
-    
+
     let output = Command::new(jit_binary())
         .current_dir(&temp_dir)
         .args(["issue", "list"])
         .output()
         .unwrap();
-    
+
     assert!(!output.status.success());
     // File not found is code 3, not 10
     assert_eq!(output.status.code(), Some(3));
@@ -158,7 +165,7 @@ fn test_exit_code_already_exists() {
         .args(["registry", "add", "--title", "Test gate", "test-gate"])
         .output()
         .unwrap();
-    
+
     assert!(!output.status.success());
     assert_eq!(output.status.code(), Some(6));
     assert!(String::from_utf8_lossy(&output.stderr).contains("already exists"));
@@ -207,10 +214,19 @@ fn test_exit_code_validation_command() {
     let id = json["id"].as_str().expect("id should exist");
 
     // Corrupt the issue file by adding invalid dependency reference
-    let issue_path = temp_dir.path().join(".jit").join("issues").join(format!("{}.json", id));
-    let mut issue_data: serde_json::Value = serde_json::from_str(&fs::read_to_string(&issue_path).unwrap()).unwrap();
+    let issue_path = temp_dir
+        .path()
+        .join(".jit")
+        .join("issues")
+        .join(format!("{}.json", id));
+    let mut issue_data: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&issue_path).unwrap()).unwrap();
     issue_data["dependencies"] = serde_json::json!(["nonexistent"]);
-    fs::write(&issue_path, serde_json::to_string_pretty(&issue_data).unwrap()).unwrap();
+    fs::write(
+        &issue_path,
+        serde_json::to_string_pretty(&issue_data).unwrap(),
+    )
+    .unwrap();
 
     // Validation should fail with exit code 4
     let output = Command::new(jit_binary())
@@ -218,7 +234,7 @@ fn test_exit_code_validation_command() {
         .args(["validate"])
         .output()
         .unwrap();
-    
+
     assert!(!output.status.success());
     assert_eq!(output.status.code(), Some(4));
     assert!(String::from_utf8_lossy(&output.stderr).contains("Invalid"));
@@ -227,10 +243,7 @@ fn test_exit_code_validation_command() {
 #[test]
 fn test_exit_code_help_and_version() {
     // --help should return exit code 0
-    let status = Command::new(jit_binary())
-        .arg("--help")
-        .status()
-        .unwrap();
+    let status = Command::new(jit_binary()).arg("--help").status().unwrap();
     assert!(status.success());
     assert_eq!(status.code(), Some(0));
 
@@ -242,4 +255,3 @@ fn test_exit_code_help_and_version() {
     assert!(status.success());
     assert_eq!(status.code(), Some(0));
 }
-

@@ -34,7 +34,7 @@ use storage::{IssueStore, JsonFileStorage};
 /// Helper to determine exit code from error message
 fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
     let error_msg = error.to_string().to_lowercase();
-    
+
     // Check root cause for IO errors
     if let Some(io_error) = error.downcast_ref::<std::io::Error>() {
         return match io_error.kind() {
@@ -43,7 +43,7 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
             _ => ExitCode::ExternalError,
         };
     }
-    
+
     // Check error message patterns
     if error_msg.contains("not found") || error_msg.contains("no such file") {
         ExitCode::NotFound
@@ -53,14 +53,15 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
         ExitCode::AlreadyExists
     } else if error_msg.contains("invalid") && !error_msg.contains("invalid dependency") {
         ExitCode::InvalidArgument
-    } else if error_msg.contains("data") && (error_msg.contains("failed to read") || error_msg.contains("io error")) {
+    } else if error_msg.contains("data")
+        && (error_msg.contains("failed to read") || error_msg.contains("io error"))
+    {
         // File system errors related to data directory
         ExitCode::ExternalError
     } else {
         ExitCode::GenericError
     }
 }
-
 
 fn main() {
     let exit_code = match run() {
@@ -70,7 +71,7 @@ fn main() {
             error_to_exit_code(&e)
         }
     };
-    
+
     if exit_code != ExitCode::Success {
         std::process::exit(exit_code.code());
     }
@@ -89,17 +90,19 @@ fn run() -> Result<()> {
     }
 
     // Ensure command is provided
-    let command = cli.command.ok_or_else(|| anyhow::anyhow!("No command provided. Use --help for usage."))?;
+    let command = cli
+        .command
+        .ok_or_else(|| anyhow::anyhow!("No command provided. Use --help for usage."))?;
 
     let current_dir = env::current_dir()?;
-    
+
     // Determine jit data directory: JIT_DATA_DIR env var or default to .jit/
     let jit_dir = if let Ok(custom_dir) = env::var("JIT_DATA_DIR") {
         current_dir.join(custom_dir)
     } else {
         current_dir.join(".jit")
     };
-    
+
     let storage = JsonFileStorage::new(&jit_dir);
     let executor = CommandExecutor::new(storage.clone());
 

@@ -1,9 +1,9 @@
 //! Output helper macros for reducing JSON boilerplate in main.rs
 
 /// Output a simple message: either JSON-wrapped or plain text
-/// 
+///
 /// # Examples
-/// 
+///
 /// ```ignore
 /// output_message!(json, "Created issue: {}", id);
 /// ```

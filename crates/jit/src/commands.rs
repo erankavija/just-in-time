@@ -603,11 +603,11 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// ```
     pub fn validate_silent(&self) -> Result<()> {
         let issues = self.storage.list_issues()?;
-        
+
         // Build lookup map of valid issue IDs
-        let valid_ids: std::collections::HashSet<String> = 
+        let valid_ids: std::collections::HashSet<String> =
             issues.iter().map(|i| i.id.clone()).collect();
-        
+
         // Check for broken dependency references
         for issue in &issues {
             for dep in &issue.dependencies {
@@ -620,7 +620,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 }
             }
         }
-        
+
         // Check for invalid gate references
         let registry = self.storage.load_gate_registry()?;
         for issue in &issues {
@@ -634,12 +634,12 @@ impl<S: IssueStore> CommandExecutor<S> {
                 }
             }
         }
-        
+
         // Validate DAG (no cycles)
         let issue_refs: Vec<&Issue> = issues.iter().collect();
         let graph = DependencyGraph::new(&issue_refs);
         graph.validate_dag()?;
-        
+
         Ok(())
     }
 
