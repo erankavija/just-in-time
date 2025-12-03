@@ -824,7 +824,9 @@ impl CommandSchema {
                         arg_type: "string".to_string(),
                         required: true,
                         default: None,
-                        description: Some("Path to document relative to repository root".to_string()),
+                        description: Some(
+                            "Path to document relative to repository root".to_string(),
+                        ),
                     },
                 ],
                 flags: vec![
@@ -841,7 +843,8 @@ impl CommandSchema {
                     Flag {
                         name: "doc-type".to_string(),
                         flag_type: "string".to_string(),
-                        description: "Document type (e.g., design, implementation, notes)".to_string(),
+                        description: "Document type (e.g., design, implementation, notes)"
+                            .to_string(),
                     },
                     Flag {
                         name: "json".to_string(),

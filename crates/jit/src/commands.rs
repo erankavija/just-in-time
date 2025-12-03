@@ -635,10 +635,78 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
+        // Validate document references (git integration)
+        self.validate_document_references(&issues)?;
+
         // Validate DAG (no cycles)
         let issue_refs: Vec<&Issue> = issues.iter().collect();
         let graph = DependencyGraph::new(&issue_refs);
         graph.validate_dag()?;
+
+        Ok(())
+    }
+
+    /// Validate all document references in issues
+    fn validate_document_references(&self, issues: &[Issue]) -> Result<()> {
+        use git2::Repository;
+
+        // Try to open git repository
+        let repo = match Repository::open(".") {
+            Ok(r) => r,
+            Err(_) => {
+                // If not a git repo, skip document validation
+                return Ok(());
+            }
+        };
+
+        for issue in issues {
+            for doc in &issue.documents {
+                // Validate commit hash if specified
+                if let Some(ref commit_hash) = doc.commit {
+                    if repo.find_commit(git2::Oid::from_str(commit_hash)?).is_err() {
+                        return Err(anyhow!(
+                            "Invalid document reference in issue '{}': commit '{}' not found for '{}'",
+                            issue.id,
+                            commit_hash,
+                            doc.path
+                        ));
+                    }
+                }
+
+                // Validate file exists (at HEAD if no commit specified)
+                let reference = if let Some(ref commit_hash) = doc.commit {
+                    commit_hash.as_str()
+                } else {
+                    "HEAD"
+                };
+
+                if self.check_file_exists_in_git(&repo, &doc.path, reference).is_err() {
+                    return Err(anyhow!(
+                        "Invalid document reference in issue '{}': file '{}' not found at {}",
+                        issue.id,
+                        doc.path,
+                        reference
+                    ));
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Check if a file exists in git at a specific reference
+    fn check_file_exists_in_git(
+        &self,
+        repo: &git2::Repository,
+        path: &str,
+        reference: &str,
+    ) -> Result<()> {
+        let obj = repo.revparse_single(reference)?;
+        let commit = obj.peel_to_commit()?;
+        let tree = commit.tree()?;
+
+        // Try to find the file in the tree
+        tree.get_path(std::path::Path::new(path))?;
 
         Ok(())
     }
@@ -957,12 +1025,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::domain::DocumentReference;
         use crate::output::{JsonError, JsonOutput};
 
-        let mut issue = self.storage.load_issue(issue_id).map_err(|e| {
+        let mut issue = self.storage.load_issue(issue_id).inspect_err(|_| {
             if json {
                 let err = JsonError::issue_not_found(issue_id);
                 println!("{}", err.to_json_string().unwrap());
             }
-            e
         })?;
 
         let doc_ref = DocumentReference {
@@ -1002,12 +1069,11 @@ impl<S: IssueStore> CommandExecutor<S> {
     pub fn list_document_references(&self, issue_id: &str, json: bool) -> Result<()> {
         use crate::output::{JsonError, JsonOutput};
 
-        let issue = self.storage.load_issue(issue_id).map_err(|e| {
+        let issue = self.storage.load_issue(issue_id).inspect_err(|_| {
             if json {
                 let err = JsonError::issue_not_found(issue_id);
                 println!("{}", err.to_json_string().unwrap());
             }
-            e
         })?;
 
         if json {
@@ -1017,28 +1083,26 @@ impl<S: IssueStore> CommandExecutor<S> {
                 "count": issue.documents.len(),
             }));
             println!("{}", output.to_json_string()?);
+        } else if issue.documents.is_empty() {
+            println!("No document references for issue {}", issue_id);
         } else {
-            if issue.documents.is_empty() {
-                println!("No document references for issue {}", issue_id);
-            } else {
-                println!("Document references for issue {}:", issue_id);
-                for doc in &issue.documents {
-                    print!("  - {}", doc.path);
-                    if let Some(ref label) = doc.label {
-                        print!(" ({})", label);
-                    }
-                    if let Some(ref commit) = doc.commit {
-                        print!(" [{}]", &commit[..7.min(commit.len())]);
-                    } else {
-                        print!(" [HEAD]");
-                    }
-                    if let Some(ref doc_type) = doc.doc_type {
-                        print!(" <{}>", doc_type);
-                    }
-                    println!();
+            println!("Document references for issue {}:", issue_id);
+            for doc in &issue.documents {
+                print!("  - {}", doc.path);
+                if let Some(ref label) = doc.label {
+                    print!(" ({})", label);
                 }
-                println!("\nTotal: {}", issue.documents.len());
+                if let Some(ref commit) = doc.commit {
+                    print!(" [{}]", &commit[..7.min(commit.len())]);
+                } else {
+                    print!(" [HEAD]");
+                }
+                if let Some(ref doc_type) = doc.doc_type {
+                    print!(" <{}>", doc_type);
+                }
+                println!();
             }
+            println!("\nTotal: {}", issue.documents.len());
         }
 
         Ok(())
@@ -1048,19 +1112,21 @@ impl<S: IssueStore> CommandExecutor<S> {
     pub fn remove_document_reference(&self, issue_id: &str, path: &str, json: bool) -> Result<()> {
         use crate::output::{JsonError, JsonOutput};
 
-        let mut issue = self.storage.load_issue(issue_id).map_err(|e| {
+        let mut issue = self.storage.load_issue(issue_id).inspect_err(|_| {
             if json {
                 let err = JsonError::issue_not_found(issue_id);
                 println!("{}", err.to_json_string().unwrap());
             }
-            e
         })?;
 
         let original_len = issue.documents.len();
         issue.documents.retain(|doc| doc.path != path);
 
         if issue.documents.len() == original_len {
-            let err_msg = format!("Document reference {} not found in issue {}", path, issue_id);
+            let err_msg = format!(
+                "Document reference {} not found in issue {}",
+                path, issue_id
+            );
             if json {
                 let err = JsonError::new("DOCUMENT_NOT_FOUND", &err_msg)
                     .with_suggestion("Run 'jit doc list <issue-id>' to see available documents");
@@ -1078,36 +1144,85 @@ impl<S: IssueStore> CommandExecutor<S> {
             }));
             println!("{}", output.to_json_string()?);
         } else {
-            println!("Removed document reference {} from issue {}", path, issue_id);
+            println!(
+                "Removed document reference {} from issue {}",
+                path, issue_id
+            );
         }
 
         Ok(())
     }
 
-    /// Show document content (placeholder for now - will implement with git integration)
+    /// Show document content from git
     pub fn show_document_content(&self, issue_id: &str, path: &str) -> Result<()> {
+        use git2::Repository;
+
         let issue = self.storage.load_issue(issue_id)?;
 
-        let doc = issue.documents.iter()
+        let doc = issue
+            .documents
+            .iter()
             .find(|d| d.path == path)
-            .ok_or_else(|| anyhow!("Document reference {} not found in issue {}", path, issue_id))?;
+            .ok_or_else(|| {
+                anyhow!(
+                    "Document reference {} not found in issue {}",
+                    path,
+                    issue_id
+                )
+            })?;
 
+        // Display metadata
         println!("Document: {}", doc.path);
         if let Some(ref label) = doc.label {
             println!("Label: {}", label);
         }
-        if let Some(ref commit) = doc.commit {
+        let reference = if let Some(ref commit) = doc.commit {
             println!("Commit: {}", commit);
+            commit.as_str()
         } else {
             println!("Commit: HEAD");
-        }
+            "HEAD"
+        };
         if let Some(ref doc_type) = doc.doc_type {
             println!("Type: {}", doc_type);
         }
         println!("\n---\n");
-        println!("Note: Document content viewing will be implemented in Phase 1.3 with git integration");
+
+        // Try to read content from git
+        match Repository::open(".") {
+            Ok(repo) => match self.read_file_from_git(&repo, &doc.path, reference) {
+                Ok(content) => {
+                    println!("{}", content);
+                }
+                Err(e) => {
+                    println!("Error reading file from git: {}", e);
+                    println!("\nFallback: File may have been moved or deleted.");
+                }
+            },
+            Err(e) => {
+                println!("Not a git repository: {}", e);
+                println!("\nNote: Document content viewing requires git integration.");
+            }
+        }
 
         Ok(())
+    }
+
+    /// Read file content from git at a specific reference
+    fn read_file_from_git(
+        &self,
+        repo: &git2::Repository,
+        path: &str,
+        reference: &str,
+    ) -> Result<String> {
+        let obj = repo.revparse_single(reference)?;
+        let commit = obj.peel_to_commit()?;
+        let tree = commit.tree()?;
+        let entry = tree.get_path(std::path::Path::new(path))?;
+        let blob = repo.find_blob(entry.id())?;
+
+        let content = std::str::from_utf8(blob.content())?;
+        Ok(content.to_string())
     }
 }
 

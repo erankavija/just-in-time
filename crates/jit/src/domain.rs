@@ -545,7 +545,7 @@ mod tests {
         let doc = DocumentReference::new("docs/design.md".to_string())
             .with_label("API Design".to_string())
             .with_type("design".to_string());
-        
+
         assert_eq!(doc.label, Some("API Design".to_string()));
         assert_eq!(doc.doc_type, Some("design".to_string()));
     }
@@ -554,10 +554,10 @@ mod tests {
     fn test_document_reference_serialization() {
         let doc = DocumentReference::new("docs/design.md".to_string())
             .with_label("Design Doc".to_string());
-        
+
         let json = serde_json::to_string(&doc).unwrap();
         let deserialized: DocumentReference = serde_json::from_str(&json).unwrap();
-        
+
         assert_eq!(doc, deserialized);
     }
 
@@ -566,7 +566,9 @@ mod tests {
         let mut issue = Issue::new("Test".to_string(), "Description".to_string());
         assert_eq!(issue.documents.len(), 0);
 
-        issue.documents.push(DocumentReference::new("docs/design.md".to_string()));
+        issue
+            .documents
+            .push(DocumentReference::new("docs/design.md".to_string()));
         assert_eq!(issue.documents.len(), 1);
         assert_eq!(issue.documents[0].path, "docs/design.md");
     }
@@ -576,7 +578,7 @@ mod tests {
         let mut issue = Issue::new("Test".to_string(), "Description".to_string());
         issue.documents.push(
             DocumentReference::at_commit("docs/design.md".to_string(), "abc123".to_string())
-                .with_label("Design".to_string())
+                .with_label("Design".to_string()),
         );
 
         let json = serde_json::to_string(&issue).unwrap();
