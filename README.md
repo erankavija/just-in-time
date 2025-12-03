@@ -9,6 +9,7 @@ Traditional issue trackers are designed for humans. JIT is designed for **AI age
 - 🤖 **Agent-First**: Copilot agents can create issues, claim work, and coordinate with each other
 - 🔗 **Dependency DAG**: Express "Task B needs Task A" with automatic blocking and cycle detection  
 - ✅ **Quality Gates**: Enforce tests, reviews, scans before work can proceed
+- 🔒 **Multi-Agent Safe**: File locking prevents race conditions with concurrent agents
 - 📊 **Full Observability**: Event log tracks every action for debugging agent behavior
 - 🎯 **Priority Dispatch**: Coordinator automatically assigns critical work first
 - 📁 **Git-Friendly**: All state in plain JSON—version, diff, and merge like code
@@ -341,18 +342,50 @@ jit events tail -n 20
 ✅ **Phase 0**: Design and architecture  
 ✅ **Phase 1**: Core issue management with dependency graph  
 ✅ **Phase 2**: Quality gates and coordinator daemon  
-🚧 **Phase 3**: Advanced observability (graph export, webhooks)  
-📋 **Phase 4**: Production readiness (locking, plugins, metrics)
+✅ **Phase 3**: Advanced observability and file locking  
+🚧 **Phase 4**: Production readiness (retry logic, metrics, plugins)
+
+**Latest**: File locking for multi-agent safety (Phase 3) - Safe concurrent access for multiple agents/processes
 
 See [ROADMAP.md](ROADMAP.md) for details.
+
+## Configuration
+
+### Environment Variables
+
+```bash
+# Data directory (default: .jit/)
+export JIT_DATA_DIR=/path/to/custom/dir
+
+# Lock timeout for concurrent operations (default: 5 seconds)
+export JIT_LOCK_TIMEOUT=10  # Increase for high-contention scenarios
+```
+
+### Concurrent Agent Usage
+
+JIT is safe for concurrent access by multiple agents or processes:
+
+```bash
+# Terminal 1: Agent creating issues
+jit issue create --title "Task 1"
+
+# Terminal 2: Agent listing issues (concurrent, no conflicts)
+jit issue list
+
+# Terminal 3: Agent updating different issue (concurrent)
+jit issue update <issue-id> --state done
+```
+
+File locking ensures data consistency. See [docs/file-locking-usage.md](docs/file-locking-usage.md) for details.
 
 ## Documentation
 
 - [EXAMPLE.md](EXAMPLE.md) - Complete agent orchestration walkthrough
 - [docs/design.md](docs/design.md) - Detailed design specifications
+- [docs/file-locking-usage.md](docs/file-locking-usage.md) - Multi-agent concurrency guide
 - [ROADMAP.md](ROADMAP.md) - Development phases and progress
 - [TESTING.md](TESTING.md) - Testing strategy and best practices
-- [docs/storage-abstraction.md](docs/storage-abstraction.md) - Pluggable backend design (next priority)
+- [docs/storage-abstraction.md](docs/storage-abstraction.md) - Pluggable backend design
 
 ## Architecture
 
