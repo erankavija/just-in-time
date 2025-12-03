@@ -30,6 +30,52 @@ The server communicates over stdio using the Model Context Protocol:
 node index.js
 ```
 
+### With GitHub Copilot CLI
+
+**Note**: MCP support in GitHub Copilot CLI requires the `jit` binary in your PATH.
+
+1. Build the CLI and add to PATH:
+   ```bash
+   cd /path/to/just-in-time
+   cargo build --release
+   export PATH="$(pwd)/target/release:$PATH"
+   ```
+
+2. Configure the MCP server (location depends on your Copilot version):
+
+   **Option A**: Create `~/.config/github-copilot/mcp-servers.json`:
+   ```json
+   {
+     "mcpServers": {
+       "jit": {
+         "command": "node",
+         "args": ["/path/to/just-in-time/mcp-server/index.js"]
+       }
+     }
+   }
+   ```
+
+   **Option B**: Or use `~/.config/github-copilot/agents.json`:
+   ```json
+   {
+     "agents": {
+       "jit": {
+         "name": "JIT Issue Tracker",
+         "description": "Just-In-Time issue tracker with dependency graphs",
+         "mcp": {
+           "command": "node",
+           "args": ["/path/to/just-in-time/mcp-server/index.js"]
+         }
+       }
+     }
+   }
+   ```
+
+3. Verify configuration:
+   ```bash
+   gh copilot suggest "Use jit to create a new high-priority issue"
+   ```
+
 ### With Claude Desktop
 
 Add to your Claude Desktop configuration (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
@@ -178,6 +224,44 @@ Test the server manually:
 
 ```bash
 echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | node index.js
+```
+
+## Troubleshooting
+
+### "jit: command not found"
+
+The MCP server executes `jit` commands via shell. Ensure it's in your PATH:
+
+```bash
+# Check if jit is accessible
+which jit
+
+# If not, add to your shell config (~/.bashrc, ~/.zshrc, etc.)
+export PATH="/path/to/just-in-time/target/release:$PATH"
+
+# Then reload
+source ~/.bashrc  # or ~/.zshrc
+```
+
+Alternatively, modify `index.js` to use absolute path:
+```javascript
+// Change in runJitCommand():
+const cmd = `/absolute/path/to/jit ${args}${jsonFlag}`;
+```
+
+### Module not found
+
+Install dependencies:
+```bash
+cd mcp-server
+npm install
+```
+
+### Node version issues
+
+Requires Node.js v16+:
+```bash
+node --version  # Should be v16 or later
 ```
 
 ## Architecture

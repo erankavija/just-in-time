@@ -140,10 +140,10 @@
 
 ### MCP Server
 
-- [ ] TypeScript MCP server wrapping CLI
-- [ ] 15-20 MCP tools covering all operations
-- [ ] Integration with Claude Desktop
-- [ ] See `docs/cli-and-mcp-strategy.md` for detailed plan
+- [x] TypeScript MCP server wrapping CLI
+- [x] 29 MCP tools covering all operations
+- [ ] Integration with Claude Desktop (documented, not tested)
+- [ ] See `mcp-server/README.md` for usage
 
 ### Knowledge Management System
 

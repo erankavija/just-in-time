@@ -29,8 +29,9 @@ const jitSchema = JSON.parse(readFileSync(schemaPath, "utf-8"));
 /**
  * Execute jit CLI command and return parsed JSON output
  */
-async function runJitCommand(args) {
-  const cmd = `jit ${args} --json`;
+async function runJitCommand(args, useJsonFlag = true) {
+  const jsonFlag = useJsonFlag ? " --json" : "";
+  const cmd = `jit ${args}${jsonFlag}`;
   try {
     const { stdout, stderr } = await execAsync(cmd, {
       maxBuffer: 10 * 1024 * 1024, // 10MB buffer
@@ -40,13 +41,26 @@ async function runJitCommand(args) {
       throw new Error(stderr);
     }
     
-    const result = JSON.parse(stdout);
-    
-    if (!result.success) {
-      throw new Error(result.error?.message || "Command failed");
+    // Commands without --json flag return plain text
+    if (!useJsonFlag) {
+      return { message: stdout.trim() };
     }
     
-    return result.data;
+    // JIT CLI returns JSON - may be wrapped or unwrapped
+    const result = JSON.parse(stdout);
+    
+    // If response has success/data wrapper, unwrap it
+    if (result.success === true && result.data !== undefined) {
+      return result.data;
+    }
+    
+    // If response has error, throw it
+    if (result.success === false && result.error) {
+      throw new Error(`${result.error.code || 'ERROR'}: ${result.error.message}`);
+    }
+    
+    // Otherwise return as-is
+    return result;
   } catch (error) {
     if (error.stdout) {
       try {
@@ -124,6 +138,42 @@ function generateTools() {
 }
 
 /**
+ * Check if command supports --json flag by examining schema
+ */
+function supportsJsonFlag(cmdName, subCmdName = null) {
+  const cmd = jitSchema.commands[cmdName];
+  if (!cmd) return false;
+  
+  let targetCmd = cmd;
+  if (subCmdName && cmd.subcommands) {
+    targetCmd = cmd.subcommands[subCmdName];
+    if (!targetCmd) return false;
+  }
+  
+  // Check if flags array contains json flag
+  return targetCmd.flags?.some(flag => flag.name === "json") || false;
+}
+
+/**
+ * Commands that use positional arguments (not flags)
+ * Format: "cmd_subcmd": ["arg1", "arg2"]
+ */
+const POSITIONAL_ARG_COMMANDS = {
+  "dep_add": ["from", "to"],
+  "dep_rm": ["from", "to"],
+  "issue_show": ["id"],
+  "issue_delete": ["id"],
+  "issue_claim": ["id", "assignee"],
+  "issue_unclaim": ["id"],
+  "issue_update": ["id"],
+  "registry_show": ["key"],
+  "graph_downstream": ["id"],
+  "gate_add": ["id", "gate"],
+  "gate_pass": ["id", "gate"],
+  "gate_fail": ["id", "gate"],
+};
+
+/**
  * Execute MCP tool by mapping to jit CLI command
  */
 async function executeTool(name, args) {
@@ -132,32 +182,65 @@ async function executeTool(name, args) {
   parts.shift(); // Remove 'jit' prefix
   
   let cliArgs;
+  let hasJsonFlag;
   
   if (parts.length === 2) {
     // Subcommand: jit_issue_create -> jit issue create
     const [cmd, subcmd] = parts;
+    const cmdKey = `${cmd}_${subcmd}`;
     cliArgs = `${cmd} ${subcmd}`;
+    hasJsonFlag = supportsJsonFlag(cmd, subcmd);
     
-    // Build arguments
-    const argPairs = [];
-    for (const [key, value] of Object.entries(args)) {
-      if (Array.isArray(value)) {
-        // Handle array arguments like --gate
-        for (const item of value) {
-          argPairs.push(`--${key} "${item}"`);
+    // Check if this command uses positional arguments
+    const positionalArgNames = POSITIONAL_ARG_COMMANDS[cmdKey];
+    
+    if (positionalArgNames) {
+      // Use positional arguments
+      const positionalArgs = [];
+      for (const argName of positionalArgNames) {
+        const value = args[argName];
+        if (value !== undefined && value !== "") {
+          positionalArgs.push(`"${value}"`);
         }
-      } else if (value !== undefined && value !== "") {
-        argPairs.push(`--${key} "${value}"`);
       }
+      cliArgs += positionalArgs.length > 0 ? ` ${positionalArgs.join(" ")}` : "";
+      
+      // Add any remaining arguments as flags
+      const positionalSet = new Set(positionalArgNames);
+      const flagArgs = [];
+      for (const [key, value] of Object.entries(args)) {
+        if (positionalSet.has(key)) continue;
+        
+        if (Array.isArray(value)) {
+          for (const item of value) {
+            flagArgs.push(`--${key} "${item}"`);
+          }
+        } else if (value !== undefined && value !== "") {
+          flagArgs.push(`--${key} "${value}"`);
+        }
+      }
+      cliArgs += flagArgs.length > 0 ? ` ${flagArgs.join(" ")}` : "";
+    } else {
+      // All arguments are flags
+      const flagArgs = [];
+      for (const [key, value] of Object.entries(args)) {
+        if (Array.isArray(value)) {
+          for (const item of value) {
+            flagArgs.push(`--${key} "${item}"`);
+          }
+        } else if (value !== undefined && value !== "") {
+          flagArgs.push(`--${key} "${value}"`);
+        }
+      }
+      cliArgs += flagArgs.length > 0 ? ` ${flagArgs.join(" ")}` : "";
     }
-    
-    cliArgs += argPairs.length > 0 ? ` ${argPairs.join(" ")}` : "";
   } else {
     // Top-level command: jit_status -> jit status
     cliArgs = parts[0];
+    hasJsonFlag = supportsJsonFlag(parts[0]);
   }
   
-  return await runJitCommand(cliArgs);
+  return await runJitCommand(cliArgs, hasJsonFlag);
 }
 
 // Create MCP server
