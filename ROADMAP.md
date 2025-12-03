@@ -177,9 +177,9 @@
     - All 362 tests passing, zero clippy warnings
   - [x] Add lock timeout configuration (via environment variables) - **JIT_LOCK_TIMEOUT**
   - [x] Add tests for concurrent access patterns (parallel creates, updates, dependency adds) - **7 comprehensive tests**
-  - [ ] Add retry logic with exponential backoff for lock contention - **Phase 2**
-  - [ ] Document locking semantics and performance implications
-  - [ ] Test with MCP server and multiple concurrent clients
+  - [x] Document locking semantics and performance implications - **docs/file-locking-usage.md (2025-12-03)**
+  - [ ] Add retry logic with exponential backoff for lock contention - **Phase 2 (deferred)**
+  - [ ] Test with MCP server and multiple concurrent clients - **Phase 2 (next priority)**
 - [ ] Plugin system for custom gates
 - [ ] Prometheus metrics export
 - [ ] Web dashboard (optional)
