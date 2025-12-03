@@ -1,20 +1,18 @@
 //! In-memory storage implementation for testing.
 //!
 //! This backend stores all data in RAM using HashMaps, providing 10-100x faster
-//! test execution compared to JSON file I/O. Each instance is isolated, making
-//! it ideal for parallel test execution.
+//! test execution compared to JSON file I/O. Thread-safe for concurrent access.
 
 use crate::domain::{Event, Issue};
 use crate::storage::{GateRegistry, IssueStore};
 use anyhow::{anyhow, Result};
-use std::cell::RefCell;
 use std::collections::HashMap;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 /// In-memory storage backend using HashMaps.
 ///
 /// All data is stored in memory and lost when the instance is dropped.
-/// Uses `Rc<RefCell<>>` for shared interior mutability - clones share the same data.
+/// Uses `Arc<Mutex<>>` for thread-safe shared interior mutability.
 ///
 /// # Examples
 ///
@@ -34,9 +32,9 @@ use std::rc::Rc;
 #[derive(Clone)]
 #[allow(dead_code)] // Public API used only in tests, not in binary
 pub struct InMemoryStorage {
-    issues: Rc<RefCell<HashMap<String, Issue>>>,
-    gate_registry: Rc<RefCell<GateRegistry>>,
-    events: Rc<RefCell<Vec<Event>>>,
+    issues: Arc<Mutex<HashMap<String, Issue>>>,
+    gate_registry: Arc<Mutex<GateRegistry>>,
+    events: Arc<Mutex<Vec<Event>>>,
 }
 
 impl InMemoryStorage {
@@ -44,9 +42,9 @@ impl InMemoryStorage {
     #[allow(dead_code)] // Public API used only in tests, not in binary
     pub fn new() -> Self {
         Self {
-            issues: Rc::new(RefCell::new(HashMap::new())),
-            gate_registry: Rc::new(RefCell::new(GateRegistry::default())),
-            events: Rc::new(RefCell::new(Vec::new())),
+            issues: Arc::new(Mutex::new(HashMap::new())),
+            gate_registry: Arc::new(Mutex::new(GateRegistry::default())),
+            events: Arc::new(Mutex::new(Vec::new())),
         }
     }
 }
@@ -65,14 +63,16 @@ impl IssueStore for InMemoryStorage {
 
     fn save_issue(&self, issue: &Issue) -> Result<()> {
         self.issues
-            .borrow_mut()
+            .lock()
+            .unwrap()
             .insert(issue.id.clone(), issue.clone());
         Ok(())
     }
 
     fn load_issue(&self, id: &str) -> Result<Issue> {
         self.issues
-            .borrow()
+            .lock()
+            .unwrap()
             .get(id)
             .cloned()
             .ok_or_else(|| anyhow!("Issue not found: {}", id))
@@ -80,32 +80,33 @@ impl IssueStore for InMemoryStorage {
 
     fn delete_issue(&self, id: &str) -> Result<()> {
         self.issues
-            .borrow_mut()
+            .lock()
+            .unwrap()
             .remove(id)
             .ok_or_else(|| anyhow!("Issue not found: {}", id))?;
         Ok(())
     }
 
     fn list_issues(&self) -> Result<Vec<Issue>> {
-        Ok(self.issues.borrow().values().cloned().collect())
+        Ok(self.issues.lock().unwrap().values().cloned().collect())
     }
 
     fn load_gate_registry(&self) -> Result<GateRegistry> {
-        Ok(self.gate_registry.borrow().clone())
+        Ok(self.gate_registry.lock().unwrap().clone())
     }
 
     fn save_gate_registry(&self, registry: &GateRegistry) -> Result<()> {
-        *self.gate_registry.borrow_mut() = registry.clone();
+        *self.gate_registry.lock().unwrap() = registry.clone();
         Ok(())
     }
 
     fn append_event(&self, event: &Event) -> Result<()> {
-        self.events.borrow_mut().push(event.clone());
+        self.events.lock().unwrap().push(event.clone());
         Ok(())
     }
 
     fn read_events(&self) -> Result<Vec<Event>> {
-        Ok(self.events.borrow().clone())
+        Ok(self.events.lock().unwrap().clone())
     }
 }
 

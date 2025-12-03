@@ -1,0 +1,21 @@
+[package]
+name = "jit-server"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "REST API server for JIT issue tracker"
+
+[dependencies]
+jit = { path = "../jit" }
+axum = "0.7"
+tokio = { version = "1.35", features = ["full"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+axum-test = "14.0"

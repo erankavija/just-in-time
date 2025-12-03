@@ -680,7 +680,10 @@ impl<S: IssueStore> CommandExecutor<S> {
                     "HEAD"
                 };
 
-                if self.check_file_exists_in_git(&repo, &doc.path, reference).is_err() {
+                if self
+                    .check_file_exists_in_git(&repo, &doc.path, reference)
+                    .is_err()
+                {
                     return Err(anyhow!(
                         "Invalid document reference in issue '{}': file '{}' not found at {}",
                         issue.id,
