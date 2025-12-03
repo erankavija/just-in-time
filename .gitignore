@@ -1,2 +1,10 @@
 /target/
 **/target/
+
+# Jit database (local to each developer)
+.jit/
+data/
+
+# MCP Server (Node.js)
+mcp-server/node_modules/**
+mcp-server/package-lock.json

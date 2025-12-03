@@ -14,7 +14,7 @@ jit (single binary)
 ├── Core issue tracker (CRUD, dependencies, gates)
 ├── Query interface (ready, blocked, assignee)
 └── Built-in coordinator daemon
-    ├── Config loading (data/coordinator.json)
+    ├── Config loading (.jit/coordinator.json)
     ├── Agent pool management
     ├── Polling & dispatch logic
     └── Capacity tracking
@@ -51,7 +51,7 @@ jit (single binary)
 │         │  jit issue claim <id>      │                  │
 │         └────────────────────────────┘                  │
 │                                                          │
-│  Shared: data/ directory (issues, gates, events, index) │
+│  Shared: .jit/ directory (issues, gates, events, index) │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -251,7 +251,7 @@ jit-dispatch start  # External orchestrator
 
 **Breaking changes:**
 - ✅ Removed `jit coord` subcommand (732 lines)
-- ✅ Moved `data/coordinator.json` → `dispatch.toml`
+- ✅ Moved `.jit/coordinator.json` → `dispatch.toml`
 - ✅ Config format slightly different (agent capacity added)
 
 ## Current Features (Implemented)

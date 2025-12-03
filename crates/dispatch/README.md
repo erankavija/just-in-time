@@ -57,7 +57,7 @@ jit-dispatch once --config dispatch.toml --repo /path/to/jit/repo
          │ Stores data
          ▼
 ┌─────────────────┐
-│   data/*.json   │  Repository storage
+│   .jit/*.json   │  Repository storage
 └─────────────────┘
 ```
 

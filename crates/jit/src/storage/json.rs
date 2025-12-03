@@ -1,6 +1,7 @@
 //! JSON file-based storage implementation.
 //!
-//! All data is stored as JSON files in a `data/` directory with atomic writes.
+//! All data is stored as JSON files in a `.jit/` directory with atomic writes.
+//! The directory location can be overridden with the `JIT_DATA_DIR` environment variable.
 
 use crate::domain::{Event, Issue};
 use crate::storage::{GateRegistry, IssueStore};
@@ -10,10 +11,10 @@ use std::fs::{self, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 
-const ISSUES_DIR: &str = "data/issues";
-const INDEX_FILE: &str = "data/index.json";
-const GATES_FILE: &str = "data/gates.json";
-const EVENTS_FILE: &str = "data/events.jsonl";
+const ISSUES_DIR: &str = "issues";
+const INDEX_FILE: &str = "index.json";
+const GATES_FILE: &str = "gates.json";
+const EVENTS_FILE: &str = "events.jsonl";
 
 /// Index of all issues in the repository
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -35,8 +36,8 @@ impl Default for Index {
 
 /// JSON file-based storage for issues, gates, and events.
 ///
-/// This implementation stores each issue as a separate JSON file in `data/issues/`,
-/// gate definitions in `data/gates.json`, and events in `data/events.jsonl`.
+/// This implementation stores each issue as a separate JSON file in `.jit/issues/`,
+/// gate definitions in `.jit/gates.json`, and events in `.jit/events.jsonl`.
 /// All file writes are atomic (write to temp file, then rename).
 #[derive(Clone)]
 pub struct JsonFileStorage {
@@ -44,7 +45,8 @@ pub struct JsonFileStorage {
 }
 
 impl JsonFileStorage {
-    /// Create a new JSON file storage instance at the given root path
+    /// Create a new JSON file storage instance at the given root path.
+    /// The root should be the `.jit` directory (or custom directory from JIT_DATA_DIR).
     pub fn new<P: AsRef<Path>>(root: P) -> Self {
         Self {
             root: root.as_ref().to_path_buf(),

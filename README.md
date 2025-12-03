@@ -26,7 +26,7 @@ Traditional issue trackers are designed for humans. JIT is designed for **AI age
 # 1. Install (requires Rust)
 cd cli && cargo build --release
 
-# 2. Initialize in your project
+# 2. Initialize in your project (creates .jit/ directory)
 ./target/release/jit init
 
 # 3. Create your first issue
@@ -37,6 +37,8 @@ jit coordinator init-config
 
 # That's it! Now agents can create issues, claim work, and coordinate.
 ```
+
+**Note:** All data is stored in `.jit/` directory (similar to `.git/`). Override with `JIT_DATA_DIR` environment variable if needed.
 
 See [EXAMPLE.md](EXAMPLE.md) for complete workflows.
 
@@ -94,7 +96,7 @@ jit graph show $EPIC        # Visualize dependencies
 # Create coordinator configuration
 jit coordinator init-config
 
-# Edit data/coordinator.json to configure your agents:
+# Edit .jit/coordinator.json to configure your agents:
 {
   "agent_pool": [
     {
@@ -302,7 +304,7 @@ jit coordinator stop
 | **Quality Gates** | Tests, reviews, scans must pass before state transitions |
 | **Coordinator Daemon** | Automatically dispatches ready work to available agents |
 | **Priority Dispatch** | Critical work gets assigned first |
-| **Event Log** | Full audit trail—every action logged to `data/events.jsonl` |
+| **Event Log** | Full audit trail—every action logged to `.jit/events.jsonl` |
 | **Git-Friendly Storage** | Plain JSON files you can version, diff, and merge |
 | **Atomic Operations** | `claim` ensures no race conditions between agents |
 | **Graph Queries** | Understand upstream/downstream dependencies |
@@ -368,7 +370,7 @@ See [ROADMAP.md](ROADMAP.md) for details.
    └────────┴────────┴─────────┘
             │
     ┌───────▼────────┐
-    │  data/         │
+    │  .jit/         │
     │  ├─ issues/    │ ← One JSON file per issue
     │  ├─ gates.json │ ← Gate definitions
     │  └─ events.jsonl│ ← Append-only audit log

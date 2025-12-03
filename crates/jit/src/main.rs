@@ -92,7 +92,15 @@ fn run() -> Result<()> {
     let command = cli.command.ok_or_else(|| anyhow::anyhow!("No command provided. Use --help for usage."))?;
 
     let current_dir = env::current_dir()?;
-    let storage = JsonFileStorage::new(&current_dir);
+    
+    // Determine jit data directory: JIT_DATA_DIR env var or default to .jit/
+    let jit_dir = if let Ok(custom_dir) = env::var("JIT_DATA_DIR") {
+        current_dir.join(custom_dir)
+    } else {
+        current_dir.join(".jit")
+    };
+    
+    let storage = JsonFileStorage::new(&jit_dir);
     let executor = CommandExecutor::new(storage.clone());
 
     match command {

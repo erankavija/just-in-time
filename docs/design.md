@@ -23,7 +23,7 @@ This document captures the domain model, file layout, behaviors, CLI surface, va
 ---
 
 ## High-level concept
-- Repository-local store: one file per issue under data/issues/<id>.json plus small global files.
+- Repository-local store: one file per issue under .jit/issues/<id>.json plus small global files.
 - CLI tool ('jit') performs CRUD, dependency edits, validation, gate operations, and shows dependency trees.
 - System enforces DAG property for dependencies and enforces that issues cannot be marked ready/done while gates or dependencies block them.
 - Separate orchestrator tool ('jit-dispatch') handles agent coordination and work distribution.
@@ -47,14 +47,14 @@ Issue (stored per-file)
 - context: map[string, string] - flexible key-value for agent-specific data
   - Example: {"epic": "auth", "pr_url": "...", "agent_notes": "..."}
 
-Gate Definition (global registry, data/gates.json)
+Gate Definition (global registry, .jit/gates.json)
 - key: string (unique)
 - title: string
 - description: string
 - auto: boolean (true = automation can pass it; false = manual)
 - example_integration: optional string (how automation might satisfy this)
 
-System metadata (data/index.json)
+System metadata (.jit/index.json)
 - schema_version: integer
 - next_id_hint: optional (if using incremental ids; nil if ULIDs)
 - all_ids: list of ids (or computed from filesystem)
@@ -68,7 +68,7 @@ Derived fields:
 ## Data layout (skeleton)
 - README.md
 - docs/design.md
-- data/
+- .jit/
   - index.json
   - gates.json
   - issues/ (per-issue files, one file per issue id)
@@ -77,7 +77,7 @@ Derived fields:
 - scripts/ (future helpers)
 - .gitignore
 
-Per-issue file example: data/issues/01FABCDE...json
+Per-issue file example: .jit/issues/01FABCDE...json
 
 Design choice: Option B — per-issue files.
 Rationale: fewer conflicts in collaborative edits, smaller diffs, easy partial reviews.
@@ -162,7 +162,7 @@ Machine outputs
 
 Phase 0 (this PR)
 - Add README and docs/design.md
-- Add data/gates.json and data/index.json with samples
+- Add .jit/gates.json and .jit/index.json with samples
 - Add cli/ placeholder and .gitignore
 
 Phase 1: Core Issue Management
@@ -174,7 +174,7 @@ Phase 1: Core Issue Management
 
 Phase 2: Quality Gates & Query Interface
 - Implement gate assignment and status transitions (pass/fail)
-- Event log: append-only data/events.jsonl for audit trail
+- Event log: append-only .jit/events.jsonl for audit trail
   - Events: issue.created, issue.claimed, gate.passed, gate.failed, issue.completed
 - Query interface for ready/blocked/filtered issues
 - CLI consistency: all commands support --json for machine-readable output
@@ -278,7 +278,7 @@ jit-dispatch start --config dispatch.toml --jit-path ./jit [--daemon]
 5. Uses `jit issue claim <id> --to <agent-id>` to assign work
 6. Repeats based on poll_interval
 
-**Event log format (data/events.jsonl):**
+**Event log format (.jit/events.jsonl):**
 The core `jit` CLI writes append-only events for audit trail:
 ```json
 {"ts":"2025-11-27T19:00:00Z","event":"issue.created","id":"01JD...","title":"..."}
@@ -364,7 +364,7 @@ jit metrics report --format csv --output metrics.csv
 1. **Language**: Rust (clap, serde, ulid crate)
 2. **ID format**: ULID to avoid central coordination and race conditions
 3. **Ready state**: explicit but auto-evaluated from dependencies + gate statuses
-4. **Gate registry**: global registry (data/gates.json) to prevent typos and provide metadata
+4. **Gate registry**: global registry (.jit/gates.json) to prevent typos and provide metadata
 5. **Assignee format**: `{type}:{identifier}` (e.g., "copilot:session-1", "human:alice")
 6. **Architecture**: Separate core tracker (`jit`) from orchestrator (`jit-dispatch`) for clean boundaries
 7. **Orchestration**: Push-based via jit-dispatch (Phase 3) with pull-based fallback available
@@ -398,7 +398,7 @@ Open questions for later phases:
 
 ## Example file formats
 
-data/gates.json (sample)
+.jit/gates.json (sample)
 {
   "review": {
     "key": "review",
@@ -414,7 +414,7 @@ data/gates.json (sample)
   }
 }
 
-data/index.json (sample)
+.jit/index.json (sample)
 {
   "schema_version": 1,
   "next_id_hint": null,

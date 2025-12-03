@@ -12,7 +12,7 @@
 **Goal:** Basic issue tracker with dependency graph enforcement.
 
 - [x] Initialize Rust project
-- [x] Implement `jit init` - create `data/` structure
+- [x] Implement `jit init` - create `.jit/` structure
 - [x] Core domain types (Issue, State, Priority, Gate)
 - [x] Storage layer with atomic writes
 - [x] Issue CRUD: `create`, `list`, `show`, `update`, `delete`
@@ -27,11 +27,11 @@
 
 **Goal:** Gate enforcement and clean query interface for external orchestrators.
 
-- [x] Gate registry management (`data/gates.json`)
+- [x] Gate registry management (`.jit/gates.json`)
 - [x] Gate operations: `gate add`, `gate pass`, `gate fail`
 - [x] Blocked state: consider gates + dependencies
 - [x] State transitions with gate validation
-- [x] Event log: append-only `data/events.jsonl`
+- [x] Event log: append-only `.jit/events.jsonl`
 - [x] Event types: issue.created, issue.claimed, gate.passed, gate.failed, issue.completed
 - [x] Query interface: `query ready`, `query blocked`, `query assignee`, `query state`, `query priority`
 - [x] CLI Consistency:
@@ -159,7 +159,15 @@
 
 ### Production Readiness
 
-- [ ] File locking for multi-agent safety
+- [ ] **File locking for multi-agent safety** (Priority: High - race conditions observed with MCP server)
+  - [ ] Research locking strategy (flock vs advisory locks vs process-based locking)
+  - [ ] Add locking abstraction to storage layer (lock_file/unlock_file methods)
+  - [ ] Implement file-level locking for atomic operations (index.json, individual issues)
+  - [ ] Add retry logic with exponential backoff for lock contention
+  - [ ] Add lock timeout configuration
+  - [ ] Update JsonFileStorage to acquire locks before write operations
+  - [ ] Add tests for concurrent access patterns (parallel creates, updates, dependency adds)
+  - [ ] Document locking semantics and performance implications
 - [ ] Plugin system for custom gates
 - [ ] Prometheus metrics export
 - [ ] Web dashboard (optional)

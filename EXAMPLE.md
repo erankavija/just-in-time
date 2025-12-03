@@ -22,7 +22,7 @@ jit registry add integration-tests --title "Integration Tests" --auto
 # Initialize coordinator with agent pool
 jit coordinator init-config
 
-# Edit data/coordinator.json to configure your agents
+# Edit .jit/coordinator.json to configure your agents
 # (The default config has 2 example Copilot agents)
 ```
 

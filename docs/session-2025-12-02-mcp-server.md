@@ -91,7 +91,7 @@ Why so fast?
 2. **Validation** - Use Zod for input validation
 3. **Error context** - Better error messages with suggestions
 4. **Tool metadata** - Add examples to tool descriptions
-5. **Resources** - Expose data/ directory as MCP resources
+5. **Resources** - Expose .jit/ directory as MCP resources
 
 ## Technical Decisions
 

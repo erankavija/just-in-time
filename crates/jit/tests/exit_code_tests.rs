@@ -137,7 +137,7 @@ fn test_exit_code_io_error() {
     assert!(!output.status.success());
     // File not found is code 3, not 10
     assert_eq!(output.status.code(), Some(3));
-    assert!(String::from_utf8_lossy(&output.stderr).contains("data"));
+    assert!(String::from_utf8_lossy(&output.stderr).contains(".jit"));
 }
 
 #[test]
@@ -207,7 +207,7 @@ fn test_exit_code_validation_command() {
     let id = json["id"].as_str().expect("id should exist");
 
     // Corrupt the issue file by adding invalid dependency reference
-    let issue_path = temp_dir.path().join("data").join("issues").join(format!("{}.json", id));
+    let issue_path = temp_dir.path().join(".jit").join("issues").join(format!("{}.json", id));
     let mut issue_data: serde_json::Value = serde_json::from_str(&fs::read_to_string(&issue_path).unwrap()).unwrap();
     issue_data["dependencies"] = serde_json::json!(["nonexistent"]);
     fs::write(&issue_path, serde_json::to_string_pretty(&issue_data).unwrap()).unwrap();
