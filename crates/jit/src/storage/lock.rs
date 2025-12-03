@@ -13,6 +13,7 @@ use std::time::Duration;
 #[derive(Debug)]
 pub struct LockGuard {
     file: File,
+    #[allow(dead_code)]
     path: PathBuf,
 }
 
@@ -20,8 +21,9 @@ impl LockGuard {
     fn new(file: File, path: PathBuf) -> Self {
         Self { file, path }
     }
-    
+
     /// Get the path of the locked file
+    #[allow(dead_code)]
     pub fn path(&self) -> &Path {
         &self.path
     }
@@ -74,12 +76,7 @@ impl FileLocker {
     pub fn new(timeout: Duration) -> Self {
         Self { timeout }
     }
-    
-    /// Create a FileLocker with default timeout (5 seconds)
-    pub fn default() -> Self {
-        Self::new(Duration::from_secs(5))
-    }
-    
+
     /// Acquire an exclusive (write) lock on the file
     ///
     /// This will block until the lock is acquired or the timeout expires.
@@ -93,11 +90,11 @@ impl FileLocker {
     /// - The lock cannot be acquired within the timeout
     pub fn lock_exclusive(&self, path: &Path) -> Result<LockGuard> {
         let file = self.open_or_create(path)?;
-        
+
         // Try to acquire lock with polling and timeout
         let start = std::time::Instant::now();
         let poll_interval = Duration::from_millis(10);
-        
+
         loop {
             match Fs4FileExt::try_lock_exclusive(&file) {
                 Ok(true) => {
@@ -119,7 +116,7 @@ impl FileLocker {
             }
         }
     }
-    
+
     /// Acquire a shared (read) lock on the file
     ///
     /// Multiple processes can hold shared locks simultaneously, but shared
@@ -132,10 +129,10 @@ impl FileLocker {
     /// - The lock cannot be acquired within the timeout
     pub fn lock_shared(&self, path: &Path) -> Result<LockGuard> {
         let file = self.open_or_create(path)?;
-        
+
         let start = std::time::Instant::now();
         let poll_interval = Duration::from_millis(10);
-        
+
         loop {
             match Fs4FileExt::try_lock_shared(&file) {
                 Ok(true) => {
@@ -157,7 +154,7 @@ impl FileLocker {
             }
         }
     }
-    
+
     /// Try to acquire an exclusive lock without blocking
     ///
     /// Returns `Ok(Some(guard))` if the lock was acquired immediately,
@@ -166,16 +163,17 @@ impl FileLocker {
     /// # Errors
     ///
     /// Returns an error only if the file cannot be opened.
+    #[allow(dead_code)]
     pub fn try_lock_exclusive(&self, path: &Path) -> Result<Option<LockGuard>> {
         let file = self.open_or_create(path)?;
-        
+
         match Fs4FileExt::try_lock_exclusive(&file) {
             Ok(true) => Ok(Some(LockGuard::new(file, path.to_path_buf()))),
             Ok(false) => Ok(None),
             Err(e) => Err(e.into()),
         }
     }
-    
+
     /// Try to acquire a shared lock without blocking
     ///
     /// Returns `Ok(Some(guard))` if the lock was acquired immediately,
@@ -184,22 +182,24 @@ impl FileLocker {
     /// # Errors
     ///
     /// Returns an error only if the file cannot be opened.
+    #[allow(dead_code)]
     pub fn try_lock_shared(&self, path: &Path) -> Result<Option<LockGuard>> {
         let file = self.open_or_create(path)?;
-        
+
         match Fs4FileExt::try_lock_shared(&file) {
             Ok(true) => Ok(Some(LockGuard::new(file, path.to_path_buf()))),
             Ok(false) => Ok(None),
             Err(e) => Err(e.into()),
         }
     }
-    
+
     /// Open file for locking, creating it if it doesn't exist
     fn open_or_create(&self, path: &Path) -> Result<File> {
         OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
+            .truncate(false)
             .open(path)
             .with_context(|| format!("Failed to open file for locking: {}", path.display()))
     }
@@ -211,69 +211,69 @@ mod tests {
     use std::sync::{Arc, Barrier, Mutex};
     use std::thread;
     use tempfile::TempDir;
-    
+
     #[test]
     fn test_exclusive_lock_acquired() {
         let temp_dir = TempDir::new().unwrap();
         let file_path = temp_dir.path().join("test.lock");
-        
+
         let locker = FileLocker::new(Duration::from_millis(100));
         let guard = locker.lock_exclusive(&file_path).unwrap();
-        
+
         assert_eq!(guard.path(), file_path);
     }
-    
+
     #[test]
     fn test_shared_lock_acquired() {
         let temp_dir = TempDir::new().unwrap();
         let file_path = temp_dir.path().join("test.lock");
-        
+
         let locker = FileLocker::new(Duration::from_millis(100));
         let _guard = locker.lock_shared(&file_path).unwrap();
     }
-    
+
     #[test]
     fn test_try_lock_non_blocking() {
         let temp_dir = TempDir::new().unwrap();
         let file_path = temp_dir.path().join("test.lock");
-        
+
         let locker = FileLocker::new(Duration::from_millis(100));
-        
+
         // First try should succeed
         let guard = locker.try_lock_exclusive(&file_path).unwrap();
         assert!(guard.is_some());
-        
+
         // Second try should fail (lock held)
         let result = locker.try_lock_exclusive(&file_path).unwrap();
         assert!(result.is_none());
     }
-    
+
     #[test]
     fn test_lock_released_on_drop() {
         let temp_dir = TempDir::new().unwrap();
         let file_path = temp_dir.path().join("test.lock");
-        
+
         let locker = FileLocker::new(Duration::from_millis(100));
-        
+
         {
             let _guard = locker.lock_exclusive(&file_path).unwrap();
             // Lock held here
         } // Lock dropped and released
-        
+
         // Should be able to acquire lock again
         let _guard2 = locker.lock_exclusive(&file_path).unwrap();
     }
-    
+
     #[test]
     fn test_exclusive_lock_prevents_concurrent_writes() {
         let temp_dir = TempDir::new().unwrap();
         let file_path = temp_dir.path().join("test.lock");
-        
+
         // Thread 1: Acquire lock and hold it
         let path1 = Arc::new(file_path.clone());
         let acquired = Arc::new(Mutex::new(false));
         let acquired1 = Arc::clone(&acquired);
-        
+
         let handle1 = thread::spawn(move || {
             let locker = FileLocker::new(Duration::from_millis(500));
             let _guard = locker.lock_exclusive(&path1).unwrap();
@@ -281,11 +281,14 @@ mod tests {
             thread::sleep(Duration::from_millis(200));
             // Lock held until guard drops
         });
-        
+
         // Wait for first thread to acquire lock
         thread::sleep(Duration::from_millis(50));
-        assert!(*acquired.lock().unwrap(), "First thread should have acquired lock");
-        
+        assert!(
+            *acquired.lock().unwrap(),
+            "First thread should have acquired lock"
+        );
+
         // Thread 2: Try to acquire same lock with short timeout (should fail)
         let path2 = file_path.clone();
         let handle2 = thread::spawn(move || {
@@ -294,34 +297,39 @@ mod tests {
             // Should timeout since lock is held
             result
         });
-        
+
         handle1.join().unwrap();
         let result2 = handle2.join().unwrap();
-        
+
         // Second thread should have timed out
-        assert!(result2.is_err(), "Second thread should timeout waiting for lock");
-        assert!(result2.unwrap_err().to_string().contains("Lock timeout"), 
-                "Error should mention lock timeout");
+        assert!(
+            result2.is_err(),
+            "Second thread should timeout waiting for lock"
+        );
+        assert!(
+            result2.unwrap_err().to_string().contains("Lock timeout"),
+            "Error should mention lock timeout"
+        );
     }
-    
+
     #[test]
     fn test_shared_locks_allow_concurrent_reads() {
         let temp_dir = TempDir::new().unwrap();
         let file_path = temp_dir.path().join("test.lock");
-        
+
         let path = Arc::new(file_path);
         let barrier = Arc::new(Barrier::new(3));
         let success_count = Arc::new(Mutex::new(0));
-        
+
         let handles: Vec<_> = (0..3)
             .map(|_| {
                 let path = Arc::clone(&path);
                 let barrier = Arc::clone(&barrier);
                 let success_count = Arc::clone(&success_count);
-                
+
                 thread::spawn(move || {
                     barrier.wait();
-                    
+
                     let locker = FileLocker::new(Duration::from_millis(500));
                     if let Ok(_guard) = locker.lock_shared(&path) {
                         thread::sleep(Duration::from_millis(100));
@@ -330,11 +338,11 @@ mod tests {
                 })
             })
             .collect();
-        
+
         for handle in handles {
             handle.join().unwrap();
         }
-        
+
         // All threads should acquire shared lock
         let count = *success_count.lock().unwrap();
         assert_eq!(count, 3, "All threads should acquire shared lock");

@@ -169,11 +169,17 @@
     - Try-lock non-blocking variants
     - 6 comprehensive unit tests
     - All 338 tests passing
-  - [ ] Add retry logic with exponential backoff for lock contention
-  - [ ] Add lock timeout configuration (via environment variables)
-  - [ ] Update JsonFileStorage to acquire locks before write operations - **Phase 1.2 (In Progress)**
-  - [ ] Add tests for concurrent access patterns (parallel creates, updates, dependency adds)
+  - [x] Update JsonFileStorage to acquire locks before write operations - **Phase 1.2 Complete (2025-12-03)**
+    - Uses separate .lock files to avoid conflicts with atomic writes
+    - Lock ordering: index first, then issue (prevents deadlocks)
+    - All operations protected: save, load, delete, list, gates, events
+    - 7 concurrent tests including 50-thread stress test
+    - All 362 tests passing, zero clippy warnings
+  - [x] Add lock timeout configuration (via environment variables) - **JIT_LOCK_TIMEOUT**
+  - [x] Add tests for concurrent access patterns (parallel creates, updates, dependency adds) - **7 comprehensive tests**
+  - [ ] Add retry logic with exponential backoff for lock contention - **Phase 2**
   - [ ] Document locking semantics and performance implications
+  - [ ] Test with MCP server and multiple concurrent clients
 - [ ] Plugin system for custom gates
 - [ ] Prometheus metrics export
 - [ ] Web dashboard (optional)

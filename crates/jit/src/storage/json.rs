@@ -4,12 +4,13 @@
 //! The directory location can be overridden with the `JIT_DATA_DIR` environment variable.
 
 use crate::domain::{Event, Issue};
-use crate::storage::{GateRegistry, IssueStore};
+use crate::storage::{FileLocker, GateRegistry, IssueStore};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::fs::{self, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 const ISSUES_DIR: &str = "issues";
 const INDEX_FILE: &str = "index.json";
@@ -39,17 +40,30 @@ impl Default for Index {
 /// This implementation stores each issue as a separate JSON file in `.jit/issues/`,
 /// gate definitions in `.jit/gates.json`, and events in `.jit/events.jsonl`.
 /// All file writes are atomic (write to temp file, then rename).
+///
+/// File locking is used to prevent race conditions in concurrent access:
+/// - Index updates are protected with exclusive locks
+/// - Individual issue updates use per-file locks
+/// - Gate registry and event log use exclusive locks for writes
 #[derive(Clone)]
 pub struct JsonFileStorage {
     root: PathBuf,
+    locker: FileLocker,
 }
 
 impl JsonFileStorage {
     /// Create a new JSON file storage instance at the given root path.
     /// The root should be the `.jit` directory (or custom directory from JIT_DATA_DIR).
     pub fn new<P: AsRef<Path>>(root: P) -> Self {
+        let timeout = std::env::var("JIT_LOCK_TIMEOUT")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .map(Duration::from_secs)
+            .unwrap_or(Duration::from_secs(5));
+
         Self {
             root: root.as_ref().to_path_buf(),
+            locker: FileLocker::new(timeout),
         }
     }
 
@@ -59,6 +73,11 @@ impl JsonFileStorage {
 
     fn write_json<T: Serialize>(&self, path: &Path, data: &T) -> Result<()> {
         let json = serde_json::to_string_pretty(data).context("Failed to serialize data")?;
+
+        // Ensure parent directory exists
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).context("Failed to create parent directory")?;
+        }
 
         // Atomic write: write to temp file, then rename
         let temp_path = path.with_extension("json.tmp");
@@ -116,11 +135,21 @@ impl IssueStore for JsonFileStorage {
 
     fn save_issue(&self, issue: &Issue) -> Result<()> {
         let issue_path = self.issue_path(&issue.id);
+        let index_lock_path = self.root.join(".index.lock");
+        let issue_lock_path = issue_path.with_extension("lock");
+
+        // Lock order: index first (to prevent deadlock), then issue
+        // Use separate .lock files to avoid conflicts with atomic writes
+        let _index_lock = self.locker.lock_exclusive(&index_lock_path)?;
+        let mut index = self.load_index()?;
+        let needs_index_update = !index.all_ids.contains(&issue.id);
+
+        // Lock the issue (exclusive) and write
+        let _issue_lock = self.locker.lock_exclusive(&issue_lock_path)?;
         self.write_json(&issue_path, issue)?;
 
-        // Update index
-        let mut index = self.load_index()?;
-        if !index.all_ids.contains(&issue.id) {
+        // Update index if this is a new issue
+        if needs_index_update {
             index.all_ids.push(issue.id.clone());
             self.save_index(&index)?;
         }
@@ -130,12 +159,23 @@ impl IssueStore for JsonFileStorage {
 
     fn load_issue(&self, id: &str) -> Result<Issue> {
         let issue_path = self.issue_path(id);
+        let issue_lock_path = issue_path.with_extension("lock");
+        let _lock = self.locker.lock_shared(&issue_lock_path)?;
         self.read_json(&issue_path)
     }
 
     fn delete_issue(&self, id: &str) -> Result<()> {
         let issue_path = self.issue_path(id);
+        let index_lock_path = self.root.join(".index.lock");
+        let issue_lock_path = issue_path.with_extension("lock");
+
+        // Lock in order: index first, then issue
+        let _index_lock = self.locker.lock_exclusive(&index_lock_path)?;
+        let _issue_lock = self.locker.lock_exclusive(&issue_lock_path)?;
+
         fs::remove_file(&issue_path).context("Failed to delete issue file")?;
+        // Clean up lock file too
+        let _ = fs::remove_file(&issue_lock_path);
 
         // Update index
         let mut index = self.load_index()?;
@@ -146,21 +186,41 @@ impl IssueStore for JsonFileStorage {
     }
 
     fn list_issues(&self) -> Result<Vec<Issue>> {
+        let index_lock_path = self.root.join(".index.lock");
+        let _lock = self.locker.lock_shared(&index_lock_path)?;
         let index = self.load_index()?;
-        index.all_ids.iter().map(|id| self.load_issue(id)).collect()
+
+        // Load issues with individual shared locks
+        index
+            .all_ids
+            .iter()
+            .map(|id| {
+                let issue_path = self.issue_path(id);
+                let issue_lock_path = issue_path.with_extension("lock");
+                let _lock = self.locker.lock_shared(&issue_lock_path)?;
+                self.read_json(&issue_path)
+            })
+            .collect()
     }
 
     fn load_gate_registry(&self) -> Result<GateRegistry> {
+        let gates_lock_path = self.root.join(".gates.lock");
+        let _lock = self.locker.lock_shared(&gates_lock_path)?;
         let gates_path = self.root.join(GATES_FILE);
         self.read_json(&gates_path)
     }
 
     fn save_gate_registry(&self, registry: &GateRegistry) -> Result<()> {
+        let gates_lock_path = self.root.join(".gates.lock");
+        let _lock = self.locker.lock_exclusive(&gates_lock_path)?;
         let gates_path = self.root.join(GATES_FILE);
         self.write_json(&gates_path, registry)
     }
 
     fn append_event(&self, event: &Event) -> Result<()> {
+        let events_lock_path = self.root.join(".events.lock");
+        let _lock = self.locker.lock_exclusive(&events_lock_path)?;
+
         let events_path = self.root.join(EVENTS_FILE);
         let mut file = OpenOptions::new()
             .create(true)
@@ -178,6 +238,9 @@ impl IssueStore for JsonFileStorage {
         if !events_path.exists() {
             return Ok(Vec::new());
         }
+
+        let events_lock_path = self.root.join(".events.lock");
+        let _lock = self.locker.lock_shared(&events_lock_path)?;
 
         let file = fs::File::open(&events_path).context("Failed to open events file")?;
         let reader = BufReader::new(file);
@@ -343,5 +406,288 @@ mod tests {
         let loaded = storage.load_gate_registry().unwrap();
         assert_eq!(loaded.gates.len(), 1);
         assert_eq!(loaded.gates.get("review").unwrap().title, "Code Review");
+    }
+
+    // Concurrent access tests
+
+    #[test]
+    fn test_concurrent_issue_creates_no_corruption() {
+        use std::sync::Arc;
+        use std::thread;
+
+        let temp_dir = TempDir::new().unwrap();
+        let storage = Arc::new(JsonFileStorage::new(temp_dir.path()));
+        storage.init().unwrap();
+
+        let num_threads = 10;
+        let issues_per_thread = 5;
+
+        let handles: Vec<_> = (0..num_threads)
+            .map(|thread_id| {
+                let storage = Arc::clone(&storage);
+                thread::spawn(move || {
+                    for i in 0..issues_per_thread {
+                        let issue = Issue::new(
+                            format!("Thread {} Issue {}", thread_id, i),
+                            format!("Description {}-{}", thread_id, i),
+                        );
+                        storage.save_issue(&issue).unwrap();
+                    }
+                })
+            })
+            .collect();
+
+        for handle in handles {
+            handle.join().unwrap();
+        }
+
+        // Verify: exactly 50 issues, no duplicates in index
+        let issues = storage.list_issues().unwrap();
+        assert_eq!(issues.len(), num_threads * issues_per_thread);
+
+        let index = storage.load_index().unwrap();
+        assert_eq!(index.all_ids.len(), num_threads * issues_per_thread);
+
+        // Check for duplicates
+        let mut ids = index.all_ids.clone();
+        ids.sort();
+        ids.dedup();
+        assert_eq!(ids.len(), num_threads * issues_per_thread);
+    }
+
+    #[test]
+    fn test_concurrent_updates_to_different_issues() {
+        use std::sync::Arc;
+        use std::thread;
+
+        let temp_dir = TempDir::new().unwrap();
+        let storage = Arc::new(JsonFileStorage::new(temp_dir.path()));
+        storage.init().unwrap();
+
+        // Create two issues
+        let issue1 = Issue::new("Issue 1".to_string(), "Desc 1".to_string());
+        let issue2 = Issue::new("Issue 2".to_string(), "Desc 2".to_string());
+        let id1 = issue1.id.clone();
+        let id2 = issue2.id.clone();
+
+        storage.save_issue(&issue1).unwrap();
+        storage.save_issue(&issue2).unwrap();
+
+        // Update them concurrently
+        let storage1 = Arc::clone(&storage);
+        let storage2 = Arc::clone(&storage);
+        let id1_clone = id1.clone();
+        let id2_clone = id2.clone();
+
+        let handle1 = thread::spawn(move || {
+            for i in 0..10 {
+                let mut issue = storage1.load_issue(&id1_clone).unwrap();
+                issue.title = format!("Updated 1 - {}", i);
+                storage1.save_issue(&issue).unwrap();
+            }
+        });
+
+        let handle2 = thread::spawn(move || {
+            for i in 0..10 {
+                let mut issue = storage2.load_issue(&id2_clone).unwrap();
+                issue.title = format!("Updated 2 - {}", i);
+                storage2.save_issue(&issue).unwrap();
+            }
+        });
+
+        handle1.join().unwrap();
+        handle2.join().unwrap();
+
+        // Both issues should exist and be loadable
+        let loaded1 = storage.load_issue(&id1).unwrap();
+        let loaded2 = storage.load_issue(&id2).unwrap();
+        assert!(loaded1.title.starts_with("Updated 1"));
+        assert!(loaded2.title.starts_with("Updated 2"));
+    }
+
+    #[test]
+    fn test_concurrent_updates_to_same_issue() {
+        use std::sync::Arc;
+        use std::thread;
+
+        let temp_dir = TempDir::new().unwrap();
+        let storage = Arc::new(JsonFileStorage::new(temp_dir.path()));
+        storage.init().unwrap();
+
+        let issue = Issue::new("Test Issue".to_string(), "Description".to_string());
+        let issue_id = issue.id.clone();
+        storage.save_issue(&issue).unwrap();
+
+        let num_threads = 5;
+        let updates_per_thread = 3;
+
+        let handles: Vec<_> = (0..num_threads)
+            .map(|thread_id| {
+                let storage = Arc::clone(&storage);
+                let id = issue_id.clone();
+                thread::spawn(move || {
+                    for i in 0..updates_per_thread {
+                        let mut issue = storage.load_issue(&id).unwrap();
+                        issue.title = format!("Thread {} Update {}", thread_id, i);
+                        storage.save_issue(&issue).unwrap();
+                    }
+                })
+            })
+            .collect();
+
+        for handle in handles {
+            handle.join().unwrap();
+        }
+
+        // Issue should still be loadable and valid
+        let final_issue = storage.load_issue(&issue_id).unwrap();
+        assert!(final_issue.title.starts_with("Thread"));
+        assert_eq!(final_issue.id, issue_id);
+    }
+
+    #[test]
+    fn test_concurrent_read_write_issue() {
+        use std::sync::{Arc, Barrier};
+        use std::thread;
+
+        let temp_dir = TempDir::new().unwrap();
+        let storage = Arc::new(JsonFileStorage::new(temp_dir.path()));
+        storage.init().unwrap();
+
+        let issue = Issue::new("Test".to_string(), "Desc".to_string());
+        let issue_id = issue.id.clone();
+        storage.save_issue(&issue).unwrap();
+
+        let barrier = Arc::new(Barrier::new(6)); // 1 writer + 5 readers
+
+        // Writer thread
+        let storage_writer = Arc::clone(&storage);
+        let id_writer = issue_id.clone();
+        let barrier_writer = Arc::clone(&barrier);
+        let writer = thread::spawn(move || {
+            barrier_writer.wait();
+            for i in 0..5 {
+                let mut issue = storage_writer.load_issue(&id_writer).unwrap();
+                issue.title = format!("Updated {}", i);
+                storage_writer.save_issue(&issue).unwrap();
+                thread::sleep(std::time::Duration::from_millis(10));
+            }
+        });
+
+        // Reader threads
+        let mut readers = vec![];
+        for _ in 0..5 {
+            let storage_reader = Arc::clone(&storage);
+            let id_reader = issue_id.clone();
+            let barrier_reader = Arc::clone(&barrier);
+            readers.push(thread::spawn(move || {
+                barrier_reader.wait();
+                for _ in 0..10 {
+                    let issue = storage_reader.load_issue(&id_reader).unwrap();
+                    // Should always get valid data (not corrupted)
+                    assert!(!issue.title.is_empty());
+                    assert_eq!(issue.id, id_reader);
+                }
+            }));
+        }
+
+        writer.join().unwrap();
+        for reader in readers {
+            reader.join().unwrap();
+        }
+    }
+
+    #[test]
+    fn test_concurrent_dependency_operations() {
+        use std::sync::Arc;
+        use std::thread;
+
+        let temp_dir = TempDir::new().unwrap();
+        let storage = Arc::new(JsonFileStorage::new(temp_dir.path()));
+        storage.init().unwrap();
+
+        // Create base issue
+        let base = Issue::new("Base".to_string(), "Desc".to_string());
+        let base_id = base.id.clone();
+        storage.save_issue(&base).unwrap();
+
+        // Add dependencies concurrently
+        let handles: Vec<_> = (0..5)
+            .map(|i| {
+                let storage = Arc::clone(&storage);
+                let base_id = base_id.clone();
+                thread::spawn(move || {
+                    let dep = Issue::new(format!("Dep {}", i), "Desc".to_string());
+                    let dep_id = dep.id.clone();
+                    storage.save_issue(&dep).unwrap();
+
+                    let mut base = storage.load_issue(&base_id).unwrap();
+                    base.dependencies.push(dep_id);
+                    storage.save_issue(&base).unwrap();
+                })
+            })
+            .collect();
+
+        for handle in handles {
+            handle.join().unwrap();
+        }
+
+        // Load and verify
+        let final_base = storage.load_issue(&base_id).unwrap();
+        // Note: Due to concurrent updates, we may lose some dependencies
+        // (last write wins), but the data should not be corrupted
+        assert!(final_base.dependencies.len() >= 1);
+        assert!(final_base.dependencies.len() <= 5);
+    }
+
+    #[test]
+    fn test_concurrent_list_and_create() {
+        use std::sync::{Arc, Barrier};
+        use std::thread;
+
+        let temp_dir = TempDir::new().unwrap();
+        let storage = Arc::new(JsonFileStorage::new(temp_dir.path()));
+        storage.init().unwrap();
+
+        let barrier = Arc::new(Barrier::new(4));
+
+        // Create some initial issues
+        for i in 0..3 {
+            let issue = Issue::new(format!("Initial {}", i), "Desc".to_string());
+            storage.save_issue(&issue).unwrap();
+        }
+
+        // Concurrent readers
+        let mut handles = vec![];
+        for _ in 0..3 {
+            let storage = Arc::clone(&storage);
+            let barrier = Arc::clone(&barrier);
+            handles.push(thread::spawn(move || {
+                barrier.wait();
+                for _ in 0..5 {
+                    let issues = storage.list_issues().unwrap();
+                    assert!(issues.len() >= 3); // At least initial issues
+                }
+            }));
+        }
+
+        // Concurrent writer
+        let storage_writer = Arc::clone(&storage);
+        let barrier_writer = Arc::clone(&barrier);
+        handles.push(thread::spawn(move || {
+            barrier_writer.wait();
+            for i in 0..5 {
+                let issue = Issue::new(format!("New {}", i), "Desc".to_string());
+                storage_writer.save_issue(&issue).unwrap();
+            }
+        }));
+
+        for handle in handles {
+            handle.join().unwrap();
+        }
+
+        // Final check
+        let final_issues = storage.list_issues().unwrap();
+        assert_eq!(final_issues.len(), 8); // 3 initial + 5 new
     }
 }

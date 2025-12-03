@@ -15,7 +15,7 @@ pub mod memory;
 
 // Re-export for convenience
 pub use json::JsonFileStorage;
-pub use lock::{FileLocker, LockGuard};
+pub use lock::FileLocker;
 
 #[allow(unused_imports)] // Public API used only in tests, not in binary
 pub use memory::InMemoryStorage;
