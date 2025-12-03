@@ -23,8 +23,8 @@ mod visualization;
 use anyhow::Result;
 use clap::Parser;
 use cli::{
-    Cli, Commands, DepCommands, EventCommands, GateCommands, GraphCommands, IssueCommands,
-    RegistryCommands,
+    Cli, Commands, DepCommands, DocCommands, EventCommands, GateCommands, GraphCommands,
+    IssueCommands, RegistryCommands,
 };
 use commands::{parse_priority, parse_state, CommandExecutor};
 use output::ExitCode;
@@ -213,6 +213,21 @@ fn run() -> Result<()> {
                         println!("Dependencies: {:?}", issue.dependencies);
                         println!("Gates Required: {:?}", issue.gates_required);
                         println!("Gates Status: {:?}", issue.gates_status);
+                        if !issue.documents.is_empty() {
+                            println!("Documents:");
+                            for doc in &issue.documents {
+                                print!("  - {}", doc.path);
+                                if let Some(ref label) = doc.label {
+                                    print!(" ({})", label);
+                                }
+                                if let Some(ref commit) = doc.commit {
+                                    print!(" [{}]", &commit[..7.min(commit.len())]);
+                                } else {
+                                    print!(" [HEAD]");
+                                }
+                                println!();
+                            }
+                        }
                     });
                 }
                 Err(e) => {
@@ -674,6 +689,34 @@ fn run() -> Result<()> {
                 for event in events {
                     println!("{}", serde_json::to_string(&event)?);
                 }
+            }
+        },
+        Commands::Doc(doc_cmd) => match doc_cmd {
+            DocCommands::Add {
+                id,
+                path,
+                commit,
+                label,
+                doc_type,
+                json,
+            } => {
+                executor.add_document_reference(
+                    &id,
+                    &path,
+                    commit.as_deref(),
+                    label.as_deref(),
+                    doc_type.as_deref(),
+                    json,
+                )?;
+            }
+            DocCommands::List { id, json } => {
+                executor.list_document_references(&id, json)?;
+            }
+            DocCommands::Remove { id, path, json } => {
+                executor.remove_document_reference(&id, &path, json)?;
+            }
+            DocCommands::Show { id, path } => {
+                executor.show_document_content(&id, &path)?;
             }
         },
         Commands::Query(query_cmd) => match query_cmd {

@@ -943,6 +943,172 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         Ok(filtered)
     }
+
+    /// Add a document reference to an issue
+    pub fn add_document_reference(
+        &self,
+        issue_id: &str,
+        path: &str,
+        commit: Option<&str>,
+        label: Option<&str>,
+        doc_type: Option<&str>,
+        json: bool,
+    ) -> Result<()> {
+        use crate::domain::DocumentReference;
+        use crate::output::{JsonError, JsonOutput};
+
+        let mut issue = self.storage.load_issue(issue_id).map_err(|e| {
+            if json {
+                let err = JsonError::issue_not_found(issue_id);
+                println!("{}", err.to_json_string().unwrap());
+            }
+            e
+        })?;
+
+        let doc_ref = DocumentReference {
+            path: path.to_string(),
+            commit: commit.map(String::from),
+            label: label.map(String::from),
+            doc_type: doc_type.map(String::from),
+        };
+
+        issue.documents.push(doc_ref.clone());
+        self.storage.save_issue(&issue)?;
+
+        if json {
+            let output = JsonOutput::success(serde_json::json!({
+                "issue_id": issue_id,
+                "document": doc_ref,
+            }));
+            println!("{}", output.to_json_string()?);
+        } else {
+            println!("Added document reference to issue {}", issue_id);
+            println!("  Path: {}", path);
+            if let Some(c) = commit {
+                println!("  Commit: {}", c);
+            }
+            if let Some(l) = label {
+                println!("  Label: {}", l);
+            }
+            if let Some(t) = doc_type {
+                println!("  Type: {}", t);
+            }
+        }
+
+        Ok(())
+    }
+
+    /// List document references for an issue
+    pub fn list_document_references(&self, issue_id: &str, json: bool) -> Result<()> {
+        use crate::output::{JsonError, JsonOutput};
+
+        let issue = self.storage.load_issue(issue_id).map_err(|e| {
+            if json {
+                let err = JsonError::issue_not_found(issue_id);
+                println!("{}", err.to_json_string().unwrap());
+            }
+            e
+        })?;
+
+        if json {
+            let output = JsonOutput::success(serde_json::json!({
+                "issue_id": issue_id,
+                "documents": issue.documents,
+                "count": issue.documents.len(),
+            }));
+            println!("{}", output.to_json_string()?);
+        } else {
+            if issue.documents.is_empty() {
+                println!("No document references for issue {}", issue_id);
+            } else {
+                println!("Document references for issue {}:", issue_id);
+                for doc in &issue.documents {
+                    print!("  - {}", doc.path);
+                    if let Some(ref label) = doc.label {
+                        print!(" ({})", label);
+                    }
+                    if let Some(ref commit) = doc.commit {
+                        print!(" [{}]", &commit[..7.min(commit.len())]);
+                    } else {
+                        print!(" [HEAD]");
+                    }
+                    if let Some(ref doc_type) = doc.doc_type {
+                        print!(" <{}>", doc_type);
+                    }
+                    println!();
+                }
+                println!("\nTotal: {}", issue.documents.len());
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Remove a document reference from an issue
+    pub fn remove_document_reference(&self, issue_id: &str, path: &str, json: bool) -> Result<()> {
+        use crate::output::{JsonError, JsonOutput};
+
+        let mut issue = self.storage.load_issue(issue_id).map_err(|e| {
+            if json {
+                let err = JsonError::issue_not_found(issue_id);
+                println!("{}", err.to_json_string().unwrap());
+            }
+            e
+        })?;
+
+        let original_len = issue.documents.len();
+        issue.documents.retain(|doc| doc.path != path);
+
+        if issue.documents.len() == original_len {
+            let err_msg = format!("Document reference {} not found in issue {}", path, issue_id);
+            if json {
+                let err = JsonError::new("DOCUMENT_NOT_FOUND", &err_msg)
+                    .with_suggestion("Run 'jit doc list <issue-id>' to see available documents");
+                println!("{}", err.to_json_string()?);
+            }
+            return Err(anyhow!(err_msg));
+        }
+
+        self.storage.save_issue(&issue)?;
+
+        if json {
+            let output = JsonOutput::success(serde_json::json!({
+                "issue_id": issue_id,
+                "removed_path": path,
+            }));
+            println!("{}", output.to_json_string()?);
+        } else {
+            println!("Removed document reference {} from issue {}", path, issue_id);
+        }
+
+        Ok(())
+    }
+
+    /// Show document content (placeholder for now - will implement with git integration)
+    pub fn show_document_content(&self, issue_id: &str, path: &str) -> Result<()> {
+        let issue = self.storage.load_issue(issue_id)?;
+
+        let doc = issue.documents.iter()
+            .find(|d| d.path == path)
+            .ok_or_else(|| anyhow!("Document reference {} not found in issue {}", path, issue_id))?;
+
+        println!("Document: {}", doc.path);
+        if let Some(ref label) = doc.label {
+            println!("Label: {}", label);
+        }
+        if let Some(ref commit) = doc.commit {
+            println!("Commit: {}", commit);
+        } else {
+            println!("Commit: HEAD");
+        }
+        if let Some(ref doc_type) = doc.doc_type {
+            println!("Type: {}", doc_type);
+        }
+        println!("\n---\n");
+        println!("Note: Document content viewing will be implemented in Phase 1.3 with git integration");
+
+        Ok(())
+    }
 }
 
 pub fn parse_priority(s: &str) -> Result<Priority> {

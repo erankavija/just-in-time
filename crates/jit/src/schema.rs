@@ -122,6 +122,9 @@ impl CommandSchema {
         // Events commands
         commands.insert("events".to_string(), Self::generate_events_commands());
 
+        // Document commands
+        commands.insert("doc".to_string(), Self::generate_doc_commands());
+
         // Graph commands
         commands.insert("graph".to_string(), Self::generate_graph_commands());
 
@@ -793,6 +796,154 @@ impl CommandSchema {
 
         Command {
             description: "Event log commands".to_string(),
+            subcommands: Some(subcommands),
+            args: vec![],
+            flags: vec![],
+            output: None,
+        }
+    }
+
+    fn generate_doc_commands() -> Command {
+        let mut subcommands = HashMap::new();
+
+        subcommands.insert(
+            "add".to_string(),
+            Command {
+                description: "Add a document reference to an issue".to_string(),
+                subcommands: None,
+                args: vec![
+                    Argument {
+                        name: "id".to_string(),
+                        arg_type: "string".to_string(),
+                        required: true,
+                        default: None,
+                        description: Some("Issue ID".to_string()),
+                    },
+                    Argument {
+                        name: "path".to_string(),
+                        arg_type: "string".to_string(),
+                        required: true,
+                        default: None,
+                        description: Some("Path to document relative to repository root".to_string()),
+                    },
+                ],
+                flags: vec![
+                    Flag {
+                        name: "commit".to_string(),
+                        flag_type: "string".to_string(),
+                        description: "Git commit hash (optional, defaults to HEAD)".to_string(),
+                    },
+                    Flag {
+                        name: "label".to_string(),
+                        flag_type: "string".to_string(),
+                        description: "Human-readable label".to_string(),
+                    },
+                    Flag {
+                        name: "doc-type".to_string(),
+                        flag_type: "string".to_string(),
+                        description: "Document type (e.g., design, implementation, notes)".to_string(),
+                    },
+                    Flag {
+                        name: "json".to_string(),
+                        flag_type: "boolean".to_string(),
+                        description: "Output JSON format".to_string(),
+                    },
+                ],
+                output: Some(OutputSchema {
+                    success: "DocumentAdded".to_string(),
+                    error: "ErrorResponse".to_string(),
+                }),
+            },
+        );
+
+        subcommands.insert(
+            "list".to_string(),
+            Command {
+                description: "List document references for an issue".to_string(),
+                subcommands: None,
+                args: vec![Argument {
+                    name: "id".to_string(),
+                    arg_type: "string".to_string(),
+                    required: true,
+                    default: None,
+                    description: Some("Issue ID".to_string()),
+                }],
+                flags: vec![Flag {
+                    name: "json".to_string(),
+                    flag_type: "boolean".to_string(),
+                    description: "Output JSON format".to_string(),
+                }],
+                output: Some(OutputSchema {
+                    success: "DocumentList".to_string(),
+                    error: "ErrorResponse".to_string(),
+                }),
+            },
+        );
+
+        subcommands.insert(
+            "remove".to_string(),
+            Command {
+                description: "Remove a document reference from an issue".to_string(),
+                subcommands: None,
+                args: vec![
+                    Argument {
+                        name: "id".to_string(),
+                        arg_type: "string".to_string(),
+                        required: true,
+                        default: None,
+                        description: Some("Issue ID".to_string()),
+                    },
+                    Argument {
+                        name: "path".to_string(),
+                        arg_type: "string".to_string(),
+                        required: true,
+                        default: None,
+                        description: Some("Path to document to remove".to_string()),
+                    },
+                ],
+                flags: vec![Flag {
+                    name: "json".to_string(),
+                    flag_type: "boolean".to_string(),
+                    description: "Output JSON format".to_string(),
+                }],
+                output: Some(OutputSchema {
+                    success: "DocumentRemoved".to_string(),
+                    error: "ErrorResponse".to_string(),
+                }),
+            },
+        );
+
+        subcommands.insert(
+            "show".to_string(),
+            Command {
+                description: "Show document content".to_string(),
+                subcommands: None,
+                args: vec![
+                    Argument {
+                        name: "id".to_string(),
+                        arg_type: "string".to_string(),
+                        required: true,
+                        default: None,
+                        description: Some("Issue ID".to_string()),
+                    },
+                    Argument {
+                        name: "path".to_string(),
+                        arg_type: "string".to_string(),
+                        required: true,
+                        default: None,
+                        description: Some("Path to document".to_string()),
+                    },
+                ],
+                flags: vec![],
+                output: Some(OutputSchema {
+                    success: "DocumentContent".to_string(),
+                    error: "ErrorResponse".to_string(),
+                }),
+            },
+        );
+
+        Command {
+            description: "Document reference commands".to_string(),
             subcommands: Some(subcommands),
             args: vec![],
             flags: vec![],

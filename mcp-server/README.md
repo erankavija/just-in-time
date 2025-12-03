@@ -8,7 +8,7 @@ This MCP server wraps the `jit` CLI to provide MCP tools for AI agents like Clau
 
 ## Features
 
-- **29 MCP tools** automatically generated from JIT schema
+- **33 MCP tools** automatically generated from JIT schema
 - **Type-safe** input validation using JSON Schema
 - **Zero-maintenance** - tools update automatically when CLI changes
 - **Full coverage** - all CLI commands exposed as MCP tools
@@ -93,7 +93,7 @@ Add to your Claude Desktop configuration (`~/Library/Application Support/Claude/
 
 ## Available Tools
 
-The server exposes 29 tools organized by command:
+The server exposes 33 tools organized by command:
 
 ### Issue Management
 - `jit_issue_create` - Create a new issue
@@ -121,6 +121,12 @@ The server exposes 29 tools organized by command:
 
 ### Events
 - `jit_events_tail` - Show recent events
+
+### Document Management
+- `jit_doc_add` - Add document reference to issue
+- `jit_doc_list` - List document references
+- `jit_doc_remove` - Remove document reference
+- `jit_doc_show` - Show document content
 
 ### Graph Operations
 - `jit_graph_show` - Show dependency graph

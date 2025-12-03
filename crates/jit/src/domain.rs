@@ -84,6 +84,8 @@ pub struct Issue {
     pub gates_status: HashMap<String, GateState>,
     /// Flexible key-value storage for agent-specific data
     pub context: HashMap<String, String>,
+    /// References to design documents, notes, and artifacts
+    pub documents: Vec<DocumentReference>,
 }
 
 impl Issue {
@@ -100,6 +102,7 @@ impl Issue {
             gates_required: Vec::new(),
             gates_status: HashMap::new(),
             context: HashMap::new(),
+            documents: Vec::new(),
         }
     }
 
@@ -141,6 +144,56 @@ impl crate::graph::GraphNode for Issue {
 
     fn dependencies(&self) -> &[String] {
         &self.dependencies
+    }
+}
+
+/// A reference to a document (design doc, notes, artifact) in the repository
+///
+/// Documents can reference files at HEAD or specific git commits for
+/// version-aware knowledge management.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DocumentReference {
+    /// Path relative to repository root (e.g., "docs/api-design.md")
+    pub path: String,
+    /// Optional git commit hash (None = HEAD, Some("a1b2c3d") = specific commit)
+    pub commit: Option<String>,
+    /// Human-readable label (e.g., "API Design Document")
+    pub label: Option<String>,
+    /// Document type hint (e.g., "design", "implementation", "notes")
+    pub doc_type: Option<String>,
+}
+
+impl DocumentReference {
+    /// Create a new document reference pointing to HEAD
+    pub fn new(path: String) -> Self {
+        Self {
+            path,
+            commit: None,
+            label: None,
+            doc_type: None,
+        }
+    }
+
+    /// Create a reference to a document at a specific commit
+    pub fn at_commit(path: String, commit: String) -> Self {
+        Self {
+            path,
+            commit: Some(commit),
+            label: None,
+            doc_type: None,
+        }
+    }
+
+    /// Builder method to add a label
+    pub fn with_label(mut self, label: String) -> Self {
+        self.label = Some(label);
+        self
+    }
+
+    /// Builder method to add a document type
+    pub fn with_type(mut self, doc_type: String) -> Self {
+        self.doc_type = Some(doc_type);
+        self
     }
 }
 
@@ -469,5 +522,67 @@ mod tests {
         let resolved = HashMap::new();
 
         assert!(!issue.is_blocked(&resolved));
+    }
+
+    #[test]
+    fn test_document_reference_new() {
+        let doc = DocumentReference::new("docs/design.md".to_string());
+        assert_eq!(doc.path, "docs/design.md");
+        assert_eq!(doc.commit, None);
+        assert_eq!(doc.label, None);
+        assert_eq!(doc.doc_type, None);
+    }
+
+    #[test]
+    fn test_document_reference_at_commit() {
+        let doc = DocumentReference::at_commit("docs/design.md".to_string(), "a1b2c3d".to_string());
+        assert_eq!(doc.path, "docs/design.md");
+        assert_eq!(doc.commit, Some("a1b2c3d".to_string()));
+    }
+
+    #[test]
+    fn test_document_reference_builder() {
+        let doc = DocumentReference::new("docs/design.md".to_string())
+            .with_label("API Design".to_string())
+            .with_type("design".to_string());
+        
+        assert_eq!(doc.label, Some("API Design".to_string()));
+        assert_eq!(doc.doc_type, Some("design".to_string()));
+    }
+
+    #[test]
+    fn test_document_reference_serialization() {
+        let doc = DocumentReference::new("docs/design.md".to_string())
+            .with_label("Design Doc".to_string());
+        
+        let json = serde_json::to_string(&doc).unwrap();
+        let deserialized: DocumentReference = serde_json::from_str(&json).unwrap();
+        
+        assert_eq!(doc, deserialized);
+    }
+
+    #[test]
+    fn test_issue_with_documents() {
+        let mut issue = Issue::new("Test".to_string(), "Description".to_string());
+        assert_eq!(issue.documents.len(), 0);
+
+        issue.documents.push(DocumentReference::new("docs/design.md".to_string()));
+        assert_eq!(issue.documents.len(), 1);
+        assert_eq!(issue.documents[0].path, "docs/design.md");
+    }
+
+    #[test]
+    fn test_issue_serialization_with_documents() {
+        let mut issue = Issue::new("Test".to_string(), "Description".to_string());
+        issue.documents.push(
+            DocumentReference::at_commit("docs/design.md".to_string(), "abc123".to_string())
+                .with_label("Design".to_string())
+        );
+
+        let json = serde_json::to_string(&issue).unwrap();
+        let deserialized: Issue = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(issue.documents.len(), deserialized.documents.len());
+        assert_eq!(issue.documents[0], deserialized.documents[0]);
     }
 }

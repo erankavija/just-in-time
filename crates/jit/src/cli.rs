@@ -53,6 +53,10 @@ pub enum Commands {
     #[command(subcommand)]
     Events(EventCommands),
 
+    /// Document reference commands
+    #[command(subcommand)]
+    Doc(DocCommands),
+
     /// Graph query commands
     #[command(subcommand)]
     Graph(GraphCommands),
@@ -290,6 +294,63 @@ pub enum GateCommands {
 
         #[arg(long)]
         json: bool,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum DocCommands {
+    /// Add a document reference to an issue
+    Add {
+        /// Issue ID
+        id: String,
+
+        /// Path to document relative to repository root
+        path: String,
+
+        /// Git commit hash (optional, defaults to HEAD)
+        #[arg(short, long)]
+        commit: Option<String>,
+
+        /// Human-readable label
+        #[arg(short, long)]
+        label: Option<String>,
+
+        /// Document type (e.g., design, implementation, notes)
+        #[arg(short = 't', long)]
+        doc_type: Option<String>,
+
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// List document references for an issue
+    List {
+        /// Issue ID
+        id: String,
+
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Remove a document reference from an issue
+    Remove {
+        /// Issue ID
+        id: String,
+
+        /// Path to document to remove
+        path: String,
+
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Show document content
+    Show {
+        /// Issue ID
+        id: String,
+
+        /// Path to document
+        path: String,
     },
 }
 

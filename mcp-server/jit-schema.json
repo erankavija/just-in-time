@@ -1,6 +1,372 @@
 {
   "version": "0.2.0",
   "commands": {
+    "issue": {
+      "description": "Issue management commands",
+      "subcommands": {
+        "show": {
+          "description": "Show issue details",
+          "args": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "description": "Issue ID"
+            }
+          ],
+          "flags": [
+            {
+              "name": "json",
+              "type": "boolean",
+              "description": "Output JSON format"
+            }
+          ],
+          "output": {
+            "success": "Issue",
+            "error": "ErrorResponse"
+          }
+        },
+        "create": {
+          "description": "Create a new issue",
+          "args": [
+            {
+              "name": "title",
+              "type": "string",
+              "required": true,
+              "description": "Issue title"
+            },
+            {
+              "name": "desc",
+              "type": "string",
+              "required": false,
+              "default": "",
+              "description": "Issue description"
+            },
+            {
+              "name": "priority",
+              "type": "string",
+              "required": false,
+              "default": "normal",
+              "description": "Priority: low, normal, high, critical"
+            },
+            {
+              "name": "gate",
+              "type": "array[string]",
+              "required": false,
+              "description": "Required gate keys"
+            }
+          ],
+          "flags": [
+            {
+              "name": "json",
+              "type": "boolean",
+              "description": "Output JSON format"
+            }
+          ],
+          "output": {
+            "success": "Issue",
+            "error": "ErrorResponse"
+          }
+        },
+        "unclaim": {
+          "description": "Unclaim an issue",
+          "args": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "description": "Issue ID"
+            }
+          ],
+          "flags": [
+            {
+              "name": "json",
+              "type": "boolean",
+              "description": "Output JSON format"
+            }
+          ],
+          "output": {
+            "success": "Issue",
+            "error": "ErrorResponse"
+          }
+        },
+        "search": {
+          "description": "Search issues by text query",
+          "args": [
+            {
+              "name": "query",
+              "type": "string",
+              "required": true,
+              "description": "Search query (searches title, description, ID)"
+            },
+            {
+              "name": "state",
+              "type": "string",
+              "required": false,
+              "description": "Filter by state"
+            },
+            {
+              "name": "assignee",
+              "type": "string",
+              "required": false,
+              "description": "Filter by assignee"
+            },
+            {
+              "name": "priority",
+              "type": "string",
+              "required": false,
+              "description": "Filter by priority"
+            }
+          ],
+          "flags": [
+            {
+              "name": "json",
+              "type": "boolean",
+              "description": "Output JSON format"
+            }
+          ],
+          "output": {
+            "success": "IssueList",
+            "error": "ErrorResponse"
+          }
+        },
+        "list": {
+          "description": "List issues with optional filters",
+          "args": [
+            {
+              "name": "state",
+              "type": "string",
+              "required": false,
+              "description": "Filter by state"
+            },
+            {
+              "name": "assignee",
+              "type": "string",
+              "required": false,
+              "description": "Filter by assignee"
+            },
+            {
+              "name": "priority",
+              "type": "string",
+              "required": false,
+              "description": "Filter by priority"
+            }
+          ],
+          "flags": [
+            {
+              "name": "json",
+              "type": "boolean",
+              "description": "Output JSON format"
+            }
+          ],
+          "output": {
+            "success": "IssueList",
+            "error": "ErrorResponse"
+          }
+        },
+        "claim": {
+          "description": "Claim an issue for an assignee",
+          "args": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "description": "Issue ID"
+            },
+            {
+              "name": "assignee",
+              "type": "string",
+              "required": true,
+              "description": "Assignee identifier (type:id format)"
+            }
+          ],
+          "flags": [
+            {
+              "name": "json",
+              "type": "boolean",
+              "description": "Output JSON format"
+            }
+          ],
+          "output": {
+            "success": "Issue",
+            "error": "ErrorResponse"
+          }
+        },
+        "update": {
+          "description": "Update an issue",
+          "args": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "description": "Issue ID"
+            },
+            {
+              "name": "title",
+              "type": "string",
+              "required": false,
+              "description": "New title"
+            },
+            {
+              "name": "desc",
+              "type": "string",
+              "required": false,
+              "description": "New description"
+            },
+            {
+              "name": "priority",
+              "type": "string",
+              "required": false,
+              "description": "New priority"
+            },
+            {
+              "name": "state",
+              "type": "string",
+              "required": false,
+              "description": "New state"
+            }
+          ],
+          "flags": [
+            {
+              "name": "json",
+              "type": "boolean",
+              "description": "Output JSON format"
+            }
+          ],
+          "output": {
+            "success": "Issue",
+            "error": "ErrorResponse"
+          }
+        },
+        "delete": {
+          "description": "Delete an issue",
+          "args": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "description": "Issue ID"
+            }
+          ],
+          "flags": [
+            {
+              "name": "json",
+              "type": "boolean",
+              "description": "Output JSON format"
+            }
+          ],
+          "output": {
+            "success": "void",
+            "error": "ErrorResponse"
+          }
+        }
+      },
+      "args": [],
+      "flags": []
+    },
+    "query": {
+      "description": "Query issues for orchestrators",
+      "subcommands": {
+        "blocked": {
+          "description": "Query blocked issues",
+          "args": [],
+          "flags": [
+            {
+              "name": "json",
+              "type": "boolean",
+              "description": "Output JSON format"
+            }
+          ],
+          "output": {
+            "success": "IssueList",
+            "error": "ErrorResponse"
+          }
+        },
+        "ready": {
+          "description": "Query ready issues",
+          "args": [],
+          "flags": [
+            {
+              "name": "json",
+              "type": "boolean",
+              "description": "Output JSON format"
+            }
+          ],
+          "output": {
+            "success": "IssueList",
+            "error": "ErrorResponse"
+          }
+        },
+        "assignee": {
+          "description": "Query issues by assignee",
+          "args": [
+            {
+              "name": "assignee",
+              "type": "string",
+              "required": true,
+              "description": "Assignee identifier"
+            }
+          ],
+          "flags": [
+            {
+              "name": "json",
+              "type": "boolean",
+              "description": "Output JSON format"
+            }
+          ],
+          "output": {
+            "success": "IssueList",
+            "error": "ErrorResponse"
+          }
+        },
+        "priority": {
+          "description": "Query issues by priority",
+          "args": [
+            {
+              "name": "priority",
+              "type": "string",
+              "required": true,
+              "description": "Priority to query"
+            }
+          ],
+          "flags": [
+            {
+              "name": "json",
+              "type": "boolean",
+              "description": "Output JSON format"
+            }
+          ],
+          "output": {
+            "success": "IssueList",
+            "error": "ErrorResponse"
+          }
+        },
+        "state": {
+          "description": "Query issues by state",
+          "args": [
+            {
+              "name": "state",
+              "type": "string",
+              "required": true,
+              "description": "State to query"
+            }
+          ],
+          "flags": [
+            {
+              "name": "json",
+              "type": "boolean",
+              "description": "Output JSON format"
+            }
+          ],
+          "output": {
+            "success": "IssueList",
+            "error": "ErrorResponse"
+          }
+        }
+      },
+      "args": [],
+      "flags": []
+    },
     "validate": {
       "description": "Validate repository integrity",
       "args": [],
@@ -79,84 +445,14 @@
       "args": [],
       "flags": []
     },
-    "registry": {
-      "description": "Gate registry management commands",
-      "subcommands": {
-        "show": {
-          "description": "Show gate definition",
-          "args": [
-            {
-              "name": "key",
-              "type": "string",
-              "required": true,
-              "description": "Gate key"
-            }
-          ],
-          "flags": [
-            {
-              "name": "json",
-              "type": "boolean",
-              "description": "Output JSON format"
-            }
-          ],
-          "output": {
-            "success": "GateDefinition",
-            "error": "ErrorResponse"
-          }
-        },
-        "add": {
-          "description": "Register a new gate definition",
-          "args": [
-            {
-              "name": "key",
-              "type": "string",
-              "required": true,
-              "description": "Gate key"
-            },
-            {
-              "name": "name",
-              "type": "string",
-              "required": true,
-              "description": "Gate name"
-            },
-            {
-              "name": "description",
-              "type": "string",
-              "required": false,
-              "default": "",
-              "description": "Gate description"
-            }
-          ],
-          "flags": [
-            {
-              "name": "json",
-              "type": "boolean",
-              "description": "Output JSON format"
-            }
-          ],
-          "output": {
-            "success": "void",
-            "error": "ErrorResponse"
-          }
-        },
-        "list": {
-          "description": "List all registered gates",
-          "args": [],
-          "flags": [
-            {
-              "name": "json",
-              "type": "boolean",
-              "description": "Output JSON format"
-            }
-          ],
-          "output": {
-            "success": "GateList",
-            "error": "ErrorResponse"
-          }
-        }
-      },
+    "init": {
+      "description": "Initialize the issue tracker in the current directory",
       "args": [],
-      "flags": []
+      "flags": [],
+      "output": {
+        "success": "void",
+        "error": "ErrorResponse"
+      }
     },
     "gate": {
       "description": "Gate management commands",
@@ -264,109 +560,6 @@
         "error": "ErrorResponse"
       }
     },
-    "query": {
-      "description": "Query issues for orchestrators",
-      "subcommands": {
-        "state": {
-          "description": "Query issues by state",
-          "args": [
-            {
-              "name": "state",
-              "type": "string",
-              "required": true,
-              "description": "State to query"
-            }
-          ],
-          "flags": [
-            {
-              "name": "json",
-              "type": "boolean",
-              "description": "Output JSON format"
-            }
-          ],
-          "output": {
-            "success": "IssueList",
-            "error": "ErrorResponse"
-          }
-        },
-        "assignee": {
-          "description": "Query issues by assignee",
-          "args": [
-            {
-              "name": "assignee",
-              "type": "string",
-              "required": true,
-              "description": "Assignee identifier"
-            }
-          ],
-          "flags": [
-            {
-              "name": "json",
-              "type": "boolean",
-              "description": "Output JSON format"
-            }
-          ],
-          "output": {
-            "success": "IssueList",
-            "error": "ErrorResponse"
-          }
-        },
-        "priority": {
-          "description": "Query issues by priority",
-          "args": [
-            {
-              "name": "priority",
-              "type": "string",
-              "required": true,
-              "description": "Priority to query"
-            }
-          ],
-          "flags": [
-            {
-              "name": "json",
-              "type": "boolean",
-              "description": "Output JSON format"
-            }
-          ],
-          "output": {
-            "success": "IssueList",
-            "error": "ErrorResponse"
-          }
-        },
-        "blocked": {
-          "description": "Query blocked issues",
-          "args": [],
-          "flags": [
-            {
-              "name": "json",
-              "type": "boolean",
-              "description": "Output JSON format"
-            }
-          ],
-          "output": {
-            "success": "IssueList",
-            "error": "ErrorResponse"
-          }
-        },
-        "ready": {
-          "description": "Query ready issues",
-          "args": [],
-          "flags": [
-            {
-              "name": "json",
-              "type": "boolean",
-              "description": "Output JSON format"
-            }
-          ],
-          "output": {
-            "success": "IssueList",
-            "error": "ErrorResponse"
-          }
-        }
-      },
-      "args": [],
-      "flags": []
-    },
     "events": {
       "description": "Event log commands",
       "subcommands": {
@@ -400,19 +593,25 @@
     "graph": {
       "description": "Graph query commands",
       "subcommands": {
-        "export": {
-          "description": "Export graph in various formats",
+        "show": {
+          "description": "Show dependency graph",
           "args": [
             {
-              "name": "format",
+              "name": "id",
               "type": "string",
-              "required": true,
-              "description": "Export format: dot, mermaid"
+              "required": false,
+              "description": "Issue ID to show subgraph for"
             }
           ],
-          "flags": [],
+          "flags": [
+            {
+              "name": "json",
+              "type": "boolean",
+              "description": "Output JSON format"
+            }
+          ],
           "output": {
-            "success": "string",
+            "success": "Graph",
             "error": "ErrorResponse"
           }
         },
@@ -438,25 +637,19 @@
             "error": "ErrorResponse"
           }
         },
-        "show": {
-          "description": "Show dependency graph",
+        "export": {
+          "description": "Export graph in various formats",
           "args": [
             {
-              "name": "id",
+              "name": "format",
               "type": "string",
-              "required": false,
-              "description": "Issue ID to show subgraph for"
+              "required": true,
+              "description": "Export format: dot, mermaid"
             }
           ],
-          "flags": [
-            {
-              "name": "json",
-              "type": "boolean",
-              "description": "Output JSON format"
-            }
-          ],
+          "flags": [],
           "output": {
-            "success": "Graph",
+            "success": "string",
             "error": "ErrorResponse"
           }
         },
@@ -479,20 +672,54 @@
       "args": [],
       "flags": []
     },
-    "init": {
-      "description": "Initialize the issue tracker in the current directory",
-      "args": [],
-      "flags": [],
-      "output": {
-        "success": "void",
-        "error": "ErrorResponse"
-      }
-    },
-    "issue": {
-      "description": "Issue management commands",
+    "doc": {
+      "description": "Document reference commands",
       "subcommands": {
-        "show": {
-          "description": "Show issue details",
+        "add": {
+          "description": "Add a document reference to an issue",
+          "args": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "description": "Issue ID"
+            },
+            {
+              "name": "path",
+              "type": "string",
+              "required": true,
+              "description": "Path to document relative to repository root"
+            }
+          ],
+          "flags": [
+            {
+              "name": "commit",
+              "type": "string",
+              "description": "Git commit hash (optional, defaults to HEAD)"
+            },
+            {
+              "name": "label",
+              "type": "string",
+              "description": "Human-readable label"
+            },
+            {
+              "name": "doc-type",
+              "type": "string",
+              "description": "Document type (e.g., design, implementation, notes)"
+            },
+            {
+              "name": "json",
+              "type": "boolean",
+              "description": "Output JSON format"
+            }
+          ],
+          "output": {
+            "success": "DocumentAdded",
+            "error": "ErrorResponse"
+          }
+        },
+        "list": {
+          "description": "List document references for an issue",
           "args": [
             {
               "name": "id",
@@ -509,60 +736,88 @@
             }
           ],
           "output": {
-            "success": "Issue",
+            "success": "DocumentList",
             "error": "ErrorResponse"
           }
         },
-        "create": {
-          "description": "Create a new issue",
+        "remove": {
+          "description": "Remove a document reference from an issue",
           "args": [
             {
-              "name": "title",
+              "name": "id",
               "type": "string",
               "required": true,
-              "description": "Issue title"
+              "description": "Issue ID"
             },
             {
-              "name": "desc",
+              "name": "path",
+              "type": "string",
+              "required": true,
+              "description": "Path to document to remove"
+            }
+          ],
+          "flags": [
+            {
+              "name": "json",
+              "type": "boolean",
+              "description": "Output JSON format"
+            }
+          ],
+          "output": {
+            "success": "DocumentRemoved",
+            "error": "ErrorResponse"
+          }
+        },
+        "show": {
+          "description": "Show document content",
+          "args": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "description": "Issue ID"
+            },
+            {
+              "name": "path",
+              "type": "string",
+              "required": true,
+              "description": "Path to document"
+            }
+          ],
+          "flags": [],
+          "output": {
+            "success": "DocumentContent",
+            "error": "ErrorResponse"
+          }
+        }
+      },
+      "args": [],
+      "flags": []
+    },
+    "registry": {
+      "description": "Gate registry management commands",
+      "subcommands": {
+        "add": {
+          "description": "Register a new gate definition",
+          "args": [
+            {
+              "name": "key",
+              "type": "string",
+              "required": true,
+              "description": "Gate key"
+            },
+            {
+              "name": "name",
+              "type": "string",
+              "required": true,
+              "description": "Gate name"
+            },
+            {
+              "name": "description",
               "type": "string",
               "required": false,
               "default": "",
-              "description": "Issue description"
-            },
-            {
-              "name": "priority",
-              "type": "string",
-              "required": false,
-              "default": "normal",
-              "description": "Priority: low, normal, high, critical"
-            },
-            {
-              "name": "gate",
-              "type": "array[string]",
-              "required": false,
-              "description": "Required gate keys"
-            }
-          ],
-          "flags": [
-            {
-              "name": "json",
-              "type": "boolean",
-              "description": "Output JSON format"
-            }
-          ],
-          "output": {
-            "success": "Issue",
-            "error": "ErrorResponse"
-          }
-        },
-        "delete": {
-          "description": "Delete an issue",
-          "args": [
-            {
-              "name": "id",
-              "type": "string",
-              "required": true,
-              "description": "Issue ID"
+              "description": "Gate description"
             }
           ],
           "flags": [
@@ -577,136 +832,9 @@
             "error": "ErrorResponse"
           }
         },
-        "unclaim": {
-          "description": "Unclaim an issue",
-          "args": [
-            {
-              "name": "id",
-              "type": "string",
-              "required": true,
-              "description": "Issue ID"
-            }
-          ],
-          "flags": [
-            {
-              "name": "json",
-              "type": "boolean",
-              "description": "Output JSON format"
-            }
-          ],
-          "output": {
-            "success": "Issue",
-            "error": "ErrorResponse"
-          }
-        },
-        "search": {
-          "description": "Search issues by text query",
-          "args": [
-            {
-              "name": "query",
-              "type": "string",
-              "required": true,
-              "description": "Search query (searches title, description, ID)"
-            },
-            {
-              "name": "state",
-              "type": "string",
-              "required": false,
-              "description": "Filter by state"
-            },
-            {
-              "name": "assignee",
-              "type": "string",
-              "required": false,
-              "description": "Filter by assignee"
-            },
-            {
-              "name": "priority",
-              "type": "string",
-              "required": false,
-              "description": "Filter by priority"
-            }
-          ],
-          "flags": [
-            {
-              "name": "json",
-              "type": "boolean",
-              "description": "Output JSON format"
-            }
-          ],
-          "output": {
-            "success": "IssueList",
-            "error": "ErrorResponse"
-          }
-        },
-        "update": {
-          "description": "Update an issue",
-          "args": [
-            {
-              "name": "id",
-              "type": "string",
-              "required": true,
-              "description": "Issue ID"
-            },
-            {
-              "name": "title",
-              "type": "string",
-              "required": false,
-              "description": "New title"
-            },
-            {
-              "name": "desc",
-              "type": "string",
-              "required": false,
-              "description": "New description"
-            },
-            {
-              "name": "priority",
-              "type": "string",
-              "required": false,
-              "description": "New priority"
-            },
-            {
-              "name": "state",
-              "type": "string",
-              "required": false,
-              "description": "New state"
-            }
-          ],
-          "flags": [
-            {
-              "name": "json",
-              "type": "boolean",
-              "description": "Output JSON format"
-            }
-          ],
-          "output": {
-            "success": "Issue",
-            "error": "ErrorResponse"
-          }
-        },
         "list": {
-          "description": "List issues with optional filters",
-          "args": [
-            {
-              "name": "state",
-              "type": "string",
-              "required": false,
-              "description": "Filter by state"
-            },
-            {
-              "name": "assignee",
-              "type": "string",
-              "required": false,
-              "description": "Filter by assignee"
-            },
-            {
-              "name": "priority",
-              "type": "string",
-              "required": false,
-              "description": "Filter by priority"
-            }
-          ],
+          "description": "List all registered gates",
+          "args": [],
           "flags": [
             {
               "name": "json",
@@ -715,24 +843,18 @@
             }
           ],
           "output": {
-            "success": "IssueList",
+            "success": "GateList",
             "error": "ErrorResponse"
           }
         },
-        "claim": {
-          "description": "Claim an issue for an assignee",
+        "show": {
+          "description": "Show gate definition",
           "args": [
             {
-              "name": "id",
+              "name": "key",
               "type": "string",
               "required": true,
-              "description": "Issue ID"
-            },
-            {
-              "name": "assignee",
-              "type": "string",
-              "required": true,
-              "description": "Assignee identifier (type:id format)"
+              "description": "Gate key"
             }
           ],
           "flags": [
@@ -743,7 +865,7 @@
             }
           ],
           "output": {
-            "success": "Issue",
+            "success": "GateDefinition",
             "error": "ErrorResponse"
           }
         }
@@ -753,16 +875,6 @@
     }
   },
   "types": {
-    "Priority": {
-      "description": "Issue priority level",
-      "enum": [
-        "low",
-        "normal",
-        "high",
-        "critical"
-      ],
-      "type": "enum"
-    },
     "Issue": {
       "properties": {
         "assignee": {
@@ -815,16 +927,27 @@
       },
       "type": "object"
     },
-    "State": {
-      "description": "Issue lifecycle state",
+    "Priority": {
+      "description": "Issue priority level",
       "enum": [
-        "open",
-        "ready",
-        "in_progress",
-        "done",
-        "archived"
+        "low",
+        "normal",
+        "high",
+        "critical"
       ],
       "type": "enum"
+    },
+    "Metadata": {
+      "properties": {
+        "timestamp": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "type": "object"
     },
     "ErrorResponse": {
       "properties": {
@@ -858,6 +981,17 @@
       },
       "type": "object"
     },
+    "State": {
+      "description": "Issue lifecycle state",
+      "enum": [
+        "open",
+        "ready",
+        "in_progress",
+        "done",
+        "archived"
+      ],
+      "type": "enum"
+    },
     "GateStatus": {
       "description": "Quality gate status",
       "enum": [
@@ -866,18 +1000,6 @@
         "failed"
       ],
       "type": "enum"
-    },
-    "Metadata": {
-      "properties": {
-        "timestamp": {
-          "format": "date-time",
-          "type": "string"
-        },
-        "version": {
-          "type": "string"
-        }
-      },
-      "type": "object"
     }
   },
   "exit_codes": [
