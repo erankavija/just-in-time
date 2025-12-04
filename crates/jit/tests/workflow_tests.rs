@@ -257,7 +257,7 @@ fn test_workflow_gates() {
     let output = run_jit(&temp, &["query", "blocked"]);
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(!stdout.contains(&id));
-    
+
     // Issue should be ready
     let output = run_jit(&temp, &["query", "ready"]);
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -271,7 +271,7 @@ fn test_workflow_gates() {
 
     // Pass tests gate
     run_jit(&temp, &["gate", "pass", &id, "tests"]);
-    
+
     // Still in Gated (review not passed)
     let output = run_jit(&temp, &["issue", "show", &id]);
     let stdout = String::from_utf8_lossy(&output.stdout);

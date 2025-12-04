@@ -119,9 +119,11 @@ fn test_gates_work_without_coordinator() {
     // Issue should still be ready even with pending gate
     let ready = h.executor.query_ready().unwrap();
     assert_eq!(ready.len(), 1);
-    
+
     // But gates prevent completion - attempting to mark Done will transition to Gated
-    h.executor.update_issue(&id, None, None, None, Some(jit::domain::State::Done)).unwrap();
+    h.executor
+        .update_issue(&id, None, None, None, Some(jit::domain::State::Done))
+        .unwrap();
     let issue = h.storage.load_issue(&id).unwrap();
     assert_eq!(issue.state, jit::domain::State::Gated);
 

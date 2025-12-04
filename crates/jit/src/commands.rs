@@ -14,7 +14,7 @@ use std::collections::HashMap;
 /// Status summary for all issues
 #[derive(Debug, Serialize)]
 pub struct StatusSummary {
-    pub open: usize,  // Backlog count (kept as 'open' for compatibility)
+    pub open: usize, // Backlog count (kept as 'open' for compatibility)
     pub ready: usize,
     pub in_progress: usize,
     pub gated: usize,
@@ -195,7 +195,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                         "Cannot transition to Done: issue blocked by incomplete dependencies"
                     ));
                 }
-                
+
                 // If gates not passed, transition to Gated instead
                 if issue.has_unpassed_gates() {
                     issue.state = State::Gated;
@@ -774,7 +774,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let blocked = issues.iter().filter(|i| i.is_blocked(&resolved)).count();
 
         Ok(StatusSummary {
-            open: backlog,  // Keep 'open' field name for backward compatibility
+            open: backlog, // Keep 'open' field name for backward compatibility
             ready,
             in_progress,
             done,
@@ -1280,7 +1280,7 @@ pub fn parse_priority(s: &str) -> Result<Priority> {
 pub fn parse_state(s: &str) -> Result<State> {
     match s.to_lowercase().as_str() {
         "backlog" => Ok(State::Backlog),
-        "open" => Ok(State::Backlog),  // Backward compatibility alias
+        "open" => Ok(State::Backlog), // Backward compatibility alias
         "ready" => Ok(State::Ready),
         "in_progress" | "inprogress" => Ok(State::InProgress),
         "gated" => Ok(State::Gated),
@@ -1480,7 +1480,7 @@ mod tests {
         // but transition to Gated instead
         let result = executor.update_issue(&id, None, None, None, Some(State::Done));
         assert!(result.is_ok());
-        
+
         let issue = executor.show_issue(&id).unwrap();
         assert_eq!(issue.state, State::Gated);
     }

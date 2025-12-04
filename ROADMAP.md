@@ -97,6 +97,27 @@
 - [ ] Metrics reporting: `metrics report --format csv`
 - [ ] Webhooks for orchestrator events
 
+## Core Improvements ✅
+
+### State Model Refactoring ✅
+
+**Goal:** Clearer state semantics and explicit quality gate blocking.
+
+- [x] Renamed `Open` → `Backlog` for clearer semantics
+- [x] Added `Gated` state for work awaiting quality approval
+- [x] Separated blocking logic: dependencies block starting, gates block completion
+- [x] Auto-transitions: Backlog→Ready (deps done), Gated→Done (gates pass)
+- [x] Updated all components: Rust core (167 tests), MCP server (7 tests), Web UI (11 tests), REST API (6 tests)
+- [x] Backward compatible: accepts 'open' as alias for 'backlog'
+- [x] Comprehensive documentation: `docs/state-model-refactoring.md`
+- [x] Test suites: MCP protocol testing, Web UI type/component testing
+
+**Implementation:**
+- Updated `State` enum: `Backlog | Ready | InProgress | Gated | Done | Archived`
+- Split `is_blocked()` (dependencies only) from `has_unpassed_gates()`
+- Updated all visualizations, CLI output, MCP schema, Web UI types/colors/emojis
+- Added `web/TESTING.md`, `mcp-server/test.js` with full test coverage
+
 ## Code Quality & Housekeeping ✅
 
 **Goal:** Maintain clean, well-documented, maintainable codebase.

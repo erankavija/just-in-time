@@ -57,13 +57,10 @@ async fn get_issue<S: IssueStore>(
     Path(id): Path<String>,
     State(executor): State<AppState<S>>,
 ) -> Result<Json<Issue>, StatusCode> {
-    executor
-        .show_issue(&id)
-        .map(Json)
-        .map_err(|e| {
-            tracing::error!("Failed to get issue {}: {:?}", id, e);
-            StatusCode::NOT_FOUND
-        })
+    executor.show_issue(&id).map(Json).map_err(|e| {
+        tracing::error!("Failed to get issue {}: {:?}", id, e);
+        StatusCode::NOT_FOUND
+    })
 }
 
 /// Graph data for visualization
@@ -93,12 +90,10 @@ pub struct GraphEdge {
 async fn get_graph<S: IssueStore>(
     State(executor): State<AppState<S>>,
 ) -> Result<Json<GraphData>, StatusCode> {
-    let issues = executor
-        .list_issues(None, None, None)
-        .map_err(|e| {
-            tracing::error!("Failed to list issues for graph: {:?}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+    let issues = executor.list_issues(None, None, None).map_err(|e| {
+        tracing::error!("Failed to list issues for graph: {:?}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     // Build node lookup for blocked state calculation
     let issue_map: std::collections::HashMap<String, &Issue> =
@@ -146,12 +141,10 @@ pub struct StatusResponse {
 async fn get_status<S: IssueStore>(
     State(executor): State<AppState<S>>,
 ) -> Result<Json<StatusResponse>, StatusCode> {
-    let summary = executor
-        .get_status()
-        .map_err(|e| {
-            tracing::error!("Failed to get status: {:?}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+    let summary = executor.get_status().map_err(|e| {
+        tracing::error!("Failed to get status: {:?}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     Ok(Json(StatusResponse {
         open: summary.open,

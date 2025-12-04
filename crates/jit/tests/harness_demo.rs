@@ -140,7 +140,7 @@ fn test_harness_gates() {
     let resolved: std::collections::HashMap<String, &jit::domain::Issue> =
         all.iter().map(|i| (i.id.clone(), i)).collect();
     assert!(!issue.is_blocked(&resolved));
-    
+
     // But gates do prevent completion
     assert!(issue.has_unpassed_gates());
 

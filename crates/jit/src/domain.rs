@@ -623,7 +623,7 @@ mod tests {
     fn test_backlog_issue_should_auto_transition_to_ready_when_unblocked() {
         let issue = Issue::new("Test".to_string(), "Description".to_string());
         let resolved = HashMap::new();
-        
+
         assert_eq!(issue.state, State::Backlog);
         assert!(issue.should_auto_transition_to_ready(&resolved));
     }
@@ -707,7 +707,7 @@ mod tests {
         let state = State::Backlog;
         let json = serde_json::to_string(&state).unwrap();
         assert_eq!(json, "\"backlog\"");
-        
+
         let deserialized: State = serde_json::from_str(&json).unwrap();
         assert_eq!(state, deserialized);
     }
@@ -717,7 +717,7 @@ mod tests {
         let state = State::Gated;
         let json = serde_json::to_string(&state).unwrap();
         assert_eq!(json, "\"gated\"");
-        
+
         let deserialized: State = serde_json::from_str(&json).unwrap();
         assert_eq!(state, deserialized);
     }
