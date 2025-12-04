@@ -169,6 +169,7 @@ const POSITIONAL_ARG_COMMANDS = {
   "registry_show": ["key"],
   "graph_downstream": ["id"],
   "gate_add": ["id", "gate"],
+  "search": ["query"],
   "gate_pass": ["id", "gate"],
   "gate_fail": ["id", "gate"],
 };
@@ -235,9 +236,41 @@ async function executeTool(name, args) {
       cliArgs += flagArgs.length > 0 ? ` ${flagArgs.join(" ")}` : "";
     }
   } else {
-    // Top-level command: jit_status -> jit status
-    cliArgs = parts[0];
-    hasJsonFlag = supportsJsonFlag(parts[0]);
+    // Top-level command: jit_status -> jit status  or jit_search -> jit search
+    const cmd = parts[0];
+    cliArgs = cmd;
+    hasJsonFlag = supportsJsonFlag(cmd);
+    
+    // Check if this command uses positional arguments
+    const positionalArgNames = POSITIONAL_ARG_COMMANDS[cmd];
+    
+    if (positionalArgNames) {
+      // Use positional arguments
+      const positionalArgs = [];
+      for (const argName of positionalArgNames) {
+        const value = args[argName];
+        if (value !== undefined && value !== "") {
+          positionalArgs.push(`"${value}"`);
+        }
+      }
+      cliArgs += positionalArgs.length > 0 ? ` ${positionalArgs.join(" ")}` : "";
+      
+      // Add any remaining arguments as flags
+      const positionalSet = new Set(positionalArgNames);
+      const flagArgs = [];
+      for (const [key, value] of Object.entries(args)) {
+        if (positionalSet.has(key)) continue;
+        
+        if (Array.isArray(value)) {
+          for (const item of value) {
+            flagArgs.push(`--${key} "${item}"`);
+          }
+        } else if (value !== undefined && value !== "") {
+          flagArgs.push(`--${key} "${value}"`);
+        }
+      }
+      cliArgs += flagArgs.length > 0 ? ` ${flagArgs.join(" ")}` : "";
+    }
   }
   
   return await runJitCommand(cliArgs, hasJsonFlag);

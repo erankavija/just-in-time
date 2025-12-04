@@ -150,6 +150,59 @@ impl CommandSchema {
             },
         );
 
+        // Search
+        commands.insert(
+            "search".to_string(),
+            Command {
+                description: "Search issues and documents using ripgrep".to_string(),
+                subcommands: None,
+                args: vec![Argument {
+                    name: "query".to_string(),
+                    arg_type: "string".to_string(),
+                    required: true,
+                    default: None,
+                    description: Some("Search query string".to_string()),
+                }],
+                flags: vec![
+                    Flag {
+                        name: "regex".to_string(),
+                        flag_type: "boolean".to_string(),
+                        description: "Use regex pattern matching".to_string(),
+                    },
+                    Flag {
+                        name: "case-sensitive".to_string(),
+                        flag_type: "boolean".to_string(),
+                        description: "Case sensitive search".to_string(),
+                    },
+                    Flag {
+                        name: "context".to_string(),
+                        flag_type: "number".to_string(),
+                        description: "Show N lines of context".to_string(),
+                    },
+                    Flag {
+                        name: "limit".to_string(),
+                        flag_type: "number".to_string(),
+                        description: "Maximum results to return".to_string(),
+                    },
+                    Flag {
+                        name: "glob".to_string(),
+                        flag_type: "string".to_string(),
+                        description: "Search only matching files (e.g., '*.json' or '*.md')"
+                            .to_string(),
+                    },
+                    Flag {
+                        name: "json".to_string(),
+                        flag_type: "boolean".to_string(),
+                        description: "Output JSON format".to_string(),
+                    },
+                ],
+                output: Some(OutputSchema {
+                    success: "SearchResults".to_string(),
+                    error: "ErrorResponse".to_string(),
+                }),
+            },
+        );
+
         // Validate
         commands.insert(
             "validate".to_string(),

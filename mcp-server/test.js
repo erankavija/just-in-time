@@ -259,6 +259,94 @@ const tests = [
       
       console.log(`  ✓ Invalid tool rejection works`);
     }
+  },
+
+  {
+    name: 'Search tool exists',
+    async run(tester) {
+      const response = await tester.request('tools/list', {});
+      
+      assert(response.result, 'Should have result');
+      assert(response.result.tools, 'Should have tools array');
+      
+      const searchTool = response.result.tools.find(t => t.name === 'jit_search');
+      assert(searchTool, 'Should have jit_search tool');
+      assert(searchTool.description.includes('Search'), 'Should have search description');
+      assert(searchTool.inputSchema, 'Should have input schema');
+      assert(searchTool.inputSchema.properties.query, 'Should have query parameter');
+      
+      console.log(`  ✓ Search tool registered correctly`);
+    }
+  },
+
+  {
+    name: 'Search tool basic query',
+    async run(tester) {
+      const response = await tester.request('tools/call', {
+        name: 'jit_search',
+        arguments: {
+          query: 'priority'
+        }
+      });
+
+      assert(response.result, 'Should have result');
+      assert(response.result.content, 'Should have content');
+      const content = response.result.content[0];
+      assert(content.type === 'text', 'Content should be text');
+      
+      // Parse the output
+      const output = JSON.parse(content.text);
+      assert(output.data, 'Should have data field');
+      assert(output.data.query === 'priority', 'Should echo query');
+      assert(typeof output.data.total === 'number', 'Should have total count');
+      assert(Array.isArray(output.data.results), 'Should have results array');
+      
+      console.log(`  ✓ Search returned ${output.data.total} results`);
+    }
+  },
+
+  {
+    name: 'Search with regex flag',
+    async run(tester) {
+      const response = await tester.request('tools/call', {
+        name: 'jit_search',
+        arguments: {
+          query: 'p[ri]+ority',
+          regex: true
+        }
+      });
+
+      assert(response.result, 'Should have result');
+      const output = JSON.parse(response.result.content[0].text);
+      assert(output.data, 'Should have data');
+      
+      console.log(`  ✓ Regex search works`);
+    }
+  },
+
+  {
+    name: 'Search with glob filter',
+    async run(tester) {
+      const response = await tester.request('tools/call', {
+        name: 'jit_search',
+        arguments: {
+          query: 'priority',
+          glob: '*.json'
+        }
+      });
+
+      assert(response.result, 'Should have result');
+      const output = JSON.parse(response.result.content[0].text);
+      assert(output.data, 'Should have data');
+      assert(Array.isArray(output.data.results), 'Should have results');
+      
+      // All results should be from .json files
+      for (const result of output.data.results) {
+        assert(result.path.endsWith('.json'), 'Should only match .json files');
+      }
+      
+      console.log(`  ✓ Glob filter works (${output.data.total} JSON matches)`);
+    }
   }
 ];
 

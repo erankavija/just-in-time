@@ -327,6 +327,13 @@ jit graph show <issue>
 jit gate add <issue> unit-tests
 jit gate pass <issue> unit-tests
 
+# Search
+jit search "authentication"                    # Search all files
+jit search "bug" --glob "*.json"               # Search only issues
+jit search "API" --glob "*.md"                 # Search only documents
+jit search "auth(entication|orization)" --regex # Regex search
+jit search "login" --json                      # JSON output
+
 # Coordination
 jit coordinator start
 jit coordinator agents
@@ -341,11 +348,10 @@ jit events tail -n 20
 
 ✅ **Phase 0**: Design and architecture  
 ✅ **Phase 1**: Core issue management with dependency graph  
-✅ **Phase 2**: Quality gates and coordinator daemon  
-✅ **Phase 3**: Advanced observability and file locking  
-🚧 **Phase 4**: Production readiness (retry logic, metrics, plugins)
-
-**Latest**: File locking for multi-agent safety (Phase 3) - Safe concurrent access for multiple agents/processes
+✅ **Phase 2**: Quality gates, web UI, and REST API  
+✅ **Phase 3.1**: Full-text search with ripgrep  
+🚧 **Phase 3**: Advanced knowledge management features (in progress)  
+🚧 **Phase 4**: Production readiness (metrics, plugins)
 
 See [ROADMAP.md](ROADMAP.md) for details.
 

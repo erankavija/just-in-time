@@ -171,7 +171,7 @@
 - [ ] Integration with Claude Desktop (documented, not tested)
 - [ ] See `mcp-server/README.md` for usage
 
-### Knowledge Management System ✅ (Phase 1 Complete - 2025-12-03)
+### Knowledge Management System ✅ (Phase 1-3.1 Complete)
 
 **Phase 1.1: Document References** ✅
 - [x] Document references in issues (design docs, notes, artifacts)
@@ -228,7 +228,7 @@
 - [x] State legend with color coding
 - [x] Priority indicators
 
-**Phase 2.3: Enhanced UI Features** 🚧 (Planned)
+**Phase 2.3: Enhanced UI Features** 🚧 (Deferred - CLI-first)
 - [ ] Search and filter functionality
 - [ ] Inline document content viewer
 - [ ] State transition buttons (change issue state from UI)
@@ -238,11 +238,21 @@
 - [ ] Mobile responsive layout
 - [ ] Better graph layout algorithms (elk.js)
 
-**Future Phases:**
-- [ ] Historical document viewer (time machine)
-- [ ] Full-text search across issues and documents
-- [ ] Archive system for project knowledge preservation
-- [ ] See `docs/knowledge-management-vision.md` and `docs/web-ui-architecture.md` for detailed plan
+**Phase 3: Advanced Features** 🚧 (In Progress)
+- [x] **Full-text search with ripgrep (Phase 3.1)** ✅
+  - Search across issues and referenced documents
+  - Regex and glob pattern filtering
+  - CLI: `jit search <query> [--regex] [--glob "*.json"]`
+  - MCP tool: `search_issues`
+  - 20+ tests (unit + integration + MCP)
+  - Graceful degradation when ripgrep not installed
+  - JSON output support for automation
+  - Zero dependencies (uses system ripgrep)
+  - Future: Optional Tantivy backend for large repos (>1000 issues)
+- [ ] Historical document viewer (Phase 3.2)
+- [ ] Document graph visualization (Phase 3.3)
+- [ ] Archive system (Phase 3.4)
+- [ ] See `docs/knowledge-management-vision.md`, `docs/search-implementation.md`, and `docs/web-ui-architecture.md` for detailed plan
 
 ### Production Readiness
 

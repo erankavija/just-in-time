@@ -65,6 +65,36 @@ pub enum Commands {
     #[command(subcommand)]
     Query(QueryCommands),
 
+    /// Search issues and documents
+    Search {
+        /// Search query string
+        query: String,
+
+        /// Use regex pattern matching
+        #[arg(short, long)]
+        regex: bool,
+
+        /// Case sensitive search
+        #[arg(short = 'C', long)]
+        case_sensitive: bool,
+
+        /// Show N lines of context
+        #[arg(short = 'c', long, default_value = "0")]
+        context: usize,
+
+        /// Maximum results to return
+        #[arg(short = 'n', long)]
+        limit: Option<usize>,
+
+        /// Search only in specific files (glob pattern, e.g., "*.json" or "*.md")
+        #[arg(short = 'g', long)]
+        glob: Option<String>,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Show overall status
     Status {
         #[arg(long)]

@@ -876,6 +876,99 @@ fn run() -> Result<()> {
                 }
             },
         },
+        Commands::Search {
+            query,
+            regex,
+            case_sensitive,
+            context,
+            limit,
+            glob,
+            json,
+        } => {
+            use jit::search::{search, SearchOptions};
+
+            let options = SearchOptions {
+                case_sensitive,
+                regex,
+                context_lines: context,
+                max_results: limit,
+                file_pattern: glob.clone(),
+            };
+
+            match search(&jit_dir, &query, options) {
+                Ok(results) => {
+                    if json {
+                        use output::JsonOutput;
+                        use serde_json::json;
+
+                        let output = JsonOutput::success(json!({
+                            "query": query,
+                            "total": results.len(),
+                            "results": results
+                        }));
+                        println!("{}", output.to_json_string()?);
+                    } else if results.is_empty() {
+                        println!("No matches found for \"{}\"", query);
+                    } else {
+                        println!(
+                            "Search results for \"{}\" ({} matches):\n",
+                            query,
+                            results.len()
+                        );
+
+                        let mut current_file = String::new();
+                        for result in &results {
+                            if result.path != current_file {
+                                current_file = result.path.clone();
+
+                                if let Some(issue_id) = &result.issue_id {
+                                    // Try to load issue for title
+                                    if let Ok(issue) = storage.load_issue(issue_id) {
+                                        println!("Issue {} | {}", issue_id, issue.title);
+                                    } else {
+                                        println!("Issue {}", issue_id);
+                                    }
+                                } else {
+                                    println!("Document {}", result.path);
+                                }
+                            }
+
+                            println!("  Line {}: {}", result.line_number, result.line_text.trim());
+                        }
+                        println!();
+                    }
+                }
+                Err(e) => {
+                    if json {
+                        use output::JsonError;
+
+                        let error_code = if e.to_string().contains("not installed") {
+                            "RIPGREP_NOT_FOUND"
+                        } else {
+                            "SEARCH_FAILED"
+                        };
+
+                        let suggestion = if error_code == "RIPGREP_NOT_FOUND" {
+                            Some(
+                                "Install ripgrep from https://github.com/BurntSushi/ripgrep"
+                                    .to_string(),
+                            )
+                        } else {
+                            None
+                        };
+
+                        let mut json_error = JsonError::new(error_code, e.to_string());
+                        if let Some(sug) = suggestion {
+                            json_error = json_error.with_suggestion(sug);
+                        }
+                        println!("{}", json_error.to_json_string()?);
+                        std::process::exit(10); // External dependency failed
+                    } else {
+                        return Err(e);
+                    }
+                }
+            }
+        }
         Commands::Status { json } => {
             if json {
                 use output::JsonOutput;

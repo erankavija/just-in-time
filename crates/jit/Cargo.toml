@@ -23,6 +23,7 @@ uuid = { workspace = true }
 chrono = { workspace = true }
 fs4 = { version = "0.13", features = ["sync"] }
 git2 = "0.18"
+which = "6.0"
 
 [dev-dependencies]
 tempfile = { workspace = true }
