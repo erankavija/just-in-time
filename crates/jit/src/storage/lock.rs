@@ -293,9 +293,8 @@ mod tests {
         let path2 = file_path.clone();
         let handle2 = thread::spawn(move || {
             let locker = FileLocker::new(Duration::from_millis(50));
-            let result = locker.lock_exclusive(&path2);
             // Should timeout since lock is held
-            result
+            locker.lock_exclusive(&path2)
         });
 
         handle1.join().unwrap();

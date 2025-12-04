@@ -1,4 +1,4 @@
-export type State = 'open' | 'ready' | 'in_progress' | 'done' | 'archived';
+export type State = 'backlog' | 'ready' | 'in_progress' | 'gated' | 'done' | 'archived';
 export type Priority = 'low' | 'normal' | 'high' | 'critical';
 
 export interface DocumentReference {

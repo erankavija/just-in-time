@@ -8,7 +8,8 @@
     "jit-mcp-server": "./index.js"
   },
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "test": "node test.js"
   },
   "keywords": ["mcp", "jit", "issue-tracker", "ai"],
   "author": "",

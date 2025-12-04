@@ -83,9 +83,10 @@ export function IssueDetail({ issueId }: IssueDetailProps) {
   }
 
   const stateEmoji: Record<string, string> = {
-    open: '🔵',
+    backlog: '⏸️',
     ready: '🟢',
     in_progress: '🟡',
+    gated: '🟠',
     done: '✅',
     archived: '📦',
   };

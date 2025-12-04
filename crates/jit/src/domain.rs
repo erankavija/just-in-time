@@ -12,12 +12,14 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum State {
-    /// Newly created, may have unmet dependencies or gates
-    Open,
+    /// Created but not actionable yet (blocked by dependencies or gates)
+    Backlog,
     /// All dependencies done and gates passed, ready for work
     Ready,
     /// Currently being worked on
     InProgress,
+    /// Work complete, awaiting quality gate approval
+    Gated,
     /// Completed
     Done,
     /// No longer relevant
@@ -95,7 +97,7 @@ impl Issue {
             id: Uuid::new_v4().to_string(),
             title,
             description,
-            state: State::Open,
+            state: State::Backlog,
             priority: Priority::Normal,
             assignee: None,
             dependencies: Vec::new(),
@@ -106,33 +108,40 @@ impl Issue {
         }
     }
 
-    /// Check if this issue is blocked by dependencies or unpassed gates
+    /// Check if this issue is blocked by incomplete dependencies
     ///
-    /// Returns true if any dependency is not done or any required gate hasn't passed.
+    /// Returns true if any dependency is not done.
+    /// Note: Gates do not block work from starting, only from completing.
     pub fn is_blocked(&self, resolved_issues: &HashMap<String, &Issue>) -> bool {
         // Check if any dependency is not done
-        let has_incomplete_deps = self
-            .dependencies
+        self.dependencies
             .iter()
-            .any(|dep_id| !matches!(resolved_issues.get(dep_id), Some(issue) if issue.state == State::Done));
+            .any(|dep_id| !matches!(resolved_issues.get(dep_id), Some(issue) if issue.state == State::Done))
+    }
 
-        if has_incomplete_deps {
-            return true;
-        }
-
-        // Check if any required gate is not passed
+    /// Check if this issue has unpassed gates
+    ///
+    /// Returns true if any required gate hasn't passed.
+    /// Used to determine if issue can transition to Done.
+    pub fn has_unpassed_gates(&self) -> bool {
         self.gates_required
             .iter()
             .any(|gate_key| !matches!(self.gates_status.get(gate_key), Some(gate_state) if gate_state.status == GateStatus::Passed))
     }
 
     /// Check if this issue should auto-transition to Ready state
-    /// An Open issue transitions to Ready when it becomes unblocked
+    /// A Backlog issue transitions to Ready when it becomes unblocked
     pub fn should_auto_transition_to_ready(
         &self,
         resolved_issues: &HashMap<String, &Issue>,
     ) -> bool {
-        self.state == State::Open && !self.is_blocked(resolved_issues)
+        self.state == State::Backlog && !self.is_blocked(resolved_issues)
+    }
+
+    /// Check if this issue should auto-transition to Done state
+    /// A Gated issue transitions to Done when all required gates pass
+    pub fn should_auto_transition_to_done(&self) -> bool {
+        self.state == State::Gated && !self.has_unpassed_gates()
     }
 }
 
@@ -165,6 +174,7 @@ pub struct DocumentReference {
 
 impl DocumentReference {
     /// Create a new document reference pointing to HEAD
+    #[allow(dead_code)]
     pub fn new(path: String) -> Self {
         Self {
             path,
@@ -175,6 +185,7 @@ impl DocumentReference {
     }
 
     /// Create a reference to a document at a specific commit
+    #[allow(dead_code)]
     pub fn at_commit(path: String, commit: String) -> Self {
         Self {
             path,
@@ -185,12 +196,14 @@ impl DocumentReference {
     }
 
     /// Builder method to add a label
+    #[allow(dead_code)]
     pub fn with_label(mut self, label: String) -> Self {
         self.label = Some(label);
         self
     }
 
     /// Builder method to add a document type
+    #[allow(dead_code)]
     pub fn with_type(mut self, doc_type: String) -> Self {
         self.doc_type = Some(doc_type);
         self
@@ -415,7 +428,7 @@ mod tests {
 
         assert_eq!(issue.title, "Test Issue");
         assert_eq!(issue.description, "Description");
-        assert_eq!(issue.state, State::Open);
+        assert_eq!(issue.state, State::Backlog);
         assert_eq!(issue.priority, Priority::Normal);
         assert_eq!(issue.assignee, None);
         assert!(issue.dependencies.is_empty());
@@ -461,17 +474,20 @@ mod tests {
     }
 
     #[test]
-    fn test_issue_blocked_by_unpassed_gate() {
+    fn test_issue_not_blocked_by_unpassed_gate() {
         let mut issue = Issue::new("Test".to_string(), "Desc".to_string());
         issue.gates_required.push("review".to_string());
 
         let resolved = HashMap::new();
 
-        assert!(issue.is_blocked(&resolved));
+        // Gates don't block work from starting
+        assert!(!issue.is_blocked(&resolved));
+        // But gates do prevent completion
+        assert!(issue.has_unpassed_gates());
     }
 
     #[test]
-    fn test_issue_blocked_by_pending_gate() {
+    fn test_issue_not_blocked_by_pending_gate() {
         let mut issue = Issue::new("Test".to_string(), "Desc".to_string());
         issue.gates_required.push("review".to_string());
         issue.gates_status.insert(
@@ -485,11 +501,14 @@ mod tests {
 
         let resolved = HashMap::new();
 
-        assert!(issue.is_blocked(&resolved));
+        // Gates don't block work from starting
+        assert!(!issue.is_blocked(&resolved));
+        // But gates do prevent completion
+        assert!(issue.has_unpassed_gates());
     }
 
     #[test]
-    fn test_issue_blocked_by_failed_gate() {
+    fn test_issue_not_blocked_by_failed_gate() {
         let mut issue = Issue::new("Test".to_string(), "Desc".to_string());
         issue.gates_required.push("review".to_string());
         issue.gates_status.insert(
@@ -503,7 +522,10 @@ mod tests {
 
         let resolved = HashMap::new();
 
-        assert!(issue.is_blocked(&resolved));
+        // Gates don't block work from starting
+        assert!(!issue.is_blocked(&resolved));
+        // But gates do prevent completion
+        assert!(issue.has_unpassed_gates());
     }
 
     #[test]
@@ -522,6 +544,7 @@ mod tests {
         let resolved = HashMap::new();
 
         assert!(!issue.is_blocked(&resolved));
+        assert!(!issue.has_unpassed_gates());
     }
 
     #[test]
@@ -586,5 +609,116 @@ mod tests {
 
         assert_eq!(issue.documents.len(), deserialized.documents.len());
         assert_eq!(issue.documents[0], deserialized.documents[0]);
+    }
+
+    // State model tests for Backlog and Gated states
+
+    #[test]
+    fn test_new_issue_starts_in_backlog() {
+        let issue = Issue::new("Test".to_string(), "Description".to_string());
+        assert_eq!(issue.state, State::Backlog);
+    }
+
+    #[test]
+    fn test_backlog_issue_should_auto_transition_to_ready_when_unblocked() {
+        let issue = Issue::new("Test".to_string(), "Description".to_string());
+        let resolved = HashMap::new();
+        
+        assert_eq!(issue.state, State::Backlog);
+        assert!(issue.should_auto_transition_to_ready(&resolved));
+    }
+
+    #[test]
+    fn test_backlog_issue_should_not_transition_to_ready_when_blocked() {
+        let mut issue = Issue::new("Test".to_string(), "Description".to_string());
+        let dependency = Issue::new("Dependency".to_string(), "Desc".to_string());
+        issue.dependencies.push(dependency.id.clone());
+
+        let mut resolved = HashMap::new();
+        resolved.insert(dependency.id.clone(), &dependency);
+
+        assert_eq!(issue.state, State::Backlog);
+        assert!(!issue.should_auto_transition_to_ready(&resolved));
+    }
+
+    #[test]
+    fn test_gated_issue_should_auto_transition_to_done_when_gates_pass() {
+        let mut issue = Issue::new("Test".to_string(), "Description".to_string());
+        issue.state = State::Gated;
+        issue.gates_required.push("review".to_string());
+        issue.gates_status.insert(
+            "review".to_string(),
+            GateState {
+                status: GateStatus::Passed,
+                updated_by: Some("human:reviewer".to_string()),
+                updated_at: Utc::now(),
+            },
+        );
+
+        assert!(issue.should_auto_transition_to_done());
+    }
+
+    #[test]
+    fn test_gated_issue_should_not_transition_to_done_when_gates_pending() {
+        let mut issue = Issue::new("Test".to_string(), "Description".to_string());
+        issue.state = State::Gated;
+        issue.gates_required.push("review".to_string());
+        issue.gates_status.insert(
+            "review".to_string(),
+            GateState {
+                status: GateStatus::Pending,
+                updated_by: None,
+                updated_at: Utc::now(),
+            },
+        );
+
+        assert!(!issue.should_auto_transition_to_done());
+    }
+
+    #[test]
+    fn test_gated_issue_should_not_transition_to_done_when_gates_failed() {
+        let mut issue = Issue::new("Test".to_string(), "Description".to_string());
+        issue.state = State::Gated;
+        issue.gates_required.push("review".to_string());
+        issue.gates_status.insert(
+            "review".to_string(),
+            GateState {
+                status: GateStatus::Failed,
+                updated_by: Some("ci:tests".to_string()),
+                updated_at: Utc::now(),
+            },
+        );
+
+        assert!(!issue.should_auto_transition_to_done());
+    }
+
+    #[test]
+    fn test_in_progress_issue_should_not_auto_transition() {
+        let mut issue = Issue::new("Test".to_string(), "Description".to_string());
+        issue.state = State::InProgress;
+
+        let resolved = HashMap::new();
+        assert!(!issue.should_auto_transition_to_ready(&resolved));
+        assert!(!issue.should_auto_transition_to_done());
+    }
+
+    #[test]
+    fn test_state_serialization_backlog() {
+        let state = State::Backlog;
+        let json = serde_json::to_string(&state).unwrap();
+        assert_eq!(json, "\"backlog\"");
+        
+        let deserialized: State = serde_json::from_str(&json).unwrap();
+        assert_eq!(state, deserialized);
+    }
+
+    #[test]
+    fn test_state_serialization_gated() {
+        let state = State::Gated;
+        let json = serde_json::to_string(&state).unwrap();
+        assert_eq!(json, "\"gated\"");
+        
+        let deserialized: State = serde_json::from_str(&json).unwrap();
+        assert_eq!(state, deserialized);
     }
 }

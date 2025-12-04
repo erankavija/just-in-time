@@ -36,8 +36,14 @@ Issue (stored per-file)
 - id: string (ULID; stable and sortable)
 - title: string - one-line summary
 - description: string - task details, acceptance criteria, context for agents/humans
-- state: enum {open, ready, in_progress, done, archived}
-  - Note: "blocked" is derived from dependencies/gates, not stored
+- state: enum {backlog, ready, in_progress, gated, done, archived}
+  - backlog: Created but has incomplete dependencies
+  - ready: Dependencies done, available to start work (gates don't block this)
+  - in_progress: Currently being worked on
+  - gated: Work complete, awaiting quality gate approval
+  - done: Completed successfully
+  - archived: No longer relevant
+  - Note: "blocked" is derived from dependencies only, not stored
 - priority: enum {low, normal, high, critical}
 - assignee: string (optional) - format: {type}:{identifier}
   - Examples: "human:vkaskivuo", "copilot:session-abc", "ci:github-actions", null (unassigned)

@@ -186,17 +186,36 @@
 - [x] 6 API integration tests
 - [x] Server listens on http://localhost:3000
 
-**Phase 2.2: Frontend Foundation** ✅ (Complete - 2025-12-03)
+**Phase 2.2: Frontend Foundation** ✅ (Complete - 2025-12-04)
 - [x] React + TypeScript project with Vite
 - [x] Interactive graph visualization (React Flow)
 - [x] Web UI with interactive graph visualization
 - [x] Issue detail panel
-- [x] Inline markdown document rendering
-- [x] API client with axios
+- [x] Inline markdown document rendering with LaTeX support (KaTeX)
+- [x] API client with axios (dynamic hostname)
 - [x] Complete component structure
-- [x] Dev server running on http://localhost:5174
+- [x] Dev server running on http://localhost:5173
 - [x] API server integration (fixed storage path, CORS, type imports)
 - [x] Markdown showcase with rich content (headers, tables, code, emojis)
+- [x] Terminal-style dark theme with light mode toggle
+- [x] Left-to-right DAG layout using dagre algorithm
+- [x] Resizable split pane layout (drag separator)
+- [x] Rounded node boxes with state-based coloring
+- [x] Smooth curved edges with proper L->R dependency flow
+- [x] Sans-serif font for markdown content, monospace for UI
+- [x] Complex DAG support (multiple dependencies/dependents)
+- [x] State legend with color coding
+- [x] Priority indicators
+
+**Phase 2.3: Enhanced UI Features** 🚧 (Planned)
+- [ ] Search and filter functionality
+- [ ] Inline document content viewer
+- [ ] State transition buttons (change issue state from UI)
+- [ ] Real-time updates (polling or WebSocket)
+- [ ] Export graph as PNG/SVG
+- [ ] Keyboard shortcuts
+- [ ] Mobile responsive layout
+- [ ] Better graph layout algorithms (elk.js)
 
 **Future Phases:**
 - [ ] Historical document viewer (time machine)

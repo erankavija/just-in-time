@@ -16,9 +16,10 @@ import type { State, Priority, GraphNode as ApiGraphNode } from '../../types/mod
 
 // State colors using CSS variables
 const stateColors: Record<State, string> = {
-  open: 'var(--state-open)',
+  backlog: 'var(--state-backlog)',
   ready: 'var(--state-ready)',
   in_progress: 'var(--state-in-progress)',
+  gated: 'var(--state-gated)',
   done: 'var(--state-done)',
   archived: 'var(--state-archived)',
 };

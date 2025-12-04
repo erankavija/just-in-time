@@ -14,9 +14,10 @@ use std::collections::HashMap;
 /// Status summary for all issues
 #[derive(Debug, Serialize)]
 pub struct StatusSummary {
-    pub open: usize,
+    pub open: usize,  // Backlog count (kept as 'open' for compatibility)
     pub ready: usize,
     pub in_progress: usize,
+    pub gated: usize,
     pub done: usize,
     pub blocked: usize,
     pub total: usize,
@@ -83,8 +84,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue.priority = priority;
         issue.gates_required = gates;
 
-        // Auto-transition to Ready if no blockers
-        if issue.dependencies.is_empty() && issue.gates_required.is_empty() {
+        // Auto-transition to Ready if no dependencies (gates don't block Ready)
+        if issue.dependencies.is_empty() {
             issue.state = State::Ready;
         }
 
@@ -170,17 +171,40 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         if let Some(s) = state {
             // Validate state transition
-            if s == State::Ready || s == State::Done {
+            if s == State::Ready {
+                // Check dependencies only (gates don't block Ready)
                 let issues = self.storage.list_issues()?;
                 let issue_refs: Vec<&Issue> = issues.iter().collect();
                 let resolved: HashMap<String, &Issue> =
                     issue_refs.iter().map(|i| (i.id.clone(), *i)).collect();
 
                 if issue.is_blocked(&resolved) {
-                    return Err(anyhow!("Cannot transition to {:?}: issue is blocked", s));
+                    return Err(anyhow!(
+                        "Cannot transition to Ready: issue blocked by incomplete dependencies"
+                    ));
                 }
+            } else if s == State::Done {
+                // Check both dependencies and gates
+                let issues = self.storage.list_issues()?;
+                let issue_refs: Vec<&Issue> = issues.iter().collect();
+                let resolved: HashMap<String, &Issue> =
+                    issue_refs.iter().map(|i| (i.id.clone(), *i)).collect();
+
+                if issue.is_blocked(&resolved) {
+                    return Err(anyhow!(
+                        "Cannot transition to Done: issue blocked by incomplete dependencies"
+                    ));
+                }
+                
+                // If gates not passed, transition to Gated instead
+                if issue.has_unpassed_gates() {
+                    issue.state = State::Gated;
+                } else {
+                    issue.state = State::Done;
+                }
+            } else {
+                issue.state = s;
             }
-            issue.state = s;
 
             // Log state change event
             if old_state != issue.state {
@@ -388,16 +412,16 @@ impl<S: IssueStore> CommandExecutor<S> {
         if !issue.dependencies.contains(&dep_id.to_string()) {
             issue.dependencies.push(dep_id.to_string());
 
-            // If issue becomes blocked by this dependency, transition to Open
+            // If issue becomes blocked by this dependency, transition to Backlog
             let dep_issue = self.storage.load_issue(dep_id)?;
             if issue.state == State::Ready && dep_issue.state != State::Done {
                 let old_state = issue.state;
-                issue.state = State::Open;
+                issue.state = State::Backlog;
                 self.storage.save_issue(&issue)?;
 
                 // Log state change
                 let event =
-                    Event::new_issue_state_changed(issue.id.clone(), old_state, State::Open);
+                    Event::new_issue_state_changed(issue.id.clone(), old_state, State::Backlog);
                 self.storage.append_event(&event)?;
             } else {
                 self.storage.save_issue(&issue)?;
@@ -422,20 +446,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         let mut issue = self.storage.load_issue(issue_id)?;
         if !issue.gates_required.contains(&gate_key) {
             issue.gates_required.push(gate_key.clone());
-
-            // If issue was Ready, transition to Open since gate is pending
-            if issue.state == State::Ready {
-                let old_state = issue.state;
-                issue.state = State::Open;
-                self.storage.save_issue(&issue)?;
-
-                // Log state change
-                let event =
-                    Event::new_issue_state_changed(issue.id.clone(), old_state, State::Open);
-                self.storage.append_event(&event)?;
-            } else {
-                self.storage.save_issue(&issue)?;
-            }
+            // Note: Gates don't block Ready state, only Done state
+            self.storage.save_issue(&issue)?;
         }
         Ok(())
     }
@@ -465,8 +477,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         let event = Event::new_gate_passed(issue.id.clone(), gate_key, by);
         self.storage.append_event(&event)?;
 
-        // Check if this issue can now transition to ready
-        self.auto_transition_to_ready(issue_id)?;
+        // Check if Gated issue can now transition to Done
+        self.auto_transition_to_done(issue_id)?;
 
         Ok(())
     }
@@ -522,16 +534,40 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
     }
 
-    /// Check and auto-transition all Open issues that are now unblocked
+    /// Check if issue should auto-transition from Gated to Done
+    /// Returns true if transition occurred
+    fn auto_transition_to_done(&self, issue_id: &str) -> Result<bool> {
+        let mut issue = self.storage.load_issue(issue_id)?;
+
+        if issue.should_auto_transition_to_done() {
+            let old_state = issue.state;
+            issue.state = State::Done;
+            self.storage.save_issue(&issue)?;
+
+            // Log state change event
+            let event = Event::new_issue_state_changed(issue.id.clone(), old_state, State::Done);
+            self.storage.append_event(&event)?;
+
+            // Log completion event
+            let event = Event::new_issue_completed(issue.id.clone());
+            self.storage.append_event(&event)?;
+
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    /// Check and auto-transition all Backlog issues that are now unblocked
     fn check_auto_transitions(&self) -> Result<()> {
         let issues = self.storage.list_issues()?;
-        let open_issues: Vec<_> = issues
+        let backlog_issues: Vec<_> = issues
             .iter()
-            .filter(|i| i.state == State::Open)
+            .filter(|i| i.state == State::Backlog)
             .map(|i| i.id.clone())
             .collect();
 
-        for issue_id in open_issues {
+        for issue_id in backlog_issues {
             self.auto_transition_to_ready(&issue_id)?;
         }
 
@@ -727,21 +763,23 @@ impl<S: IssueStore> CommandExecutor<S> {
         let resolved: HashMap<String, &Issue> =
             issue_refs.iter().map(|i| (i.id.clone(), *i)).collect();
 
-        let open = issues.iter().filter(|i| i.state == State::Open).count();
+        let backlog = issues.iter().filter(|i| i.state == State::Backlog).count();
         let ready = issues.iter().filter(|i| i.state == State::Ready).count();
         let in_progress = issues
             .iter()
             .filter(|i| i.state == State::InProgress)
             .count();
+        let gated = issues.iter().filter(|i| i.state == State::Gated).count();
         let done = issues.iter().filter(|i| i.state == State::Done).count();
         let blocked = issues.iter().filter(|i| i.is_blocked(&resolved)).count();
 
         Ok(StatusSummary {
-            open,
+            open: backlog,  // Keep 'open' field name for backward compatibility
             ready,
             in_progress,
             done,
             blocked,
+            gated,
             total: issues.len(),
         })
     }
@@ -1241,9 +1279,11 @@ pub fn parse_priority(s: &str) -> Result<Priority> {
 
 pub fn parse_state(s: &str) -> Result<State> {
     match s.to_lowercase().as_str() {
-        "open" => Ok(State::Open),
+        "backlog" => Ok(State::Backlog),
+        "open" => Ok(State::Backlog),  // Backward compatibility alias
         "ready" => Ok(State::Ready),
         "in_progress" | "inprogress" => Ok(State::InProgress),
+        "gated" => Ok(State::Gated),
         "done" => Ok(State::Done),
         "archived" => Ok(State::Archived),
         _ => Err(anyhow!("Invalid state: {}", s)),
@@ -1436,8 +1476,13 @@ mod tests {
             )
             .unwrap();
 
+        // Attempting to transition to Done with unpassed gates should succeed
+        // but transition to Gated instead
         let result = executor.update_issue(&id, None, None, None, Some(State::Done));
-        assert!(result.is_err());
+        assert!(result.is_ok());
+        
+        let issue = executor.show_issue(&id).unwrap();
+        assert_eq!(issue.state, State::Gated);
     }
 
     #[test]
@@ -2305,15 +2350,16 @@ mod tests {
             )
             .unwrap();
 
-        // Create issue with a gate (stays Open)
-        executor
+        // Create issue with dependency (stays in Backlog)
+        let id2 = executor
             .create_issue(
-                "Open task".to_string(),
+                "Backlog task".to_string(),
                 "Desc".to_string(),
                 Priority::Normal,
-                vec!["some-gate".to_string()],
+                vec![],
             )
             .unwrap();
+        executor.add_dependency(&id2, &id1).unwrap();
 
         let results = executor
             .search_issues_with_filters("task", None, Some(State::Ready), None)

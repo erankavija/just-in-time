@@ -636,7 +636,7 @@ mod tests {
         let final_base = storage.load_issue(&base_id).unwrap();
         // Note: Due to concurrent updates, we may lose some dependencies
         // (last write wins), but the data should not be corrupted
-        assert!(final_base.dependencies.len() >= 1);
+        assert!(!final_base.dependencies.is_empty());
         assert!(final_base.dependencies.len() <= 5);
     }
 

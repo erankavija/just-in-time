@@ -46,7 +46,7 @@ fn test_query_ready_returns_unblocked_issues() {
         .current_dir(temp.path())
         .output()
         .unwrap();
-    let id1 = String::from_utf8_lossy(&output1.stdout)
+    let _id1 = String::from_utf8_lossy(&output1.stdout)
         .split_whitespace()
         .last()
         .unwrap()
@@ -98,7 +98,7 @@ fn test_query_ready_returns_unblocked_issues() {
         .unwrap()
         .to_string();
 
-    // id1 is auto-ready (no blockers), id2 move to in_progress, id3 stays in Open (has pending gate)
+    // id1 is auto-ready (no blockers), id2 move to in_progress, id3 is also ready (gates don't block Ready)
     Command::new(&jit)
         .args(["issue", "update", &id2, "--state", "in_progress"])
         .current_dir(temp.path())
@@ -116,10 +116,8 @@ fn test_query_ready_returns_unblocked_issues() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
-    // Should return only the ready issue
-    assert_eq!(json["data"]["count"], 1);
-    assert_eq!(json["data"]["issues"][0]["id"], id1);
-    assert_eq!(json["data"]["issues"][0]["state"], "ready");
+    // Should return two ready issues (id1 and id3, gates don't block Ready state)
+    assert_eq!(json["data"]["count"], 2);
 }
 
 #[test]

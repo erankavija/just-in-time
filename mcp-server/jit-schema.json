@@ -984,9 +984,10 @@
     "State": {
       "description": "Issue lifecycle state",
       "enum": [
-        "open",
+        "backlog",
         "ready",
         "in_progress",
+        "gated",
         "done",
         "archived"
       ],

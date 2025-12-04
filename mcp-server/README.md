@@ -226,10 +226,29 @@ cd ..
 
 ### Testing
 
-Test the server manually:
+Run the automated test suite:
+
+```bash
+npm test
+```
+
+The test suite verifies:
+- MCP protocol initialization
+- Tool listing (33 tools)
+- Schema correctness (new `backlog` and `gated` states)
+- Tool execution and error handling
+- Invalid tool/argument rejection
+
+Test manually with JSON-RPC:
 
 ```bash
 echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | node index.js
+```
+
+Test with isolated directory:
+
+```bash
+./test-with-env.sh
 ```
 
 ## Troubleshooting

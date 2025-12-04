@@ -253,26 +253,37 @@ fn test_workflow_gates() {
     );
     let id = extract_id(&String::from_utf8_lossy(&output.stdout));
 
-    // Issue should be blocked
+    // Issue should NOT be blocked (gates don't block ready state)
     let output = run_jit(&temp, &["query", "blocked"]);
     let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(!stdout.contains(&id));
+    
+    // Issue should be ready
+    let output = run_jit(&temp, &["query", "ready"]);
+    let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains(&id));
+
+    // Attempt to complete - should transition to Gated
+    run_jit(&temp, &["issue", "update", &id, "--state", "done"]);
+    let output = run_jit(&temp, &["issue", "show", &id]);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Gated"));
 
     // Pass tests gate
     run_jit(&temp, &["gate", "pass", &id, "tests"]);
-
-    // Still blocked by review
-    let output = run_jit(&temp, &["query", "blocked"]);
+    
+    // Still in Gated (review not passed)
+    let output = run_jit(&temp, &["issue", "show", &id]);
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains(&id));
+    assert!(stdout.contains("Gated"));
 
     // Pass review gate
     run_jit(&temp, &["gate", "pass", &id, "review"]);
 
-    // Now unblocked
-    let output = run_jit(&temp, &["query", "ready"]);
+    // Now should auto-transition to Done
+    let output = run_jit(&temp, &["issue", "show", &id]);
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains(&id));
+    assert!(stdout.contains("Done"));
 }
 
 // ============================================================================

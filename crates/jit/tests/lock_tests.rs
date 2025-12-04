@@ -23,7 +23,7 @@ fn test_exclusive_lock_prevents_concurrent_writes() {
 
     let handles: Vec<_> = (0..2)
         .map(|i| {
-            let path = Arc::clone(&path);
+            let _path = Arc::clone(&path);
             let barrier = Arc::clone(&barrier);
             let success_count = Arc::clone(&success_count);
 
@@ -32,7 +32,7 @@ fn test_exclusive_lock_prevents_concurrent_writes() {
 
                 // TODO: Use FileLocker once implemented
                 // let locker = FileLocker::new(Duration::from_millis(100));
-                // if let Ok(_guard) = locker.lock_exclusive(&path) {
+                // if let Ok(_guard) = locker.lock_exclusive(&_path) {
                 //     thread::sleep(Duration::from_millis(50));
                 //     *success_count.lock().unwrap() += 1;
                 // }
@@ -68,7 +68,7 @@ fn test_shared_locks_allow_concurrent_reads() {
 
     let handles: Vec<_> = (0..3)
         .map(|_| {
-            let path = Arc::clone(&path);
+            let _path = Arc::clone(&path);
             let barrier = Arc::clone(&barrier);
             let success_count = Arc::clone(&success_count);
 
@@ -77,7 +77,7 @@ fn test_shared_locks_allow_concurrent_reads() {
 
                 // TODO: Use FileLocker
                 // let locker = FileLocker::new(Duration::from_millis(100));
-                // if let Ok(_guard) = locker.lock_shared(&path) {
+                // if let Ok(_guard) = locker.lock_shared(&_path) {
                 //     thread::sleep(Duration::from_millis(50));
                 //     *success_count.lock().unwrap() += 1;
                 // }
@@ -108,14 +108,14 @@ fn test_exclusive_lock_blocks_shared_locks() {
     let exclusive_acquired = Arc::new(std::sync::Mutex::new(false));
     let shared_blocked = Arc::new(std::sync::Mutex::new(false));
 
-    let path1 = Arc::clone(&path);
+    let _path1 = Arc::clone(&path);
     let exclusive_acquired1 = Arc::clone(&exclusive_acquired);
 
     // Thread 1: Acquire exclusive lock and hold it
     let handle1 = thread::spawn(move || {
         // TODO: Use FileLocker
         // let locker = FileLocker::new(Duration::from_secs(1));
-        // let _guard = locker.lock_exclusive(&path1).unwrap();
+        // let _guard = locker.lock_exclusive(&_path1).unwrap();
         *exclusive_acquired1.lock().unwrap() = true;
         thread::sleep(Duration::from_millis(200));
     });
@@ -123,14 +123,14 @@ fn test_exclusive_lock_blocks_shared_locks() {
     // Wait for thread 1 to acquire lock
     thread::sleep(Duration::from_millis(50));
 
-    let path2 = Arc::clone(&path);
+    let _path2 = Arc::clone(&path);
     let shared_blocked2 = Arc::clone(&shared_blocked);
 
     // Thread 2: Try to acquire shared lock (should block/timeout)
     let handle2 = thread::spawn(move || {
         // TODO: Use FileLocker
         // let locker = FileLocker::new(Duration::from_millis(100));
-        // if locker.lock_shared(&path2).is_err() {
+        // if locker.lock_shared(&_path2).is_err() {
         //     *shared_blocked2.lock().unwrap() = true;
         // }
 
@@ -178,19 +178,19 @@ fn test_timeout_on_lock_contention() {
     // let locker = FileLocker::new(Duration::from_millis(100));
 
     // Thread 1: Hold lock
-    let path1 = Arc::clone(&path);
+    let _path1 = Arc::clone(&path);
     let handle1 = thread::spawn(move || {
-        // let _guard = locker.lock_exclusive(&path1).unwrap();
+        // let _guard = locker.lock_exclusive(&_path1).unwrap();
         thread::sleep(Duration::from_millis(300));
     });
 
     thread::sleep(Duration::from_millis(50));
 
     // Thread 2: Should timeout
-    let path2 = Arc::clone(&path);
+    let _path2 = Arc::clone(&path);
     let handle2 = thread::spawn(move || {
         // let locker = FileLocker::new(Duration::from_millis(100));
-        // let result = locker.lock_exclusive(&path2);
+        // let result = locker.lock_exclusive(&_path2);
         // assert!(result.is_err(), "Should timeout waiting for lock");
     });
 

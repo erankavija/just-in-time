@@ -20,9 +20,10 @@
   --info: #79c0ff;
   
   /* State colors - dark */
-  --state-open: #1f6feb;
+  --state-backlog: #6e7681;
   --state-ready: #3fb950;
   --state-in-progress: #d29922;
+  --state-gated: #d29922;
   --state-done: #8b949e;
   --state-archived: #6e7681;
   
@@ -49,9 +50,10 @@
   --info: #0969da;
   
   /* State colors - light */
-  --state-open: #0969da;
+  --state-backlog: #6e7781;
   --state-ready: #1a7f37;
   --state-in-progress: #9a6700;
+  --state-gated: #d29922;
   --state-done: #6e7781;
   --state-archived: #8c959f;
 }

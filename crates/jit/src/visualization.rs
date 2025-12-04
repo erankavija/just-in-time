@@ -44,9 +44,10 @@ pub fn export_dot(graph: &DependencyGraph<Issue>) -> String {
     for issue in &all_nodes {
         let label = format!("{}\\n{}", issue.id, issue.title.replace('"', "\\\""));
         let color = match issue.state {
-            State::Open => "lightgray",
+            State::Backlog => "lightgray",
             State::Ready => "lightblue",
             State::InProgress => "yellow",
+            State::Gated => "orange",
             State::Done => "lightgreen",
             State::Archived => "gray",
         };
@@ -101,9 +102,10 @@ pub fn export_mermaid(graph: &DependencyGraph<Issue>) -> String {
     for issue in &all_nodes {
         let label = format!("{}:<br/>{}", issue.id, issue.title);
         let style_class = match issue.state {
-            State::Open => "open",
+            State::Backlog => "backlog",
             State::Ready => "ready",
             State::InProgress => "inprogress",
+            State::Gated => "gated",
             State::Done => "done",
             State::Archived => "archived",
         };

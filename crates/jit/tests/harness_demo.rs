@@ -134,24 +134,24 @@ fn test_harness_gates() {
     // Create issue with gate
     let id = h.create_issue_with_gates("Task", vec!["review".to_string()]);
 
-    // Issue should be blocked by pending gate
+    // Issue should NOT be blocked by pending gate (gates don't block starting work)
     let issue = h.get_issue(&id);
     let all = h.all_issues();
     let resolved: std::collections::HashMap<String, &jit::domain::Issue> =
         all.iter().map(|i| (i.id.clone(), i)).collect();
-    assert!(issue.is_blocked(&resolved));
+    assert!(!issue.is_blocked(&resolved));
+    
+    // But gates do prevent completion
+    assert!(issue.has_unpassed_gates());
 
     // Pass gate
     h.executor
         .pass_gate(&id, "review".to_string(), None)
         .unwrap();
 
-    // Issue should be unblocked
+    // Issue gates should be passed now
     let issue = h.get_issue(&id);
-    let all = h.all_issues();
-    let resolved: std::collections::HashMap<String, &jit::domain::Issue> =
-        all.iter().map(|i| (i.id.clone(), i)).collect();
-    assert!(!issue.is_blocked(&resolved));
+    assert!(!issue.has_unpassed_gates());
 }
 
 // ========== Complex Scenarios ==========
