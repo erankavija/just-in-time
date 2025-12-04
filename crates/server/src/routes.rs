@@ -46,7 +46,10 @@ async fn list_issues<S: IssueStore>(
     executor
         .list_issues(None, None, None)
         .map(Json)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
+        .map_err(|e| {
+            tracing::error!("Failed to list issues: {:?}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })
 }
 
 /// Get single issue by ID
@@ -57,7 +60,10 @@ async fn get_issue<S: IssueStore>(
     executor
         .show_issue(&id)
         .map(Json)
-        .map_err(|_| StatusCode::NOT_FOUND)
+        .map_err(|e| {
+            tracing::error!("Failed to get issue {}: {:?}", id, e);
+            StatusCode::NOT_FOUND
+        })
 }
 
 /// Graph data for visualization
@@ -89,7 +95,10 @@ async fn get_graph<S: IssueStore>(
 ) -> Result<Json<GraphData>, StatusCode> {
     let issues = executor
         .list_issues(None, None, None)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|e| {
+            tracing::error!("Failed to list issues for graph: {:?}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     // Build node lookup for blocked state calculation
     let issue_map: std::collections::HashMap<String, &Issue> =
@@ -139,7 +148,10 @@ async fn get_status<S: IssueStore>(
 ) -> Result<Json<StatusResponse>, StatusCode> {
     let summary = executor
         .get_status()
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|e| {
+            tracing::error!("Failed to get status: {:?}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     Ok(Json(StatusResponse {
         open: summary.open,

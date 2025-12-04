@@ -101,16 +101,19 @@
 
 **Goal:** Maintain clean, well-documented, maintainable codebase.
 
-**Current Status (2025-12-03):**
-- ✅ All 12 modules have module-level docs (added storage/lock.rs)
+**Current Status (2025-12-03 - Evening):**
+- ✅ All modules have module-level docs
 - ✅ Zero rustdoc warnings in default mode
 - ✅ Zero clippy warnings
-- ✅ **362 tests passing** (was 332, added 30 concurrency tests)
+- ✅ **381 tests passing** (375 jit + 6 server)
 - ✅ main.rs at 843 lines (under 1,000 threshold)
 - ✅ commands.rs at 2,134 lines (critical methods documented)
-- ✅ output_macros.rs created (4 helper macros)
-- ✅ Key CommandExecutor methods documented with examples
-- ✅ Comprehensive documentation: file-locking-usage.md (400 lines)
+- ✅ New crate: jit-server (REST API)
+- ✅ Thread-safe InMemoryStorage (refactored for async)
+- ✅ Comprehensive documentation: 
+  - file-locking-usage.md (400 lines)
+  - knowledge-management-vision.md (537 lines)
+  - web-ui-architecture.md (466 lines)
 
 **Completed:**
 - [x] Refactor main.rs
@@ -139,24 +142,67 @@
   - Documentation in `docs/json-schema-api.md`
 - [ ] **Phase 1.5:** Batch operations support
 
-### MCP Server
+### MCP Server ✅
 
 - [x] TypeScript MCP server wrapping CLI
-- [x] 29 MCP tools covering all operations
+- [x] 33 MCP tools covering all operations (added 4 doc tools)
+- [x] Schema auto-generation from CLI definitions
 - [ ] Integration with Claude Desktop (documented, not tested)
 - [ ] See `mcp-server/README.md` for usage
 
-### Knowledge Management System
+### Knowledge Management System ✅ (Phase 1 Complete - 2025-12-03)
 
-- [ ] Document references in issues (design docs, notes, artifacts)
-- [ ] Git integration for version-aware references
-- [ ] Validation of document links and commit hashes
-- [ ] Web UI with interactive graph visualization
-- [ ] Inline markdown document rendering
+**Phase 1.1: Document References** ✅
+- [x] Document references in issues (design docs, notes, artifacts)
+  - Added `DocumentReference` type to domain model
+  - Fields: path, commit, label, doc_type
+  - Builder methods: new(), at_commit(), with_label(), with_type()
+- [x] CLI commands: `jit doc add/list/remove/show`
+- [x] Updated `jit issue show` to display document references
+- [x] Full JSON output support
+- [x] 6 new domain tests, all 384 tests passing
+
+**Phase 1.3: Git Integration & Validation** ✅
+- [x] Git integration for version-aware references
+  - Added `git2 = "0.18"` dependency
+  - Extended `jit validate` to check document references
+- [x] Validation of document links and commit hashes
+  - Validates files exist at HEAD or specified commits
+  - Validates commit hashes are valid
+  - Graceful fallback for non-git repos
+- [x] Document content viewing
+  - `jit doc show` reads file content from git
+  - Supports reading at HEAD or specific commits
+
+**Phase 2.1: REST API Server** ✅ (2025-12-03)
+- [x] Web API server with Axum framework
+  - GET /api/health - Health check
+  - GET /api/issues - List all issues
+  - GET /api/issues/:id - Get single issue
+  - GET /api/graph - Dependency graph (nodes + edges)
+  - GET /api/status - Repository status summary
+- [x] CORS enabled for local development
+- [x] Thread-safe InMemoryStorage (Arc<Mutex<>>)
+- [x] 6 API integration tests
+- [x] Server listens on http://localhost:3000
+
+**Phase 2.2: Frontend Foundation** ✅ (Complete - 2025-12-03)
+- [x] React + TypeScript project with Vite
+- [x] Interactive graph visualization (React Flow)
+- [x] Web UI with interactive graph visualization
+- [x] Issue detail panel
+- [x] Inline markdown document rendering
+- [x] API client with axios
+- [x] Complete component structure
+- [x] Dev server running on http://localhost:5174
+- [x] API server integration (fixed storage path, CORS, type imports)
+- [x] Markdown showcase with rich content (headers, tables, code, emojis)
+
+**Future Phases:**
 - [ ] Historical document viewer (time machine)
 - [ ] Full-text search across issues and documents
 - [ ] Archive system for project knowledge preservation
-- [ ] See `docs/knowledge-management-vision.md` for detailed plan
+- [ ] See `docs/knowledge-management-vision.md` and `docs/web-ui-architecture.md` for detailed plan
 
 ### Production Readiness
 

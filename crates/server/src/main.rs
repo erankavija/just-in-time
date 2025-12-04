@@ -25,7 +25,8 @@ async fn main() -> Result<()> {
     info!("Starting JIT API Server...");
 
     // Initialize storage and command executor
-    let storage = JsonFileStorage::new(String::from("."));
+    // Note: JsonFileStorage expects the .jit directory path
+    let storage = JsonFileStorage::new(String::from(".jit"));
     let executor = Arc::new(CommandExecutor::new(storage));
 
     // Build CORS layer for local development
@@ -41,7 +42,8 @@ async fn main() -> Result<()> {
         .layer(tower_http::trace::TraceLayer::new_for_http());
 
     // Start server
-    let addr = "127.0.0.1:3000";
+    // Bind to 0.0.0.0 to accept connections from all network interfaces
+    let addr = "0.0.0.0:3000";
     let listener = tokio::net::TcpListener::bind(addr).await?;
     info!("Server listening on http://{}", addr);
 
