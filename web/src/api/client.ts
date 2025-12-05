@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Issue, GraphData, StatusSummary } from '../types/models';
+import type { Issue, GraphData, StatusSummary, DocumentContent, DocumentHistory, DocumentDiff } from '../types/models';
 
 // Use relative URL or construct from current host to avoid CORS issues
 const API_BASE = window.location.hostname === 'localhost' 
@@ -47,6 +47,42 @@ export const apiClient = {
     if (options?.regex) params.set('regex', 'true');
     
     const response = await api.get(`/search?${params.toString()}`);
+    return response.data;
+  },
+
+  async getDocumentContent(
+    issueId: string,
+    path: string,
+    commit?: string
+  ): Promise<DocumentContent> {
+    const params = new URLSearchParams();
+    if (commit) params.set('commit', commit);
+    const encodedPath = encodeURIComponent(path);
+    const url = `/issues/${issueId}/documents/${encodedPath}/content${params.toString() ? '?' + params.toString() : ''}`;
+    const response = await api.get(url);
+    return response.data;
+  },
+
+  async getDocumentHistory(
+    issueId: string,
+    path: string
+  ): Promise<DocumentHistory> {
+    const encodedPath = encodeURIComponent(path);
+    const response = await api.get(`/issues/${issueId}/documents/${encodedPath}/history`);
+    return response.data;
+  },
+
+  async getDocumentDiff(
+    issueId: string,
+    path: string,
+    from: string,
+    to?: string
+  ): Promise<DocumentDiff> {
+    const params = new URLSearchParams();
+    params.set('from', from);
+    if (to) params.set('to', to);
+    const encodedPath = encodeURIComponent(path);
+    const response = await api.get(`/issues/${issueId}/documents/${encodedPath}/diff?${params.toString()}`);
     return response.data;
   },
 };

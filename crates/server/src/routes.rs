@@ -29,6 +29,15 @@ pub fn create_routes<S: IssueStore + Send + Sync + 'static>(
         .route("/graph", get(get_graph))
         .route("/status", get(get_status))
         .route("/search", get(search_issues))
+        .route(
+            "/issues/:id/documents/:path/content",
+            get(get_document_content),
+        )
+        .route(
+            "/issues/:id/documents/:path/history",
+            get(get_document_history),
+        )
+        .route("/issues/:id/documents/:path/diff", get(get_document_diff))
         .with_state(executor)
 }
 
@@ -215,6 +224,150 @@ async fn search_issues<S: IssueStore>(
         total: results.len(),
         results,
         duration_ms,
+    }))
+}
+
+/// Query parameters for document content
+#[derive(Debug, Deserialize)]
+struct DocumentContentQuery {
+    commit: Option<String>,
+}
+
+/// Response for document content
+#[derive(Debug, Serialize)]
+struct DocumentContentResponse {
+    path: String,
+    commit: String,
+    content: String,
+    content_type: String,
+}
+
+/// Get document content
+async fn get_document_content<S: IssueStore>(
+    Path((id, path)): Path<(String, String)>,
+    Query(query): Query<DocumentContentQuery>,
+    State(executor): State<AppState<S>>,
+) -> Result<Json<DocumentContentResponse>, StatusCode> {
+    let at_commit = query.commit.as_deref();
+
+    let (content, commit_hash) = executor
+        .read_document_content(&id, &path, at_commit)
+        .map_err(|e| {
+            tracing::error!("Failed to read document content: {:?}", e);
+            if e.to_string().contains("not found") {
+                StatusCode::NOT_FOUND
+            } else {
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
+        })?;
+
+    // Infer content type from file extension
+    let content_type = if path.ends_with(".md") {
+        "text/markdown"
+    } else if path.ends_with(".txt") {
+        "text/plain"
+    } else if path.ends_with(".json") {
+        "application/json"
+    } else {
+        "text/plain"
+    };
+
+    Ok(Json(DocumentContentResponse {
+        path: path.clone(),
+        commit: commit_hash,
+        content,
+        content_type: content_type.to_string(),
+    }))
+}
+
+/// Response for document history
+#[derive(Debug, Serialize)]
+struct DocumentHistoryResponse {
+    path: String,
+    commits: Vec<CommitInfoResponse>,
+}
+
+/// Commit information
+#[derive(Debug, Serialize)]
+struct CommitInfoResponse {
+    commit: String,
+    author: String,
+    date: String,
+    message: String,
+}
+
+/// Get document history
+async fn get_document_history<S: IssueStore>(
+    Path((id, path)): Path<(String, String)>,
+    State(executor): State<AppState<S>>,
+) -> Result<Json<DocumentHistoryResponse>, StatusCode> {
+    let commits = executor.get_document_history(&id, &path).map_err(|e| {
+        tracing::error!("Failed to get document history: {:?}", e);
+        if e.to_string().contains("not found") {
+            StatusCode::NOT_FOUND
+        } else {
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
+    })?;
+
+    let commits_response = commits
+        .into_iter()
+        .map(|c| CommitInfoResponse {
+            commit: c.sha,
+            author: c.author,
+            date: c.date,
+            message: c.message,
+        })
+        .collect();
+
+    Ok(Json(DocumentHistoryResponse {
+        path: path.clone(),
+        commits: commits_response,
+    }))
+}
+
+/// Query parameters for document diff
+#[derive(Debug, Deserialize)]
+struct DocumentDiffQuery {
+    from: String,
+    to: Option<String>,
+}
+
+/// Response for document diff
+#[derive(Debug, Serialize)]
+struct DocumentDiffResponse {
+    path: String,
+    from: String,
+    to: String,
+    diff: String,
+}
+
+/// Get document diff
+async fn get_document_diff<S: IssueStore>(
+    Path((id, path)): Path<(String, String)>,
+    Query(query): Query<DocumentDiffQuery>,
+    State(executor): State<AppState<S>>,
+) -> Result<Json<DocumentDiffResponse>, StatusCode> {
+    let to = query.to.as_deref();
+
+    let diff = executor
+        .get_document_diff(&id, &path, &query.from, to)
+        .map_err(|e| {
+            tracing::error!("Failed to get document diff: {:?}", e);
+            if e.to_string().contains("not found") {
+                StatusCode::NOT_FOUND
+            } else {
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
+        })?;
+
+    let to_ref = to.unwrap_or("HEAD");
+
+    Ok(Json(DocumentDiffResponse {
+        path: path.clone(),
+        from: query.from.clone(),
+        to: to_ref.to_string(),
+        diff,
     }))
 }
 

@@ -122,15 +122,15 @@
 
 **Goal:** Maintain clean, well-documented, maintainable codebase.
 
-**Current Status:**
+**Status:**
 - ✅ All modules have module-level docs
 - ✅ Zero rustdoc warnings in default mode
 - ✅ Zero clippy warnings
-- ✅ **392+ tests passing** (171 lib + 161 integration + others)
+- ✅ **483+ tests passing** (171 lib + 161 integration + 9 doc history + others)
 - ✅ **Transitive reduction implemented** - storage-level minimal edge set
 - ✅ **Issue breakdown command** - foolproof task decomposition for agents
-- ✅ main.rs at 843 lines (under 1,000 threshold)
-- ✅ commands.rs at 2,600+ lines (well-tested, comprehensive)
+- ✅ main.rs well-maintained (under 1,000 lines)
+- ✅ commands.rs comprehensive and well-tested
 - ✅ jit-server crate with search API endpoint
 - ✅ Thread-safe InMemoryStorage (refactored for async)
 - ✅ Responsive web UI with search functionality
@@ -144,14 +144,11 @@
 - [x] Refactor main.rs
   - Created `output_macros.rs` with 4 macros
   - Demonstrated usage, ready for broader adoption
-  - main.rs reduced from 853 → 843 lines
 - [~] Document CommandExecutor public API
   - Documented 5 critical methods (create_issue, list_issues, add_dependency, claim_issue, validate_silent)
   - All doc tests passing
   - Remaining 35+ methods can be documented as needed
 - [x] Monitor code growth
-  - main.rs: 843 lines (✓ under 1,000)
-  - commands.rs: 2,134 lines (✓ under 2,500)
   - Overall quality maintained
 
 ## Phase 4: Future Enhancements
@@ -211,7 +208,7 @@
 - [x] 6 API integration tests
 - [x] Server listens on http://localhost:3000
 
-**Phase 2.2: Frontend Foundation** ✅ (Complete - 2025-12-04)
+**Phase 2.2: Frontend Foundation** ✅
 - [x] React + TypeScript project with Vite
 - [x] Interactive graph visualization (React Flow)
 - [x] Web UI with interactive graph visualization
@@ -232,7 +229,7 @@
 - [x] State legend with color coding
 - [x] Priority indicators
 
-**Phase 2.3: Responsive Search UI** ✅ (Complete - 2025-12-05)
+**Phase 2.3: Responsive Search UI** ✅
 - [x] **Backend search API**
   - GET /api/search endpoint with query parameters
   - Integrates ripgrep backend for deep content search
@@ -260,14 +257,23 @@
   - Instructions to run 'jit init' or set JIT_DATA_DIR
   - Environment variable support for custom repo location
 
-**Phase 2.4: Additional UI Features** 🚧 (Deferred)
-- [ ] Inline document content viewer
-- [ ] State transition buttons (change issue state from UI)
-- [ ] Real-time updates (polling or WebSocket)
-- [ ] Export graph as PNG/SVG
-- [ ] Keyboard shortcuts (Cmd+K for search focus)
-- [ ] Mobile responsive layout
-- [ ] Better graph layout algorithms (elk.js)
+**Phase 2.4: Document Viewer & Additional UI Features** ✅ (Complete)
+- [x] **Inline document content viewer (Phase 2.4.1)** ✅
+  - [x] Backend API endpoints for document content/history/diff
+  - [x] Frontend API client with TypeScript types
+  - [x] DocumentViewer React component with markdown rendering
+  - [x] DocumentHistory component with commit timeline
+  - [x] Modal overlay for document viewing
+  - [x] Integration with IssueDetail component
+  - [x] Terminal-style CSS theming
+  - [x] Comprehensive test coverage (13 new tests)
+  - [x] See `docs/document-viewer-implementation-plan.md` for details
+- [ ] State transition buttons (change issue state from UI) (Deferred)
+- [ ] Real-time updates (polling or WebSocket) (Deferred)
+- [ ] Export graph as PNG/SVG (Deferred)
+- [ ] Keyboard shortcuts (Cmd+K for search focus) (Deferred)
+- [ ] Mobile responsive layout (Deferred)
+- [ ] Better graph layout algorithms (elk.js) (Deferred)
 
 **Phase 3: Advanced Features** 🚧 (In Progress)
 - [x] **Full-text search with ripgrep (Phase 3.1)** ✅
@@ -279,16 +285,26 @@
   - Graceful degradation when ripgrep not installed
   - JSON output support for automation
   - Zero dependencies (uses system ripgrep)
-- [x] **Responsive search UI (Phase 3.1b)** ✅ - **COMPLETE**
+- [x] **Responsive search UI (Phase 3.1b)** ✅
   - Web UI search bar with instant client-side results
   - Hybrid client + server search strategy
   - 16 tests covering search logic and integration
-  - See commit 60a3154 for full implementation
   - Future: Optional Tantivy backend for large repos (>1000 issues)
-- [ ] Historical document viewer (Phase 3.2)
+- [x] **Historical document viewer (Phase 3.2)** ✅
+  - CLI commands: `jit doc history`, `jit doc diff`, `jit doc show --at`
+  - 9 integration tests, all 490+ tests passing
+  - Automatic schema generation from clap (eliminated 1,325 lines)
+- [x] **Web UI document viewer (Phase 2.4.1)** ✅ - **2024-12-05**
+  - REST API endpoints: `/api/issues/:id/documents/:path/{content,history,diff}`
+  - DocumentViewer React component with markdown rendering + LaTeX
+  - DocumentHistory component with commit timeline navigation
+  - Modal overlay integration in IssueDetail
+  - 13 new tests (5 backend + 8 frontend), all passing
+  - Implementation plan: `docs/document-viewer-implementation-plan.md`
+  - Total estimated time: 9-12 hours (actual: ~8 hours with TDD)
 - [ ] Document graph visualization (Phase 3.3)
 - [ ] Archive system (Phase 3.4)
-- [ ] See `docs/knowledge-management-vision.md`, `docs/search-implementation.md`, and `docs/web-ui-architecture.md` for detailed plan
+- [ ] See `docs/knowledge-management-vision.md`, `docs/search-implementation.md`, `docs/web-ui-architecture.md`, and `docs/document-viewer-implementation-plan.md` for detailed plans
 
 ### Production Readiness
 
@@ -333,10 +349,15 @@
 
 - **Phase 1:** Can track issues with dependencies, detect cycles ✅
 - **Phase 2:** Gates block transitions, events logged ✅
+  - **Web UI:** Interactive graph visualization with document viewer ✅
+  - **REST API:** Complete CRUD + search + documents endpoints ✅
+  - **Document viewer:** View, history, diff support in web UI ✅
 - **Phase 3:** Full observability, external integration working ✅
   - **File locking:** Multi-agent safe, tested with 50 concurrent operations ✅
   - **MCP server:** 29 tools, TypeScript wrapper complete ✅
   - **Documentation:** Comprehensive usage guides ✅
+  - **Search:** Full-text search with ripgrep integration ✅
+  - **Historical documents:** CLI and web UI support ✅
 - **Phase 4:** Production-grade reliability, advanced features (in progress)
   - Knowledge management system
   - Plugin architecture for custom gates

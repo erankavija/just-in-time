@@ -5,6 +5,14 @@ edition.workspace = true
 license.workspace = true
 description = "REST API server for JIT issue tracker"
 
+[lib]
+name = "jit_server"
+path = "src/lib.rs"
+
+[[bin]]
+name = "jit-server"
+path = "src/main.rs"
+
 [dependencies]
 jit = { path = "../jit" }
 axum = "0.7"

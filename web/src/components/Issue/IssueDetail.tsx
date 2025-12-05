@@ -5,7 +5,8 @@ import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 import './IssueDetail.css';
 import { apiClient } from '../../api/client';
-import type { Issue } from '../../types/models';
+import type { Issue, DocumentReference } from '../../types/models';
+import { DocumentViewer } from '../Document/DocumentViewer';
 
 interface IssueDetailProps {
   issueId: string | null;
@@ -15,6 +16,7 @@ export function IssueDetail({ issueId }: IssueDetailProps) {
   const [issue, setIssue] = useState<Issue | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedDocument, setSelectedDocument] = useState<DocumentReference | null>(null);
 
   useEffect(() => {
     if (!issueId) {
@@ -308,6 +310,73 @@ export function IssueDetail({ issueId }: IssueDetailProps) {
         </section>
       )}
 
+      {issue.documents && issue.documents.length > 0 && (
+        <section style={{ marginBottom: '20px' }}>
+          <h2 style={{ 
+            fontSize: '13px',
+            fontWeight: 600,
+            marginBottom: '10px',
+            color: 'var(--text-primary)',
+          }}>
+            📄 Documents ({issue.documents.length})
+          </h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {issue.documents.map((doc, idx) => (
+              <div 
+                key={idx}
+                onClick={() => setSelectedDocument(doc)}
+                style={{ 
+                  padding: '10px 12px',
+                  backgroundColor: 'var(--bg-tertiary)',
+                  borderRadius: '4px',
+                  fontSize: '12px',
+                  color: 'var(--text-secondary)',
+                  border: '1px solid var(--border)',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  fontFamily: 'var(--font-mono)',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--bg-secondary)';
+                  e.currentTarget.style.borderColor = 'var(--text-secondary)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)';
+                  e.currentTarget.style.borderColor = 'var(--border)';
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: 'var(--text-primary)' }}>
+                    📄 {doc.label || doc.path}
+                  </span>
+                  {doc.commit && (
+                    <span style={{ 
+                      fontSize: '10px',
+                      padding: '2px 6px',
+                      backgroundColor: 'var(--bg-secondary)',
+                      borderRadius: '3px',
+                      color: 'var(--accent)',
+                      border: '1px solid var(--border)',
+                    }}>
+                      @{doc.commit.substring(0, 8)}
+                    </span>
+                  )}
+                </div>
+                {doc.doc_type && (
+                  <div style={{ 
+                    fontSize: '10px',
+                    color: 'var(--text-muted)',
+                    marginTop: '4px',
+                  }}>
+                    Type: {doc.doc_type}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       <div style={{ 
         fontSize: '10px',
         color: 'var(--text-muted)',
@@ -318,6 +387,37 @@ export function IssueDetail({ issueId }: IssueDetailProps) {
         <div>created: {new Date(issue.created_at).toLocaleString()}</div>
         <div>updated: {new Date(issue.updated_at).toLocaleString()}</div>
       </div>
+
+      {selectedDocument && (
+        <div style={{ 
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000,
+        }}>
+          <div style={{ 
+            width: '90%',
+            maxWidth: '1200px',
+            height: '90%',
+            backgroundColor: 'var(--bg-primary)',
+            borderRadius: '8px',
+            overflow: 'hidden',
+            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.3)',
+          }}>
+            <DocumentViewer
+              issueId={issue.id}
+              documentRef={selectedDocument}
+              onClose={() => setSelectedDocument(null)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

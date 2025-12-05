@@ -1461,6 +1461,130 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(())
     }
 
+    /// Read file content from git at a specific reference (public API for server)
+    pub fn read_document_content(
+        &self,
+        issue_id: &str,
+        path: &str,
+        at_commit: Option<&str>,
+    ) -> Result<(String, String)> {
+        use git2::Repository;
+
+        let issue = self.storage.load_issue(issue_id)?;
+
+        let doc = issue
+            .documents
+            .iter()
+            .find(|d| d.path == path)
+            .ok_or_else(|| {
+                anyhow!(
+                    "Document reference {} not found in issue {}",
+                    path,
+                    issue_id
+                )
+            })?;
+
+        // Determine which commit to view
+        let reference = if let Some(at) = at_commit {
+            at
+        } else if let Some(ref commit) = doc.commit {
+            commit.as_str()
+        } else {
+            "HEAD"
+        };
+
+        // Try to read content from git
+        let repo = Repository::open(".").map_err(|e| anyhow!("Not a git repository: {}", e))?;
+
+        let content = self
+            .read_file_from_git(&repo, &doc.path, reference)
+            .map_err(|e| anyhow!("Error reading file from git: {}", e))?;
+
+        // Resolve the actual commit hash
+        let obj = repo.revparse_single(reference)?;
+        let commit = obj.peel_to_commit()?;
+        let commit_hash = format!("{}", commit.id());
+
+        Ok((content, commit_hash))
+    }
+
+    /// Get document history (public API for server)
+    pub fn get_document_history(&self, issue_id: &str, path: &str) -> Result<Vec<CommitInfo>> {
+        use git2::Repository;
+
+        let issue = self.storage.load_issue(issue_id)?;
+
+        // Verify document reference exists
+        issue
+            .documents
+            .iter()
+            .find(|d| d.path == path)
+            .ok_or_else(|| {
+                anyhow!(
+                    "Document reference {} not found in issue {}",
+                    path,
+                    issue_id
+                )
+            })?;
+
+        let repo = Repository::open(".").map_err(|e| anyhow!("Not a git repository: {}", e))?;
+
+        self.get_file_history(&repo, path)
+    }
+
+    /// Get document diff (public API for server)
+    pub fn get_document_diff(
+        &self,
+        issue_id: &str,
+        path: &str,
+        from: &str,
+        to: Option<&str>,
+    ) -> Result<String> {
+        use git2::Repository;
+        use similar::{ChangeTag, TextDiff};
+
+        let issue = self.storage.load_issue(issue_id)?;
+
+        // Verify document reference exists
+        issue
+            .documents
+            .iter()
+            .find(|d| d.path == path)
+            .ok_or_else(|| {
+                anyhow!(
+                    "Document reference {} not found in issue {}",
+                    path,
+                    issue_id
+                )
+            })?;
+
+        let repo = Repository::open(".").map_err(|e| anyhow!("Not a git repository: {}", e))?;
+
+        let to_ref = to.unwrap_or("HEAD");
+
+        // Get content at both commits
+        let from_content = self.read_file_from_git(&repo, path, from)?;
+        let to_content = self.read_file_from_git(&repo, path, to_ref)?;
+
+        // Generate unified diff
+        let mut diff_output = format!("diff --git a/{} b/{}\n", path, path);
+        diff_output.push_str(&format!("--- a/{} ({})\n", path, from));
+        diff_output.push_str(&format!("+++ b/{} ({})\n\n", path, to_ref));
+
+        let diff = TextDiff::from_lines(&from_content, &to_content);
+
+        for change in diff.iter_all_changes() {
+            let sign = match change.tag() {
+                ChangeTag::Delete => "-",
+                ChangeTag::Insert => "+",
+                ChangeTag::Equal => " ",
+            };
+            diff_output.push_str(&format!("{}{}", sign, change));
+        }
+
+        Ok(diff_output)
+    }
+
     /// Read file content from git at a specific reference
     fn read_file_from_git(
         &self,

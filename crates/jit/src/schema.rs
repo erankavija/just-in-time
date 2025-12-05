@@ -197,9 +197,9 @@ impl CommandSchema {
             .get_long()
             .map(|s| s.to_string())
             .unwrap_or_else(|| arg.get_id().to_string());
-        
+
         let flag_type = Self::infer_flag_type(arg);
-        
+
         // Get description, with fallback for common flags
         let description = arg
             .get_help()

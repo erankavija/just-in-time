@@ -14,7 +14,7 @@ pub mod storage;
 pub mod visualization;
 
 // Re-export commonly used types
-pub use commands::CommandExecutor;
+pub use commands::{CommandExecutor, CommitInfo};
 pub use domain::{Issue, Priority, State};
 pub use output::{ExitCode, JsonError, JsonOutput};
 pub use schema::CommandSchema;

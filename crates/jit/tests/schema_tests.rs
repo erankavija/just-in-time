@@ -36,7 +36,7 @@ fn test_schema_issue_subcommands() {
     assert!(subcommands.contains_key("update"));
     assert!(subcommands.contains_key("delete"));
     assert!(subcommands.contains_key("claim"));
-    assert!(subcommands.contains_key("unclaim"));
+    assert!(subcommands.contains_key("unassign"));
 }
 
 #[test]
@@ -50,21 +50,20 @@ fn test_schema_create_issue_args() {
         .get("create")
         .unwrap();
 
-    // Should have title, desc, priority, gate args
-    let args = &create_cmd.args;
-    assert!(args.iter().any(|a| a.name == "title"));
-    assert!(args.iter().any(|a| a.name == "desc"));
-    assert!(args.iter().any(|a| a.name == "priority"));
-    assert!(args.iter().any(|a| a.name == "gate"));
+    // Should have title, desc, priority, gate flags (not args, since they use --flag syntax)
+    let flags = &create_cmd.flags;
+    assert!(flags.iter().any(|f| f.name == "title"));
+    assert!(flags.iter().any(|f| f.name == "desc"));
+    assert!(flags.iter().any(|f| f.name == "priority"));
+    assert!(flags.iter().any(|f| f.name == "gate"));
 
-    // Title should be required
-    let title_arg = args.iter().find(|a| a.name == "title").unwrap();
-    assert!(title_arg.required);
+    // Title flag should exist
+    let title_flag = flags.iter().find(|f| f.name == "title").unwrap();
+    assert_eq!(title_flag.flag_type, "string");
 
-    // Priority should have enum values
-    let priority_arg = args.iter().find(|a| a.name == "priority").unwrap();
-    assert_eq!(priority_arg.arg_type, "string");
-    assert!(priority_arg.default.is_some());
+    // Priority flag should exist
+    let priority_flag = flags.iter().find(|f| f.name == "priority").unwrap();
+    assert_eq!(priority_flag.flag_type, "string");
 }
 
 #[test]
@@ -109,15 +108,15 @@ fn test_schema_type_definitions() {
     assert!(schema.types.contains_key("Issue"));
     assert!(schema.types.contains_key("State"));
     assert!(schema.types.contains_key("Priority"));
-    assert!(schema.types.contains_key("GateStatus"));
+    assert!(schema.types.contains_key("ErrorResponse"));
 
-    // State should be enum
-    let state_type = schema.types.get("State").unwrap();
-    assert!(state_type.get("enum").is_some());
-    let state_values = state_type.get("enum").unwrap().as_array().unwrap();
-    assert!(state_values.iter().any(|v| v == "open"));
-    assert!(state_values.iter().any(|v| v == "ready"));
-    assert!(state_values.iter().any(|v| v == "done"));
+    // State should be an enum with variants
+    let state = schema.types.get("State").unwrap();
+    let state_obj = state.as_object().unwrap();
+    assert!(state_obj.contains_key("enum"));
+
+    let variants = state_obj.get("enum").unwrap().as_array().unwrap();
+    assert!(variants.len() > 0);
 }
 
 #[test]

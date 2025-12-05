@@ -81,3 +81,29 @@ export interface SearchResponse {
   results: SearchResult[];
   duration_ms: number;
 }
+
+export interface DocumentContent {
+  path: string;
+  commit: string;
+  content: string;
+  content_type: string;
+}
+
+export interface CommitInfo {
+  commit: string;
+  author: string;
+  date: string;
+  message: string;
+}
+
+export interface DocumentHistory {
+  path: string;
+  commits: CommitInfo[];
+}
+
+export interface DocumentDiff {
+  path: string;
+  from: string;
+  to: string;
+  diff: string;
+}
