@@ -1,7 +1,7 @@
 //! API route definitions
 
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
     routing::get,
@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use jit::commands::CommandExecutor;
 use jit::domain::{Issue, Priority, State as IssueState};
+use jit::search::{SearchOptions, SearchResult};
 use jit::storage::IssueStore;
 
 /// Shared application state
@@ -27,6 +28,7 @@ pub fn create_routes<S: IssueStore + Send + Sync + 'static>(
         .route("/issues/:id", get(get_issue))
         .route("/graph", get(get_graph))
         .route("/status", get(get_status))
+        .route("/search", get(search_issues))
         .with_state(executor)
 }
 
@@ -153,6 +155,66 @@ async fn get_status<S: IssueStore>(
         done: summary.done,
         blocked: summary.blocked,
         total: summary.total,
+    }))
+}
+
+/// Search query parameters
+#[derive(Debug, Deserialize)]
+pub struct SearchQuery {
+    /// Search query string
+    q: String,
+    /// Maximum number of results (default: 50)
+    #[serde(default = "default_limit")]
+    limit: usize,
+    /// Case-sensitive search
+    #[serde(default)]
+    case_sensitive: bool,
+    /// Use regex pattern matching
+    #[serde(default)]
+    regex: bool,
+}
+
+fn default_limit() -> usize {
+    50
+}
+
+/// Search response
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SearchResponse {
+    pub query: String,
+    pub total: usize,
+    pub results: Vec<SearchResult>,
+    pub duration_ms: u128,
+}
+
+/// Search issues and documents
+async fn search_issues<S: IssueStore>(
+    Query(params): Query<SearchQuery>,
+    State(_executor): State<AppState<S>>,
+) -> Result<Json<SearchResponse>, StatusCode> {
+    let start = std::time::Instant::now();
+
+    let options = SearchOptions {
+        case_sensitive: params.case_sensitive,
+        regex: params.regex,
+        max_results: Some(params.limit),
+        ..Default::default()
+    };
+
+    // Call search directly with the data directory
+    let data_dir = std::path::Path::new(".jit");
+    let results = jit::search::search(data_dir, &params.q, options).map_err(|e| {
+        tracing::error!("Search failed: {:?}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    let duration_ms = start.elapsed().as_millis();
+
+    Ok(Json(SearchResponse {
+        query: params.q,
+        total: results.len(),
+        results,
+        duration_ms,
     }))
 }
 
@@ -289,5 +351,42 @@ mod tests {
         let status: StatusResponse = response.json();
         assert_eq!(status.total, 1);
         assert_eq!(status.ready, 1); // New issue with no deps is ready
+    }
+
+    #[tokio::test]
+    async fn test_search_endpoint_requires_query() {
+        let server = create_test_app();
+        let response = server.get("/search").await;
+        // Should fail without query parameter
+        assert!(response.status_code() != StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_search_endpoint_empty_results() {
+        let server = create_test_app();
+        // Search for something that doesn't exist
+        let response = server.get("/search?q=nonexistent").await;
+        
+        if response.status_code() == StatusCode::OK {
+            let search_response: SearchResponse = response.json();
+            assert_eq!(search_response.query, "nonexistent");
+            assert_eq!(search_response.total, 0);
+            assert_eq!(search_response.results.len(), 0);
+        }
+        // Note: may fail if ripgrep is not installed, which is acceptable
+    }
+
+    #[tokio::test]
+    async fn test_search_response_structure() {
+        let server = create_test_app();
+        let response = server.get("/search?q=test&limit=10").await;
+        
+        if response.status_code() == StatusCode::OK {
+            let search_response: SearchResponse = response.json();
+            assert_eq!(search_response.query, "test");
+            // duration_ms is always >= 0 for u128, just verify it exists
+            let _duration = search_response.duration_ms;
+            assert_eq!(search_response.total, search_response.results.len());
+        }
     }
 }

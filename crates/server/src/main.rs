@@ -26,7 +26,20 @@ async fn main() -> Result<()> {
 
     // Initialize storage and command executor
     // Note: JsonFileStorage expects the .jit directory path
-    let storage = JsonFileStorage::new(String::from(".jit"));
+    let data_dir = std::env::var("JIT_DATA_DIR").unwrap_or_else(|_| String::from(".jit"));
+    let storage = JsonFileStorage::new(&data_dir);
+    
+    // Validate repository exists
+    storage.validate().map_err(|e| {
+        anyhow::anyhow!(
+            "Failed to initialize storage: {}\n\n\
+             The server requires a JIT repository to be initialized.\n\
+             Run 'jit init' in the repository directory, or set JIT_DATA_DIR to point to an existing repository.",
+            e
+        )
+    })?;
+    
+    info!("Using JIT repository at: {}", data_dir);
     let executor = Arc::new(CommandExecutor::new(storage));
 
     // Build CORS layer for local development

@@ -60,3 +60,24 @@ export interface StatusSummary {
   ready_count: number;
   blocked_count: number;
 }
+
+export interface SearchMatch {
+  text: string;
+  start: number;
+  end: number;
+}
+
+export interface SearchResult {
+  issue_id?: string;
+  path: string;
+  line_number: number;
+  line_text: string;
+  matches: SearchMatch[];
+}
+
+export interface SearchResponse {
+  query: string;
+  total: number;
+  results: SearchResult[];
+  duration_ms: number;
+}

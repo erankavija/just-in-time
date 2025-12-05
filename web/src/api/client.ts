@@ -38,4 +38,15 @@ export const apiClient = {
     const response = await api.get('/status');
     return response.data;
   },
+
+  async search(query: string, options?: { limit?: number; caseSensitive?: boolean; regex?: boolean }): Promise<import('../types/models').SearchResponse> {
+    const params = new URLSearchParams();
+    params.set('q', query);
+    if (options?.limit) params.set('limit', options.limit.toString());
+    if (options?.caseSensitive) params.set('case_sensitive', 'true');
+    if (options?.regex) params.set('regex', 'true');
+    
+    const response = await api.get(`/search?${params.toString()}`);
+    return response.data;
+  },
 };

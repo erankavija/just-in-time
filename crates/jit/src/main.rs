@@ -110,6 +110,16 @@ fn run() -> Result<()> {
         Commands::Init => {
             executor.init()?;
         }
+        _ => {
+            // Validate repository exists for all commands except init
+            storage.validate()?;
+        }
+    }
+
+    match command {
+        Commands::Init => {
+            // Already handled above
+        }
         Commands::Issue(issue_cmd) => match issue_cmd {
             IssueCommands::Create {
                 title,

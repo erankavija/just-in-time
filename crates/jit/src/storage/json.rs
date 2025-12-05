@@ -67,6 +67,30 @@ impl JsonFileStorage {
         }
     }
 
+    /// Check if the storage directory exists and is initialized.
+    /// Returns an error with a helpful message if not.
+    pub fn validate(&self) -> Result<()> {
+        if !self.root.exists() {
+            anyhow::bail!(
+                "JIT repository not found at '{}'\n\n\
+                 Initialize a repository with: jit init\n\
+                 Or set JIT_DATA_DIR environment variable to point to an existing repository.",
+                self.root.display()
+            );
+        }
+
+        let index_path = self.root.join(INDEX_FILE);
+        if !index_path.exists() {
+            anyhow::bail!(
+                "JIT repository at '{}' is not properly initialized (missing index.json)\n\n\
+                 Initialize with: jit init",
+                self.root.display()
+            );
+        }
+
+        Ok(())
+    }
+
     fn issue_path(&self, id: &str) -> PathBuf {
         self.root.join(ISSUES_DIR).join(format!("{}.json", id))
     }
