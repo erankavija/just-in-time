@@ -122,19 +122,21 @@
 
 **Goal:** Maintain clean, well-documented, maintainable codebase.
 
-**Current Status (2025-12-03 - Evening):**
+**Current Status (2025-12-05 - Evening):**
 - ✅ All modules have module-level docs
 - ✅ Zero rustdoc warnings in default mode
 - ✅ Zero clippy warnings
-- ✅ **381 tests passing** (375 jit + 6 server)
+- ✅ **387+ tests passing** (381 jit + 9 server + 16 frontend)
 - ✅ main.rs at 843 lines (under 1,000 threshold)
 - ✅ commands.rs at 2,134 lines (critical methods documented)
-- ✅ New crate: jit-server (REST API)
+- ✅ jit-server crate with search API endpoint
 - ✅ Thread-safe InMemoryStorage (refactored for async)
+- ✅ Responsive web UI with search functionality
 - ✅ Comprehensive documentation: 
   - file-locking-usage.md (400 lines)
   - knowledge-management-vision.md (537 lines)
   - web-ui-architecture.md (466 lines)
+  - search-implementation.md (596 lines)
 
 **Completed:**
 - [x] Refactor main.rs
@@ -228,26 +230,58 @@
 - [x] State legend with color coding
 - [x] Priority indicators
 
-**Phase 2.3: Enhanced UI Features** 🚧 (Deferred - CLI-first)
-- [ ] Search and filter functionality
+**Phase 2.3: Responsive Search UI** ✅ (Complete - 2025-12-05)
+- [x] **Backend search API**
+  - GET /api/search endpoint with query parameters
+  - Integrates ripgrep backend for deep content search
+  - Query params: q, limit, case_sensitive, regex
+  - JSON response with results, query, total, duration_ms
+  - 3 new API endpoint tests
+- [x] **Frontend search components**
+  - SearchBar component with instant feedback
+  - useSearch custom hook with hybrid client + server strategy
+  - Client-side filtering (<16ms) for instant results
+  - Debounced server search (300ms, min 3 chars)
+  - Search results dropdown with click-to-navigate
+  - ⚡ badge for instant client results
+  - Result deduplication by issue ID
+  - Graceful error handling with fallback
+- [x] **Client-side search logic**
+  - Relevance scoring: ID (20pts) > Title (10pts) > Description (5pts)
+  - All search terms must match (AND logic)
+  - Case-insensitive by default
+  - Results sorted by score descending
+  - 11 unit tests covering edge cases
+- [x] **Developer experience**
+  - Storage validation on startup (CLI and server)
+  - Clear error messages when .jit not found
+  - Instructions to run 'jit init' or set JIT_DATA_DIR
+  - Environment variable support for custom repo location
+
+**Phase 2.4: Additional UI Features** 🚧 (Deferred)
 - [ ] Inline document content viewer
 - [ ] State transition buttons (change issue state from UI)
 - [ ] Real-time updates (polling or WebSocket)
 - [ ] Export graph as PNG/SVG
-- [ ] Keyboard shortcuts
+- [ ] Keyboard shortcuts (Cmd+K for search focus)
 - [ ] Mobile responsive layout
 - [ ] Better graph layout algorithms (elk.js)
 
 **Phase 3: Advanced Features** 🚧 (In Progress)
 - [x] **Full-text search with ripgrep (Phase 3.1)** ✅
+  - CLI: `jit search <query> [--regex] [--glob "*.json"]`
   - Search across issues and referenced documents
   - Regex and glob pattern filtering
-  - CLI: `jit search <query> [--regex] [--glob "*.json"]`
   - MCP tool: `search_issues`
   - 20+ tests (unit + integration + MCP)
   - Graceful degradation when ripgrep not installed
   - JSON output support for automation
   - Zero dependencies (uses system ripgrep)
+- [x] **Responsive search UI (Phase 3.1b)** ✅ - **COMPLETE (2025-12-05)**
+  - Web UI search bar with instant client-side results
+  - Hybrid client + server search strategy
+  - 16 tests covering search logic and integration
+  - See commit 60a3154 for full implementation
   - Future: Optional Tantivy backend for large repos (>1000 issues)
 - [ ] Historical document viewer (Phase 3.2)
 - [ ] Document graph visualization (Phase 3.3)

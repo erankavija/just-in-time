@@ -28,7 +28,7 @@ async fn main() -> Result<()> {
     // Note: JsonFileStorage expects the .jit directory path
     let data_dir = std::env::var("JIT_DATA_DIR").unwrap_or_else(|_| String::from(".jit"));
     let storage = JsonFileStorage::new(&data_dir);
-    
+
     // Validate repository exists
     storage.validate().map_err(|e| {
         anyhow::anyhow!(
@@ -38,7 +38,7 @@ async fn main() -> Result<()> {
             e
         )
     })?;
-    
+
     info!("Using JIT repository at: {}", data_dir);
     let executor = Arc::new(CommandExecutor::new(storage));
 

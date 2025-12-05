@@ -472,6 +472,44 @@ impl CommandSchema {
         );
 
         subcommands.insert(
+            "breakdown".to_string(),
+            Command {
+                description:
+                    "Break down an issue into subtasks with automatic dependency inheritance"
+                        .to_string(),
+                subcommands: None,
+                args: vec![Argument {
+                    name: "parent_id".to_string(),
+                    arg_type: "string".to_string(),
+                    required: true,
+                    default: None,
+                    description: Some("Parent issue ID to break down".to_string()),
+                }],
+                flags: vec![
+                    Flag {
+                        name: "subtask".to_string(),
+                        flag_type: "array<string>".to_string(),
+                        description: "Subtask titles (use multiple times)".to_string(),
+                    },
+                    Flag {
+                        name: "desc".to_string(),
+                        flag_type: "array<string>".to_string(),
+                        description: "Subtask descriptions (optional)".to_string(),
+                    },
+                    Flag {
+                        name: "json".to_string(),
+                        flag_type: "boolean".to_string(),
+                        description: "Output JSON format".to_string(),
+                    },
+                ],
+                output: Some(OutputSchema {
+                    success: "BreakdownResult".to_string(),
+                    error: "ErrorResponse".to_string(),
+                }),
+            },
+        );
+
+        subcommands.insert(
             "claim".to_string(),
             Command {
                 description: "Claim an issue for an assignee".to_string(),

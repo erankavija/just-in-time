@@ -23,6 +23,17 @@ pub struct StatusSummary {
     pub total: usize,
 }
 
+/// Result of adding a dependency
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DependencyAddResult {
+    /// Dependency was added
+    Added,
+    /// Dependency was skipped because it's transitive (redundant)
+    Skipped { reason: String },
+    /// Dependency already existed
+    AlreadyExists,
+}
+
 /// Executes CLI commands with business logic and validation.
 ///
 /// Generic over storage backend to support different implementations
@@ -388,6 +399,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// ```
     /// # use jit::{CommandExecutor, Priority};
+    /// # use jit::commands::DependencyAddResult;
     /// # use jit::storage::InMemoryStorage;
     /// let storage = InMemoryStorage::new();
     /// let executor = CommandExecutor::new(storage);
@@ -396,10 +408,12 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// let frontend = executor.create_issue("Frontend UI".into(), "".into(), Priority::Normal, vec![]).unwrap();
     ///
     /// // Frontend depends on backend
-    /// executor.add_dependency(&frontend, &backend).unwrap();
+    /// let result = executor.add_dependency(&frontend, &backend).unwrap();
+    /// assert_eq!(result, DependencyAddResult::Added);
     /// ```
-    pub fn add_dependency(&self, issue_id: &str, dep_id: &str) -> Result<()> {
-        // Validate both issues exist
+    pub fn add_dependency(&self, issue_id: &str, dep_id: &str) -> Result<DependencyAddResult> {
+        // Load all issues and build graph for analysis
+        // Note: Storage layer handles locking internally
         let issues = self.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
         let graph = DependencyGraph::new(&issue_refs);
@@ -407,28 +421,120 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Check for cycles
         graph.validate_add_dependency(issue_id, dep_id)?;
 
-        // Add the dependency
+        // Check if this dependency is transitive (redundant)
+        if graph.is_transitive(issue_id, dep_id) {
+            let reason = "transitive (already reachable via other dependencies)".to_string();
+            return Ok(DependencyAddResult::Skipped { reason });
+        }
+
+        // Load the issue and add dependency
         let mut issue = self.storage.load_issue(issue_id)?;
-        if !issue.dependencies.contains(&dep_id.to_string()) {
-            issue.dependencies.push(dep_id.to_string());
+        if issue.dependencies.contains(&dep_id.to_string()) {
+            return Ok(DependencyAddResult::AlreadyExists);
+        }
 
-            // If issue becomes blocked by this dependency, transition to Backlog
-            let dep_issue = self.storage.load_issue(dep_id)?;
-            if issue.state == State::Ready && dep_issue.state != State::Done {
-                let old_state = issue.state;
-                issue.state = State::Backlog;
-                self.storage.save_issue(&issue)?;
+        issue.dependencies.push(dep_id.to_string());
 
-                // Log state change
-                let event =
-                    Event::new_issue_state_changed(issue.id.clone(), old_state, State::Backlog);
-                self.storage.append_event(&event)?;
-            } else {
-                self.storage.save_issue(&issue)?;
+        // Apply transitive reduction: remove any deps now reachable through others
+        // Build a temporary graph with the new edge to compute reduction
+        let temp_issue = issue.clone();
+        let mut temp_issues = issues.clone();
+        temp_issues.retain(|i| i.id != issue_id);
+        temp_issues.push(temp_issue);
+        let temp_refs: Vec<&Issue> = temp_issues.iter().collect();
+        let new_graph = DependencyGraph::new(&temp_refs);
+        let new_reduced = new_graph.compute_transitive_reduction(issue_id);
+        issue.dependencies = new_reduced.into_iter().collect();
+
+        // If issue becomes blocked by this dependency, transition to Backlog
+        let dep_issue = self.storage.load_issue(dep_id)?;
+        if issue.state == State::Ready && dep_issue.state != State::Done {
+            let old_state = issue.state;
+            issue.state = State::Backlog;
+            self.storage.save_issue(&issue)?;
+
+            // Log state change
+            let event = Event::new_issue_state_changed(issue.id.clone(), old_state, State::Backlog);
+            self.storage.append_event(&event)?;
+        } else {
+            self.storage.save_issue(&issue)?;
+        }
+
+        Ok(DependencyAddResult::Added)
+    }
+
+    /// Break down an issue into subtasks with automatic dependency inheritance.
+    ///
+    /// Creates subtasks, makes the parent depend on them, and automatically copies
+    /// the parent's dependencies to each subtask. The parent's original dependencies
+    /// are then removed as they become transitive through the subtasks.
+    ///
+    /// # Arguments
+    ///
+    /// * `parent_id` - ID of the issue to break down
+    /// * `subtasks` - List of (title, description) tuples for subtasks to create
+    ///
+    /// # Returns
+    ///
+    /// Vector of created subtask IDs
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use jit::{CommandExecutor, Priority};
+    /// # use jit::storage::InMemoryStorage;
+    /// let storage = InMemoryStorage::new();
+    /// let executor = CommandExecutor::new(storage);
+    ///
+    /// let dep = executor.create_issue("Build".into(), "".into(), Priority::Normal, vec![]).unwrap();
+    /// let parent = executor.create_issue("Review".into(), "".into(), Priority::High, vec![]).unwrap();
+    /// executor.add_dependency(&parent, &dep).unwrap();
+    ///
+    /// let subtasks = vec![
+    ///     ("Check tests".to_string(), "".to_string()),
+    ///     ("Check docs".to_string(), "".to_string()),
+    /// ];
+    ///
+    /// let subtask_ids = executor.breakdown_issue(&parent, subtasks).unwrap();
+    /// assert_eq!(subtask_ids.len(), 2);
+    ///
+    /// // Each subtask now depends on Build
+    /// // Parent depends on subtasks (not Build anymore - transitive)
+    /// ```
+    pub fn breakdown_issue(
+        &self,
+        parent_id: &str,
+        subtasks: Vec<(String, String)>,
+    ) -> Result<Vec<String>> {
+        // Load parent issue
+        let parent = self.storage.load_issue(parent_id)?;
+        let original_deps = parent.dependencies.clone();
+
+        // Create subtasks with inherited priority
+        let mut subtask_ids = Vec::new();
+        for (title, desc) in subtasks {
+            let subtask_id = self.create_issue(title, desc, parent.priority, vec![])?;
+            subtask_ids.push(subtask_id);
+        }
+
+        // Copy parent's dependencies to each subtask
+        for subtask_id in &subtask_ids {
+            for dep_id in &original_deps {
+                self.add_dependency(subtask_id, dep_id)?;
             }
         }
 
-        Ok(())
+        // Make parent depend on all subtasks
+        for subtask_id in &subtask_ids {
+            self.add_dependency(parent_id, subtask_id)?;
+        }
+
+        // Remove parent's original dependencies (now transitive through subtasks)
+        for dep_id in &original_deps {
+            self.remove_dependency(parent_id, dep_id)?;
+        }
+
+        Ok(subtask_ids)
     }
 
     pub fn remove_dependency(&self, issue_id: &str, dep_id: &str) -> Result<()> {
@@ -2460,5 +2566,375 @@ mod tests {
         let results = executor.search_issues(prefix).unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].id, id);
+    }
+
+    // Tests for transitive reduction
+
+    #[test]
+    fn test_add_dependency_skips_transitive_simple_chain() {
+        let (_temp, executor) = setup();
+
+        // Create A→B→C
+        let a = executor
+            .create_issue("A".to_string(), "".to_string(), Priority::Normal, vec![])
+            .unwrap();
+        let b = executor
+            .create_issue("B".to_string(), "".to_string(), Priority::Normal, vec![])
+            .unwrap();
+        let c = executor
+            .create_issue("C".to_string(), "".to_string(), Priority::Normal, vec![])
+            .unwrap();
+
+        executor.add_dependency(&c, &b).unwrap();
+        executor.add_dependency(&b, &a).unwrap();
+
+        // Try to add redundant C→A
+        executor.add_dependency(&c, &a).unwrap();
+
+        // C should only depend on B, not A (transitive edge removed)
+        let issue_c = executor.show_issue(&c).unwrap();
+        assert_eq!(issue_c.dependencies.len(), 1);
+        assert!(issue_c.dependencies.contains(&b));
+        assert!(!issue_c.dependencies.contains(&a));
+    }
+
+    #[test]
+    fn test_add_dependency_skips_transitive_diamond() {
+        let (_temp, executor) = setup();
+
+        // Create diamond: A→B, A→C, B→C
+        let a = executor
+            .create_issue("A".to_string(), "".to_string(), Priority::Normal, vec![])
+            .unwrap();
+        let b = executor
+            .create_issue("B".to_string(), "".to_string(), Priority::Normal, vec![])
+            .unwrap();
+        let c = executor
+            .create_issue("C".to_string(), "".to_string(), Priority::Normal, vec![])
+            .unwrap();
+
+        executor.add_dependency(&a, &b).unwrap();
+        executor.add_dependency(&b, &c).unwrap();
+
+        // Try to add redundant A→C
+        executor.add_dependency(&a, &c).unwrap();
+
+        // A should only depend on B, not C
+        let issue_a = executor.show_issue(&a).unwrap();
+        assert_eq!(issue_a.dependencies.len(), 1);
+        assert!(issue_a.dependencies.contains(&b));
+        assert!(!issue_a.dependencies.contains(&c));
+    }
+
+    #[test]
+    fn test_add_dependency_keeps_parallel_deps() {
+        let (_temp, executor) = setup();
+
+        // Create parallel: A→B, A→C (no path between B and C)
+        let a = executor
+            .create_issue("A".to_string(), "".to_string(), Priority::Normal, vec![])
+            .unwrap();
+        let b = executor
+            .create_issue("B".to_string(), "".to_string(), Priority::Normal, vec![])
+            .unwrap();
+        let c = executor
+            .create_issue("C".to_string(), "".to_string(), Priority::Normal, vec![])
+            .unwrap();
+
+        executor.add_dependency(&a, &b).unwrap();
+        executor.add_dependency(&a, &c).unwrap();
+
+        // Both dependencies should remain (not transitive)
+        let issue_a = executor.show_issue(&a).unwrap();
+        assert_eq!(issue_a.dependencies.len(), 2);
+        assert!(issue_a.dependencies.contains(&b));
+        assert!(issue_a.dependencies.contains(&c));
+    }
+
+    #[test]
+    fn test_add_dependency_reduces_existing_edges() {
+        let (_temp, executor) = setup();
+
+        // Create A with redundant edges first
+        let a = executor
+            .create_issue("A".to_string(), "".to_string(), Priority::Normal, vec![])
+            .unwrap();
+        let b = executor
+            .create_issue("B".to_string(), "".to_string(), Priority::Normal, vec![])
+            .unwrap();
+        let c = executor
+            .create_issue("C".to_string(), "".to_string(), Priority::Normal, vec![])
+            .unwrap();
+
+        // Add all edges including redundant one
+        executor.add_dependency(&a, &b).unwrap();
+        executor.add_dependency(&a, &c).unwrap();
+
+        // Now add B→C, which makes A→C redundant
+        executor.add_dependency(&b, &c).unwrap();
+
+        // A→C should be automatically removed when we add A→B
+        // But we already have both edges. We need to trigger reduction.
+        // Let's add another dependency to A to trigger reduction
+        let d = executor
+            .create_issue("D".to_string(), "".to_string(), Priority::Normal, vec![])
+            .unwrap();
+        executor.add_dependency(&a, &d).unwrap();
+
+        // After adding D, all of A's edges should be reduced
+        let issue_a = executor.show_issue(&a).unwrap();
+        // A should depend on B and D, but not C (transitive via B)
+        assert!(issue_a.dependencies.contains(&b));
+        assert!(issue_a.dependencies.contains(&d));
+        assert!(!issue_a.dependencies.contains(&c));
+    }
+
+    #[test]
+    fn test_add_dependency_complex_reduction() {
+        let (_temp, executor) = setup();
+
+        // Create complex graph: A→B, A→C, A→D, B→D, C→D
+        // A→D should be removed as it's transitive via both B and C
+        let a = executor
+            .create_issue("A".to_string(), "".to_string(), Priority::Normal, vec![])
+            .unwrap();
+        let b = executor
+            .create_issue("B".to_string(), "".to_string(), Priority::Normal, vec![])
+            .unwrap();
+        let c = executor
+            .create_issue("C".to_string(), "".to_string(), Priority::Normal, vec![])
+            .unwrap();
+        let d = executor
+            .create_issue("D".to_string(), "".to_string(), Priority::Normal, vec![])
+            .unwrap();
+
+        executor.add_dependency(&a, &b).unwrap();
+        executor.add_dependency(&a, &c).unwrap();
+        executor.add_dependency(&b, &d).unwrap();
+        executor.add_dependency(&c, &d).unwrap();
+
+        // Try to add A→D (should be skipped)
+        executor.add_dependency(&a, &d).unwrap();
+
+        // A should only depend on B and C, not D
+        let issue_a = executor.show_issue(&a).unwrap();
+        assert_eq!(issue_a.dependencies.len(), 2);
+        assert!(issue_a.dependencies.contains(&b));
+        assert!(issue_a.dependencies.contains(&c));
+        assert!(!issue_a.dependencies.contains(&d));
+    }
+
+    #[test]
+    fn test_transitive_reduction_concurrent_operations() {
+        use std::sync::Arc;
+        use std::thread;
+
+        let (_temp, executor) = setup();
+        let executor = Arc::new(executor);
+
+        // Create a graph: A, B, C, D
+        let a = executor
+            .create_issue("A".to_string(), "".to_string(), Priority::Normal, vec![])
+            .unwrap();
+        let b = executor
+            .create_issue("B".to_string(), "".to_string(), Priority::Normal, vec![])
+            .unwrap();
+        let c = executor
+            .create_issue("C".to_string(), "".to_string(), Priority::Normal, vec![])
+            .unwrap();
+
+        // Thread 1: Add A→B, then B→C
+        let executor1 = Arc::clone(&executor);
+        let a1 = a.clone();
+        let b1 = b.clone();
+        let c1 = c.clone();
+        let t1 = thread::spawn(move || {
+            executor1.add_dependency(&a1, &b1).unwrap();
+            executor1.add_dependency(&b1, &c1).unwrap();
+        });
+
+        // Thread 2: Try to add A→C (might be redundant depending on timing)
+        let executor2 = Arc::clone(&executor);
+        let a2 = a.clone();
+        let c2 = c.clone();
+        let t2 = thread::spawn(move || {
+            // Sleep briefly to let T1 potentially establish A→B→C first
+            thread::sleep(std::time::Duration::from_millis(10));
+            executor2.add_dependency(&a2, &c2).unwrap();
+        });
+
+        t1.join().unwrap();
+        t2.join().unwrap();
+
+        // Final state should have transitively reduced edges
+        let issue_a = executor.show_issue(&a).unwrap();
+        let issue_b = executor.show_issue(&b).unwrap();
+
+        // Verify DAG integrity
+        assert!(issue_b.dependencies.contains(&c)); // B→C
+
+        // A should only depend on B (A→C removed as transitive)
+        // OR if timing caused A→C to be added first, we should still have valid state
+        assert!(issue_a.dependencies.contains(&b)); // A→B always present
+
+        // The key property: no cycles and graph is still valid
+        let issues = executor.list_issues(None, None, None).unwrap();
+        let issue_refs: Vec<&Issue> = issues.iter().collect();
+        let graph = DependencyGraph::new(&issue_refs);
+        assert!(graph.validate_dag().is_ok());
+    }
+
+    // Tests for issue breakdown
+
+    #[test]
+    fn test_breakdown_issue_simple() {
+        let (_temp, executor) = setup();
+
+        // Create parent with a dependency
+        let dep = executor
+            .create_issue(
+                "Build".to_string(),
+                "".to_string(),
+                Priority::Normal,
+                vec![],
+            )
+            .unwrap();
+        let parent = executor
+            .create_issue(
+                "Security Review".to_string(),
+                "".to_string(),
+                Priority::High,
+                vec![],
+            )
+            .unwrap();
+
+        executor.add_dependency(&parent, &dep).unwrap();
+
+        // Breakdown into subtasks
+        let subtasks = vec![
+            ("Check vulnerabilities".to_string(), "npm audit".to_string()),
+            ("Scan for secrets".to_string(), "gitleaks".to_string()),
+        ];
+
+        let subtask_ids = executor.breakdown_issue(&parent, subtasks).unwrap();
+
+        // Verify 2 subtasks created
+        assert_eq!(subtask_ids.len(), 2);
+
+        // Verify parent depends on subtasks
+        let parent_issue = executor.show_issue(&parent).unwrap();
+        assert_eq!(parent_issue.dependencies.len(), 2);
+        assert!(parent_issue.dependencies.contains(&subtask_ids[0]));
+        assert!(parent_issue.dependencies.contains(&subtask_ids[1]));
+
+        // Verify subtasks inherit parent's original dependency
+        let subtask1 = executor.show_issue(&subtask_ids[0]).unwrap();
+        let subtask2 = executor.show_issue(&subtask_ids[1]).unwrap();
+        assert!(subtask1.dependencies.contains(&dep));
+        assert!(subtask2.dependencies.contains(&dep));
+
+        // Verify parent's original dependency was removed (now transitive)
+        assert!(!parent_issue.dependencies.contains(&dep));
+    }
+
+    #[test]
+    fn test_breakdown_issue_no_dependencies() {
+        let (_temp, executor) = setup();
+
+        // Create parent with no dependencies
+        let parent = executor
+            .create_issue("Epic".to_string(), "".to_string(), Priority::Normal, vec![])
+            .unwrap();
+
+        let subtasks = vec![
+            ("Task 1".to_string(), "".to_string()),
+            ("Task 2".to_string(), "".to_string()),
+        ];
+
+        let subtask_ids = executor.breakdown_issue(&parent, subtasks).unwrap();
+
+        // Verify subtasks created
+        assert_eq!(subtask_ids.len(), 2);
+
+        // Verify parent depends on subtasks
+        let parent_issue = executor.show_issue(&parent).unwrap();
+        assert_eq!(parent_issue.dependencies.len(), 2);
+
+        // Verify subtasks have no dependencies (parent had none)
+        let subtask1 = executor.show_issue(&subtask_ids[0]).unwrap();
+        let subtask2 = executor.show_issue(&subtask_ids[1]).unwrap();
+        assert_eq!(subtask1.dependencies.len(), 0);
+        assert_eq!(subtask2.dependencies.len(), 0);
+    }
+
+    #[test]
+    fn test_breakdown_issue_multiple_dependencies() {
+        let (_temp, executor) = setup();
+
+        // Create parent with multiple dependencies
+        let dep1 = executor
+            .create_issue("Dep1".to_string(), "".to_string(), Priority::Normal, vec![])
+            .unwrap();
+        let dep2 = executor
+            .create_issue("Dep2".to_string(), "".to_string(), Priority::Normal, vec![])
+            .unwrap();
+        let parent = executor
+            .create_issue("Parent".to_string(), "".to_string(), Priority::High, vec![])
+            .unwrap();
+
+        executor.add_dependency(&parent, &dep1).unwrap();
+        executor.add_dependency(&parent, &dep2).unwrap();
+
+        let subtasks = vec![
+            ("Sub1".to_string(), "".to_string()),
+            ("Sub2".to_string(), "".to_string()),
+        ];
+
+        let subtask_ids = executor.breakdown_issue(&parent, subtasks).unwrap();
+
+        // Verify all subtasks inherit both dependencies
+        for subtask_id in &subtask_ids {
+            let subtask = executor.show_issue(subtask_id).unwrap();
+            assert!(subtask.dependencies.contains(&dep1));
+            assert!(subtask.dependencies.contains(&dep2));
+        }
+
+        // Verify parent only depends on subtasks (original deps removed)
+        let parent_issue = executor.show_issue(&parent).unwrap();
+        assert_eq!(parent_issue.dependencies.len(), 2);
+        assert!(!parent_issue.dependencies.contains(&dep1));
+        assert!(!parent_issue.dependencies.contains(&dep2));
+    }
+
+    #[test]
+    fn test_breakdown_issue_preserves_priority() {
+        let (_temp, executor) = setup();
+
+        let parent = executor
+            .create_issue(
+                "Critical Task".to_string(),
+                "".to_string(),
+                Priority::Critical,
+                vec![],
+            )
+            .unwrap();
+
+        let subtasks = vec![("Sub".to_string(), "desc".to_string())];
+
+        let subtask_ids = executor.breakdown_issue(&parent, subtasks).unwrap();
+
+        // Subtasks inherit parent's priority
+        let subtask = executor.show_issue(&subtask_ids[0]).unwrap();
+        assert_eq!(subtask.priority, Priority::Critical);
+    }
+
+    #[test]
+    fn test_breakdown_nonexistent_issue() {
+        let (_temp, executor) = setup();
+
+        let result =
+            executor.breakdown_issue("nonexistent-id", vec![("Sub".to_string(), "".to_string())]);
+
+        assert!(result.is_err());
     }
 }

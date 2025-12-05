@@ -187,6 +187,112 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
         rec_stack.remove(node);
         false
     }
+
+    /// Check if edge from→to is transitive (redundant).
+    ///
+    /// An edge is transitive if there exists a path from→...→to
+    /// through other edges (i.e., path length > 1).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::graph::DependencyGraph;
+    /// use jit::domain::Issue;
+    ///
+    /// let a = Issue::new("A".into(), "".into());
+    /// let mut b = Issue::new("B".into(), "".into());
+    /// let mut c = Issue::new("C".into(), "".into());
+    /// b.dependencies.push(a.id.clone());
+    /// c.dependencies.push(b.id.clone());
+    /// c.dependencies.push(a.id.clone()); // Redundant!
+    ///
+    /// let graph = DependencyGraph::new(&[&a, &b, &c]);
+    /// assert!(graph.is_transitive(&c.id, &a.id)); // C→A is transitive via C→B→A
+    /// ```
+    pub fn is_transitive(&self, from: &str, to: &str) -> bool {
+        // Check if there's a path from→to excluding the direct edge
+        self.has_path_excluding_direct(from, to)
+    }
+
+    /// Check if path exists from start to target, excluding the direct edge.
+    fn has_path_excluding_direct(&self, start: &str, target: &str) -> bool {
+        let mut visited = HashSet::new();
+        let mut stack = vec![start];
+
+        while let Some(current) = stack.pop() {
+            if current == target && current != start {
+                return true;
+            }
+
+            if visited.contains(current) {
+                continue;
+            }
+            visited.insert(current);
+
+            if let Some(node) = self.nodes.get(current) {
+                for dep in node.dependencies() {
+                    // Skip the direct edge from start to target
+                    if current == start && dep == target {
+                        continue;
+                    }
+                    stack.push(dep.as_str());
+                }
+            }
+        }
+
+        false
+    }
+
+    /// Compute transitive reduction for a single node's dependencies.
+    ///
+    /// Returns the minimal set of dependencies that preserves reachability.
+    /// An edge is kept only if it's not reachable through other edges.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::graph::DependencyGraph;
+    /// use jit::domain::Issue;
+    ///
+    /// let a = Issue::new("A".into(), "".into());
+    /// let mut b = Issue::new("B".into(), "".into());
+    /// let mut c = Issue::new("C".into(), "".into());
+    /// b.dependencies.push(a.id.clone());
+    /// c.dependencies.push(b.id.clone());
+    /// c.dependencies.push(a.id.clone()); // Redundant
+    ///
+    /// let graph = DependencyGraph::new(&[&a, &b, &c]);
+    /// let reduced = graph.compute_transitive_reduction(&c.id);
+    ///
+    /// assert_eq!(reduced.len(), 1);
+    /// assert!(reduced.contains(&b.id)); // Only keep C→B
+    /// ```
+    pub fn compute_transitive_reduction(&self, node_id: &str) -> HashSet<String> {
+        let Some(node) = self.nodes.get(node_id) else {
+            return HashSet::new();
+        };
+
+        let deps = node.dependencies();
+        if deps.is_empty() {
+            return HashSet::new();
+        }
+
+        // Keep only dependencies that are NOT reachable through other dependencies
+        deps.iter()
+            .filter(|dep| {
+                // Check if this dep is reachable through other deps
+                let other_deps: Vec<&str> = deps
+                    .iter()
+                    .filter(|d| d != dep)
+                    .map(String::as_str)
+                    .collect();
+
+                // If dep is reachable from any other dep, it's redundant
+                !other_deps.iter().any(|other| self.is_reachable(other, dep))
+            })
+            .cloned()
+            .collect()
+    }
 }
 
 #[cfg(test)]
@@ -441,5 +547,148 @@ mod tests {
         let graph = DependencyGraph::new(&issues);
 
         assert_eq!(graph.validate_dag(), Err(GraphError::CycleDetected));
+    }
+
+    // Tests for transitive reduction
+
+    #[test]
+    fn test_is_transitive_simple_chain() {
+        // A→B→C, test if A→C is transitive
+        let a = TestNode::new("A", vec!["B"]);
+        let b = TestNode::new("B", vec!["C"]);
+        let c = TestNode::new("C", vec![]);
+
+        let graph = DependencyGraph::new(&[&a, &b, &c]);
+
+        // A→C is transitive (reachable via A→B→C)
+        assert!(graph.is_transitive("A", "C"));
+        // A→B is NOT transitive (direct edge)
+        assert!(!graph.is_transitive("A", "B"));
+        // B→C is NOT transitive (direct edge)
+        assert!(!graph.is_transitive("B", "C"));
+    }
+
+    #[test]
+    fn test_is_transitive_diamond() {
+        // Diamond: A→B, A→C, B→C
+        // A→C is transitive via A→B→C
+        let a = TestNode::new("A", vec!["B", "C"]);
+        let b = TestNode::new("B", vec!["C"]);
+        let c = TestNode::new("C", vec![]);
+
+        let graph = DependencyGraph::new(&[&a, &b, &c]);
+
+        // A→C is transitive (reachable via A→B→C)
+        assert!(graph.is_transitive("A", "C"));
+        // A→B is NOT transitive
+        assert!(!graph.is_transitive("A", "B"));
+        // B→C is NOT transitive
+        assert!(!graph.is_transitive("B", "C"));
+    }
+
+    #[test]
+    fn test_is_transitive_no_path() {
+        // A→B, C→D (disconnected)
+        let a = TestNode::new("A", vec!["B"]);
+        let b = TestNode::new("B", vec![]);
+        let c = TestNode::new("C", vec!["D"]);
+        let d = TestNode::new("D", vec![]);
+
+        let graph = DependencyGraph::new(&[&a, &b, &c, &d]);
+
+        // A→D has no path at all
+        assert!(!graph.is_transitive("A", "D"));
+    }
+
+    #[test]
+    fn test_is_transitive_complex_graph() {
+        // A→B, A→C, A→D, B→D, C→D
+        // A→D is transitive via both A→B→D and A→C→D
+        let a = TestNode::new("A", vec!["B", "C", "D"]);
+        let b = TestNode::new("B", vec!["D"]);
+        let c = TestNode::new("C", vec!["D"]);
+        let d = TestNode::new("D", vec![]);
+
+        let graph = DependencyGraph::new(&[&a, &b, &c, &d]);
+
+        // A→D is transitive (reachable via A→B→D and A→C→D)
+        assert!(graph.is_transitive("A", "D"));
+        // Direct edges are not transitive
+        assert!(!graph.is_transitive("A", "B"));
+        assert!(!graph.is_transitive("A", "C"));
+        assert!(!graph.is_transitive("B", "D"));
+        assert!(!graph.is_transitive("C", "D"));
+    }
+
+    #[test]
+    fn test_is_transitive_long_chain() {
+        // A→B→C→D→E, test A→E
+        let a = TestNode::new("A", vec!["B"]);
+        let b = TestNode::new("B", vec!["C"]);
+        let c = TestNode::new("C", vec!["D"]);
+        let d = TestNode::new("D", vec!["E"]);
+        let e = TestNode::new("E", vec![]);
+
+        let graph = DependencyGraph::new(&[&a, &b, &c, &d, &e]);
+
+        // A→E is transitive (long path)
+        assert!(graph.is_transitive("A", "E"));
+        // All direct edges are not transitive
+        assert!(!graph.is_transitive("A", "B"));
+        assert!(!graph.is_transitive("B", "C"));
+        assert!(!graph.is_transitive("C", "D"));
+        assert!(!graph.is_transitive("D", "E"));
+    }
+
+    #[test]
+    fn test_compute_transitive_reduction_simple() {
+        // A→B, A→C, B→C
+        // Should keep only A→B and B→C
+        let a = TestNode::new("A", vec!["B", "C"]);
+        let b = TestNode::new("B", vec!["C"]);
+        let c = TestNode::new("C", vec![]);
+
+        let graph = DependencyGraph::new(&[&a, &b, &c]);
+        let reduced_deps = graph.compute_transitive_reduction("A");
+
+        // A should only depend on B (not C)
+        assert_eq!(reduced_deps.len(), 1);
+        assert!(reduced_deps.contains("B"));
+        assert!(!reduced_deps.contains("C"));
+    }
+
+    #[test]
+    fn test_compute_transitive_reduction_no_redundancy() {
+        // A→B, A→C (parallel, no transitive path)
+        let a = TestNode::new("A", vec!["B", "C"]);
+        let b = TestNode::new("B", vec![]);
+        let c = TestNode::new("C", vec![]);
+
+        let graph = DependencyGraph::new(&[&a, &b, &c]);
+        let reduced_deps = graph.compute_transitive_reduction("A");
+
+        // Both dependencies should remain
+        assert_eq!(reduced_deps.len(), 2);
+        assert!(reduced_deps.contains("B"));
+        assert!(reduced_deps.contains("C"));
+    }
+
+    #[test]
+    fn test_compute_transitive_reduction_complex() {
+        // A→B, A→C, A→D, B→D, C→D
+        // Should keep only A→B and A→C (remove A→D)
+        let a = TestNode::new("A", vec!["B", "C", "D"]);
+        let b = TestNode::new("B", vec!["D"]);
+        let c = TestNode::new("C", vec!["D"]);
+        let d = TestNode::new("D", vec![]);
+
+        let graph = DependencyGraph::new(&[&a, &b, &c, &d]);
+        let reduced_deps = graph.compute_transitive_reduction("A");
+
+        // A should depend on B and C, but not D
+        assert_eq!(reduced_deps.len(), 2);
+        assert!(reduced_deps.contains("B"));
+        assert!(reduced_deps.contains("C"));
+        assert!(!reduced_deps.contains("D"));
     }
 }

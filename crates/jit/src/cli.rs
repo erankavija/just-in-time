@@ -198,6 +198,24 @@ pub enum IssueCommands {
         json: bool,
     },
 
+    /// Break down an issue into subtasks with automatic dependency inheritance
+    Breakdown {
+        /// Parent issue ID to break down
+        parent_id: String,
+
+        /// Subtask titles (use multiple times)
+        #[arg(long = "subtask", required = true)]
+        subtask_titles: Vec<String>,
+
+        /// Subtask descriptions (optional, must match number of subtasks)
+        #[arg(long = "desc")]
+        subtask_descs: Vec<String>,
+
+        /// Output as JSON for machine consumption
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Assign issue to someone
     Assign {
         /// Issue ID

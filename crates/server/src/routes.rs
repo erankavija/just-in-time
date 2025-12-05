@@ -366,7 +366,7 @@ mod tests {
         let server = create_test_app();
         // Search for something that doesn't exist
         let response = server.get("/search?q=nonexistent").await;
-        
+
         if response.status_code() == StatusCode::OK {
             let search_response: SearchResponse = response.json();
             assert_eq!(search_response.query, "nonexistent");
@@ -380,7 +380,7 @@ mod tests {
     async fn test_search_response_structure() {
         let server = create_test_app();
         let response = server.get("/search?q=test&limit=10").await;
-        
+
         if response.status_code() == StatusCode::OK {
             let search_response: SearchResponse = response.json();
             assert_eq!(search_response.query, "test");

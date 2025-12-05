@@ -276,6 +276,47 @@ fn run() -> Result<()> {
                     println!("Deleted issue: {}", id);
                 }
             }
+            IssueCommands::Breakdown {
+                parent_id,
+                subtask_titles,
+                subtask_descs,
+                json,
+            } => {
+                // Pad descriptions with empty strings if not enough provided
+                let mut descs = subtask_descs.clone();
+                while descs.len() < subtask_titles.len() {
+                    descs.push(String::new());
+                }
+
+                let subtasks: Vec<(String, String)> = subtask_titles
+                    .iter()
+                    .zip(descs.iter())
+                    .map(|(t, d)| (t.clone(), d.clone()))
+                    .collect();
+
+                let subtask_ids = executor.breakdown_issue(&parent_id, subtasks)?;
+
+                if json {
+                    use output::JsonOutput;
+                    let response = serde_json::json!({
+                        "parent_id": parent_id,
+                        "subtask_ids": subtask_ids,
+                        "count": subtask_ids.len(),
+                        "message": format!("Broke down {} into {} subtasks", parent_id, subtask_ids.len())
+                    });
+                    let output = JsonOutput::success(response);
+                    println!("{}", output.to_json_string()?);
+                } else {
+                    println!(
+                        "Broke down {} into {} subtasks:",
+                        parent_id,
+                        subtask_ids.len()
+                    );
+                    for (i, id) in subtask_ids.iter().enumerate() {
+                        println!("  {}. {}", i + 1, id);
+                    }
+                }
+            }
             IssueCommands::Assign { id, assignee, json } => {
                 executor.assign_issue(&id, assignee)?;
 
@@ -327,18 +368,45 @@ fn run() -> Result<()> {
                 to_id,
                 json,
             } => match executor.add_dependency(&from_id, &to_id) {
-                Ok(_) => {
+                Ok(result) => {
+                    use commands::DependencyAddResult;
                     if json {
                         use output::JsonOutput;
+                        let (status, message) = match result {
+                            DependencyAddResult::Added => {
+                                ("added", format!("{} now depends on {}", from_id, to_id))
+                            }
+                            DependencyAddResult::Skipped { reason } => {
+                                ("skipped", format!("Dependency skipped: {}", reason))
+                            }
+                            DependencyAddResult::AlreadyExists => (
+                                "exists",
+                                format!("{} already depends on {}", from_id, to_id),
+                            ),
+                        };
                         let response = serde_json::json!({
                             "from_id": from_id,
                             "to_id": to_id,
-                            "message": format!("{} now depends on {}", from_id, to_id)
+                            "status": status,
+                            "message": message
                         });
                         let output = JsonOutput::success(response);
                         println!("{}", output.to_json_string()?);
                     } else {
-                        println!("Added dependency: {} depends on {}", from_id, to_id);
+                        match result {
+                            DependencyAddResult::Added => {
+                                println!("Added dependency: {} depends on {}", from_id, to_id);
+                            }
+                            DependencyAddResult::Skipped { reason } => {
+                                println!("Skipped: dependency not added ({})", reason);
+                            }
+                            DependencyAddResult::AlreadyExists => {
+                                println!(
+                                    "Dependency already exists: {} depends on {}",
+                                    from_id, to_id
+                                );
+                            }
+                        }
                     }
                 }
                 Err(e) => {
