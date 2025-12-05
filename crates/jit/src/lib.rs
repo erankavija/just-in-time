@@ -9,7 +9,6 @@ pub mod domain;
 pub mod graph;
 pub mod output;
 pub mod schema;
-pub mod schema_auto;
 pub mod search;
 pub mod storage;
 pub mod visualization;

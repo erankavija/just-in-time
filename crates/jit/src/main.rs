@@ -80,19 +80,19 @@ fn main() {
 fn run() -> Result<()> {
     let cli = Cli::parse();
 
-    // Handle --schema flags first
+    // Handle --schema flag first
     if cli.schema {
         use jit::CommandSchema;
-        let schema = CommandSchema::generate_auto();
+        let schema = CommandSchema::generate();
         let json = serde_json::to_string_pretty(&schema)?;
         println!("{}", json);
         return Ok(());
     }
 
     if cli.schema_auto {
-        // Keep for backwards compatibility during transition
+        // Deprecated: kept for backwards compatibility, same as --schema
         use jit::CommandSchema;
-        let schema = CommandSchema::generate_auto();
+        let schema = CommandSchema::generate();
         let json = serde_json::to_string_pretty(&schema)?;
         println!("{}", json);
         return Ok(());
