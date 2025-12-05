@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
+import remarkGfm from 'remark-gfm';
 import rehypeKatex from 'rehype-katex';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import 'katex/dist/katex.min.css';
 import './IssueDetail.css';
 import { apiClient } from '../../api/client';
@@ -187,8 +190,52 @@ export function IssueDetail({ issueId }: IssueDetailProps) {
           }}
         >
           <ReactMarkdown
-            remarkPlugins={[remarkMath]}
+            remarkPlugins={[remarkMath, remarkGfm]}
             rehypePlugins={[rehypeKatex]}
+            components={{
+              code({ node, inline, className, children, ...props }: any) {
+                const match = /language-(\w+)/.exec(className || '');
+                if (inline) {
+                  return (
+                    <code className={className} {...props} style={{
+                      backgroundColor: 'var(--bg-secondary)',
+                      padding: '2px 6px',
+                      borderRadius: '3px',
+                      fontSize: '0.9em',
+                      fontFamily: 'var(--font-mono)',
+                    }}>
+                      {children}
+                    </code>
+                  );
+                }
+                return match ? (
+                  <SyntaxHighlighter
+                    style={vscDarkPlus}
+                    language={match[1]}
+                    PreTag="div"
+                    customStyle={{
+                      margin: '1em 0',
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                    }}
+                    {...props}
+                  >
+                    {String(children).replace(/\n$/, '')}
+                  </SyntaxHighlighter>
+                ) : (
+                  <code className={className} {...props} style={{
+                    display: 'block',
+                    backgroundColor: 'var(--bg-secondary)',
+                    padding: '12px',
+                    borderRadius: '6px',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '13px',
+                  }}>
+                    {children}
+                  </code>
+                );
+              },
+            }}
           >
             {issue.description}
           </ReactMarkdown>
@@ -267,57 +314,6 @@ export function IssueDetail({ issueId }: IssueDetailProps) {
             marginBottom: '10px',
             color: 'var(--text-primary)',
           }}>
-            📎 Documents ({issue.documents.length})
-          </h2>
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-            {issue.documents.map((doc, idx) => (
-              <li key={idx} style={{ 
-                padding: '8px 10px',
-                backgroundColor: 'var(--bg-tertiary)',
-                marginBottom: '6px',
-                borderRadius: '4px',
-                fontSize: '11px',
-                border: '1px solid var(--border)',
-                fontFamily: 'var(--font-mono)',
-              }}>
-                <div style={{ 
-                  fontWeight: 600,
-                  color: 'var(--accent)',
-                  marginBottom: '4px',
-                }}>
-                  {doc.path}
-                </div>
-                {doc.label && (
-                  <div style={{ 
-                    fontSize: '10px',
-                    color: 'var(--text-muted)',
-                    marginBottom: '2px',
-                  }}>
-                    {doc.label}
-                  </div>
-                )}
-                {doc.commit && (
-                  <div style={{ 
-                    fontSize: '10px',
-                    color: 'var(--text-muted)',
-                  }}>
-                    @ {doc.commit.substring(0, 7)}
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {issue.documents && issue.documents.length > 0 && (
-        <section style={{ marginBottom: '20px' }}>
-          <h2 style={{ 
-            fontSize: '13px',
-            fontWeight: 600,
-            marginBottom: '10px',
-            color: 'var(--text-primary)',
-          }}>
             📄 Documents ({issue.documents.length})
           </h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -345,8 +341,11 @@ export function IssueDetail({ issueId }: IssueDetailProps) {
                   e.currentTarget.style.borderColor = 'var(--border)';
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: 'var(--text-primary)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                  <span style={{ 
+                    color: 'var(--text-primary)',
+                    fontWeight: 500,
+                  }}>
                     📄 {doc.label || doc.path}
                   </span>
                   {doc.commit && (
@@ -362,11 +361,17 @@ export function IssueDetail({ issueId }: IssueDetailProps) {
                     </span>
                   )}
                 </div>
+                <div style={{ 
+                  fontSize: '10px',
+                  color: 'var(--text-muted)',
+                }}>
+                  {doc.path}
+                </div>
                 {doc.doc_type && (
                   <div style={{ 
                     fontSize: '10px',
                     color: 'var(--text-muted)',
-                    marginTop: '4px',
+                    marginTop: '2px',
                   }}>
                     Type: {doc.doc_type}
                   </div>

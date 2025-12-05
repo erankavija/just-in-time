@@ -1,11 +1,33 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
+import remarkGfm from 'remark-gfm';
 import rehypeKatex from 'rehype-katex';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import mermaid from 'mermaid';
 import 'katex/dist/katex.min.css';
 import { apiClient } from '../../api/client';
 import type { DocumentReference, DocumentContent } from '../../types/models';
 import './Document.css';
+
+// Initialize mermaid
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'dark',
+  themeVariables: {
+    primaryColor: '#6366f1',
+    primaryTextColor: '#e5e7eb',
+    primaryBorderColor: '#4b5563',
+    lineColor: '#9ca3af',
+    secondaryColor: '#3b82f6',
+    tertiaryColor: '#8b5cf6',
+    background: '#1f2937',
+    mainBkg: '#1f2937',
+    textColor: '#e5e7eb',
+    fontSize: '14px',
+  },
+});
 
 interface DocumentViewerProps {
   issueId: string;
@@ -21,10 +43,37 @@ export function DocumentViewer({ issueId, documentRef, onClose }: DocumentViewer
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const mermaidContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadContent(documentRef.path, selectedCommit);
   }, [issueId, documentRef.path, selectedCommit]);
+
+  // Render mermaid diagrams after content loads
+  useEffect(() => {
+    if (content && mermaidContainerRef.current) {
+      const renderMermaid = async () => {
+        const mermaidElements = mermaidContainerRef.current?.querySelectorAll('.language-mermaid');
+        if (mermaidElements) {
+          for (let i = 0; i < mermaidElements.length; i++) {
+            const element = mermaidElements[i] as HTMLElement;
+            const code = element.textContent || '';
+            const id = `mermaid-${Date.now()}-${i}`;
+            try {
+              const { svg } = await mermaid.render(id, code);
+              element.innerHTML = svg;
+              element.classList.remove('language-mermaid');
+              element.classList.add('mermaid-rendered');
+            } catch (error) {
+              console.error('Mermaid rendering error:', error);
+              element.innerHTML = `<div style="color: var(--error); padding: 10px;">Failed to render diagram</div>`;
+            }
+          }
+        }
+      };
+      renderMermaid();
+    }
+  }, [content]);
 
   const loadContent = async (path: string, commit?: string) => {
     try {
@@ -105,10 +154,74 @@ export function DocumentViewer({ issueId, documentRef, onClose }: DocumentViewer
         </div>
       )}
 
-      <div className="document-content markdown-content">
+      <div className="document-content markdown-content" ref={mermaidContainerRef}>
         <ReactMarkdown
-          remarkPlugins={[remarkMath]}
+          remarkPlugins={[remarkMath, remarkGfm]}
           rehypePlugins={[rehypeKatex]}
+          components={{
+            code({ node, inline, className, children, ...props }: any) {
+              const match = /language-(\w+)/.exec(className || '');
+              const language = match ? match[1] : '';
+              
+              // Handle mermaid diagrams
+              if (language === 'mermaid') {
+                return (
+                  <pre className="language-mermaid" style={{ 
+                    backgroundColor: 'var(--bg-secondary)',
+                    padding: '20px',
+                    borderRadius: '6px',
+                    overflow: 'auto',
+                  }}>
+                    {String(children).replace(/\n$/, '')}
+                  </pre>
+                );
+              }
+              
+              // Handle inline code
+              if (inline) {
+                return (
+                  <code className={className} {...props} style={{
+                    backgroundColor: 'var(--bg-tertiary)',
+                    padding: '2px 6px',
+                    borderRadius: '3px',
+                    fontSize: '0.9em',
+                    fontFamily: 'var(--font-mono)',
+                  }}>
+                    {children}
+                  </code>
+                );
+              }
+              
+              // Handle code blocks with syntax highlighting
+              return match ? (
+                <SyntaxHighlighter
+                  style={vscDarkPlus}
+                  language={language}
+                  PreTag="div"
+                  customStyle={{
+                    margin: '1em 0',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                  }}
+                  {...props}
+                >
+                  {String(children).replace(/\n$/, '')}
+                </SyntaxHighlighter>
+              ) : (
+                <code className={className} {...props} style={{
+                  display: 'block',
+                  backgroundColor: 'var(--bg-tertiary)',
+                  padding: '12px',
+                  borderRadius: '6px',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '13px',
+                  overflowX: 'auto',
+                }}>
+                  {children}
+                </code>
+              );
+            },
+          }}
         >
           {content.content}
         </ReactMarkdown>
