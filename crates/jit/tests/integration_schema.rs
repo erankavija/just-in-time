@@ -75,17 +75,14 @@ fn test_schema_issue_create_details() {
 
     assert_eq!(create["description"], "Create a new issue");
 
-    // Check args
+    // Check args (issue create has no positional args)
     let args = create["args"].as_array().unwrap();
-    assert!(args
-        .iter()
-        .any(|a| a["name"] == "title" && a["required"] == true));
-    assert!(args
-        .iter()
-        .any(|a| a["name"] == "priority" && a["default"] == "normal"));
+    assert_eq!(args.len(), 0, "issue create should have no positional args");
 
-    // Check flags
+    // Check flags (title, priority are flags with automatic schema generation)
     let flags = create["flags"].as_array().unwrap();
+    assert!(flags.iter().any(|f| f["name"] == "title"));
+    assert!(flags.iter().any(|f| f["name"] == "priority"));
     assert!(flags.iter().any(|f| f["name"] == "json"));
 }
 

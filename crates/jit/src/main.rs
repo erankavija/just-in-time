@@ -83,13 +83,14 @@ fn run() -> Result<()> {
     // Handle --schema flags first
     if cli.schema {
         use jit::CommandSchema;
-        let schema = CommandSchema::generate();
+        let schema = CommandSchema::generate_auto();
         let json = serde_json::to_string_pretty(&schema)?;
         println!("{}", json);
         return Ok(());
     }
 
     if cli.schema_auto {
+        // Keep for backwards compatibility during transition
         use jit::CommandSchema;
         let schema = CommandSchema::generate_auto();
         let json = serde_json::to_string_pretty(&schema)?;
