@@ -399,6 +399,39 @@ pub enum DocCommands {
 
         /// Path to document
         path: String,
+
+        /// View document at specific commit (defaults to HEAD)
+        #[arg(long)]
+        at: Option<String>,
+    },
+
+    /// List commit history for a document
+    History {
+        /// Issue ID
+        id: String,
+
+        /// Path to document
+        path: String,
+
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Show diff between document versions
+    Diff {
+        /// Issue ID
+        id: String,
+
+        /// Path to document
+        path: String,
+
+        /// Source commit (required)
+        #[arg(long)]
+        from: String,
+
+        /// Target commit (defaults to HEAD)
+        #[arg(long)]
+        to: Option<String>,
     },
 }
 

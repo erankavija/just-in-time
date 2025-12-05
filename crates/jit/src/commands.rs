@@ -11,6 +11,15 @@ use chrono::Utc;
 use serde::Serialize;
 use std::collections::HashMap;
 
+/// Information about a git commit
+#[derive(Debug, Clone, Serialize)]
+pub struct CommitInfo {
+    pub sha: String,
+    pub author: String,
+    pub date: String,
+    pub message: String,
+}
+
 /// Status summary for all issues
 #[derive(Debug, Serialize)]
 pub struct StatusSummary {
@@ -1301,7 +1310,12 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     /// Show document content from git
-    pub fn show_document_content(&self, issue_id: &str, path: &str) -> Result<()> {
+    pub fn show_document_content(
+        &self,
+        issue_id: &str,
+        path: &str,
+        at_commit: Option<&str>,
+    ) -> Result<()> {
         use git2::Repository;
 
         let issue = self.storage.load_issue(issue_id)?;
@@ -1318,38 +1332,130 @@ impl<S: IssueStore> CommandExecutor<S> {
                 )
             })?;
 
+        // Determine which commit to view
+        let reference = if let Some(at) = at_commit {
+            at
+        } else if let Some(ref commit) = doc.commit {
+            commit.as_str()
+        } else {
+            "HEAD"
+        };
+
         // Display metadata
         println!("Document: {}", doc.path);
         if let Some(ref label) = doc.label {
             println!("Label: {}", label);
         }
-        let reference = if let Some(ref commit) = doc.commit {
-            println!("Commit: {}", commit);
-            commit.as_str()
-        } else {
-            println!("Commit: HEAD");
-            "HEAD"
-        };
+        println!("Commit: {}", reference);
         if let Some(ref doc_type) = doc.doc_type {
             println!("Type: {}", doc_type);
         }
         println!("\n---\n");
 
         // Try to read content from git
-        match Repository::open(".") {
-            Ok(repo) => match self.read_file_from_git(&repo, &doc.path, reference) {
-                Ok(content) => {
-                    println!("{}", content);
-                }
-                Err(e) => {
-                    println!("Error reading file from git: {}", e);
-                    println!("\nFallback: File may have been moved or deleted.");
-                }
-            },
-            Err(e) => {
-                println!("Not a git repository: {}", e);
-                println!("\nNote: Document content viewing requires git integration.");
+        let repo = Repository::open(".").map_err(|e| anyhow!("Not a git repository: {}", e))?;
+
+        let content = self
+            .read_file_from_git(&repo, &doc.path, reference)
+            .map_err(|e| anyhow!("Error reading file from git: {}", e))?;
+
+        println!("{}", content);
+
+        Ok(())
+    }
+
+    /// List commit history for a document
+    pub fn document_history(&self, issue_id: &str, path: &str, json: bool) -> Result<()> {
+        use git2::Repository;
+
+        let issue = self.storage.load_issue(issue_id)?;
+
+        // Verify document reference exists
+        issue
+            .documents
+            .iter()
+            .find(|d| d.path == path)
+            .ok_or_else(|| {
+                anyhow!(
+                    "Document reference {} not found in issue {}",
+                    path,
+                    issue_id
+                )
+            })?;
+
+        let repo = Repository::open(".").map_err(|e| anyhow!("Not a git repository: {}", e))?;
+
+        let commits = self.get_file_history(&repo, path)?;
+
+        if json {
+            let json_output = serde_json::to_string_pretty(&commits)?;
+            println!("{}", json_output);
+        } else {
+            println!("History for {}:", path);
+            println!();
+            for commit in commits {
+                println!("commit {}", commit.sha);
+                println!("Author: {}", commit.author);
+                println!("Date:   {}", commit.date);
+                println!();
+                println!("    {}", commit.message);
+                println!();
             }
+        }
+
+        Ok(())
+    }
+
+    /// Show diff between two versions of a document
+    pub fn document_diff(
+        &self,
+        issue_id: &str,
+        path: &str,
+        from: &str,
+        to: Option<&str>,
+    ) -> Result<()> {
+        use git2::Repository;
+
+        let issue = self.storage.load_issue(issue_id)?;
+
+        // Verify document reference exists
+        issue
+            .documents
+            .iter()
+            .find(|d| d.path == path)
+            .ok_or_else(|| {
+                anyhow!(
+                    "Document reference {} not found in issue {}",
+                    path,
+                    issue_id
+                )
+            })?;
+
+        let repo = Repository::open(".").map_err(|e| anyhow!("Not a git repository: {}", e))?;
+
+        let to_ref = to.unwrap_or("HEAD");
+
+        // Get content at both commits
+        let from_content = self.read_file_from_git(&repo, path, from)?;
+        let to_content = self.read_file_from_git(&repo, path, to_ref)?;
+
+        // Generate unified diff
+        println!("diff --git a/{} b/{}", path, path);
+        println!("--- a/{} ({})", path, from);
+        println!("+++ b/{} ({})", path, to_ref);
+        println!();
+
+        // Use similar crate for diff generation
+        use similar::{ChangeTag, TextDiff};
+        let diff = TextDiff::from_lines(&from_content, &to_content);
+
+        for change in diff.iter_all_changes() {
+            let sign = match change.tag() {
+                ChangeTag::Delete => "-",
+                ChangeTag::Insert => "+",
+                ChangeTag::Equal => " ",
+            };
+            print!("{}{}", sign, change);
         }
 
         Ok(())
@@ -1370,6 +1476,59 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let content = std::str::from_utf8(blob.content())?;
         Ok(content.to_string())
+    }
+
+    /// Get commit history for a file
+    fn get_file_history(&self, repo: &git2::Repository, path: &str) -> Result<Vec<CommitInfo>> {
+        let mut revwalk = repo.revwalk()?;
+        revwalk.push_head()?;
+
+        let mut commits = Vec::new();
+        let file_path = std::path::Path::new(path);
+
+        for oid in revwalk {
+            let oid = oid?;
+            let commit = repo.find_commit(oid)?;
+
+            // Check if this commit touches the file
+            let tree = commit.tree()?;
+            if tree.get_path(file_path).is_ok() {
+                // Check if this commit modified the file (not just has it)
+                let parent_count = commit.parent_count();
+                let mut modified = parent_count == 0; // Root commit always counts
+
+                if !modified && parent_count > 0 {
+                    let parent = commit.parent(0)?;
+                    let parent_tree = parent.tree()?;
+
+                    // Compare file content with parent
+                    let current_entry = tree.get_path(file_path).ok();
+                    let parent_entry = parent_tree.get_path(file_path).ok();
+
+                    modified = match (current_entry, parent_entry) {
+                        (Some(curr), Some(par)) => curr.id() != par.id(),
+                        (Some(_), None) => true, // File added
+                        _ => false,
+                    };
+                }
+
+                if modified {
+                    let author = commit.author();
+                    let time = commit.time();
+                    let datetime =
+                        chrono::DateTime::from_timestamp(time.seconds(), 0).unwrap_or_default();
+
+                    commits.push(CommitInfo {
+                        sha: format!("{:.7}", oid),
+                        author: author.name().unwrap_or("Unknown").to_string(),
+                        date: datetime.format("%Y-%m-%d %H:%M:%S").to_string(),
+                        message: commit.message().unwrap_or("").trim().to_string(),
+                    });
+                }
+            }
+        }
+
+        Ok(commits)
     }
 }
 

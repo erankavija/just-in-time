@@ -1028,9 +1028,86 @@ impl CommandSchema {
                         description: Some("Path to document".to_string()),
                     },
                 ],
-                flags: vec![],
+                flags: vec![Flag {
+                    name: "at".to_string(),
+                    flag_type: "string".to_string(),
+                    description: "View document at specific commit (defaults to HEAD)".to_string(),
+                }],
                 output: Some(OutputSchema {
                     success: "DocumentContent".to_string(),
+                    error: "ErrorResponse".to_string(),
+                }),
+            },
+        );
+
+        subcommands.insert(
+            "history".to_string(),
+            Command {
+                description: "List commit history for a document".to_string(),
+                subcommands: None,
+                args: vec![
+                    Argument {
+                        name: "id".to_string(),
+                        arg_type: "string".to_string(),
+                        required: true,
+                        default: None,
+                        description: Some("Issue ID".to_string()),
+                    },
+                    Argument {
+                        name: "path".to_string(),
+                        arg_type: "string".to_string(),
+                        required: true,
+                        default: None,
+                        description: Some("Path to document".to_string()),
+                    },
+                ],
+                flags: vec![Flag {
+                    name: "json".to_string(),
+                    flag_type: "boolean".to_string(),
+                    description: "Output JSON format".to_string(),
+                }],
+                output: Some(OutputSchema {
+                    success: "CommitHistory".to_string(),
+                    error: "ErrorResponse".to_string(),
+                }),
+            },
+        );
+
+        subcommands.insert(
+            "diff".to_string(),
+            Command {
+                description: "Show diff between document versions".to_string(),
+                subcommands: None,
+                args: vec![
+                    Argument {
+                        name: "id".to_string(),
+                        arg_type: "string".to_string(),
+                        required: true,
+                        default: None,
+                        description: Some("Issue ID".to_string()),
+                    },
+                    Argument {
+                        name: "path".to_string(),
+                        arg_type: "string".to_string(),
+                        required: true,
+                        default: None,
+                        description: Some("Path to document".to_string()),
+                    },
+                ],
+                flags: vec![
+                    Flag {
+                        name: "from".to_string(),
+                        flag_type: "string".to_string(),
+                        description: "Source commit (required)".to_string(),
+                    },
+                    Flag {
+                        name: "to".to_string(),
+                        flag_type: "string".to_string(),
+                        description: "Target commit (defaults to HEAD)".to_string(),
+                    },
+                ],
+                output: Some(OutputSchema {
+                    success: "DocumentDiff".to_string(),
                     error: "ErrorResponse".to_string(),
                 }),
             },

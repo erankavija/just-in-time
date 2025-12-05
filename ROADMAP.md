@@ -122,13 +122,15 @@
 
 **Goal:** Maintain clean, well-documented, maintainable codebase.
 
-**Current Status (2025-12-05 - Evening):**
+**Current Status:**
 - ✅ All modules have module-level docs
 - ✅ Zero rustdoc warnings in default mode
 - ✅ Zero clippy warnings
-- ✅ **387+ tests passing** (381 jit + 9 server + 16 frontend)
+- ✅ **392+ tests passing** (171 lib + 161 integration + others)
+- ✅ **Transitive reduction implemented** - storage-level minimal edge set
+- ✅ **Issue breakdown command** - foolproof task decomposition for agents
 - ✅ main.rs at 843 lines (under 1,000 threshold)
-- ✅ commands.rs at 2,134 lines (critical methods documented)
+- ✅ commands.rs at 2,600+ lines (well-tested, comprehensive)
 - ✅ jit-server crate with search API endpoint
 - ✅ Thread-safe InMemoryStorage (refactored for async)
 - ✅ Responsive web UI with search functionality
@@ -197,7 +199,7 @@
   - `jit doc show` reads file content from git
   - Supports reading at HEAD or specific commits
 
-**Phase 2.1: REST API Server** ✅ (2025-12-03)
+**Phase 2.1: REST API Server** ✅
 - [x] Web API server with Axum framework
   - GET /api/health - Health check
   - GET /api/issues - List all issues
@@ -277,7 +279,7 @@
   - Graceful degradation when ripgrep not installed
   - JSON output support for automation
   - Zero dependencies (uses system ripgrep)
-- [x] **Responsive search UI (Phase 3.1b)** ✅ - **COMPLETE (2025-12-05)**
+- [x] **Responsive search UI (Phase 3.1b)** ✅ - **COMPLETE**
   - Web UI search bar with instant client-side results
   - Hybrid client + server search strategy
   - 16 tests covering search logic and integration
@@ -290,7 +292,7 @@
 
 ### Production Readiness
 
-- [x] **File locking for multi-agent safety** - **COMPLETE (2025-12-03)** ✅
+- [x] **File locking for multi-agent safety** - **COMPLETE** ✅
   - [x] Research locking strategy (flock vs advisory locks vs process-based locking) - **Decision: fs4 with advisory locks**
   - [x] Add locking abstraction to storage layer (lock_file/unlock_file methods) - **FileLocker + LockGuard**
   - [x] Implement file-level locking for atomic operations (index.json, individual issues) - **Phase 1.1 Complete**

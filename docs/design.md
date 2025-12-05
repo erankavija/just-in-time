@@ -124,14 +124,15 @@ Issue management
 - jit issue show <id>
 - jit issue update <id> [--title ...] [--desc ...] [--priority ...]
 - jit issue delete <id>
+- **jit issue breakdown <parent_id> --subtask "Title" --desc "Desc"** (atomically creates subtasks with automatic dependency inheritance)
 Assignment (for agent coordination)
 - jit issue assign <id> --to <assignee>
 - jit issue claim <id> --to <assignee>     (atomic: only succeeds if unassigned)
 - jit issue unassign <id>
 - jit issue claim-next [--filter "..."] --to <assignee>  (find and claim first ready issue)
 Dependencies
-- jit issue dep add <id> --on <depId>
-- jit issue dep rm <id> --on <depId>
+- jit dep add <from_id> <to_id> (from now depends on to; automatically skips if transitive)
+- jit dep rm <from_id> <to_id>
 Gates
 - jit gate add <id> <gate_key>
 - jit gate pass <id> <gate_key> [--by actor]

@@ -793,8 +793,14 @@ fn run() -> Result<()> {
             DocCommands::Remove { id, path, json } => {
                 executor.remove_document_reference(&id, &path, json)?;
             }
-            DocCommands::Show { id, path } => {
-                executor.show_document_content(&id, &path)?;
+            DocCommands::Show { id, path, at } => {
+                executor.show_document_content(&id, &path, at.as_deref())?;
+            }
+            DocCommands::History { id, path, json } => {
+                executor.document_history(&id, &path, json)?;
+            }
+            DocCommands::Diff { id, path, from, to } => {
+                executor.document_diff(&id, &path, &from, to.as_deref())?;
             }
         },
         Commands::Query(query_cmd) => match query_cmd {
