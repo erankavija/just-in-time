@@ -1,0 +1,57 @@
+name: Security Audit
+
+on:
+  # Run weekly on Monday at 00:00 UTC
+  schedule:
+    - cron: '0 0 * * 1'
+  # Run on dependency file changes
+  push:
+    branches: [ main ]
+    paths:
+      - '**/Cargo.lock'
+      - '**/package-lock.json'
+  # Allow manual trigger
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Cache cargo-audit
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-audit
+          key: ${{ runner.os }}-cargo-audit
+      
+      - name: Install cargo-audit
+        run: cargo install cargo-audit || true
+      
+      - name: Run Rust security audit
+        run: cargo audit
+        continue-on-error: true
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Audit MCP server dependencies
+        working-directory: mcp-server
+        run: npm audit --production
+        continue-on-error: true
+      
+      - name: Audit Web UI dependencies
+        working-directory: web
+        run: npm audit --production
+        continue-on-error: true

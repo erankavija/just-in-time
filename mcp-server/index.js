@@ -216,6 +216,11 @@ async function executeTool(name, args) {
           for (const item of value) {
             flagArgs.push(`--${key} "${item}"`);
           }
+        } else if (typeof value === 'boolean') {
+          // Boolean flags: only add if true, without value
+          if (value) {
+            flagArgs.push(`--${key}`);
+          }
         } else if (value !== undefined && value !== "") {
           flagArgs.push(`--${key} "${value}"`);
         }
@@ -228,6 +233,11 @@ async function executeTool(name, args) {
         if (Array.isArray(value)) {
           for (const item of value) {
             flagArgs.push(`--${key} "${item}"`);
+          }
+        } else if (typeof value === 'boolean') {
+          // Boolean flags: only add if true, without value
+          if (value) {
+            flagArgs.push(`--${key}`);
           }
         } else if (value !== undefined && value !== "") {
           flagArgs.push(`--${key} "${value}"`);
@@ -264,6 +274,11 @@ async function executeTool(name, args) {
         if (Array.isArray(value)) {
           for (const item of value) {
             flagArgs.push(`--${key} "${item}"`);
+          }
+        } else if (typeof value === 'boolean') {
+          // Boolean flags: only add if true, without value
+          if (value) {
+            flagArgs.push(`--${key}`);
           }
         } else if (value !== undefined && value !== "") {
           flagArgs.push(`--${key} "${value}"`);

@@ -1,5 +1,9 @@
 # Just-In-Time Issue Tracker
 
+[![CI](https://github.com/vkaskivuo/just-in-time/actions/workflows/ci.yml/badge.svg)](https://github.com/vkaskivuo/just-in-time/actions/workflows/ci.yml)
+[![Docker](https://github.com/vkaskivuo/just-in-time/actions/workflows/docker.yml/badge.svg)](https://github.com/vkaskivuo/just-in-time/actions/workflows/docker.yml)
+[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
+
 **Enable AI agents to orchestrate their own work.** A repository-local CLI issue tracker that lets a lead agent break down complex tasks and coordinate multiple worker agents—with dependency management, quality gates, and full observability.
 
 ## Why JIT?
@@ -23,17 +27,39 @@ Traditional issue trackers are designed for humans. JIT is designed for **AI age
 
 ## Quick Start
 
+### Installation
+
+**Pre-built binaries (Linux x64):**
 ```bash
-# 1. Install (requires Rust)
-cd cli && cargo build --release
+wget https://github.com/vkaskivuo/just-in-time/releases/latest/download/jit-linux-x64.tar.gz
+tar -xzf jit-linux-x64.tar.gz
+sudo mv jit jit-server jit-dispatch /usr/local/bin/
+```
 
-# 2. Initialize in your project (creates .jit/ directory)
-./target/release/jit init
+**Docker:**
+```bash
+docker-compose up -d
+# Access Web UI at http://localhost:8080
+# API at http://localhost:3000
+```
 
-# 3. Create your first issue
+**From source:**
+```bash
+cargo build --release --workspace
+```
+
+See [INSTALL.md](INSTALL.md) for all installation options.
+
+### Usage
+
+```bash
+# 1. Initialize in your project (creates .jit/ directory)
+jit init
+
+# 2. Create your first issue
 jit issue create --title "Implement login feature" --priority high
 
-# 4. Setup coordinator for agent orchestration  
+# 3. Setup coordinator for agent orchestration  
 jit coordinator init-config
 
 # That's it! Now agents can create issues, claim work, and coordinate.
@@ -386,6 +412,8 @@ File locking ensures data consistency. See [docs/file-locking-usage.md](docs/fil
 
 ## Documentation
 
+- [INSTALL.md](INSTALL.md) - Installation guide (binaries, Docker, from source)
+- [DEPLOYMENT.md](DEPLOYMENT.md) - Production deployment guide
 - [EXAMPLE.md](EXAMPLE.md) - Complete agent orchestration walkthrough
 - [docs/design.md](docs/design.md) - Detailed design specifications
 - [docs/file-locking-usage.md](docs/file-locking-usage.md) - Multi-agent concurrency guide

@@ -1462,6 +1462,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     /// Read file content from git at a specific reference (public API for server)
+    #[allow(dead_code)]
     pub fn read_document_content(
         &self,
         issue_id: &str,
@@ -1509,6 +1510,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     /// Get document history (public API for server)
+    #[allow(dead_code)]
     pub fn get_document_history(&self, issue_id: &str, path: &str) -> Result<Vec<CommitInfo>> {
         use git2::Repository;
 
@@ -1533,6 +1535,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     /// Get document diff (public API for server)
+    #[allow(dead_code)]
     pub fn get_document_diff(
         &self,
         issue_id: &str,

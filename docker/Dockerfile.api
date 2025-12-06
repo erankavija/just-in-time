@@ -1,0 +1,39 @@
+# Lightweight API server image (Linux only)
+
+FROM rust:alpine as builder
+
+WORKDIR /build
+
+# Install build dependencies
+RUN apk add --no-cache musl-dev pkgconfig openssl-dev openssl-libs-static
+
+# Copy workspace files
+COPY Cargo.toml Cargo.lock ./
+COPY crates/ ./crates/
+
+# Build only the API server
+RUN cargo build --release --bin jit-server
+
+# Runtime stage
+FROM alpine:latest
+
+WORKDIR /app
+
+# Install runtime dependencies
+RUN apk add --no-cache ca-certificates ripgrep libgcc
+
+# Copy binary
+COPY --from=builder /build/target/release/jit-server /usr/local/bin/
+
+# Create data directory
+RUN mkdir -p /data && chmod 777 /data
+
+ENV JIT_DATA_DIR=/data
+EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1
+
+USER nobody
+
+CMD ["jit-server"]

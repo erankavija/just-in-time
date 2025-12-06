@@ -1,0 +1,137 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
+      - '.gitignore'
+  pull_request:
+    branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
+      - '.gitignore'
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  test-rust:
+    name: Test Rust Components
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+      
+      - name: Install ripgrep (for search tests)
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
+      
+      - name: Check formatting
+        run: cargo fmt -- --check
+      
+      - name: Run clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+      
+      - name: Build all crates
+        run: cargo build --workspace --verbose
+      
+      - name: Run tests
+        run: cargo test --workspace --verbose
+      
+      - name: Run integration tests
+        run: |
+          cd crates/jit
+          cargo test --test '*' --verbose
+
+  test-mcp-server:
+    name: Test MCP Server
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          # Note: cache disabled for act compatibility
+          # Real GitHub Actions will still benefit from npm's own cache
+      
+      - name: Install dependencies
+        working-directory: mcp-server
+        run: npm ci
+      
+      - name: Install ripgrep (for search tests)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ripgrep
+      
+      - name: Build Rust CLI (needed for MCP tests)
+        run: cargo build --release --bin jit
+      
+      - name: Run MCP tests
+        working-directory: mcp-server
+        run: |
+          export PATH="${GITHUB_WORKSPACE}/target/release:$PATH"
+          npm test
+
+  test-web-ui:
+    name: Test Web UI
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          # Note: cache disabled for act compatibility
+          # Real GitHub Actions will still benefit from npm's own cache
+      
+      - name: Install dependencies
+        working-directory: web
+        run: npm ci
+      
+      - name: Run linter
+        working-directory: web
+        run: npm run lint
+      
+      - name: Run tests
+        working-directory: web
+        run: npm test
+      
+      - name: Build for production
+        working-directory: web
+        run: npm run build
+
+  # Security audit moved to separate weekly workflow (security-audit.yml)
+  # This reduces CI time by ~2 minutes per run
+  # Run manually with: gh workflow run security-audit.yml

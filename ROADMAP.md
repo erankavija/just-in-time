@@ -268,6 +268,15 @@
   - [x] Terminal-style CSS theming
   - [x] Comprehensive test coverage (13 new tests)
   - [x] See `docs/document-viewer-implementation-plan.md` for details
+- [x] **Enhanced markdown rendering (Phase 2.4.2)** ✅
+  - [x] Syntax highlighting with react-syntax-highlighter (100+ languages)
+  - [x] VS Code Dark+ theme matching terminal aesthetic
+  - [x] Mermaid diagram rendering (flowcharts, sequences, class diagrams)
+  - [x] GitHub Flavored Markdown support (tables, strikethrough, task lists)
+  - [x] Custom dark theme for Mermaid diagrams
+  - [x] React 19 compatibility fixes for test suite
+  - [x] All 38 tests passing with zero warnings
+  - [x] Improved UX: single clickable Documents section
 - [ ] State transition buttons (change issue state from UI) (Deferred)
 - [ ] Real-time updates (polling or WebSocket) (Deferred)
 - [ ] Export graph as PNG/SVG (Deferred)

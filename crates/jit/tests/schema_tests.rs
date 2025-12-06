@@ -116,7 +116,7 @@ fn test_schema_type_definitions() {
     assert!(state_obj.contains_key("enum"));
 
     let variants = state_obj.get("enum").unwrap().as_array().unwrap();
-    assert!(variants.len() > 0);
+    assert!(!variants.is_empty());
 }
 
 #[test]

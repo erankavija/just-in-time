@@ -225,17 +225,25 @@ web/
 
 ---
 
-#### 2.4 Document Viewer
+#### 2.4 Document Viewer ✅ **COMPLETE**
 **Actions:**
-- [ ] Markdown rendering with `react-markdown`
-- [ ] Code syntax highlighting with Prism
-- [ ] Support for images (relative paths resolved)
-- [ ] Table of contents generation
-- [ ] Print/export to PDF
-- [ ] Link to view document at specific commit
-- [ ] "View in GitHub" link
+- [x] Markdown rendering with `react-markdown`
+- [x] Code syntax highlighting with react-syntax-highlighter (100+ languages)
+- [x] VS Code Dark+ theme for syntax highlighting
+- [x] Mermaid diagram rendering (flowcharts, sequences, class diagrams, etc.)
+- [x] GitHub Flavored Markdown support (tables, strikethrough, task lists)
+- [x] LaTeX math formulas with KaTeX
+- [x] Modal overlay document viewer
+- [x] Document history with commit timeline
+- [x] Link to view document at specific commit
+- [x] Integration with issue detail panel
+- [ ] Support for images (relative paths resolved) (Deferred)
+- [ ] Table of contents generation (Deferred)
+- [ ] Print/export to PDF (Deferred)
+- [ ] "View in GitHub" link (Deferred)
 
-**Estimated**: 4-6 hours
+**Status**: Production-ready with comprehensive markdown rendering
+**Actual time**: ~12 hours (including test fixes)
 
 ---
 
@@ -257,16 +265,19 @@ web/
 
 ---
 
-#### 3.2 Historical Document Viewer
+#### 3.2 Historical Document Viewer ✅ **COMPLETE**
 **Actions:**
-- [ ] "Time machine" UI: select commit to view
-- [ ] Git log integration (list commits for a file)
-- [ ] Side-by-side diff view (compare versions)
-- [ ] "View as of date" feature
-- [ ] Commit message display
-- [ ] Link to full commit in GitHub
+- [x] "Time machine" UI: select commit to view (DocumentHistory component)
+- [x] Git log integration (list commits for a file)
+- [x] View document at any commit via API
+- [x] "View as of date" feature (commit timeline)
+- [x] Commit message display
+- [x] Author and timestamp for each commit
+- [ ] Side-by-side diff view (compare versions) (Deferred)
+- [ ] Link to full commit in GitHub (Deferred)
 
-**Estimated**: 8-10 hours
+**Status**: Core functionality complete
+**Implementation**: CLI commands (`jit doc history`, `jit doc diff`) + Web UI with commit timeline
 
 ---
 

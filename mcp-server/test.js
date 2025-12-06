@@ -7,7 +7,9 @@
  */
 
 import { spawn } from 'child_process';
-import { readFileSync } from 'fs';
+import { readFileSync, mkdirSync, rmSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 
 const TIMEOUT = 5000; // 5 seconds per test
 
@@ -17,12 +19,21 @@ class MCPTester {
     this.responseBuffer = '';
     this.pendingRequests = new Map();
     this.nextId = 1;
+    this.testDir = null;
   }
 
   async start() {
+    // Create temporary test directory
+    this.testDir = join(tmpdir(), `jit-mcp-test-${Date.now()}`);
+    mkdirSync(this.testDir, { recursive: true });
+    
+    // Get absolute path to index.js (in mcp-server directory)
+    const serverPath = join(process.cwd(), 'index.js');
+    
     return new Promise((resolve, reject) => {
-      this.server = spawn('node', ['index.js'], {
-        stdio: ['pipe', 'pipe', 'pipe']
+      this.server = spawn('node', [serverPath], {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        cwd: this.testDir  // Run in test directory
       });
 
       this.server.stdout.on('data', (data) => {
@@ -94,6 +105,15 @@ class MCPTester {
     if (this.server) {
       this.server.kill();
       this.server = null;
+    }
+    
+    // Clean up test directory
+    if (this.testDir) {
+      try {
+        rmSync(this.testDir, { recursive: true, force: true });
+      } catch (err) {
+        console.error('Warning: Failed to clean up test directory:', err.message);
+      }
     }
   }
 }
@@ -207,17 +227,11 @@ const tests = [
       const content = response.result.content[0];
       assert(content.type === 'text', 'Content should be text');
       
-      // Check if it's an error or success
-      if (content.text.startsWith('Error:')) {
-        console.log(`  ⚠ Status failed (no JIT_DATA_DIR inheritance)`);
-        return; // Skip this test - env vars don't propagate to spawned process
-      }
-      
+      // MCP server unwraps the {success, data} wrapper
       const output = JSON.parse(content.text);
-      assert(output.data, 'Should have data field');
-      assert(typeof output.data.open === 'number', 'Should have open count');
+      assert(typeof output.total === 'number', 'Should have total count');
       
-      console.log(`  ✓ Status: ${output.data.total} total issues`);
+      console.log(`  ✓ Status: ${output.total} total issues`);
     }
   },
 
@@ -294,14 +308,13 @@ const tests = [
       const content = response.result.content[0];
       assert(content.type === 'text', 'Content should be text');
       
-      // Parse the output
+      // Parse the output (MCP server unwraps {success, data})
       const output = JSON.parse(content.text);
-      assert(output.data, 'Should have data field');
-      assert(output.data.query === 'priority', 'Should echo query');
-      assert(typeof output.data.total === 'number', 'Should have total count');
-      assert(Array.isArray(output.data.results), 'Should have results array');
+      assert(output.query === 'priority', 'Should echo query');
+      assert(typeof output.total === 'number', 'Should have total count');
+      assert(Array.isArray(output.results), 'Should have results array');
       
-      console.log(`  ✓ Search returned ${output.data.total} results`);
+      console.log(`  ✓ Search returned ${output.total} results`);
     }
   },
 
@@ -317,8 +330,16 @@ const tests = [
       });
 
       assert(response.result, 'Should have result');
-      const output = JSON.parse(response.result.content[0].text);
-      assert(output.data, 'Should have data');
+      const text = response.result.content[0].text;
+      
+      // Check if it's specifically a ripgrep-not-installed error
+      if (text.includes('ripgrep') && text.includes('not installed')) {
+        console.log(`  ⚠ Regex search skipped (ripgrep not installed)`);
+        return;
+      }
+      
+      const output = JSON.parse(text);
+      assert(Array.isArray(output.results), 'Should have results');
       
       console.log(`  ✓ Regex search works`);
     }
@@ -336,16 +357,23 @@ const tests = [
       });
 
       assert(response.result, 'Should have result');
-      const output = JSON.parse(response.result.content[0].text);
-      assert(output.data, 'Should have data');
-      assert(Array.isArray(output.data.results), 'Should have results');
+      const text = response.result.content[0].text;
       
-      // All results should be from .json files
-      for (const result of output.data.results) {
+      // Check if it's specifically a ripgrep-not-installed error
+      if (text.includes('ripgrep') && text.includes('not installed')) {
+        console.log(`  ⚠ Glob search skipped (ripgrep not installed)`);
+        return;
+      }
+      
+      const output = JSON.parse(text);
+      assert(Array.isArray(output.results), 'Should have results');
+      
+      // All results should be from .json files (if any results)
+      for (const result of output.results) {
         assert(result.path.endsWith('.json'), 'Should only match .json files');
       }
       
-      console.log(`  ✓ Glob filter works (${output.data.total} JSON matches)`);
+      console.log(`  ✓ Glob filter works (${output.total} JSON matches)`);
     }
   }
 ];

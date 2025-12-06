@@ -1,0 +1,47 @@
+# Git
+.git
+.gitignore
+.github
+
+# Build artifacts
+target/
+*/target/
+dist/
+*/dist/
+
+# Dependencies
+node_modules/
+*/node_modules/
+
+# JIT data
+.jit/
+*/.jit/
+
+# Temporary files
+*.tmp
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# Test outputs
+test-output.log
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Lock files (we copy these explicitly)
+.index.lock

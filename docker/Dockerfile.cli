@@ -1,0 +1,34 @@
+# Lightweight CLI image (Linux only)
+
+FROM rust:alpine as builder
+
+WORKDIR /build
+
+# Install build dependencies
+RUN apk add --no-cache musl-dev pkgconfig openssl-dev openssl-libs-static
+
+# Copy workspace files
+COPY Cargo.toml Cargo.lock ./
+COPY crates/ ./crates/
+
+# Build only the CLI
+RUN cargo build --release --bin jit
+
+# Runtime stage
+FROM alpine:latest
+
+WORKDIR /app
+
+# Install runtime dependencies
+RUN apk add --no-cache ca-certificates ripgrep
+
+# Copy binary
+COPY --from=builder /build/target/release/jit /usr/local/bin/
+
+# Create data directory
+RUN mkdir -p /data && chmod 777 /data
+
+ENV JIT_DATA_DIR=/data
+
+ENTRYPOINT ["jit"]
+CMD ["--help"]

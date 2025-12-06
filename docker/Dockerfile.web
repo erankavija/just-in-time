@@ -1,0 +1,30 @@
+# Static Web UI with Nginx (Linux only)
+
+FROM node:20-alpine as builder
+
+WORKDIR /build
+
+# Copy and install dependencies
+COPY web/package*.json ./
+RUN npm ci
+
+# Copy source and build
+COPY web/ ./
+RUN npm run build
+
+# Runtime stage with nginx
+FROM nginx:alpine
+
+# Copy built files
+COPY --from=builder /build/dist /usr/share/nginx/html
+
+# Copy nginx configuration
+COPY docker/nginx.conf /etc/nginx/nginx.conf
+
+EXPOSE 80
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost/ || exit 1
+
+CMD ["nginx", "-g", "daemon off;"]

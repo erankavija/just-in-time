@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
 interface SearchBarProps {
   onSearch: (query: string) => void;
@@ -15,23 +15,22 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   error = null,
   resultCount,
 }) => {
-  const [localQuery, setLocalQuery] = useState(controlledQuery || '');
-
-  // Sync with controlled query prop
-  useEffect(() => {
-    if (controlledQuery !== undefined) {
-      setLocalQuery(controlledQuery);
-    }
-  }, [controlledQuery]);
+  // Use controlled query if provided, otherwise use local state
+  const [localQuery, setLocalQuery] = useState('');
+  const query = controlledQuery !== undefined ? controlledQuery : localQuery;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newQuery = e.target.value;
-    setLocalQuery(newQuery);
+    if (controlledQuery === undefined) {
+      setLocalQuery(newQuery);
+    }
     onSearch(newQuery);
   };
 
   const handleClear = () => {
-    setLocalQuery('');
+    if (controlledQuery === undefined) {
+      setLocalQuery('');
+    }
     onSearch('');
   };
 
@@ -102,12 +101,12 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           type="text"
           style={styles.input}
           placeholder="Search issues..."
-          value={localQuery}
+          value={query}
           onChange={handleChange}
           aria-label="Search"
         />
         
-        {localQuery && (
+        {query && (
           <button
             style={styles.clearButton}
             onClick={handleClear}
@@ -129,7 +128,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         </div>
       )}
       
-      {localQuery && resultCount !== undefined && !error && (
+      {query && resultCount !== undefined && !error && (
         <div style={styles.resultCount}>
           {resultCount} {resultCount === 1 ? 'result' : 'results'}
         </div>

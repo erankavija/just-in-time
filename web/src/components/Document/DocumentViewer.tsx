@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import remarkGfm from 'remark-gfm';
@@ -8,7 +8,7 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import mermaid from 'mermaid';
 import 'katex/dist/katex.min.css';
 import { apiClient } from '../../api/client';
-import type { DocumentReference, DocumentContent } from '../../types/models';
+import type { DocumentReference, DocumentContent, DocumentHistory } from '../../types/models';
 import './Document.css';
 
 // Initialize mermaid
@@ -45,10 +45,6 @@ export function DocumentViewer({ issueId, documentRef, onClose }: DocumentViewer
   const [showHistory, setShowHistory] = useState(false);
   const mermaidContainerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    loadContent(documentRef.path, selectedCommit);
-  }, [issueId, documentRef.path, selectedCommit]);
-
   // Render mermaid diagrams after content loads
   useEffect(() => {
     if (content && mermaidContainerRef.current) {
@@ -75,7 +71,7 @@ export function DocumentViewer({ issueId, documentRef, onClose }: DocumentViewer
     }
   }, [content]);
 
-  const loadContent = async (path: string, commit?: string) => {
+  const loadContent = useCallback(async (path: string, commit?: string) => {
     try {
       setLoading(true);
       setError(null);
@@ -87,7 +83,11 @@ export function DocumentViewer({ issueId, documentRef, onClose }: DocumentViewer
     } finally {
       setLoading(false);
     }
-  };
+  }, [issueId]);
+
+  useEffect(() => {
+    loadContent(documentRef.path, selectedCommit);
+  }, [documentRef.path, selectedCommit, loadContent]);
 
   if (loading) {
     return (
@@ -159,9 +159,10 @@ export function DocumentViewer({ issueId, documentRef, onClose }: DocumentViewer
           remarkPlugins={[remarkMath, remarkGfm]}
           rehypePlugins={[rehypeKatex]}
           components={{
-            code({ node, inline, className, children, ...props }: any) {
+            code({ className, children, ...props }) {
               const match = /language-(\w+)/.exec(className || '');
               const language = match ? match[1] : '';
+              const isInline = !className;
               
               // Handle mermaid diagrams
               if (language === 'mermaid') {
@@ -178,7 +179,7 @@ export function DocumentViewer({ issueId, documentRef, onClose }: DocumentViewer
               }
               
               // Handle inline code
-              if (inline) {
+              if (isInline) {
                 return (
                   <code className={className} {...props} style={{
                     backgroundColor: 'var(--bg-tertiary)',
@@ -193,20 +194,21 @@ export function DocumentViewer({ issueId, documentRef, onClose }: DocumentViewer
               }
               
               // Handle code blocks with syntax highlighting
+              // Note: Type assertions needed due to react-syntax-highlighter v16 type definitions
               return match ? (
                 <SyntaxHighlighter
-                  style={vscDarkPlus}
-                  language={language}
-                  PreTag="div"
-                  customStyle={{
-                    margin: '1em 0',
-                    borderRadius: '6px',
-                    fontSize: '13px',
-                  }}
-                  {...props}
-                >
-                  {String(children).replace(/\n$/, '')}
-                </SyntaxHighlighter>
+                  {...({
+                    style: vscDarkPlus,
+                    language,
+                    PreTag: 'div',
+                    customStyle: {
+                      margin: '1em 0',
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                    },
+                    children: String(children).replace(/\n$/, ''),
+                  } as React.ComponentProps<typeof SyntaxHighlighter>)}
+                />
               ) : (
                 <code className={className} {...props} style={{
                   display: 'block',
@@ -250,15 +252,11 @@ interface DocumentHistoryProps {
 }
 
 function DocumentHistory({ issueId, path, currentCommit, onSelectCommit }: DocumentHistoryProps) {
-  const [history, setHistory] = useState<any>(null);
+  const [history, setHistory] = useState<DocumentHistory | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadHistory();
-  }, [issueId, path]);
-
-  const loadHistory = async () => {
+  const loadHistory = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -270,7 +268,11 @@ function DocumentHistory({ issueId, path, currentCommit, onSelectCommit }: Docum
     } finally {
       setLoading(false);
     }
-  };
+  }, [issueId, path]);
+
+  useEffect(() => {
+    loadHistory();
+  }, [loadHistory]);
 
   if (loading) {
     return <div style={{ padding: '10px', color: 'var(--text-muted)' }}>Loading history...</div>;
@@ -287,7 +289,7 @@ function DocumentHistory({ issueId, path, currentCommit, onSelectCommit }: Docum
   return (
     <div className="commit-list">
       <h4>Commit History</h4>
-      {history.commits.map((commit: any) => (
+      {history.commits.map((commit) => (
         <div
           key={commit.commit}
           className={`commit-item ${commit.commit === currentCommit ? 'active' : ''}`}

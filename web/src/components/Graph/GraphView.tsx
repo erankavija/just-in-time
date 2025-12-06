@@ -84,11 +84,7 @@ export function GraphView({ onNodeClick }: GraphViewProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadGraph();
-  }, []);
-
-  const loadGraph = async () => {
+  const loadGraph = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -181,7 +177,11 @@ export function GraphView({ onNodeClick }: GraphViewProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [setNodes, setEdges]);
+
+  useEffect(() => {
+    loadGraph();
+  }, [loadGraph]);
 
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
@@ -246,15 +246,7 @@ export function GraphView({ onNodeClick }: GraphViewProps) {
         attributionPosition="bottom-right"
         proOptions={{ hideAttribution: true }}
       >
-        <Controls 
-          style={{
-            button: {
-              backgroundColor: 'var(--bg-tertiary)',
-              borderColor: 'var(--border)',
-              color: 'var(--text-primary)',
-            }
-          }}
-        />
+        <Controls />
         <Background 
           color="var(--border)" 
           gap={16}

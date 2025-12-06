@@ -193,9 +193,10 @@ export function IssueDetail({ issueId }: IssueDetailProps) {
             remarkPlugins={[remarkMath, remarkGfm]}
             rehypePlugins={[rehypeKatex]}
             components={{
-              code({ node, inline, className, children, ...props }: any) {
+              code({ className, children, ...props }) {
                 const match = /language-(\w+)/.exec(className || '');
-                if (inline) {
+                const isInline = !className;
+                if (isInline) {
                   return (
                     <code className={className} {...props} style={{
                       backgroundColor: 'var(--bg-secondary)',
@@ -208,20 +209,21 @@ export function IssueDetail({ issueId }: IssueDetailProps) {
                     </code>
                   );
                 }
+                // Note: Type assertions needed due to react-syntax-highlighter v16 type definitions
                 return match ? (
                   <SyntaxHighlighter
-                    style={vscDarkPlus}
-                    language={match[1]}
-                    PreTag="div"
-                    customStyle={{
-                      margin: '1em 0',
-                      borderRadius: '6px',
-                      fontSize: '13px',
-                    }}
-                    {...props}
-                  >
-                    {String(children).replace(/\n$/, '')}
-                  </SyntaxHighlighter>
+                    {...({
+                      style: vscDarkPlus,
+                      language: match[1],
+                      PreTag: 'div',
+                      customStyle: {
+                        margin: '1em 0',
+                        borderRadius: '6px',
+                        fontSize: '13px',
+                      },
+                      children: String(children).replace(/\n$/, ''),
+                    } as React.ComponentProps<typeof SyntaxHighlighter>)}
+                  />
                 ) : (
                   <code className={className} {...props} style={{
                     display: 'block',
