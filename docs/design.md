@@ -46,7 +46,7 @@ Issue (stored per-file)
   - Note: "blocked" is derived from dependencies only, not stored
 - priority: enum {low, normal, high, critical}
 - assignee: string (optional) - format: {type}:{identifier}
-  - Examples: "human:vkaskivuo", "copilot:session-abc", "ci:github-actions", null (unassigned)
+  - Examples: "human:erankavija", "copilot:session-abc", "ci:github-actions", null (unassigned)
 - dependencies: list of issue ids (prerequisites)
 - gates_required: list of gate keys
 - gates_status: map: gate_key -> {status: enum {pending, passed, failed}, updated_by, updated_at}

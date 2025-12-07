@@ -38,7 +38,7 @@ FROM node:20-slim
 
 LABEL org.opencontainers.image.title="JIT Issue Tracker"
 LABEL org.opencontainers.image.description="CLI-first issue tracker for AI agents"
-LABEL org.opencontainers.image.source="https://github.com/vkaskivuo/just-in-time"
+LABEL org.opencontainers.image.source="https://github.com/erankavija/just-in-time"
 LABEL org.opencontainers.image.licenses="MIT OR Apache-2.0"
 
 WORKDIR /app

@@ -1,7 +1,7 @@
 # Just-In-Time Issue Tracker
 
-[![CI](https://github.com/vkaskivuo/just-in-time/actions/workflows/ci.yml/badge.svg)](https://github.com/vkaskivuo/just-in-time/actions/workflows/ci.yml)
-[![Docker](https://github.com/vkaskivuo/just-in-time/actions/workflows/docker.yml/badge.svg)](https://github.com/vkaskivuo/just-in-time/actions/workflows/docker.yml)
+[![CI](https://github.com/erankavija/just-in-time/actions/workflows/ci.yml/badge.svg)](https://github.com/erankavija/just-in-time/actions/workflows/ci.yml)
+[![Docker](https://github.com/erankavija/just-in-time/actions/workflows/docker.yml/badge.svg)](https://github.com/erankavija/just-in-time/actions/workflows/docker.yml)
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
 
 **Enable AI agents to orchestrate their own work.** A repository-local CLI issue tracker that lets a lead agent break down complex tasks and coordinate multiple worker agents—with dependency management, quality gates, and full observability.
@@ -31,7 +31,7 @@ Traditional issue trackers are designed for humans. JIT is designed for **AI age
 
 **Pre-built binaries (Linux x64):**
 ```bash
-wget https://github.com/vkaskivuo/just-in-time/releases/latest/download/jit-linux-x64.tar.gz
+wget https://github.com/erankavija/just-in-time/releases/latest/download/jit-linux-x64.tar.gz
 tar -xzf jit-linux-x64.tar.gz
 sudo mv jit jit-server jit-dispatch /usr/local/bin/
 ```

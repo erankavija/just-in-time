@@ -9,7 +9,7 @@
 ### MCP Server (TypeScript)
 - **Location**: `mcp-server/`
 - **Entry point**: `index.js` (220 lines)
-- **Package**: `@vkaskivuo/jit-mcp-server` v0.1.0
+- **Package**: `@erankavija/jit-mcp-server` v0.1.0
 
 ### Features Delivered
 

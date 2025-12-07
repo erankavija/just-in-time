@@ -20,7 +20,7 @@ This guide covers all methods to install JIT Issue Tracker on Linux systems.
 
 ```bash
 # Download and extract
-wget https://github.com/vkaskivuo/just-in-time/releases/latest/download/jit-linux-x64.tar.gz
+wget https://github.com/erankavija/just-in-time/releases/latest/download/jit-linux-x64.tar.gz
 tar -xzf jit-linux-x64.tar.gz
 
 # Install to system (requires sudo)
@@ -48,7 +48,7 @@ jit --version
 ### Verify Checksums
 
 ```bash
-wget https://github.com/vkaskivuo/just-in-time/releases/latest/download/checksums.txt
+wget https://github.com/erankavija/just-in-time/releases/latest/download/checksums.txt
 sha256sum -c checksums.txt
 ```
 
@@ -62,7 +62,7 @@ sha256sum -c checksums.txt
 
 ```bash
 # Clone repository (or download docker-compose.yml)
-git clone https://github.com/vkaskivuo/just-in-time.git
+git clone https://github.com/erankavija/just-in-time.git
 cd just-in-time
 
 # Start all services (API + Web UI)
@@ -83,10 +83,10 @@ docker-compose down
 
 ```bash
 # Pull latest images
-docker pull ghcr.io/vkaskivuo/just-in-time:latest         # All-in-one
-docker pull ghcr.io/vkaskivuo/just-in-time-api:latest     # API server only
-docker pull ghcr.io/vkaskivuo/just-in-time-web:latest     # Web UI only
-docker pull ghcr.io/vkaskivuo/just-in-time-cli:latest     # CLI only
+docker pull ghcr.io/erankavija/just-in-time:latest         # All-in-one
+docker pull ghcr.io/erankavija/just-in-time-api:latest     # API server only
+docker pull ghcr.io/erankavija/just-in-time-web:latest     # Web UI only
+docker pull ghcr.io/erankavija/just-in-time-cli:latest     # CLI only
 ```
 
 ### Run Individual Containers
@@ -99,7 +99,7 @@ docker run -d \
   -p 3000:3000 \
   -v jit-data:/data \
   -e JIT_DATA_DIR=/data \
-  ghcr.io/vkaskivuo/just-in-time-api:latest
+  ghcr.io/erankavija/just-in-time-api:latest
 ```
 
 #### Web UI
@@ -108,7 +108,7 @@ docker run -d \
 docker run -d \
   --name jit-web \
   -p 8080:80 \
-  ghcr.io/vkaskivuo/just-in-time-web:latest
+  ghcr.io/erankavija/just-in-time-web:latest
 ```
 
 #### CLI (Interactive)
@@ -118,14 +118,14 @@ docker run -d \
 docker run --rm \
   -v jit-data:/data \
   -e JIT_DATA_DIR=/data \
-  ghcr.io/vkaskivuo/just-in-time-cli:latest \
+  ghcr.io/erankavija/just-in-time-cli:latest \
   issue list
 
 # Interactive shell
 docker run --rm -it \
   -v $(pwd):/data \
   -e JIT_DATA_DIR=/data \
-  ghcr.io/vkaskivuo/just-in-time-cli:latest \
+  ghcr.io/erankavija/just-in-time-cli:latest \
   sh
 ```
 
@@ -138,7 +138,7 @@ docker run -d \
   -p 3000:3000 \
   -p 8080:80 \
   -v jit-data:/data \
-  ghcr.io/vkaskivuo/just-in-time:latest
+  ghcr.io/erankavija/just-in-time:latest
 ```
 
 ---
@@ -157,7 +157,7 @@ docker run -d \
 
 ```bash
 # Clone repository
-git clone https://github.com/vkaskivuo/just-in-time.git
+git clone https://github.com/erankavija/just-in-time.git
 cd just-in-time
 
 # Build all Rust binaries (CLI, API server, dispatch)
@@ -210,7 +210,7 @@ npm run dev
 ### Install from NPM (After Publishing)
 
 ```bash
-npm install -g @vkaskivuo/jit-mcp-server
+npm install -g @erankavija/jit-mcp-server
 jit-mcp-server
 ```
 
@@ -336,13 +336,13 @@ sudo rm /usr/local/bin/jit-dispatch
 
 ```bash
 docker-compose down -v  # Remove containers and volumes
-docker rmi ghcr.io/vkaskivuo/just-in-time:latest
+docker rmi ghcr.io/erankavija/just-in-time:latest
 ```
 
 ### NPM
 
 ```bash
-npm uninstall -g @vkaskivuo/jit-mcp-server
+npm uninstall -g @erankavija/jit-mcp-server
 ```
 
 ### Data

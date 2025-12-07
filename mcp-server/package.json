@@ -1,5 +1,5 @@
 {
-  "name": "@vkaskivuo/jit-mcp-server",
+  "name": "@erankavija/jit-mcp-server",
   "version": "0.1.0",
   "description": "MCP server for Just-In-Time issue tracker",
   "type": "module",

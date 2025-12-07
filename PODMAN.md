@@ -224,7 +224,7 @@ podman inspect jit-api
 podman tag jit-api:latest jit-api:v0.1.0
 
 # Push to registry
-podman push jit-api ghcr.io/vkaskivuo/just-in-time-api:latest
+podman push jit-api ghcr.io/erankavija/just-in-time-api:latest
 ```
 
 ### Volume Management
@@ -446,10 +446,10 @@ Podman's security advantages:
 podman login ghcr.io
 
 # Pull image
-podman pull ghcr.io/vkaskivuo/just-in-time-api:latest
+podman pull ghcr.io/erankavija/just-in-time-api:latest
 
 # Push image
-podman push jit-api:latest ghcr.io/vkaskivuo/just-in-time-api:latest
+podman push jit-api:latest ghcr.io/erankavija/just-in-time-api:latest
 ```
 
 ### Local Registry

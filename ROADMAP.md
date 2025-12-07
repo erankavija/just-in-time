@@ -169,7 +169,7 @@
 - [x] TypeScript MCP server wrapping CLI
 - [x] 33 MCP tools covering all operations (added 4 doc tools)
 - [x] Schema auto-generation from CLI definitions
-- [ ] Integration with Claude Desktop (documented, not tested)
+- [ ] Integration testing with MCP-compatible AI tools
 - [ ] See `mcp-server/README.md` for usage
 
 ### Knowledge Management System ✅ (Phase 1-3.1 Complete)
@@ -311,12 +311,29 @@
   - 13 new tests (5 backend + 8 frontend), all passing
   - Implementation plan: `docs/document-viewer-implementation-plan.md`
   - Total estimated time: 9-12 hours (actual: ~8 hours with TDD)
-- [ ] Document graph visualization (Phase 3.3)
+- [ ] **Document graph visualization (Phase 3.3)** - **DEFERRED**
+  - Parse markdown links to build document-to-document graph
+  - Detect circular references in documentation
+  - Reverse lookup: which issues reference a document
+  - Combined graph visualization (issues + documents)
+  - See `docs/document-graph-implementation-plan.md` for detailed design
+  - Estimated: 12-16 hours across 4 sub-phases
 - [ ] Archive system (Phase 3.4)
-- [ ] See `docs/knowledge-management-vision.md`, `docs/search-implementation.md`, `docs/web-ui-architecture.md`, and `docs/document-viewer-implementation-plan.md` for detailed plans
+- [ ] See `docs/knowledge-management-vision.md`, `docs/search-implementation.md`, `docs/web-ui-architecture.md`, `docs/document-viewer-implementation-plan.md`, and `docs/document-graph-implementation-plan.md` for detailed plans
 
 ### Production Readiness
 
+- [x] **CI/CD, Packaging & Containerization** - **COMPLETE** ✅ - **2024-12-06**
+  - [x] GitHub Actions workflows (ci.yml, docker.yml, release.yml, security-audit.yml)
+  - [x] Comprehensive testing pipeline (Rust 490+ tests, MCP 11 tests, Web UI 38 tests)
+  - [x] Docker configuration (all-in-one + specialized images for CLI, API, Web)
+  - [x] Docker Compose setup with health checks
+  - [x] Local CI testing with act + manual test scripts
+  - [x] Installation documentation (INSTALL.md, DEPLOYMENT.md, PODMAN.md)
+  - [x] Optimized workflows (path filters, separate security audits, no cache for act)
+  - [x] All components tested: TypeScript fixes, MCP boolean flags, PATH setup, ripgrep installation
+  - **Status:** Production-ready CI/CD pipeline, tested with local act runner
+  
 - [x] **File locking for multi-agent safety** - **COMPLETE** ✅
   - [x] Research locking strategy (flock vs advisory locks vs process-based locking) - **Decision: fs4 with advisory locks**
   - [x] Add locking abstraction to storage layer (lock_file/unlock_file methods) - **FileLocker + LockGuard**
@@ -348,11 +365,38 @@
 - [ ] Performance optimization (if needed)
 - [ ] Comprehensive error recovery
 
+## Infrastructure & Deployment ✅
+
+- [x] **GitHub Actions CI/CD** ✅
+  - ci.yml: Rust tests (490+), MCP tests (11), Web UI tests (38), lint, build
+  - docker.yml: Build and push images to GHCR (cli, api, web, all-in-one)
+  - release.yml: Create releases with binaries, checksums, artifacts
+  - security-audit.yml: Weekly dependency audits (Rust + npm)
+  - Path filters to skip documentation-only changes
+  - Optimizations: 40-60% faster CI pipeline
+- [x] **Docker & Containerization** ✅
+  - All-in-one image: CLI + API + MCP + Web UI (~300 MB)
+  - Specialized images: CLI (24 MB), API (24 MB), Web (30 MB)
+  - Docker Compose with health checks
+  - Multi-stage builds with Alpine Linux
+  - Static binaries with musl
+- [x] **Local Testing** ✅
+  - test-ci-manual.sh: Direct command testing (5-8 min)
+  - test-ci-local.sh: Act-based GitHub Actions simulation
+  - test-podman.sh: Container testing with Podman
+  - validate-setup.sh: Pre-commit validation
+- [x] **Documentation** ✅
+  - INSTALL.md: Multiple installation methods
+  - DEPLOYMENT.md: Production deployment guide
+  - PODMAN.md: Podman-specific guide with SQLite migration
+  - Comprehensive troubleshooting sections
+
 ## Dependencies
 
 - Phase 1 → Phase 2 (core needed for gates)
 - Phase 2 → Phase 3 (events needed for observability)
 - Phase 3 → Phase 4 (stable features before hardening)
+- Infrastructure: Ready for production deployment
 
 ## Success Metrics
 
@@ -371,6 +415,10 @@
   - Knowledge management system
   - Plugin architecture for custom gates
   - Performance benchmarks and optimization
+- **CI/CD Infrastructure:** Complete and tested ✅
+  - All workflows validated with YAML syntax checks
+  - Tested locally with act and manual scripts
+  - Ready for first push to GitHub and production release
 
 ## Quick Start
 

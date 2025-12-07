@@ -101,7 +101,7 @@ sudo mkdir -p /opt/jit
 cd /opt/jit
 
 # 2. Download docker-compose.yml
-wget https://raw.githubusercontent.com/vkaskivuo/just-in-time/main/docker-compose.yml
+wget https://raw.githubusercontent.com/erankavija/just-in-time/main/docker-compose.yml
 
 # 3. Create environment file
 cat > .env << EOF
@@ -132,7 +132,7 @@ version: '3.8'
 
 services:
   api:
-    image: ghcr.io/vkaskivuo/just-in-time-api:latest
+    image: ghcr.io/erankavija/just-in-time-api:latest
     container_name: jit-api
     restart: always
     ports:
@@ -155,7 +155,7 @@ services:
         max-file: "3"
 
   web:
-    image: ghcr.io/vkaskivuo/just-in-time-web:latest
+    image: ghcr.io/erankavija/just-in-time-web:latest
     container_name: jit-web
     restart: always
     ports:
@@ -213,7 +213,7 @@ docker-compose exec api jit issue list
 
 ```bash
 # Install binaries
-wget https://github.com/vkaskivuo/just-in-time/releases/latest/download/jit-linux-x64.tar.gz
+wget https://github.com/erankavija/just-in-time/releases/latest/download/jit-linux-x64.tar.gz
 tar -xzf jit-linux-x64.tar.gz
 sudo mv jit jit-server jit-dispatch /usr/local/bin/
 sudo chmod +x /usr/local/bin/jit*
@@ -310,7 +310,7 @@ Enable and start:
 ```bash
 # Deploy Web UI
 sudo mkdir -p /var/www/jit
-wget https://github.com/vkaskivuo/just-in-time/releases/latest/download/jit-web-ui.tar.gz
+wget https://github.com/erankavija/just-in-time/releases/latest/download/jit-web-ui.tar.gz
 sudo tar -xzf jit-web-ui.tar.gz -C /var/www/jit
 
 # Enable site
