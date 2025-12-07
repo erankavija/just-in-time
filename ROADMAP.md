@@ -155,6 +155,61 @@
 
 **Goal:** Advanced features and optimizations.
 
+### Issue Hierarchy & Strategic Views 🚧 (Planned)
+
+**Goal:** Labels-based hierarchy for epics, milestones, and strategic/tactical views.
+
+**Design Complete:**
+- [x] Design: Labels define hierarchy (not separate storage)
+- [x] Implementation plan: 6 phases, 12-18 hours
+- [x] All design decisions confirmed
+- [ ] See: `docs/label-hierarchy-implementation-plan.md` (complete plan)
+- [ ] See: `docs/label-conventions.md` (format rules & agent usage)
+
+**Implementation Phases:**
+- [ ] **Phase 1:** Core labels (3-4 hours)
+  - Add `labels: Vec<String>` to Issue
+  - Label validation with regex: `namespace:value`
+  - CLI: `--label`, `--remove-label`, `query label`
+- [ ] **Phase 2:** Namespace registry (2-3 hours)
+  - `.jit/label-namespaces.json` with standard namespaces
+  - Validate uniqueness constraints (type, team)
+  - CLI: `label namespaces`, `label values`
+- [ ] **Phase 3:** Breakdown & strategic queries (2-3 hours)
+  - Update breakdown to copy labels
+  - Strategic query helpers: `query strategic`
+- [ ] **Phase 4:** MCP integration (1-2 hours)
+  - MCP tools: `label_add`, `label_query`, `label_list_namespaces`
+- [ ] **Phase 5:** Web UI (3-4 hours)
+  - Label badges on nodes
+  - Strategic/tactical view toggle
+  - Filter by label
+- [ ] **Phase 6:** Polish (1-2 hours)
+  - Audit tool: `label audit`
+  - Migration helpers
+  - Documentation
+
+**Key Features:**
+- Milestone = Issue with `label:milestone:v1.0`
+- Epic = Issue with `label:epic:auth`
+- Strategic view = Filter to milestone/epic labels
+- Progress = Derived from `graph downstream`
+- No separate milestone file needed
+
+**Standard Namespaces:**
+- `milestone:*` - Release goals (strategic)
+- `epic:*` - Large features (strategic)
+- `component:*` - Technical areas
+- `type:*` - Work type (unique)
+- `team:*` - Owning team (unique)
+
+**Design Decisions (All Confirmed):**
+1. Strict validation (reject malformed labels)
+2. Required registry (auto-create on `jit init`)
+3. Inherit all labels in breakdown
+4. Target dates via context field
+5. Query: exact match + wildcard (`milestone:*`)
+
 ### CLI Consistency
 
 - [x] **Phase 1.4:** Command schema export
