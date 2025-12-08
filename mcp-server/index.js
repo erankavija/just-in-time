@@ -32,6 +32,10 @@ const jitSchema = JSON.parse(readFileSync(schemaPath, "utf-8"));
 async function runJitCommand(args, useJsonFlag = true) {
   const jsonFlag = useJsonFlag ? " --json" : "";
   const cmd = `jit ${args}${jsonFlag}`;
+  
+  // Check if command will output JSON (either from useJsonFlag or already in args)
+  const expectsJson = useJsonFlag || args.includes('--json');
+  
   try {
     const { stdout, stderr } = await execAsync(cmd, {
       maxBuffer: 10 * 1024 * 1024, // 10MB buffer
@@ -42,7 +46,7 @@ async function runJitCommand(args, useJsonFlag = true) {
     }
     
     // Commands without --json flag return plain text
-    if (!useJsonFlag) {
+    if (!expectsJson) {
       return { message: stdout.trim() };
     }
     
@@ -255,7 +259,6 @@ async function executeTool(name, args) {
     // Top-level command: jit_status -> jit status  or jit_search -> jit search
     const cmd = parts[0];
     cliArgs = cmd;
-    hasJsonFlag = supportsJsonFlag(cmd);
     
     // Get positional arguments from schema
     const positionalArgNames = getPositionalArgs(cmd, null);
@@ -292,6 +295,18 @@ async function executeTool(name, args) {
       }
       cliArgs += flagArgs.length > 0 ? ` ${flagArgs.join(" ")}` : "";
     }
+    
+    // Check if json flag was already added by user
+    if (args.json === true) {
+      hasJsonFlag = false; // Don't add --json again in runJitCommand
+    } else {
+      hasJsonFlag = supportsJsonFlag(cmd);
+    }
+  }
+  
+  // Override: if --json is already in cliArgs, don't add it again
+  if (cliArgs.includes('--json')) {
+    hasJsonFlag = false;
   }
   
   return await runJitCommand(cliArgs, hasJsonFlag);

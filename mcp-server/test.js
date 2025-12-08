@@ -215,9 +215,7 @@ const tests = [
     async run(tester) {
       const response = await tester.request('tools/call', {
         name: 'jit_status',
-        arguments: {
-          json: true
-        }
+        arguments: {}
       });
 
       assert(response.result, 'Should have result');

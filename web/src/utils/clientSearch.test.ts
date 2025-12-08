@@ -9,6 +9,7 @@ const createMockIssue = (overrides: Partial<Issue>): Issue => ({
   state: 'backlog',
   priority: 'normal',
   dependencies: [],
+  labels: [],
   documents: [],
   gates: [],
   gates_status: [],
