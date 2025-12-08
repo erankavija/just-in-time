@@ -18,6 +18,7 @@ fn test_validation_detects_broken_dependency() {
             "".to_string(),
             Priority::Normal,
             vec![],
+            vec![],
         )
         .unwrap();
 
@@ -26,6 +27,7 @@ fn test_validation_detects_broken_dependency() {
             "Task B".to_string(),
             "".to_string(),
             Priority::Normal,
+            vec![],
             vec![],
         )
         .unwrap();
@@ -53,10 +55,10 @@ fn test_validation_detects_cycle() {
 
     // Create two issues
     let issue1_id = executor
-        .create_issue("A".to_string(), "".to_string(), Priority::Normal, vec![])
+        .create_issue("A".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
         .unwrap();
     let issue2_id = executor
-        .create_issue("B".to_string(), "".to_string(), Priority::Normal, vec![])
+        .create_issue("B".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
         .unwrap();
 
     // Add A -> B
@@ -81,13 +83,13 @@ fn test_validation_passes_with_valid_graph() {
 
     // Create a valid dependency graph: A -> B -> C
     let issue_c_id = executor
-        .create_issue("C".to_string(), "".to_string(), Priority::Normal, vec![])
+        .create_issue("C".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
         .unwrap();
     let issue_b_id = executor
-        .create_issue("B".to_string(), "".to_string(), Priority::Normal, vec![])
+        .create_issue("B".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
         .unwrap();
     let issue_a_id = executor
-        .create_issue("A".to_string(), "".to_string(), Priority::Normal, vec![])
+        .create_issue("A".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
         .unwrap();
 
     executor.add_dependency(&issue_b_id, &issue_c_id).unwrap();
@@ -103,7 +105,7 @@ fn test_validation_detects_multiple_broken_dependencies() {
     let executor = CommandExecutor::new(storage.clone());
 
     let issue1_id = executor
-        .create_issue("Task".to_string(), "".to_string(), Priority::Normal, vec![])
+        .create_issue("Task".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
         .unwrap();
 
     // Manually add broken dependencies
@@ -140,6 +142,7 @@ fn test_validation_detects_invalid_gate_reference() {
             "".to_string(),
             Priority::Normal,
             vec!["nonexistent-gate".to_string()],
+            vec![],
         )
         .unwrap();
 

@@ -92,6 +92,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///     "Users cannot log in with special characters".to_string(),
     ///     Priority::High,
     ///     vec!["unit-tests".to_string(), "code-review".to_string()],
+    ///     vec!["type:bug".to_string()],
     /// ).unwrap();
     /// ```
     pub fn create_issue(
@@ -176,6 +177,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         self.storage.load_issue(id)
     }
 
+    #[allow(clippy::too_many_arguments)] // Update operation naturally has many optional fields
     pub fn update_issue(
         &self,
         id: &str,

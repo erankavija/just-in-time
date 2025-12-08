@@ -27,7 +27,7 @@ impl TestHarness {
     /// Create an issue with minimal parameters
     pub fn create_issue(&self, title: &str) -> String {
         self.executor
-            .create_issue(title.to_string(), String::new(), Priority::Normal, vec![])
+            .create_issue(title.to_string(), String::new(), Priority::Normal, vec![], vec![])
             .unwrap()
     }
 
@@ -40,6 +40,7 @@ impl TestHarness {
                 desc.to_string(),
                 Priority::Normal,
                 vec![],
+                vec![],
             )
             .unwrap()
     }
@@ -47,7 +48,7 @@ impl TestHarness {
     /// Create an issue with priority
     pub fn create_issue_with_priority(&self, title: &str, priority: Priority) -> String {
         self.executor
-            .create_issue(title.to_string(), String::new(), priority, vec![])
+            .create_issue(title.to_string(), String::new(), priority, vec![], vec![])
             .unwrap()
     }
 
@@ -55,7 +56,7 @@ impl TestHarness {
     pub fn create_ready_issue(&self, title: &str) -> String {
         let id = self.create_issue(title);
         self.executor
-            .update_issue(&id, None, None, None, Some(State::Ready))
+            .update_issue(&id, None, None, None, Some(State::Ready), vec![], vec![])
             .unwrap();
         id
     }
@@ -64,7 +65,7 @@ impl TestHarness {
     #[allow(dead_code)]
     pub fn create_issue_with_gates(&self, title: &str, gates: Vec<String>) -> String {
         self.executor
-            .create_issue(title.to_string(), String::new(), Priority::Normal, gates)
+            .create_issue(title.to_string(), String::new(), Priority::Normal, gates, vec![])
             .unwrap()
     }
 

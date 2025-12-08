@@ -54,7 +54,7 @@ fn test_harness_issue_lifecycle() {
 
     // Update state
     h.executor
-        .update_issue(&id, None, None, None, Some(State::Ready))
+        .update_issue(&id, None, None, None, Some(State::Ready), vec![], vec![])
         .unwrap();
     let issue = h.get_issue(&id);
     assert_eq!(issue.state, State::Ready);
@@ -97,7 +97,7 @@ fn test_harness_dependencies_block() {
 
     // Complete parent
     h.executor
-        .update_issue(&parent, None, None, None, Some(State::Done))
+        .update_issue(&parent, None, None, None, Some(State::Done), vec![], vec![])
         .unwrap();
 
     // Child should be unblocked
@@ -182,10 +182,10 @@ fn test_harness_complex_workflow() {
 
     // Complete dependencies
     h.executor
-        .update_issue(&dep1, None, None, None, Some(State::Done))
+        .update_issue(&dep1, None, None, None, Some(State::Done), vec![], vec![])
         .unwrap();
     h.executor
-        .update_issue(&dep2, None, None, None, Some(State::Done))
+        .update_issue(&dep2, None, None, None, Some(State::Done), vec![], vec![])
         .unwrap();
 
     // Pass epic's gate

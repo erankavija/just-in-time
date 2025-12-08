@@ -51,6 +51,7 @@ fn test_issue_lifecycle_works_without_coordinator() {
             "description".to_string(),
             Priority::Normal,
             vec![],
+            vec![],
         )
         .unwrap();
 
@@ -62,6 +63,8 @@ fn test_issue_lifecycle_works_without_coordinator() {
             Some("Updated desc".to_string()),
             None,
             None,
+            vec![],
+            vec![],
         )
         .unwrap();
 
@@ -122,7 +125,7 @@ fn test_gates_work_without_coordinator() {
 
     // But gates prevent completion - attempting to mark Done will transition to Gated
     h.executor
-        .update_issue(&id, None, None, None, Some(jit::domain::State::Done))
+        .update_issue(&id, None, None, None, Some(jit::domain::State::Done), vec![], vec![])
         .unwrap();
     let issue = h.storage.load_issue(&id).unwrap();
     assert_eq!(issue.state, jit::domain::State::Gated);

@@ -64,6 +64,7 @@ pub fn validate_label(label: &str) -> Result<()> {
 /// assert_eq!(ns, "milestone");
 /// assert_eq!(val, "v1.0");
 /// ```
+#[allow(dead_code)] // Will be used in Phase 1.4 for query by label
 pub fn parse_label(label: &str) -> Result<(String, String)> {
     validate_label(label)?;
     
