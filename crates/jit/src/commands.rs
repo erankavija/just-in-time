@@ -1731,28 +1731,40 @@ impl<S: IssueStore> CommandExecutor<S> {
                 )
             })?;
 
-        // Determine which commit to view
-        let reference = if let Some(at) = at_commit {
-            at
-        } else if let Some(ref commit) = doc.commit {
-            commit.as_str()
-        } else {
-            "HEAD"
-        };
+        // Try git first if available
+        if let Ok(repo) = Repository::open(".") {
+            // Determine which commit to view
+            let reference = if let Some(at) = at_commit {
+                at
+            } else if let Some(ref commit) = doc.commit {
+                commit.as_str()
+            } else {
+                "HEAD"
+            };
 
-        // Try to read content from git
-        let repo = Repository::open(".").map_err(|e| anyhow!("Not a git repository: {}", e))?;
+            // Try to read content from git
+            if let Ok(content) = self.read_file_from_git(&repo, &doc.path, reference) {
+                // Resolve the actual commit hash
+                if let Ok(obj) = repo.revparse_single(reference) {
+                    if let Ok(commit) = obj.peel_to_commit() {
+                        let commit_hash = format!("{}", commit.id());
+                        return Ok((content, commit_hash));
+                    }
+                }
+            }
+        }
 
-        let content = self
-            .read_file_from_git(&repo, &doc.path, reference)
-            .map_err(|e| anyhow!("Error reading file from git: {}", e))?;
+        // Fallback: read directly from filesystem
+        let file_path = std::path::Path::new(&doc.path);
+        if !file_path.exists() {
+            return Err(anyhow!("Document file not found: {}", path));
+        }
 
-        // Resolve the actual commit hash
-        let obj = repo.revparse_single(reference)?;
-        let commit = obj.peel_to_commit()?;
-        let commit_hash = format!("{}", commit.id());
+        let content = std::fs::read_to_string(file_path)
+            .map_err(|e| anyhow!("Failed to read document file: {}", e))?;
 
-        Ok((content, commit_hash))
+        // Return "working-tree" as commit hash to indicate non-git content
+        Ok((content, "working-tree".to_string()))
     }
 
     /// Get document history (public API for server)
