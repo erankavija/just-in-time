@@ -1787,9 +1787,15 @@ impl<S: IssueStore> CommandExecutor<S> {
                 )
             })?;
 
-        let repo = Repository::open(".").map_err(|e| anyhow!("Not a git repository: {}", e))?;
+        // Try to get history from git, return empty list if not available
+        if let Ok(repo) = Repository::open(".") {
+            if let Ok(history) = self.get_file_history(&repo, path) {
+                return Ok(history);
+            }
+        }
 
-        self.get_file_history(&repo, path)
+        // No git or no history available - return empty list
+        Ok(Vec::new())
     }
 
     /// Get document diff (public API for server)
@@ -1819,31 +1825,39 @@ impl<S: IssueStore> CommandExecutor<S> {
                 )
             })?;
 
-        let repo = Repository::open(".").map_err(|e| anyhow!("Not a git repository: {}", e))?;
+        // Try to get diff from git, return error message if not available
+        if let Ok(repo) = Repository::open(".") {
+            let to_ref = to.unwrap_or("HEAD");
 
-        let to_ref = to.unwrap_or("HEAD");
+            // Try to get content at both commits
+            if let (Ok(from_content), Ok(to_content)) = (
+                self.read_file_from_git(&repo, path, from),
+                self.read_file_from_git(&repo, path, to_ref),
+            ) {
+                // Generate unified diff
+                let mut diff_output = format!("diff --git a/{} b/{}\n", path, path);
+                diff_output.push_str(&format!("--- a/{} ({})\n", path, from));
+                diff_output.push_str(&format!("+++ b/{} ({})\n\n", path, to_ref));
 
-        // Get content at both commits
-        let from_content = self.read_file_from_git(&repo, path, from)?;
-        let to_content = self.read_file_from_git(&repo, path, to_ref)?;
+                let diff = TextDiff::from_lines(&from_content, &to_content);
 
-        // Generate unified diff
-        let mut diff_output = format!("diff --git a/{} b/{}\n", path, path);
-        diff_output.push_str(&format!("--- a/{} ({})\n", path, from));
-        diff_output.push_str(&format!("+++ b/{} ({})\n\n", path, to_ref));
+                for change in diff.iter_all_changes() {
+                    let sign = match change.tag() {
+                        ChangeTag::Delete => "-",
+                        ChangeTag::Insert => "+",
+                        ChangeTag::Equal => " ",
+                    };
+                    diff_output.push_str(&format!("{}{}", sign, change));
+                }
 
-        let diff = TextDiff::from_lines(&from_content, &to_content);
-
-        for change in diff.iter_all_changes() {
-            let sign = match change.tag() {
-                ChangeTag::Delete => "-",
-                ChangeTag::Insert => "+",
-                ChangeTag::Equal => " ",
-            };
-            diff_output.push_str(&format!("{}{}", sign, change));
+                return Ok(diff_output);
+            }
         }
 
-        Ok(diff_output)
+        // No git or diff not available
+        Err(anyhow!(
+            "Document diff not available (requires git repository with history)"
+        ))
     }
 
     /// Read file content from git at a specific reference
