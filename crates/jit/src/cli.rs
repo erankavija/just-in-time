@@ -585,4 +585,13 @@ pub enum QueryCommands {
         #[arg(long)]
         json: bool,
     },
+
+    /// Query issues by label (exact match or wildcard)
+    Label {
+        /// Label pattern: 'namespace:value' for exact match, 'namespace:*' for wildcard
+        pattern: String,
+
+        #[arg(long)]
+        json: bool,
+    },
 }

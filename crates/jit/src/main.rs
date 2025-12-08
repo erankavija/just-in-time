@@ -972,6 +972,39 @@ fn run() -> Result<()> {
                     }
                 }
             },
+            cli::QueryCommands::Label { pattern, json } => {
+                match executor.query_by_label(&pattern) {
+                    Ok(issues) => {
+                        if json {
+                            use output::{JsonOutput, LabelQueryResponse};
+                            let response = LabelQueryResponse {
+                                pattern: pattern.clone(),
+                                issues: issues.clone(),
+                                count: issues.len(),
+                            };
+                            let output = JsonOutput::success(response);
+                            println!("{}", output.to_json_string()?);
+                        } else {
+                            println!("Issues matching label '{}':", pattern);
+                            for issue in &issues {
+                                println!("  {} | {} | {:?}", issue.id, issue.title, issue.state);
+                            }
+                            println!("\nTotal: {}", issues.len());
+                        }
+                    }
+                    Err(e) => {
+                        if json {
+                            use output::JsonError;
+                            let json_error = JsonError::new("INVALID_LABEL_PATTERN", e.to_string())
+                                .with_suggestion("Use 'namespace:value' for exact match or 'namespace:*' for wildcard");
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
+                        } else {
+                            return Err(e);
+                        }
+                    }
+                }
+            }
         },
         Commands::Search {
             query,

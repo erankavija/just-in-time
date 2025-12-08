@@ -391,6 +391,14 @@ pub struct PriorityQueryResponse {
     pub count: usize,
 }
 
+/// Response for `query label` command
+#[derive(Debug, Serialize)]
+pub struct LabelQueryResponse {
+    pub pattern: String,
+    pub issues: Vec<Issue>,
+    pub count: usize,
+}
+
 // ============================================================================
 // Graph Response Types
 // ============================================================================

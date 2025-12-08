@@ -1192,6 +1192,73 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(filtered)
     }
 
+    /// Query issues by label pattern
+    /// 
+    /// Supports exact match (e.g., "milestone:v1.0") or wildcard (e.g., "milestone:*")
+    /// to match all issues with labels in a specific namespace.
+    /// 
+    /// # Examples
+    /// ```
+    /// # use jit::commands::CommandExecutor;
+    /// # use jit::storage::InMemoryStorage;
+    /// # use jit::domain::Priority;
+    /// # let storage = InMemoryStorage::new();
+    /// # let executor = CommandExecutor::new(storage);
+    /// # executor.init().unwrap();
+    /// # executor.create_issue("Task".to_string(), "".to_string(), Priority::Normal, vec![], vec!["milestone:v1.0".to_string()]).unwrap();
+    /// // Query exact match
+    /// let issues = executor.query_by_label("milestone:v1.0").unwrap();
+    /// 
+    /// // Query all issues with milestone labels
+    /// let milestones = executor.query_by_label("milestone:*").unwrap();
+    /// ```
+    pub fn query_by_label(&self, pattern: &str) -> Result<Vec<Issue>> {
+        use crate::labels;
+
+        // Validate pattern format
+        if !pattern.contains(':') {
+            return Err(anyhow!("Invalid label pattern '{}': must be 'namespace:value' or 'namespace:*'", pattern));
+        }
+
+        let parts: Vec<&str> = pattern.splitn(2, ':').collect();
+        if parts.len() != 2 {
+            return Err(anyhow!("Invalid label pattern '{}': must contain exactly one colon", pattern));
+        }
+
+        let namespace = parts[0];
+        let value = parts[1];
+
+        // Validate namespace format
+        if !namespace.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-') {
+            return Err(anyhow!("Invalid label pattern '{}': namespace must be lowercase alphanumeric with hyphens", pattern));
+        }
+
+        let issues = self.storage.list_issues()?;
+        let filtered: Vec<Issue> = if value == "*" {
+            // Wildcard: match all labels in this namespace
+            issues
+                .into_iter()
+                .filter(|issue| {
+                    issue.labels.iter().any(|label| {
+                        if let Ok((ns, _)) = labels::parse_label(label) {
+                            ns == namespace
+                        } else {
+                            false
+                        }
+                    })
+                })
+                .collect()
+        } else {
+            // Exact match
+            issues
+                .into_iter()
+                .filter(|issue| issue.labels.contains(&pattern.to_string()))
+                .collect()
+        };
+
+        Ok(filtered)
+    }
+
     /// Add a document reference to an issue
     pub fn add_document_reference(
         &self,
