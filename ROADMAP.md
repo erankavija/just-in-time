@@ -181,9 +181,11 @@
   - `jit issue update <id> --label "..." --remove-label "..."`
   - Updated CommandExecutor methods
   - All 196 tests passing
-- [ ] **Phase 1.4:** Query by label (1-2 hours)
+- [x] **Phase 1.4:** Query by label (1-2 hours) - **COMPLETE** ✅ 2025-12-08
   - `jit query label "pattern"`
   - Support exact match and wildcard: `milestone:*`
+  - 8 comprehensive tests
+  - JSON output support
 - [ ] **Phase 2:** Namespace registry (2-3 hours)
   - `.jit/label-namespaces.json` with standard namespaces
   - Validate uniqueness constraints (type, team)
