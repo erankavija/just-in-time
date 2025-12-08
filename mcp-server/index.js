@@ -158,21 +158,25 @@ function supportsJsonFlag(cmdName, subCmdName = null) {
  * Commands that use positional arguments (not flags)
  * Format: "cmd_subcmd": ["arg1", "arg2"]
  */
-const POSITIONAL_ARG_COMMANDS = {
-  "dep_add": ["from", "to"],
-  "dep_rm": ["from", "to"],
-  "issue_show": ["id"],
-  "issue_delete": ["id"],
-  "issue_claim": ["id", "assignee"],
-  "issue_unclaim": ["id"],
-  "issue_update": ["id"],
-  "registry_show": ["key"],
-  "graph_downstream": ["id"],
-  "gate_add": ["id", "gate"],
-  "search": ["query"],
-  "gate_pass": ["id", "gate"],
-  "gate_fail": ["id", "gate"],
-};
+/**
+ * Get positional argument names for a command from the schema
+ */
+function getPositionalArgs(cmd, subcmd) {
+  let cmdDef;
+  
+  if (subcmd) {
+    cmdDef = jitSchema.commands[cmd]?.subcommands?.[subcmd];
+  } else {
+    cmdDef = jitSchema.commands[cmd];
+  }
+  
+  if (!cmdDef || !cmdDef.args) {
+    return [];
+  }
+  
+  // Return names of all positional args in order
+  return cmdDef.args.map(arg => arg.name);
+}
 
 /**
  * Execute MCP tool by mapping to jit CLI command
@@ -185,15 +189,17 @@ async function executeTool(name, args) {
   let cliArgs;
   let hasJsonFlag;
   
-  if (parts.length === 2) {
+  if (parts.length >= 2) {
     // Subcommand: jit_issue_create -> jit issue create
-    const [cmd, subcmd] = parts;
-    const cmdKey = `${cmd}_${subcmd}`;
+    // Handle multi-word subcommands: jit_label_add_namespace -> jit label add-namespace
+    const cmd = parts[0];
+    const subcmdParts = parts.slice(1);
+    const subcmd = subcmdParts.join("-"); // Convert underscores back to hyphens
     cliArgs = `${cmd} ${subcmd}`;
     hasJsonFlag = supportsJsonFlag(cmd, subcmd);
     
-    // Check if this command uses positional arguments
-    const positionalArgNames = POSITIONAL_ARG_COMMANDS[cmdKey];
+    // Get positional arguments from schema (use hyphens for lookup)
+    const positionalArgNames = getPositionalArgs(cmd, subcmd);
     
     if (positionalArgNames) {
       // Use positional arguments
@@ -251,8 +257,8 @@ async function executeTool(name, args) {
     cliArgs = cmd;
     hasJsonFlag = supportsJsonFlag(cmd);
     
-    // Check if this command uses positional arguments
-    const positionalArgNames = POSITIONAL_ARG_COMMANDS[cmd];
+    // Get positional arguments from schema
+    const positionalArgNames = getPositionalArgs(cmd, null);
     
     if (positionalArgNames) {
       // Use positional arguments

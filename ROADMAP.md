@@ -203,8 +203,14 @@
   - Label inheritance enables hierarchical planning (milestone → epic → tasks)
   - 12 comprehensive tests (query + breakdown scenarios)
   - 550 total tests passing, zero clippy warnings
-- [ ] **Phase 4:** MCP integration (1-2 hours)
-  - MCP tools: `label_add`, `label_query`, `label_list_namespaces`
+- [x] **Phase 4:** MCP integration (1-2 hours) - **COMPLETE** ✅ 2025-12-08
+  - CLI commands: `jit label namespaces`, `jit label values`, `jit label add-namespace`
+  - Schema auto-generates MCP tools from CLI definitions
+  - Fixed MCP server to read positional args from schema (no hardcoded map)
+  - Fixed multi-word subcommand handling (add-namespace)
+  - MCP tools: jit_query_label, jit_query_strategic, jit_label_namespaces, jit_label_values, jit_label_add_namespace
+  - 5 comprehensive MCP tests, all passing
+  - Zero-maintenance: new CLI commands automatically become MCP tools
 - [ ] **Phase 5:** Web UI (3-4 hours)
   - Label badges on nodes
   - Strategic/tactical view toggle

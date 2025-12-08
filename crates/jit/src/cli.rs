@@ -69,6 +69,10 @@ pub enum Commands {
     #[command(subcommand)]
     Query(QueryCommands),
 
+    /// Label namespace management commands
+    #[command(subcommand)]
+    Label(LabelCommands),
+
     /// Search issues and documents
     Search {
         /// Search query string
@@ -597,6 +601,45 @@ pub enum QueryCommands {
 
     /// Query strategic issues (those with labels from strategic namespaces)
     Strategic {
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum LabelCommands {
+    /// List all label namespaces
+    Namespaces {
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// List all values used in a namespace
+    Values {
+        /// Namespace to query (e.g., 'milestone', 'epic')
+        namespace: String,
+
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Add a custom label namespace
+    AddNamespace {
+        /// Namespace name (lowercase alphanumeric with hyphens)
+        name: String,
+
+        /// Human-readable description
+        #[arg(short, long)]
+        description: String,
+
+        /// Only one label from this namespace per issue
+        #[arg(long)]
+        unique: bool,
+
+        /// Namespace is for strategic planning (appears in strategic queries)
+        #[arg(long)]
+        strategic: bool,
+
         #[arg(long)]
         json: bool,
     },

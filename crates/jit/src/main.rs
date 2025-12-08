@@ -1037,6 +1037,64 @@ fn run() -> Result<()> {
                 }
             }
         },
+        Commands::Label(label_cmd) => match label_cmd {
+            cli::LabelCommands::Namespaces { json } => {
+                let namespaces = executor.storage().load_label_namespaces()?;
+                if json {
+                    use output::JsonOutput;
+                    let output = JsonOutput::success(namespaces);
+                    println!("{}", output.to_json_string()?);
+                } else {
+                    println!("Label Namespaces:\n");
+                    for (name, ns) in &namespaces.namespaces {
+                        println!("  {}", name);
+                        println!("    Description: {}", ns.description);
+                        println!("    Unique: {}", ns.unique);
+                        println!("    Strategic: {}", ns.strategic);
+                        println!();
+                    }
+                }
+            }
+            cli::LabelCommands::Values { namespace, json } => {
+                let values = executor.list_label_values(&namespace)?;
+                if json {
+                    use output::JsonOutput;
+                    let output = JsonOutput::success(serde_json::json!({
+                        "namespace": namespace,
+                        "values": values,
+                        "count": values.len()
+                    }));
+                    println!("{}", output.to_json_string()?);
+                } else {
+                    println!("Values in namespace '{}':\n", namespace);
+                    for value in &values {
+                        println!("  {}", value);
+                    }
+                    println!("\nTotal: {}", values.len());
+                }
+            }
+            cli::LabelCommands::AddNamespace {
+                name,
+                description,
+                unique,
+                strategic,
+                json,
+            } => {
+                executor.add_label_namespace(&name, &description, unique, strategic)?;
+                if json {
+                    use output::JsonOutput;
+                    let output = JsonOutput::success(serde_json::json!({
+                        "namespace": name,
+                        "description": description,
+                        "unique": unique,
+                        "strategic": strategic
+                    }));
+                    println!("{}", output.to_json_string()?);
+                } else {
+                    println!("Added label namespace '{}'", name);
+                }
+            }
+        },
         Commands::Search {
             query,
             regex,

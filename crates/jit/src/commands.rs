@@ -58,6 +58,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         Self { storage }
     }
 
+    /// Get reference to the storage backend
+    pub fn storage(&self) -> &S {
+        &self.storage
+    }
+
     /// Initialize a new jit repository in the current directory
     pub fn init(&self) -> Result<()> {
         self.storage.init()?;
