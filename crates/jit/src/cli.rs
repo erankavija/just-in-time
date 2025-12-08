@@ -594,4 +594,10 @@ pub enum QueryCommands {
         #[arg(long)]
         json: bool,
     },
+
+    /// Query strategic issues (those with labels from strategic namespaces)
+    Strategic {
+        #[arg(long)]
+        json: bool,
+    },
 }

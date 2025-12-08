@@ -399,6 +399,13 @@ pub struct LabelQueryResponse {
     pub count: usize,
 }
 
+/// Response for `query strategic` command
+#[derive(Debug, Serialize)]
+pub struct StrategicQueryResponse {
+    pub issues: Vec<Issue>,
+    pub count: usize,
+}
+
 // ============================================================================
 // Graph Response Types
 // ============================================================================

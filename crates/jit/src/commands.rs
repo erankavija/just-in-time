@@ -562,10 +562,16 @@ impl<S: IssueStore> CommandExecutor<S> {
         let parent = self.storage.load_issue(parent_id)?;
         let original_deps = parent.dependencies.clone();
 
-        // Create subtasks with inherited priority
+        // Create subtasks with inherited priority and labels
         let mut subtask_ids = Vec::new();
         for (title, desc) in subtasks {
-            let subtask_id = self.create_issue(title, desc, parent.priority, vec![], vec![])?;
+            let subtask_id = self.create_issue(
+                title,
+                desc,
+                parent.priority,
+                vec![],
+                parent.labels.clone(), // Copy parent's labels
+            )?;
             subtask_ids.push(subtask_id);
         }
 
@@ -1357,6 +1363,40 @@ impl<S: IssueStore> CommandExecutor<S> {
         );
         self.storage.save_label_namespaces(&namespaces)?;
         Ok(())
+    }
+
+    /// Query all issues with labels from strategic namespaces
+    #[allow(dead_code)] // Will be used via CLI in next step
+    pub fn query_strategic(&self) -> Result<Vec<Issue>> {
+        use crate::labels;
+
+        let namespaces = self.storage.load_label_namespaces()?;
+        let strategic_namespaces: Vec<String> = namespaces
+            .namespaces
+            .iter()
+            .filter(|(_, ns)| ns.strategic)
+            .map(|(name, _)| name.clone())
+            .collect();
+
+        if strategic_namespaces.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let issues = self.storage.list_issues()?;
+        let filtered = issues
+            .into_iter()
+            .filter(|issue| {
+                issue.labels.iter().any(|label| {
+                    if let Ok((ns, _)) = labels::parse_label(label) {
+                        strategic_namespaces.contains(&ns)
+                    } else {
+                        false
+                    }
+                })
+            })
+            .collect();
+
+        Ok(filtered)
     }
 
     /// Add a document reference to an issue

@@ -195,9 +195,14 @@
   - CommandExecutor methods: get_issue, add_label, list_label_values, add_label_namespace
   - 9 comprehensive tests
   - Zero clippy warnings
-- [ ] **Phase 3:** Breakdown & strategic queries (2-3 hours)
-  - Update breakdown to copy labels
-  - Strategic query helpers: `query strategic`
+- [x] **Phase 3:** Breakdown & strategic queries (2-3 hours) - **COMPLETE** ✅ 2025-12-08
+  - Updated `breakdown_issue` to copy parent labels to all subtasks
+  - `query_strategic`: dynamically queries all namespaces with strategic=true
+  - CLI: `jit query strategic [--json]`
+  - Flexible design: custom namespaces can be marked strategic
+  - Label inheritance enables hierarchical planning (milestone → epic → tasks)
+  - 12 comprehensive tests (query + breakdown scenarios)
+  - 550 total tests passing, zero clippy warnings
 - [ ] **Phase 4:** MCP integration (1-2 hours)
   - MCP tools: `label_add`, `label_query`, `label_list_namespaces`
 - [ ] **Phase 5:** Web UI (3-4 hours)
