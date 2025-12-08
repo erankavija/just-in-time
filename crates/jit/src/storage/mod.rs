@@ -109,6 +109,26 @@ pub trait IssueStore: Clone {
     ///
     /// Returns an error if events cannot be read.
     fn read_events(&self) -> Result<Vec<Event>>;
+
+    /// Load the label namespace registry.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the registry cannot be loaded.
+    fn load_label_namespaces(&self) -> Result<crate::domain::LabelNamespaces>;
+
+    /// Save the label namespace registry.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the registry cannot be persisted.
+    fn save_label_namespaces(&self, namespaces: &crate::domain::LabelNamespaces) -> Result<()>;
+
+    /// List all label namespaces as a HashMap for convenience
+    #[allow(dead_code)] // Used in tests
+    fn list_label_namespaces(&self) -> Result<std::collections::HashMap<String, crate::domain::LabelNamespace>> {
+        Ok(self.load_label_namespaces()?.namespaces)
+    }
 }
 
 #[cfg(test)]

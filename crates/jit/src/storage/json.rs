@@ -154,6 +154,13 @@ impl IssueStore for JsonFileStorage {
             fs::File::create(&events_path).context("Failed to create events file")?;
         }
 
+        // Create label-namespaces.json with defaults if it doesn't exist
+        let namespaces_path = self.root.join("label-namespaces.json");
+        if !namespaces_path.exists() {
+            let namespaces = crate::domain::LabelNamespaces::with_defaults();
+            self.save_label_namespaces(&namespaces)?;
+        }
+
         Ok(())
     }
 
@@ -281,6 +288,36 @@ impl IssueStore for JsonFileStorage {
         }
 
         Ok(events)
+    }
+
+    fn load_label_namespaces(&self) -> Result<crate::domain::LabelNamespaces> {
+        let path = self.root.join("label-namespaces.json");
+        
+        if !path.exists() {
+            return Ok(crate::domain::LabelNamespaces::new());
+        }
+
+        let data = fs::read_to_string(&path)
+            .context("Failed to read label-namespaces.json")?;
+        let namespaces: crate::domain::LabelNamespaces = serde_json::from_str(&data)
+            .context("Failed to deserialize label-namespaces.json")?;
+        Ok(namespaces)
+    }
+
+    fn save_label_namespaces(&self, namespaces: &crate::domain::LabelNamespaces) -> Result<()> {
+        let path = self.root.join("label-namespaces.json");
+        let temp_path = self.root.join("label-namespaces.json.tmp");
+
+        let json = serde_json::to_string_pretty(namespaces)
+            .context("Failed to serialize label namespaces")?;
+
+        // Atomic write: temp file + rename
+        fs::write(&temp_path, json)
+            .context("Failed to write temporary label-namespaces.json")?;
+        fs::rename(&temp_path, &path)
+            .context("Failed to rename temporary label-namespaces.json")?;
+
+        Ok(())
     }
 }
 

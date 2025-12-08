@@ -767,3 +767,101 @@ mod tests {
         assert_eq!(issue.labels[0], "priority:high");
     }
 }
+
+/// Label namespace configuration
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LabelNamespace {
+    /// Human-readable description
+    pub description: String,
+    /// Whether only one label from this namespace can be applied per issue
+    pub unique: bool,
+    /// Whether this namespace is used for strategic planning (milestones, epics)
+    pub strategic: bool,
+}
+
+impl LabelNamespace {
+    /// Create a new namespace with given properties
+    pub fn new(description: impl Into<String>, unique: bool, strategic: bool) -> Self {
+        Self {
+            description: description.into(),
+            unique,
+            strategic,
+        }
+    }
+}
+
+/// Container for all label namespaces
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LabelNamespaces {
+    /// Schema version for future migrations
+    pub schema_version: u32,
+    /// Map of namespace name to configuration
+    pub namespaces: HashMap<String, LabelNamespace>,
+}
+
+impl LabelNamespaces {
+    /// Create empty namespace registry
+    pub fn new() -> Self {
+        Self {
+            schema_version: 1,
+            namespaces: HashMap::new(),
+        }
+    }
+
+    /// Create registry with standard namespaces
+    pub fn with_defaults() -> Self {
+        let mut namespaces = HashMap::new();
+        
+        namespaces.insert(
+            "milestone".to_string(),
+            LabelNamespace::new("Release milestones and version targets", false, true),
+        );
+        
+        namespaces.insert(
+            "epic".to_string(),
+            LabelNamespace::new("Large features or initiatives", false, true),
+        );
+        
+        namespaces.insert(
+            "component".to_string(),
+            LabelNamespace::new("Technical component or subsystem", false, false),
+        );
+        
+        namespaces.insert(
+            "type".to_string(),
+            LabelNamespace::new("Issue type (bug, feature, task, etc.)", true, false),
+        );
+        
+        namespaces.insert(
+            "team".to_string(),
+            LabelNamespace::new("Owning team", true, false),
+        );
+
+        Self {
+            schema_version: 1,
+            namespaces,
+        }
+    }
+
+    /// Add or update a namespace
+    pub fn add(&mut self, name: String, namespace: LabelNamespace) {
+        self.namespaces.insert(name, namespace);
+    }
+
+    /// Get a namespace by name
+    pub fn get(&self, name: &str) -> Option<&LabelNamespace> {
+        self.namespaces.get(name)
+    }
+
+    /// Check if a namespace exists
+    #[allow(dead_code)] // May be used in future
+    pub fn contains(&self, name: &str) -> bool {
+        self.namespaces.contains_key(name)
+    }
+}
+
+impl Default for LabelNamespaces {
+    fn default() -> Self {
+        Self::with_defaults()
+    }
+}

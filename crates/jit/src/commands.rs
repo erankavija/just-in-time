@@ -108,6 +108,25 @@ impl<S: IssueStore> CommandExecutor<S> {
             labels::validate_label(label_str)?;
         }
 
+        // Check uniqueness constraints
+        let namespaces = self.storage.load_label_namespaces()?;
+        let mut unique_namespaces_seen = std::collections::HashSet::new();
+
+        for label_str in &labels {
+            if let Ok((namespace, _)) = labels::parse_label(label_str) {
+                if let Some(ns_config) = namespaces.get(&namespace) {
+                    if ns_config.unique
+                        && !unique_namespaces_seen.insert(namespace.clone())
+                    {
+                        return Err(anyhow!(
+                            "Cannot add multiple labels from unique namespace '{}' to the same issue",
+                            namespace
+                        ));
+                    }
+                }
+            }
+        }
+
         let mut issue = Issue::new(title, description);
         issue.priority = priority;
         issue.gates_required = gates;
@@ -1257,6 +1276,87 @@ impl<S: IssueStore> CommandExecutor<S> {
         };
 
         Ok(filtered)
+    }
+
+    /// Get an issue by ID
+    #[allow(dead_code)] // Used in tests
+    pub fn get_issue(&self, id: &str) -> Result<Issue> {
+        self.storage.load_issue(id)
+    }
+
+    /// Add a label to an issue with uniqueness validation
+    #[allow(dead_code)] // Used in tests
+    pub fn add_label(&self, issue_id: &str, label: &str) -> Result<()> {
+        use crate::labels;
+
+        // Validate label format
+        labels::validate_label(label)?;
+
+        let mut issue = self.storage.load_issue(issue_id)?;
+        
+        // Check uniqueness constraint
+        let (namespace, _) = labels::parse_label(label)?;
+        let namespaces = self.storage.load_label_namespaces()?;
+        
+        if let Some(ns_config) = namespaces.get(&namespace) {
+            if ns_config.unique {
+                // Check if issue already has a label in this namespace
+                for existing_label in &issue.labels {
+                    if let Ok((existing_ns, _)) = labels::parse_label(existing_label) {
+                        if existing_ns == namespace {
+                            return Err(anyhow!(
+                                "Issue already has label '{}' from unique namespace '{}'",
+                                existing_label,
+                                namespace
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+
+        issue.labels.push(label.to_string());
+        self.storage.save_issue(&issue)?;
+        Ok(())
+    }
+
+    /// List all unique values used in a label namespace
+    #[allow(dead_code)] // Used in tests
+    pub fn list_label_values(&self, namespace: &str) -> Result<Vec<String>> {
+        let issues = self.storage.list_issues()?;
+        let mut values = std::collections::HashSet::new();
+
+        for issue in issues {
+            for label in &issue.labels {
+                if let Ok((ns, value)) = crate::labels::parse_label(label) {
+                    if ns == namespace {
+                        values.insert(value.to_string());
+                    }
+                }
+            }
+        }
+
+        let mut result: Vec<String> = values.into_iter().collect();
+        result.sort();
+        Ok(result)
+    }
+
+    /// Add a new label namespace to the registry
+    #[allow(dead_code)] // Used in tests
+    pub fn add_label_namespace(
+        &self,
+        name: &str,
+        description: &str,
+        unique: bool,
+        strategic: bool,
+    ) -> Result<()> {
+        let mut namespaces = self.storage.load_label_namespaces()?;
+        namespaces.add(
+            name.to_string(),
+            crate::domain::LabelNamespace::new(description, unique, strategic),
+        );
+        self.storage.save_label_namespaces(&namespaces)?;
+        Ok(())
     }
 
     /// Add a document reference to an issue

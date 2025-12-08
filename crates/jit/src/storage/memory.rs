@@ -35,6 +35,7 @@ pub struct InMemoryStorage {
     issues: Arc<Mutex<HashMap<String, Issue>>>,
     gate_registry: Arc<Mutex<GateRegistry>>,
     events: Arc<Mutex<Vec<Event>>>,
+    label_namespaces: Arc<Mutex<crate::domain::LabelNamespaces>>,
 }
 
 impl InMemoryStorage {
@@ -45,6 +46,7 @@ impl InMemoryStorage {
             issues: Arc::new(Mutex::new(HashMap::new())),
             gate_registry: Arc::new(Mutex::new(GateRegistry::default())),
             events: Arc::new(Mutex::new(Vec::new())),
+            label_namespaces: Arc::new(Mutex::new(crate::domain::LabelNamespaces::new())),
         }
     }
 }
@@ -57,7 +59,9 @@ impl Default for InMemoryStorage {
 
 impl IssueStore for InMemoryStorage {
     fn init(&self) -> Result<()> {
-        // No initialization needed for in-memory storage
+        // Initialize with default namespaces
+        let namespaces = crate::domain::LabelNamespaces::with_defaults();
+        self.save_label_namespaces(&namespaces)?;
         Ok(())
     }
 
@@ -107,6 +111,15 @@ impl IssueStore for InMemoryStorage {
 
     fn read_events(&self) -> Result<Vec<Event>> {
         Ok(self.events.lock().unwrap().clone())
+    }
+
+    fn load_label_namespaces(&self) -> Result<crate::domain::LabelNamespaces> {
+        Ok(self.label_namespaces.lock().unwrap().clone())
+    }
+
+    fn save_label_namespaces(&self, namespaces: &crate::domain::LabelNamespaces) -> Result<()> {
+        *self.label_namespaces.lock().unwrap() = namespaces.clone();
+        Ok(())
     }
 }
 
