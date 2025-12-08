@@ -126,7 +126,9 @@ pub trait IssueStore: Clone {
 
     /// List all label namespaces as a HashMap for convenience
     #[allow(dead_code)] // Used in tests
-    fn list_label_namespaces(&self) -> Result<std::collections::HashMap<String, crate::domain::LabelNamespace>> {
+    fn list_label_namespaces(
+        &self,
+    ) -> Result<std::collections::HashMap<String, crate::domain::LabelNamespace>> {
         Ok(self.load_label_namespaces()?.namespaces)
     }
 }

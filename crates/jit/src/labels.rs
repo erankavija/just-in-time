@@ -44,7 +44,10 @@ pub fn validate_label(label: &str) -> Result<()> {
     if !label_regex().is_match(label) {
         // Provide helpful suggestions for common errors
         let suggestion = suggest_label_fix(label);
-        let mut msg = format!("Invalid label format: '{}'. Expected 'namespace:value'", label);
+        let mut msg = format!(
+            "Invalid label format: '{}'. Expected 'namespace:value'",
+            label
+        );
         if let Some(hint) = suggestion {
             msg.push_str(&format!(". {}", hint));
         }
@@ -67,12 +70,15 @@ pub fn validate_label(label: &str) -> Result<()> {
 #[allow(dead_code)] // Will be used in Phase 1.4 for query by label
 pub fn parse_label(label: &str) -> Result<(String, String)> {
     validate_label(label)?;
-    
+
     let parts: Vec<&str> = label.splitn(2, ':').collect();
     if parts.len() != 2 {
-        return Err(anyhow!("Invalid label '{}': missing colon separator", label));
+        return Err(anyhow!(
+            "Invalid label '{}': missing colon separator",
+            label
+        ));
     }
-    
+
     Ok((parts[0].to_string(), parts[1].to_string()))
 }
 
@@ -80,26 +86,33 @@ pub fn parse_label(label: &str) -> Result<(String, String)> {
 fn suggest_label_fix(label: &str) -> Option<String> {
     // No colon: suggest adding namespace
     if !label.contains(':') {
-        return Some(format!("Did you mean 'type:{}' or 'component:{}'?", label.to_lowercase(), label.to_lowercase()));
+        return Some(format!(
+            "Did you mean 'type:{}' or 'component:{}'?",
+            label.to_lowercase(),
+            label.to_lowercase()
+        ));
     }
-    
+
     // Wrong separator (dash instead of colon)
     if label.contains('-') && !label.contains(':') {
         let fixed = label.replacen('-', ":", 1);
         return Some(format!("Did you mean '{}'?", fixed));
     }
-    
+
     // Uppercase namespace
     if label.starts_with(|c: char| c.is_uppercase()) {
         let fixed = label.chars().next().unwrap().to_lowercase().to_string() + &label[1..];
-        return Some(format!("Namespace must be lowercase. Did you mean '{}'?", fixed));
+        return Some(format!(
+            "Namespace must be lowercase. Did you mean '{}'?",
+            fixed
+        ));
     }
-    
+
     // Multiple colons
     if label.matches(':').count() > 1 {
         return Some("Label can only have one colon separator".to_string());
     }
-    
+
     None
 }
 

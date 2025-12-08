@@ -64,7 +64,10 @@ fn test_query_label_json_exact_match() {
 
     let issue = &json["data"]["issues"][0];
     assert_eq!(issue["title"], "Milestone Task");
-    assert!(issue["labels"].as_array().unwrap().contains(&serde_json::json!("milestone:v1.0")));
+    assert!(issue["labels"]
+        .as_array()
+        .unwrap()
+        .contains(&serde_json::json!("milestone:v1.0")));
 }
 
 #[test]
@@ -123,14 +126,7 @@ fn test_query_label_json_no_matches() {
 
     // Create issue without the queried label
     Command::new(&jit)
-        .args([
-            "issue",
-            "create",
-            "-t",
-            "Task",
-            "--label",
-            "milestone:v1.0",
-        ])
+        .args(["issue", "create", "-t", "Task", "--label", "milestone:v1.0"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -240,14 +236,7 @@ fn test_query_label_wildcard_with_no_matches() {
 
     // Create issue with different namespace
     Command::new(&jit)
-        .args([
-            "issue",
-            "create",
-            "-t",
-            "Task",
-            "--label",
-            "epic:auth",
-        ])
+        .args(["issue", "create", "-t", "Task", "--label", "epic:auth"])
         .current_dir(temp.path())
         .output()
         .unwrap();

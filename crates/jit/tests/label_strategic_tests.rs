@@ -33,7 +33,7 @@ fn test_query_strategic_returns_milestone_issues() {
 
     // Query strategic issues
     let strategic = executor.query_strategic().unwrap();
-    
+
     assert_eq!(strategic.len(), 1);
     assert_eq!(strategic[0].id, milestone_id);
 }
@@ -55,7 +55,7 @@ fn test_query_strategic_returns_epic_issues() {
         .unwrap();
 
     let strategic = executor.query_strategic().unwrap();
-    
+
     assert_eq!(strategic.len(), 1);
     assert_eq!(strategic[0].id, epic_id);
 }
@@ -97,7 +97,7 @@ fn test_query_strategic_returns_both_milestone_and_epic() {
         .unwrap();
 
     let strategic = executor.query_strategic().unwrap();
-    
+
     assert_eq!(strategic.len(), 2);
     let ids: Vec<String> = strategic.iter().map(|i| i.id.clone()).collect();
     assert!(ids.contains(&milestone_id));
@@ -132,7 +132,7 @@ fn test_query_strategic_excludes_tactical_only() {
         .unwrap();
 
     let strategic = executor.query_strategic().unwrap();
-    
+
     assert_eq!(strategic.len(), 0);
 }
 
@@ -158,7 +158,7 @@ fn test_query_strategic_includes_mixed_labels() {
         .unwrap();
 
     let strategic = executor.query_strategic().unwrap();
-    
+
     assert_eq!(strategic.len(), 1);
     assert_eq!(strategic[0].id, mixed_id);
 }
@@ -185,7 +185,7 @@ fn test_query_strategic_with_custom_strategic_namespace() {
         .unwrap();
 
     let strategic = executor.query_strategic().unwrap();
-    
+
     assert_eq!(strategic.len(), 1);
     assert_eq!(strategic[0].id, initiative_id);
 }
@@ -197,7 +197,7 @@ fn test_query_strategic_empty_repo() {
     executor.init().unwrap();
 
     let strategic = executor.query_strategic().unwrap();
-    
+
     assert_eq!(strategic.len(), 0);
 }
 
@@ -227,10 +227,8 @@ fn test_breakdown_copies_labels_to_subtasks() {
         ("Implement login".to_string(), "Login flow".to_string()),
         ("Implement logout".to_string(), "Logout flow".to_string()),
     ];
-    
-    let subtask_ids = executor
-        .breakdown_issue(&parent_id, subtasks)
-        .unwrap();
+
+    let subtask_ids = executor.breakdown_issue(&parent_id, subtasks).unwrap();
 
     assert_eq!(subtask_ids.len(), 2);
 

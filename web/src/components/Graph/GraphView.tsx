@@ -13,6 +13,7 @@ import dagre from 'dagre';
 import 'reactflow/dist/style.css';
 import { apiClient } from '../../api/client';
 import type { State, Priority, GraphNode as ApiGraphNode } from '../../types/models';
+import { LabelBadge } from '../Labels/LabelBadge';
 
 // State colors using CSS variables
 const stateColors: Record<State, string> = {
@@ -134,6 +135,27 @@ export function GraphView({ onNodeClick }: GraphViewProps) {
                   | {node.state}
                 </span>
               </div>
+              {node.labels && node.labels.length > 0 && (
+                <div style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '4px',
+                  marginTop: '6px',
+                }}>
+                  {node.labels.slice(0, 2).map((label) => (
+                    <LabelBadge key={label} label={label} size="small" />
+                  ))}
+                  {node.labels.length > 2 && (
+                    <span style={{
+                      fontSize: '9px',
+                      color: 'var(--text-muted)',
+                      fontFamily: 'var(--font-mono)',
+                    }}>
+                      +{node.labels.length - 2}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           ),
         },

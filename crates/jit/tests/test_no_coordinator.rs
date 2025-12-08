@@ -125,7 +125,15 @@ fn test_gates_work_without_coordinator() {
 
     // But gates prevent completion - attempting to mark Done will transition to Gated
     h.executor
-        .update_issue(&id, None, None, None, Some(jit::domain::State::Done), vec![], vec![])
+        .update_issue(
+            &id,
+            None,
+            None,
+            None,
+            Some(jit::domain::State::Done),
+            vec![],
+            vec![],
+        )
         .unwrap();
     let issue = h.storage.load_issue(&id).unwrap();
     assert_eq!(issue.state, jit::domain::State::Gated);

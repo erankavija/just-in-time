@@ -88,6 +88,7 @@ pub struct GraphNode {
     pub state: IssueState,
     pub priority: Priority,
     pub assignee: Option<String>,
+    pub labels: Vec<String>,
     pub blocked: bool,
 }
 
@@ -119,6 +120,7 @@ async fn get_graph<S: IssueStore>(
             state: issue.state,
             priority: issue.priority,
             assignee: issue.assignee.clone(),
+            labels: issue.labels.clone(),
             blocked: issue.is_blocked(&issue_map),
         })
         .collect();
@@ -425,7 +427,7 @@ mod tests {
                 "Description".to_string(),
                 Priority::Normal,
                 vec![],
-            vec![],
+                vec![],
             )
             .unwrap();
         executor
@@ -434,7 +436,7 @@ mod tests {
                 "Description".to_string(),
                 Priority::High,
                 vec![],
-            vec![],
+                vec![],
             )
             .unwrap();
 

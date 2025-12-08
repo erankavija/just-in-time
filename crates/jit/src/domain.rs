@@ -749,8 +749,6 @@ mod tests {
         assert!(deserialized.labels.contains(&"type:task".to_string()));
     }
 
-
-
     #[test]
     fn test_issue_labels_can_be_modified() {
         let mut issue = Issue::new("Test".to_string(), "Desc".to_string());
@@ -811,27 +809,27 @@ impl LabelNamespaces {
     /// Create registry with standard namespaces
     pub fn with_defaults() -> Self {
         let mut namespaces = HashMap::new();
-        
+
         namespaces.insert(
             "milestone".to_string(),
             LabelNamespace::new("Release milestones and version targets", false, true),
         );
-        
+
         namespaces.insert(
             "epic".to_string(),
             LabelNamespace::new("Large features or initiatives", false, true),
         );
-        
+
         namespaces.insert(
             "component".to_string(),
             LabelNamespace::new("Technical component or subsystem", false, false),
         );
-        
+
         namespaces.insert(
             "type".to_string(),
             LabelNamespace::new("Issue type (bug, feature, task, etc.)", true, false),
         );
-        
+
         namespaces.insert(
             "team".to_string(),
             LabelNamespace::new("Owning team", true, false),

@@ -27,6 +27,7 @@ export interface Issue {
   priority: Priority;
   assignee?: string;
   dependencies: string[];
+  labels: string[];
   documents: DocumentReference[];
   gates: string[];
   gates_status: GateStatus[];
@@ -40,6 +41,7 @@ export interface GraphNode {
   state: State;
   priority: Priority;
   assignee?: string;
+  labels: string[];
   blocked: boolean;
 }
 

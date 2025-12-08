@@ -27,7 +27,13 @@ impl TestHarness {
     /// Create an issue with minimal parameters
     pub fn create_issue(&self, title: &str) -> String {
         self.executor
-            .create_issue(title.to_string(), String::new(), Priority::Normal, vec![], vec![])
+            .create_issue(
+                title.to_string(),
+                String::new(),
+                Priority::Normal,
+                vec![],
+                vec![],
+            )
             .unwrap()
     }
 
@@ -65,7 +71,13 @@ impl TestHarness {
     #[allow(dead_code)]
     pub fn create_issue_with_gates(&self, title: &str, gates: Vec<String>) -> String {
         self.executor
-            .create_issue(title.to_string(), String::new(), Priority::Normal, gates, vec![])
+            .create_issue(
+                title.to_string(),
+                String::new(),
+                Priority::Normal,
+                gates,
+                vec![],
+            )
             .unwrap()
     }
 

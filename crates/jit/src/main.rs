@@ -1005,37 +1005,35 @@ fn run() -> Result<()> {
                     }
                 }
             }
-            cli::QueryCommands::Strategic { json } => {
-                match executor.query_strategic() {
-                    Ok(issues) => {
-                        if json {
-                            use output::{JsonOutput, StrategicQueryResponse};
-                            let response = StrategicQueryResponse {
-                                issues: issues.clone(),
-                                count: issues.len(),
-                            };
-                            let output = JsonOutput::success(response);
-                            println!("{}", output.to_json_string()?);
-                        } else {
-                            println!("Strategic issues:");
-                            for issue in &issues {
-                                println!("  {} | {} | {:?}", issue.id, issue.title, issue.state);
-                            }
-                            println!("\nTotal: {}", issues.len());
+            cli::QueryCommands::Strategic { json } => match executor.query_strategic() {
+                Ok(issues) => {
+                    if json {
+                        use output::{JsonOutput, StrategicQueryResponse};
+                        let response = StrategicQueryResponse {
+                            issues: issues.clone(),
+                            count: issues.len(),
+                        };
+                        let output = JsonOutput::success(response);
+                        println!("{}", output.to_json_string()?);
+                    } else {
+                        println!("Strategic issues:");
+                        for issue in &issues {
+                            println!("  {} | {} | {:?}", issue.id, issue.title, issue.state);
                         }
-                    }
-                    Err(e) => {
-                        if json {
-                            use output::JsonError;
-                            let json_error = JsonError::new("QUERY_FAILED", e.to_string());
-                            println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error.exit_code().code());
-                        } else {
-                            return Err(e);
-                        }
+                        println!("\nTotal: {}", issues.len());
                     }
                 }
-            }
+                Err(e) => {
+                    if json {
+                        use output::JsonError;
+                        let json_error = JsonError::new("QUERY_FAILED", e.to_string());
+                        println!("{}", json_error.to_json_string()?);
+                        std::process::exit(json_error.exit_code().code());
+                    } else {
+                        return Err(e);
+                    }
+                }
+            },
         },
         Commands::Label(label_cmd) => match label_cmd {
             cli::LabelCommands::Namespaces { json } => {

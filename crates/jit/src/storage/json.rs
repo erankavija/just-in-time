@@ -292,15 +292,14 @@ impl IssueStore for JsonFileStorage {
 
     fn load_label_namespaces(&self) -> Result<crate::domain::LabelNamespaces> {
         let path = self.root.join("label-namespaces.json");
-        
+
         if !path.exists() {
             return Ok(crate::domain::LabelNamespaces::new());
         }
 
-        let data = fs::read_to_string(&path)
-            .context("Failed to read label-namespaces.json")?;
-        let namespaces: crate::domain::LabelNamespaces = serde_json::from_str(&data)
-            .context("Failed to deserialize label-namespaces.json")?;
+        let data = fs::read_to_string(&path).context("Failed to read label-namespaces.json")?;
+        let namespaces: crate::domain::LabelNamespaces =
+            serde_json::from_str(&data).context("Failed to deserialize label-namespaces.json")?;
         Ok(namespaces)
     }
 
@@ -312,8 +311,7 @@ impl IssueStore for JsonFileStorage {
             .context("Failed to serialize label namespaces")?;
 
         // Atomic write: temp file + rename
-        fs::write(&temp_path, json)
-            .context("Failed to write temporary label-namespaces.json")?;
+        fs::write(&temp_path, json).context("Failed to write temporary label-namespaces.json")?;
         fs::rename(&temp_path, &path)
             .context("Failed to rename temporary label-namespaces.json")?;
 

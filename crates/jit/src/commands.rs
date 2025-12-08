@@ -120,9 +120,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         for label_str in &labels {
             if let Ok((namespace, _)) = labels::parse_label(label_str) {
                 if let Some(ns_config) = namespaces.get(&namespace) {
-                    if ns_config.unique
-                        && !unique_namespaces_seen.insert(namespace.clone())
-                    {
+                    if ns_config.unique && !unique_namespaces_seen.insert(namespace.clone()) {
                         return Err(anyhow!(
                             "Cannot add multiple labels from unique namespace '{}' to the same issue",
                             namespace
@@ -1223,10 +1221,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     /// Query issues by label pattern
-    /// 
+    ///
     /// Supports exact match (e.g., "milestone:v1.0") or wildcard (e.g., "milestone:*")
     /// to match all issues with labels in a specific namespace.
-    /// 
+    ///
     /// # Examples
     /// ```
     /// # use jit::commands::CommandExecutor;
@@ -1238,7 +1236,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// # executor.create_issue("Task".to_string(), "".to_string(), Priority::Normal, vec![], vec!["milestone:v1.0".to_string()]).unwrap();
     /// // Query exact match
     /// let issues = executor.query_by_label("milestone:v1.0").unwrap();
-    /// 
+    ///
     /// // Query all issues with milestone labels
     /// let milestones = executor.query_by_label("milestone:*").unwrap();
     /// ```
@@ -1247,20 +1245,32 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Validate pattern format
         if !pattern.contains(':') {
-            return Err(anyhow!("Invalid label pattern '{}': must be 'namespace:value' or 'namespace:*'", pattern));
+            return Err(anyhow!(
+                "Invalid label pattern '{}': must be 'namespace:value' or 'namespace:*'",
+                pattern
+            ));
         }
 
         let parts: Vec<&str> = pattern.splitn(2, ':').collect();
         if parts.len() != 2 {
-            return Err(anyhow!("Invalid label pattern '{}': must contain exactly one colon", pattern));
+            return Err(anyhow!(
+                "Invalid label pattern '{}': must contain exactly one colon",
+                pattern
+            ));
         }
 
         let namespace = parts[0];
         let value = parts[1];
 
         // Validate namespace format
-        if !namespace.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-') {
-            return Err(anyhow!("Invalid label pattern '{}': namespace must be lowercase alphanumeric with hyphens", pattern));
+        if !namespace
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+        {
+            return Err(anyhow!(
+                "Invalid label pattern '{}': namespace must be lowercase alphanumeric with hyphens",
+                pattern
+            ));
         }
 
         let issues = self.storage.list_issues()?;
@@ -1304,11 +1314,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         labels::validate_label(label)?;
 
         let mut issue = self.storage.load_issue(issue_id)?;
-        
+
         // Check uniqueness constraint
         let (namespace, _) = labels::parse_label(label)?;
         let namespaces = self.storage.load_label_namespaces()?;
-        
+
         if let Some(ns_config) = namespaces.get(&namespace) {
             if ns_config.unique {
                 // Check if issue already has a label in this namespace
@@ -1998,7 +2008,15 @@ mod tests {
             .unwrap();
 
         executor
-            .update_issue(&id, Some("Updated".to_string()), None, None, None, vec![], vec![])
+            .update_issue(
+                &id,
+                Some("Updated".to_string()),
+                None,
+                None,
+                None,
+                vec![],
+                vec![],
+            )
             .unwrap();
 
         let issue = executor.show_issue(&id).unwrap();
@@ -2059,7 +2077,13 @@ mod tests {
         let (_temp, executor) = setup();
 
         let _low = executor
-            .create_issue("Low".to_string(), "Desc".to_string(), Priority::Low, vec![], vec![])
+            .create_issue(
+                "Low".to_string(),
+                "Desc".to_string(),
+                Priority::Low,
+                vec![],
+                vec![],
+            )
             .unwrap();
         let high_id = executor
             .create_issue(
@@ -2116,7 +2140,8 @@ mod tests {
 
         // Attempting to transition to Done with unpassed gates should succeed
         // but transition to Gated instead
-        let result = executor.update_issue(&id, None, None, None, Some(State::Done), vec![], vec![]);
+        let result =
+            executor.update_issue(&id, None, None, None, Some(State::Done), vec![], vec![]);
         assert!(result.is_ok());
 
         let issue = executor.show_issue(&id).unwrap();
@@ -3161,13 +3186,31 @@ mod tests {
 
         // Create A→B→C
         let a = executor
-            .create_issue("A".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
+            .create_issue(
+                "A".to_string(),
+                "".to_string(),
+                Priority::Normal,
+                vec![],
+                vec![],
+            )
             .unwrap();
         let b = executor
-            .create_issue("B".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
+            .create_issue(
+                "B".to_string(),
+                "".to_string(),
+                Priority::Normal,
+                vec![],
+                vec![],
+            )
             .unwrap();
         let c = executor
-            .create_issue("C".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
+            .create_issue(
+                "C".to_string(),
+                "".to_string(),
+                Priority::Normal,
+                vec![],
+                vec![],
+            )
             .unwrap();
 
         executor.add_dependency(&c, &b).unwrap();
@@ -3189,13 +3232,31 @@ mod tests {
 
         // Create diamond: A→B, A→C, B→C
         let a = executor
-            .create_issue("A".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
+            .create_issue(
+                "A".to_string(),
+                "".to_string(),
+                Priority::Normal,
+                vec![],
+                vec![],
+            )
             .unwrap();
         let b = executor
-            .create_issue("B".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
+            .create_issue(
+                "B".to_string(),
+                "".to_string(),
+                Priority::Normal,
+                vec![],
+                vec![],
+            )
             .unwrap();
         let c = executor
-            .create_issue("C".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
+            .create_issue(
+                "C".to_string(),
+                "".to_string(),
+                Priority::Normal,
+                vec![],
+                vec![],
+            )
             .unwrap();
 
         executor.add_dependency(&a, &b).unwrap();
@@ -3217,13 +3278,31 @@ mod tests {
 
         // Create parallel: A→B, A→C (no path between B and C)
         let a = executor
-            .create_issue("A".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
+            .create_issue(
+                "A".to_string(),
+                "".to_string(),
+                Priority::Normal,
+                vec![],
+                vec![],
+            )
             .unwrap();
         let b = executor
-            .create_issue("B".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
+            .create_issue(
+                "B".to_string(),
+                "".to_string(),
+                Priority::Normal,
+                vec![],
+                vec![],
+            )
             .unwrap();
         let c = executor
-            .create_issue("C".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
+            .create_issue(
+                "C".to_string(),
+                "".to_string(),
+                Priority::Normal,
+                vec![],
+                vec![],
+            )
             .unwrap();
 
         executor.add_dependency(&a, &b).unwrap();
@@ -3242,13 +3321,31 @@ mod tests {
 
         // Create A with redundant edges first
         let a = executor
-            .create_issue("A".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
+            .create_issue(
+                "A".to_string(),
+                "".to_string(),
+                Priority::Normal,
+                vec![],
+                vec![],
+            )
             .unwrap();
         let b = executor
-            .create_issue("B".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
+            .create_issue(
+                "B".to_string(),
+                "".to_string(),
+                Priority::Normal,
+                vec![],
+                vec![],
+            )
             .unwrap();
         let c = executor
-            .create_issue("C".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
+            .create_issue(
+                "C".to_string(),
+                "".to_string(),
+                Priority::Normal,
+                vec![],
+                vec![],
+            )
             .unwrap();
 
         // Add all edges including redundant one
@@ -3262,7 +3359,13 @@ mod tests {
         // But we already have both edges. We need to trigger reduction.
         // Let's add another dependency to A to trigger reduction
         let d = executor
-            .create_issue("D".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
+            .create_issue(
+                "D".to_string(),
+                "".to_string(),
+                Priority::Normal,
+                vec![],
+                vec![],
+            )
             .unwrap();
         executor.add_dependency(&a, &d).unwrap();
 
@@ -3281,16 +3384,40 @@ mod tests {
         // Create complex graph: A→B, A→C, A→D, B→D, C→D
         // A→D should be removed as it's transitive via both B and C
         let a = executor
-            .create_issue("A".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
+            .create_issue(
+                "A".to_string(),
+                "".to_string(),
+                Priority::Normal,
+                vec![],
+                vec![],
+            )
             .unwrap();
         let b = executor
-            .create_issue("B".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
+            .create_issue(
+                "B".to_string(),
+                "".to_string(),
+                Priority::Normal,
+                vec![],
+                vec![],
+            )
             .unwrap();
         let c = executor
-            .create_issue("C".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
+            .create_issue(
+                "C".to_string(),
+                "".to_string(),
+                Priority::Normal,
+                vec![],
+                vec![],
+            )
             .unwrap();
         let d = executor
-            .create_issue("D".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
+            .create_issue(
+                "D".to_string(),
+                "".to_string(),
+                Priority::Normal,
+                vec![],
+                vec![],
+            )
             .unwrap();
 
         executor.add_dependency(&a, &b).unwrap();
@@ -3319,13 +3446,31 @@ mod tests {
 
         // Create a graph: A, B, C, D
         let a = executor
-            .create_issue("A".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
+            .create_issue(
+                "A".to_string(),
+                "".to_string(),
+                Priority::Normal,
+                vec![],
+                vec![],
+            )
             .unwrap();
         let b = executor
-            .create_issue("B".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
+            .create_issue(
+                "B".to_string(),
+                "".to_string(),
+                Priority::Normal,
+                vec![],
+                vec![],
+            )
             .unwrap();
         let c = executor
-            .create_issue("C".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
+            .create_issue(
+                "C".to_string(),
+                "".to_string(),
+                Priority::Normal,
+                vec![],
+                vec![],
+            )
             .unwrap();
 
         // Thread 1: Add A→B, then B→C
@@ -3430,7 +3575,13 @@ mod tests {
 
         // Create parent with no dependencies
         let parent = executor
-            .create_issue("Epic".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
+            .create_issue(
+                "Epic".to_string(),
+                "".to_string(),
+                Priority::Normal,
+                vec![],
+                vec![],
+            )
             .unwrap();
 
         let subtasks = vec![
@@ -3460,13 +3611,31 @@ mod tests {
 
         // Create parent with multiple dependencies
         let dep1 = executor
-            .create_issue("Dep1".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
+            .create_issue(
+                "Dep1".to_string(),
+                "".to_string(),
+                Priority::Normal,
+                vec![],
+                vec![],
+            )
             .unwrap();
         let dep2 = executor
-            .create_issue("Dep2".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
+            .create_issue(
+                "Dep2".to_string(),
+                "".to_string(),
+                Priority::Normal,
+                vec![],
+                vec![],
+            )
             .unwrap();
         let parent = executor
-            .create_issue("Parent".to_string(), "".to_string(), Priority::High, vec![], vec![])
+            .create_issue(
+                "Parent".to_string(),
+                "".to_string(),
+                Priority::High,
+                vec![],
+                vec![],
+            )
             .unwrap();
 
         executor.add_dependency(&parent, &dep1).unwrap();

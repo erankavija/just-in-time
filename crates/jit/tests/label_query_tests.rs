@@ -43,7 +43,7 @@ fn test_query_by_label_exact_match() {
 
     // Query exact match for milestone:v1.0
     let results = executor.query_by_label("milestone:v1.0").unwrap();
-    
+
     assert_eq!(results.len(), 2);
     let result_ids: Vec<String> = results.iter().map(|i| i.id.clone()).collect();
     assert!(result_ids.contains(&milestone_id));
@@ -89,7 +89,7 @@ fn test_query_by_label_wildcard_namespace() {
 
     // Query wildcard milestone:*
     let results = executor.query_by_label("milestone:*").unwrap();
-    
+
     assert_eq!(results.len(), 2);
     let result_ids: Vec<String> = results.iter().map(|i| i.id.clone()).collect();
     assert!(result_ids.contains(&v1_id));
@@ -115,7 +115,7 @@ fn test_query_by_label_no_matches() {
 
     // Query for non-existent label
     let results = executor.query_by_label("epic:auth").unwrap();
-    
+
     assert_eq!(results.len(), 0);
 }
 
@@ -127,7 +127,7 @@ fn test_query_by_label_empty_repo() {
 
     // Query with no issues
     let results = executor.query_by_label("milestone:v1.0").unwrap();
-    
+
     assert_eq!(results.len(), 0);
 }
 
@@ -170,7 +170,7 @@ fn test_query_by_label_wildcard_matches_all_in_namespace() {
 
     // Query wildcard type:*
     let results = executor.query_by_label("type:*").unwrap();
-    
+
     assert_eq!(results.len(), 3);
     let result_ids: Vec<String> = results.iter().map(|i| i.id.clone()).collect();
     assert!(result_ids.contains(&task_id));
@@ -213,7 +213,10 @@ fn test_query_by_label_invalid_pattern() {
     // Invalid pattern (no colon)
     let result = executor.query_by_label("invalidlabel");
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Invalid label pattern"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Invalid label pattern"));
 }
 
 #[test]

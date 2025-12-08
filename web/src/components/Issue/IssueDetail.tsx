@@ -10,6 +10,7 @@ import './IssueDetail.css';
 import { apiClient } from '../../api/client';
 import type { Issue, DocumentReference } from '../../types/models';
 import { DocumentViewer } from '../Document/DocumentViewer';
+import { LabelBadge } from '../Labels/LabelBadge';
 
 interface IssueDetailProps {
   issueId: string | null;
@@ -166,6 +167,19 @@ export function IssueDetail({ issueId }: IssueDetailProps) {
             </span>
           )}
         </div>
+
+        {issue.labels && issue.labels.length > 0 && (
+          <div style={{ 
+            marginTop: '12px',
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '6px',
+          }}>
+            {issue.labels.map((label) => (
+              <LabelBadge key={label} label={label} />
+            ))}
+          </div>
+        )}
       </div>
 
       <section style={{ marginBottom: '20px' }}>
