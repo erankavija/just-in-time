@@ -786,6 +786,7 @@ dependencies = [
  "fs4",
  "git2",
  "predicates",
+ "regex",
  "serde",
  "serde_json",
  "similar",

@@ -425,6 +425,7 @@ mod tests {
                 "Description".to_string(),
                 Priority::Normal,
                 vec![],
+            vec![],
             )
             .unwrap();
         executor
@@ -433,6 +434,7 @@ mod tests {
                 "Description".to_string(),
                 Priority::High,
                 vec![],
+            vec![],
             )
             .unwrap();
 
@@ -457,6 +459,7 @@ mod tests {
                 "Description".to_string(),
                 Priority::Normal,
                 vec![],
+                vec![],
             )
             .unwrap();
         let id2 = executor
@@ -464,6 +467,7 @@ mod tests {
                 "Issue 2".to_string(),
                 "Description".to_string(),
                 Priority::Normal,
+                vec![],
                 vec![],
             )
             .unwrap();
@@ -492,6 +496,7 @@ mod tests {
                 "Issue 1".to_string(),
                 "Description".to_string(),
                 Priority::Normal,
+                vec![],
                 vec![],
             )
             .unwrap();

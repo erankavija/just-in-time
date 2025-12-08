@@ -5,6 +5,7 @@
 
 use crate::domain::{Event, Gate, GateState, GateStatus, Issue, Priority, State};
 use crate::graph::DependencyGraph;
+use crate::labels;
 use crate::storage::IssueStore;
 use anyhow::{anyhow, Result};
 use chrono::Utc;
@@ -99,10 +100,17 @@ impl<S: IssueStore> CommandExecutor<S> {
         description: String,
         priority: Priority,
         gates: Vec<String>,
+        labels: Vec<String>,
     ) -> Result<String> {
+        // Validate all labels
+        for label_str in &labels {
+            labels::validate_label(label_str)?;
+        }
+
         let mut issue = Issue::new(title, description);
         issue.priority = priority;
         issue.gates_required = gates;
+        issue.labels = labels;
 
         // Auto-transition to Ready if no dependencies (gates don't block Ready)
         if issue.dependencies.is_empty() {
@@ -175,6 +183,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         description: Option<String>,
         priority: Option<Priority>,
         state: Option<State>,
+        add_labels: Vec<String>,
+        remove_labels: Vec<String>,
     ) -> Result<()> {
         let mut issue = self.storage.load_issue(id)?;
 
@@ -187,6 +197,18 @@ impl<S: IssueStore> CommandExecutor<S> {
         if let Some(p) = priority {
             issue.priority = p;
         }
+
+        // Handle label operations
+        for label_str in &add_labels {
+            labels::validate_label(label_str)?;
+            if !issue.labels.contains(label_str) {
+                issue.labels.push(label_str.clone());
+            }
+        }
+        for label in &remove_labels {
+            issue.labels.retain(|l| l != label);
+        }
+
         let old_state = issue.state;
 
         if let Some(s) = state {
@@ -287,7 +309,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// let storage = InMemoryStorage::new();
     /// let executor = CommandExecutor::new(storage);
     ///
-    /// let id = executor.create_issue("Task".into(), "".into(), Priority::Normal, vec![]).unwrap();
+    /// let id = executor.create_issue("Task".into(), "".into(), Priority::Normal, vec![], vec![]).unwrap();
     /// executor.claim_issue(&id, "agent:worker-1".to_string()).unwrap();
     /// ```
     pub fn claim_issue(&self, id: &str, assignee: String) -> Result<()> {
@@ -413,8 +435,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// let storage = InMemoryStorage::new();
     /// let executor = CommandExecutor::new(storage);
     ///
-    /// let backend = executor.create_issue("Backend API".into(), "".into(), Priority::Normal, vec![]).unwrap();
-    /// let frontend = executor.create_issue("Frontend UI".into(), "".into(), Priority::Normal, vec![]).unwrap();
+    /// let backend = executor.create_issue("Backend API".into(), "".into(), Priority::Normal, vec![], vec![]).unwrap();
+    /// let frontend = executor.create_issue("Frontend UI".into(), "".into(), Priority::Normal, vec![], vec![]).unwrap();
     ///
     /// // Frontend depends on backend
     /// let result = executor.add_dependency(&frontend, &backend).unwrap();
@@ -495,8 +517,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// let storage = InMemoryStorage::new();
     /// let executor = CommandExecutor::new(storage);
     ///
-    /// let dep = executor.create_issue("Build".into(), "".into(), Priority::Normal, vec![]).unwrap();
-    /// let parent = executor.create_issue("Review".into(), "".into(), Priority::High, vec![]).unwrap();
+    /// let dep = executor.create_issue("Build".into(), "".into(), Priority::Normal, vec![], vec![]).unwrap();
+    /// let parent = executor.create_issue("Review".into(), "".into(), Priority::High, vec![], vec![]).unwrap();
     /// executor.add_dependency(&parent, &dep).unwrap();
     ///
     /// let subtasks = vec![
@@ -522,7 +544,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Create subtasks with inherited priority
         let mut subtask_ids = Vec::new();
         for (title, desc) in subtasks {
-            let subtask_id = self.create_issue(title, desc, parent.priority, vec![])?;
+            let subtask_id = self.create_issue(title, desc, parent.priority, vec![], vec![])?;
             subtask_ids.push(subtask_id);
         }
 
@@ -749,7 +771,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// let storage = InMemoryStorage::new();
     /// let executor = CommandExecutor::new(storage);
     ///
-    /// executor.create_issue("Task".into(), "".into(), Priority::Normal, vec![]).unwrap();
+    /// executor.create_issue("Task".into(), "".into(), Priority::Normal, vec![], vec![]).unwrap();
     /// assert!(executor.validate_silent().is_ok());
     /// ```
     pub fn validate_silent(&self) -> Result<()> {
@@ -1706,6 +1728,7 @@ mod tests {
                 "Description".to_string(),
                 Priority::High,
                 vec![],
+                vec![],
             )
             .unwrap();
 
@@ -1724,6 +1747,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::High,
                 vec![],
+                vec![],
             )
             .unwrap();
         executor
@@ -1731,6 +1755,7 @@ mod tests {
                 "Issue 2".to_string(),
                 "Desc".to_string(),
                 Priority::Low,
+                vec![],
                 vec![],
             )
             .unwrap();
@@ -1754,11 +1779,12 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
+                vec![],
             )
             .unwrap();
 
         executor
-            .update_issue(&id, Some("Updated".to_string()), None, None, None)
+            .update_issue(&id, Some("Updated".to_string()), None, None, None, vec![], vec![])
             .unwrap();
 
         let issue = executor.show_issue(&id).unwrap();
@@ -1775,6 +1801,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
+                vec![],
             )
             .unwrap();
         let id2 = executor
@@ -1782,6 +1809,7 @@ mod tests {
                 "Issue 2".to_string(),
                 "Desc".to_string(),
                 Priority::Normal,
+                vec![],
                 vec![],
             )
             .unwrap();
@@ -1802,6 +1830,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
+                vec![],
             )
             .unwrap();
 
@@ -1816,13 +1845,14 @@ mod tests {
         let (_temp, executor) = setup();
 
         let _low = executor
-            .create_issue("Low".to_string(), "Desc".to_string(), Priority::Low, vec![])
+            .create_issue("Low".to_string(), "Desc".to_string(), Priority::Low, vec![], vec![])
             .unwrap();
         let high_id = executor
             .create_issue(
                 "High".to_string(),
                 "Desc".to_string(),
                 Priority::High,
+                vec![],
                 vec![],
             )
             .unwrap();
@@ -1841,6 +1871,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec!["review".to_string()],
+                vec![],
             )
             .unwrap();
 
@@ -1865,12 +1896,13 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec!["review".to_string()],
+                vec![],
             )
             .unwrap();
 
         // Attempting to transition to Done with unpassed gates should succeed
         // but transition to Gated instead
-        let result = executor.update_issue(&id, None, None, None, Some(State::Done));
+        let result = executor.update_issue(&id, None, None, None, Some(State::Done), vec![], vec![]);
         assert!(result.is_ok());
 
         let issue = executor.show_issue(&id).unwrap();
@@ -1888,6 +1920,7 @@ mod tests {
                 "D1".to_string(),
                 Priority::Normal,
                 vec![],
+                vec![],
             )
             .unwrap();
         executor
@@ -1896,6 +1929,7 @@ mod tests {
                 "D2".to_string(),
                 Priority::Normal,
                 vec![],
+                vec![],
             )
             .unwrap();
         executor
@@ -1903,6 +1937,7 @@ mod tests {
                 "Issue 3".to_string(),
                 "D3".to_string(),
                 Priority::Normal,
+                vec![],
                 vec![],
             )
             .unwrap();
@@ -1925,6 +1960,7 @@ mod tests {
                 "Test Issue".to_string(),
                 "Desc".to_string(),
                 Priority::Normal,
+                vec![],
                 vec![],
             )
             .unwrap();
@@ -1960,6 +1996,7 @@ mod tests {
                 "D1".to_string(),
                 Priority::Normal,
                 vec![],
+                vec![],
             )
             .unwrap();
         let id2 = executor
@@ -1967,6 +2004,7 @@ mod tests {
                 "Issue 2".to_string(),
                 "D2".to_string(),
                 Priority::Normal,
+                vec![],
                 vec![],
             )
             .unwrap();
@@ -1994,6 +2032,7 @@ mod tests {
                     "Desc".to_string(),
                     Priority::Normal,
                     vec![],
+                    vec![],
                 )
                 .unwrap();
         }
@@ -2017,6 +2056,7 @@ mod tests {
                 "D1".to_string(),
                 Priority::Normal,
                 vec![],
+                vec![],
             )
             .unwrap();
         let id2 = executor
@@ -2024,6 +2064,7 @@ mod tests {
                 "Issue 2".to_string(),
                 "D2".to_string(),
                 Priority::Normal,
+                vec![],
                 vec![],
             )
             .unwrap();
@@ -2051,6 +2092,7 @@ mod tests {
                 "To Delete".to_string(),
                 "Desc".to_string(),
                 Priority::Normal,
+                vec![],
                 vec![],
             )
             .unwrap();
@@ -2087,6 +2129,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
+                vec![],
             )
             .unwrap();
 
@@ -2105,6 +2148,7 @@ mod tests {
                 "Task".to_string(),
                 "Desc".to_string(),
                 Priority::Normal,
+                vec![],
                 vec![],
             )
             .unwrap();
@@ -2126,6 +2170,7 @@ mod tests {
                 "Task".to_string(),
                 "Desc".to_string(),
                 Priority::Normal,
+                vec![],
                 vec![],
             )
             .unwrap();
@@ -2149,6 +2194,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
+                vec![],
             )
             .unwrap();
 
@@ -2166,6 +2212,7 @@ mod tests {
                 "D1".to_string(),
                 Priority::Normal,
                 vec![],
+                vec![],
             )
             .unwrap();
         let id2 = executor
@@ -2173,6 +2220,7 @@ mod tests {
                 "Issue 2".to_string(),
                 "D2".to_string(),
                 Priority::Normal,
+                vec![],
                 vec![],
             )
             .unwrap();
@@ -2193,6 +2241,7 @@ mod tests {
                 "D1".to_string(),
                 Priority::Normal,
                 vec![],
+                vec![],
             )
             .unwrap();
         let id2 = executor
@@ -2200,6 +2249,7 @@ mod tests {
                 "Issue 2".to_string(),
                 "D2".to_string(),
                 Priority::Normal,
+                vec![],
                 vec![],
             )
             .unwrap();
@@ -2221,6 +2271,7 @@ mod tests {
                 "D1".to_string(),
                 Priority::Normal,
                 vec![],
+                vec![],
             )
             .unwrap();
         let id2 = executor
@@ -2228,6 +2279,7 @@ mod tests {
                 "Issue 2".to_string(),
                 "D2".to_string(),
                 Priority::Normal,
+                vec![],
                 vec![],
             )
             .unwrap();
@@ -2245,6 +2297,7 @@ mod tests {
                 "Issue".to_string(),
                 "Desc".to_string(),
                 Priority::Normal,
+                vec![],
                 vec![],
             )
             .unwrap();
@@ -2265,6 +2318,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec!["review".to_string()],
+                vec![],
             )
             .unwrap();
 
@@ -2288,6 +2342,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
+                vec![],
             )
             .unwrap();
 
@@ -2306,6 +2361,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec!["tests".to_string()],
+                vec![],
             )
             .unwrap();
 
@@ -2329,6 +2385,7 @@ mod tests {
                 "D1".to_string(),
                 Priority::Normal,
                 vec![],
+                vec![],
             )
             .unwrap();
         let id2 = executor
@@ -2336,6 +2393,7 @@ mod tests {
                 "Child".to_string(),
                 "D2".to_string(),
                 Priority::Normal,
+                vec![],
                 vec![],
             )
             .unwrap();
@@ -2359,6 +2417,7 @@ mod tests {
                 "D1".to_string(),
                 Priority::Normal,
                 vec![],
+                vec![],
             )
             .unwrap();
         let id2 = executor
@@ -2366,6 +2425,7 @@ mod tests {
                 "Dependent".to_string(),
                 "D2".to_string(),
                 Priority::Normal,
+                vec![],
                 vec![],
             )
             .unwrap();
@@ -2387,6 +2447,7 @@ mod tests {
                 "D1".to_string(),
                 Priority::Normal,
                 vec![],
+                vec![],
             )
             .unwrap();
         let id2 = executor
@@ -2394,6 +2455,7 @@ mod tests {
                 "Child".to_string(),
                 "D2".to_string(),
                 Priority::Normal,
+                vec![],
                 vec![],
             )
             .unwrap();
@@ -2415,6 +2477,7 @@ mod tests {
                 "D1".to_string(),
                 Priority::Normal,
                 vec![],
+                vec![],
             )
             .unwrap();
         let id2 = executor
@@ -2422,6 +2485,7 @@ mod tests {
                 "Issue 2".to_string(),
                 "D2".to_string(),
                 Priority::Normal,
+                vec![],
                 vec![],
             )
             .unwrap();
@@ -2552,6 +2616,7 @@ mod tests {
                 "Design API".to_string(),
                 Priority::Normal,
                 vec![],
+                vec![],
             )
             .unwrap();
         let id2 = executor
@@ -2559,6 +2624,7 @@ mod tests {
                 "Backend".to_string(),
                 "Implement".to_string(),
                 Priority::Normal,
+                vec![],
                 vec![],
             )
             .unwrap();
@@ -2586,6 +2652,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
+                vec![],
             )
             .unwrap();
 
@@ -2604,6 +2671,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
+                vec![],
             )
             .unwrap();
         let id2 = executor
@@ -2611,6 +2679,7 @@ mod tests {
                 "InProgress".to_string(),
                 "Desc".to_string(),
                 Priority::Normal,
+                vec![],
                 vec![],
             )
             .unwrap();
@@ -2632,6 +2701,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
+                vec![],
             )
             .unwrap();
         executor
@@ -2640,6 +2710,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
+                vec![],
             )
             .unwrap();
         executor
@@ -2647,6 +2718,7 @@ mod tests {
                 "Fix bug in lexer".to_string(),
                 "Desc".to_string(),
                 Priority::Normal,
+                vec![],
                 vec![],
             )
             .unwrap();
@@ -2666,6 +2738,7 @@ mod tests {
                 "Contains security vulnerability".to_string(),
                 Priority::Normal,
                 vec![],
+                vec![],
             )
             .unwrap();
         executor
@@ -2673,6 +2746,7 @@ mod tests {
                 "Task 2".to_string(),
                 "Regular task".to_string(),
                 Priority::Normal,
+                vec![],
                 vec![],
             )
             .unwrap();
@@ -2692,6 +2766,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
+                vec![],
             )
             .unwrap();
 
@@ -2709,6 +2784,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Critical,
                 vec![],
+                vec![],
             )
             .unwrap();
         executor
@@ -2716,6 +2792,7 @@ mod tests {
                 "Normal bug".to_string(),
                 "Desc".to_string(),
                 Priority::Normal,
+                vec![],
                 vec![],
             )
             .unwrap();
@@ -2739,6 +2816,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
+                vec![],
             )
             .unwrap();
 
@@ -2748,6 +2826,7 @@ mod tests {
                 "Backlog task".to_string(),
                 "Desc".to_string(),
                 Priority::Normal,
+                vec![],
                 vec![],
             )
             .unwrap();
@@ -2771,6 +2850,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
+                vec![],
             )
             .unwrap();
         let id2 = executor
@@ -2778,6 +2858,7 @@ mod tests {
                 "Bob work".to_string(),
                 "Desc".to_string(),
                 Priority::Normal,
+                vec![],
                 vec![],
             )
             .unwrap();
@@ -2802,6 +2883,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
+                vec![],
             )
             .unwrap();
         executor
@@ -2809,6 +2891,7 @@ mod tests {
                 "Task 2".to_string(),
                 "Desc".to_string(),
                 Priority::Normal,
+                vec![],
                 vec![],
             )
             .unwrap();
@@ -2827,6 +2910,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
+                vec![],
             )
             .unwrap();
 
@@ -2843,6 +2927,7 @@ mod tests {
                 "Task".to_string(),
                 "Desc".to_string(),
                 Priority::Normal,
+                vec![],
                 vec![],
             )
             .unwrap();
@@ -2862,13 +2947,13 @@ mod tests {
 
         // Create A→B→C
         let a = executor
-            .create_issue("A".to_string(), "".to_string(), Priority::Normal, vec![])
+            .create_issue("A".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
             .unwrap();
         let b = executor
-            .create_issue("B".to_string(), "".to_string(), Priority::Normal, vec![])
+            .create_issue("B".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
             .unwrap();
         let c = executor
-            .create_issue("C".to_string(), "".to_string(), Priority::Normal, vec![])
+            .create_issue("C".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
             .unwrap();
 
         executor.add_dependency(&c, &b).unwrap();
@@ -2890,13 +2975,13 @@ mod tests {
 
         // Create diamond: A→B, A→C, B→C
         let a = executor
-            .create_issue("A".to_string(), "".to_string(), Priority::Normal, vec![])
+            .create_issue("A".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
             .unwrap();
         let b = executor
-            .create_issue("B".to_string(), "".to_string(), Priority::Normal, vec![])
+            .create_issue("B".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
             .unwrap();
         let c = executor
-            .create_issue("C".to_string(), "".to_string(), Priority::Normal, vec![])
+            .create_issue("C".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
             .unwrap();
 
         executor.add_dependency(&a, &b).unwrap();
@@ -2918,13 +3003,13 @@ mod tests {
 
         // Create parallel: A→B, A→C (no path between B and C)
         let a = executor
-            .create_issue("A".to_string(), "".to_string(), Priority::Normal, vec![])
+            .create_issue("A".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
             .unwrap();
         let b = executor
-            .create_issue("B".to_string(), "".to_string(), Priority::Normal, vec![])
+            .create_issue("B".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
             .unwrap();
         let c = executor
-            .create_issue("C".to_string(), "".to_string(), Priority::Normal, vec![])
+            .create_issue("C".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
             .unwrap();
 
         executor.add_dependency(&a, &b).unwrap();
@@ -2943,13 +3028,13 @@ mod tests {
 
         // Create A with redundant edges first
         let a = executor
-            .create_issue("A".to_string(), "".to_string(), Priority::Normal, vec![])
+            .create_issue("A".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
             .unwrap();
         let b = executor
-            .create_issue("B".to_string(), "".to_string(), Priority::Normal, vec![])
+            .create_issue("B".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
             .unwrap();
         let c = executor
-            .create_issue("C".to_string(), "".to_string(), Priority::Normal, vec![])
+            .create_issue("C".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
             .unwrap();
 
         // Add all edges including redundant one
@@ -2963,7 +3048,7 @@ mod tests {
         // But we already have both edges. We need to trigger reduction.
         // Let's add another dependency to A to trigger reduction
         let d = executor
-            .create_issue("D".to_string(), "".to_string(), Priority::Normal, vec![])
+            .create_issue("D".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
             .unwrap();
         executor.add_dependency(&a, &d).unwrap();
 
@@ -2982,16 +3067,16 @@ mod tests {
         // Create complex graph: A→B, A→C, A→D, B→D, C→D
         // A→D should be removed as it's transitive via both B and C
         let a = executor
-            .create_issue("A".to_string(), "".to_string(), Priority::Normal, vec![])
+            .create_issue("A".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
             .unwrap();
         let b = executor
-            .create_issue("B".to_string(), "".to_string(), Priority::Normal, vec![])
+            .create_issue("B".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
             .unwrap();
         let c = executor
-            .create_issue("C".to_string(), "".to_string(), Priority::Normal, vec![])
+            .create_issue("C".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
             .unwrap();
         let d = executor
-            .create_issue("D".to_string(), "".to_string(), Priority::Normal, vec![])
+            .create_issue("D".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
             .unwrap();
 
         executor.add_dependency(&a, &b).unwrap();
@@ -3020,13 +3105,13 @@ mod tests {
 
         // Create a graph: A, B, C, D
         let a = executor
-            .create_issue("A".to_string(), "".to_string(), Priority::Normal, vec![])
+            .create_issue("A".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
             .unwrap();
         let b = executor
-            .create_issue("B".to_string(), "".to_string(), Priority::Normal, vec![])
+            .create_issue("B".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
             .unwrap();
         let c = executor
-            .create_issue("C".to_string(), "".to_string(), Priority::Normal, vec![])
+            .create_issue("C".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
             .unwrap();
 
         // Thread 1: Add A→B, then B→C
@@ -3083,6 +3168,7 @@ mod tests {
                 "".to_string(),
                 Priority::Normal,
                 vec![],
+                vec![],
             )
             .unwrap();
         let parent = executor
@@ -3090,6 +3176,7 @@ mod tests {
                 "Security Review".to_string(),
                 "".to_string(),
                 Priority::High,
+                vec![],
                 vec![],
             )
             .unwrap();
@@ -3129,7 +3216,7 @@ mod tests {
 
         // Create parent with no dependencies
         let parent = executor
-            .create_issue("Epic".to_string(), "".to_string(), Priority::Normal, vec![])
+            .create_issue("Epic".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
             .unwrap();
 
         let subtasks = vec![
@@ -3159,13 +3246,13 @@ mod tests {
 
         // Create parent with multiple dependencies
         let dep1 = executor
-            .create_issue("Dep1".to_string(), "".to_string(), Priority::Normal, vec![])
+            .create_issue("Dep1".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
             .unwrap();
         let dep2 = executor
-            .create_issue("Dep2".to_string(), "".to_string(), Priority::Normal, vec![])
+            .create_issue("Dep2".to_string(), "".to_string(), Priority::Normal, vec![], vec![])
             .unwrap();
         let parent = executor
-            .create_issue("Parent".to_string(), "".to_string(), Priority::High, vec![])
+            .create_issue("Parent".to_string(), "".to_string(), Priority::High, vec![], vec![])
             .unwrap();
 
         executor.add_dependency(&parent, &dep1).unwrap();
@@ -3201,6 +3288,7 @@ mod tests {
                 "Critical Task".to_string(),
                 "".to_string(),
                 Priority::Critical,
+                vec![],
                 vec![],
             )
             .unwrap();

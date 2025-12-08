@@ -110,9 +110,10 @@ Store in `.jit/label-namespaces.json`:
     },
     "type": {
       "description": "Work item type",
-      "examples": ["type:feature", "type:bug", "type:tech-debt", "type:docs"],
+      "examples": ["type:idea", "type:research", "type:task", "type:epic", "type:milestone", "type:bug", "type:feature"],
       "unique": true,
-      "required_for_strategic_view": false
+      "required_for_strategic_view": false,
+      "note": "Research tasks are time-boxed investigations (sometimes called 'spikes' in Agile contexts)"
     },
     "priority": {
       "description": "Priority level (supplements built-in priority field)",
@@ -140,6 +141,34 @@ Store in `.jit/label-namespaces.json`:
 
 - **unique**: If true, issue can only have ONE label from this namespace
 - **required_for_strategic_view**: If true, this namespace defines strategic issues
+
+### Standard Work Item Types
+
+The `type:*` namespace defines the kind of work an issue represents:
+
+| Type | Description | Typical Use | Time-boxed? |
+|------|-------------|-------------|-------------|
+| `type:idea` | Exploratory concept, not yet validated | Early-stage thoughts needing validation | No |
+| `type:research` | Time-boxed investigation or feasibility study | Technical feasibility, user research, literature review | Yes (recommended) |
+| `type:task` | Concrete implementation work | Coding, configuration, deployment | No |
+| `type:epic` | Large, coherent body of work | Major features spanning multiple tasks | No |
+| `type:milestone` | Time-bound release goal | Version releases, quarterly goals | Yes (by definition) |
+| `type:bug` | Defect or error to fix | Production issues, broken functionality | No |
+| `type:feature` | New functionality or enhancement | User-facing additions | No |
+
+**Note on "research" vs "spike":**
+- `type:research` is the standard term for time-boxed investigations
+- "Spike" is Agile jargon with the same meaning (used in Jira, Rally, etc.)
+- Both terms acceptable in descriptions; use `type:research` for the label
+
+**Example research task:**
+```bash
+jit issue create \
+  --title "Research: Evaluate vector database options" \
+  --description "Compare Qdrant, Milvus, pgvector. Time-box: 2 days" \
+  --label "type:research" \
+  --label "component:search"
+```
 
 **Validation rules:**
 ```rust

@@ -129,6 +129,10 @@ pub enum IssueCommands {
         #[arg(short, long, value_delimiter = ',')]
         gate: Vec<String>,
 
+        /// Labels (format: namespace:value, repeatable)
+        #[arg(short, long)]
+        label: Vec<String>,
+
         #[arg(long)]
         json: bool,
     },
@@ -189,6 +193,14 @@ pub enum IssueCommands {
 
         #[arg(short, long)]
         state: Option<String>,
+
+        /// Add label(s) (format: namespace:value, repeatable)
+        #[arg(short, long)]
+        label: Vec<String>,
+
+        /// Remove label(s) (repeatable)
+        #[arg(long)]
+        remove_label: Vec<String>,
 
         #[arg(long)]
         json: bool,

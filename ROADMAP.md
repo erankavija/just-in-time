@@ -126,7 +126,7 @@
 - ✅ All modules have module-level docs
 - ✅ Zero rustdoc warnings in default mode
 - ✅ Zero clippy warnings
-- ✅ **483+ tests passing** (171 lib + 161 integration + 9 doc history + others)
+- ✅ **196+ tests passing** (187 lib + 9 server)
 - ✅ **Transitive reduction implemented** - storage-level minimal edge set
 - ✅ **Issue breakdown command** - foolproof task decomposition for agents
 - ✅ main.rs well-maintained (under 1,000 lines)
@@ -167,10 +167,23 @@
 - [ ] See: `docs/label-conventions.md` (format rules & agent usage)
 
 **Implementation Phases:**
-- [ ] **Phase 1:** Core labels (3-4 hours)
-  - Add `labels: Vec<String>` to Issue
-  - Label validation with regex: `namespace:value`
-  - CLI: `--label`, `--remove-label`, `query label`
+- [x] **Phase 1.1:** Domain model (30 min) - **COMPLETE** ✅ 2025-12-08
+  - Added `labels: Vec<String>` to Issue struct
+  - 4 new domain tests
+  - All 187 tests passing
+- [x] **Phase 1.2:** Label validation (1 hour) - **COMPLETE** ✅ 2025-12-08
+  - Created `labels.rs` module with validation
+  - Regex: `^[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9._-]*$`
+  - Helpful error messages with suggestions
+  - 13 validation tests
+- [x] **Phase 1.3:** CLI commands (2 hours) - **COMPLETE** ✅ 2025-12-08
+  - `jit issue create --label "namespace:value"`
+  - `jit issue update <id> --label "..." --remove-label "..."`
+  - Updated CommandExecutor methods
+  - All 196 tests passing
+- [ ] **Phase 1.4:** Query by label (1-2 hours)
+  - `jit query label "pattern"`
+  - Support exact match and wildcard: `milestone:*`
 - [ ] **Phase 2:** Namespace registry (2-3 hours)
   - `.jit/label-namespaces.json` with standard namespaces
   - Validate uniqueness constraints (type, team)

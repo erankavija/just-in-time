@@ -88,6 +88,8 @@ pub struct Issue {
     pub context: HashMap<String, String>,
     /// References to design documents, notes, and artifacts
     pub documents: Vec<DocumentReference>,
+    /// Labels for categorization and hierarchy (format: "namespace:value")
+    pub labels: Vec<String>,
 }
 
 impl Issue {
@@ -105,6 +107,7 @@ impl Issue {
             gates_status: HashMap::new(),
             context: HashMap::new(),
             documents: Vec::new(),
+            labels: Vec::new(),
         }
     }
 
@@ -720,5 +723,47 @@ mod tests {
 
         let deserialized: State = serde_json::from_str(&json).unwrap();
         assert_eq!(state, deserialized);
+    }
+
+    #[test]
+    fn test_new_issue_has_empty_labels() {
+        let issue = Issue::new("Test".to_string(), "Description".to_string());
+        assert!(issue.labels.is_empty());
+    }
+
+    #[test]
+    fn test_issue_serialization_with_labels() {
+        let mut issue = Issue::new("Test".to_string(), "Desc".to_string());
+        issue.labels.push("milestone:v1.0".to_string());
+        issue.labels.push("epic:auth".to_string());
+        issue.labels.push("type:task".to_string());
+
+        let json = serde_json::to_string(&issue).unwrap();
+        assert!(json.contains("\"labels\""));
+        assert!(json.contains("milestone:v1.0"));
+
+        let deserialized: Issue = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.labels.len(), 3);
+        assert!(deserialized.labels.contains(&"milestone:v1.0".to_string()));
+        assert!(deserialized.labels.contains(&"epic:auth".to_string()));
+        assert!(deserialized.labels.contains(&"type:task".to_string()));
+    }
+
+
+
+    #[test]
+    fn test_issue_labels_can_be_modified() {
+        let mut issue = Issue::new("Test".to_string(), "Desc".to_string());
+        assert!(issue.labels.is_empty());
+
+        issue.labels.push("component:backend".to_string());
+        assert_eq!(issue.labels.len(), 1);
+
+        issue.labels.push("priority:high".to_string());
+        assert_eq!(issue.labels.len(), 2);
+
+        issue.labels.retain(|l| l != "component:backend");
+        assert_eq!(issue.labels.len(), 1);
+        assert_eq!(issue.labels[0], "priority:high");
     }
 }
