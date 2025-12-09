@@ -126,7 +126,7 @@
 - ✅ All modules have module-level docs
 - ✅ Zero rustdoc warnings in default mode
 - ✅ Zero clippy warnings
-- ✅ **196+ tests passing** (187 lib + 9 server)
+- ✅ **578 tests passing** (195 core lib + 383 across workspace)
 - ✅ **Transitive reduction implemented** - storage-level minimal edge set
 - ✅ **Issue breakdown command** - foolproof task decomposition for agents
 - ✅ main.rs well-maintained (under 1,000 lines)
@@ -134,6 +134,7 @@
 - ✅ jit-server crate with search API endpoint
 - ✅ Thread-safe InMemoryStorage (refactored for async)
 - ✅ Responsive web UI with search functionality
+- ✅ **Label system complete** - validation, querying, strategic views, web UI badges
 - ✅ Comprehensive documentation: 
   - file-locking-usage.md (400 lines)
   - knowledge-management-vision.md (537 lines)
@@ -151,11 +152,11 @@
 - [x] Monitor code growth
   - Overall quality maintained
 
-## Phase 4: Future Enhancements
+## Phase 4: Advanced Features & Production Hardening
 
-**Goal:** Advanced features and optimizations.
+**Goal:** Knowledge management and production-grade reliability.
 
-### Issue Hierarchy & Strategic Views 🚧 (Planned)
+### Issue Hierarchy & Strategic Views 🚧 (Phase 1-4 Complete, Phase 5 Partial)
 
 **Goal:** Labels-based hierarchy for epics, milestones, and strategic/tactical views.
 
@@ -163,8 +164,8 @@
 - [x] Design: Labels define hierarchy (not separate storage)
 - [x] Implementation plan: 6 phases, 12-18 hours
 - [x] All design decisions confirmed
-- [ ] See: `docs/label-hierarchy-implementation-plan.md` (complete plan)
-- [ ] See: `docs/label-conventions.md` (format rules & agent usage)
+- [x] See: `docs/label-hierarchy-implementation-plan.md` (complete plan)
+- [x] See: `docs/label-conventions.md` (format rules & agent usage)
 
 **Implementation Phases:**
 - [x] **Phase 1.1:** Domain model (30 min) - **COMPLETE** ✅ 2025-12-08
@@ -219,15 +220,22 @@
   - Backend: Updated GraphNode API to include labels field
   - TypeScript: Updated Issue and GraphNode types
   - All 38 web tests + 490+ Rust tests passing
-- [~] **Phase 5.2:** Strategic/tactical view toggle - **DEFERRED**
-  - Filter graph by strategic labels
-  - Toggle between all issues and strategic view
-- [~] **Phase 5.3:** Label filtering - **DEFERRED**
-  - Search/filter by label in web UI
-- [ ] **Phase 6:** Polish (1-2 hours)
-  - Audit tool: `label audit`
-  - Migration helpers
-  - Documentation
+- [ ] **Phase 5.2:** Strategic/tactical view toggle (1-2 hours) - **REMAINING**
+  - Filter graph nodes to milestone/epic labels only
+  - Toggle button to switch between all issues and strategic view
+  - Show rollup stats in tooltips
+- [ ] **Phase 5.3:** Label filtering (1-2 hours) - **REMAINING**
+  - Search/filter issues by label in web UI
+  - Label selector dropdown for filtering
+  - API endpoint: GET /api/issues?label=pattern
+- [x] **Phase 6:** Label validation (30 min) - **COMPLETE** ✅ 2025-12-09
+  - Integrated label validation into `jit validate` command
+  - Validates label format (namespace:value) for all issues
+  - Checks namespaces exist in registry
+  - Enforces uniqueness constraints (type, team)
+  - 3 comprehensive tests (malformed, unknown namespace, duplicate unique)
+  - All 578 tests passing, zero clippy warnings
+  - **Note:** Separate "label audit" tool unnecessary - integrated into existing validate
 
 **Key Features:**
 - Milestone = Issue with `label:milestone:v1.0`
@@ -514,9 +522,16 @@
   - **Search:** Full-text search with ripgrep integration ✅
   - **Historical documents:** CLI and web UI support ✅
 - **Phase 4:** Production-grade reliability, advanced features (in progress)
-  - Knowledge management system
-  - Plugin architecture for custom gates
-  - Performance benchmarks and optimization
+  - **Label system:** Phases 1-4 complete, Phase 5-6 partial ✅
+    - Core labels, namespace registry, strategic queries, MCP tools ✅
+    - Label badges in web UI ✅
+    - Label validation integrated into `jit validate` ✅
+    - Remaining: Strategic view toggle, label filtering in web UI (2-4 hours)
+  - **Next priorities:**
+    - Option A: Complete label Phase 5 (strategic view toggle + filtering, 2-4 hours)
+    - Option B: Document graph visualization (12-16 hours)
+  - Future: Plugin architecture for custom gates
+  - Future: Performance benchmarks and optimization
 - **CI/CD Infrastructure:** Complete and tested ✅
   - All workflows validated with YAML syntax checks
   - Tested locally with act and manual scripts

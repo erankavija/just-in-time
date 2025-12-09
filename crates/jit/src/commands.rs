@@ -838,6 +838,9 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
+        // Validate labels
+        self.validate_labels(&issues)?;
+
         // Validate document references (git integration)
         self.validate_document_references(&issues)?;
 
@@ -845,6 +848,66 @@ impl<S: IssueStore> CommandExecutor<S> {
         let issue_refs: Vec<&Issue> = issues.iter().collect();
         let graph = DependencyGraph::new(&issue_refs);
         graph.validate_dag()?;
+
+        Ok(())
+    }
+
+    /// Validate all labels in issues
+    fn validate_labels(&self, issues: &[Issue]) -> Result<()> {
+        let namespaces = self.storage.load_label_namespaces()?;
+
+        for issue in issues {
+            // Check label format
+            for label in &issue.labels {
+                labels::validate_label(label).map_err(|e| {
+                    anyhow!(
+                        "Invalid label format in issue '{}': {}",
+                        issue.id,
+                        e
+                    )
+                })?;
+            }
+
+            // Check namespace exists in registry
+            for label in &issue.labels {
+                if let Ok((namespace, _)) = labels::parse_label(label) {
+                    if !namespaces.namespaces.contains_key(&namespace) {
+                        return Err(anyhow!(
+                            "Issue '{}' has label with unknown namespace '{}'. \
+                             Label: '{}'. Available namespaces: {}",
+                            issue.id,
+                            namespace,
+                            label,
+                            namespaces.namespaces.keys()
+                                .map(|k| k.as_str())
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        ));
+                    }
+                }
+            }
+
+            // Check uniqueness constraints
+            let mut unique_namespaces_seen = std::collections::HashMap::new();
+            for label in &issue.labels {
+                if let Ok((namespace, _)) = labels::parse_label(label) {
+                    if let Some(ns_config) = namespaces.namespaces.get(&namespace) {
+                        if ns_config.unique {
+                            if let Some(first_label) = unique_namespaces_seen.get(&namespace) {
+                                return Err(anyhow!(
+                                    "Issue '{}' has multiple labels from unique namespace '{}': '{}' and '{}'",
+                                    issue.id,
+                                    namespace,
+                                    first_label,
+                                    label
+                                ));
+                            }
+                            unique_namespaces_seen.insert(namespace, label.clone());
+                        }
+                    }
+                }
+            }
+        }
 
         Ok(())
     }
@@ -3719,5 +3782,136 @@ mod tests {
             executor.breakdown_issue("nonexistent-id", vec![("Sub".to_string(), "".to_string())]);
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_rejects_malformed_labels() {
+        let (_temp, executor) = setup();
+
+        // Create valid issue, then corrupt it by adding malformed label directly
+        let id = executor
+            .create_issue(
+                "Task".to_string(),
+                "Description".to_string(),
+                Priority::Normal,
+                vec![],
+                vec![],
+            )
+            .unwrap();
+
+        // Corrupt the issue by directly modifying storage
+        let mut issue = executor.storage().load_issue(&id).unwrap();
+        issue.labels.push("just-a-value".to_string()); // Missing namespace
+        executor.storage().save_issue(&issue).unwrap();
+
+        // Validation should fail
+        let result = executor.validate_silent();
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("Invalid label format"));
+        assert!(err_msg.contains(&id));
+    }
+
+    #[test]
+    fn test_validate_rejects_unknown_namespace() {
+        let (_temp, executor) = setup();
+
+        // Create valid issue, then add label with unknown namespace directly
+        let id = executor
+            .create_issue(
+                "Task".to_string(),
+                "Description".to_string(),
+                Priority::Normal,
+                vec![],
+                vec![],
+            )
+            .unwrap();
+
+        // Corrupt the issue by directly modifying storage
+        let mut issue = executor.storage().load_issue(&id).unwrap();
+        issue.labels.push("unknown:value".to_string());
+        executor.storage().save_issue(&issue).unwrap();
+
+        // Validation should fail
+        let result = executor.validate_silent();
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("unknown namespace"));
+        assert!(err_msg.contains("unknown"));
+        assert!(err_msg.contains(&id));
+    }
+
+    #[test]
+    fn test_validate_rejects_duplicate_unique_namespace() {
+        let (_temp, executor) = setup();
+
+        // Create issue with one label from unique namespace
+        let id = executor
+            .create_issue(
+                "Task".to_string(),
+                "Description".to_string(),
+                Priority::Normal,
+                vec![],
+                vec!["type:bug".to_string()],
+            )
+            .unwrap();
+
+        // Corrupt the issue by adding another label from same unique namespace
+        let mut issue = executor.storage().load_issue(&id).unwrap();
+        issue.labels.push("type:feature".to_string());
+        executor.storage().save_issue(&issue).unwrap();
+
+        // Validation should fail
+        let result = executor.validate_silent();
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("unique namespace"));
+        assert!(err_msg.contains("type"));
+        assert!(err_msg.contains(&id));
+    }
+
+    #[test]
+    fn test_validate_accepts_valid_labels() {
+        let (_temp, executor) = setup();
+
+        // Create issue with valid labels
+        executor
+            .create_issue(
+                "Task".to_string(),
+                "Description".to_string(),
+                Priority::Normal,
+                vec![],
+                vec![
+                    "milestone:v1.0".to_string(),
+                    "epic:auth".to_string(),
+                    "component:backend".to_string(),
+                    "type:feature".to_string(),
+                ],
+            )
+            .unwrap();
+
+        // Validation should succeed
+        let result = executor.validate_silent();
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_validate_accepts_multiple_non_unique_labels() {
+        let (_temp, executor) = setup();
+
+        // Create issue with multiple labels from non-unique namespace (milestone)
+        executor
+            .create_issue(
+                "Task".to_string(),
+                "Description".to_string(),
+                Priority::Normal,
+                vec![],
+                vec!["milestone:v1.0".to_string(), "milestone:q1".to_string()],
+            )
+            .unwrap();
+
+        // Validation should succeed (milestone is not unique)
+        let result = executor.validate_silent();
+        assert!(result.is_ok());
     }
 }
