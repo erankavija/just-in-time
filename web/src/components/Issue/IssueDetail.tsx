@@ -14,9 +14,11 @@ import { LabelBadge } from '../Labels/LabelBadge';
 
 interface IssueDetailProps {
   issueId: string | null;
+  allIssues?: Issue[];
+  onNavigate?: (issueId: string) => void;
 }
 
-export function IssueDetail({ issueId }: IssueDetailProps) {
+export function IssueDetail({ issueId, allIssues = [], onNavigate }: IssueDetailProps) {
   const [issue, setIssue] = useState<Issue | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -269,20 +271,46 @@ export function IssueDetail({ issueId }: IssueDetailProps) {
             → Dependencies ({issue.dependencies.length})
           </h2>
           <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-            {issue.dependencies.map((dep) => (
-              <li key={dep} style={{ 
-                padding: '8px 10px',
-                backgroundColor: 'var(--bg-tertiary)',
-                marginBottom: '6px',
-                borderRadius: '4px',
-                fontSize: '11px',
-                color: 'var(--text-secondary)',
-                border: '1px solid var(--border)',
-                fontFamily: 'var(--font-mono)',
-              }}>
-                #{dep.substring(0, 8)}
-              </li>
-            ))}
+            {issue.dependencies.map((depId) => {
+              const depIssue = allIssues.find(i => i.id === depId);
+              const depTitle = depIssue?.title || 'Unknown issue';
+              
+              return (
+                <li 
+                  key={depId} 
+                  style={{ 
+                    padding: '8px 10px',
+                    backgroundColor: 'var(--bg-tertiary)',
+                    marginBottom: '6px',
+                    borderRadius: '4px',
+                    fontSize: '11px',
+                    color: 'var(--text-secondary)',
+                    border: '1px solid var(--border)',
+                    fontFamily: 'var(--font-mono)',
+                    cursor: onNavigate ? 'pointer' : 'default',
+                    transition: 'background-color 0.2s',
+                  }}
+                  onClick={() => onNavigate?.(depId)}
+                  onMouseEnter={(e) => {
+                    if (onNavigate) {
+                      e.currentTarget.style.backgroundColor = 'var(--bg-elevated)';
+                      e.currentTarget.style.borderColor = 'var(--border-hover)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)';
+                    e.currentTarget.style.borderColor = 'var(--border)';
+                  }}
+                >
+                  <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
+                    {depTitle}
+                  </span>
+                  <span style={{ color: 'var(--text-muted)', marginLeft: '8px' }}>
+                    #{depId.substring(0, 8)}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         </section>
       )}

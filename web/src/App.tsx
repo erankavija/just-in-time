@@ -116,7 +116,11 @@ function App() {
             overflow: 'auto',
             backgroundColor: 'var(--bg-secondary)',
           }}>
-            <IssueDetail issueId={selectedIssueId} />
+            <IssueDetail 
+              issueId={selectedIssueId}
+              allIssues={allIssues}
+              onNavigate={setSelectedIssueId}
+            />
           </div>
         </Split>
       </div>

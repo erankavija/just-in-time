@@ -211,10 +211,19 @@
   - MCP tools: jit_query_label, jit_query_strategic, jit_label_namespaces, jit_label_values, jit_label_add_namespace
   - 5 comprehensive MCP tests, all passing
   - Zero-maintenance: new CLI commands automatically become MCP tools
-- [ ] **Phase 5:** Web UI (3-4 hours)
-  - Label badges on nodes
-  - Strategic/tactical view toggle
-  - Filter by label
+- [x] **Phase 5.1:** Label badges in Web UI (2 hours) - **COMPLETE** ✅ 2025-12-08
+  - Created LabelBadge component with namespace:value formatting
+  - Color-coded badges by namespace (milestone=blue, epic=yellow, etc.)
+  - Added labels to GraphView nodes (max 2 badges + count)
+  - Added labels to IssueDetail view (all labels shown)
+  - Backend: Updated GraphNode API to include labels field
+  - TypeScript: Updated Issue and GraphNode types
+  - All 38 web tests + 490+ Rust tests passing
+- [~] **Phase 5.2:** Strategic/tactical view toggle - **DEFERRED**
+  - Filter graph by strategic labels
+  - Toggle between all issues and strategic view
+- [~] **Phase 5.3:** Label filtering - **DEFERRED**
+  - Search/filter by label in web UI
 - [ ] **Phase 6:** Polish (1-2 hours)
   - Audit tool: `label audit`
   - Migration helpers
@@ -253,8 +262,10 @@
 ### MCP Server ✅
 
 - [x] TypeScript MCP server wrapping CLI
-- [x] 33 MCP tools covering all operations (added 4 doc tools)
+- [x] 47 MCP tools covering all operations (added label + doc tools)
 - [x] Schema auto-generation from CLI definitions
+- [x] Fixed json flag handling (prevented double --json)
+- [x] All 11 MCP tests passing
 - [ ] Integration testing with MCP-compatible AI tools
 - [ ] See `mcp-server/README.md` for usage
 
@@ -281,6 +292,11 @@
 - [x] Document content viewing
   - `jit doc show` reads file content from git
   - Supports reading at HEAD or specific commits
+- [x] **Graceful degradation without git** - **COMPLETE** ✅ 2025-12-08
+  - Document content: filesystem fallback (returns "working-tree")
+  - Document history: returns empty list (no error)
+  - Document diff: returns graceful error message
+  - All features work with or without git repository
 
 **Phase 2.1: REST API Server** ✅
 - [x] Web API server with Axum framework
