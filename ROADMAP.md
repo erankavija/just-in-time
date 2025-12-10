@@ -532,18 +532,28 @@
   - **Search:** Full-text search with ripgrep integration ✅
   - **Historical documents:** CLI and web UI support ✅
 - **Phase 4:** Production-grade reliability, advanced features ✅
-  - **Label system:** All phases complete (1-6 + 5.3) ✅
+  - **Label system:** All phases complete (1-6 + 5.3) ✅ **2025-12-10**
     - Core labels, namespace registry, strategic queries, MCP tools ✅
     - Label badges in web UI ✅
     - Strategic/tactical view toggle with downstream stats ✅
     - Label validation integrated into `jit validate` ✅
     - **Label filtering in web UI with gray-out approach** ✅
-    - Flexible filter architecture supporting multiple filter types ✅
+      - Flexible filter architecture supporting multiple filter types
+      - Label filters dim non-matching nodes (preserves context)
+      - Strategic filters hide non-strategic nodes
+      - 37 new tests (28 filter logic + 9 UI)
+      - Fixed all React Testing Library warnings
+      - Zero TypeScript errors, production build successful
     - 95 web tests + 578 Rust tests passing ✅
+    - **Documentation clarified type vs membership labels** ✅
+      - docs/label-quick-reference.md: Quick guide for agents
+      - docs/label-enforcement-proposal.md: Programmatic validation proposal (~3-4h)
+      - Updated label-conventions.md with clear distinction
   - **Next priorities:**
-    - Option A: Document graph visualization (12-16 hours)
-    - Option B: Plugin architecture for custom gates
-    - Option C: Performance benchmarks and optimization
+    - Option A: Implement label enforcement (3-4 hours) - Programmatic validation
+    - Option B: Document graph visualization (12-16 hours)
+    - Option C: Plugin architecture for custom gates
+    - Option D: Performance benchmarks and optimization
 - **CI/CD Infrastructure:** Complete and tested ✅
   - All workflows validated with YAML syntax checks
   - Tested locally with act and manual scripts
