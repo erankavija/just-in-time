@@ -35,11 +35,11 @@ interface DocumentViewerProps {
   documentRef?: DocumentReference;
   // Option 2: Standalone via path
   documentPath?: string;
-  highlightLine?: number;
+  searchQuery?: string;
   onClose?: () => void;
 }
 
-export function DocumentViewer({ issueId, documentRef, documentPath, highlightLine, onClose }: DocumentViewerProps) {
+export function DocumentViewer({ issueId, documentRef, documentPath, searchQuery, onClose }: DocumentViewerProps) {
   const [content, setContent] = useState<DocumentContent | null>(null);
   const [selectedCommit, setSelectedCommit] = useState<string | undefined>(
     documentRef?.commit || undefined
@@ -47,6 +47,7 @@ export function DocumentViewer({ issueId, documentRef, documentPath, highlightLi
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [highlightsActive, setHighlightsActive] = useState(true);
   const mermaidContainerRef = useRef<HTMLDivElement>(null);
   const contentContainerRef = useRef<HTMLDivElement>(null);
 
@@ -105,26 +106,76 @@ export function DocumentViewer({ issueId, documentRef, documentPath, highlightLi
     }
   }, [documentPath, documentRef?.path, selectedCommit, loadContent]);
 
-  // Scroll to and highlight the specified line
+  // Handle ESC key to clear highlights
   useEffect(() => {
-    if (highlightLine && content && contentContainerRef.current) {
-      // Wait for content to render
-      setTimeout(() => {
-        // For now, just scroll to approximate position based on line number
-        // More sophisticated implementation would parse the rendered content
-        const approximateScroll = highlightLine * 20; // ~20px per line estimate
-        contentContainerRef.current?.scrollTo({
-          top: approximateScroll,
-          behavior: 'smooth'
-        });
-        
-        // Add visual highlight by adding a yellow background to the container temporarily
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && highlightsActive) {
+        setHighlightsActive(false);
+        // Remove all highlight marks
         if (contentContainerRef.current) {
-          contentContainerRef.current.style.scrollMarginTop = '100px';
+          const marks = contentContainerRef.current.querySelectorAll('mark');
+          marks.forEach(mark => {
+            const text = mark.textContent;
+            const textNode = document.createTextNode(text || '');
+            mark.parentNode?.replaceChild(textNode, mark);
+          });
         }
-      }, 100);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [highlightsActive]);
+
+  // Highlight search query in rendered content
+  useEffect(() => {
+    if (searchQuery && highlightsActive && content && contentContainerRef.current) {
+      setTimeout(() => {
+        const container = contentContainerRef.current;
+        if (!container) return;
+
+        // Use browser's find-in-page API to highlight
+        const searchTerms = searchQuery.trim().split(/\s+/);
+        
+        // Simple text highlighting using CSS
+        const highlightText = (node: Node) => {
+          if (node.nodeType === Node.TEXT_NODE) {
+            const text = node.textContent || '';
+            let hasMatch = false;
+            let html = text;
+            
+            searchTerms.forEach(term => {
+              const regex = new RegExp(`(${term})`, 'gi');
+              if (regex.test(text)) {
+                hasMatch = true;
+                html = html.replace(regex, '<mark style="background-color: rgba(255, 215, 0, 0.4); padding: 0 2px;">$1</mark>');
+              }
+            });
+            
+            if (hasMatch && node.parentNode) {
+              const span = document.createElement('span');
+              span.innerHTML = html;
+              node.parentNode.replaceChild(span, node);
+              
+              // Scroll to first match
+              const firstMark = container.querySelector('mark');
+              if (firstMark) {
+                firstMark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
+            }
+          } else if (node.nodeType === Node.ELEMENT_NODE) {
+            // Don't highlight inside code blocks or other special elements
+            const element = node as Element;
+            if (!element.matches('code, pre, script, style')) {
+              Array.from(node.childNodes).forEach(highlightText);
+            }
+          }
+        };
+        
+        highlightText(container);
+      }, 500);
     }
-  }, [highlightLine, content]);
+  }, [searchQuery, highlightsActive, content]);
 
   if (loading) {
     return (
@@ -163,9 +214,14 @@ export function DocumentViewer({ issueId, documentRef, documentPath, highlightLi
         <div className="document-title">
           <span className="document-icon">📄</span>
           <h3>{displayLabel}</h3>
-          {highlightLine && (
+          {searchQuery && (
             <span style={{ marginLeft: '1rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-              Line {highlightLine}
+              Searching: "{searchQuery}"
+              {highlightsActive && (
+                <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', opacity: 0.7 }}>
+                  (ESC to clear)
+                </span>
+              )}
             </span>
           )}
         </div>

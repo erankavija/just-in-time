@@ -21,7 +21,7 @@ function App() {
   const [labelFilters, setLabelFilters] = useState<string[]>([]);
   const [documentViewerState, setDocumentViewerState] = useState<{
     path: string;
-    highlightLine?: number;
+    searchQuery?: string;
   } | null>(null);
   const { theme, toggleTheme } = useTheme();
   const searchResults = useSearch(searchQuery, allIssues);
@@ -89,7 +89,7 @@ function App() {
                       // Open document viewer for document matches
                       setDocumentViewerState({
                         path: result.serverResult.path,
-                        highlightLine: result.serverResult.line_number,
+                        searchQuery: searchQuery,
                       });
                       setSearchQuery(''); // Clear search after selection
                     }
@@ -230,7 +230,7 @@ function App() {
           >
             <DocumentViewer
               documentPath={documentViewerState.path}
-              highlightLine={documentViewerState.highlightLine}
+              searchQuery={documentViewerState.searchQuery}
               onClose={() => setDocumentViewerState(null)}
             />
           </div>
