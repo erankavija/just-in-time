@@ -1110,6 +1110,7 @@ fn run() -> Result<()> {
                 context_lines: context,
                 max_results: limit,
                 file_pattern: glob.clone(),
+                file_patterns: Vec::new(),
             };
 
             match search(&jit_dir, &query, options) {
