@@ -37,7 +37,6 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   const styles = {
     searchBar: {
       width: '100%',
-      marginBottom: '1rem',
     },
     inputWrapper: {
       position: 'relative' as const,
