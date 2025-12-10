@@ -859,13 +859,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         for issue in issues {
             // Check label format
             for label in &issue.labels {
-                labels::validate_label(label).map_err(|e| {
-                    anyhow!(
-                        "Invalid label format in issue '{}': {}",
-                        issue.id,
-                        e
-                    )
-                })?;
+                labels::validate_label(label)
+                    .map_err(|e| anyhow!("Invalid label format in issue '{}': {}", issue.id, e))?;
             }
 
             // Check namespace exists in registry
@@ -878,7 +873,9 @@ impl<S: IssueStore> CommandExecutor<S> {
                             issue.id,
                             namespace,
                             label,
-                            namespaces.namespaces.keys()
+                            namespaces
+                                .namespaces
+                                .keys()
                                 .map(|k| k.as_str())
                                 .collect::<Vec<_>>()
                                 .join(", ")

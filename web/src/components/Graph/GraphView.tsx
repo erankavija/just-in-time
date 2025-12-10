@@ -12,8 +12,9 @@ import ReactFlow, {
 import dagre from 'dagre';
 import 'reactflow/dist/style.css';
 import { apiClient } from '../../api/client';
-import type { State, Priority, GraphNode as ApiGraphNode } from '../../types/models';
+import type { State, Priority, GraphNode as ApiGraphNode, GraphEdge as ApiGraphEdge } from '../../types/models';
 import { LabelBadge } from '../Labels/LabelBadge';
+import { filterStrategicNodes, filterStrategicEdges, calculateDownstreamStats, type DownstreamStats } from '../../utils/strategicView';
 
 // State colors using CSS variables
 const stateColors: Record<State, string> = {
@@ -75,15 +76,19 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'LR') => 
   return { nodes: layoutedNodes, edges };
 };
 
+export type ViewMode = 'tactical' | 'strategic';
+
 interface GraphViewProps {
   onNodeClick?: (issueId: string) => void;
+  viewMode?: ViewMode;
 }
 
-export function GraphView({ onNodeClick }: GraphViewProps) {
+export function GraphView({ onNodeClick, viewMode = 'tactical' }: GraphViewProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [nodeStats, setNodeStats] = useState<Map<string, DownstreamStats>>(new Map());
 
   const loadGraph = useCallback(async () => {
     try {
@@ -91,87 +96,126 @@ export function GraphView({ onNodeClick }: GraphViewProps) {
       setError(null);
       const data = await apiClient.getGraph();
       
-      const flowNodes: Node[] = data.nodes.map((node: ApiGraphNode) => ({
-        id: node.id,
-        type: 'default',
-        position: { x: 0, y: 0 }, // Will be set by dagre
-        sourcePosition: Position.Right,
-        targetPosition: Position.Left,
-        data: {
-          label: (
-            <div style={{ 
-              padding: '10px 12px',
-              fontFamily: 'var(--font-mono)',
-              fontSize: '12px',
-            }}>
+      // Filter nodes and edges based on view mode
+      let filteredNodes: ApiGraphNode[] = data.nodes;
+      let filteredEdges: ApiGraphEdge[] = data.edges;
+      
+      if (viewMode === 'strategic') {
+        filteredNodes = filterStrategicNodes(data.nodes);
+        const strategicNodeIds = new Set(filteredNodes.map(n => n.id));
+        filteredEdges = filterStrategicEdges(data.edges, strategicNodeIds);
+      }
+      
+      // Calculate downstream stats for all nodes (using full graph)
+      const stats = new Map<string, DownstreamStats>();
+      for (const node of filteredNodes) {
+        stats.set(node.id, calculateDownstreamStats(node.id, data.nodes, data.edges));
+      }
+      setNodeStats(stats);
+      
+      const flowNodes: Node[] = filteredNodes.map((node: ApiGraphNode) => {
+        const stats = nodeStats.get(node.id);
+        const hasDownstream = stats && stats.total > 0;
+        
+        return {
+          id: node.id,
+          type: 'default',
+          position: { x: 0, y: 0 }, // Will be set by dagre
+          sourcePosition: Position.Right,
+          targetPosition: Position.Left,
+          data: {
+            label: (
               <div style={{ 
-                fontSize: '10px', 
-                color: 'var(--text-muted)',
-                marginBottom: '4px',
+                padding: '10px 12px',
+                fontFamily: 'var(--font-mono)',
+                fontSize: '12px',
               }}>
-                #{node.id.substring(0, 8)}
-              </div>
-              <div style={{ 
-                fontWeight: 600,
-                marginBottom: '6px',
-                color: 'var(--text-primary)',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                maxWidth: '180px',
-              }}>
-                {node.label}
-              </div>
-              <div style={{ 
-                fontSize: '11px',
-                display: 'flex',
-                gap: '8px',
-                alignItems: 'center',
-              }}>
-                <span style={{ color: priorityColors[node.priority] }}>
-                  {priorityIcons[node.priority]} {node.priority}
-                </span>
-                <span style={{ color: 'var(--text-secondary)' }}>
-                  | {node.state}
-                </span>
-              </div>
-              {node.labels && node.labels.length > 0 && (
-                <div style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  gap: '4px',
-                  marginTop: '6px',
+                <div style={{ 
+                  fontSize: '10px', 
+                  color: 'var(--text-muted)',
+                  marginBottom: '4px',
                 }}>
-                  {node.labels.slice(0, 2).map((label) => (
-                    <LabelBadge key={label} label={label} size="small" />
-                  ))}
-                  {node.labels.length > 2 && (
-                    <span style={{
-                      fontSize: '9px',
-                      color: 'var(--text-muted)',
-                      fontFamily: 'var(--font-mono)',
-                    }}>
-                      +{node.labels.length - 2}
-                    </span>
-                  )}
+                  #{node.id.substring(0, 8)}
                 </div>
-              )}
-            </div>
-          ),
-        },
-        style: {
-          border: `2px solid ${stateColors[node.state]}`,
-          borderRadius: '12px',
-          backgroundColor: 'var(--bg-tertiary)',
-          padding: 0,
-          width: 220,
-          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
-        },
-      }));
+                <div style={{ 
+                  fontWeight: 600,
+                  marginBottom: '6px',
+                  color: 'var(--text-primary)',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  maxWidth: '180px',
+                }}>
+                  {node.label}
+                </div>
+                <div style={{ 
+                  fontSize: '11px',
+                  display: 'flex',
+                  gap: '8px',
+                  alignItems: 'center',
+                }}>
+                  <span style={{ color: priorityColors[node.priority] }}>
+                    {priorityIcons[node.priority]} {node.priority}
+                  </span>
+                  <span style={{ color: 'var(--text-secondary)' }}>
+                    | {node.state}
+                  </span>
+                </div>
+                {node.labels && node.labels.length > 0 && (
+                  <div style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: '4px',
+                    marginTop: '6px',
+                  }}>
+                    {node.labels.slice(0, 2).map((label) => (
+                      <LabelBadge key={label} label={label} size="small" />
+                    ))}
+                    {node.labels.length > 2 && (
+                      <span style={{
+                        fontSize: '9px',
+                        color: 'var(--text-muted)',
+                        fontFamily: 'var(--font-mono)',
+                      }}>
+                        +{node.labels.length - 2}
+                      </span>
+                    )}
+                  </div>
+                )}
+                {hasDownstream && (
+                  <div 
+                    style={{
+                      fontSize: '10px',
+                      color: 'var(--text-secondary)',
+                      fontFamily: 'var(--font-mono)',
+                      borderTop: '1px solid var(--border)',
+                      paddingTop: '4px',
+                      marginTop: '6px',
+                    }}
+                    title={`Downstream: ${stats.total} tasks (${stats.done} done, ${stats.inProgress} in progress, ${stats.blocked} blocked)`}
+                  >
+                    ↓ {stats.total} task{stats.total !== 1 ? 's' : ''}
+                    {stats.done > 0 && ` • ✓ ${stats.done}`}
+                    {stats.blocked > 0 && ` • ⚠ ${stats.blocked}`}
+                  </div>
+                )}
+              </div>
+            ),
+          },
+          style: {
+            border: `2px solid ${stateColors[node.state]}`,
+            borderRadius: '12px',
+            backgroundColor: 'var(--bg-tertiary)',
+            padding: 0,
+            width: 220,
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
+          },
+        };
+      });
 
       // Note: edge.from depends on edge.to, so for L->R layout, 
       // the dependency (to) should be on the left, and dependent (from) on the right
-      const flowEdges: Edge[] = data.edges.map((edge) => ({
+      const flowEdges: Edge[] = filteredEdges.map((edge) => ({
         id: `${edge.from}-${edge.to}`,
         source: edge.to,   // Swap: dependency goes on the left
         target: edge.from, // Swap: dependent goes on the right
@@ -199,7 +243,8 @@ export function GraphView({ onNodeClick }: GraphViewProps) {
     } finally {
       setLoading(false);
     }
-  }, [setNodes, setEdges]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setNodes, setEdges, viewMode]); // nodeStats is setState, not a dependency
 
   useEffect(() => {
     loadGraph();

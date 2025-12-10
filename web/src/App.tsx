@@ -9,10 +9,13 @@ import { apiClient } from './api/client';
 import type { Issue } from './types/models';
 import './App.css';
 
+import type { ViewMode } from './components/Graph/GraphView';
+
 function App() {
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [allIssues, setAllIssues] = useState<Issue[]>([]);
+  const [viewMode, setViewMode] = useState<ViewMode>('tactical');
   const { theme, toggleTheme } = useTheme();
   const searchResults = useSearch(searchQuery, allIssues);
 
@@ -25,9 +28,18 @@ function App() {
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       <header className="app-header">
         <h1>$ jit --ui</h1>
-        <button className="theme-toggle" onClick={toggleTheme}>
-          {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <button 
+            className="theme-toggle"
+            onClick={() => setViewMode(viewMode === 'tactical' ? 'strategic' : 'tactical')}
+            title={viewMode === 'tactical' ? 'Switch to Strategic View' : 'Switch to Tactical View'}
+          >
+            {viewMode === 'tactical' ? '📋 Tactical' : '🎯 Strategic'}
+          </button>
+          <button className="theme-toggle" onClick={toggleTheme}>
+            {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
+          </button>
+        </div>
       </header>
       
       <div style={{ padding: '1rem', borderBottom: '1px solid var(--border)' }}>
@@ -108,7 +120,7 @@ function App() {
           cursor="col-resize"
         >
           <div style={{ height: '100%', position: 'relative' }}>
-            <GraphView onNodeClick={setSelectedIssueId} />
+            <GraphView onNodeClick={setSelectedIssueId} viewMode={viewMode} />
           </div>
           
           <div style={{ 
