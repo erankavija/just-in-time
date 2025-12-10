@@ -212,8 +212,8 @@ async fn search_issues<S: IssueStore>(
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    // Build file patterns: always search issues/*.json + linked docs
-    let mut file_patterns = vec!["issues/*.json".to_string()];
+    // Build file patterns: always search .jit/issues/*.json + linked docs (from repo root)
+    let mut file_patterns = vec![".jit/issues/*.json".to_string()];
     file_patterns.extend(linked_docs);
 
     let options = SearchOptions {
@@ -224,9 +224,9 @@ async fn search_issues<S: IssueStore>(
         ..Default::default()
     };
 
-    // Call search directly with the data directory
-    let data_dir = std::path::Path::new(".jit");
-    let results = jit::search::search(data_dir, &params.q, options).map_err(|e| {
+    // Search from repository root to include both .jit and linked documents
+    let search_dir = std::path::Path::new(".");
+    let results = jit::search::search(search_dir, &params.q, options).map_err(|e| {
         tracing::error!("Search failed: {:?}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
