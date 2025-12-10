@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Split from 'react-split';
 import { GraphView } from './components/Graph/GraphView';
 import { IssueDetail } from './components/Issue/IssueDetail';
 import { SearchBar } from './components/Search/SearchBar';
+import { LabelFilter } from './components/Labels/LabelFilter';
 import { useTheme } from './hooks/useTheme';
 import { useSearch } from './components/Search/useSearch';
 import { apiClient } from './api/client';
@@ -16,6 +17,7 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [allIssues, setAllIssues] = useState<Issue[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('tactical');
+  const [labelFilters, setLabelFilters] = useState<string[]>([]);
   const { theme, toggleTheme } = useTheme();
   const searchResults = useSearch(searchQuery, allIssues);
 
@@ -23,6 +25,17 @@ function App() {
   useEffect(() => {
     apiClient.listIssues().then(setAllIssues).catch(console.error);
   }, []);
+
+  // Extract all unique labels from issues
+  const allLabels = useMemo(() => {
+    const labelSet = new Set<string>();
+    for (const issue of allIssues) {
+      for (const label of issue.labels) {
+        labelSet.add(label);
+      }
+    }
+    return Array.from(labelSet).sort();
+  }, [allIssues]);
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -109,6 +122,12 @@ function App() {
           </div>
         )}
       </div>
+
+      <LabelFilter 
+        labels={allLabels}
+        selectedPatterns={labelFilters}
+        onChange={setLabelFilters}
+      />
       
       <div style={{ flex: 1, overflow: 'hidden' }}>
         <Split
@@ -120,7 +139,11 @@ function App() {
           cursor="col-resize"
         >
           <div style={{ height: '100%', position: 'relative' }}>
-            <GraphView onNodeClick={setSelectedIssueId} viewMode={viewMode} />
+            <GraphView 
+              onNodeClick={setSelectedIssueId} 
+              viewMode={viewMode}
+              labelFilters={labelFilters}
+            />
           </div>
           
           <div style={{ 

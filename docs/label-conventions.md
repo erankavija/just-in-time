@@ -144,6 +144,8 @@ Store in `.jit/label-namespaces.json`:
 
 ### Standard Work Item Types
 
+**CRITICAL: Every issue MUST have exactly ONE `type:*` label.**
+
 The `type:*` namespace defines the kind of work an issue represents:
 
 | Type | Description | Typical Use | Time-boxed? |
@@ -155,6 +157,46 @@ The `type:*` namespace defines the kind of work an issue represents:
 | `type:milestone` | Time-bound release goal | Version releases, quarterly goals | Yes (by definition) |
 | `type:bug` | Defect or error to fix | Production issues, broken functionality | No |
 | `type:feature` | New functionality or enhancement | User-facing additions | No |
+
+### Epic and Milestone Labels: Membership vs Type
+
+**KEY DISTINCTION:**
+
+- **`type:epic`** = "This issue IS an epic" (the work item type)
+- **`epic:auth`** = "This issue belongs to the auth epic" (membership/grouping)
+
+- **`type:milestone`** = "This issue IS a milestone" (the work item type)
+- **`milestone:v1.0`** = "This issue belongs to the v1.0 milestone" (membership/grouping)
+
+**Examples:**
+
+```bash
+# Epic issue itself
+jit issue create \
+  --title "User Authentication System" \
+  --label "type:epic" \
+  --label "epic:auth" \
+  --label "milestone:v1.0"
+# type:epic = this IS an epic
+# epic:auth = this epic is about auth (self-referential)
+# milestone:v1.0 = this epic is part of v1.0 milestone
+
+# Task under that epic
+jit issue create \
+  --title "Implement login endpoint" \
+  --label "type:task" \
+  --label "epic:auth" \
+  --label "milestone:v1.0" \
+  --label "component:backend"
+# type:task = this IS a task
+# epic:auth = this task belongs to auth epic
+# milestone:v1.0 = this task contributes to v1.0 milestone
+```
+
+**Strategic View Filtering:**
+- Shows issues with `type:epic` OR `type:milestone` labels
+- Alternative: Shows issues with `epic:*` OR `milestone:*` labels (catches all strategic work)
+- Recommendation: Use the latter to include epics and their container milestones
 
 **Note on "research" vs "spike":**
 - `type:research` is the standard term for time-boxed investigations

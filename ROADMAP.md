@@ -134,7 +134,9 @@
 - ✅ jit-server crate with search API endpoint
 - ✅ Thread-safe InMemoryStorage (refactored for async)
 - ✅ Responsive web UI with search functionality
-- ✅ **Label system complete** - validation, querying, strategic views, web UI badges
+- ✅ **54 web tests passing** (14 new strategic view tests)
+- ✅ **Strategic/tactical view toggle** - filtering, downstream stats, seamless switching
+- ✅ **Label system (95% complete)** - validation, querying, strategic views, web UI badges
 - ✅ Comprehensive documentation: 
   - file-locking-usage.md (400 lines)
   - knowledge-management-vision.md (537 lines)
@@ -156,7 +158,7 @@
 
 **Goal:** Knowledge management and production-grade reliability.
 
-### Issue Hierarchy & Strategic Views 🚧 (Phase 1-4 Complete, Phase 5 Partial)
+### Issue Hierarchy & Strategic Views ✅ (All Phases Complete)
 
 **Goal:** Labels-based hierarchy for epics, milestones, and strategic/tactical views.
 
@@ -220,14 +222,22 @@
   - Backend: Updated GraphNode API to include labels field
   - TypeScript: Updated Issue and GraphNode types
   - All 38 web tests + 490+ Rust tests passing
-- [ ] **Phase 5.2:** Strategic/tactical view toggle (1-2 hours) - **REMAINING**
-  - Filter graph nodes to milestone/epic labels only
-  - Toggle button to switch between all issues and strategic view
-  - Show rollup stats in tooltips
-- [ ] **Phase 5.3:** Label filtering (1-2 hours) - **REMAINING**
-  - Search/filter issues by label in web UI
-  - Label selector dropdown for filtering
-  - API endpoint: GET /api/issues?label=pattern
+- [x] **Phase 5.2:** Strategic/tactical view toggle (1.5 hours) - **COMPLETE** ✅ 2025-12-09
+  - Filter graph nodes to milestone/epic labels only (Option A)
+  - Downstream stats with DFS calculation (Option C)
+  - Toggle button in header: 📋 Tactical / 🎯 Strategic
+  - Display rollup stats on nodes: "↓ 5 tasks • ✓ 3 • ⚠ 1"
+  - 14 new tests for strategic view filtering
+  - All 54 web tests + 192 Rust tests passing
+  - TDD implementation with full test coverage
+- [x] **Phase 5.3:** Label filtering (1-2 hours) - **COMPLETE** ✅ 2025-12-10
+  - Flexible graph filter architecture supporting multiple filter types
+  - Label filters gray out non-matching nodes (preserves context)
+  - Strategic filter hides non-strategic nodes (different semantic)
+  - Filter composition: strategic + label filters work together
+  - LabelFilter component with autocomplete and wildcard support
+  - 37 new tests (28 filter logic + 9 UI), all 95 web tests passing
+  - Zero TypeScript errors, production build successful
 - [x] **Phase 6:** Label validation (30 min) - **COMPLETE** ✅ 2025-12-09
   - Integrated label validation into `jit validate` command
   - Validates label format (namespace:value) for all issues
@@ -521,17 +531,19 @@
   - **Documentation:** Comprehensive usage guides ✅
   - **Search:** Full-text search with ripgrep integration ✅
   - **Historical documents:** CLI and web UI support ✅
-- **Phase 4:** Production-grade reliability, advanced features (in progress)
-  - **Label system:** Phases 1-4 complete, Phase 5-6 partial ✅
+- **Phase 4:** Production-grade reliability, advanced features ✅
+  - **Label system:** All phases complete (1-6 + 5.3) ✅
     - Core labels, namespace registry, strategic queries, MCP tools ✅
     - Label badges in web UI ✅
+    - Strategic/tactical view toggle with downstream stats ✅
     - Label validation integrated into `jit validate` ✅
-    - Remaining: Strategic view toggle, label filtering in web UI (2-4 hours)
+    - **Label filtering in web UI with gray-out approach** ✅
+    - Flexible filter architecture supporting multiple filter types ✅
+    - 95 web tests + 578 Rust tests passing ✅
   - **Next priorities:**
-    - Option A: Complete label Phase 5 (strategic view toggle + filtering, 2-4 hours)
-    - Option B: Document graph visualization (12-16 hours)
-  - Future: Plugin architecture for custom gates
-  - Future: Performance benchmarks and optimization
+    - Option A: Document graph visualization (12-16 hours)
+    - Option B: Plugin architecture for custom gates
+    - Option C: Performance benchmarks and optimization
 - **CI/CD Infrastructure:** Complete and tested ✅
   - All workflows validated with YAML syntax checks
   - Tested locally with act and manual scripts

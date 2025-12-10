@@ -278,44 +278,51 @@ jit epic-status <id>
 
 **Goal**: Visual strategic/tactical views, label badges
 
-#### 5.1 API Endpoints
-- [ ] `GET /api/issues?label=pattern` - Filter by label
-- [ ] `GET /api/labels/namespaces` - List namespaces
-- [ ] `GET /api/labels/values/:namespace` - List values
-- [ ] `POST /api/issues/:id/labels` - Add label
-- [ ] `DELETE /api/issues/:id/labels/:label` - Remove label
+#### 5.1 Label Badges - **COMPLETE** ✅ 2025-12-08
+- [x] Label badge component (shows labels on nodes)
+- [x] Added to GraphView nodes (max 2 badges + count)
+- [x] Added to IssueDetail view (all labels shown)
+- [x] Color-coded by namespace
 
 **Files changed:**
-- `crates/jit-server/src/main.rs`
+- `web/src/components/Labels/LabelBadge.tsx`
+- `web/src/components/Graph/GraphView.tsx`
+- `web/src/components/Issue/IssueDetail.tsx`
 
-**Tests**: 8-10 API tests
+**Tests**: 11 component tests
 
-#### 5.2 Frontend Components
-- [ ] Label badge component (shows labels on nodes)
-- [ ] Strategic view toggle button
-- [ ] Filter issues by label
-- [ ] Label selector dropdown (for adding)
-
-**Files changed:**
-- `web/src/components/LabelBadge.tsx` (new)
-- `web/src/components/IssueGraph.tsx` (add filter)
-- `web/src/components/IssueDetail.tsx` (show labels)
-- `web/src/App.tsx` (add strategic toggle)
-
-**Tests**: 8-10 component tests
-
-#### 5.3 Strategic View Logic
-- [ ] Filter graph nodes to milestone/epic labels only
-- [ ] Show rollup stats in tooltips
-- [ ] Expand/collapse epic nodes (optional)
+#### 5.2 Strategic View Toggle - **COMPLETE** ✅ 2025-12-09
+- [x] Filter graph nodes to milestone/epic labels only
+- [x] Strategic view toggle button in header
+- [x] Show rollup stats with DFS calculation
+- [x] Downstream stats: "↓ 5 tasks • ✓ 3 • ⚠ 1"
+- [x] Seamless switching with automatic re-layout
 
 **Files changed:**
-- `web/src/hooks/useGraphData.ts`
-- `web/src/utils/graphLayout.ts`
+- `web/src/utils/strategicView.ts` (new) - Core filtering logic
+- `web/src/utils/strategicView.test.ts` (new) - 14 tests
+- `web/src/components/Graph/GraphView.tsx` - View mode support
+- `web/src/components/Graph/__tests__/GraphView.test.tsx` (new)
+- `web/src/App.tsx` - Toggle button
 
-**Tests**: 5-8 integration tests
+**Tests**: 16 tests (14 utility + 2 component)
 
-**Phase 5 Deliverable**: Web UI shows strategic/tactical views
+**Implementation approach**: Option A (filter nodes/edges) + Option C (downstream stats)
+
+#### 5.3 Label Filtering - **REMAINING** (1-2 hours)
+- [ ] `GET /api/issues?label=pattern` - Filter by label API
+- [ ] Filter issues by label in web UI
+- [ ] Label selector dropdown for filtering
+- [ ] Search/filter integration
+
+**Files needed:**
+- `crates/jit-server/src/routes.rs` - API endpoint
+- `web/src/components/LabelFilter.tsx` (new)
+- `web/src/App.tsx` - Filter state
+
+**Tests**: 8-10 API + component tests
+
+**Phase 5 Status**: 5.1-5.2 complete (85%), 5.3 remaining (15%)
 
 ---
 

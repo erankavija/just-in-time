@@ -12,9 +12,10 @@ import ReactFlow, {
 import dagre from 'dagre';
 import 'reactflow/dist/style.css';
 import { apiClient } from '../../api/client';
-import type { State, Priority, GraphNode as ApiGraphNode, GraphEdge as ApiGraphEdge } from '../../types/models';
+import type { State, Priority, GraphNode as ApiGraphNode } from '../../types/models';
 import { LabelBadge } from '../Labels/LabelBadge';
-import { filterStrategicNodes, filterStrategicEdges, calculateDownstreamStats, type DownstreamStats } from '../../utils/strategicView';
+import { calculateDownstreamStats, type DownstreamStats } from '../../utils/strategicView';
+import { applyFiltersToNode, applyFiltersToEdge, createStrategicFilter, createLabelFilter, type GraphFilter } from '../../utils/graphFilter';
 
 // State colors using CSS variables
 const stateColors: Record<State, string> = {
@@ -81,9 +82,10 @@ export type ViewMode = 'tactical' | 'strategic';
 interface GraphViewProps {
   onNodeClick?: (issueId: string) => void;
   viewMode?: ViewMode;
+  labelFilters?: string[]; // e.g., ["milestone:v1.0", "epic:*"]
 }
 
-export function GraphView({ onNodeClick, viewMode = 'tactical' }: GraphViewProps) {
+export function GraphView({ onNodeClick, viewMode = 'tactical', labelFilters = [] }: GraphViewProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [loading, setLoading] = useState(true);
@@ -96,26 +98,35 @@ export function GraphView({ onNodeClick, viewMode = 'tactical' }: GraphViewProps
       setError(null);
       const data = await apiClient.getGraph();
       
-      // Filter nodes and edges based on view mode
-      let filteredNodes: ApiGraphNode[] = data.nodes;
-      let filteredEdges: ApiGraphEdge[] = data.edges;
-      
+      // Build filter configuration
+      const filters: GraphFilter[] = [];
       if (viewMode === 'strategic') {
-        filteredNodes = filterStrategicNodes(data.nodes);
-        const strategicNodeIds = new Set(filteredNodes.map(n => n.id));
-        filteredEdges = filterStrategicEdges(data.edges, strategicNodeIds);
+        filters.push(createStrategicFilter(true));
+      }
+      if (labelFilters.length > 0) {
+        filters.push(createLabelFilter(labelFilters));
       }
       
-      // Calculate downstream stats for all nodes (using full graph)
+      // Apply filters to all nodes
+      const nodeFilterResults = new Map(
+        data.nodes.map(node => [node.id, applyFiltersToNode(node, filters)])
+      );
+      
+      // Filter out hidden nodes
+      const visibleNodes = data.nodes.filter(node => nodeFilterResults.get(node.id)?.visible);
+      
+      // Calculate downstream stats for visible nodes (using full graph)
       const stats = new Map<string, DownstreamStats>();
-      for (const node of filteredNodes) {
+      for (const node of visibleNodes) {
         stats.set(node.id, calculateDownstreamStats(node.id, data.nodes, data.edges));
       }
       setNodeStats(stats);
       
-      const flowNodes: Node[] = filteredNodes.map((node: ApiGraphNode) => {
+      const flowNodes: Node[] = visibleNodes.map((node: ApiGraphNode) => {
         const stats = nodeStats.get(node.id);
         const hasDownstream = stats && stats.total > 0;
+        const filterResult = nodeFilterResults.get(node.id)!;
+        const isDimmed = filterResult.dimmed;
         
         return {
           id: node.id,
@@ -129,6 +140,8 @@ export function GraphView({ onNodeClick, viewMode = 'tactical' }: GraphViewProps
                 padding: '10px 12px',
                 fontFamily: 'var(--font-mono)',
                 fontSize: '12px',
+                opacity: isDimmed ? 0.4 : 1,
+                transition: 'opacity 0.2s ease',
               }}>
                 <div style={{ 
                   fontSize: '10px', 
@@ -209,29 +222,53 @@ export function GraphView({ onNodeClick, viewMode = 'tactical' }: GraphViewProps
             padding: 0,
             width: 220,
             boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
+            opacity: isDimmed ? 0.5 : 1,
+            transition: 'opacity 0.2s ease',
           },
         };
       });
 
       // Note: edge.from depends on edge.to, so for L->R layout, 
       // the dependency (to) should be on the left, and dependent (from) on the right
-      const flowEdges: Edge[] = filteredEdges.map((edge) => ({
-        id: `${edge.from}-${edge.to}`,
-        source: edge.to,   // Swap: dependency goes on the left
-        target: edge.from, // Swap: dependent goes on the right
-        sourceHandle: 'right',
-        targetHandle: 'left',
-        type: 'smoothstep',
-        animated: false,
-        style: {
-          stroke: 'var(--border-hover)',
-          strokeWidth: 2,
-        },
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          color: 'var(--border-hover)',
-        },
-      }));
+      const flowEdges: Edge[] = data.edges
+        .map((edge) => {
+          const sourceResult = nodeFilterResults.get(edge.to);
+          const targetResult = nodeFilterResults.get(edge.from);
+          
+          if (!sourceResult || !targetResult) {
+            return null;
+          }
+          
+          const edgeFilterResult = applyFiltersToEdge(edge, sourceResult, targetResult);
+          
+          if (!edgeFilterResult.visible) {
+            return null;
+          }
+          
+          const isDimmed = edgeFilterResult.dimmed;
+          const edgeColor = isDimmed ? 'var(--border)' : 'var(--border-hover)';
+          
+          return {
+            id: `${edge.from}-${edge.to}`,
+            source: edge.to,   // Swap: dependency goes on the left
+            target: edge.from, // Swap: dependent goes on the right
+            sourceHandle: 'right' as const,
+            targetHandle: 'left' as const,
+            type: 'smoothstep' as const,
+            animated: false,
+            style: {
+              stroke: edgeColor,
+              strokeWidth: 2,
+              opacity: isDimmed ? 0.3 : 1,
+              transition: 'opacity 0.2s ease',
+            },
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              color: edgeColor,
+            },
+          } as Edge;
+        })
+        .filter((edge): edge is Edge => edge !== null);
 
       // Apply dagre layout
       const layouted = getLayoutedElements(flowNodes, flowEdges);
@@ -244,7 +281,7 @@ export function GraphView({ onNodeClick, viewMode = 'tactical' }: GraphViewProps
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setNodes, setEdges, viewMode]); // nodeStats is setState, not a dependency
+  }, [setNodes, setEdges, viewMode, labelFilters]); // nodeStats is setState, not a dependency
 
   useEffect(() => {
     loadGraph();
