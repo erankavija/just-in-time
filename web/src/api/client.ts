@@ -85,4 +85,15 @@ export const apiClient = {
     const response = await api.get(`/issues/${issueId}/documents/${encodedPath}/diff?${params.toString()}`);
     return response.data;
   },
+
+  async getDocumentByPath(
+    path: string,
+    commit?: string
+  ): Promise<DocumentContent> {
+    const params = new URLSearchParams();
+    params.set('path', path);
+    if (commit) params.set('commit', commit);
+    const response = await api.get(`/documents?${params.toString()}`);
+    return response.data;
+  },
 };

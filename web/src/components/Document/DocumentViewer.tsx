@@ -30,20 +30,25 @@ mermaid.initialize({
 });
 
 interface DocumentViewerProps {
-  issueId: string;
-  documentRef: DocumentReference;
+  // Option 1: Via issue context
+  issueId?: string;
+  documentRef?: DocumentReference;
+  // Option 2: Standalone via path
+  documentPath?: string;
+  highlightLine?: number;
   onClose?: () => void;
 }
 
-export function DocumentViewer({ issueId, documentRef, onClose }: DocumentViewerProps) {
+export function DocumentViewer({ issueId, documentRef, documentPath, highlightLine, onClose }: DocumentViewerProps) {
   const [content, setContent] = useState<DocumentContent | null>(null);
   const [selectedCommit, setSelectedCommit] = useState<string | undefined>(
-    documentRef.commit || undefined
+    documentRef?.commit || undefined
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const mermaidContainerRef = useRef<HTMLDivElement>(null);
+  const contentContainerRef = useRef<HTMLDivElement>(null);
 
   // Render mermaid diagrams after content loads
   useEffect(() => {
@@ -75,7 +80,15 @@ export function DocumentViewer({ issueId, documentRef, onClose }: DocumentViewer
     try {
       setLoading(true);
       setError(null);
-      const data = await apiClient.getDocumentContent(issueId, path, commit);
+      
+      // Use standalone endpoint if no issueId, otherwise use issue-specific endpoint
+      let data: DocumentContent;
+      if (issueId) {
+        data = await apiClient.getDocumentContent(issueId, path, commit);
+      } else {
+        data = await apiClient.getDocumentByPath(path, commit);
+      }
+      
       setContent(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load document');
@@ -86,8 +99,32 @@ export function DocumentViewer({ issueId, documentRef, onClose }: DocumentViewer
   }, [issueId]);
 
   useEffect(() => {
-    loadContent(documentRef.path, selectedCommit);
-  }, [documentRef.path, selectedCommit, loadContent]);
+    const path = documentPath || documentRef?.path;
+    if (path) {
+      loadContent(path, selectedCommit);
+    }
+  }, [documentPath, documentRef?.path, selectedCommit, loadContent]);
+
+  // Scroll to and highlight the specified line
+  useEffect(() => {
+    if (highlightLine && content && contentContainerRef.current) {
+      // Wait for content to render
+      setTimeout(() => {
+        // For now, just scroll to approximate position based on line number
+        // More sophisticated implementation would parse the rendered content
+        const approximateScroll = highlightLine * 20; // ~20px per line estimate
+        contentContainerRef.current?.scrollTo({
+          top: approximateScroll,
+          behavior: 'smooth'
+        });
+        
+        // Add visual highlight by adding a yellow background to the container temporarily
+        if (contentContainerRef.current) {
+          contentContainerRef.current.style.scrollMarginTop = '100px';
+        }
+      }, 100);
+    }
+  }, [highlightLine, content]);
 
   if (loading) {
     return (
@@ -99,11 +136,14 @@ export function DocumentViewer({ issueId, documentRef, onClose }: DocumentViewer
     );
   }
 
+  const displayPath = documentPath || documentRef?.path || 'Unknown';
+  const displayLabel = documentRef?.label || displayPath;
+
   if (error) {
     return (
       <div className="document-viewer">
         <div className="document-header">
-          <h3>{documentRef.label || documentRef.path}</h3>
+          <h3>{displayLabel}</h3>
           <button className="close-btn" onClick={onClose}>✕</button>
         </div>
         <div style={{ padding: '20px', color: 'var(--error)', fontFamily: 'var(--font-mono)', fontSize: '12px' }}>
@@ -122,16 +162,23 @@ export function DocumentViewer({ issueId, documentRef, onClose }: DocumentViewer
       <div className="document-header">
         <div className="document-title">
           <span className="document-icon">📄</span>
-          <h3>{documentRef.label || documentRef.path}</h3>
+          <h3>{displayLabel}</h3>
+          {highlightLine && (
+            <span style={{ marginLeft: '1rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+              Line {highlightLine}
+            </span>
+          )}
         </div>
         <div className="document-actions">
-          <button 
-            className="history-btn"
-            onClick={() => setShowHistory(!showHistory)}
-            title="View commit history"
-          >
-            {showHistory ? '✕' : '📜'} {showHistory ? 'Close' : 'History'}
-          </button>
+          {issueId && documentRef && (
+            <button 
+              className="history-btn"
+              onClick={() => setShowHistory(!showHistory)}
+              title="View commit history"
+            >
+              {showHistory ? '✕' : '📜'} {showHistory ? 'Close' : 'History'}
+            </button>
+          )}
           {onClose && (
             <button className="close-btn" onClick={onClose} title="Close document">
               ✕
@@ -140,7 +187,7 @@ export function DocumentViewer({ issueId, documentRef, onClose }: DocumentViewer
         </div>
       </div>
 
-      {showHistory && (
+      {showHistory && issueId && documentRef && (
         <div className="document-history-panel">
           <DocumentHistory
             issueId={issueId}
@@ -154,8 +201,9 @@ export function DocumentViewer({ issueId, documentRef, onClose }: DocumentViewer
         </div>
       )}
 
-      <div className="document-content markdown-content" ref={mermaidContainerRef}>
-        <ReactMarkdown
+      <div className="document-content markdown-content" ref={contentContainerRef} style={{ position: 'relative' }}>
+        <div ref={mermaidContainerRef}>
+          <ReactMarkdown
           remarkPlugins={[remarkMath, remarkGfm]}
           rehypePlugins={[rehypeKatex]}
           components={{
@@ -225,8 +273,9 @@ export function DocumentViewer({ issueId, documentRef, onClose }: DocumentViewer
             },
           }}
         >
-          {content.content}
-        </ReactMarkdown>
+            {content.content}
+          </ReactMarkdown>
+        </div>
       </div>
 
       <div className="document-footer">
