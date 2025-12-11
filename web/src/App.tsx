@@ -4,6 +4,7 @@ import { GraphView } from './components/Graph/GraphView';
 import { IssueDetail } from './components/Issue/IssueDetail';
 import { SearchBar } from './components/Search/SearchBar';
 import { LabelFilter } from './components/Labels/LabelFilter';
+import { DocumentViewer } from './components/Document/DocumentViewer';
 import { useTheme } from './hooks/useTheme';
 import { useSearch } from './components/Search/useSearch';
 import { apiClient } from './api/client';
@@ -18,6 +19,10 @@ function App() {
   const [allIssues, setAllIssues] = useState<Issue[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('tactical');
   const [labelFilters, setLabelFilters] = useState<string[]>([]);
+  const [documentViewerState, setDocumentViewerState] = useState<{
+    path: string;
+    searchQuery?: string;
+  } | null>(null);
   const { theme, toggleTheme } = useTheme();
   const searchResults = useSearch(searchQuery, allIssues);
 
@@ -80,6 +85,13 @@ function App() {
                     if (result.issue) {
                       setSelectedIssueId(result.issue.id);
                       setSearchQuery(''); // Clear search after selection
+                    } else if (result.serverResult) {
+                      // Open document viewer for document matches
+                      setDocumentViewerState({
+                        path: result.serverResult.path,
+                        searchQuery: searchQuery,
+                      });
+                      setSearchQuery(''); // Clear search after selection
                     }
                   }}
                   onMouseEnter={(e) => {
@@ -105,9 +117,27 @@ function App() {
                       )}
                     </>
                   ) : (
-                    <span style={{ color: 'var(--text-secondary)' }}>
-                      📄 {result.serverResult?.path}
-                    </span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                      <div>
+                        <span style={{ color: 'var(--text-secondary)' }}>📄 {result.serverResult?.path}</span>
+                        <span style={{ marginLeft: '0.5rem', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                          Line {result.serverResult?.line_number}
+                        </span>
+                      </div>
+                      {result.serverResult?.line_text && (
+                        <div style={{ 
+                          fontSize: '0.75rem',
+                          color: 'var(--text-muted)',
+                          paddingLeft: '1rem',
+                          fontStyle: 'italic',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}>
+                          {result.serverResult.line_text.trim()}
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               ))}
@@ -168,6 +198,44 @@ function App() {
       <footer className="app-footer">
         jit v0.1.0 | api: {window.location.hostname}:3000 | {theme} mode | search: {searchQuery ? `"${searchQuery}"` : 'ready'}
       </footer>
+
+      {/* Document Viewer Modal */}
+      {documentViewerState && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          zIndex: 2000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '2rem',
+        }}
+        onClick={() => setDocumentViewerState(null)}
+        >
+          <div 
+            style={{
+              width: '90%',
+              maxWidth: '1200px',
+              height: '90%',
+              backgroundColor: 'var(--bg-primary)',
+              borderRadius: '8px',
+              overflow: 'hidden',
+              boxShadow: '0 10px 40px rgba(0, 0, 0, 0.5)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <DocumentViewer
+              documentPath={documentViewerState.path}
+              searchQuery={documentViewerState.searchQuery}
+              onClose={() => setDocumentViewerState(null)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

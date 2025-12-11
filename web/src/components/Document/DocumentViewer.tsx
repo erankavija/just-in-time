@@ -30,20 +30,26 @@ mermaid.initialize({
 });
 
 interface DocumentViewerProps {
-  issueId: string;
-  documentRef: DocumentReference;
+  // Option 1: Via issue context
+  issueId?: string;
+  documentRef?: DocumentReference;
+  // Option 2: Standalone via path
+  documentPath?: string;
+  searchQuery?: string;
   onClose?: () => void;
 }
 
-export function DocumentViewer({ issueId, documentRef, onClose }: DocumentViewerProps) {
+export function DocumentViewer({ issueId, documentRef, documentPath, searchQuery, onClose }: DocumentViewerProps) {
   const [content, setContent] = useState<DocumentContent | null>(null);
   const [selectedCommit, setSelectedCommit] = useState<string | undefined>(
-    documentRef.commit || undefined
+    documentRef?.commit || undefined
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [highlightsActive, setHighlightsActive] = useState(true);
   const mermaidContainerRef = useRef<HTMLDivElement>(null);
+  const contentContainerRef = useRef<HTMLDivElement>(null);
 
   // Render mermaid diagrams after content loads
   useEffect(() => {
@@ -75,7 +81,15 @@ export function DocumentViewer({ issueId, documentRef, onClose }: DocumentViewer
     try {
       setLoading(true);
       setError(null);
-      const data = await apiClient.getDocumentContent(issueId, path, commit);
+      
+      // Use standalone endpoint if no issueId, otherwise use issue-specific endpoint
+      let data: DocumentContent;
+      if (issueId) {
+        data = await apiClient.getDocumentContent(issueId, path, commit);
+      } else {
+        data = await apiClient.getDocumentByPath(path, commit);
+      }
+      
       setContent(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load document');
@@ -86,8 +100,82 @@ export function DocumentViewer({ issueId, documentRef, onClose }: DocumentViewer
   }, [issueId]);
 
   useEffect(() => {
-    loadContent(documentRef.path, selectedCommit);
-  }, [documentRef.path, selectedCommit, loadContent]);
+    const path = documentPath || documentRef?.path;
+    if (path) {
+      loadContent(path, selectedCommit);
+    }
+  }, [documentPath, documentRef?.path, selectedCommit, loadContent]);
+
+  // Handle ESC key to clear highlights
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && highlightsActive) {
+        setHighlightsActive(false);
+        // Remove all highlight marks
+        if (contentContainerRef.current) {
+          const marks = contentContainerRef.current.querySelectorAll('mark');
+          marks.forEach(mark => {
+            const text = mark.textContent;
+            const textNode = document.createTextNode(text || '');
+            mark.parentNode?.replaceChild(textNode, mark);
+          });
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [highlightsActive]);
+
+  // Highlight search query in rendered content
+  useEffect(() => {
+    if (searchQuery && highlightsActive && content && contentContainerRef.current) {
+      setTimeout(() => {
+        const container = contentContainerRef.current;
+        if (!container) return;
+
+        // Use browser's find-in-page API to highlight
+        const searchTerms = searchQuery.trim().split(/\s+/);
+        
+        // Simple text highlighting using CSS
+        const highlightText = (node: Node) => {
+          if (node.nodeType === Node.TEXT_NODE) {
+            const text = node.textContent || '';
+            let hasMatch = false;
+            let html = text;
+            
+            searchTerms.forEach(term => {
+              const regex = new RegExp(`(${term})`, 'gi');
+              if (regex.test(text)) {
+                hasMatch = true;
+                html = html.replace(regex, '<mark style="background-color: rgba(255, 215, 0, 0.4); padding: 0 2px;">$1</mark>');
+              }
+            });
+            
+            if (hasMatch && node.parentNode) {
+              const span = document.createElement('span');
+              span.innerHTML = html;
+              node.parentNode.replaceChild(span, node);
+              
+              // Scroll to first match
+              const firstMark = container.querySelector('mark');
+              if (firstMark) {
+                firstMark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
+            }
+          } else if (node.nodeType === Node.ELEMENT_NODE) {
+            // Don't highlight inside code blocks or other special elements
+            const element = node as Element;
+            if (!element.matches('code, pre, script, style')) {
+              Array.from(node.childNodes).forEach(highlightText);
+            }
+          }
+        };
+        
+        highlightText(container);
+      }, 500);
+    }
+  }, [searchQuery, highlightsActive, content]);
 
   if (loading) {
     return (
@@ -99,11 +187,14 @@ export function DocumentViewer({ issueId, documentRef, onClose }: DocumentViewer
     );
   }
 
+  const displayPath = documentPath || documentRef?.path || 'Unknown';
+  const displayLabel = documentRef?.label || displayPath;
+
   if (error) {
     return (
       <div className="document-viewer">
         <div className="document-header">
-          <h3>{documentRef.label || documentRef.path}</h3>
+          <h3>{displayLabel}</h3>
           <button className="close-btn" onClick={onClose}>✕</button>
         </div>
         <div style={{ padding: '20px', color: 'var(--error)', fontFamily: 'var(--font-mono)', fontSize: '12px' }}>
@@ -122,16 +213,28 @@ export function DocumentViewer({ issueId, documentRef, onClose }: DocumentViewer
       <div className="document-header">
         <div className="document-title">
           <span className="document-icon">📄</span>
-          <h3>{documentRef.label || documentRef.path}</h3>
+          <h3>{displayLabel}</h3>
+          {searchQuery && (
+            <span style={{ marginLeft: '1rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+              Searching: "{searchQuery}"
+              {highlightsActive && (
+                <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', opacity: 0.7 }}>
+                  (ESC to clear)
+                </span>
+              )}
+            </span>
+          )}
         </div>
         <div className="document-actions">
-          <button 
-            className="history-btn"
-            onClick={() => setShowHistory(!showHistory)}
-            title="View commit history"
-          >
-            {showHistory ? '✕' : '📜'} {showHistory ? 'Close' : 'History'}
-          </button>
+          {issueId && documentRef && (
+            <button 
+              className="history-btn"
+              onClick={() => setShowHistory(!showHistory)}
+              title="View commit history"
+            >
+              {showHistory ? '✕' : '📜'} {showHistory ? 'Close' : 'History'}
+            </button>
+          )}
           {onClose && (
             <button className="close-btn" onClick={onClose} title="Close document">
               ✕
@@ -140,7 +243,7 @@ export function DocumentViewer({ issueId, documentRef, onClose }: DocumentViewer
         </div>
       </div>
 
-      {showHistory && (
+      {showHistory && issueId && documentRef && (
         <div className="document-history-panel">
           <DocumentHistory
             issueId={issueId}
@@ -154,8 +257,9 @@ export function DocumentViewer({ issueId, documentRef, onClose }: DocumentViewer
         </div>
       )}
 
-      <div className="document-content markdown-content" ref={mermaidContainerRef}>
-        <ReactMarkdown
+      <div className="document-content markdown-content" ref={contentContainerRef} style={{ position: 'relative' }}>
+        <div ref={mermaidContainerRef}>
+          <ReactMarkdown
           remarkPlugins={[remarkMath, remarkGfm]}
           rehypePlugins={[rehypeKatex]}
           components={{
@@ -225,8 +329,9 @@ export function DocumentViewer({ issueId, documentRef, onClose }: DocumentViewer
             },
           }}
         >
-          {content.content}
-        </ReactMarkdown>
+            {content.content}
+          </ReactMarkdown>
+        </div>
       </div>
 
       <div className="document-footer">

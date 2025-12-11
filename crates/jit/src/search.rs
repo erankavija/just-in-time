@@ -63,6 +63,9 @@ pub struct SearchOptions {
     pub max_results: Option<usize>,
     /// File pattern filter (e.g., "*.json", "*.md")
     pub file_pattern: Option<String>,
+    /// Multiple file patterns (e.g., specific document paths)
+    /// If provided, overrides file_pattern
+    pub file_patterns: Vec<String>,
 }
 
 /// Execute ripgrep search in the specified directory
@@ -116,7 +119,12 @@ pub fn search(data_dir: &Path, query: &str, options: SearchOptions) -> Result<Ve
         cmd.arg(format!("--context={}", options.context_lines));
     }
 
-    if let Some(pattern) = &options.file_pattern {
+    // Use file_patterns if provided, otherwise fall back to file_pattern
+    if !options.file_patterns.is_empty() {
+        for pattern in &options.file_patterns {
+            cmd.arg("--glob").arg(pattern);
+        }
+    } else if let Some(pattern) = &options.file_pattern {
         cmd.arg("--glob").arg(pattern);
     }
 
