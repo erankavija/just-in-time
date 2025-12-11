@@ -27,7 +27,11 @@ fn test_query_by_label_exact_match() {
             "".to_string(),
             Priority::Normal,
             vec![],
-            vec!["type:task".to_string(), "epic:auth".to_string(), "milestone:v1.0".to_string()],
+            vec![
+                "type:task".to_string(),
+                "epic:auth".to_string(),
+                "milestone:v1.0".to_string(),
+            ],
         )
         .unwrap();
 

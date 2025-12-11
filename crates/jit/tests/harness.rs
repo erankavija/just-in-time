@@ -54,7 +54,13 @@ impl TestHarness {
     /// Create an issue with priority
     pub fn create_issue_with_priority(&self, title: &str, priority: Priority) -> String {
         self.executor
-            .create_issue(title.to_string(), String::new(), priority, vec![], vec!["type:task".to_string()])
+            .create_issue(
+                title.to_string(),
+                String::new(),
+                priority,
+                vec![],
+                vec!["type:task".to_string()],
+            )
             .unwrap()
     }
 

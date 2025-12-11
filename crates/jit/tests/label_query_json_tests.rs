@@ -132,7 +132,16 @@ fn test_query_label_json_no_matches() {
 
     // Create issue without the queried label
     Command::new(&jit)
-        .args(["issue", "create", "-t", "Task", "--label", "type:task", "--label", "milestone:v1.0"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Task",
+            "--label",
+            "type:task",
+            "--label",
+            "milestone:v1.0",
+        ])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -244,7 +253,16 @@ fn test_query_label_wildcard_with_no_matches() {
 
     // Create issue with different namespace
     Command::new(&jit)
-        .args(["issue", "create", "-t", "Task", "--label", "type:task", "--label", "epic:auth"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Task",
+            "--label",
+            "type:task",
+            "--label",
+            "epic:auth",
+        ])
         .current_dir(temp.path())
         .output()
         .unwrap();

@@ -25,10 +25,7 @@ use anyhow::{anyhow, Result};
 /// assert!(validate_required_labels(&labels).is_err());
 /// ```
 pub fn validate_required_labels(labels: &[String]) -> Result<()> {
-    let type_labels: Vec<_> = labels
-        .iter()
-        .filter(|l| l.starts_with("type:"))
-        .collect();
+    let type_labels: Vec<_> = labels.iter().filter(|l| l.starts_with("type:")).collect();
 
     if type_labels.is_empty() {
         return Err(anyhow!(
@@ -78,7 +75,7 @@ mod tests {
         let labels = vec!["epic:auth".to_string()];
         let result = validate_required_labels(&labels);
         assert!(result.is_err());
-        
+
         let err = result.unwrap_err();
         assert!(err.to_string().contains("must have exactly one type label"));
     }
@@ -88,20 +85,17 @@ mod tests {
         let labels: Vec<String> = vec![];
         let result = validate_required_labels(&labels);
         assert!(result.is_err());
-        
+
         let err = result.unwrap_err();
         assert!(err.to_string().contains("must have exactly one type label"));
     }
 
     #[test]
     fn test_validate_required_labels_multiple_types() {
-        let labels = vec![
-            "type:task".to_string(),
-            "type:bug".to_string(),
-        ];
+        let labels = vec!["type:task".to_string(), "type:bug".to_string()];
         let result = validate_required_labels(&labels);
         assert!(result.is_err());
-        
+
         let err = result.unwrap_err();
         let msg = err.to_string();
         assert!(msg.contains("can only have ONE type label"));
@@ -122,8 +116,11 @@ mod tests {
 
         for type_label in valid_types {
             let labels = vec![type_label.to_string()];
-            assert!(validate_required_labels(&labels).is_ok(),
-                "Expected {} to be valid", type_label);
+            assert!(
+                validate_required_labels(&labels).is_ok(),
+                "Expected {} to be valid",
+                type_label
+            );
         }
     }
 
@@ -132,7 +129,7 @@ mod tests {
         // type:Task should work (value is case-insensitive)
         let labels = vec!["type:Task".to_string()];
         assert!(validate_required_labels(&labels).is_ok());
-        
+
         // Type:task should NOT work (namespace is case-sensitive)
         let labels = vec!["Type:task".to_string()];
         let result = validate_required_labels(&labels);

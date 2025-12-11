@@ -42,7 +42,16 @@ fn test_query_ready_returns_unblocked_issues() {
 
     // Create multiple issues with different states
     let output1 = Command::new(&jit)
-        .args(["issue", "create", "-t", "Task 1", "-d", "Ready task", "--label", "type:task"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Task 1",
+            "-d",
+            "Ready task",
+            "--label",
+            "type:task",
+        ])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -53,7 +62,16 @@ fn test_query_ready_returns_unblocked_issues() {
         .to_string();
 
     let output2 = Command::new(&jit)
-        .args(["issue", "create", "-t", "Task 2", "-d", "In progress task", "--label", "type:task"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Task 2",
+            "-d",
+            "In progress task",
+            "--label",
+            "type:task",
+        ])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -139,7 +157,16 @@ fn test_query_ready_excludes_assigned_issues() {
 
     // Create two ready issues
     let output1 = Command::new(&jit)
-        .args(["issue", "create", "-t", "Task 1", "-d", "Unassigned", "--label", "type:task"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Task 1",
+            "-d",
+            "Unassigned",
+            "--label",
+            "type:task",
+        ])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -150,7 +177,16 @@ fn test_query_ready_excludes_assigned_issues() {
         .to_string();
 
     let output2 = Command::new(&jit)
-        .args(["issue", "create", "-t", "Task 2", "-d", "Assigned", "--label", "type:task"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Task 2",
+            "-d",
+            "Assigned",
+            "--label",
+            "type:task",
+        ])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -192,7 +228,16 @@ fn test_query_blocked_returns_issues_with_reasons() {
 
     // Create parent and child issues
     let output1 = Command::new(&jit)
-        .args(["issue", "create", "-t", "Parent", "-d", "Dependency", "--label", "type:task"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Parent",
+            "-d",
+            "Dependency",
+            "--label",
+            "type:task",
+        ])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -203,7 +248,16 @@ fn test_query_blocked_returns_issues_with_reasons() {
         .to_string();
 
     let output2 = Command::new(&jit)
-        .args(["issue", "create", "-t", "Child", "-d", "Depends on parent", "--label", "type:task"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Child",
+            "-d",
+            "Depends on parent",
+            "--label",
+            "type:task",
+        ])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -254,7 +308,16 @@ fn test_query_by_assignee() {
 
     // Create issues with different assignees
     let output1 = Command::new(&jit)
-        .args(["issue", "create", "-t", "Task 1", "-d", "For worker 1", "--label", "type:task"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Task 1",
+            "-d",
+            "For worker 1",
+            "--label",
+            "type:task",
+        ])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -265,7 +328,16 @@ fn test_query_by_assignee() {
         .to_string();
 
     let output2 = Command::new(&jit)
-        .args(["issue", "create", "-t", "Task 2", "-d", "For worker 2", "--label", "type:task"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Task 2",
+            "-d",
+            "For worker 2",
+            "--label",
+            "type:task",
+        ])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -311,7 +383,16 @@ fn test_issue_release() {
 
     // Create and assign issue
     let output = Command::new(&jit)
-        .args(["issue", "create", "-t", "Task", "-d", "Test release", "--label", "type:task"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Task",
+            "-d",
+            "Test release",
+            "--label",
+            "type:task",
+        ])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -355,7 +436,16 @@ fn test_query_by_state() {
 
     // Create issues with different states
     let output1 = Command::new(&jit)
-        .args(["issue", "create", "-t", "Task 1", "-d", "Open", "--label", "type:task"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Task 1",
+            "-d",
+            "Open",
+            "--label",
+            "type:task",
+        ])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -366,7 +456,16 @@ fn test_query_by_state() {
         .to_string();
 
     let output2 = Command::new(&jit)
-        .args(["issue", "create", "-t", "Task 2", "-d", "Done", "--label", "type:task"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Task 2",
+            "-d",
+            "Done",
+            "--label",
+            "type:task",
+        ])
         .current_dir(temp.path())
         .output()
         .unwrap();

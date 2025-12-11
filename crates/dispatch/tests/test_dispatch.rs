@@ -40,7 +40,16 @@ fn init_jit_repo() -> TempDir {
 fn create_ready_issue(repo_path: &Path, title: &str) -> String {
     // Create issue
     let output = std::process::Command::new(jit_binary())
-        .args(["issue", "create", "-t", title, "-d", "Test", "--label", "type:task"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            title,
+            "-d",
+            "Test",
+            "--label",
+            "type:task",
+        ])
         .current_dir(repo_path)
         .output()
         .unwrap();

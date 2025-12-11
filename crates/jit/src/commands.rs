@@ -4096,7 +4096,11 @@ mod tests {
                 "Description".to_string(),
                 Priority::Normal,
                 vec![],
-                vec!["type:task".to_string(), "milestone:v1.0".to_string(), "milestone:q1".to_string()],
+                vec![
+                    "type:task".to_string(),
+                    "milestone:v1.0".to_string(),
+                    "milestone:q1".to_string(),
+                ],
             )
             .unwrap();
 
@@ -4218,4 +4222,3 @@ mod tests {
         assert!(result.is_ok()); // Currently no enforcement on save
     }
 }
-

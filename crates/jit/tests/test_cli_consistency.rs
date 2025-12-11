@@ -38,7 +38,17 @@ fn test_issue_create_supports_json() {
     let repo = setup_repo();
 
     let output = Command::new(jit_binary())
-        .args(["issue", "create", "-t", "Test task", "-d", "Test", "--label", "type:task", "--json"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Test task",
+            "-d",
+            "Test",
+            "--label",
+            "type:task",
+            "--json",
+        ])
         .current_dir(repo.path())
         .output()
         .unwrap();
@@ -59,7 +69,16 @@ fn test_issue_create_without_json_is_human_readable() {
     let repo = setup_repo();
 
     let output = Command::new(jit_binary())
-        .args(["issue", "create", "-t", "Test task", "-d", "Test", "--label", "type:task"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Test task",
+            "-d",
+            "Test",
+            "--label",
+            "type:task",
+        ])
         .current_dir(repo.path())
         .output()
         .unwrap();
@@ -85,7 +104,17 @@ fn test_issue_update_supports_json() {
 
     // Create issue first
     let create_output = Command::new(jit_binary())
-        .args(["issue", "create", "-t", "Test", "-d", "Test", "--label", "type:task", "--json"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Test",
+            "-d",
+            "Test",
+            "--label",
+            "type:task",
+            "--json",
+        ])
         .current_dir(repo.path())
         .output()
         .unwrap();
@@ -118,7 +147,17 @@ fn test_issue_claim_takes_id_first() {
 
     // Create ready issue
     let create_output = Command::new(jit_binary())
-        .args(["issue", "create", "-t", "Task", "-d", "Test", "--label", "type:task", "--json"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Task",
+            "-d",
+            "Test",
+            "--label",
+            "type:task",
+            "--json",
+        ])
         .current_dir(repo.path())
         .output()
         .unwrap();
@@ -156,7 +195,17 @@ fn test_issue_claim_supports_json() {
     let repo = setup_repo();
 
     let create_output = Command::new(jit_binary())
-        .args(["issue", "create", "-t", "Task", "-d", "Test", "--label", "type:task", "--json"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Task",
+            "-d",
+            "Test",
+            "--label",
+            "type:task",
+            "--json",
+        ])
         .current_dir(repo.path())
         .output()
         .unwrap();
@@ -190,7 +239,17 @@ fn test_issue_delete_supports_json() {
     let repo = setup_repo();
 
     let create_output = Command::new(jit_binary())
-        .args(["issue", "create", "-t", "Task", "-d", "Test", "--label", "type:task", "--json"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Task",
+            "-d",
+            "Test",
+            "--label",
+            "type:task",
+            "--json",
+        ])
         .current_dir(repo.path())
         .output()
         .unwrap();
@@ -222,7 +281,17 @@ fn test_issue_release_supports_json() {
 
     // Create and claim issue
     let create_output = Command::new(jit_binary())
-        .args(["issue", "create", "-t", "Task", "-d", "Test", "--label", "type:task", "--json"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Task",
+            "-d",
+            "Test",
+            "--label",
+            "type:task",
+            "--json",
+        ])
         .current_dir(repo.path())
         .output()
         .unwrap();
@@ -270,7 +339,17 @@ fn test_json_output_has_consistent_structure() {
     // - relevant issue data
 
     let output = Command::new(jit_binary())
-        .args(["issue", "create", "-t", "Test", "-d", "Test", "--label", "type:task", "--json"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Test",
+            "-d",
+            "Test",
+            "--label",
+            "type:task",
+            "--json",
+        ])
         .current_dir(repo.path())
         .output()
         .unwrap();

@@ -180,7 +180,10 @@ fn test_query_strategic_with_custom_strategic_namespace() {
             "".to_string(),
             Priority::Critical,
             vec![],
-            vec!["type:task".to_string(), "initiative:cloud-migration".to_string()],
+            vec![
+                "type:task".to_string(),
+                "initiative:cloud-migration".to_string(),
+            ],
         )
         .unwrap();
 

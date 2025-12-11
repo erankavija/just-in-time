@@ -38,19 +38,46 @@ fn test_search_by_title() {
 
     // Create issues
     Command::new(&jit)
-        .args(["issue", "create", "-t", "Fix bug in parser", "-d", "Desc", "--label", "type:task"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Fix bug in parser",
+            "-d",
+            "Desc",
+            "--label",
+            "type:task",
+        ])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     Command::new(&jit)
-        .args(["issue", "create", "-t", "Add feature", "-d", "Desc", "--label", "type:task"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Add feature",
+            "-d",
+            "Desc",
+            "--label",
+            "type:task",
+        ])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     Command::new(&jit)
-        .args(["issue", "create", "-t", "Fix bug in lexer", "-d", "Desc", "--label", "type:task"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Fix bug in lexer",
+            "-d",
+            "Desc",
+            "--label",
+            "type:task",
+        ])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -91,7 +118,16 @@ fn test_search_by_description() {
         .unwrap();
 
     Command::new(&jit)
-        .args(["issue", "create", "-t", "Task 2", "-d", "Regular task", "--label", "type:task"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Task 2",
+            "-d",
+            "Regular task",
+            "--label",
+            "type:task",
+        ])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -114,7 +150,16 @@ fn test_search_case_insensitive() {
     let jit = jit_binary();
 
     Command::new(&jit)
-        .args(["issue", "create", "-t", "Fix BUG", "-d", "Desc", "--label", "type:task"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Fix BUG",
+            "-d",
+            "Desc",
+            "--label",
+            "type:task",
+        ])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -189,7 +234,16 @@ fn test_search_no_results() {
     let jit = jit_binary();
 
     Command::new(&jit)
-        .args(["issue", "create", "-t", "Task", "-d", "Desc", "--label", "type:task"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Task",
+            "-d",
+            "Desc",
+            "--label",
+            "type:task",
+        ])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -212,7 +266,16 @@ fn test_export_dot_format() {
 
     // Create issues with dependencies
     let output1 = Command::new(&jit)
-        .args(["issue", "create", "-t", "API", "-d", "Design API", "--label", "type:task"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "API",
+            "-d",
+            "Design API",
+            "--label",
+            "type:task",
+        ])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -220,7 +283,16 @@ fn test_export_dot_format() {
     let id1 = stdout1.split_whitespace().last().unwrap();
 
     let output2 = Command::new(&jit)
-        .args(["issue", "create", "-t", "Backend", "-d", "Implement", "--label", "type:task"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Backend",
+            "-d",
+            "Implement",
+            "--label",
+            "type:task",
+        ])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -252,7 +324,16 @@ fn test_export_mermaid_format() {
     let jit = jit_binary();
 
     Command::new(&jit)
-        .args(["issue", "create", "-t", "Task", "-d", "Desc", "--label", "type:task"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Task",
+            "-d",
+            "Desc",
+            "--label",
+            "type:task",
+        ])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -327,7 +408,16 @@ fn test_issue_update_and_delete() {
     let jit = jit_binary();
 
     let output = Command::new(&jit)
-        .args(["issue", "create", "-t", "Old Title", "-d", "Desc", "--label", "type:task"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Old Title",
+            "-d",
+            "Desc",
+            "--label",
+            "type:task",
+        ])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -377,7 +467,16 @@ fn test_dependencies() {
     let jit = jit_binary();
 
     let output1 = Command::new(&jit)
-        .args(["issue", "create", "-t", "Dependency", "-d", "Desc", "--label", "type:task"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Dependency",
+            "-d",
+            "Desc",
+            "--label",
+            "type:task",
+        ])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -388,7 +487,16 @@ fn test_dependencies() {
         .to_string();
 
     let output2 = Command::new(&jit)
-        .args(["issue", "create", "-t", "Dependent", "-d", "Desc", "--label", "type:task"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Dependent",
+            "-d",
+            "Desc",
+            "--label",
+            "type:task",
+        ])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -434,7 +542,16 @@ fn test_cycle_detection() {
     let jit = jit_binary();
 
     let output1 = Command::new(&jit)
-        .args(["issue", "create", "-t", "Issue 1", "-d", "Desc", "--label", "type:task"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Issue 1",
+            "-d",
+            "Desc",
+            "--label",
+            "type:task",
+        ])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -445,7 +562,16 @@ fn test_cycle_detection() {
         .to_string();
 
     let output2 = Command::new(&jit)
-        .args(["issue", "create", "-t", "Issue 2", "-d", "Desc", "--label", "type:task"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Issue 2",
+            "-d",
+            "Desc",
+            "--label",
+            "type:task",
+        ])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -509,7 +635,16 @@ fn test_gates() {
     // Create issue with gate
     let output = Command::new(&jit)
         .args([
-            "issue", "create", "-t", "Task", "-d", "Desc", "--gate", "tests", "--label", "type:task",
+            "issue",
+            "create",
+            "-t",
+            "Task",
+            "-d",
+            "Desc",
+            "--gate",
+            "tests",
+            "--label",
+            "type:task",
         ])
         .current_dir(temp.path())
         .output()
@@ -547,7 +682,16 @@ fn test_assignment_workflow() {
     let jit = jit_binary();
 
     let output = Command::new(&jit)
-        .args(["issue", "create", "-t", "Task", "-d", "Desc", "--label", "type:task"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Task",
+            "-d",
+            "Desc",
+            "--label",
+            "type:task",
+        ])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -598,13 +742,31 @@ fn test_events() {
 
     // Create issues to generate events
     Command::new(&jit)
-        .args(["issue", "create", "-t", "Task 1", "-d", "Desc", "--label", "type:task"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Task 1",
+            "-d",
+            "Desc",
+            "--label",
+            "type:task",
+        ])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     Command::new(&jit)
-        .args(["issue", "create", "-t", "Task 2", "-d", "Desc", "--label", "type:task"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Task 2",
+            "-d",
+            "Desc",
+            "--label",
+            "type:task",
+        ])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -637,13 +799,31 @@ fn test_validate_repository() {
     let jit = jit_binary();
 
     Command::new(&jit)
-        .args(["issue", "create", "-t", "Task 1", "-d", "Desc", "--label", "type:task"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Task 1",
+            "-d",
+            "Desc",
+            "--label",
+            "type:task",
+        ])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     Command::new(&jit)
-        .args(["issue", "create", "-t", "Task 2", "-d", "Desc", "--label", "type:task"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Task 2",
+            "-d",
+            "Desc",
+            "--label",
+            "type:task",
+        ])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -664,7 +844,16 @@ fn test_graph_roots() {
     let jit = jit_binary();
 
     let output1 = Command::new(&jit)
-        .args(["issue", "create", "-t", "Root", "-d", "Desc", "--label", "type:task"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Root",
+            "-d",
+            "Desc",
+            "--label",
+            "type:task",
+        ])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -675,7 +864,16 @@ fn test_graph_roots() {
         .to_string();
 
     let output2 = Command::new(&jit)
-        .args(["issue", "create", "-t", "Child", "-d", "Desc", "--label", "type:task"])
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Child",
+            "-d",
+            "Desc",
+            "--label",
+            "type:task",
+        ])
         .current_dir(temp.path())
         .output()
         .unwrap();

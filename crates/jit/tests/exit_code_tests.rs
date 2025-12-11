@@ -37,7 +37,14 @@ fn test_exit_code_success() {
     // Successful command should return exit code 0
     let status = Command::new(jit_binary())
         .current_dir(&temp_dir)
-        .args(["issue", "create", "--title", "Test issue", "--label", "type:task"])
+        .args([
+            "issue",
+            "create",
+            "--title",
+            "Test issue",
+            "--label",
+            "type:task",
+        ])
         .status()
         .unwrap();
 
@@ -70,7 +77,15 @@ fn test_exit_code_validation_failed_cycle() {
     // Create two issues
     let output1 = Command::new(jit_binary())
         .current_dir(&temp_dir)
-        .args(["issue", "create", "--title", "Task A", "--label", "type:task", "--json"])
+        .args([
+            "issue",
+            "create",
+            "--title",
+            "Task A",
+            "--label",
+            "type:task",
+            "--json",
+        ])
         .output()
         .unwrap();
     assert!(output1.status.success());
@@ -80,7 +95,15 @@ fn test_exit_code_validation_failed_cycle() {
 
     let output2 = Command::new(jit_binary())
         .current_dir(&temp_dir)
-        .args(["issue", "create", "--title", "Task B", "--label", "type:task", "--json"])
+        .args([
+            "issue",
+            "create",
+            "--title",
+            "Task B",
+            "--label",
+            "type:task",
+            "--json",
+        ])
         .output()
         .unwrap();
     assert!(output2.status.success());
@@ -207,7 +230,15 @@ fn test_exit_code_validation_command() {
     // Create an issue and manually corrupt the data to cause validation failure
     let output = Command::new(jit_binary())
         .current_dir(&temp_dir)
-        .args(["issue", "create", "--title", "Test", "--label", "type:task", "--json"])
+        .args([
+            "issue",
+            "create",
+            "--title",
+            "Test",
+            "--label",
+            "type:task",
+            "--json",
+        ])
         .output()
         .unwrap();
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
