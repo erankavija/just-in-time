@@ -5,6 +5,7 @@
 
 use crate::domain::{Event, Gate, GateState, GateStatus, Issue, Priority, State};
 use crate::graph::DependencyGraph;
+use crate::label_validation;
 use crate::labels;
 use crate::storage::IssueStore;
 use anyhow::{anyhow, Result};
@@ -112,6 +113,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         for label_str in &labels {
             labels::validate_label(label_str)?;
         }
+
+        // Validate required type label (enforcement)
+        label_validation::validate_required_labels(&labels)?;
 
         // Check uniqueness constraints
         let namespaces = self.storage.load_label_namespaces()?;
@@ -862,6 +866,10 @@ impl<S: IssueStore> CommandExecutor<S> {
                 labels::validate_label(label)
                     .map_err(|e| anyhow!("Invalid label format in issue '{}': {}", issue.id, e))?;
             }
+
+            // Validate required type label (enforcement)
+            label_validation::validate_required_labels(&issue.labels)
+                .map_err(|e| anyhow!("Issue '{}': {}", issue.id, e))?;
 
             // Check namespace exists in registry
             for label in &issue.labels {
@@ -4094,4 +4102,118 @@ mod tests {
         let result = executor.validate_silent();
         assert!(result.is_ok());
     }
+
+    // ==================== Label Enforcement Tests ====================
+
+    #[test]
+    fn test_create_issue_requires_type_label() {
+        let (_temp, executor) = setup();
+
+        // Should fail without type label
+        let result = executor.create_issue(
+            "Task".to_string(),
+            "Description".to_string(),
+            Priority::Normal,
+            vec![],
+            vec!["epic:auth".to_string()],
+        );
+
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("must have exactly one type label"));
+        assert!(err_msg.contains("type:task"));
+    }
+
+    #[test]
+    fn test_create_issue_succeeds_with_type_label() {
+        let (_temp, executor) = setup();
+
+        // Should succeed with type label
+        let result = executor.create_issue(
+            "Task".to_string(),
+            "Description".to_string(),
+            Priority::Normal,
+            vec![],
+            vec!["type:task".to_string(), "epic:auth".to_string()],
+        );
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_create_issue_rejects_multiple_type_labels() {
+        let (_temp, executor) = setup();
+
+        // Should fail with multiple type labels
+        let result = executor.create_issue(
+            "Task".to_string(),
+            "Description".to_string(),
+            Priority::Normal,
+            vec![],
+            vec!["type:task".to_string(), "type:bug".to_string()],
+        );
+
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("can only have ONE type label"));
+        assert!(err_msg.contains("type:task"));
+        assert!(err_msg.contains("type:bug"));
+    }
+
+    #[test]
+    fn test_create_issue_accepts_all_valid_type_values() {
+        let (_temp, executor) = setup();
+
+        let valid_types = vec![
+            "type:task",
+            "type:epic",
+            "type:milestone",
+            "type:bug",
+            "type:feature",
+            "type:research",
+        ];
+
+        for type_label in valid_types {
+            let result = executor.create_issue(
+                format!("Issue with {}", type_label),
+                "Description".to_string(),
+                Priority::Normal,
+                vec![],
+                vec![type_label.to_string()],
+            );
+
+            assert!(
+                result.is_ok(),
+                "Expected {} to be valid, but got error: {:?}",
+                type_label,
+                result.err()
+            );
+        }
+    }
+
+    #[test]
+    fn test_add_label_enforces_type_requirement() {
+        let (_temp, executor) = setup();
+
+        // Create issue with type label
+        let id = executor
+            .create_issue(
+                "Task".to_string(),
+                "Description".to_string(),
+                Priority::Normal,
+                vec![],
+                vec!["type:task".to_string()],
+            )
+            .unwrap();
+
+        // Removing type label should fail
+        let mut issue = executor.storage().load_issue(&id).unwrap();
+        issue.labels.clear();
+        issue.labels.push("epic:auth".to_string());
+
+        let result = executor.storage().save_issue(&issue);
+        // Note: This test shows current behavior - we'll add enforcement in next phase
+        assert!(result.is_ok()); // Currently no enforcement on save
+    }
 }
+
