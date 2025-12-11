@@ -51,7 +51,7 @@ fn test_workflow_simple_task_completion() {
     // 1. Create a task (auto-transitions to Ready since no blockers)
     let output = run_jit(
         &temp,
-        &["issue", "create", "-t", "Fix bug", "--priority", "high"],
+        &["issue", "create", "-t", "Fix bug", "-d", "Test", "--priority", "high", "--label", "type:task"],
     );
     assert!(output.status.success());
     let id = extract_id(&String::from_utf8_lossy(&output.stdout));
@@ -100,7 +100,7 @@ fn test_workflow_agent_claim_next() {
     // Create multiple ready tasks with different priorities
     let output = run_jit(
         &temp,
-        &["issue", "create", "-t", "Low priority", "--priority", "low"],
+        &["issue", "create", "-t", "Low priority", "-d", "Test", "--priority", "low", "--label", "type:task"],
     );
     let low_id = extract_id(&String::from_utf8_lossy(&output.stdout));
     run_jit(&temp, &["issue", "update", &low_id, "--state", "ready"]);
@@ -112,8 +112,12 @@ fn test_workflow_agent_claim_next() {
             "create",
             "-t",
             "High priority",
+            "-d",
+            "Test",
             "--priority",
             "high",
+            "--label",
+            "type:task",
         ],
     );
     let high_id = extract_id(&String::from_utf8_lossy(&output.stdout));
@@ -126,8 +130,12 @@ fn test_workflow_agent_claim_next() {
             "create",
             "-t",
             "Critical",
+            "-d",
+            "Test",
             "--priority",
             "critical",
+            "--label",
+            "type:task",
         ],
     );
     let critical_id = extract_id(&String::from_utf8_lossy(&output.stdout));
@@ -171,13 +179,13 @@ fn test_workflow_dependency_chain_unblocking() {
     let temp = setup_test_repo();
 
     // Create a chain: task3 depends on task2 depends on task1
-    let output = run_jit(&temp, &["issue", "create", "-t", "Task 1"]);
+    let output = run_jit(&temp, &["issue", "create", "-t", "Task 1", "-d", "Test", "--label", "type:task"]);
     let task1 = extract_id(&String::from_utf8_lossy(&output.stdout));
 
-    let output = run_jit(&temp, &["issue", "create", "-t", "Task 2"]);
+    let output = run_jit(&temp, &["issue", "create", "-t", "Task 2", "-d", "Test", "--label", "type:task"]);
     let task2 = extract_id(&String::from_utf8_lossy(&output.stdout));
 
-    let output = run_jit(&temp, &["issue", "create", "-t", "Task 3"]);
+    let output = run_jit(&temp, &["issue", "create", "-t", "Task 3", "-d", "Test", "--label", "type:task"]);
     let task3 = extract_id(&String::from_utf8_lossy(&output.stdout));
 
     // Create dependencies
@@ -249,7 +257,7 @@ fn test_workflow_gates() {
     // Create issue with both gates
     let output = run_jit(
         &temp,
-        &["issue", "create", "-t", "Feature", "--gate", "review,tests"],
+        &["issue", "create", "-t", "Feature", "-d", "Test", "--gate", "review,tests", "--label", "type:task"],
     );
     let id = extract_id(&String::from_utf8_lossy(&output.stdout));
 
@@ -295,7 +303,7 @@ fn test_workflow_task_release_and_reassignment() {
     let temp = setup_test_repo();
 
     // Create and claim a task (auto-transitions to Ready)
-    let output = run_jit(&temp, &["issue", "create", "-t", "Task"]);
+    let output = run_jit(&temp, &["issue", "create", "-t", "Task", "-d", "Test", "--label", "type:task"]);
     let id = extract_id(&String::from_utf8_lossy(&output.stdout));
     run_jit(&temp, &["issue", "claim", &id, "agent:worker-1"]);
 
@@ -347,19 +355,19 @@ fn test_workflow_complex_epic() {
     // Create feature tasks
     let output = run_jit(
         &temp,
-        &["issue", "create", "-t", "Backend API", "--gate", "tests"],
+        &["issue", "create", "-t", "Backend API", "-d", "Test", "--gate", "tests", "--label", "type:task"],
     );
     let backend = extract_id(&String::from_utf8_lossy(&output.stdout));
 
     let output = run_jit(
         &temp,
-        &["issue", "create", "-t", "Frontend UI", "--gate", "tests"],
+        &["issue", "create", "-t", "Frontend UI", "-d", "Test", "--gate", "tests", "--label", "type:task"],
     );
     let frontend = extract_id(&String::from_utf8_lossy(&output.stdout));
 
     let output = run_jit(
         &temp,
-        &["issue", "create", "-t", "Documentation", "--gate", "review"],
+        &["issue", "create", "-t", "Documentation", "-d", "Test", "--gate", "review", "--label", "type:task"],
     );
     let docs = extract_id(&String::from_utf8_lossy(&output.stdout));
 
@@ -371,8 +379,12 @@ fn test_workflow_complex_epic() {
             "create",
             "-t",
             "Release v1.0",
+            "-d",
+            "Test",
             "--priority",
             "critical",
+            "--label",
+            "type:epic",
         ],
     );
     let epic = extract_id(&String::from_utf8_lossy(&output.stdout));
@@ -417,10 +429,10 @@ fn test_workflow_error_scenarios() {
     assert!(!output.status.success());
 
     // Try to create cycle
-    let output = run_jit(&temp, &["issue", "create", "-t", "Task 1"]);
+    let output = run_jit(&temp, &["issue", "create", "-t", "Task 1", "-d", "Test", "--label", "type:task"]);
     let id1 = extract_id(&String::from_utf8_lossy(&output.stdout));
 
-    let output = run_jit(&temp, &["issue", "create", "-t", "Task 2"]);
+    let output = run_jit(&temp, &["issue", "create", "-t", "Task 2", "-d", "Test", "--label", "type:task"]);
     let id2 = extract_id(&String::from_utf8_lossy(&output.stdout));
 
     run_jit(&temp, &["dep", "add", &id2, &id1]);
@@ -431,7 +443,7 @@ fn test_workflow_error_scenarios() {
     assert!(stderr.contains("cycle") || stderr.contains("Cycle"));
 
     // Try to claim already claimed issue
-    let output = run_jit(&temp, &["issue", "create", "-t", "Task"]);
+    let output = run_jit(&temp, &["issue", "create", "-t", "Task", "-d", "Test", "--label", "type:task"]);
     let id = extract_id(&String::from_utf8_lossy(&output.stdout));
     run_jit(&temp, &["issue", "update", &id, "--state", "ready"]);
     run_jit(&temp, &["issue", "claim", &id, "agent:worker-1"]);
@@ -449,16 +461,16 @@ fn test_workflow_graph_visualization() {
     let temp = setup_test_repo();
 
     // Create dependency graph
-    let output = run_jit(&temp, &["issue", "create", "-t", "Foundation"]);
+    let output = run_jit(&temp, &["issue", "create", "-t", "Foundation", "-d", "Test", "--label", "type:task"]);
     let foundation = extract_id(&String::from_utf8_lossy(&output.stdout));
 
-    let output = run_jit(&temp, &["issue", "create", "-t", "Feature A"]);
+    let output = run_jit(&temp, &["issue", "create", "-t", "Feature A", "-d", "Test", "--label", "type:task"]);
     let feature_a = extract_id(&String::from_utf8_lossy(&output.stdout));
 
-    let output = run_jit(&temp, &["issue", "create", "-t", "Feature B"]);
+    let output = run_jit(&temp, &["issue", "create", "-t", "Feature B", "-d", "Test", "--label", "type:task"]);
     let feature_b = extract_id(&String::from_utf8_lossy(&output.stdout));
 
-    let output = run_jit(&temp, &["issue", "create", "-t", "Integration"]);
+    let output = run_jit(&temp, &["issue", "create", "-t", "Integration", "-d", "Test", "--label", "type:task"]);
     let integration = extract_id(&String::from_utf8_lossy(&output.stdout));
 
     run_jit(&temp, &["dep", "add", &feature_a, &foundation]);

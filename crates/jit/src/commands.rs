@@ -337,7 +337,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// let storage = InMemoryStorage::new();
     /// let executor = CommandExecutor::new(storage);
     ///
-    /// let id = executor.create_issue("Task".into(), "".into(), Priority::Normal, vec![], vec![]).unwrap();
+    /// let id = executor.create_issue("Task".into(), "".into(), Priority::Normal, vec![], vec!["type:task".to_string()]).unwrap();
     /// executor.claim_issue(&id, "agent:worker-1".to_string()).unwrap();
     /// ```
     pub fn claim_issue(&self, id: &str, assignee: String) -> Result<()> {
@@ -463,8 +463,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// let storage = InMemoryStorage::new();
     /// let executor = CommandExecutor::new(storage);
     ///
-    /// let backend = executor.create_issue("Backend API".into(), "".into(), Priority::Normal, vec![], vec![]).unwrap();
-    /// let frontend = executor.create_issue("Frontend UI".into(), "".into(), Priority::Normal, vec!["type:task".to_string()], vec!["type:task".to_string()]).unwrap();
+    /// let backend = executor.create_issue("Backend API".into(), "".into(), Priority::Normal, vec![], vec!["type:task".to_string()]).unwrap();
+    /// let frontend = executor.create_issue("Frontend UI".into(), "".into(), Priority::Normal, vec![], vec!["type:task".to_string()]).unwrap();
     ///
     /// // Frontend depends on backend
     /// let result = executor.add_dependency(&frontend, &backend).unwrap();
@@ -545,8 +545,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// let storage = InMemoryStorage::new();
     /// let executor = CommandExecutor::new(storage);
     ///
-    /// let dep = executor.create_issue("Build".into(), "".into(), Priority::Normal, vec![], vec![]).unwrap();
-    /// let parent = executor.create_issue("Review".into(), "".into(), Priority::High, vec!["type:task".to_string()], vec!["type:task".to_string()]).unwrap();
+    /// let dep = executor.create_issue("Build".into(), "".into(), Priority::Normal, vec![], vec!["type:task".to_string()]).unwrap();
+    /// let parent = executor.create_issue("Review".into(), "".into(), Priority::High, vec![], vec!["type:task".to_string()]).unwrap();
     /// executor.add_dependency(&parent, &dep).unwrap();
     ///
     /// let subtasks = vec![
@@ -804,8 +804,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// # use jit::storage::InMemoryStorage;
     /// let storage = InMemoryStorage::new();
     /// let executor = CommandExecutor::new(storage);
+    /// executor.init().unwrap();
     ///
-    /// executor.create_issue("Task".into(), "".into(), Priority::Normal, vec![], vec![]).unwrap();
+    /// executor.create_issue("Task".into(), "".into(), Priority::Normal, vec![], vec!["type:task".to_string()]).unwrap();
     /// assert!(executor.validate_silent().is_ok());
     /// ```
     pub fn validate_silent(&self) -> Result<()> {
@@ -1301,7 +1302,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// # let storage = InMemoryStorage::new();
     /// # let executor = CommandExecutor::new(storage);
     /// # executor.init().unwrap();
-    /// # executor.create_issue("Task".to_string(), "".to_string(), Priority::Normal, vec![], vec!["milestone:v1.0".to_string()]).unwrap();
+    /// # executor.create_issue("Task".to_string(), "".to_string(), Priority::Normal, vec![], vec!["type:task".to_string(), "milestone:v1.0".to_string()]).unwrap();
     /// // Query exact match
     /// let issues = executor.query_by_label("milestone:v1.0").unwrap();
     ///

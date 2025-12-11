@@ -34,7 +34,7 @@ fn setup_jit_repo() -> TempDir {
 fn create_ready_issue(repo_path: &Path, title: &str, priority: &str) -> String {
     // Create issue
     let output = Command::new(jit_binary())
-        .args(["issue", "create", "-t", title, "-p", priority, "--json"])
+        .args(["issue", "create", "-t", title, "-d", "Test", "-p", priority, "--label", "type:task", "--json"])
         .current_dir(repo_path)
         .output()
         .unwrap();

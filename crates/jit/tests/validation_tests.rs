@@ -10,6 +10,7 @@ use jit::storage::{InMemoryStorage, IssueStore};
 fn test_validation_detects_broken_dependency() {
     let storage = InMemoryStorage::new();
     let executor = CommandExecutor::new(storage.clone());
+    executor.init().unwrap();
 
     // Create two issues
     let issue1_id = executor
@@ -52,6 +53,7 @@ fn test_validation_detects_broken_dependency() {
 fn test_validation_detects_cycle() {
     let storage = InMemoryStorage::new();
     let executor = CommandExecutor::new(storage.clone());
+    executor.init().unwrap();
 
     // Create two issues
     let issue1_id = executor
@@ -93,6 +95,7 @@ fn test_validation_detects_cycle() {
 fn test_validation_passes_with_valid_graph() {
     let storage = InMemoryStorage::new();
     let executor = CommandExecutor::new(storage.clone());
+    executor.init().unwrap();
 
     // Create a valid dependency graph: A -> B -> C
     let issue_c_id = executor
