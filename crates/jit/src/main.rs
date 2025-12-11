@@ -15,6 +15,7 @@ mod cli;
 mod commands;
 mod domain;
 mod graph;
+mod label_validation;
 mod labels;
 mod output;
 mod output_macros;

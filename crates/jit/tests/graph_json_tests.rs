@@ -31,7 +31,7 @@ fn test_graph_show_json_output() {
 
     // Create two issues with dependency
     let output1 = Command::new(&jit)
-        .args(["issue", "create", "-t", "Task A", "-d", "First"])
+        .args(["issue", "create", "-t", "Task A", "-d", "First", "--label", "type:task"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -42,7 +42,7 @@ fn test_graph_show_json_output() {
         .to_string();
 
     let output2 = Command::new(&jit)
-        .args(["issue", "create", "-t", "Task B", "-d", "Second"])
+        .args(["issue", "create", "-t", "Task B", "-d", "Second", "--label", "type:task"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -85,7 +85,7 @@ fn test_graph_show_all_json_output() {
 
     // Create two issues with dependency
     Command::new(&jit)
-        .args(["issue", "create", "-t", "Task A", "-d", "First"])
+        .args(["issue", "create", "-t", "Task A", "-d", "First", "--label", "type:task"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -114,7 +114,7 @@ fn test_graph_downstream_json_output() {
 
     // Create two issues with dependency
     let output1 = Command::new(&jit)
-        .args(["issue", "create", "-t", "Task A", "-d", "First"])
+        .args(["issue", "create", "-t", "Task A", "-d", "First", "--label", "type:task"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -125,7 +125,7 @@ fn test_graph_downstream_json_output() {
         .to_string();
 
     let output2 = Command::new(&jit)
-        .args(["issue", "create", "-t", "Task B", "-d", "Second"])
+        .args(["issue", "create", "-t", "Task B", "-d", "Second", "--label", "type:task"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -167,7 +167,7 @@ fn test_graph_roots_json_output() {
 
     // Create two issues with dependency
     let output1 = Command::new(&jit)
-        .args(["issue", "create", "-t", "Root Task", "-d", "First"])
+        .args(["issue", "create", "-t", "Root Task", "-d", "First", "--label", "type:task"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -178,7 +178,7 @@ fn test_graph_roots_json_output() {
         .to_string();
 
     let output2 = Command::new(&jit)
-        .args(["issue", "create", "-t", "Dependent Task", "-d", "Second"])
+        .args(["issue", "create", "-t", "Dependent Task", "-d", "Second", "--label", "type:task"])
         .current_dir(temp.path())
         .output()
         .unwrap();

@@ -58,7 +58,7 @@ fn test_cycle_detected_error_json() {
 
     // Create two issues
     let output1 = Command::new(&jit)
-        .args(["issue", "create", "-t", "Task A", "-d", "First"])
+        .args(["issue", "create", "-t", "Task A", "-d", "First", "--label", "type:task"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -69,7 +69,7 @@ fn test_cycle_detected_error_json() {
         .to_string();
 
     let output2 = Command::new(&jit)
-        .args(["issue", "create", "-t", "Task B", "-d", "Second"])
+        .args(["issue", "create", "-t", "Task B", "-d", "Second", "--label", "type:task"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -143,7 +143,7 @@ fn test_gate_operation_error_json() {
 
     // Create an issue
     let output1 = Command::new(&jit)
-        .args(["issue", "create", "-t", "Task", "-d", "Test"])
+        .args(["issue", "create", "-t", "Task", "-d", "Test", "--label", "type:task"])
         .current_dir(temp.path())
         .output()
         .unwrap();

@@ -520,8 +520,8 @@ mod tests {
                 "Issue 1".to_string(),
                 "Description".to_string(),
                 Priority::Normal,
-                vec![],
-                vec![],
+                vec!["type:task".to_string()],
+                vec!["type:task".to_string()],
             )
             .unwrap();
         executor
@@ -529,8 +529,8 @@ mod tests {
                 "Issue 2".to_string(),
                 "Description".to_string(),
                 Priority::High,
-                vec![],
-                vec![],
+                vec!["type:task".to_string()],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -554,8 +554,8 @@ mod tests {
                 "Issue 1".to_string(),
                 "Description".to_string(),
                 Priority::Normal,
-                vec![],
-                vec![],
+                vec!["type:task".to_string()],
+                vec!["type:task".to_string()],
             )
             .unwrap();
         let id2 = executor
@@ -563,8 +563,8 @@ mod tests {
                 "Issue 2".to_string(),
                 "Description".to_string(),
                 Priority::Normal,
-                vec![],
-                vec![],
+                vec!["type:task".to_string()],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -592,8 +592,8 @@ mod tests {
                 "Issue 1".to_string(),
                 "Description".to_string(),
                 Priority::Normal,
-                vec![],
-                vec![],
+                vec!["type:task".to_string()],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
