@@ -464,7 +464,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// let executor = CommandExecutor::new(storage);
     ///
     /// let backend = executor.create_issue("Backend API".into(), "".into(), Priority::Normal, vec![], vec![]).unwrap();
-    /// let frontend = executor.create_issue("Frontend UI".into(), "".into(), Priority::Normal, vec![], vec![]).unwrap();
+    /// let frontend = executor.create_issue("Frontend UI".into(), "".into(), Priority::Normal, vec!["type:task".to_string()], vec!["type:task".to_string()]).unwrap();
     ///
     /// // Frontend depends on backend
     /// let result = executor.add_dependency(&frontend, &backend).unwrap();
@@ -546,7 +546,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// let executor = CommandExecutor::new(storage);
     ///
     /// let dep = executor.create_issue("Build".into(), "".into(), Priority::Normal, vec![], vec![]).unwrap();
-    /// let parent = executor.create_issue("Review".into(), "".into(), Priority::High, vec![], vec![]).unwrap();
+    /// let parent = executor.create_issue("Review".into(), "".into(), Priority::High, vec!["type:task".to_string()], vec!["type:task".to_string()]).unwrap();
     /// executor.add_dependency(&parent, &dep).unwrap();
     ///
     /// let subtasks = vec![
@@ -576,7 +576,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 title,
                 desc,
                 parent.priority,
-                vec![],
+                vec!["type:task".to_string()],
                 parent.labels.clone(), // Copy parent's labels
             )?;
             subtask_ids.push(subtask_id);
@@ -2084,8 +2084,8 @@ mod tests {
                 "Test Issue".to_string(),
                 "Description".to_string(),
                 Priority::High,
-                vec![],
-                vec![],
+                vec!["type:task".to_string()],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -2104,7 +2104,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::High,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
         executor
@@ -2113,7 +2113,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Low,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -2136,7 +2136,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -2166,7 +2166,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
         let id2 = executor
@@ -2175,7 +2175,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -2195,7 +2195,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -2215,7 +2215,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Low,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
         let high_id = executor
@@ -2224,7 +2224,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::High,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -2242,7 +2242,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec!["review".to_string()],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -2267,7 +2267,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec!["review".to_string()],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -2292,7 +2292,7 @@ mod tests {
                 "D1".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
         executor
@@ -2301,7 +2301,7 @@ mod tests {
                 "D2".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
         executor
@@ -2310,7 +2310,7 @@ mod tests {
                 "D3".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -2333,7 +2333,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -2368,7 +2368,7 @@ mod tests {
                 "D1".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
         let id2 = executor
@@ -2377,7 +2377,7 @@ mod tests {
                 "D2".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -2404,7 +2404,7 @@ mod tests {
                     "Desc".to_string(),
                     Priority::Normal,
                     vec![],
-                    vec![],
+                    vec!["type:task".to_string()],
                 )
                 .unwrap();
         }
@@ -2428,7 +2428,7 @@ mod tests {
                 "D1".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
         let id2 = executor
@@ -2437,7 +2437,7 @@ mod tests {
                 "D2".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -2465,7 +2465,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -2501,7 +2501,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -2521,7 +2521,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -2543,7 +2543,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -2566,7 +2566,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -2584,7 +2584,7 @@ mod tests {
                 "D1".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
         let id2 = executor
@@ -2593,7 +2593,7 @@ mod tests {
                 "D2".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -2613,7 +2613,7 @@ mod tests {
                 "D1".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
         let id2 = executor
@@ -2622,7 +2622,7 @@ mod tests {
                 "D2".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -2643,7 +2643,7 @@ mod tests {
                 "D1".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
         let id2 = executor
@@ -2652,7 +2652,7 @@ mod tests {
                 "D2".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -2670,7 +2670,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -2690,7 +2690,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec!["review".to_string()],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -2714,7 +2714,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -2733,7 +2733,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec!["tests".to_string()],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -2757,7 +2757,7 @@ mod tests {
                 "D1".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
         let id2 = executor
@@ -2766,7 +2766,7 @@ mod tests {
                 "D2".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -2789,7 +2789,7 @@ mod tests {
                 "D1".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
         let id2 = executor
@@ -2798,7 +2798,7 @@ mod tests {
                 "D2".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -2819,7 +2819,7 @@ mod tests {
                 "D1".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
         let id2 = executor
@@ -2828,7 +2828,7 @@ mod tests {
                 "D2".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -2849,7 +2849,7 @@ mod tests {
                 "D1".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
         let id2 = executor
@@ -2858,7 +2858,7 @@ mod tests {
                 "D2".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -2988,7 +2988,7 @@ mod tests {
                 "Design API".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
         let id2 = executor
@@ -2997,7 +2997,7 @@ mod tests {
                 "Implement".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -3024,7 +3024,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -3043,7 +3043,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
         let id2 = executor
@@ -3052,7 +3052,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -3073,7 +3073,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
         executor
@@ -3082,7 +3082,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
         executor
@@ -3091,7 +3091,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -3110,7 +3110,7 @@ mod tests {
                 "Contains security vulnerability".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
         executor
@@ -3119,7 +3119,7 @@ mod tests {
                 "Regular task".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -3138,7 +3138,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -3156,7 +3156,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Critical,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
         executor
@@ -3165,7 +3165,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -3188,7 +3188,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -3199,7 +3199,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
         executor.add_dependency(&id2, &id1).unwrap();
@@ -3222,7 +3222,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
         let id2 = executor
@@ -3231,7 +3231,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -3255,7 +3255,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
         executor
@@ -3264,7 +3264,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -3282,7 +3282,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -3300,7 +3300,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -3333,7 +3333,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -3351,7 +3351,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -3377,7 +3377,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -3387,7 +3387,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -3423,7 +3423,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -3433,7 +3433,7 @@ mod tests {
                 "Desc".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -3468,7 +3468,7 @@ mod tests {
                 "".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
         let b = executor
@@ -3477,7 +3477,7 @@ mod tests {
                 "".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
         let c = executor
@@ -3486,7 +3486,7 @@ mod tests {
                 "".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -3514,7 +3514,7 @@ mod tests {
                 "".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
         let b = executor
@@ -3523,7 +3523,7 @@ mod tests {
                 "".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
         let c = executor
@@ -3532,7 +3532,7 @@ mod tests {
                 "".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -3560,7 +3560,7 @@ mod tests {
                 "".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
         let b = executor
@@ -3569,7 +3569,7 @@ mod tests {
                 "".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
         let c = executor
@@ -3578,7 +3578,7 @@ mod tests {
                 "".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -3603,7 +3603,7 @@ mod tests {
                 "".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
         let b = executor
@@ -3612,7 +3612,7 @@ mod tests {
                 "".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
         let c = executor
@@ -3621,7 +3621,7 @@ mod tests {
                 "".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -3641,7 +3641,7 @@ mod tests {
                 "".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
         executor.add_dependency(&a, &d).unwrap();
@@ -3666,7 +3666,7 @@ mod tests {
                 "".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
         let b = executor
@@ -3675,7 +3675,7 @@ mod tests {
                 "".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
         let c = executor
@@ -3684,7 +3684,7 @@ mod tests {
                 "".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
         let d = executor
@@ -3693,7 +3693,7 @@ mod tests {
                 "".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -3728,7 +3728,7 @@ mod tests {
                 "".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
         let b = executor
@@ -3737,7 +3737,7 @@ mod tests {
                 "".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
         let c = executor
@@ -3746,7 +3746,7 @@ mod tests {
                 "".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -3804,7 +3804,7 @@ mod tests {
                 "".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
         let parent = executor
@@ -3813,7 +3813,7 @@ mod tests {
                 "".to_string(),
                 Priority::High,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -3857,7 +3857,7 @@ mod tests {
                 "".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -3893,7 +3893,7 @@ mod tests {
                 "".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
         let dep2 = executor
@@ -3902,7 +3902,7 @@ mod tests {
                 "".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
         let parent = executor
@@ -3911,7 +3911,7 @@ mod tests {
                 "".to_string(),
                 Priority::High,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -3949,7 +3949,7 @@ mod tests {
                 "".to_string(),
                 Priority::Critical,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -3983,7 +3983,7 @@ mod tests {
                 "Description".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -4011,7 +4011,7 @@ mod tests {
                 "Description".to_string(),
                 Priority::Normal,
                 vec![],
-                vec![],
+                vec!["type:task".to_string()],
             )
             .unwrap();
 
@@ -4053,7 +4053,8 @@ mod tests {
         let result = executor.validate_silent();
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
-        assert!(err_msg.contains("unique namespace"));
+        // Should detect either unique namespace violation OR multiple type labels
+        assert!(err_msg.contains("unique namespace") || err_msg.contains("ONE type label"));
         assert!(err_msg.contains("type"));
         assert!(err_msg.contains(&id));
     }
@@ -4070,10 +4071,10 @@ mod tests {
                 Priority::Normal,
                 vec![],
                 vec![
+                    "type:feature".to_string(),
                     "milestone:v1.0".to_string(),
                     "epic:auth".to_string(),
                     "component:backend".to_string(),
-                    "type:feature".to_string(),
                 ],
             )
             .unwrap();
@@ -4094,7 +4095,7 @@ mod tests {
                 "Description".to_string(),
                 Priority::Normal,
                 vec![],
-                vec!["milestone:v1.0".to_string(), "milestone:q1".to_string()],
+                vec!["type:task".to_string(), "milestone:v1.0".to_string(), "milestone:q1".to_string()],
             )
             .unwrap();
 
@@ -4114,7 +4115,7 @@ mod tests {
             "Task".to_string(),
             "Description".to_string(),
             Priority::Normal,
-            vec![],
+            vec!["type:task".to_string()],
             vec!["epic:auth".to_string()],
         );
 
@@ -4133,7 +4134,7 @@ mod tests {
             "Task".to_string(),
             "Description".to_string(),
             Priority::Normal,
-            vec![],
+            vec!["type:task".to_string()],
             vec!["type:task".to_string(), "epic:auth".to_string()],
         );
 
@@ -4149,7 +4150,7 @@ mod tests {
             "Task".to_string(),
             "Description".to_string(),
             Priority::Normal,
-            vec![],
+            vec!["type:task".to_string()],
             vec!["type:task".to_string(), "type:bug".to_string()],
         );
 
@@ -4178,7 +4179,7 @@ mod tests {
                 format!("Issue with {}", type_label),
                 "Description".to_string(),
                 Priority::Normal,
-                vec![],
+                vec!["type:task".to_string()],
                 vec![type_label.to_string()],
             );
 
@@ -4201,7 +4202,7 @@ mod tests {
                 "Task".to_string(),
                 "Description".to_string(),
                 Priority::Normal,
-                vec![],
+                vec!["type:task".to_string()],
                 vec!["type:task".to_string()],
             )
             .unwrap();
