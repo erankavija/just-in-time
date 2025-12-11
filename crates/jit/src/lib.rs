@@ -7,6 +7,7 @@ pub mod cli;
 pub mod commands;
 pub mod domain;
 pub mod graph;
+pub mod label_validation;
 pub mod labels;
 pub mod output;
 pub mod schema;
