@@ -2005,26 +2005,27 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// ```no_run
     /// # use jit::commands::CommandExecutor;
     /// # use jit::storage::JsonFileStorage;
-    /// # let storage = JsonFileStorage::new(".jit").unwrap();
+    /// # let storage = JsonFileStorage::new(".jit");
     /// # let executor = CommandExecutor::new(storage);
     /// let paths = executor.get_linked_document_paths().unwrap();
     /// for path in paths {
     ///     println!("Linked document: {}", path);
     /// }
     /// ```
+    #[allow(dead_code)] // Used by jit-server crate
     pub fn get_linked_document_paths(&self) -> Result<Vec<String>> {
         let issues = self.storage.list_issues()?;
-        
+
         let mut paths = std::collections::HashSet::new();
         for issue in issues {
             for doc in &issue.documents {
                 paths.insert(doc.path.clone());
             }
         }
-        
+
         let mut result: Vec<String> = paths.into_iter().collect();
         result.sort();
-        
+
         Ok(result)
     }
 }
@@ -3307,7 +3308,7 @@ mod tests {
     #[test]
     fn test_get_linked_document_paths_empty() {
         let (_temp, executor) = setup();
-        
+
         // No issues created
         let paths = executor.get_linked_document_paths().unwrap();
         assert_eq!(paths.len(), 0);
@@ -3316,7 +3317,7 @@ mod tests {
     #[test]
     fn test_get_linked_document_paths_no_documents() {
         let (_temp, executor) = setup();
-        
+
         // Create issue without documents
         executor
             .create_issue(
@@ -3327,7 +3328,7 @@ mod tests {
                 vec![],
             )
             .unwrap();
-        
+
         let paths = executor.get_linked_document_paths().unwrap();
         assert_eq!(paths.len(), 0);
     }
@@ -3335,7 +3336,7 @@ mod tests {
     #[test]
     fn test_get_linked_document_paths_single_document() {
         let (_temp, executor) = setup();
-        
+
         let id = executor
             .create_issue(
                 "Task".to_string(),
@@ -3345,12 +3346,14 @@ mod tests {
                 vec![],
             )
             .unwrap();
-        
+
         // Add document reference
         let mut issue = executor.storage.load_issue(&id).unwrap();
-        issue.documents.push(crate::domain::DocumentReference::new("docs/design.md".to_string()));
+        issue.documents.push(crate::domain::DocumentReference::new(
+            "docs/design.md".to_string(),
+        ));
         executor.storage.save_issue(&issue).unwrap();
-        
+
         let paths = executor.get_linked_document_paths().unwrap();
         assert_eq!(paths.len(), 1);
         assert_eq!(paths[0], "docs/design.md");
@@ -3359,7 +3362,7 @@ mod tests {
     #[test]
     fn test_get_linked_document_paths_multiple_documents() {
         let (_temp, executor) = setup();
-        
+
         let id1 = executor
             .create_issue(
                 "Task 1".to_string(),
@@ -3369,7 +3372,7 @@ mod tests {
                 vec![],
             )
             .unwrap();
-        
+
         let id2 = executor
             .create_issue(
                 "Task 2".to_string(),
@@ -3379,19 +3382,25 @@ mod tests {
                 vec![],
             )
             .unwrap();
-        
+
         let mut issue1 = executor.storage.load_issue(&id1).unwrap();
-        issue1.documents.push(crate::domain::DocumentReference::new("docs/design.md".to_string()));
-        issue1.documents.push(crate::domain::DocumentReference::new("docs/api.md".to_string()));
+        issue1.documents.push(crate::domain::DocumentReference::new(
+            "docs/design.md".to_string(),
+        ));
+        issue1.documents.push(crate::domain::DocumentReference::new(
+            "docs/api.md".to_string(),
+        ));
         executor.storage.save_issue(&issue1).unwrap();
-        
+
         let mut issue2 = executor.storage.load_issue(&id2).unwrap();
-        issue2.documents.push(crate::domain::DocumentReference::new("README.md".to_string()));
+        issue2.documents.push(crate::domain::DocumentReference::new(
+            "README.md".to_string(),
+        ));
         executor.storage.save_issue(&issue2).unwrap();
-        
+
         let mut paths = executor.get_linked_document_paths().unwrap();
         paths.sort();
-        
+
         assert_eq!(paths.len(), 3);
         assert_eq!(paths, vec!["README.md", "docs/api.md", "docs/design.md"]);
     }
@@ -3399,7 +3408,7 @@ mod tests {
     #[test]
     fn test_get_linked_document_paths_deduplicates() {
         let (_temp, executor) = setup();
-        
+
         let id1 = executor
             .create_issue(
                 "Task 1".to_string(),
@@ -3409,7 +3418,7 @@ mod tests {
                 vec![],
             )
             .unwrap();
-        
+
         let id2 = executor
             .create_issue(
                 "Task 2".to_string(),
@@ -3419,16 +3428,20 @@ mod tests {
                 vec![],
             )
             .unwrap();
-        
+
         // Both reference the same document
         let mut issue1 = executor.storage.load_issue(&id1).unwrap();
-        issue1.documents.push(crate::domain::DocumentReference::new("docs/design.md".to_string()));
+        issue1.documents.push(crate::domain::DocumentReference::new(
+            "docs/design.md".to_string(),
+        ));
         executor.storage.save_issue(&issue1).unwrap();
-        
+
         let mut issue2 = executor.storage.load_issue(&id2).unwrap();
-        issue2.documents.push(crate::domain::DocumentReference::new("docs/design.md".to_string()));
+        issue2.documents.push(crate::domain::DocumentReference::new(
+            "docs/design.md".to_string(),
+        ));
         executor.storage.save_issue(&issue2).unwrap();
-        
+
         let paths = executor.get_linked_document_paths().unwrap();
         assert_eq!(paths.len(), 1);
         assert_eq!(paths[0], "docs/design.md");

@@ -330,7 +330,8 @@ fn infer_content_type(path: &str) -> String {
         "application/json"
     } else {
         "text/plain"
-    }.to_string()
+    }
+    .to_string()
 }
 
 /// Query parameters for document content

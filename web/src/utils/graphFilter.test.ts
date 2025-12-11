@@ -7,6 +7,8 @@ import {
   createStrategicFilter,
   createLabelFilter,
   type GraphFilter,
+  type StrategicFilterConfig,
+  type LabelFilterConfig,
 } from './graphFilter';
 import type { GraphNode, GraphEdge } from '../types/models';
 
@@ -268,13 +270,13 @@ describe('graphFilter', () => {
     it('creates strategic filter correctly', () => {
       const filter = createStrategicFilter(true);
       expect(filter.type).toBe('strategic');
-      expect((filter.config as any).enabled).toBe(true);
+      expect((filter.config as StrategicFilterConfig).enabled).toBe(true);
     });
 
     it('creates label filter correctly', () => {
       const filter = createLabelFilter(['milestone:*', 'epic:*']);
       expect(filter.type).toBe('label');
-      expect((filter.config as any).patterns).toEqual(['milestone:*', 'epic:*']);
+      expect((filter.config as LabelFilterConfig).patterns).toEqual(['milestone:*', 'epic:*']);
     });
   });
 });
