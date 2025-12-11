@@ -94,6 +94,7 @@ fn test_non_unique_namespace_allows_multiple_labels() {
             Priority::Normal,
             vec![],
             vec![
+                "type:task".to_string(),
                 "component:auth".to_string(),
                 "component:database".to_string(),
             ],
@@ -101,7 +102,7 @@ fn test_non_unique_namespace_allows_multiple_labels() {
         .unwrap();
 
     let issue = executor.get_issue(&id).unwrap();
-    assert_eq!(issue.labels.len(), 2);
+    assert_eq!(issue.labels.len(), 3);
 }
 
 #[test]
@@ -140,7 +141,7 @@ fn test_list_label_values_in_namespace() {
             "".to_string(),
             Priority::Normal,
             vec![],
-            vec!["milestone:v1.0".to_string()],
+            vec!["type:task".to_string(), "milestone:v1.0".to_string()],
         )
         .unwrap();
 
@@ -150,7 +151,7 @@ fn test_list_label_values_in_namespace() {
             "".to_string(),
             Priority::Normal,
             vec![],
-            vec!["milestone:v2.0".to_string()],
+            vec!["type:task".to_string(), "milestone:v2.0".to_string()],
         )
         .unwrap();
 
@@ -160,7 +161,7 @@ fn test_list_label_values_in_namespace() {
             "".to_string(),
             Priority::Normal,
             vec![],
-            vec!["milestone:v1.0".to_string()],
+            vec!["type:task".to_string(), "milestone:v1.0".to_string()],
         )
         .unwrap();
 
@@ -207,7 +208,7 @@ fn test_unknown_namespace_warning() {
         "".to_string(),
         Priority::Normal,
         vec![],
-        vec!["unknown:value".to_string()],
+        vec!["type:task".to_string(), "unknown:value".to_string()],
     );
 
     // Should succeed (only warning, not error)

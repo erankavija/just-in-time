@@ -18,7 +18,7 @@ fn test_validation_detects_broken_dependency() {
             "".to_string(),
             Priority::Normal,
             vec![],
-            vec![],
+            vec!["type:task".to_string()],
         )
         .unwrap();
 
@@ -28,7 +28,7 @@ fn test_validation_detects_broken_dependency() {
             "".to_string(),
             Priority::Normal,
             vec![],
-            vec![],
+            vec!["type:task".to_string()],
         )
         .unwrap();
 
@@ -60,7 +60,7 @@ fn test_validation_detects_cycle() {
             "".to_string(),
             Priority::Normal,
             vec![],
-            vec![],
+            vec!["type:task".to_string()],
         )
         .unwrap();
     let issue2_id = executor
@@ -69,7 +69,7 @@ fn test_validation_detects_cycle() {
             "".to_string(),
             Priority::Normal,
             vec![],
-            vec![],
+            vec!["type:task".to_string()],
         )
         .unwrap();
 
@@ -77,6 +77,7 @@ fn test_validation_detects_cycle() {
     executor.add_dependency(&issue1_id, &issue2_id).unwrap();
 
     // Manually create cycle by adding B -> A directly in storage
+    // We also need to ensure the manually modified issue still has type label for validation
     let mut issue2_updated = storage.load_issue(&issue2_id).unwrap();
     issue2_updated.dependencies.push(issue1_id.clone());
     storage.save_issue(&issue2_updated).unwrap();
@@ -100,7 +101,7 @@ fn test_validation_passes_with_valid_graph() {
             "".to_string(),
             Priority::Normal,
             vec![],
-            vec![],
+            vec!["type:task".to_string()],
         )
         .unwrap();
     let issue_b_id = executor
@@ -109,7 +110,7 @@ fn test_validation_passes_with_valid_graph() {
             "".to_string(),
             Priority::Normal,
             vec![],
-            vec![],
+            vec!["type:task".to_string()],
         )
         .unwrap();
     let issue_a_id = executor
@@ -118,7 +119,7 @@ fn test_validation_passes_with_valid_graph() {
             "".to_string(),
             Priority::Normal,
             vec![],
-            vec![],
+            vec!["type:task".to_string()],
         )
         .unwrap();
 
@@ -140,7 +141,7 @@ fn test_validation_detects_multiple_broken_dependencies() {
             "".to_string(),
             Priority::Normal,
             vec![],
-            vec![],
+            vec!["type:task".to_string()],
         )
         .unwrap();
 
@@ -178,7 +179,7 @@ fn test_validation_detects_invalid_gate_reference() {
             "".to_string(),
             Priority::Normal,
             vec!["nonexistent-gate".to_string()],
-            vec![],
+            vec!["type:task".to_string()],
         )
         .unwrap();
 

@@ -31,7 +31,7 @@ fn test_query_ready_json_output() {
 
     // Create a ready issue
     Command::new(&jit)
-        .args(["issue", "create", "-t", "Ready Task", "-d", "Test"])
+        .args(["issue", "create", "-t", "Ready Task", "-d", "Test", "--label", "type:task"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -62,7 +62,7 @@ fn test_query_blocked_json_output() {
 
     // Create two issues with dependency
     let output1 = Command::new(&jit)
-        .args(["issue", "create", "-t", "Task A", "-d", "First"])
+        .args(["issue", "create", "-t", "Task A", "-d", "First", "--label", "type:task"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -73,7 +73,7 @@ fn test_query_blocked_json_output() {
         .to_string();
 
     let output2 = Command::new(&jit)
-        .args(["issue", "create", "-t", "Task B", "-d", "Second"])
+        .args(["issue", "create", "-t", "Task B", "-d", "Second", "--label", "type:task"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -119,7 +119,7 @@ fn test_query_assignee_json_output() {
 
     // Create and assign an issue
     let output = Command::new(&jit)
-        .args(["issue", "create", "-t", "Task", "-d", "Test"])
+        .args(["issue", "create", "-t", "Task", "-d", "Test", "--label", "type:task"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -160,7 +160,7 @@ fn test_query_state_json_output() {
 
     // Create an issue (will be in ready state since no dependencies)
     Command::new(&jit)
-        .args(["issue", "create", "-t", "Task", "-d", "Test"])
+        .args(["issue", "create", "-t", "Task", "-d", "Test", "--label", "type:task"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -191,7 +191,7 @@ fn test_query_priority_json_output() {
     // Create an issue with high priority
     Command::new(&jit)
         .args([
-            "issue", "create", "-t", "Urgent", "-d", "Test", "-p", "high",
+            "issue", "create", "-t", "Urgent", "-d", "Test", "-p", "high", "--label", "type:task",
         ])
         .current_dir(temp.path())
         .output()

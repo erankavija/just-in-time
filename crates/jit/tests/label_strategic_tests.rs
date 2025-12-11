@@ -17,7 +17,7 @@ fn test_query_strategic_returns_milestone_issues() {
             "".to_string(),
             Priority::High,
             vec![],
-            vec!["milestone:v1.0".to_string()],
+            vec!["type:task".to_string(), "milestone:v1.0".to_string()],
         )
         .unwrap();
 
@@ -50,7 +50,7 @@ fn test_query_strategic_returns_epic_issues() {
             "".to_string(),
             Priority::High,
             vec![],
-            vec!["epic:auth".to_string()],
+            vec!["type:epic".to_string(), "epic:auth".to_string()],
         )
         .unwrap();
 
@@ -72,7 +72,7 @@ fn test_query_strategic_returns_both_milestone_and_epic() {
             "".to_string(),
             Priority::High,
             vec![],
-            vec!["milestone:v1.0".to_string()],
+            vec!["type:task".to_string(), "milestone:v1.0".to_string()],
         )
         .unwrap();
 
@@ -82,7 +82,7 @@ fn test_query_strategic_returns_both_milestone_and_epic() {
             "".to_string(),
             Priority::High,
             vec![],
-            vec!["epic:auth".to_string()],
+            vec!["type:epic".to_string(), "epic:auth".to_string()],
         )
         .unwrap();
 
@@ -127,7 +127,7 @@ fn test_query_strategic_excludes_tactical_only() {
             "".to_string(),
             Priority::Normal,
             vec![],
-            vec!["component:backend".to_string()],
+            vec!["type:task".to_string(), "component:backend".to_string()],
         )
         .unwrap();
 
@@ -180,7 +180,7 @@ fn test_query_strategic_with_custom_strategic_namespace() {
             "".to_string(),
             Priority::Critical,
             vec![],
-            vec!["initiative:cloud-migration".to_string()],
+            vec!["type:task".to_string(), "initiative:cloud-migration".to_string()],
         )
         .unwrap();
 
@@ -215,6 +215,7 @@ fn test_breakdown_copies_labels_to_subtasks() {
             Priority::High,
             vec![],
             vec![
+                "type:task".to_string(),
                 "milestone:v1.0".to_string(),
                 "epic:auth".to_string(),
                 "component:backend".to_string(),
@@ -235,7 +236,8 @@ fn test_breakdown_copies_labels_to_subtasks() {
     // Verify each subtask has parent's labels
     for subtask_id in subtask_ids {
         let subtask = executor.get_issue(&subtask_id).unwrap();
-        assert_eq!(subtask.labels.len(), 3);
+        assert_eq!(subtask.labels.len(), 4);
+        assert!(subtask.labels.contains(&"type:task".to_string()));
         assert!(subtask.labels.contains(&"milestone:v1.0".to_string()));
         assert!(subtask.labels.contains(&"epic:auth".to_string()));
         assert!(subtask.labels.contains(&"component:backend".to_string()));
@@ -254,7 +256,7 @@ fn test_breakdown_preserves_parent_labels() {
             "".to_string(),
             Priority::High,
             vec![],
-            vec!["milestone:v1.0".to_string()],
+            vec!["type:task".to_string(), "milestone:v1.0".to_string()],
         )
         .unwrap();
 
@@ -264,8 +266,9 @@ fn test_breakdown_preserves_parent_labels() {
 
     // Parent should still have its labels
     let parent = executor.get_issue(&parent_id).unwrap();
-    assert_eq!(parent.labels.len(), 1);
-    assert_eq!(parent.labels[0], "milestone:v1.0");
+    assert_eq!(parent.labels.len(), 2);
+    assert!(parent.labels.contains(&"type:task".to_string()));
+    assert!(parent.labels.contains(&"milestone:v1.0".to_string()));
 }
 
 #[test]
@@ -280,7 +283,7 @@ fn test_breakdown_with_no_labels() {
             "".to_string(),
             Priority::Normal,
             vec![],
-            vec![],
+            vec!["type:task".to_string()],
         )
         .unwrap();
 
@@ -288,9 +291,10 @@ fn test_breakdown_with_no_labels() {
         .breakdown_issue(&parent_id, vec![("Subtask".to_string(), "".to_string())])
         .unwrap();
 
-    // Subtask should have no labels
+    // Subtask should inherit parent's type label
     let subtask = executor.get_issue(&subtask_ids[0]).unwrap();
-    assert_eq!(subtask.labels.len(), 0);
+    assert_eq!(subtask.labels.len(), 1);
+    assert_eq!(subtask.labels[0], "type:task");
 }
 
 #[test]
@@ -305,7 +309,7 @@ fn test_breakdown_updates_parent_state() {
             "".to_string(),
             Priority::High,
             vec![],
-            vec!["milestone:v1.0".to_string()],
+            vec!["type:task".to_string(), "milestone:v1.0".to_string()],
         )
         .unwrap();
 
@@ -337,7 +341,7 @@ fn test_breakdown_creates_dependency_edges() {
             "".to_string(),
             Priority::High,
             vec![],
-            vec!["epic:feature".to_string()],
+            vec!["type:epic".to_string(), "epic:feature".to_string()],
         )
         .unwrap();
 

@@ -39,6 +39,8 @@ fn test_query_label_json_exact_match() {
             "-t",
             "Milestone Task",
             "--label",
+            "type:task",
+            "--label",
             "milestone:v1.0",
         ])
         .current_dir(temp.path())
@@ -83,6 +85,8 @@ fn test_query_label_json_wildcard() {
             "-t",
             "Task v1",
             "--label",
+            "type:task",
+            "--label",
             "milestone:v1.0",
         ])
         .current_dir(temp.path())
@@ -95,6 +99,8 @@ fn test_query_label_json_wildcard() {
             "create",
             "-t",
             "Task v2",
+            "--label",
+            "type:task",
             "--label",
             "milestone:v2.0",
         ])
@@ -126,7 +132,7 @@ fn test_query_label_json_no_matches() {
 
     // Create issue without the queried label
     Command::new(&jit)
-        .args(["issue", "create", "-t", "Task", "--label", "milestone:v1.0"])
+        .args(["issue", "create", "-t", "Task", "--label", "type:task", "--label", "milestone:v1.0"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -188,6 +194,8 @@ fn test_query_label_text_output() {
             "-t",
             "Test Task",
             "--label",
+            "type:task",
+            "--label",
             "milestone:v1.0",
         ])
         .current_dir(temp.path())
@@ -236,7 +244,7 @@ fn test_query_label_wildcard_with_no_matches() {
 
     // Create issue with different namespace
     Command::new(&jit)
-        .args(["issue", "create", "-t", "Task", "--label", "epic:auth"])
+        .args(["issue", "create", "-t", "Task", "--label", "type:task", "--label", "epic:auth"])
         .current_dir(temp.path())
         .output()
         .unwrap();

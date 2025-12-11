@@ -51,7 +51,7 @@ fn test_issue_lifecycle_works_without_coordinator() {
             "description".to_string(),
             Priority::Normal,
             vec![],
-            vec![],
+            vec!["type:task".to_string()],
         )
         .unwrap();
 

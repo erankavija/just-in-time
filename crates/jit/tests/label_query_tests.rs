@@ -17,7 +17,7 @@ fn test_query_by_label_exact_match() {
             "".to_string(),
             Priority::High,
             vec![],
-            vec!["milestone:v1.0".to_string()],
+            vec!["type:task".to_string(), "milestone:v1.0".to_string()],
         )
         .unwrap();
 
@@ -27,7 +27,7 @@ fn test_query_by_label_exact_match() {
             "".to_string(),
             Priority::Normal,
             vec![],
-            vec!["epic:auth".to_string(), "milestone:v1.0".to_string()],
+            vec!["type:task".to_string(), "epic:auth".to_string(), "milestone:v1.0".to_string()],
         )
         .unwrap();
 
@@ -37,7 +37,7 @@ fn test_query_by_label_exact_match() {
             "".to_string(),
             Priority::Normal,
             vec![],
-            vec!["milestone:v2.0".to_string()],
+            vec!["type:task".to_string(), "milestone:v2.0".to_string()],
         )
         .unwrap();
 
@@ -63,7 +63,7 @@ fn test_query_by_label_wildcard_namespace() {
             "".to_string(),
             Priority::Normal,
             vec![],
-            vec!["milestone:v1.0".to_string()],
+            vec!["type:task".to_string(), "milestone:v1.0".to_string()],
         )
         .unwrap();
 
@@ -73,7 +73,7 @@ fn test_query_by_label_wildcard_namespace() {
             "".to_string(),
             Priority::Normal,
             vec![],
-            vec!["milestone:v2.0".to_string()],
+            vec!["type:task".to_string(), "milestone:v2.0".to_string()],
         )
         .unwrap();
 
@@ -83,7 +83,7 @@ fn test_query_by_label_wildcard_namespace() {
             "".to_string(),
             Priority::Normal,
             vec![],
-            vec!["epic:auth".to_string()],
+            vec!["type:task".to_string(), "epic:auth".to_string()],
         )
         .unwrap();
 
@@ -109,7 +109,7 @@ fn test_query_by_label_no_matches() {
             "".to_string(),
             Priority::Normal,
             vec![],
-            vec!["milestone:v1.0".to_string()],
+            vec!["type:task".to_string(), "milestone:v1.0".to_string()],
         )
         .unwrap();
 
@@ -191,7 +191,7 @@ fn test_query_by_label_case_sensitive() {
             "".to_string(),
             Priority::Normal,
             vec![],
-            vec!["component:AuthService".to_string()],
+            vec!["type:task".to_string(), "component:AuthService".to_string()],
         )
         .unwrap();
 
@@ -233,6 +233,7 @@ fn test_query_by_label_multiple_labels_per_issue() {
             Priority::Normal,
             vec![],
             vec![
+                "type:task".to_string(),
                 "milestone:v1.0".to_string(),
                 "epic:auth".to_string(),
                 "component:backend".to_string(),
