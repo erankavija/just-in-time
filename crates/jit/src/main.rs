@@ -129,7 +129,12 @@ fn run() -> Result<()> {
 
                 let mut namespaces = executor.storage().load_label_namespaces()?;
                 namespaces.type_hierarchy = Some(template.hierarchy);
+                namespaces.label_associations = Some(template.label_associations);
                 namespaces.schema_version = 2;
+                
+                // Dynamically create/update membership namespaces
+                namespaces.sync_membership_namespaces();
+                
                 executor.storage().save_label_namespaces(&namespaces)?;
 
                 println!("Initialized with '{}' hierarchy template", template_name);

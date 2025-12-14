@@ -298,8 +298,12 @@ impl IssueStore for JsonFileStorage {
         }
 
         let data = fs::read_to_string(&path).context("Failed to read labels.json")?;
-        let namespaces: crate::domain::LabelNamespaces =
+        let mut namespaces: crate::domain::LabelNamespaces =
             serde_json::from_str(&data).context("Failed to deserialize labels.json")?;
+        
+        // Dynamically register membership namespaces from label_associations
+        namespaces.sync_membership_namespaces();
+        
         Ok(namespaces)
     }
 

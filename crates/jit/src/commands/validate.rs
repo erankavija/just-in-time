@@ -97,6 +97,14 @@ impl<S: IssueStore> CommandExecutor<S> {
                         } => {
                             println!("  • Issue {} has unknown type '{}'", issue_id, unknown_type);
                         }
+                        ValidationIssue::InvalidMembershipReference {
+                            issue_id,
+                            label,
+                            reason,
+                            ..
+                        } => {
+                            println!("  • Issue {} has invalid membership label '{}': {}", issue_id, label, reason);
+                        }
                     }
                 }
             }
@@ -286,6 +294,19 @@ impl<S: IssueStore> CommandExecutor<S> {
                             issue_id,
                             unknown_type,
                             suggestion
+                        ));
+                    }
+                    ValidationIssue::InvalidMembershipReference {
+                        issue_id,
+                        label,
+                        reason,
+                        ..
+                    } => {
+                        return Err(anyhow!(
+                            "Issue '{}' has invalid membership label '{}': {}",
+                            issue_id,
+                            label,
+                            reason
                         ));
                     }
                 }

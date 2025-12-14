@@ -65,6 +65,14 @@ pub enum ValidationIssue {
         unknown_type: String,
         suggested_fix: Option<String>,
     },
+    /// An issue has a membership label referencing a non-existent issue
+    InvalidMembershipReference {
+        issue_id: String,
+        label: String,
+        namespace: String,
+        value: String,
+        reason: String,
+    },
 }
 
 /// Represents a fix to apply to resolve a validation issue.
@@ -98,24 +106,35 @@ pub enum ConfigError {
 
 /// Configuration for issue type hierarchy.
 ///
-/// Types at lower levels can depend on types at the same or higher levels.
-/// For example, with default config:
-/// - Level 1 (milestone) can depend on: milestone
-/// - Level 2 (epic) can depend on: epic, milestone
-/// - Level 3 (story) can depend on: story, epic, milestone
-/// - Level 4 (task) can depend on: task, story, epic, milestone
+/// Defines the hierarchy levels and their associated membership label namespaces.
+///
+/// # Examples
+///
+/// ```
+/// use jit::type_hierarchy::HierarchyConfig;
+/// use std::collections::HashMap;
+///
+/// let config = HierarchyConfig::default();
+/// assert!(config.contains_type("epic"));
+/// assert_eq!(config.get_membership_namespace("epic"), Some("epic"));
+/// ```
 #[derive(Debug, Clone, PartialEq)]
 pub struct HierarchyConfig {
     /// Map of type name to its level (1 = highest, higher numbers = lower)
     types: HashMap<String, u8>,
+    
+    /// Map of type name to its membership label namespace
+    /// e.g., "epic" -> "epic" means type:epic uses epic:* labels
+    /// e.g., "release" -> "milestone" means type:release uses milestone:* labels
+    label_associations: HashMap<String, String>,
 }
 
 impl Default for HierarchyConfig {
     /// Creates the default 4-level hierarchy:
-    /// 1. milestone (strategic, highest)
-    /// 2. epic (strategic, feature-level)
-    /// 3. story (tactical, user story)
-    /// 4. task (tactical, implementation detail)
+    /// 1. milestone (strategic, highest) - uses milestone:* labels
+    /// 2. epic (strategic, feature-level) - uses epic:* labels
+    /// 3. story (tactical, user story) - uses story:* labels
+    /// 4. task (tactical, implementation detail) - no membership labels
     fn default() -> Self {
         let mut types = HashMap::new();
         types.insert("milestone".to_string(), 1);
@@ -123,20 +142,35 @@ impl Default for HierarchyConfig {
         types.insert("story".to_string(), 3);
         types.insert("task".to_string(), 4);
 
-        Self { types }
+        let mut label_associations = HashMap::new();
+        label_associations.insert("milestone".to_string(), "milestone".to_string());
+        label_associations.insert("epic".to_string(), "epic".to_string());
+        label_associations.insert("story".to_string(), "story".to_string());
+
+        Self {
+            types,
+            label_associations,
+        }
     }
 }
 
 impl HierarchyConfig {
     /// Creates a new hierarchy configuration from a map of type names to levels.
     ///
+    /// # Arguments
+    ///
+    /// * `types` - Map of type names to hierarchy levels
+    /// * `label_associations` - Map of type names to membership label namespaces
+    ///
     /// # Errors
     ///
     /// Returns `ConfigError` if:
     /// - Any type name is empty
     /// - Any level is 0
-    /// - Multiple types have the same level (duplicate entries are allowed)
-    pub fn new(types: HashMap<String, u8>) -> Result<Self, ConfigError> {
+    pub fn new(
+        types: HashMap<String, u8>,
+        label_associations: HashMap<String, String>,
+    ) -> Result<Self, ConfigError> {
         for (name, level) in &types {
             if name.trim().is_empty() {
                 return Err(ConfigError::EmptyTypeName(*level));
@@ -146,7 +180,10 @@ impl HierarchyConfig {
             }
         }
 
-        Ok(Self { types })
+        Ok(Self {
+            types,
+            label_associations,
+        })
     }
 
     /// Returns the level of a type, or None if the type is not in the hierarchy.
@@ -162,6 +199,28 @@ impl HierarchyConfig {
     /// Returns an iterator over all types in the hierarchy.
     pub fn types(&self) -> impl Iterator<Item = (&String, &u8)> {
         self.types.iter()
+    }
+
+    /// Returns the membership label namespace for a type, if configured.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::type_hierarchy::HierarchyConfig;
+    ///
+    /// let config = HierarchyConfig::default();
+    /// assert_eq!(config.get_membership_namespace("epic"), Some("epic"));
+    /// assert_eq!(config.get_membership_namespace("task"), None);
+    /// ```
+    pub fn get_membership_namespace(&self, type_name: &str) -> Option<&str> {
+        self.label_associations.get(type_name).map(String::as_str)
+    }
+
+    /// Returns an iterator over all (type_name, namespace) pairs for membership labels.
+    ///
+    /// This provides the reverse mapping: for each membership namespace, which types use it.
+    pub fn membership_namespaces(&self) -> impl Iterator<Item = (&String, &String)> {
+        self.label_associations.iter()
     }
 }
 
@@ -317,6 +376,138 @@ pub fn detect_validation_issues(
     issues
 }
 
+/// Detects membership validation issues for an issue.
+///
+/// Checks that membership labels (epic:*, milestone:*, etc.) reference actual issues
+/// with matching types.
+///
+/// # Arguments
+///
+/// * `config` - The hierarchy configuration
+/// * `issue` - The issue to validate
+/// * `all_issues` - All issues in the repository (for reference lookup)
+///
+/// # Returns
+///
+/// A vector of validation issues found (empty if no issues)
+///
+/// # Examples
+///
+/// ```
+/// use jit::type_hierarchy::{detect_membership_issues, HierarchyConfig};
+/// use jit::domain::Issue;
+///
+/// let config = HierarchyConfig::default();
+/// let task = Issue::new("Login", 1, vec!["type:task".to_string(), "epic:auth".to_string()]);
+/// let epic = Issue::new("Auth", 1, vec!["type:epic".to_string(), "epic:auth".to_string()]);
+/// let all_issues = vec![task.clone(), epic];
+///
+/// let issues = detect_membership_issues(&config, &task, &all_issues);
+/// assert!(issues.is_empty()); // Valid reference
+/// ```
+pub fn detect_membership_issues(
+    config: &HierarchyConfig,
+    issue: &crate::domain::Issue,
+    all_issues: &[crate::domain::Issue],
+) -> Vec<ValidationIssue> {
+    use crate::labels::parse_label;
+    
+    let mut issues = Vec::new();
+    
+    // Build reverse map: namespace -> expected_type
+    // e.g., "epic" -> "epic", "milestone" -> "milestone"
+    let namespace_to_type: HashMap<&str, Vec<&str>> = {
+        let mut map: HashMap<&str, Vec<&str>> = HashMap::new();
+        for (type_name, namespace) in config.membership_namespaces() {
+            map.entry(namespace.as_str())
+                .or_default()
+                .push(type_name.as_str());
+        }
+        map
+    };
+    
+    for label in &issue.labels {
+        // Parse the label
+        let (namespace, value) = match parse_label(label) {
+            Ok(pair) => pair,
+            Err(_) => continue, // Invalid format, skip (handled by label validation)
+        };
+        
+        // Check if this namespace is a configured membership namespace
+        if let Some(expected_types) = namespace_to_type.get(namespace.as_str()) {
+            // Find issues with matching label that have one of the expected types
+            let matching_with_correct_type: Vec<_> = all_issues
+                .iter()
+                .filter(|i| {
+                    i.labels.contains(&label.clone())
+                        && i.labels.iter().any(|l| {
+                            expected_types
+                                .iter()
+                                .any(|t| l == &format!("type:{}", t))
+                        })
+                })
+                .collect();
+
+            if matching_with_correct_type.is_empty() {
+                // Check if ANY issues have this label (for better error message)
+                let any_matches = all_issues
+                    .iter()
+                    .any(|i| i.id != issue.id && i.labels.contains(&label.clone()));
+
+                if !any_matches {
+                    // No other issue found with this label at all
+                    issues.push(ValidationIssue::InvalidMembershipReference {
+                        issue_id: issue.id.clone(),
+                        label: label.clone(),
+                        namespace: namespace.clone(),
+                        value: value.clone(),
+                        reason: format!(
+                            "No issue found with label '{}'. Expected an issue with type: {}",
+                            label,
+                            expected_types
+                                .iter()
+                                .map(|t| format!("type:{}", t))
+                                .collect::<Vec<_>>()
+                                .join(" or ")
+                        ),
+                    });
+                } else {
+                    // Found issues but none have the correct type
+                    let found_types: Vec<String> = all_issues
+                        .iter()
+                        .filter(|i| i.id != issue.id && i.labels.contains(&label.clone()))
+                        .filter_map(|i| {
+                            i.labels
+                                .iter()
+                                .find(|l| l.starts_with("type:"))
+                                .cloned()
+                        })
+                        .collect();
+
+                    issues.push(ValidationIssue::InvalidMembershipReference {
+                        issue_id: issue.id.clone(),
+                        label: label.clone(),
+                        namespace: namespace.clone(),
+                        value: value.clone(),
+                        reason: format!(
+                            "Issue(s) with label '{}' have type {:?}, expected type: {}",
+                            label,
+                            found_types,
+                            expected_types
+                                .iter()
+                                .map(|t| format!("type:{}", t))
+                                .collect::<Vec<_>>()
+                                .join(" or ")
+                        ),
+                    });
+                }
+            }
+        }
+    }
+    
+    issues
+}
+
 /// Generates fixes for validation issues.
 ///
 /// Currently only generates fixes for unknown type labels with suggested replacements.
@@ -342,6 +533,7 @@ pub fn generate_fixes(issues: &[ValidationIssue]) -> Vec<ValidationFix> {
                 new_type: suggested.clone(),
             }),
             ValidationIssue::UnknownType { .. } => None, // No suggestion available
+            ValidationIssue::InvalidMembershipReference { .. } => None, // No auto-fix for membership issues
         })
         .collect()
 }
@@ -365,8 +557,9 @@ mod tests {
     fn test_config_validation_empty_name() {
         let mut types = HashMap::new();
         types.insert("".to_string(), 1);
+        let label_associations = HashMap::new();
 
-        let result = HierarchyConfig::new(types);
+        let result = HierarchyConfig::new(types, label_associations);
         assert_eq!(result, Err(ConfigError::EmptyTypeName(1)));
     }
 
@@ -374,8 +567,9 @@ mod tests {
     fn test_config_validation_invalid_level() {
         let mut types = HashMap::new();
         types.insert("task".to_string(), 0);
+        let label_associations = HashMap::new();
 
-        let result = HierarchyConfig::new(types);
+        let result = HierarchyConfig::new(types, label_associations);
         assert_eq!(result, Err(ConfigError::InvalidLevel(0)));
     }
 

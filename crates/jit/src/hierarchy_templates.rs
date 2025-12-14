@@ -8,6 +8,7 @@ pub struct HierarchyTemplate {
     pub name: String,
     pub description: String,
     pub hierarchy: HashMap<String, u8>,
+    pub label_associations: HashMap<String, String>,
 }
 
 impl HierarchyTemplate {
@@ -41,10 +42,16 @@ impl HierarchyTemplate {
         hierarchy.insert("story".to_string(), 3);
         hierarchy.insert("task".to_string(), 4);
 
+        let mut label_associations = HashMap::new();
+        label_associations.insert("milestone".to_string(), "milestone".to_string());
+        label_associations.insert("epic".to_string(), "epic".to_string());
+        label_associations.insert("story".to_string(), "story".to_string());
+
         Self {
             name: "default".to_string(),
             description: "4-level hierarchy: milestone → epic → story → task".to_string(),
             hierarchy,
+            label_associations,
         }
     }
 
@@ -57,10 +64,17 @@ impl HierarchyTemplate {
         hierarchy.insert("story".to_string(), 4);
         hierarchy.insert("task".to_string(), 5);
 
+        let mut label_associations = HashMap::new();
+        label_associations.insert("program".to_string(), "program".to_string());
+        label_associations.insert("milestone".to_string(), "milestone".to_string());
+        label_associations.insert("epic".to_string(), "epic".to_string());
+        label_associations.insert("story".to_string(), "story".to_string());
+
         Self {
             name: "extended".to_string(),
             description: "5-level hierarchy: program → milestone → epic → story → task".to_string(),
             hierarchy,
+            label_associations,
         }
     }
 
@@ -72,10 +86,16 @@ impl HierarchyTemplate {
         hierarchy.insert("story".to_string(), 3);
         hierarchy.insert("task".to_string(), 4);
 
+        let mut label_associations = HashMap::new();
+        label_associations.insert("release".to_string(), "release".to_string());
+        label_associations.insert("epic".to_string(), "epic".to_string());
+        label_associations.insert("story".to_string(), "story".to_string());
+
         Self {
             name: "agile".to_string(),
             description: "4-level hierarchy: release → epic → story → task".to_string(),
             hierarchy,
+            label_associations,
         }
     }
 
@@ -85,25 +105,33 @@ impl HierarchyTemplate {
         hierarchy.insert("milestone".to_string(), 1);
         hierarchy.insert("task".to_string(), 2);
 
+        let mut label_associations = HashMap::new();
+        label_associations.insert("milestone".to_string(), "milestone".to_string());
+
         Self {
             name: "minimal".to_string(),
             description: "2-level hierarchy: milestone → task".to_string(),
             hierarchy,
+            label_associations,
         }
     }
 }
 
 /// Load hierarchy configuration from storage.
 ///
-/// Reads the type_hierarchy field from .jit/labels.json or returns the default config.
+/// Reads the type_hierarchy and label_associations from .jit/labels.json 
+/// or returns the default config.
 pub fn get_hierarchy_config<S: crate::storage::IssueStore>(
     storage: &S,
 ) -> anyhow::Result<crate::type_hierarchy::HierarchyConfig> {
     let namespaces = storage.load_label_namespaces()?;
 
     if let Some(type_hierarchy) = namespaces.type_hierarchy {
-        // Convert HashMap<String, u8> to HierarchyConfig
-        crate::type_hierarchy::HierarchyConfig::new(type_hierarchy)
+        // Load label_associations or use empty map
+        let label_associations = namespaces.label_associations.unwrap_or_default();
+
+        // Convert to HierarchyConfig
+        crate::type_hierarchy::HierarchyConfig::new(type_hierarchy, label_associations)
             .map_err(|e| anyhow::anyhow!("Invalid hierarchy config: {}", e))
     } else {
         // Return default config

@@ -798,6 +798,10 @@ pub struct LabelNamespaces {
     /// Type hierarchy configuration (optional, defaults to standard hierarchy)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub type_hierarchy: Option<HashMap<String, u8>>,
+    /// Label associations for membership namespaces (type_name -> namespace)
+    /// e.g., "epic" -> "epic", "release" -> "milestone"
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label_associations: Option<HashMap<String, String>>,
 }
 
 impl LabelNamespaces {
@@ -807,6 +811,27 @@ impl LabelNamespaces {
             schema_version: 1,
             namespaces: HashMap::new(),
             type_hierarchy: None,
+            label_associations: None,
+        }
+    }
+
+    /// Ensure namespaces exist for all membership labels in label_associations.
+    /// Dynamically creates namespace entries for custom type names.
+    pub fn sync_membership_namespaces(&mut self) {
+        if let Some(ref associations) = self.label_associations {
+            for (type_name, namespace) in associations {
+                // Only create namespace if it doesn't already exist
+                if !self.namespaces.contains_key(namespace) {
+                    self.namespaces.insert(
+                        namespace.clone(),
+                        LabelNamespace::new(
+                            &format!("{} organizational grouping", type_name),
+                            false,
+                            true,
+                        ),
+                    );
+                }
+            }
         }
     }
 
@@ -814,16 +839,7 @@ impl LabelNamespaces {
     pub fn with_defaults() -> Self {
         let mut namespaces = HashMap::new();
 
-        namespaces.insert(
-            "milestone".to_string(),
-            LabelNamespace::new("Release milestones and version targets", false, true),
-        );
-
-        namespaces.insert(
-            "epic".to_string(),
-            LabelNamespace::new("Large features or initiatives", false, true),
-        );
-
+        // Core system namespaces (not derived from hierarchy)
         namespaces.insert(
             "component".to_string(),
             LabelNamespace::new("Technical component or subsystem", false, false),
@@ -846,11 +862,23 @@ impl LabelNamespaces {
         type_hierarchy.insert("story".to_string(), 3);
         type_hierarchy.insert("task".to_string(), 4);
 
-        Self {
+        // Default label associations
+        let mut label_associations = HashMap::new();
+        label_associations.insert("milestone".to_string(), "milestone".to_string());
+        label_associations.insert("epic".to_string(), "epic".to_string());
+        label_associations.insert("story".to_string(), "story".to_string());
+
+        let mut config = Self {
             schema_version: 2,
             namespaces,
             type_hierarchy: Some(type_hierarchy),
-        }
+            label_associations: Some(label_associations),
+        };
+
+        // Dynamically create membership namespaces from label_associations
+        config.sync_membership_namespaces();
+
+        config
     }
 
     /// Get the type hierarchy, or default if not specified
