@@ -157,6 +157,8 @@ fn run() -> Result<()> {
                 priority,
                 gate,
                 label,
+                force,
+                orphan,
                 json,
             } => {
                 let prio = parse_priority(&priority)?;
@@ -167,6 +169,49 @@ fn run() -> Result<()> {
                     println!("{}", serde_json::to_string_pretty(&issue)?);
                 } else {
                     println!("Created issue: {}", id);
+                    
+                    // Check for warnings unless --force is set
+                    if !force {
+                        use crate::type_hierarchy::ValidationWarning;
+                        
+                        let warnings = executor.check_warnings(&id)?;
+                        
+                        // Filter orphan warnings if --orphan flag is set
+                        let warnings_to_display: Vec<_> = if orphan {
+                            warnings.into_iter()
+                                .filter(|w| !matches!(w, ValidationWarning::OrphanedLeaf { .. }))
+                                .collect()
+                        } else {
+                            warnings
+                        };
+                        
+                        // Display warnings
+                        for warning in warnings_to_display {
+                            match warning {
+                                ValidationWarning::MissingStrategicLabel {
+                                    type_name,
+                                    expected_namespace,
+                                    ..
+                                } => {
+                                    eprintln!("\n⚠ Warning: Strategic consistency issue");
+                                    eprintln!("  Issue {} (type:{}) should have a {}:* label for identification.", 
+                                             id, type_name, expected_namespace);
+                                    eprintln!("  Suggested: jit issue update {} --label \"{}:value\"", 
+                                             id, expected_namespace);
+                                }
+                                ValidationWarning::OrphanedLeaf {
+                                    type_name,
+                                    ..
+                                } => {
+                                    eprintln!("\n⚠ Warning: Orphaned leaf issue");
+                                    eprintln!("  {} {} has no parent association (epic or milestone).", 
+                                             type_name.to_uppercase(), id);
+                                    eprintln!("  Consider adding: --label \"epic:value\" or --label \"milestone:value\"");
+                                    eprintln!("  Or use --orphan flag to acknowledge intentional orphan.");
+                                }
+                            }
+                        }
+                    }
                 }
             }
             IssueCommands::List {
@@ -1290,18 +1335,79 @@ fn run() -> Result<()> {
                     }));
                     println!("{}", output.to_json_string()?);
                 }
-            } else if json {
-                use output::JsonOutput;
-                use serde_json::json;
-
-                executor.validate_silent()?;
-                let output = JsonOutput::success(json!({
-                    "valid": true,
-                    "message": "Repository validation passed"
-                }));
-                println!("{}", output.to_json_string()?);
             } else {
-                executor.validate()?;
+                // Standard validation with warnings
+                executor.validate_silent()?;
+                let warnings = executor.collect_all_warnings()?;
+                
+                if json {
+                    use output::JsonOutput;
+                    use serde_json::json;
+                    use crate::type_hierarchy::ValidationWarning;
+
+                    let warnings_json: Vec<_> = warnings.iter()
+                        .flat_map(|(issue_id, issue_warnings)| {
+                            issue_warnings.iter().map(move |w| {
+                                match w {
+                                    ValidationWarning::MissingStrategicLabel { type_name, expected_namespace, .. } => {
+                                        json!({
+                                            "type": "missing_strategic_label",
+                                            "issue_id": issue_id,
+                                            "issue_type": type_name,
+                                            "expected_namespace": expected_namespace,
+                                            "suggestion": format!("Add label: {}:*", expected_namespace)
+                                        })
+                                    }
+                                    ValidationWarning::OrphanedLeaf { type_name, .. } => {
+                                        json!({
+                                            "type": "orphaned_leaf",
+                                            "issue_id": issue_id,
+                                            "issue_type": type_name,
+                                            "suggestion": "Add label: epic:* or milestone:*"
+                                        })
+                                    }
+                                }
+                            })
+                        })
+                        .collect();
+
+                    let output = JsonOutput::success(json!({
+                        "valid": true,
+                        "warnings": warnings_json,
+                        "warning_count": warnings_json.len(),
+                        "message": "Repository validation passed"
+                    }));
+                    println!("{}", output.to_json_string()?);
+                } else {
+                    println!("✓ Repository validation passed");
+                    
+                    if !warnings.is_empty() {
+                        use crate::type_hierarchy::ValidationWarning;
+                        
+                        println!("\nWarnings: {}", warnings.iter().map(|(_, w)| w.len()).sum::<usize>());
+                        println!();
+                        
+                        for (issue_id, issue_warnings) in warnings {
+                            for warning in issue_warnings {
+                                match warning {
+                                    ValidationWarning::MissingStrategicLabel { type_name, expected_namespace, .. } => {
+                                        println!("⚠ Issue {} (type:{}): Missing {}:* label", 
+                                                issue_id, type_name, expected_namespace);
+                                        println!("  Suggested: jit issue update {} --label \"{}:value\"", 
+                                                issue_id, expected_namespace);
+                                    }
+                                    ValidationWarning::OrphanedLeaf { type_name, .. } => {
+                                        println!("⚠ Issue {} (type:{}): Orphaned leaf issue", 
+                                                issue_id, type_name);
+                                        println!("  Suggested: jit issue update {} --label \"epic:value\"", 
+                                                issue_id);
+                                    }
+                                }
+                                println!();
+                            }
+                        }
+                    }
+                }
             }
         }
     }

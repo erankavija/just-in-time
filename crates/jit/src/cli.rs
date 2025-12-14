@@ -153,6 +153,14 @@ pub enum IssueCommands {
         #[arg(short, long)]
         label: Vec<String>,
 
+        /// Bypass validation warnings
+        #[arg(long)]
+        force: bool,
+
+        /// Explicitly allow orphaned leaf issues (tasks without parent labels)
+        #[arg(long)]
+        orphan: bool,
+
         #[arg(long)]
         json: bool,
     },

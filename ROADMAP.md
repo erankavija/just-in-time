@@ -125,23 +125,29 @@
 **Status:**
 - ✅ All modules have module-level docs
 - ✅ Zero rustdoc warnings in default mode
-- ✅ Zero clippy warnings
-- ✅ **578 tests passing** (195 core lib + 383 across workspace)
+- ✅ Zero clippy warnings (with allow(dead_code) on incomplete features)
+- ✅ **518 tests passing** (across entire workspace)
+  - Core library: 150 unit tests + 140 integration tests
+  - Type hierarchy: 10 membership validation tests
+  - Various modules: 218 additional tests
 - ✅ **Transitive reduction implemented** - storage-level minimal edge set
 - ✅ **Issue breakdown command** - foolproof task decomposition for agents
 - ✅ main.rs well-maintained (under 1,000 lines)
-- ✅ commands.rs comprehensive and well-tested
+- ✅ commands.rs modularized into 12 focused modules (1,918 lines total, 55% reduction)
 - ✅ jit-server crate with search API endpoint
 - ✅ Thread-safe InMemoryStorage (refactored for async)
 - ✅ Responsive web UI with search functionality
 - ✅ **54 web tests passing** (14 new strategic view tests)
 - ✅ **Strategic/tactical view toggle** - filtering, downstream stats, seamless switching
 - ✅ **Label system (95% complete)** - validation, querying, strategic views, web UI badges
+- ✅ **Type hierarchy enforcement (Phases A-E complete)** - type validation + membership validation
 - ✅ Comprehensive documentation: 
   - file-locking-usage.md (400 lines)
   - knowledge-management-vision.md (537 lines)
   - web-ui-architecture.md (466 lines)
   - search-implementation.md (596 lines)
+  - type-hierarchy-enforcement-proposal.md (920 lines)
+  - session-2025-12-14-membership-validation.md (453 lines)
 
 **Completed:**
 - [x] Refactor main.rs
@@ -607,21 +613,38 @@
       - [x] 5 tests for templates (all, get, extended, minimal, nonexistent)
       - [x] All 506 tests passing, zero clippy errors
       - **Implementation:** Clean module-based design, no file I/O for templates
-    - [x] **Phase D: Auto-Fix (1-2 hours)** - Automated repair ✅ **2025-12-14**
-      - [x] `validate --fix`: Repair unknown types (Levenshtein distance)
-      - [x] `validate --fix`: Reverse invalid dependencies
-      - [x] Atomic batch operations
+    - [x] **Phase D: Type Label Validation** - Type validation only ✅ **2025-12-14**
+      - [x] `validate`: Detect unknown type labels
+      - [x] `validate --fix`: Repair typos using Levenshtein distance
       - [x] Dry-run mode: `--fix --dry-run` shows changes without applying
-      - [x] 8 integration tests for auto-fix scenarios
       - [x] JSON output support (--fix --json)
       - [x] Quiet mode for JSON output
-      - [x] 489 total tests passing, **zero clippy warnings**
-      - [x] All clippy warnings documented in `docs/clippy-suppressions.md`
-      - **Note:** Deferred `--fix-warnings` for strategic labels to future iteration
+      - [x] 7 integration tests for type validation
+      - [x] All tests passing, zero clippy warnings (with allow(dead_code) on incomplete features)
+      - **CRITICAL FIX**: Removed incorrect dependency validation (commit a8fefe2)
+        - Dependencies are NOT restricted by type hierarchy
+        - Type hierarchy only validates organizational membership
+        - See `docs/session-notes-hierarchy-bug-fix.md` for details
+    - [x] **Phase E: Membership Validation** - Label-based references ✅ **2025-12-14**
+      - [x] Implemented `detect_membership_issues()` function
+      - [x] Validates `epic:auth` references point to actual issues with `type:epic`
+      - [x] Validates `milestone:*`, `story:*`, and custom membership labels
+      - [x] Self-references allowed (epic identifying itself)
+      - [x] Multiple membership labels supported
+      - [x] Added `label_associations` field to `HierarchyConfig`
+      - [x] Dynamic namespace registration from `label_associations`
+      - [x] Removed ALL hard-coded namespace names (commit d6891c5)
+      - [x] 10 comprehensive integration tests
+      - [x] Custom type names work automatically (e.g., "theme" instead of "epic")
+      - [x] Type aliases supported (e.g., "release" and "milestone" both use `milestone:*`)
+      - [x] 167 total tests passing
+      - **Key Achievement**: Fully configuration-driven, zero hard-coding
     - **Documentation**: 
       - docs/type-hierarchy-enforcement-proposal.md: Full design (~920 lines)
       - docs/type-hierarchy-implementation-summary.md: Implementation guide (~330 lines)
-    - **Estimated total effort**: 9-12 hours total (5h spent, Phase D complete!)
+      - docs/session-notes-hierarchy-bug-fix.md: Critical bug fix documentation
+      - docs/session-2025-12-14-membership-validation.md: Phase E implementation notes
+    - **Estimated total effort**: ~12 hours actual (Phases A-E complete!)
   - **Code Quality Improvements** - Identified 2025-12-14
     - [ ] **Argument ordering consistency** (low priority)
       - [ ] Consider standardizing create_issue arg order: (title, desc, labels, priority, gates)
@@ -636,9 +659,36 @@
       - [ ] If test suite grows >5000 lines, split into `tests/commands/` modules
       - [ ] Keep integration tests in main test module for now
   - **Next priorities after type hierarchy:**
-    - Option A: Document graph visualization (12-16 hours)
-    - Option B: Plugin architecture for custom gates
-    - Option C: Performance benchmarks and optimization
+    - **Phase F: Warning-Level Validations** ✅ **COMPLETE** - **2025-12-14**
+      - [x] Add `ValidationWarning` enum (MissingStrategicLabel, OrphanedLeaf)
+      - [x] Implement `validate_strategic_labels()` - check epic has epic:* label
+      - [x] Implement `validate_orphans()` - detect tasks without epic/milestone labels
+      - [x] 17 comprehensive tests (10 default + 7 custom hierarchies)
+      - [x] Fully configuration-driven validation
+      - Actual: ~1 hour (estimated 2 hours)
+    - **Phase G: CLI Warning Integration** 🚧 **75% COMPLETE** - **2025-12-14**
+      - [x] Add `--force` flag to `jit issue create` to bypass warnings
+      - [x] Add `--orphan` flag to acknowledge intentional orphans
+      - [x] Check strategic consistency on issue creation (warn if missing label)
+      - [x] Check orphan status on task creation (warn if no parent)
+      - [x] Display warnings with clear, actionable messages
+      - [x] 4 integration tests (check_warnings method)
+      - [ ] Update `jit validate` command to report warnings
+      - [ ] JSON output for warnings in validate
+      - Actual: ~1 hour so far (estimated 1.5 hours total, 0.5h remaining)
+    - **Phase H: Configuration Support** - .jit/config.toml hierarchy settings
+      - [ ] Add config.toml parsing for type_hierarchy section
+      - [ ] Support strictness levels (strict/loose/permissive)
+      - [ ] Support warn_orphaned_leaves, warn_strategic_consistency flags
+      - [ ] Cache parsed config in CommandExecutor
+      - [ ] Add 4-5 tests for config loading
+      - Estimated: 1 hour
+    - **Future enhancements:**
+      - Option A: Document graph visualization (12-16 hours)
+      - Option B: Plugin architecture for custom gates
+      - Option C: Performance benchmarks and optimization
+      - Option D: Circular membership detection
+      - Option E: Membership hierarchy constraints (story can't belong to task)
 - **CI/CD Infrastructure:** Complete and tested ✅
   - All workflows validated with YAML syntax checks
   - Tested locally with act and manual scripts

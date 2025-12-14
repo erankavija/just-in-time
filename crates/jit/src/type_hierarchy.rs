@@ -86,6 +86,22 @@ pub enum ValidationFix {
     },
 }
 
+/// Validation warnings (soft constraints that don't block operations).
+#[derive(Debug, Clone, PartialEq)]
+pub enum ValidationWarning {
+    /// A strategic type issue (epic, milestone) is missing its identifying label
+    MissingStrategicLabel {
+        issue_id: String,
+        type_name: String,
+        expected_namespace: String,
+    },
+    /// A leaf-level issue (task) has no parent association labels
+    OrphanedLeaf {
+        issue_id: String,
+        type_name: String,
+    },
+}
+
 /// Errors that can occur during configuration validation.
 #[derive(Debug, Error, PartialEq)]
 pub enum ConfigError {
@@ -376,6 +392,138 @@ pub fn detect_validation_issues(
     issues
 }
 
+/// Validates that strategic types have their identifying labels.
+///
+/// Strategic types (epic, milestone) should have matching labels for identification.
+/// For example, an issue with `type:epic` should have an `epic:*` label.
+///
+/// # Arguments
+///
+/// * `config` - The hierarchy configuration
+/// * `issue` - The issue to validate
+///
+/// # Returns
+///
+/// A vector of warnings if strategic labels are missing
+///
+/// # Examples
+///
+/// ```
+/// use jit::type_hierarchy::{validate_strategic_labels, HierarchyConfig};
+/// use jit::domain::Issue;
+///
+/// let config = HierarchyConfig::default();
+/// let mut epic = Issue::new("Auth".to_string(), "Epic description".to_string());
+/// epic.labels = vec!["type:epic".to_string()];
+///
+/// let warnings = validate_strategic_labels(&config, &epic);
+/// assert_eq!(warnings.len(), 1); // Missing epic:* label
+/// ```
+pub fn validate_strategic_labels(
+    config: &HierarchyConfig,
+    issue: &crate::domain::Issue,
+) -> Vec<ValidationWarning> {
+    let mut warnings = Vec::new();
+    
+    // Find type label
+    let type_label = issue.labels.iter().find(|l| l.starts_with("type:"));
+    let type_name = match type_label {
+        Some(label) => match extract_type(label) {
+            Ok(t) => t,
+            Err(_) => return warnings, // Invalid type label, handled by other validation
+        },
+        None => return warnings, // No type label, handled by other validation
+    };
+    
+    // Check if this type has a membership namespace (strategic types do)
+    if let Some(expected_namespace) = config.get_membership_namespace(&type_name) {
+        // Check if issue has a label in that namespace
+        let has_label = issue.labels.iter().any(|l| {
+            l.starts_with(&format!("{}:", expected_namespace))
+        });
+        
+        if !has_label {
+            warnings.push(ValidationWarning::MissingStrategicLabel {
+                issue_id: issue.id.clone(),
+                type_name: type_name.clone(),
+                expected_namespace: expected_namespace.to_string(),
+            });
+        }
+    }
+    
+    warnings
+}
+
+/// Validates that leaf-level issues have parent association labels.
+///
+/// Leaf-level issues (like tasks) should belong to higher-level organizational units
+/// (epics, milestones) for better tracking and strategic visibility.
+///
+/// # Arguments
+///
+/// * `config` - The hierarchy configuration
+/// * `issue` - The issue to validate
+///
+/// # Returns
+///
+/// A vector of warnings if the issue is an orphaned leaf
+///
+/// # Examples
+///
+/// ```
+/// use jit::type_hierarchy::{validate_orphans, HierarchyConfig};
+/// use jit::domain::Issue;
+///
+/// let config = HierarchyConfig::default();
+/// let mut task = Issue::new("Login".to_string(), "Task description".to_string());
+/// task.labels = vec!["type:task".to_string()];
+///
+/// let warnings = validate_orphans(&config, &task);
+/// assert_eq!(warnings.len(), 1); // Orphaned task
+/// ```
+pub fn validate_orphans(
+    config: &HierarchyConfig,
+    issue: &crate::domain::Issue,
+) -> Vec<ValidationWarning> {
+    let mut warnings = Vec::new();
+    
+    // Find type label
+    let type_label = issue.labels.iter().find(|l| l.starts_with("type:"));
+    let type_name = match type_label {
+        Some(label) => match extract_type(label) {
+            Ok(t) => t,
+            Err(_) => return warnings, // Invalid type label, handled by other validation
+        },
+        None => return warnings, // No type label, handled by other validation
+    };
+    
+    // Check if this is a leaf-level type
+    let type_level = match config.get_level(&type_name) {
+        Some(level) => level,
+        None => return warnings, // Unknown type, handled by other validation
+    };
+    
+    // Find the maximum level (lowest in hierarchy)
+    let max_level = config.types.values().max().copied().unwrap_or(0);
+    if type_level != max_level {
+        return warnings; // Not a leaf type
+    }
+    
+    // Check if it has any parent association labels
+    let has_parent_label = config.membership_namespaces().any(|(namespace, _)| {
+        issue.labels.iter().any(|l| l.starts_with(&format!("{}:", namespace)))
+    });
+    
+    if !has_parent_label {
+        warnings.push(ValidationWarning::OrphanedLeaf {
+            issue_id: issue.id.clone(),
+            type_name: type_name.clone(),
+        });
+    }
+    
+    warnings
+}
+
 /// Detects membership validation issues for an issue.
 ///
 /// Checks that membership labels (epic:*, milestone:*, etc.) reference actual issues
@@ -398,8 +546,10 @@ pub fn detect_validation_issues(
 /// use jit::domain::Issue;
 ///
 /// let config = HierarchyConfig::default();
-/// let task = Issue::new("Login", 1, vec!["type:task".to_string(), "epic:auth".to_string()]);
-/// let epic = Issue::new("Auth", 1, vec!["type:epic".to_string(), "epic:auth".to_string()]);
+/// let mut task = Issue::new("Login".to_string(), "Task description".to_string());
+/// task.labels = vec!["type:task".to_string(), "epic:auth".to_string()];
+/// let mut epic = Issue::new("Auth".to_string(), "Epic description".to_string());
+/// epic.labels = vec!["type:epic".to_string(), "epic:auth".to_string()];
 /// let all_issues = vec![task.clone(), epic];
 ///
 /// let issues = detect_membership_issues(&config, &task, &all_issues);

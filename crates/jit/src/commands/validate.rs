@@ -421,4 +421,55 @@ impl<S: IssueStore> CommandExecutor<S> {
             total: issues.len(),
         })
     }
+
+    /// Check for validation warnings on a specific issue.
+    ///
+    /// Returns warnings for:
+    /// - Strategic types (epic, milestone) missing identifying labels
+    /// - Leaf types (task) without parent associations
+    ///
+    /// # Arguments
+    ///
+    /// * `issue_id` - The ID of the issue to check
+    ///
+    /// # Returns
+    ///
+    /// A vector of validation warnings (empty if no warnings)
+    pub fn check_warnings(&self, issue_id: &str) -> Result<Vec<crate::type_hierarchy::ValidationWarning>> {
+        use crate::type_hierarchy::{validate_orphans, validate_strategic_labels, HierarchyConfig};
+        
+        // Load the issue
+        let issue = self.storage.load_issue(issue_id)?;
+        
+        // Load hierarchy config (use default for now)
+        let config = HierarchyConfig::default();
+        
+        // Collect all warnings
+        let mut warnings = Vec::new();
+        
+        // Check strategic label consistency
+        warnings.extend(validate_strategic_labels(&config, &issue));
+        
+        // Check for orphaned leaves
+        warnings.extend(validate_orphans(&config, &issue));
+        
+        Ok(warnings)
+    }
+
+    /// Collect all validation warnings for all issues in the repository.
+    ///
+    /// Returns a vector of (issue_id, warnings) pairs for all issues with warnings.
+    pub fn collect_all_warnings(&self) -> Result<Vec<(String, Vec<crate::type_hierarchy::ValidationWarning>)>> {
+        let issues = self.storage.list_issues()?;
+        let mut all_warnings = Vec::new();
+
+        for issue in issues {
+            let warnings = self.check_warnings(&issue.id)?;
+            if !warnings.is_empty() {
+                all_warnings.push((issue.id.clone(), warnings));
+            }
+        }
+
+        Ok(all_warnings)
+    }
 }
