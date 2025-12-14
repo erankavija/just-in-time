@@ -549,11 +549,96 @@
       - docs/label-quick-reference.md: Quick guide for agents
       - docs/label-enforcement-proposal.md: Programmatic validation proposal (~3-4h)
       - Updated label-conventions.md with clear distinction
-  - **Next priorities:**
-    - Option A: Implement label enforcement (3-4 hours) - Programmatic validation
-    - Option B: Document graph visualization (12-16 hours)
-    - Option C: Plugin architecture for custom gates
-    - Option D: Performance benchmarks and optimization
+  - **Type hierarchy enforcement:** 🚧 **IN PROGRESS** - **2025-12-14**
+    - [x] **Phase A: Core Module (2 hours)** - Pure validation library ✅
+      - [x] Create `crates/jit/src/type_hierarchy.rs` module (370 lines)
+      - [x] `HierarchyConfig` struct with configurable levels (default 4-level)
+      - [x] Error types with `thiserror` (HierarchyError, ConfigError)
+      - [x] Pure validation functions (extract_type, validate_hierarchy)
+      - [x] Type normalization (lowercase, trim whitespace)
+      - [x] 12 unit tests (config validation, extraction, hierarchy logic)
+      - [x] 6 property-based tests (transitivity, no cycles, monotonic levels, normalization)
+      - [x] Zero clippy warnings, all functions documented
+      - **Key design**: Orthogonal to DAG (validates organizational membership, not logical dependencies)
+    - [x] **Phase B: CLI Integration (1.5 hours)** - Command integration ✅
+      - [x] `add_dependency`: Enforce hierarchy constraints BEFORE cycle detection
+      - [x] Graceful degradation: Skip validation if either issue lacks type label
+      - [x] Clear error messages: "Type hierarchy violation: Type 'epic' depends on lower-level type 'task' (level 2 -> 4)"
+      - [x] 5 integration tests (same-level, lower-to-higher, higher-to-lower, no-type, mixed)
+      - [x] CLI verification with bash script (epic→task rejected, task→epic allowed)
+      - [x] 220 total tests passing (215 baseline + 5 new)
+    - [x] **Phase C.0: Code Modularization (2-3 hours)** - Technical debt reduction ✅
+      - [x] Split commands.rs (4,278 lines) into logical modules:
+        - [x] `commands/issue.rs` (355 lines) - Issue CRUD operations
+        - [x] `commands/dependency.rs` (89 lines) - Dependency graph operations
+        - [x] `commands/gate.rs` (130 lines) - Gate operations
+        - [x] `commands/graph.rs` (62 lines) - Graph visualization
+        - [x] `commands/query.rs` (185 lines) - Query operations
+        - [x] `commands/validate.rs` (222 lines) - Validation logic
+        - [x] `commands/labels.rs` (79 lines) - Label operations
+        - [x] `commands/breakdown.rs` (48 lines) - Issue breakdown operations
+        - [x] `commands/document.rs` (524 lines) - Document operations
+        - [x] `commands/events.rs` (42 lines) - Event log operations
+        - [x] `commands/search.rs` (59 lines) - Search operations
+        - [x] `commands/mod.rs` (123 lines) - CommandExecutor struct and re-exports
+      - [x] Clean module structure with proper visibility (pub(super) for helpers)
+      - [x] Zero regressions - all 496 tests pass
+      - [x] Zero clippy errors
+      - [x] Total: 1,918 lines across 12 files (55% reduction from original)
+      - **Rationale:** Prevent commands.rs from becoming unmaintainable, improve discoverability
+      - **Implementation:** No hacks or shortcuts - clean Rust idioms throughout
+    - [x] **Phase C.1: Config File Consolidation (1 hour)** - Single source of truth ✅
+      - [x] Renamed `.jit/label-namespaces.json` → `.jit/labels.json`
+      - [x] Extended LabelNamespaces struct to include `type_hierarchy: Option<HashMap<String, u8>>`
+      - [x] Schema version bumped to 2, type_hierarchy includes default 4-level hierarchy
+      - [x] Storage layer updated to use `labels.json` filename
+      - [x] Added `get_type_hierarchy()` helper with fallback to defaults
+      - [x] All 496 tests passing, zero clippy errors
+      - [x] CLI verified: `jit label namespaces --json` includes type_hierarchy
+      - **Rationale:** Single source of truth, prevent config drift, clearer naming
+      - **Implementation:** No backward compatibility - clean break (no users yet)
+    - [x] **Phase C.2: Hierarchy Config Commands (1 hour)** - Discoverability ✅
+      - [x] `jit config show-hierarchy`: Display current type hierarchy with levels
+      - [x] `jit config list-templates`: Show available hierarchy templates  
+      - [x] `jit init --hierarchy-template <name>`: Initialize with template
+      - [x] Templates: default (4-level), extended (5-level), agile (4-level), minimal (2-level)
+      - [x] Template storage: Built-in code in hierarchy_templates module
+      - [x] Config loading: get_type_hierarchy() helper with fallback to defaults
+      - [x] 5 tests for templates (all, get, extended, minimal, nonexistent)
+      - [x] All 506 tests passing, zero clippy errors
+      - **Implementation:** Clean module-based design, no file I/O for templates
+    - [x] **Phase D: Auto-Fix (1-2 hours)** - Automated repair ✅ **2025-12-14**
+      - [x] `validate --fix`: Repair unknown types (Levenshtein distance)
+      - [x] `validate --fix`: Reverse invalid dependencies
+      - [x] Atomic batch operations
+      - [x] Dry-run mode: `--fix --dry-run` shows changes without applying
+      - [x] 8 integration tests for auto-fix scenarios
+      - [x] JSON output support (--fix --json)
+      - [x] Quiet mode for JSON output
+      - [x] 489 total tests passing, **zero clippy warnings**
+      - [x] All clippy warnings documented in `docs/clippy-suppressions.md`
+      - **Note:** Deferred `--fix-warnings` for strategic labels to future iteration
+    - **Documentation**: 
+      - docs/type-hierarchy-enforcement-proposal.md: Full design (~920 lines)
+      - docs/type-hierarchy-implementation-summary.md: Implementation guide (~330 lines)
+    - **Estimated total effort**: 9-12 hours total (5h spent, Phase D complete!)
+  - **Code Quality Improvements** - Identified 2025-12-14
+    - [ ] **Argument ordering consistency** (low priority)
+      - [ ] Consider standardizing create_issue arg order: (title, desc, labels, priority, gates)
+      - [ ] Document convention for future APIs
+      - [ ] Note: Breaking change, defer until major version bump
+    - [ ] **Error type improvements** (medium priority)
+      - [ ] Consider custom error types for DAG operations (GraphError)
+      - [ ] Structured errors for programmatic handling (MCP, API)
+      - [ ] Keep anyhow for CLI, add thiserror for library errors
+      - [ ] Benefits: Better error recovery, typed error handling
+    - [ ] **Test organization** (low priority, future)
+      - [ ] If test suite grows >5000 lines, split into `tests/commands/` modules
+      - [ ] Keep integration tests in main test module for now
+  - **Next priorities after type hierarchy:**
+    - Option A: Document graph visualization (12-16 hours)
+    - Option B: Plugin architecture for custom gates
+    - Option C: Performance benchmarks and optimization
 - **CI/CD Infrastructure:** Complete and tested ✅
   - All workflows validated with YAML syntax checks
   - Tested locally with act and manual scripts

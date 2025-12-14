@@ -15,13 +15,15 @@ mod cli;
 mod commands;
 mod domain;
 mod graph;
+mod hierarchy_templates;
 mod labels;
 mod output;
 mod output_macros;
 mod storage;
+mod type_hierarchy;
 mod visualization;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use clap::Parser;
 use cli::{
     Cli, Commands, DepCommands, DocCommands, EventCommands, GateCommands, GraphCommands,
@@ -114,11 +116,24 @@ fn run() -> Result<()> {
     };
 
     let storage = JsonFileStorage::new(&jit_dir);
-    let executor = CommandExecutor::new(storage.clone());
+    let mut executor = CommandExecutor::new(storage.clone());
 
-    match command {
-        Commands::Init => {
+    match &command {
+        Commands::Init { hierarchy_template } => {
             executor.init()?;
+
+            // If a template is specified, update the labels config with the hierarchy
+            if let Some(template_name) = hierarchy_template {
+                let template = hierarchy_templates::HierarchyTemplate::get(template_name)
+                    .ok_or_else(|| anyhow!("Unknown hierarchy template: {}", template_name))?;
+
+                let mut namespaces = executor.storage().load_label_namespaces()?;
+                namespaces.type_hierarchy = Some(template.hierarchy);
+                namespaces.schema_version = 2;
+                executor.storage().save_label_namespaces(&namespaces)?;
+
+                println!("Initialized with '{}' hierarchy template", template_name);
+            }
         }
         _ => {
             // Validate repository exists for all commands except init
@@ -127,7 +142,7 @@ fn run() -> Result<()> {
     }
 
     match command {
-        Commands::Init => {
+        Commands::Init { .. } => {
             // Already handled above
         }
         Commands::Issue(issue_cmd) => match issue_cmd {
@@ -1093,6 +1108,50 @@ fn run() -> Result<()> {
                 }
             }
         },
+        Commands::Config(config_cmd) => match config_cmd {
+            cli::ConfigCommands::ShowHierarchy { json } => {
+                let namespaces = executor.storage().load_label_namespaces()?;
+                let hierarchy = namespaces.get_type_hierarchy();
+
+                if json {
+                    use output::JsonOutput;
+                    println!("{}", JsonOutput::success(hierarchy).to_json_string()?);
+                } else {
+                    println!("Type Hierarchy:\n");
+                    let mut sorted: Vec<_> = hierarchy.iter().collect();
+                    sorted.sort_by_key(|(_, level)| *level);
+                    for (type_name, level) in sorted {
+                        println!("  {} → Level {}", type_name, level);
+                    }
+                }
+            }
+            cli::ConfigCommands::ListTemplates { json } => {
+                let templates = hierarchy_templates::HierarchyTemplate::all();
+
+                if json {
+                    use output::JsonOutput;
+                    use serde_json::json;
+                    let template_data: Vec<_> = templates
+                        .iter()
+                        .map(|t| {
+                            json!({
+                                "name": t.name,
+                                "description": t.description,
+                                "hierarchy": t.hierarchy
+                            })
+                        })
+                        .collect();
+                    println!("{}", JsonOutput::success(template_data).to_json_string()?);
+                } else {
+                    println!("Available Hierarchy Templates:\n");
+                    for template in templates {
+                        println!("  {}", template.name);
+                        println!("    {}", template.description);
+                        println!();
+                    }
+                }
+            }
+        },
         Commands::Search {
             query,
             regex,
@@ -1198,8 +1257,35 @@ fn run() -> Result<()> {
                 executor.status()?;
             }
         }
-        Commands::Validate { json } => {
-            if json {
+        Commands::Validate { json, fix, dry_run } => {
+            // Validate dry_run requires fix
+            if dry_run && !fix {
+                return Err(anyhow!("--dry-run requires --fix to be specified"));
+            }
+
+            if fix {
+                // Use auto-fix mode (pass quiet=true if json mode)
+                let fixes_applied = executor.validate_with_fix(true, dry_run, json)?;
+
+                if json {
+                    use output::JsonOutput;
+                    use serde_json::json;
+
+                    let output = JsonOutput::success(json!({
+                        "valid": true,
+                        "fixes_applied": fixes_applied,
+                        "dry_run": dry_run,
+                        "message": if dry_run {
+                            format!("{} fixes would be applied", fixes_applied)
+                        } else if fixes_applied > 0 {
+                            format!("Applied {} fixes, repository is now valid", fixes_applied)
+                        } else {
+                            "Repository is valid".to_string()
+                        }
+                    }));
+                    println!("{}", output.to_json_string()?);
+                }
+            } else if json {
                 use output::JsonOutput;
                 use serde_json::json;
 

@@ -35,7 +35,11 @@ pub struct Cli {
 #[derive(Subcommand)]
 pub enum Commands {
     /// Initialize the issue tracker in the current directory
-    Init,
+    Init {
+        /// Hierarchy template to use (default, extended, agile, minimal)
+        #[arg(long)]
+        hierarchy_template: Option<String>,
+    },
 
     /// Issue management commands
     #[command(subcommand)]
@@ -72,6 +76,10 @@ pub enum Commands {
     /// Label namespace management commands
     #[command(subcommand)]
     Label(LabelCommands),
+
+    /// Configuration commands
+    #[command(subcommand)]
+    Config(ConfigCommands),
 
     /// Search issues and documents
     Search {
@@ -113,6 +121,14 @@ pub enum Commands {
     Validate {
         #[arg(long)]
         json: bool,
+
+        /// Attempt to automatically fix validation issues
+        #[arg(long)]
+        fix: bool,
+
+        /// Show what would be fixed without applying changes (requires --fix)
+        #[arg(long)]
+        dry_run: bool,
     },
 }
 
@@ -640,6 +656,21 @@ pub enum LabelCommands {
         #[arg(long)]
         strategic: bool,
 
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum ConfigCommands {
+    /// Show current type hierarchy
+    ShowHierarchy {
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// List available hierarchy templates
+    ListTemplates {
         #[arg(long)]
         json: bool,
     },

@@ -795,6 +795,9 @@ pub struct LabelNamespaces {
     pub schema_version: u32,
     /// Map of namespace name to configuration
     pub namespaces: HashMap<String, LabelNamespace>,
+    /// Type hierarchy configuration (optional, defaults to standard hierarchy)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub type_hierarchy: Option<HashMap<String, u8>>,
 }
 
 impl LabelNamespaces {
@@ -803,10 +806,11 @@ impl LabelNamespaces {
         Self {
             schema_version: 1,
             namespaces: HashMap::new(),
+            type_hierarchy: None,
         }
     }
 
-    /// Create registry with standard namespaces
+    /// Create registry with standard namespaces and default type hierarchy
     pub fn with_defaults() -> Self {
         let mut namespaces = HashMap::new();
 
@@ -835,9 +839,32 @@ impl LabelNamespaces {
             LabelNamespace::new("Owning team", true, false),
         );
 
+        // Default type hierarchy
+        let mut type_hierarchy = HashMap::new();
+        type_hierarchy.insert("milestone".to_string(), 1);
+        type_hierarchy.insert("epic".to_string(), 2);
+        type_hierarchy.insert("story".to_string(), 3);
+        type_hierarchy.insert("task".to_string(), 4);
+
         Self {
-            schema_version: 1,
+            schema_version: 2,
             namespaces,
+            type_hierarchy: Some(type_hierarchy),
+        }
+    }
+
+    /// Get the type hierarchy, or default if not specified
+    pub fn get_type_hierarchy(&self) -> HashMap<String, u8> {
+        if let Some(ref hierarchy) = self.type_hierarchy {
+            hierarchy.clone()
+        } else {
+            // Fallback to default hierarchy
+            let mut hierarchy = HashMap::new();
+            hierarchy.insert("milestone".to_string(), 1);
+            hierarchy.insert("epic".to_string(), 2);
+            hierarchy.insert("story".to_string(), 3);
+            hierarchy.insert("task".to_string(), 4);
+            hierarchy
         }
     }
 

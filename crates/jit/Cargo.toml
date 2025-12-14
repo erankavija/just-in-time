@@ -31,3 +31,4 @@ regex = "1.12.2"
 tempfile = { workspace = true }
 assert_cmd = { workspace = true }
 predicates = { workspace = true }
+proptest = { workspace = true }
