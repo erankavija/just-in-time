@@ -1,9 +1,24 @@
 # Type Hierarchy Enforcement - Implementation Summary
 
 **Date**: 2025-12-14  
-**Status**: ✅ Phase A & B Complete (Core Module + CLI Integration)  
-**Test Coverage**: 23 tests (18 core + 5 integration)  
-**Estimated Effort**: 5-7 hours total → **3.5 hours spent** (Phases A & B)
+**Status**: ✅ Core Complete - Dependency Validation Removed (Bug Fix)
+**Test Coverage**: 150 library tests + 7 integration tests  
+**Final Scope**: Type label validation only (dependencies unrestricted)
+
+---
+
+## ⚠️ Major Correction (2025-12-14 Evening)
+
+**A fundamental bug was discovered and fixed:** Phase D mistakenly implemented dependency validation based on type hierarchy. This was wrong.
+
+**The Fix:** Removed all dependency validation. Type hierarchy now ONLY validates type labels.
+
+**Current Scope:**
+- ✅ Validate type labels exist and are known
+- ✅ Suggest fixes for typos (type:taks → type:task)
+- ❌ Do NOT validate dependencies (unrestricted by type)
+
+**See `docs/session-notes-hierarchy-bug-fix.md` for details.**
 
 ---
 
@@ -15,12 +30,16 @@ Created `crates/jit/src/type_hierarchy.rs` with functional, pure validation libr
 
 **Core Types:**
 - `HierarchyConfig` - Configurable type hierarchy with default 4-level structure
-- `HierarchyError` - Type hierarchy violations (InvalidHierarchy, UnknownType, InvalidLabel)
+- `HierarchyError` - Type label validation errors (UnknownType, InvalidLabel)
 - `ConfigError` - Configuration validation errors
+- `ValidationIssue` - Unknown type labels found
+- `ValidationFix` - Suggested fixes for unknown types
 
 **Key Functions:**
 - `extract_type(label)` - Extracts and normalizes type from "type:value" labels
-- `validate_hierarchy(config, from_label, to_label)` - Validates dependencies respect hierarchy
+- `detect_validation_issues()` - Finds unknown type labels
+- `generate_fixes()` - Suggests fixes for unknown types
+- `suggest_type_fix()` - Levenshtein distance matching for typos
 
 **Default Hierarchy:**
 1. milestone (strategic, highest)
@@ -29,14 +48,10 @@ Created `crates/jit/src/type_hierarchy.rs` with functional, pure validation libr
 4. task (tactical, lowest)
 
 **Test Coverage:**
-- 12 unit tests covering all core functionality
-- 6 property-based tests (proptest) verifying invariants:
-  - Transitivity: If A→B and B→C valid, then A→C valid
-  - No cycles: If A→B valid (different levels), then B→A invalid
-  - Same level: Always bidirectional
-  - Monotonic ordering: Level relationships preserved
-  - Normalization: Type extraction stable and idempotent
-  - Invalid labels: Non-"type:" labels always rejected
+- Unit tests for type extraction, config validation, typo suggestion
+- Property tests for normalization and label format validation
+- NO tests for dependency validation (removed - wrong concept)
+
 
 ### Phase B: CLI Integration (1.5 hours actual)
 

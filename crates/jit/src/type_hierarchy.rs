@@ -1,26 +1,46 @@
 //! Type hierarchy validation for issue labels.
 //!
-//! This module provides validation for issue type hierarchies, ensuring that
-//! dependencies flow from lower-level types (e.g., "task") to higher-level types
-//! (e.g., "epic" or "milestone"). This is orthogonal to DAG validation:
-//! - DAG validation prevents logical dependency cycles
-//! - Hierarchy validation enforces organizational structure
+//! # CRITICAL: Type Hierarchy is Orthogonal to the Dependency DAG
+//!
+//! This module validates **type labels only**. It does NOT validate dependencies.
+//!
+//! ## Two Separate Concepts:
+//!
+//! 1. **Dependency DAG** (work sequencing - unrestricted):
+//!    - Expresses "what must complete before what"
+//!    - ✅ task → epic (task needs epic defined)
+//!    - ✅ epic → task (epic needs specific task done)
+//!    - ✅ milestone → task (milestone needs task completed)
+//!    - **NO RESTRICTIONS** - any issue can depend on any other for work flow
+//!
+//! 2. **Type Hierarchy** (organizational labels - future validation):
+//!    - Expresses "what belongs to what" via labels (`epic:auth`, `milestone:v1.0`)
+//!    - ✅ task with `epic:auth` = task belongs to auth epic (future validation)
+//!    - ❌ epic with `task:xyz` = nonsensical (future validation)
+//!    - **NOT YET IMPLEMENTED** - currently only validates type labels are known
+//!
+//! ## Current Scope
+//!
+//! This module currently ONLY validates:
+//! - Type labels exist and are known (`type:task` is valid, `type:taks` is typo)
+//! - Suggests fixes for unknown/typo type labels
+//!
+//! It does NOT:
+//! - Validate dependencies (dependencies are unrestricted by type)
+//! - Check organizational membership (future: via `epic:*`, `milestone:*` labels)
 //!
 //! # Examples
 //!
 //! ```
-//! use jit::type_hierarchy::{HierarchyConfig, validate_hierarchy};
+//! use jit::type_hierarchy::{HierarchyConfig, extract_type};
 //!
 //! let config = HierarchyConfig::default();
 //!
-//! // Valid: task depends on task (same level)
-//! assert!(validate_hierarchy(&config, "type:task", "type:task").is_ok());
-//!
-//! // Valid: task depends on story (higher level)
-//! assert!(validate_hierarchy(&config, "type:task", "type:story").is_ok());
-//!
-//! // Invalid: epic depends on task (lower level)
-//! assert!(validate_hierarchy(&config, "type:epic", "type:task").is_err());
+//! // Extract and validate type labels
+//! assert_eq!(extract_type("type:task"), Ok("task".to_string()));
+//! assert_eq!(extract_type("type:epic"), Ok("epic".to_string()));
+//! assert!(config.contains_type("task"));
+//! assert!(!config.contains_type("unknown"));
 //! ```
 
 use std::collections::HashMap;
@@ -29,9 +49,6 @@ use thiserror::Error;
 /// Errors that can occur during hierarchy validation.
 #[derive(Debug, Error, PartialEq)]
 pub enum HierarchyError {
-    #[error("Type '{0}' depends on lower-level type '{1}' (level {2} -> {3})")]
-    InvalidHierarchy(String, String, u8, u8),
-
     #[error("Unknown type: '{0}'")]
     UnknownType(String),
 
@@ -48,15 +65,6 @@ pub enum ValidationIssue {
         unknown_type: String,
         suggested_fix: Option<String>,
     },
-    /// A dependency violates the type hierarchy
-    InvalidHierarchyDep {
-        from_issue_id: String,
-        from_type: String,
-        to_issue_id: String,
-        to_type: String,
-        from_level: u8,
-        to_level: u8,
-    },
 }
 
 /// Represents a fix to apply to resolve a validation issue.
@@ -67,11 +75,6 @@ pub enum ValidationFix {
         issue_id: String,
         old_type: String,
         new_type: String,
-    },
-    /// Reverse a dependency that violates the hierarchy
-    ReverseDependency {
-        from_issue_id: String,
-        to_issue_id: String,
     },
 }
 
@@ -181,67 +184,6 @@ pub fn extract_type(label: &str) -> Result<String, HierarchyError> {
     Ok(type_name)
 }
 
-/// Validates that a dependency respects the type hierarchy.
-///
-/// # Arguments
-///
-/// * `config` - The hierarchy configuration
-/// * `from_label` - The label of the depending issue (format: "type:value")
-/// * `to_label` - The label of the dependency (format: "type:value")
-///
-/// # Returns
-///
-/// - `Ok(())` if the dependency is valid (same level or higher)
-/// - `Err(HierarchyError)` if the dependency violates the hierarchy
-///
-/// # Examples
-///
-/// ```
-/// use jit::type_hierarchy::{HierarchyConfig, validate_hierarchy};
-///
-/// let config = HierarchyConfig::default();
-///
-/// // Valid: same level
-/// assert!(validate_hierarchy(&config, "type:task", "type:task").is_ok());
-///
-/// // Valid: lower depends on higher
-/// assert!(validate_hierarchy(&config, "type:task", "type:epic").is_ok());
-///
-/// // Invalid: higher depends on lower
-/// assert!(validate_hierarchy(&config, "type:epic", "type:task").is_err());
-/// ```
-pub fn validate_hierarchy(
-    config: &HierarchyConfig,
-    from_label: &str,
-    to_label: &str,
-) -> Result<(), HierarchyError> {
-    let from_type = extract_type(from_label)?;
-    let to_type = extract_type(to_label)?;
-
-    let from_level = config
-        .get_level(&from_type)
-        .ok_or_else(|| HierarchyError::UnknownType(from_type.clone()))?;
-
-    let to_level = config
-        .get_level(&to_type)
-        .ok_or_else(|| HierarchyError::UnknownType(to_type.clone()))?;
-
-    // Lower levels (higher numbers) can depend on same or higher levels (lower numbers)
-    // e.g., task (4) can depend on story (3), epic (2), milestone (1)
-    if from_level > to_level {
-        // This is valid: lower level depending on higher level
-        Ok(())
-    } else if from_level == to_level {
-        // Same level is also valid
-        Ok(())
-    } else {
-        // from_level < to_level: higher level depending on lower level - invalid!
-        Err(HierarchyError::InvalidHierarchy(
-            from_type, to_type, from_level, to_level,
-        ))
-    }
-}
-
 /// Calculates the Levenshtein distance between two strings.
 ///
 /// Used for finding the closest matching type when an unknown type is encountered.
@@ -322,18 +264,19 @@ pub fn suggest_type_fix(config: &HierarchyConfig, unknown_type: &str) -> Option<
     best_match.map(|(name, _)| name)
 }
 
-/// Detects all hierarchy validation issues for a given issue and its dependencies.
+/// Detects all hierarchy validation issues for a given issue.
 ///
 /// This function checks:
 /// 1. Whether the issue has a valid type label
-/// 2. Whether any dependencies violate the type hierarchy
+///
+/// Note: Type hierarchy is orthogonal to the dependency DAG. Dependencies can flow in any
+/// direction regardless of type. The hierarchy only validates type labels are known/valid.
 ///
 /// # Arguments
 ///
 /// * `config` - The hierarchy configuration
 /// * `issue_id` - The ID of the issue to validate
 /// * `labels` - The labels of the issue
-/// * `dependencies` - Map of dependency ID to dependency labels
 ///
 /// # Returns
 ///
@@ -342,7 +285,6 @@ pub fn detect_validation_issues(
     config: &HierarchyConfig,
     issue_id: &str,
     labels: &[String],
-    dependencies: &[(String, Vec<String>)],
 ) -> Vec<ValidationIssue> {
     let mut issues = Vec::new();
 
@@ -360,32 +302,10 @@ pub fn detect_validation_issues(
                         unknown_type: type_name.clone(),
                         suggested_fix,
                     });
-                } else {
-                    // Check hierarchy for each dependency
-                    let from_level = config.get_level(&type_name).unwrap();
-
-                    for (dep_id, dep_labels) in dependencies {
-                        if let Some(dep_type_label) =
-                            dep_labels.iter().find(|l| l.starts_with("type:"))
-                        {
-                            if let Ok(dep_type) = extract_type(dep_type_label) {
-                                if let Some(to_level) = config.get_level(&dep_type) {
-                                    // Check if this violates hierarchy (from_level < to_level)
-                                    if from_level < to_level {
-                                        issues.push(ValidationIssue::InvalidHierarchyDep {
-                                            from_issue_id: issue_id.to_string(),
-                                            from_type: type_name.clone(),
-                                            to_issue_id: dep_id.clone(),
-                                            to_type: dep_type,
-                                            from_level,
-                                            to_level,
-                                        });
-                                    }
-                                }
-                            }
-                        }
-                    }
                 }
+                // Note: We do NOT check dependencies here. Type hierarchy is orthogonal to DAG.
+                // A task can depend on an epic, milestone can depend on task, etc.
+                // The hierarchy only describes organizational grouping, not work flow.
             }
             Err(_) => {
                 // Invalid type label format - skip for now
@@ -399,13 +319,15 @@ pub fn detect_validation_issues(
 
 /// Generates fixes for validation issues.
 ///
+/// Currently only generates fixes for unknown type labels with suggested replacements.
+///
 /// # Arguments
 ///
 /// * `issues` - The validation issues to fix
 ///
 /// # Returns
 ///
-/// A vector of fixes to apply
+/// A vector of fixes to apply (empty if no fixable issues)
 pub fn generate_fixes(issues: &[ValidationIssue]) -> Vec<ValidationFix> {
     issues
         .iter()
@@ -420,14 +342,6 @@ pub fn generate_fixes(issues: &[ValidationIssue]) -> Vec<ValidationFix> {
                 new_type: suggested.clone(),
             }),
             ValidationIssue::UnknownType { .. } => None, // No suggestion available
-            ValidationIssue::InvalidHierarchyDep {
-                from_issue_id,
-                to_issue_id,
-                ..
-            } => Some(ValidationFix::ReverseDependency {
-                from_issue_id: from_issue_id.clone(),
-                to_issue_id: to_issue_id.clone(),
-            }),
         })
         .collect()
 }
@@ -491,91 +405,6 @@ mod tests {
         ));
     }
 
-    #[test]
-    fn test_validate_same_level() {
-        let config = HierarchyConfig::default();
-
-        assert!(validate_hierarchy(&config, "type:task", "type:task").is_ok());
-        assert!(validate_hierarchy(&config, "type:story", "type:story").is_ok());
-        assert!(validate_hierarchy(&config, "type:epic", "type:epic").is_ok());
-        assert!(validate_hierarchy(&config, "type:milestone", "type:milestone").is_ok());
-    }
-
-    #[test]
-    fn test_validate_lower_depends_on_higher() {
-        let config = HierarchyConfig::default();
-
-        // Task (4) depends on story (3)
-        assert!(validate_hierarchy(&config, "type:task", "type:story").is_ok());
-
-        // Task (4) depends on epic (2)
-        assert!(validate_hierarchy(&config, "type:task", "type:epic").is_ok());
-
-        // Task (4) depends on milestone (1)
-        assert!(validate_hierarchy(&config, "type:task", "type:milestone").is_ok());
-
-        // Story (3) depends on epic (2)
-        assert!(validate_hierarchy(&config, "type:story", "type:epic").is_ok());
-
-        // Story (3) depends on milestone (1)
-        assert!(validate_hierarchy(&config, "type:story", "type:milestone").is_ok());
-
-        // Epic (2) depends on milestone (1)
-        assert!(validate_hierarchy(&config, "type:epic", "type:milestone").is_ok());
-    }
-
-    #[test]
-    fn test_validate_higher_depends_on_lower_fails() {
-        let config = HierarchyConfig::default();
-
-        // Epic (2) depends on task (4) - INVALID
-        let result = validate_hierarchy(&config, "type:epic", "type:task");
-        assert!(matches!(
-            result,
-            Err(HierarchyError::InvalidHierarchy(_, _, 2, 4))
-        ));
-
-        // Milestone (1) depends on task (4) - INVALID
-        let result = validate_hierarchy(&config, "type:milestone", "type:task");
-        assert!(matches!(
-            result,
-            Err(HierarchyError::InvalidHierarchy(_, _, 1, 4))
-        ));
-
-        // Epic (2) depends on story (3) - INVALID
-        let result = validate_hierarchy(&config, "type:epic", "type:story");
-        assert!(matches!(
-            result,
-            Err(HierarchyError::InvalidHierarchy(_, _, 2, 3))
-        ));
-    }
-
-    #[test]
-    fn test_validate_unknown_type() {
-        let config = HierarchyConfig::default();
-
-        let result = validate_hierarchy(&config, "type:unknown", "type:task");
-        assert!(matches!(result, Err(HierarchyError::UnknownType(_))));
-
-        let result = validate_hierarchy(&config, "type:task", "type:unknown");
-        assert!(matches!(result, Err(HierarchyError::UnknownType(_))));
-    }
-
-    #[test]
-    fn test_custom_config() {
-        let mut types = HashMap::new();
-        types.insert("level1".to_string(), 1);
-        types.insert("level2".to_string(), 2);
-        types.insert("level3".to_string(), 3);
-
-        let config = HierarchyConfig::new(types).unwrap();
-
-        // Valid: level3 depends on level1
-        assert!(validate_hierarchy(&config, "type:level3", "type:level1").is_ok());
-
-        // Invalid: level1 depends on level3
-        assert!(validate_hierarchy(&config, "type:level1", "type:level3").is_err());
-    }
 
     #[test]
     fn test_config_contains_type() {
@@ -658,9 +487,8 @@ mod tests {
 
         let config = HierarchyConfig::default();
         let labels = vec!["type:taks".to_string()]; // typo
-        let deps = vec![];
 
-        let issues = detect_validation_issues(&config, "01ABC", &labels, &deps);
+        let issues = detect_validation_issues(&config, "01ABC", &labels);
 
         assert_eq!(issues.len(), 1);
         match &issues[0] {
@@ -678,47 +506,18 @@ mod tests {
     }
 
     #[test]
-    fn test_detect_invalid_hierarchy_dep() {
-        use super::{detect_validation_issues, ValidationIssue};
-
-        let config = HierarchyConfig::default();
-        let labels = vec!["type:epic".to_string()];
-        let deps = vec![("02DEF".to_string(), vec!["type:task".to_string()])];
-
-        let issues = detect_validation_issues(&config, "01ABC", &labels, &deps);
-
-        assert_eq!(issues.len(), 1);
-        match &issues[0] {
-            ValidationIssue::InvalidHierarchyDep {
-                from_issue_id,
-                from_type,
-                to_issue_id,
-                to_type,
-                from_level,
-                to_level,
-            } => {
-                assert_eq!(from_issue_id, "01ABC");
-                assert_eq!(from_type, "epic");
-                assert_eq!(to_issue_id, "02DEF");
-                assert_eq!(to_type, "task");
-                assert_eq!(*from_level, 2);
-                assert_eq!(*to_level, 4);
-            }
-            _ => panic!("Expected InvalidHierarchyDep issue"),
-        }
-    }
-
-    #[test]
-    fn test_detect_no_issues_for_valid_hierarchy() {
+    fn test_detect_no_issues_for_valid_type() {
         use super::detect_validation_issues;
 
         let config = HierarchyConfig::default();
         let labels = vec!["type:task".to_string()];
-        let deps = vec![("02DEF".to_string(), vec!["type:epic".to_string()])];
 
-        let issues = detect_validation_issues(&config, "01ABC", &labels, &deps);
+        let issues = detect_validation_issues(&config, "01ABC", &labels);
         assert!(issues.is_empty());
     }
+
+    // Note: Removed test_detect_invalid_hierarchy_dep - dependencies are not restricted by type
+    // Type hierarchy is orthogonal to DAG. Any issue can depend on any other issue.
 
     #[test]
     fn test_generate_fixes_for_unknown_type() {
@@ -743,30 +542,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_generate_fixes_for_invalid_hierarchy() {
-        use super::{generate_fixes, ValidationFix, ValidationIssue};
-
-        let issues = vec![ValidationIssue::InvalidHierarchyDep {
-            from_issue_id: "01ABC".to_string(),
-            from_type: "epic".to_string(),
-            to_issue_id: "02DEF".to_string(),
-            to_type: "task".to_string(),
-            from_level: 2,
-            to_level: 4,
-        }];
-
-        let fixes = generate_fixes(&issues);
-
-        assert_eq!(fixes.len(), 1);
-        assert_eq!(
-            fixes[0],
-            ValidationFix::ReverseDependency {
-                from_issue_id: "01ABC".to_string(),
-                to_issue_id: "02DEF".to_string(),
-            }
-        );
-    }
+    // Note: Removed test_generate_fixes_for_invalid_hierarchy
+    // We no longer generate fixes for dependencies - type hierarchy is orthogonal to DAG
 
     #[test]
     fn test_generate_fixes_no_suggestion() {
@@ -794,77 +571,6 @@ mod proptests {
     }
 
     proptest! {
-        /// Property: Validation is transitive
-        /// If A can depend on B and B can depend on C, then A can depend on C
-        #[test]
-        fn prop_transitivity(level_a in 1u8..10, level_b in 1u8..10, level_c in 1u8..10) {
-            let mut types = HashMap::new();
-            types.insert("a".to_string(), level_a);
-            types.insert("b".to_string(), level_b);
-            types.insert("c".to_string(), level_c);
-
-            let config = HierarchyConfig::new(types).unwrap();
-
-            let a_to_b = validate_hierarchy(&config, "type:a", "type:b");
-            let b_to_c = validate_hierarchy(&config, "type:b", "type:c");
-
-            // If both A->B and B->C are valid, then A->C must be valid
-            if a_to_b.is_ok() && b_to_c.is_ok() {
-                let a_to_c = validate_hierarchy(&config, "type:a", "type:c");
-                prop_assert!(a_to_c.is_ok());
-            }
-        }
-
-        /// Property: No cycles possible with strict hierarchy
-        /// If A depends on B, then B cannot depend on A (unless same level)
-        #[test]
-        fn prop_no_cycles_different_levels(level_a in 1u8..10, level_b in 1u8..10) {
-            prop_assume!(level_a != level_b); // Only test different levels
-
-            let mut types = HashMap::new();
-            types.insert("a".to_string(), level_a);
-            types.insert("b".to_string(), level_b);
-
-            let config = HierarchyConfig::new(types).unwrap();
-
-            let a_to_b = validate_hierarchy(&config, "type:a", "type:b");
-            let b_to_a = validate_hierarchy(&config, "type:b", "type:a");
-
-            // Exactly one direction should be valid (or neither if same level)
-            prop_assert!(a_to_b.is_ok() != b_to_a.is_ok());
-        }
-
-        /// Property: Same level always valid
-        #[test]
-        fn prop_same_level_always_valid(level in 1u8..10) {
-            let mut types = HashMap::new();
-            types.insert("a".to_string(), level);
-            types.insert("b".to_string(), level);
-
-            let config = HierarchyConfig::new(types).unwrap();
-
-            prop_assert!(validate_hierarchy(&config, "type:a", "type:b").is_ok());
-            prop_assert!(validate_hierarchy(&config, "type:b", "type:a").is_ok());
-        }
-
-        /// Property: Level ordering is monotonic
-        /// If A can depend on B, and B has higher level than C, then A can depend on C
-        #[test]
-        fn prop_monotonic_ordering(level_a in 1u8..10, level_b in 1u8..10, level_c in 1u8..10) {
-            prop_assume!(level_a >= level_b && level_b >= level_c); // A lower or same, B in middle, C highest
-
-            let mut types = HashMap::new();
-            types.insert("a".to_string(), level_a);
-            types.insert("b".to_string(), level_b);
-            types.insert("c".to_string(), level_c);
-
-            let config = HierarchyConfig::new(types).unwrap();
-
-            // If A can depend on B, and B >= C in level, then A can depend on C
-            if validate_hierarchy(&config, "type:a", "type:b").is_ok() {
-                prop_assert!(validate_hierarchy(&config, "type:a", "type:c").is_ok());
-            }
-        }
 
         /// Property: Extract type is stable and normalized
         #[test]

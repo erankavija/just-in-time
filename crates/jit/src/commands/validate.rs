@@ -70,20 +70,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let mut all_validation_issues = Vec::new();
 
         for issue in &issues {
-            // Build dependency map for this issue
-            let deps: Vec<(String, Vec<String>)> = issue
-                .dependencies
-                .iter()
-                .filter_map(|dep_id| {
-                    self.storage
-                        .load_issue(dep_id)
-                        .ok()
-                        .map(|dep| (dep.id.clone(), dep.labels.clone()))
-                })
-                .collect();
-
-            let validation_issues =
-                detect_validation_issues(&config, &issue.id, &issue.labels, &deps);
+            let validation_issues = detect_validation_issues(&config, &issue.id, &issue.labels);
             all_validation_issues.extend(validation_issues);
         }
 
@@ -109,18 +96,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                             ..
                         } => {
                             println!("  • Issue {} has unknown type '{}'", issue_id, unknown_type);
-                        }
-                        ValidationIssue::InvalidHierarchyDep {
-                            from_issue_id,
-                            to_issue_id,
-                            from_type,
-                            to_type,
-                            ..
-                        } => {
-                            println!(
-                                "  • Issue {} (type:{}) depends on {} (type:{})",
-                                from_issue_id, from_type, to_issue_id, to_type
-                            );
                         }
                     }
                 }
@@ -156,28 +131,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                     }
                     fixes_applied += 1;
                 }
-                ValidationFix::ReverseDependency {
-                    from_issue_id,
-                    to_issue_id,
-                } => {
-                    if !quiet {
-                        if dry_run {
-                            println!(
-                                "Would reverse dependency: {} -> {} becomes {} -> {}",
-                                from_issue_id, to_issue_id, to_issue_id, from_issue_id
-                            );
-                        } else {
-                            self.apply_dependency_reversal(from_issue_id, to_issue_id)?;
-                            println!(
-                                "✓ Reversed dependency: {} now depends on {}",
-                                to_issue_id, from_issue_id
-                            );
-                        }
-                    } else if !dry_run {
-                        self.apply_dependency_reversal(from_issue_id, to_issue_id)?;
-                    }
-                    fixes_applied += 1;
-                }
             }
         }
 
@@ -198,36 +151,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(())
     }
 
-    fn apply_dependency_reversal(&mut self, from_id: &str, to_id: &str) -> Result<()> {
-        // Load both issues
-        let mut from_issue = self.storage.load_issue(from_id)?;
-        let mut to_issue = self.storage.load_issue(to_id)?;
-
-        // Remove from_id -> to_id dependency
-        from_issue.dependencies.retain(|dep| dep != to_id);
-
-        // Add to_id -> from_id dependency (if not already present)
-        if !to_issue.dependencies.contains(&from_id.to_string()) {
-            to_issue.dependencies.push(from_id.to_string());
-        }
-
-        // Save both issues atomically (order matters for locking)
-        let (first_id, _second_id) = if from_id < to_id {
-            (from_id, to_id)
-        } else {
-            (to_id, from_id)
-        };
-
-        if first_id == from_id {
-            self.storage.save_issue(&from_issue)?;
-            self.storage.save_issue(&to_issue)?;
-        } else {
-            self.storage.save_issue(&to_issue)?;
-            self.storage.save_issue(&from_issue)?;
-        }
-
-        Ok(())
-    }
+    // Note: apply_dependency_reversal is removed - we don't reverse dependencies
+    // Type hierarchy is orthogonal to DAG structure
 
     pub fn validate_silent(&self) -> Result<()> {
         let issues = self.storage.list_issues()?;
@@ -343,20 +268,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let config = get_hierarchy_config(&self.storage)?;
 
         for issue in issues {
-            // Build dependency map for this issue
-            let deps: Vec<(String, Vec<String>)> = issue
-                .dependencies
-                .iter()
-                .filter_map(|dep_id| {
-                    self.storage
-                        .load_issue(dep_id)
-                        .ok()
-                        .map(|dep| (dep.id.clone(), dep.labels.clone()))
-                })
-                .collect();
-
-            let validation_issues =
-                detect_validation_issues(&config, &issue.id, &issue.labels, &deps);
+            let validation_issues = detect_validation_issues(&config, &issue.id, &issue.labels);
 
             // Report first validation issue found
             if let Some(val_issue) = validation_issues.into_iter().next() {
@@ -374,25 +286,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                             issue_id,
                             unknown_type,
                             suggestion
-                        ));
-                    }
-                    ValidationIssue::InvalidHierarchyDep {
-                        from_issue_id,
-                        from_type,
-                        to_issue_id,
-                        to_type,
-                        from_level,
-                        to_level,
-                    } => {
-                        return Err(anyhow!(
-                            "Type hierarchy violation: Issue '{}' (type:{}, level {}) depends on '{}' (type:{}, level {}). \
-                             Higher-level types cannot depend on lower-level types.",
-                            from_issue_id,
-                            from_type,
-                            from_level,
-                            to_issue_id,
-                            to_type,
-                            to_level
                         ));
                     }
                 }

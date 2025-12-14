@@ -1,8 +1,53 @@
 # Issue Type Hierarchy Enforcement Proposal
 
 **Date**: 2025-12-14  
-**Status**: **APPROVED FOR IMPLEMENTATION** ✅  
+**Status**: **IMPLEMENTATION UPDATED - SEE CRITICAL NOTE** ⚠️  
 **Goal**: Flexible, configurable type enforcement with customizable hierarchy levels
+
+---
+
+## ⚠️ CRITICAL UPDATE (2025-12-14)
+
+**The original design in this document contained a fundamental misunderstanding** that was corrected during implementation.
+
+### What Changed
+
+**ORIGINAL (WRONG)**: The design suggested validating dependencies based on type hierarchy.
+
+**CORRECTED**: Type hierarchy is **ONLY** for validating type labels, NOT dependencies.
+
+### Current Implementation Scope
+
+✅ **What IS implemented:**
+- Validate type labels are known (`type:task` is valid, `type:taks` is typo)
+- Suggest fixes for unknown/typo type labels
+- Configuration system for type hierarchy
+
+❌ **What is NOT implemented:**
+- Dependency validation based on type (dependencies are unrestricted)
+- Label-based membership validation (future: `epic:auth` label references)
+
+### Why Dependencies Are NOT Validated
+
+**Dependencies express work sequencing, NOT organizational membership:**
+- ✅ task → epic: "task needs epic defined before work starts" (valid)
+- ✅ epic → task: "epic needs this specific task completed" (valid)  
+- ✅ milestone → task: "v1.0 needs this task done" (valid)
+- **Dependencies can flow in ANY direction** - they're about work flow, not structure
+
+**Organizational membership will be via labels (future):**
+- task with `epic:auth` label = "task belongs to auth epic"
+- This is separate from dependencies and not yet implemented
+
+**See `docs/session-notes-hierarchy-bug-fix.md` for full details of the confusion.**
+
+---
+
+## Document Status
+
+**This document retains the original design** for historical reference, but sections about dependency validation should be ignored.
+
+The authoritative source for current implementation is the code in `crates/jit/src/type_hierarchy.rs`.
 
 ---
 

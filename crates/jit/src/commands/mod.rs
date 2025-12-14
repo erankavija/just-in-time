@@ -33,7 +33,7 @@ use crate::domain::{Event, Gate, GateState, GateStatus, Issue, Priority, State};
 use crate::graph::DependencyGraph;
 use crate::labels as label_utils;
 use crate::storage::IssueStore;
-use crate::type_hierarchy::{self, HierarchyConfig};
+// Type hierarchy validation (currently only validates type labels)
 use anyhow::{anyhow, Result};
 use chrono::Utc;
 use serde::Serialize;
