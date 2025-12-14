@@ -234,11 +234,7 @@ fn test_mixed_valid_and_invalid_references() {
     let all_issues = executor.storage().list_issues().unwrap();
 
     let issues = detect_membership_issues(&config, &task, &all_issues);
-    assert_eq!(
-        issues.len(),
-        1,
-        "Should detect only the invalid reference"
-    );
+    assert_eq!(issues.len(), 1, "Should detect only the invalid reference");
 
     match &issues[0] {
         ValidationIssue::InvalidMembershipReference { label, .. } => {
@@ -251,16 +247,16 @@ fn test_mixed_valid_and_invalid_references() {
 #[test]
 fn test_custom_type_names_and_namespaces() {
     let (_temp, executor) = setup_test_repo();
-    
+
     // Create a custom config: "theme" type uses "theme" namespace
     let mut types = HashMap::new();
     types.insert("theme".to_string(), 1);
     types.insert("feature".to_string(), 2);
-    
+
     let mut label_associations = HashMap::new();
     label_associations.insert("theme".to_string(), "theme".to_string());
     label_associations.insert("feature".to_string(), "feature".to_string());
-    
+
     let config = HierarchyConfig::new(types, label_associations).unwrap();
 
     // Create a theme
@@ -286,17 +282,17 @@ fn test_custom_type_names_and_namespaces() {
 #[test]
 fn test_type_alias_same_namespace() {
     let (_temp, executor) = setup_test_repo();
-    
+
     // Create config where both "milestone" and "release" use "milestone" namespace
     let mut types = HashMap::new();
     types.insert("milestone".to_string(), 1);
     types.insert("release".to_string(), 1); // Same level
     types.insert("task".to_string(), 2);
-    
+
     let mut label_associations = HashMap::new();
     label_associations.insert("milestone".to_string(), "milestone".to_string());
     label_associations.insert("release".to_string(), "milestone".to_string()); // Alias!
-    
+
     let config = HierarchyConfig::new(types, label_associations).unwrap();
 
     // Create a release (uses milestone namespace)

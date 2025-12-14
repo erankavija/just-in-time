@@ -5,6 +5,24 @@ use crate::type_hierarchy::{
     detect_validation_issues, generate_fixes, ValidationFix, ValidationIssue,
 };
 
+/// Validation configuration flags loaded from config.toml.
+#[derive(Debug, Clone)]
+struct ValidationConfigFlags {
+    strictness: String,
+    warn_orphaned_leaves: bool,
+    warn_strategic_consistency: bool,
+}
+
+impl Default for ValidationConfigFlags {
+    fn default() -> Self {
+        Self {
+            strictness: "loose".to_string(),
+            warn_orphaned_leaves: true,
+            warn_strategic_consistency: true,
+        }
+    }
+}
+
 impl<S: IssueStore> CommandExecutor<S> {
     pub fn validate(&self) -> Result<()> {
         self.validate_silent()?;
@@ -103,7 +121,10 @@ impl<S: IssueStore> CommandExecutor<S> {
                             reason,
                             ..
                         } => {
-                            println!("  • Issue {} has invalid membership label '{}': {}", issue_id, label, reason);
+                            println!(
+                                "  • Issue {} has invalid membership label '{}': {}",
+                                issue_id, label, reason
+                            );
                         }
                     }
                 }
@@ -435,31 +456,80 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// # Returns
     ///
     /// A vector of validation warnings (empty if no warnings)
-    pub fn check_warnings(&self, issue_id: &str) -> Result<Vec<crate::type_hierarchy::ValidationWarning>> {
-        use crate::type_hierarchy::{validate_orphans, validate_strategic_labels, HierarchyConfig};
-        
+    pub fn check_warnings(
+        &self,
+        issue_id: &str,
+    ) -> Result<Vec<crate::type_hierarchy::ValidationWarning>> {
+        use crate::type_hierarchy::{validate_orphans, validate_strategic_labels};
+
         // Load the issue
         let issue = self.storage.load_issue(issue_id)?;
-        
-        // Load hierarchy config (use default for now)
-        let config = HierarchyConfig::default();
-        
+
+        // Load hierarchy config from file or use defaults
+        let config = self.load_hierarchy_config()?;
+
+        // Load validation config to check toggles
+        let validation_config = self.load_validation_config()?;
+
         // Collect all warnings
         let mut warnings = Vec::new();
-        
-        // Check strategic label consistency
-        warnings.extend(validate_strategic_labels(&config, &issue));
-        
-        // Check for orphaned leaves
-        warnings.extend(validate_orphans(&config, &issue));
-        
+
+        // Check strategic label consistency (if enabled)
+        if validation_config.warn_strategic_consistency {
+            warnings.extend(validate_strategic_labels(&config, &issue));
+        }
+
+        // Check for orphaned leaves (if enabled)
+        if validation_config.warn_orphaned_leaves {
+            warnings.extend(validate_orphans(&config, &issue));
+        }
+
         Ok(warnings)
+    }
+
+    /// Load hierarchy configuration from config.toml or fall back to defaults.
+    fn load_hierarchy_config(&self) -> Result<crate::type_hierarchy::HierarchyConfig> {
+        use crate::config::JitConfig;
+        use crate::type_hierarchy::HierarchyConfig;
+
+        let jit_config = JitConfig::load(self.storage.root())?;
+
+        if let Some(hierarchy_toml) = jit_config.type_hierarchy {
+            // Use config from file
+            let label_associations = hierarchy_toml.label_associations.unwrap_or_default();
+            HierarchyConfig::new(hierarchy_toml.types, label_associations)
+                .map_err(|e| anyhow::anyhow!("Invalid hierarchy config: {}", e))
+        } else {
+            // Fall back to defaults
+            Ok(HierarchyConfig::default())
+        }
+    }
+
+    /// Load validation configuration from config.toml or use defaults.
+    fn load_validation_config(&self) -> Result<ValidationConfigFlags> {
+        use crate::config::JitConfig;
+
+        let jit_config = JitConfig::load(self.storage.root())?;
+
+        let flags = if let Some(validation) = jit_config.validation {
+            ValidationConfigFlags {
+                strictness: validation.strictness.unwrap_or_else(|| "loose".to_string()),
+                warn_orphaned_leaves: validation.warn_orphaned_leaves.unwrap_or(true),
+                warn_strategic_consistency: validation.warn_strategic_consistency.unwrap_or(true),
+            }
+        } else {
+            ValidationConfigFlags::default()
+        };
+
+        Ok(flags)
     }
 
     /// Collect all validation warnings for all issues in the repository.
     ///
     /// Returns a vector of (issue_id, warnings) pairs for all issues with warnings.
-    pub fn collect_all_warnings(&self) -> Result<Vec<(String, Vec<crate::type_hierarchy::ValidationWarning>)>> {
+    pub fn collect_all_warnings(
+        &self,
+    ) -> Result<Vec<(String, Vec<crate::type_hierarchy::ValidationWarning>)>> {
         let issues = self.storage.list_issues()?;
         let mut all_warnings = Vec::new();
 

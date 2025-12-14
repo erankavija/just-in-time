@@ -666,23 +666,55 @@
       - [x] 17 comprehensive tests (10 default + 7 custom hierarchies)
       - [x] Fully configuration-driven validation
       - Actual: ~1 hour (estimated 2 hours)
-    - **Phase G: CLI Warning Integration** 🚧 **75% COMPLETE** - **2025-12-14**
+    - **Phase G: CLI Warning Integration** ✅ **COMPLETE** - **2025-12-14**
       - [x] Add `--force` flag to `jit issue create` to bypass warnings
       - [x] Add `--orphan` flag to acknowledge intentional orphans
       - [x] Check strategic consistency on issue creation (warn if missing label)
       - [x] Check orphan status on task creation (warn if no parent)
       - [x] Display warnings with clear, actionable messages
+      - [x] Update `jit validate` command to report warnings
+      - [x] JSON output for warnings in validate
       - [x] 4 integration tests (check_warnings method)
-      - [ ] Update `jit validate` command to report warnings
-      - [ ] JSON output for warnings in validate
-      - Actual: ~1 hour so far (estimated 1.5 hours total, 0.5h remaining)
-    - **Phase H: Configuration Support** - .jit/config.toml hierarchy settings
-      - [ ] Add config.toml parsing for type_hierarchy section
-      - [ ] Support strictness levels (strict/loose/permissive)
-      - [ ] Support warn_orphaned_leaves, warn_strategic_consistency flags
-      - [ ] Cache parsed config in CommandExecutor
-      - [ ] Add 4-5 tests for config loading
-      - Estimated: 1 hour
+      - Actual: ~1.5 hours (matched estimate)
+    - **Phase H: Configuration Support** ✅ **COMPLETE** - **2025-12-15**
+      - [x] Add config.toml parsing for type_hierarchy section
+      - [x] Support strictness levels (strict/loose/permissive)
+      - [x] Support warn_orphaned_leaves, warn_strategic_consistency flags
+      - [x] Add root() method to IssueStore trait
+      - [x] Implement config loading in CommandExecutor
+      - [x] 5 integration tests + 5 unit tests in config module
+      - [x] Example config.toml in docs/
+      - [x] All 556 tests passing, zero clippy errors
+      - Actual: ~1.5 hours (matched estimate)
+    - **Next High Priority: Code Quality & Architecture**
+      - **Phase I: Binary-to-Library Refactoring** 🎯 **NEXT SESSION**
+        - [ ] Remove module duplication between main.rs and lib.rs
+        - [ ] Use `use jit::{...}` imports instead of `mod` declarations in binary
+        - [ ] Keep only `mod output_macros;` in main.rs (binary-specific)
+        - [ ] Update all imports to use `jit::` prefix
+        - [ ] Test compilation time improvement (expect 5-10% faster)
+        - [ ] Verify all 556 tests still pass
+        - [ ] Update documentation with new architecture
+        - Estimated: 2 hours
+        - Priority: HIGH (reduces confusion, follows Rust best practices)
+        - See: `docs/refactoring-plan-binary-to-library.md` for full plan
+      - **Issue #1: Inconsistent new() Methods** (defer to Phase J)
+        - [ ] Add `try_new()` variants for validation where appropriate
+        - [ ] `JsonFileStorage::try_new()` - validates path exists
+        - [ ] Document pattern: `new()` never fails, `try_new()` validates
+        - Estimated: 30 minutes
+        - Priority: LOW (nice-to-have, non-breaking)
+      - **Issue #2: create_issue() Argument Order** (defer to v1.0)
+        - [ ] Standardize to: (title, desc, labels, priority, gates)
+        - [ ] Update all callsites (grep "create_issue")
+        - [ ] Breaking change - requires major version bump
+        - Estimated: 1 hour
+        - Priority: LOW (breaking change, defer to v1.0)
+      - **Issue #3: Config Caching** (defer until needed)
+        - [ ] Add optional config cache to CommandExecutor
+        - [ ] Profile to confirm it's actually a bottleneck first
+        - Estimated: 1 hour
+        - Priority: LOW (premature optimization)
     - **Future enhancements:**
       - Option A: Document graph visualization (12-16 hours)
       - Option B: Plugin architecture for custom gates

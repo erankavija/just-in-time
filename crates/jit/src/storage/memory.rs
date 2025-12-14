@@ -121,6 +121,11 @@ impl IssueStore for InMemoryStorage {
         *self.label_namespaces.lock().unwrap() = namespaces.clone();
         Ok(())
     }
+
+    fn root(&self) -> &std::path::Path {
+        // In-memory storage doesn't have a real root, return current directory
+        std::path::Path::new(".")
+    }
 }
 
 #[cfg(test)]

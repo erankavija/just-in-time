@@ -1,0 +1,52 @@
+# JIT Configuration File
+#
+# Place this file at `.jit/config.toml` to customize type hierarchy and validation behavior.
+# All settings are optional - JIT will use sensible defaults if this file doesn't exist.
+
+[type_hierarchy]
+# Type name to hierarchy level mapping (lower numbers = more strategic)
+# Default: { milestone = 1, epic = 2, story = 3, task = 4 }
+types = { milestone = 1, epic = 2, story = 3, task = 4 }
+
+# Type name to membership label namespace mapping
+# Example: epic type uses "epic:*" labels for membership
+# Default: { milestone = "milestone", epic = "epic", story = "story" }
+[type_hierarchy.label_associations]
+epic = "epic"
+milestone = "milestone"
+story = "story"
+
+[validation]
+# Strictness level: "strict", "loose", or "permissive"
+# - "strict": All validations block operations (future feature)
+# - "loose": Warnings are informational, errors block (default)
+# - "permissive": Everything is informational (future feature)
+strictness = "loose"
+
+# Enable/disable specific validation warnings
+warn_orphaned_leaves = true          # Warn on tasks without parent labels (epic:*, milestone:*)
+warn_strategic_consistency = true    # Warn on strategic types missing identifying labels
+
+# Example: Minimal 2-level hierarchy
+# [type_hierarchy]
+# types = { epic = 1, task = 2 }
+# 
+# [type_hierarchy.label_associations]
+# epic = "epic"
+
+# Example: Extended 5-level hierarchy
+# [type_hierarchy]
+# types = { program = 1, milestone = 2, epic = 3, story = 4, task = 5 }
+# 
+# [type_hierarchy.label_associations]
+# program = "program"
+# milestone = "milestone"
+# epic = "epic"
+
+# Example: Custom naming (theme instead of epic)
+# [type_hierarchy]
+# types = { release = 1, theme = 2, task = 3 }
+# 
+# [type_hierarchy.label_associations]
+# theme = "epic"
+# release = "milestone"

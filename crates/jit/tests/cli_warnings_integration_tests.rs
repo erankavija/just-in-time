@@ -15,7 +15,7 @@ fn setup_test_storage() -> (TempDir, JsonFileStorage) {
 fn test_create_epic_without_label_shows_warning() {
     let (_temp_dir, storage) = setup_test_storage();
     let executor = CommandExecutor::new(storage);
-    
+
     // Create epic without epic:* label
     let id = executor
         .create_issue(
@@ -26,14 +26,18 @@ fn test_create_epic_without_label_shows_warning() {
             vec!["type:epic".to_string()],
         )
         .unwrap();
-    
+
     // Check for warnings
     let warnings = executor.check_warnings(&id).unwrap();
     assert_eq!(warnings.len(), 1);
-    
+
     // Verify it's a strategic label warning
     match &warnings[0] {
-        jit::type_hierarchy::ValidationWarning::MissingStrategicLabel { type_name, expected_namespace, .. } => {
+        jit::type_hierarchy::ValidationWarning::MissingStrategicLabel {
+            type_name,
+            expected_namespace,
+            ..
+        } => {
             assert_eq!(type_name, "epic");
             assert_eq!(expected_namespace, "epic");
         }
@@ -45,7 +49,7 @@ fn test_create_epic_without_label_shows_warning() {
 fn test_create_task_without_parent_shows_warning() {
     let (_temp_dir, storage) = setup_test_storage();
     let executor = CommandExecutor::new(storage);
-    
+
     // Create task without parent labels
     let id = executor
         .create_issue(
@@ -56,11 +60,11 @@ fn test_create_task_without_parent_shows_warning() {
             vec!["type:task".to_string()],
         )
         .unwrap();
-    
+
     // Check for warnings
     let warnings = executor.check_warnings(&id).unwrap();
     assert_eq!(warnings.len(), 1);
-    
+
     // Verify it's an orphan warning
     match &warnings[0] {
         jit::type_hierarchy::ValidationWarning::OrphanedLeaf { type_name, .. } => {
@@ -74,7 +78,7 @@ fn test_create_task_without_parent_shows_warning() {
 fn test_create_epic_with_label_no_warning() {
     let (_temp_dir, storage) = setup_test_storage();
     let executor = CommandExecutor::new(storage);
-    
+
     // Create epic with epic:* label
     let id = executor
         .create_issue(
@@ -85,7 +89,7 @@ fn test_create_epic_with_label_no_warning() {
             vec!["type:epic".to_string(), "epic:auth".to_string()],
         )
         .unwrap();
-    
+
     // Check for warnings
     let warnings = executor.check_warnings(&id).unwrap();
     assert_eq!(warnings.len(), 0);
@@ -95,7 +99,7 @@ fn test_create_epic_with_label_no_warning() {
 fn test_create_task_with_parent_no_warning() {
     let (_temp_dir, storage) = setup_test_storage();
     let executor = CommandExecutor::new(storage);
-    
+
     // Create task with epic label
     let id = executor
         .create_issue(
@@ -106,7 +110,7 @@ fn test_create_task_with_parent_no_warning() {
             vec!["type:task".to_string(), "epic:auth".to_string()],
         )
         .unwrap();
-    
+
     // Check for warnings
     let warnings = executor.check_warnings(&id).unwrap();
     assert_eq!(warnings.len(), 0);

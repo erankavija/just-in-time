@@ -13,6 +13,7 @@
 
 mod cli;
 mod commands;
+mod config;
 mod domain;
 mod graph;
 mod hierarchy_templates;
@@ -131,10 +132,10 @@ fn run() -> Result<()> {
                 namespaces.type_hierarchy = Some(template.hierarchy);
                 namespaces.label_associations = Some(template.label_associations);
                 namespaces.schema_version = 2;
-                
+
                 // Dynamically create/update membership namespaces
                 namespaces.sync_membership_namespaces();
-                
+
                 executor.storage().save_label_namespaces(&namespaces)?;
 
                 println!("Initialized with '{}' hierarchy template", template_name);
@@ -150,296 +151,300 @@ fn run() -> Result<()> {
         Commands::Init { .. } => {
             // Already handled above
         }
-        Commands::Issue(issue_cmd) => match issue_cmd {
-            IssueCommands::Create {
-                title,
-                desc,
-                priority,
-                gate,
-                label,
-                force,
-                orphan,
-                json,
-            } => {
-                let prio = parse_priority(&priority)?;
-                let id = executor.create_issue(title, desc, prio, gate, label)?;
+        Commands::Issue(issue_cmd) => {
+            match issue_cmd {
+                IssueCommands::Create {
+                    title,
+                    desc,
+                    priority,
+                    gate,
+                    label,
+                    force,
+                    orphan,
+                    json,
+                } => {
+                    let prio = parse_priority(&priority)?;
+                    let id = executor.create_issue(title, desc, prio, gate, label)?;
 
-                if json {
-                    let issue = storage.load_issue(&id)?;
-                    println!("{}", serde_json::to_string_pretty(&issue)?);
-                } else {
-                    println!("Created issue: {}", id);
-                    
-                    // Check for warnings unless --force is set
-                    if !force {
-                        use crate::type_hierarchy::ValidationWarning;
-                        
-                        let warnings = executor.check_warnings(&id)?;
-                        
-                        // Filter orphan warnings if --orphan flag is set
-                        let warnings_to_display: Vec<_> = if orphan {
-                            warnings.into_iter()
-                                .filter(|w| !matches!(w, ValidationWarning::OrphanedLeaf { .. }))
-                                .collect()
-                        } else {
-                            warnings
-                        };
-                        
-                        // Display warnings
-                        for warning in warnings_to_display {
-                            match warning {
-                                ValidationWarning::MissingStrategicLabel {
-                                    type_name,
-                                    expected_namespace,
-                                    ..
-                                } => {
-                                    eprintln!("\n⚠ Warning: Strategic consistency issue");
-                                    eprintln!("  Issue {} (type:{}) should have a {}:* label for identification.", 
+                    if json {
+                        let issue = storage.load_issue(&id)?;
+                        println!("{}", serde_json::to_string_pretty(&issue)?);
+                    } else {
+                        println!("Created issue: {}", id);
+
+                        // Check for warnings unless --force is set
+                        if !force {
+                            use crate::type_hierarchy::ValidationWarning;
+
+                            let warnings = executor.check_warnings(&id)?;
+
+                            // Filter orphan warnings if --orphan flag is set
+                            let warnings_to_display: Vec<_> = if orphan {
+                                warnings
+                                    .into_iter()
+                                    .filter(|w| {
+                                        !matches!(w, ValidationWarning::OrphanedLeaf { .. })
+                                    })
+                                    .collect()
+                            } else {
+                                warnings
+                            };
+
+                            // Display warnings
+                            for warning in warnings_to_display {
+                                match warning {
+                                    ValidationWarning::MissingStrategicLabel {
+                                        type_name,
+                                        expected_namespace,
+                                        ..
+                                    } => {
+                                        eprintln!("\n⚠ Warning: Strategic consistency issue");
+                                        eprintln!("  Issue {} (type:{}) should have a {}:* label for identification.", 
                                              id, type_name, expected_namespace);
-                                    eprintln!("  Suggested: jit issue update {} --label \"{}:value\"", 
-                                             id, expected_namespace);
-                                }
-                                ValidationWarning::OrphanedLeaf {
-                                    type_name,
-                                    ..
-                                } => {
-                                    eprintln!("\n⚠ Warning: Orphaned leaf issue");
-                                    eprintln!("  {} {} has no parent association (epic or milestone).", 
+                                        eprintln!(
+                                            "  Suggested: jit issue update {} --label \"{}:value\"",
+                                            id, expected_namespace
+                                        );
+                                    }
+                                    ValidationWarning::OrphanedLeaf { type_name, .. } => {
+                                        eprintln!("\n⚠ Warning: Orphaned leaf issue");
+                                        eprintln!("  {} {} has no parent association (epic or milestone).", 
                                              type_name.to_uppercase(), id);
-                                    eprintln!("  Consider adding: --label \"epic:value\" or --label \"milestone:value\"");
-                                    eprintln!("  Or use --orphan flag to acknowledge intentional orphan.");
+                                        eprintln!("  Consider adding: --label \"epic:value\" or --label \"milestone:value\"");
+                                        eprintln!("  Or use --orphan flag to acknowledge intentional orphan.");
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
-            IssueCommands::List {
-                state,
-                assignee,
-                priority,
-                json,
-            } => {
-                let state_filter = state.map(|s| parse_state(&s)).transpose()?;
-                let priority_filter = priority.map(|p| parse_priority(&p)).transpose()?;
-                let issues = executor.list_issues(state_filter, assignee, priority_filter)?;
-
-                if json {
-                    use output::JsonOutput;
-                    use serde_json::json;
-
-                    // Count issues by state
-                    let mut state_counts = std::collections::HashMap::new();
-                    for issue in &issues {
-                        *state_counts.entry(issue.state).or_insert(0) += 1;
-                    }
-
-                    let output = JsonOutput::success(json!({
-                        "issues": issues,
-                        "summary": {
-                            "total": issues.len(),
-                            "by_state": state_counts,
-                        }
-                    }));
-                    println!("{}", output.to_json_string()?);
-                } else {
-                    for issue in issues {
-                        println!(
-                            "{} | {} | {:?} | {:?}",
-                            issue.id, issue.title, issue.state, issue.priority
-                        );
-                    }
-                }
-            }
-            IssueCommands::Search {
-                query,
-                state,
-                assignee,
-                priority,
-                json,
-            } => {
-                let state_filter = state.map(|s| parse_state(&s)).transpose()?;
-                let priority_filter = priority.map(|p| parse_priority(&p)).transpose()?;
-                let issues = executor.search_issues_with_filters(
-                    &query,
-                    priority_filter,
-                    state_filter,
+                IssueCommands::List {
+                    state,
                     assignee,
-                )?;
+                    priority,
+                    json,
+                } => {
+                    let state_filter = state.map(|s| parse_state(&s)).transpose()?;
+                    let priority_filter = priority.map(|p| parse_priority(&p)).transpose()?;
+                    let issues = executor.list_issues(state_filter, assignee, priority_filter)?;
 
-                if json {
-                    use output::JsonOutput;
-                    use serde_json::json;
+                    if json {
+                        use output::JsonOutput;
+                        use serde_json::json;
 
-                    let output = JsonOutput::success(json!({
-                        "query": query,
-                        "issues": issues,
-                        "count": issues.len(),
-                    }));
-                    println!("{}", output.to_json_string()?);
-                } else {
-                    println!("Found {} issue(s):", issues.len());
-                    for issue in issues {
-                        println!(
-                            "{} | {} | {:?} | {:?}",
-                            issue.id, issue.title, issue.state, issue.priority
-                        );
-                    }
-                }
-            }
-            IssueCommands::Show { id, json } => match executor.show_issue(&id) {
-                Ok(issue) => {
-                    output_data!(json, issue, {
-                        println!("ID: {}", issue.id);
-                        println!("Title: {}", issue.title);
-                        println!("Description: {}", issue.description);
-                        println!("State: {:?}", issue.state);
-                        println!("Priority: {:?}", issue.priority);
-                        println!("Assignee: {:?}", issue.assignee);
-                        println!("Dependencies: {:?}", issue.dependencies);
-                        println!("Gates Required: {:?}", issue.gates_required);
-                        println!("Gates Status: {:?}", issue.gates_status);
-                        if !issue.documents.is_empty() {
-                            println!("Documents:");
-                            for doc in &issue.documents {
-                                print!("  - {}", doc.path);
-                                if let Some(ref label) = doc.label {
-                                    print!(" ({})", label);
-                                }
-                                if let Some(ref commit) = doc.commit {
-                                    print!(" [{}]", &commit[..7.min(commit.len())]);
-                                } else {
-                                    print!(" [HEAD]");
-                                }
-                                println!();
-                            }
+                        // Count issues by state
+                        let mut state_counts = std::collections::HashMap::new();
+                        for issue in &issues {
+                            *state_counts.entry(issue.state).or_insert(0) += 1;
                         }
-                    });
-                }
-                Err(e) => {
-                    handle_json_error!(json, e, output::JsonError::issue_not_found(&id));
-                }
-            },
-            IssueCommands::Update {
-                id,
-                title,
-                desc,
-                priority,
-                state,
-                label,
-                remove_label,
-                json,
-            } => {
-                let prio = priority.map(|p| parse_priority(&p)).transpose()?;
-                let st = state.map(|s| parse_state(&s)).transpose()?;
-                executor.update_issue(&id, title, desc, prio, st, label, remove_label)?;
 
-                if json {
-                    let issue = storage.load_issue(&id)?;
-                    println!("{}", serde_json::to_string_pretty(&issue)?);
-                } else {
-                    println!("Updated issue: {}", id);
-                }
-            }
-            IssueCommands::Delete { id, json } => {
-                executor.delete_issue(&id)?;
-
-                if json {
-                    let result = serde_json::json!({
-                        "id": id,
-                        "deleted": true
-                    });
-                    println!("{}", serde_json::to_string_pretty(&result)?);
-                } else {
-                    println!("Deleted issue: {}", id);
-                }
-            }
-            IssueCommands::Breakdown {
-                parent_id,
-                subtask_titles,
-                subtask_descs,
-                json,
-            } => {
-                // Pad descriptions with empty strings if not enough provided
-                let mut descs = subtask_descs.clone();
-                while descs.len() < subtask_titles.len() {
-                    descs.push(String::new());
-                }
-
-                let subtasks: Vec<(String, String)> = subtask_titles
-                    .iter()
-                    .zip(descs.iter())
-                    .map(|(t, d)| (t.clone(), d.clone()))
-                    .collect();
-
-                let subtask_ids = executor.breakdown_issue(&parent_id, subtasks)?;
-
-                if json {
-                    use output::JsonOutput;
-                    let response = serde_json::json!({
-                        "parent_id": parent_id,
-                        "subtask_ids": subtask_ids,
-                        "count": subtask_ids.len(),
-                        "message": format!("Broke down {} into {} subtasks", parent_id, subtask_ids.len())
-                    });
-                    let output = JsonOutput::success(response);
-                    println!("{}", output.to_json_string()?);
-                } else {
-                    println!(
-                        "Broke down {} into {} subtasks:",
-                        parent_id,
-                        subtask_ids.len()
-                    );
-                    for (i, id) in subtask_ids.iter().enumerate() {
-                        println!("  {}. {}", i + 1, id);
+                        let output = JsonOutput::success(json!({
+                            "issues": issues,
+                            "summary": {
+                                "total": issues.len(),
+                                "by_state": state_counts,
+                            }
+                        }));
+                        println!("{}", output.to_json_string()?);
+                    } else {
+                        for issue in issues {
+                            println!(
+                                "{} | {} | {:?} | {:?}",
+                                issue.id, issue.title, issue.state, issue.priority
+                            );
+                        }
                     }
                 }
-            }
-            IssueCommands::Assign { id, assignee, json } => {
-                executor.assign_issue(&id, assignee)?;
+                IssueCommands::Search {
+                    query,
+                    state,
+                    assignee,
+                    priority,
+                    json,
+                } => {
+                    let state_filter = state.map(|s| parse_state(&s)).transpose()?;
+                    let priority_filter = priority.map(|p| parse_priority(&p)).transpose()?;
+                    let issues = executor.search_issues_with_filters(
+                        &query,
+                        priority_filter,
+                        state_filter,
+                        assignee,
+                    )?;
 
-                if json {
-                    let issue = storage.load_issue(&id)?;
-                    println!("{}", serde_json::to_string_pretty(&issue)?);
-                } else {
-                    println!("Assigned issue: {}", id);
+                    if json {
+                        use output::JsonOutput;
+                        use serde_json::json;
+
+                        let output = JsonOutput::success(json!({
+                            "query": query,
+                            "issues": issues,
+                            "count": issues.len(),
+                        }));
+                        println!("{}", output.to_json_string()?);
+                    } else {
+                        println!("Found {} issue(s):", issues.len());
+                        for issue in issues {
+                            println!(
+                                "{} | {} | {:?} | {:?}",
+                                issue.id, issue.title, issue.state, issue.priority
+                            );
+                        }
+                    }
                 }
-            }
-            IssueCommands::Claim { id, assignee, json } => {
-                executor.claim_issue(&id, assignee)?;
+                IssueCommands::Show { id, json } => match executor.show_issue(&id) {
+                    Ok(issue) => {
+                        output_data!(json, issue, {
+                            println!("ID: {}", issue.id);
+                            println!("Title: {}", issue.title);
+                            println!("Description: {}", issue.description);
+                            println!("State: {:?}", issue.state);
+                            println!("Priority: {:?}", issue.priority);
+                            println!("Assignee: {:?}", issue.assignee);
+                            println!("Dependencies: {:?}", issue.dependencies);
+                            println!("Gates Required: {:?}", issue.gates_required);
+                            println!("Gates Status: {:?}", issue.gates_status);
+                            if !issue.documents.is_empty() {
+                                println!("Documents:");
+                                for doc in &issue.documents {
+                                    print!("  - {}", doc.path);
+                                    if let Some(ref label) = doc.label {
+                                        print!(" ({})", label);
+                                    }
+                                    if let Some(ref commit) = doc.commit {
+                                        print!(" [{}]", &commit[..7.min(commit.len())]);
+                                    } else {
+                                        print!(" [HEAD]");
+                                    }
+                                    println!();
+                                }
+                            }
+                        });
+                    }
+                    Err(e) => {
+                        handle_json_error!(json, e, output::JsonError::issue_not_found(&id));
+                    }
+                },
+                IssueCommands::Update {
+                    id,
+                    title,
+                    desc,
+                    priority,
+                    state,
+                    label,
+                    remove_label,
+                    json,
+                } => {
+                    let prio = priority.map(|p| parse_priority(&p)).transpose()?;
+                    let st = state.map(|s| parse_state(&s)).transpose()?;
+                    executor.update_issue(&id, title, desc, prio, st, label, remove_label)?;
 
-                if json {
-                    let issue = storage.load_issue(&id)?;
-                    println!("{}", serde_json::to_string_pretty(&issue)?);
-                } else {
+                    if json {
+                        let issue = storage.load_issue(&id)?;
+                        println!("{}", serde_json::to_string_pretty(&issue)?);
+                    } else {
+                        println!("Updated issue: {}", id);
+                    }
+                }
+                IssueCommands::Delete { id, json } => {
+                    executor.delete_issue(&id)?;
+
+                    if json {
+                        let result = serde_json::json!({
+                            "id": id,
+                            "deleted": true
+                        });
+                        println!("{}", serde_json::to_string_pretty(&result)?);
+                    } else {
+                        println!("Deleted issue: {}", id);
+                    }
+                }
+                IssueCommands::Breakdown {
+                    parent_id,
+                    subtask_titles,
+                    subtask_descs,
+                    json,
+                } => {
+                    // Pad descriptions with empty strings if not enough provided
+                    let mut descs = subtask_descs.clone();
+                    while descs.len() < subtask_titles.len() {
+                        descs.push(String::new());
+                    }
+
+                    let subtasks: Vec<(String, String)> = subtask_titles
+                        .iter()
+                        .zip(descs.iter())
+                        .map(|(t, d)| (t.clone(), d.clone()))
+                        .collect();
+
+                    let subtask_ids = executor.breakdown_issue(&parent_id, subtasks)?;
+
+                    if json {
+                        use output::JsonOutput;
+                        let response = serde_json::json!({
+                            "parent_id": parent_id,
+                            "subtask_ids": subtask_ids,
+                            "count": subtask_ids.len(),
+                            "message": format!("Broke down {} into {} subtasks", parent_id, subtask_ids.len())
+                        });
+                        let output = JsonOutput::success(response);
+                        println!("{}", output.to_json_string()?);
+                    } else {
+                        println!(
+                            "Broke down {} into {} subtasks:",
+                            parent_id,
+                            subtask_ids.len()
+                        );
+                        for (i, id) in subtask_ids.iter().enumerate() {
+                            println!("  {}. {}", i + 1, id);
+                        }
+                    }
+                }
+                IssueCommands::Assign { id, assignee, json } => {
+                    executor.assign_issue(&id, assignee)?;
+
+                    if json {
+                        let issue = storage.load_issue(&id)?;
+                        println!("{}", serde_json::to_string_pretty(&issue)?);
+                    } else {
+                        println!("Assigned issue: {}", id);
+                    }
+                }
+                IssueCommands::Claim { id, assignee, json } => {
+                    executor.claim_issue(&id, assignee)?;
+
+                    if json {
+                        let issue = storage.load_issue(&id)?;
+                        println!("{}", serde_json::to_string_pretty(&issue)?);
+                    } else {
+                        println!("Claimed issue: {}", id);
+                    }
+                }
+                IssueCommands::Unassign { id, json } => {
+                    executor.unassign_issue(&id)?;
+
+                    if json {
+                        let issue = storage.load_issue(&id)?;
+                        println!("{}", serde_json::to_string_pretty(&issue)?);
+                    } else {
+                        println!("Unassigned issue: {}", id);
+                    }
+                }
+                IssueCommands::Release { id, reason, json } => {
+                    executor.release_issue(&id, &reason)?;
+
+                    if json {
+                        let issue = storage.load_issue(&id)?;
+                        println!("{}", serde_json::to_string_pretty(&issue)?);
+                    } else {
+                        println!("Released issue: {} (reason: {})", id, reason);
+                    }
+                }
+                IssueCommands::ClaimNext { assignee, filter } => {
+                    let id = executor.claim_next(assignee, filter)?;
                     println!("Claimed issue: {}", id);
                 }
             }
-            IssueCommands::Unassign { id, json } => {
-                executor.unassign_issue(&id)?;
-
-                if json {
-                    let issue = storage.load_issue(&id)?;
-                    println!("{}", serde_json::to_string_pretty(&issue)?);
-                } else {
-                    println!("Unassigned issue: {}", id);
-                }
-            }
-            IssueCommands::Release { id, reason, json } => {
-                executor.release_issue(&id, &reason)?;
-
-                if json {
-                    let issue = storage.load_issue(&id)?;
-                    println!("{}", serde_json::to_string_pretty(&issue)?);
-                } else {
-                    println!("Released issue: {} (reason: {})", id, reason);
-                }
-            }
-            IssueCommands::ClaimNext { assignee, filter } => {
-                let id = executor.claim_next(assignee, filter)?;
-                println!("Claimed issue: {}", id);
-            }
-        },
+        }
         Commands::Dep(dep_cmd) => match dep_cmd {
             DepCommands::Add {
                 from_id,
@@ -1339,33 +1344,36 @@ fn run() -> Result<()> {
                 // Standard validation with warnings
                 executor.validate_silent()?;
                 let warnings = executor.collect_all_warnings()?;
-                
+
                 if json {
+                    use crate::type_hierarchy::ValidationWarning;
                     use output::JsonOutput;
                     use serde_json::json;
-                    use crate::type_hierarchy::ValidationWarning;
 
-                    let warnings_json: Vec<_> = warnings.iter()
+                    let warnings_json: Vec<_> = warnings
+                        .iter()
                         .flat_map(|(issue_id, issue_warnings)| {
-                            issue_warnings.iter().map(move |w| {
-                                match w {
-                                    ValidationWarning::MissingStrategicLabel { type_name, expected_namespace, .. } => {
-                                        json!({
-                                            "type": "missing_strategic_label",
-                                            "issue_id": issue_id,
-                                            "issue_type": type_name,
-                                            "expected_namespace": expected_namespace,
-                                            "suggestion": format!("Add label: {}:*", expected_namespace)
-                                        })
-                                    }
-                                    ValidationWarning::OrphanedLeaf { type_name, .. } => {
-                                        json!({
-                                            "type": "orphaned_leaf",
-                                            "issue_id": issue_id,
-                                            "issue_type": type_name,
-                                            "suggestion": "Add label: epic:* or milestone:*"
-                                        })
-                                    }
+                            issue_warnings.iter().map(move |w| match w {
+                                ValidationWarning::MissingStrategicLabel {
+                                    type_name,
+                                    expected_namespace,
+                                    ..
+                                } => {
+                                    json!({
+                                        "type": "missing_strategic_label",
+                                        "issue_id": issue_id,
+                                        "issue_type": type_name,
+                                        "expected_namespace": expected_namespace,
+                                        "suggestion": format!("Add label: {}:*", expected_namespace)
+                                    })
+                                }
+                                ValidationWarning::OrphanedLeaf { type_name, .. } => {
+                                    json!({
+                                        "type": "orphaned_leaf",
+                                        "issue_id": issue_id,
+                                        "issue_type": type_name,
+                                        "suggestion": "Add label: epic:* or milestone:*"
+                                    })
                                 }
                             })
                         })
@@ -1380,25 +1388,38 @@ fn run() -> Result<()> {
                     println!("{}", output.to_json_string()?);
                 } else {
                     println!("✓ Repository validation passed");
-                    
+
                     if !warnings.is_empty() {
                         use crate::type_hierarchy::ValidationWarning;
-                        
-                        println!("\nWarnings: {}", warnings.iter().map(|(_, w)| w.len()).sum::<usize>());
+
+                        println!(
+                            "\nWarnings: {}",
+                            warnings.iter().map(|(_, w)| w.len()).sum::<usize>()
+                        );
                         println!();
-                        
+
                         for (issue_id, issue_warnings) in warnings {
                             for warning in issue_warnings {
                                 match warning {
-                                    ValidationWarning::MissingStrategicLabel { type_name, expected_namespace, .. } => {
-                                        println!("⚠ Issue {} (type:{}): Missing {}:* label", 
-                                                issue_id, type_name, expected_namespace);
-                                        println!("  Suggested: jit issue update {} --label \"{}:value\"", 
-                                                issue_id, expected_namespace);
+                                    ValidationWarning::MissingStrategicLabel {
+                                        type_name,
+                                        expected_namespace,
+                                        ..
+                                    } => {
+                                        println!(
+                                            "⚠ Issue {} (type:{}): Missing {}:* label",
+                                            issue_id, type_name, expected_namespace
+                                        );
+                                        println!(
+                                            "  Suggested: jit issue update {} --label \"{}:value\"",
+                                            issue_id, expected_namespace
+                                        );
                                     }
                                     ValidationWarning::OrphanedLeaf { type_name, .. } => {
-                                        println!("⚠ Issue {} (type:{}): Orphaned leaf issue", 
-                                                issue_id, type_name);
+                                        println!(
+                                            "⚠ Issue {} (type:{}): Orphaned leaf issue",
+                                            issue_id, type_name
+                                        );
                                         println!("  Suggested: jit issue update {} --label \"epic:value\"", 
                                                 issue_id);
                                     }

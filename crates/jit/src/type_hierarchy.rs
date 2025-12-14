@@ -96,10 +96,7 @@ pub enum ValidationWarning {
         expected_namespace: String,
     },
     /// A leaf-level issue (task) has no parent association labels
-    OrphanedLeaf {
-        issue_id: String,
-        type_name: String,
-    },
+    OrphanedLeaf { issue_id: String, type_name: String },
 }
 
 /// Errors that can occur during configuration validation.
@@ -138,7 +135,7 @@ pub enum ConfigError {
 pub struct HierarchyConfig {
     /// Map of type name to its level (1 = highest, higher numbers = lower)
     types: HashMap<String, u8>,
-    
+
     /// Map of type name to its membership label namespace
     /// e.g., "epic" -> "epic" means type:epic uses epic:* labels
     /// e.g., "release" -> "milestone" means type:release uses milestone:* labels
@@ -424,7 +421,7 @@ pub fn validate_strategic_labels(
     issue: &crate::domain::Issue,
 ) -> Vec<ValidationWarning> {
     let mut warnings = Vec::new();
-    
+
     // Find type label
     let type_label = issue.labels.iter().find(|l| l.starts_with("type:"));
     let type_name = match type_label {
@@ -434,14 +431,15 @@ pub fn validate_strategic_labels(
         },
         None => return warnings, // No type label, handled by other validation
     };
-    
+
     // Check if this type has a membership namespace (strategic types do)
     if let Some(expected_namespace) = config.get_membership_namespace(&type_name) {
         // Check if issue has a label in that namespace
-        let has_label = issue.labels.iter().any(|l| {
-            l.starts_with(&format!("{}:", expected_namespace))
-        });
-        
+        let has_label = issue
+            .labels
+            .iter()
+            .any(|l| l.starts_with(&format!("{}:", expected_namespace)));
+
         if !has_label {
             warnings.push(ValidationWarning::MissingStrategicLabel {
                 issue_id: issue.id.clone(),
@@ -450,7 +448,7 @@ pub fn validate_strategic_labels(
             });
         }
     }
-    
+
     warnings
 }
 
@@ -486,7 +484,7 @@ pub fn validate_orphans(
     issue: &crate::domain::Issue,
 ) -> Vec<ValidationWarning> {
     let mut warnings = Vec::new();
-    
+
     // Find type label
     let type_label = issue.labels.iter().find(|l| l.starts_with("type:"));
     let type_name = match type_label {
@@ -496,31 +494,34 @@ pub fn validate_orphans(
         },
         None => return warnings, // No type label, handled by other validation
     };
-    
+
     // Check if this is a leaf-level type
     let type_level = match config.get_level(&type_name) {
         Some(level) => level,
         None => return warnings, // Unknown type, handled by other validation
     };
-    
+
     // Find the maximum level (lowest in hierarchy)
     let max_level = config.types.values().max().copied().unwrap_or(0);
     if type_level != max_level {
         return warnings; // Not a leaf type
     }
-    
+
     // Check if it has any parent association labels
     let has_parent_label = config.membership_namespaces().any(|(namespace, _)| {
-        issue.labels.iter().any(|l| l.starts_with(&format!("{}:", namespace)))
+        issue
+            .labels
+            .iter()
+            .any(|l| l.starts_with(&format!("{}:", namespace)))
     });
-    
+
     if !has_parent_label {
         warnings.push(ValidationWarning::OrphanedLeaf {
             issue_id: issue.id.clone(),
             type_name: type_name.clone(),
         });
     }
-    
+
     warnings
 }
 
@@ -561,9 +562,9 @@ pub fn detect_membership_issues(
     all_issues: &[crate::domain::Issue],
 ) -> Vec<ValidationIssue> {
     use crate::labels::parse_label;
-    
+
     let mut issues = Vec::new();
-    
+
     // Build reverse map: namespace -> expected_type
     // e.g., "epic" -> "epic", "milestone" -> "milestone"
     let namespace_to_type: HashMap<&str, Vec<&str>> = {
@@ -575,14 +576,14 @@ pub fn detect_membership_issues(
         }
         map
     };
-    
+
     for label in &issue.labels {
         // Parse the label
         let (namespace, value) = match parse_label(label) {
             Ok(pair) => pair,
             Err(_) => continue, // Invalid format, skip (handled by label validation)
         };
-        
+
         // Check if this namespace is a configured membership namespace
         if let Some(expected_types) = namespace_to_type.get(namespace.as_str()) {
             // Find issues with matching label that have one of the expected types
@@ -590,11 +591,9 @@ pub fn detect_membership_issues(
                 .iter()
                 .filter(|i| {
                     i.labels.contains(&label.clone())
-                        && i.labels.iter().any(|l| {
-                            expected_types
-                                .iter()
-                                .any(|t| l == &format!("type:{}", t))
-                        })
+                        && i.labels
+                            .iter()
+                            .any(|l| expected_types.iter().any(|t| l == &format!("type:{}", t)))
                 })
                 .collect();
 
@@ -626,12 +625,7 @@ pub fn detect_membership_issues(
                     let found_types: Vec<String> = all_issues
                         .iter()
                         .filter(|i| i.id != issue.id && i.labels.contains(&label.clone()))
-                        .filter_map(|i| {
-                            i.labels
-                                .iter()
-                                .find(|l| l.starts_with("type:"))
-                                .cloned()
-                        })
+                        .filter_map(|i| i.labels.iter().find(|l| l.starts_with("type:")).cloned())
                         .collect();
 
                     issues.push(ValidationIssue::InvalidMembershipReference {
@@ -654,7 +648,7 @@ pub fn detect_membership_issues(
             }
         }
     }
-    
+
     issues
 }
 
@@ -748,7 +742,6 @@ mod tests {
             Err(HierarchyError::InvalidLabel(_))
         ));
     }
-
 
     #[test]
     fn test_config_contains_type() {

@@ -5,6 +5,7 @@
 
 pub mod cli;
 pub mod commands;
+pub mod config;
 pub mod domain;
 pub mod graph;
 pub mod hierarchy_templates;

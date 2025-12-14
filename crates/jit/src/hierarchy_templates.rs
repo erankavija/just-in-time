@@ -119,7 +119,7 @@ impl HierarchyTemplate {
 
 /// Load hierarchy configuration from storage.
 ///
-/// Reads the type_hierarchy and label_associations from .jit/labels.json 
+/// Reads the type_hierarchy and label_associations from .jit/labels.json
 /// or returns the default config.
 pub fn get_hierarchy_config<S: crate::storage::IssueStore>(
     storage: &S,

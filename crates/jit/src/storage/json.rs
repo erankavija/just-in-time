@@ -300,10 +300,10 @@ impl IssueStore for JsonFileStorage {
         let data = fs::read_to_string(&path).context("Failed to read labels.json")?;
         let mut namespaces: crate::domain::LabelNamespaces =
             serde_json::from_str(&data).context("Failed to deserialize labels.json")?;
-        
+
         // Dynamically register membership namespaces from label_associations
         namespaces.sync_membership_namespaces();
-        
+
         Ok(namespaces)
     }
 
@@ -319,6 +319,10 @@ impl IssueStore for JsonFileStorage {
         fs::rename(&temp_path, &path).context("Failed to rename temporary labels.json")?;
 
         Ok(())
+    }
+
+    fn root(&self) -> &Path {
+        &self.root
     }
 }
 
