@@ -48,6 +48,100 @@
 
 ---
 
+## Labels and Dependencies in Research
+
+Research workflows use the same parallel structure as development workflows.
+
+### Labels vs Dependencies
+
+**Labels (membership)** = Organizational grouping
+- "This literature review belongs to the vector-survey paper"
+- Purpose: Track related work, filter by project
+- Query: `jit query label "paper:vector-survey"`
+
+**Dependencies (work order)** = Blocking relationships
+- "The paper writing requires literature reviews to complete"
+- Purpose: Control workflow, determine what's ready
+- Query: `jit query ready` (unblocked work)
+
+**Both flow the same direction**: Review → Paper → Publication
+
+### Example: Literature Review → Paper
+
+```bash
+# Paper (milestone-like deliverable)
+PAPER=$(jit issue create --title "Survey Paper: Vector Databases" \
+  --label "type:paper" --label "paper:vector-db-survey")
+
+# Literature review tasks
+LIT1=$(jit issue create --title "Review: Qdrant architecture" \
+  --label "type:research" --label "paper:vector-db-survey")
+LIT2=$(jit issue create --title "Review: Milvus performance" \
+  --label "type:research" --label "paper:vector-db-survey")
+LIT3=$(jit issue create --title "Review: pgvector integration" \
+  --label "type:research" --label "paper:vector-db-survey")
+
+# Paper depends on literature reviews
+jit dep add $PAPER $LIT1
+jit dep add $PAPER $LIT2
+jit dep add $PAPER $LIT3
+
+# Result:
+# Labels: All part of vector-db-survey paper (grouped for queries)
+# Dependencies: Paper writing waits for reviews (workflow control)
+# Query: jit query label "paper:*" shows all paper-related work
+# Query: jit query ready shows reviews (paper is blocked)
+```
+
+### Asymmetry: Follow-up Work Can Depend on Published Results
+
+**Future research can depend on past publications:**
+
+```bash
+# Published paper (completed work)
+PAPER_V1=$(jit issue create --title "Paper: Initial Survey" \
+  --label "type:paper" --label "paper:vector-db-v1")
+jit issue update $PAPER_V1 --state done
+
+# Future research depends on published work
+FOLLOWUP=$(jit issue create --title "Experiment: Benchmark new DB" \
+  --label "type:experiment" --label "paper:vector-db-v2")
+
+# Follow-up depends on published paper
+jit dep add $FOLLOWUP $PAPER_V1
+
+# Valid: Future experiment waits for past publication
+# But: Published paper doesn't "belong to" future experiment (labels separate)
+```
+
+### Non-Hierarchical Research Dependencies
+
+**Experiments without shared organizational labels:**
+
+```bash
+# Three parallel experiments (different areas)
+EXP1=$(jit issue create --title "Exp: Latency test" \
+  --label "type:experiment" --label "component:performance")
+EXP2=$(jit issue create --title "Exp: Throughput test" \
+  --label "type:experiment" --label "component:scalability")
+EXP3=$(jit issue create --title "Exp: Accuracy test" \
+  --label "type:experiment" --label "component:quality")
+
+# Analysis depends on all experiments
+ANALYSIS=$(jit issue create --title "Statistical analysis" \
+  --label "type:analysis" --label "project:db-comparison")
+jit dep add $ANALYSIS $EXP1
+jit dep add $ANALYSIS $EXP2
+jit dep add $ANALYSIS $EXP3
+
+# No shared membership labels (experiments are independent areas)
+# But clear dependency structure (analysis waits for all experiments)
+# Query by component: Shows experiments in different areas
+# Query ready: Shows only experiments (analysis blocked)
+```
+
+---
+
 ## Workflow Patterns
 
 ### Pattern 1: Idea → Research Task → Decision

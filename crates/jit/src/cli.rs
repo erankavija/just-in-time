@@ -35,7 +35,11 @@ pub struct Cli {
 #[derive(Subcommand)]
 pub enum Commands {
     /// Initialize the issue tracker in the current directory
-    Init,
+    Init {
+        /// Hierarchy template to use (default, extended, agile, minimal)
+        #[arg(long)]
+        hierarchy_template: Option<String>,
+    },
 
     /// Issue management commands
     #[command(subcommand)]
@@ -72,6 +76,10 @@ pub enum Commands {
     /// Label namespace management commands
     #[command(subcommand)]
     Label(LabelCommands),
+
+    /// Configuration commands
+    #[command(subcommand)]
+    Config(ConfigCommands),
 
     /// Search issues and documents
     Search {
@@ -113,6 +121,14 @@ pub enum Commands {
     Validate {
         #[arg(long)]
         json: bool,
+
+        /// Attempt to automatically fix validation issues
+        #[arg(long)]
+        fix: bool,
+
+        /// Show what would be fixed without applying changes (requires --fix)
+        #[arg(long)]
+        dry_run: bool,
     },
 }
 
@@ -136,6 +152,14 @@ pub enum IssueCommands {
         /// Labels (format: namespace:value, repeatable)
         #[arg(short, long)]
         label: Vec<String>,
+
+        /// Bypass validation warnings
+        #[arg(long)]
+        force: bool,
+
+        /// Explicitly allow orphaned leaf issues (tasks without parent labels)
+        #[arg(long)]
+        orphan: bool,
 
         #[arg(long)]
         json: bool,
@@ -293,7 +317,14 @@ pub enum IssueCommands {
 
 #[derive(Subcommand)]
 pub enum DepCommands {
-    /// Add a dependency (FROM depends on TO)
+    /// Add a work dependency: FROM is blocked until TO completes
+    ///
+    /// FROM and TO can be any issues. Work flows from TO (upstream) into FROM (downstream).
+    /// Dependencies are orthogonal to labels - issues don't need matching labels to depend on each other.
+    ///
+    /// Examples:
+    ///   jit dep add epic-123 task-456     # Epic blocked until task done
+    ///   jit dep add planning-v2 release-v1 # v2.0 planning waits for v1.0 release
     Add {
         /// Issue that depends on another (FROM)
         from_id: String,
@@ -466,7 +497,16 @@ pub enum GraphCommands {
         json: bool,
     },
 
-    /// Show issues that depend on this issue
+    /// Show downstream dependents (issues that are blocked by this one)
+    ///
+    /// "Downstream" means work flow direction (toward completion/delivery).
+    /// If Epic depends on Task, then Task is upstream and Epic is downstream.
+    ///
+    /// Example:
+    ///   jit graph downstream task-456
+    ///   Shows: epic-123, milestone-789 (they depend on this task)
+    ///
+    /// Note: This shows dependency relationships, not label hierarchy.
     Downstream {
         /// Issue ID
         id: String,
@@ -640,6 +680,21 @@ pub enum LabelCommands {
         #[arg(long)]
         strategic: bool,
 
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum ConfigCommands {
+    /// Show current type hierarchy
+    ShowHierarchy {
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// List available hierarchy templates
+    ListTemplates {
         #[arg(long)]
         json: bool,
     },

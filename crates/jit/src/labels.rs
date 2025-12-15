@@ -10,9 +10,9 @@ use std::sync::OnceLock;
 
 /// Regex for valid label format: `namespace:value`
 ///
-/// - namespace: [a-z][a-z0-9-]* (lowercase, alphanumeric, hyphens)
-/// - value: [a-zA-Z0-9][a-zA-Z0-9._-]* (alphanumeric, dots, hyphens, underscores)
-/// - separator: exactly one colon ':'
+/// - namespace: `[a-z][a-z0-9-]*` (lowercase, alphanumeric, hyphens)
+/// - value: `[a-zA-Z0-9][a-zA-Z0-9._-]*` (alphanumeric, dots, hyphens, underscores)
+/// - separator: exactly one colon `':'`
 static LABEL_REGEX: OnceLock<Regex> = OnceLock::new();
 
 fn label_regex() -> &'static Regex {

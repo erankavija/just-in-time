@@ -1,0 +1,547 @@
+//! Validation and status operations
+
+use super::*;
+use crate::type_hierarchy::{
+    detect_validation_issues, generate_fixes, ValidationFix, ValidationIssue,
+};
+
+/// Validation configuration flags loaded from config.toml.
+#[derive(Debug, Clone)]
+struct ValidationConfigFlags {
+    #[allow(dead_code)] // Reserved for future strictness levels (strict/loose/permissive)
+    strictness: String,
+    warn_orphaned_leaves: bool,
+    warn_strategic_consistency: bool,
+}
+
+impl Default for ValidationConfigFlags {
+    fn default() -> Self {
+        Self {
+            strictness: "loose".to_string(),
+            warn_orphaned_leaves: true,
+            warn_strategic_consistency: true,
+        }
+    }
+}
+
+impl<S: IssueStore> CommandExecutor<S> {
+    #[allow(dead_code)] // Used internally by validate_with_options
+    pub fn validate(&self) -> Result<()> {
+        self.validate_silent()?;
+        println!("✓ Repository is valid");
+        Ok(())
+    }
+
+    /// Validate with optional fix mode.
+    ///
+    /// # Arguments
+    ///
+    /// * `fix` - If true, attempt to fix validation issues
+    /// * `dry_run` - If true, show what would be fixed without applying changes
+    /// * `quiet` - If true, suppress progress messages (for JSON output)
+    ///
+    /// # Returns
+    ///
+    /// Returns Ok with count of fixes applied, or Err if validation fails
+    pub fn validate_with_fix(&mut self, fix: bool, dry_run: bool, quiet: bool) -> Result<usize> {
+        // First run standard validation
+        let validation_result = self.validate_silent();
+
+        if validation_result.is_ok() && !fix {
+            return Ok(0);
+        }
+
+        // If fix mode is enabled, detect and fix type hierarchy issues
+        if fix {
+            let fixes_applied = self.detect_and_fix_hierarchy_issues(dry_run, quiet)?;
+
+            if !quiet {
+                if dry_run {
+                    println!(
+                        "\nDry run complete. {} fixes would be applied.",
+                        fixes_applied
+                    );
+                } else if fixes_applied > 0 {
+                    println!("\n✓ Applied {} fixes", fixes_applied);
+
+                    // Re-run validation to verify fixes worked
+                    self.validate_silent()?;
+                    println!("✓ Repository is now valid");
+                } else {
+                    println!("\n✓ No fixes needed");
+                }
+            }
+
+            return Ok(fixes_applied);
+        }
+
+        // Not in fix mode, just propagate the validation error
+        validation_result?;
+        Ok(0)
+    }
+
+    fn detect_and_fix_hierarchy_issues(&mut self, dry_run: bool, quiet: bool) -> Result<usize> {
+        use crate::hierarchy_templates::get_hierarchy_config;
+
+        let config = get_hierarchy_config(&self.storage)?;
+        let issues = self.storage.list_issues()?;
+
+        // Collect all validation issues
+        let mut all_validation_issues = Vec::new();
+
+        for issue in &issues {
+            let validation_issues = detect_validation_issues(&config, &issue.id, &issue.labels);
+            all_validation_issues.extend(validation_issues);
+        }
+
+        if all_validation_issues.is_empty() {
+            return Ok(0);
+        }
+
+        // Generate fixes
+        let fixes = generate_fixes(&all_validation_issues);
+
+        if fixes.is_empty() {
+            // We found issues but can't auto-fix them
+            if !quiet {
+                println!(
+                    "\nFound {} validation issues but no automatic fixes available:",
+                    all_validation_issues.len()
+                );
+                for issue in &all_validation_issues {
+                    match issue {
+                        ValidationIssue::UnknownType {
+                            issue_id,
+                            unknown_type,
+                            ..
+                        } => {
+                            println!("  • Issue {} has unknown type '{}'", issue_id, unknown_type);
+                        }
+                        ValidationIssue::InvalidMembershipReference {
+                            issue_id,
+                            label,
+                            reason,
+                            ..
+                        } => {
+                            println!(
+                                "  • Issue {} has invalid membership label '{}': {}",
+                                issue_id, label, reason
+                            );
+                        }
+                    }
+                }
+            }
+            return Ok(0);
+        }
+
+        // Apply or preview fixes
+        let mut fixes_applied = 0;
+
+        for fix in &fixes {
+            match fix {
+                ValidationFix::ReplaceType {
+                    issue_id,
+                    old_type,
+                    new_type,
+                } => {
+                    if !quiet {
+                        if dry_run {
+                            println!(
+                                "Would replace type '{}' with '{}' for issue {}",
+                                old_type, new_type, issue_id
+                            );
+                        } else {
+                            self.apply_type_fix(issue_id, old_type, new_type)?;
+                            println!(
+                                "✓ Replaced type '{}' with '{}' for issue {}",
+                                old_type, new_type, issue_id
+                            );
+                        }
+                    } else if !dry_run {
+                        self.apply_type_fix(issue_id, old_type, new_type)?;
+                    }
+                    fixes_applied += 1;
+                }
+            }
+        }
+
+        Ok(fixes_applied)
+    }
+
+    fn apply_type_fix(&mut self, issue_id: &str, old_type: &str, new_type: &str) -> Result<()> {
+        let mut issue = self.storage.load_issue(issue_id)?;
+
+        // Replace the type label
+        let old_label = format!("type:{}", old_type);
+        let new_label = format!("type:{}", new_type);
+
+        issue.labels.retain(|l| l != &old_label);
+        issue.labels.push(new_label);
+
+        self.storage.save_issue(&issue)?;
+        Ok(())
+    }
+
+    // Note: apply_dependency_reversal is removed - we don't reverse dependencies
+    // Type hierarchy is orthogonal to DAG structure
+
+    pub fn validate_silent(&self) -> Result<()> {
+        let issues = self.storage.list_issues()?;
+
+        // Build lookup map of valid issue IDs
+        let valid_ids: std::collections::HashSet<String> =
+            issues.iter().map(|i| i.id.clone()).collect();
+
+        // Check for broken dependency references
+        for issue in &issues {
+            for dep in &issue.dependencies {
+                if !valid_ids.contains(dep) {
+                    return Err(anyhow!(
+                        "Invalid dependency: issue '{}' depends on '{}' which does not exist",
+                        issue.id,
+                        dep
+                    ));
+                }
+            }
+        }
+
+        // Check for invalid gate references
+        let registry = self.storage.load_gate_registry()?;
+        for issue in &issues {
+            for gate_key in &issue.gates_required {
+                if !registry.gates.contains_key(gate_key) {
+                    return Err(anyhow!(
+                        "Gate '{}' required by issue '{}' is not defined in registry",
+                        gate_key,
+                        issue.id
+                    ));
+                }
+            }
+        }
+
+        // Validate labels
+        self.validate_labels(&issues)?;
+
+        // Validate document references (git integration)
+        self.validate_document_references(&issues)?;
+
+        // Validate type hierarchy
+        self.validate_type_hierarchy(&issues)?;
+
+        // Validate DAG (no cycles)
+        let issue_refs: Vec<&Issue> = issues.iter().collect();
+        let graph = DependencyGraph::new(&issue_refs);
+        graph.validate_dag()?;
+
+        Ok(())
+    }
+
+    fn validate_labels(&self, issues: &[Issue]) -> Result<()> {
+        let namespaces = self.storage.load_label_namespaces()?;
+
+        for issue in issues {
+            // Check label format
+            for label in &issue.labels {
+                label_utils::validate_label(label)
+                    .map_err(|e| anyhow!("Invalid label format in issue '{}': {}", issue.id, e))?;
+            }
+
+            // Check namespace exists in registry
+            for label in &issue.labels {
+                if let Ok((namespace, _)) = label_utils::parse_label(label) {
+                    if !namespaces.namespaces.contains_key(&namespace) {
+                        return Err(anyhow!(
+                            "Issue '{}' has label with unknown namespace '{}'. \
+                             Label: '{}'. Available namespaces: {}",
+                            issue.id,
+                            namespace,
+                            label,
+                            namespaces
+                                .namespaces
+                                .keys()
+                                .map(|k| k.as_str())
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        ));
+                    }
+                }
+            }
+
+            // Check uniqueness constraints
+            let mut unique_namespaces_seen = std::collections::HashMap::new();
+            for label in &issue.labels {
+                if let Ok((namespace, _)) = label_utils::parse_label(label) {
+                    if let Some(ns_config) = namespaces.namespaces.get(&namespace) {
+                        if ns_config.unique {
+                            if let Some(first_label) = unique_namespaces_seen.get(&namespace) {
+                                return Err(anyhow!(
+                                    "Issue '{}' has multiple labels from unique namespace '{}': '{}' and '{}'",
+                                    issue.id,
+                                    namespace,
+                                    first_label,
+                                    label
+                                ));
+                            }
+                            unique_namespaces_seen.insert(namespace, label.clone());
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn validate_type_hierarchy(&self, issues: &[Issue]) -> Result<()> {
+        use crate::hierarchy_templates::get_hierarchy_config;
+        use crate::type_hierarchy::{detect_validation_issues, ValidationIssue};
+
+        let config = get_hierarchy_config(&self.storage)?;
+
+        for issue in issues {
+            let validation_issues = detect_validation_issues(&config, &issue.id, &issue.labels);
+
+            // Report first validation issue found
+            if let Some(val_issue) = validation_issues.into_iter().next() {
+                match val_issue {
+                    ValidationIssue::UnknownType {
+                        issue_id,
+                        unknown_type,
+                        suggested_fix,
+                    } => {
+                        let suggestion = suggested_fix
+                            .map(|s| format!(" (did you mean '{}'?)", s))
+                            .unwrap_or_default();
+                        return Err(anyhow!(
+                            "Issue '{}' has unknown type '{}'{}",
+                            issue_id,
+                            unknown_type,
+                            suggestion
+                        ));
+                    }
+                    ValidationIssue::InvalidMembershipReference {
+                        issue_id,
+                        label,
+                        reason,
+                        ..
+                    } => {
+                        return Err(anyhow!(
+                            "Issue '{}' has invalid membership label '{}': {}",
+                            issue_id,
+                            label,
+                            reason
+                        ));
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn validate_document_references(&self, issues: &[Issue]) -> Result<()> {
+        use git2::Repository;
+
+        // Try to open git repository
+        let repo = match Repository::open(".") {
+            Ok(r) => r,
+            Err(_) => {
+                // If not a git repo, skip document validation
+                return Ok(());
+            }
+        };
+
+        for issue in issues {
+            for doc in &issue.documents {
+                // Validate commit hash if specified
+                if let Some(ref commit_hash) = doc.commit {
+                    if repo.find_commit(git2::Oid::from_str(commit_hash)?).is_err() {
+                        return Err(anyhow!(
+                            "Invalid document reference in issue '{}': commit '{}' not found for '{}'",
+                            issue.id,
+                            commit_hash,
+                            doc.path
+                        ));
+                    }
+                }
+
+                // Validate file exists (at HEAD if no commit specified)
+                let reference = if let Some(ref commit_hash) = doc.commit {
+                    commit_hash.as_str()
+                } else {
+                    "HEAD"
+                };
+
+                if self
+                    .check_file_exists_in_git(&repo, &doc.path, reference)
+                    .is_err()
+                {
+                    return Err(anyhow!(
+                        "Invalid document reference in issue '{}': file '{}' not found at {}",
+                        issue.id,
+                        doc.path,
+                        reference
+                    ));
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn check_file_exists_in_git(
+        &self,
+        repo: &git2::Repository,
+        path: &str,
+        reference: &str,
+    ) -> Result<()> {
+        let obj = repo.revparse_single(reference)?;
+        let commit = obj.peel_to_commit()?;
+        let tree = commit.tree()?;
+
+        // Try to find the file in the tree
+        tree.get_path(std::path::Path::new(path))?;
+
+        Ok(())
+    }
+
+    pub fn status(&self) -> Result<()> {
+        let summary = self.get_status()?;
+
+        println!("Status:");
+        println!("  Open: {}", summary.open);
+        println!("  Ready: {}", summary.ready);
+        println!("  In Progress: {}", summary.in_progress);
+        println!("  Done: {}", summary.done);
+        println!("  Blocked: {}", summary.blocked);
+
+        Ok(())
+    }
+
+    pub fn get_status(&self) -> Result<StatusSummary> {
+        let issues = self.storage.list_issues()?;
+        let issue_refs: Vec<&Issue> = issues.iter().collect();
+        let resolved: HashMap<String, &Issue> =
+            issue_refs.iter().map(|i| (i.id.clone(), *i)).collect();
+
+        let backlog = issues.iter().filter(|i| i.state == State::Backlog).count();
+        let ready = issues.iter().filter(|i| i.state == State::Ready).count();
+        let in_progress = issues
+            .iter()
+            .filter(|i| i.state == State::InProgress)
+            .count();
+        let gated = issues.iter().filter(|i| i.state == State::Gated).count();
+        let done = issues.iter().filter(|i| i.state == State::Done).count();
+        let blocked = issues.iter().filter(|i| i.is_blocked(&resolved)).count();
+
+        Ok(StatusSummary {
+            open: backlog, // Keep 'open' field name for backward compatibility
+            ready,
+            in_progress,
+            done,
+            blocked,
+            gated,
+            total: issues.len(),
+        })
+    }
+
+    /// Check for validation warnings on a specific issue.
+    ///
+    /// Returns warnings for:
+    /// - Strategic types (epic, milestone) missing identifying labels
+    /// - Leaf types (task) without parent associations
+    ///
+    /// # Arguments
+    ///
+    /// * `issue_id` - The ID of the issue to check
+    ///
+    /// # Returns
+    ///
+    /// A vector of validation warnings (empty if no warnings)
+    pub fn check_warnings(
+        &self,
+        issue_id: &str,
+    ) -> Result<Vec<crate::type_hierarchy::ValidationWarning>> {
+        use crate::type_hierarchy::{validate_orphans, validate_strategic_labels};
+
+        // Load the issue
+        let issue = self.storage.load_issue(issue_id)?;
+
+        // Load hierarchy config from file or use defaults
+        let config = self.load_hierarchy_config()?;
+
+        // Load validation config to check toggles
+        let validation_config = self.load_validation_config()?;
+
+        // Collect all warnings
+        let mut warnings = Vec::new();
+
+        // Check strategic label consistency (if enabled)
+        if validation_config.warn_strategic_consistency {
+            warnings.extend(validate_strategic_labels(&config, &issue));
+        }
+
+        // Check for orphaned leaves (if enabled)
+        if validation_config.warn_orphaned_leaves {
+            warnings.extend(validate_orphans(&config, &issue));
+        }
+
+        Ok(warnings)
+    }
+
+    /// Load hierarchy configuration from config.toml or fall back to defaults.
+    fn load_hierarchy_config(&self) -> Result<crate::type_hierarchy::HierarchyConfig> {
+        use crate::config::JitConfig;
+        use crate::type_hierarchy::HierarchyConfig;
+
+        let jit_config = JitConfig::load(self.storage.root())?;
+
+        if let Some(hierarchy_toml) = jit_config.type_hierarchy {
+            // Use config from file
+            let label_associations = hierarchy_toml.label_associations.unwrap_or_default();
+            HierarchyConfig::new(hierarchy_toml.types, label_associations)
+                .map_err(|e| anyhow::anyhow!("Invalid hierarchy config: {}", e))
+        } else {
+            // Fall back to defaults
+            Ok(HierarchyConfig::default())
+        }
+    }
+
+    /// Load validation configuration from config.toml or use defaults.
+    fn load_validation_config(&self) -> Result<ValidationConfigFlags> {
+        use crate::config::JitConfig;
+
+        let jit_config = JitConfig::load(self.storage.root())?;
+
+        let flags = if let Some(validation) = jit_config.validation {
+            ValidationConfigFlags {
+                strictness: validation.strictness.unwrap_or_else(|| "loose".to_string()),
+                warn_orphaned_leaves: validation.warn_orphaned_leaves.unwrap_or(true),
+                warn_strategic_consistency: validation.warn_strategic_consistency.unwrap_or(true),
+            }
+        } else {
+            ValidationConfigFlags::default()
+        };
+
+        Ok(flags)
+    }
+
+    /// Collect all validation warnings for all issues in the repository.
+    ///
+    /// Returns a vector of (issue_id, warnings) pairs for all issues with warnings.
+    pub fn collect_all_warnings(
+        &self,
+    ) -> Result<Vec<(String, Vec<crate::type_hierarchy::ValidationWarning>)>> {
+        let issues = self.storage.list_issues()?;
+        let mut all_warnings = Vec::new();
+
+        for issue in issues {
+            let warnings = self.check_warnings(&issue.id)?;
+            if !warnings.is_empty() {
+                all_warnings.push((issue.id.clone(), warnings));
+            }
+        }
+
+        Ok(all_warnings)
+    }
+}

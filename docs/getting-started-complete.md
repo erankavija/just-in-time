@@ -160,6 +160,46 @@ jit status
 
 ---
 
+## Understanding Labels and Dependencies
+
+Just-in-time uses two orthogonal structures to organize work:
+
+### Labels: Organizational Membership
+
+Labels group related work for filtering and reporting:
+- `--label "epic:auth"` means "this work is part of the auth epic"
+- `--label "milestone:v1.0"` means "this work is part of the v1.0 release"
+
+**Query**: `jit query label "epic:auth"` shows all members
+
+### Dependencies: Work Order
+
+Dependencies control workflow and blocking:
+- `jit dep add EPIC TASK` means "epic depends on task"
+- Epic is blocked until task completes
+
+**Query**: `jit query ready` shows unblocked work
+
+### They Work Together
+
+```
+Task: Login
+  ├─ label "epic:auth" → part of auth epic (grouping)
+  └─ dependency of Epic → required by epic (blocking)
+
+Both flow the same direction: Task → Epic → Milestone
+But serve different purposes: organization vs workflow
+```
+
+You can use:
+- **Labels alone** (just grouping, no workflow control)
+- **Dependencies alone** (just ordering, no organizational grouping)
+- **Both together** (recommended for most cases)
+
+See `docs/dependency-vs-labels-clarity.md` for detailed explanation.
+
+---
+
 ## Real-World Test Project
 
 Let's track a realistic small project: **Building a Personal Blog Engine**

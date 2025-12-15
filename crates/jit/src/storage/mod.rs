@@ -131,6 +131,13 @@ pub trait IssueStore: Clone {
     ) -> Result<std::collections::HashMap<String, crate::domain::LabelNamespace>> {
         Ok(self.load_label_namespaces()?.namespaces)
     }
+
+    /// Get the root directory path for this storage backend.
+    ///
+    /// Returns the path where configuration files are stored.
+    /// For file-based storage, this is the .jit directory.
+    /// For in-memory storage, this returns a temporary path.
+    fn root(&self) -> &std::path::Path;
 }
 
 #[cfg(test)]

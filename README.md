@@ -13,6 +13,8 @@ Traditional issue trackers are designed for humans. JIT is designed for **AI age
 - 🤖 **Agent-First**: Copilot agents can create issues, claim work, and coordinate with each other
 - 🔗 **Dependency DAG**: Express "Task B needs Task A" with automatic blocking and cycle detection  
 - ✅ **Quality Gates**: Enforce tests, reviews, scans before work can proceed
+- 🏗️ **Issue Hierarchy**: Organize work with epics, milestones, and strategic/tactical views
+- ⚙️ **Configurable**: Customize type hierarchies and validation rules per repository
 - 🔒 **Multi-Agent Safe**: File locking prevents race conditions with concurrent agents
 - 📊 **Full Observability**: Event log tracks every action for debugging agent behavior
 - 🎯 **Priority Dispatch**: Coordinator automatically assigns critical work first
@@ -56,16 +58,22 @@ See [INSTALL.md](INSTALL.md) for all installation options.
 # 1. Initialize in your project (creates .jit/ directory)
 jit init
 
-# 2. Create your first issue
+# 2. Create your first issue (labels optional!)
 jit issue create --title "Implement login feature" --priority high
 
-# 3. Setup coordinator for agent orchestration  
-jit coordinator init-config
+# OR with labels for hierarchy and organization
+jit issue create --title "Implement login feature" \
+  --label "type:epic" --label "milestone:v1.0" --priority high
 
-# That's it! Now agents can create issues, claim work, and coordinate.
+# 3. That's it! Start tracking work
+jit status
+jit issue list
 ```
 
-**Note:** All data is stored in `.jit/` directory (similar to `.git/`). Override with `JIT_DATA_DIR` environment variable if needed.
+**Note:** 
+- All data is stored in `.jit/` directory (similar to `.git/`)
+- **Labels are optional** - use them when you need organizational structure
+- Override storage location with `JIT_DATA_DIR` environment variable
 
 See [EXAMPLE.md](EXAMPLE.md) for complete workflows.
 
@@ -329,12 +337,67 @@ jit coordinator stop
 |---------|-------------|
 | **Dependency DAG** | Issues form a directed acyclic graph with automatic cycle detection |
 | **Quality Gates** | Tests, reviews, scans must pass before state transitions |
+| **Issue Hierarchy** | Labels define epics, milestones, and organizational structure |
+| **Strategic Views** | Filter and visualize high-level planning vs tactical work |
+| **Configurable Rules** | Customize type hierarchies and validation per repository |
 | **Coordinator Daemon** | Automatically dispatches ready work to available agents |
 | **Priority Dispatch** | Critical work gets assigned first |
 | **Event Log** | Full audit trail—every action logged to `.jit/events.jsonl` |
 | **Git-Friendly Storage** | Plain JSON files you can version, diff, and merge |
 | **Atomic Operations** | `claim` ensures no race conditions between agents |
 | **Graph Queries** | Understand upstream/downstream dependencies |
+
+## Issue Hierarchy & Organization
+
+JIT supports organizing work with **labels-based hierarchies**:
+
+```bash
+# Create a milestone
+jit issue create --title "Version 1.0 Release" \
+  --label "type:milestone" --label "milestone:v1.0"
+
+# Create an epic under that milestone
+jit issue create --title "User Authentication" \
+  --label "type:epic" --label "epic:auth" --label "milestone:v1.0"
+
+# Create tasks that belong to the epic
+jit issue create --title "Implement login endpoint" \
+  --label "type:task" --label "epic:auth"
+
+# Query strategic issues
+jit query strategic        # Shows only milestones and epics
+jit query label "epic:*"   # Shows all issues belonging to any epic
+```
+
+**Benefits:**
+- **Strategic/Tactical Views**: Toggle between high-level planning and detailed work
+- **Progress Tracking**: See downstream task counts and completion status
+- **Flexible Naming**: Use your own terminology (themes, features, etc.)
+- **Validation**: Warns about orphaned tasks or missing strategic labels
+
+See [docs/label-conventions.md](docs/label-conventions.md) for detailed usage patterns.
+
+## Configuration
+
+Customize validation and type hierarchies with `.jit/config.toml`:
+
+```toml
+[type_hierarchy]
+# Define your type hierarchy (lower numbers = more strategic)
+types = { milestone = 1, epic = 2, story = 3, task = 4 }
+
+# Map types to label namespaces
+[type_hierarchy.label_associations]
+epic = "epic"
+milestone = "milestone"
+
+[validation]
+# Control validation behavior
+warn_orphaned_leaves = true       # Warn on tasks without parent labels
+warn_strategic_consistency = true # Warn on strategic types missing labels
+```
+
+See [docs/example-config.toml](docs/example-config.toml) for more examples.
 
 ## Commands
 
@@ -348,6 +411,11 @@ jit issue update <id> --state done
 # Dependencies
 jit dep add <from-issue> <to-dependency>
 jit graph show <issue>
+
+# Labels & Organization
+jit issue create --label "type:epic" --label "milestone:v1.0"
+jit query label "epic:*"
+jit query strategic
 
 # Quality Gates  
 jit gate add <issue> unit-tests
@@ -376,12 +444,12 @@ jit events tail -n 20
 ✅ **Phase 1**: Core issue management with dependency graph  
 ✅ **Phase 2**: Quality gates, web UI, and REST API  
 ✅ **Phase 3.1**: Full-text search with ripgrep  
-🚧 **Phase 3**: Advanced knowledge management features (in progress)  
-🚧 **Phase 4**: Production readiness (metrics, plugins)
+✅ **Phase 4**: Issue hierarchy, labels, and configuration support  
+🚧 **Phase 5**: Advanced knowledge management features (in progress)  
 
 See [ROADMAP.md](ROADMAP.md) for details.
 
-## Configuration
+## Advanced Configuration
 
 ### Environment Variables
 
@@ -412,11 +480,18 @@ File locking ensures data consistency. See [docs/file-locking-usage.md](docs/fil
 
 ## Documentation
 
+### Getting Started
 - [INSTALL.md](INSTALL.md) - Installation guide (binaries, Docker, from source)
-- [DEPLOYMENT.md](DEPLOYMENT.md) - Production deployment guide
 - [EXAMPLE.md](EXAMPLE.md) - Complete agent orchestration walkthrough
+- [DEPLOYMENT.md](DEPLOYMENT.md) - Production deployment guide
+
+### Core Features
 - [docs/design.md](docs/design.md) - Detailed design specifications
+- [docs/label-conventions.md](docs/label-conventions.md) - Issue hierarchy and labels usage
+- [docs/example-config.toml](docs/example-config.toml) - Configuration examples
 - [docs/file-locking-usage.md](docs/file-locking-usage.md) - Multi-agent concurrency guide
+
+### Development
 - [ROADMAP.md](ROADMAP.md) - Development phases and progress
 - [TESTING.md](TESTING.md) - Testing strategy and best practices
 - [docs/storage-abstraction.md](docs/storage-abstraction.md) - Pluggable backend design

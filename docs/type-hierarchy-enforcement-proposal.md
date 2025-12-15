@@ -1,8 +1,113 @@
 # Issue Type Hierarchy Enforcement Proposal
 
 **Date**: 2025-12-14  
-**Status**: Proposal  
+**Status**: **IMPLEMENTATION UPDATED - SEE CRITICAL NOTE** ⚠️  
 **Goal**: Flexible, configurable type enforcement with customizable hierarchy levels
+
+---
+
+## ⚠️ CRITICAL UPDATE (2025-12-14)
+
+**The original design in this document contained a fundamental misunderstanding** that was corrected during implementation.
+
+### What Changed
+
+**ORIGINAL (WRONG)**: The design suggested validating dependencies based on type hierarchy.
+
+**CORRECTED**: Type hierarchy is **ONLY** for validating type labels, NOT dependencies.
+
+### Current Implementation Scope
+
+✅ **What IS implemented:**
+- Validate type labels are known (`type:task` is valid, `type:taks` is typo)
+- Suggest fixes for unknown/typo type labels
+- Configuration system for type hierarchy
+
+❌ **What is NOT implemented:**
+- Dependency validation based on type (dependencies are unrestricted)
+- Label-based membership validation (future: `epic:auth` label references)
+
+### Why Dependencies Are NOT Validated
+
+**Dependencies express work sequencing, NOT organizational membership:**
+- ✅ task → epic: "task needs epic defined before work starts" (valid)
+- ✅ epic → task: "epic needs this specific task completed" (valid)  
+- ✅ milestone → task: "v1.0 needs this task done" (valid)
+- **Dependencies can flow in ANY direction** - they're about work flow, not structure
+
+**Organizational membership will be via labels (future):**
+- task with `epic:auth` label = "task belongs to auth epic"
+- This is separate from dependencies and not yet implemented
+
+**See `docs/session-notes-hierarchy-bug-fix.md` for full details of the confusion.**
+
+---
+
+## Document Status
+
+**This document retains the original design** for historical reference, but sections about dependency validation should be ignored.
+
+The authoritative source for current implementation is the code in `crates/jit/src/type_hierarchy.rs`.
+
+---
+
+## Document Status
+
+**This is the authoritative design document for implementation.**
+
+### Related Documents
+- `docs/generic-hierarchy-model.md` (2025-12-11) - Earlier exploration of hierarchy concepts
+  - Contains valuable ideas for future phases (see "Ideas to Incorporate" below)
+  - NOT the basis for current implementation
+  - Deferred features: Runtime hierarchy modification, storage trait changes
+
+### Ideas to Incorporate from `generic-hierarchy-model.md`
+
+The older generic hierarchy model contains several good ideas to consider for **future phases**:
+
+1. **Explicit `order` field** (consider for Phase 5+)
+   - Old model: `order: 0` (highest) → `order: 4` (lowest)
+   - Current: Implicit ordering via HashMap key
+   - **Future**: Add explicit `order` field for clearer semantics
+   - **Benefit**: Makes level relationships explicit in config
+
+2. **`membership_namespace` field** (consider for Phase 5+)
+   - Old model: Explicit field per level (e.g., `membership_namespace: "epic"`)
+   - Current: Implicit via `label_associations` map
+   - **Future**: Add explicit field to level definitions
+   - **Benefit**: More self-documenting, clearer schema
+
+3. **Query API patterns** (incorporate in Phase B/C)
+   - `query_by_level(name)` - Query specific hierarchy level
+   - `query_above_level(min_order)` - Query strategic view by order
+   - `query_by_membership(namespace)` - Query by membership label
+   - **Action**: Use these method names in implementation
+
+4. **Runtime hierarchy modification** (defer to Phase 6+)
+   - `jit hierarchy add-level` - Add new level dynamically
+   - `jit hierarchy reorder` - Adjust level ordering
+   - `jit hierarchy remove-level` - Remove unused level
+   - **Defer**: Complex, not needed for MVP, consider post-1.0
+
+5. **Example configurations** (use immediately)
+   - 2-level minimal: epic → task
+   - 3-level standard: milestone → epic → story
+   - 5-level enterprise: portfolio → program → epic → feature → story
+   - **Action**: Include these in Phase C templates
+
+### Implementation Priority
+
+**Current Phase (Phase A-D)**: Focus on this document's design
+- Use implicit level ordering (HashMap keys)
+- Use `label_associations` for namespace mapping
+- Fixed templates (default, extended, agile, minimal)
+- No runtime modification
+
+**Future Phases (Phase 5+)**: Consider incorporating ideas above
+- Add explicit `order` field to schema
+- Add `membership_namespace` field
+- Implement runtime hierarchy commands
+- Allow dynamic level management
 
 ---
 
@@ -10,16 +115,37 @@
 
 This proposal extends the label enforcement system to include **issue type hierarchy validation** while keeping it fairly loose and optional. The system validates that type hierarchies are logically consistent based on **configurable hierarchy levels** that can be extended in either direction.
 
+**CRITICAL: Orthogonality with Dependency DAG**
+
+The type hierarchy system is **orthogonal to the dependency graph**. These are two separate concerns:
+
+1. **Dependency DAG**: Technical/logical dependencies between issues
+   - Example: Task A depends on Task B (B must complete before A)
+   - Example: Task depends on Milestone (task contributes to milestone completion)
+   - This is about **work sequencing** and **logical prerequisites**
+
+2. **Type Hierarchy**: Organizational containment and grouping
+   - Example: Task **belongs to** Epic (organizational membership)
+   - Example: Epic **belongs to** Milestone (strategic grouping)
+   - This is about **structural organization** and **strategic visibility**
+
+**Key Distinction**:
+- ✅ A task can **depend on** a milestone completing (DAG relationship: "I need v1.0 shipped before I can start")
+- ❌ A milestone cannot **belong to** a task (hierarchy violation: "v1.0 release is not contained by a single task")
+
+The hierarchy validation only restricts **organizational membership** (which direction labels flow), not **logical dependencies** (which work must complete first).
+
 ---
 
 ## Core Principles
 
-1. **Optional but Helpful**: Validation warns rather than blocks (except for critical violations)
-2. **Hierarchy-Aware**: Understands configurable hierarchy levels
-3. **Agent-Friendly**: Clear error messages guide agents to correct usage
-4. **Gradual Adoption**: Can be enabled incrementally per repository
-5. **Functionally Pure**: Validation is side-effect-free and testable
-6. **Fully Configurable**: Type names, hierarchy levels, and default type are all configurable
+1. **Orthogonal to DAG**: Type hierarchy validates containment, not dependencies
+2. **Optional but Helpful**: Validation warns rather than blocks (except for critical violations)
+3. **Hierarchy-Aware**: Understands configurable hierarchy levels
+4. **Agent-Friendly**: Clear error messages guide agents to correct usage
+5. **Gradual Adoption**: Can be enabled incrementally per repository
+6. **Functionally Pure**: Validation is side-effect-free and testable
+7. **Fully Configurable**: Type names, hierarchy levels, and default type are all configurable
 
 ---
 
@@ -57,22 +183,44 @@ milestone               (level 3: top-level container)
 
 ### Hierarchy Rules
 
-**Core Constraint**: An issue at level N can only depend on issues at level N or higher (N+1, N+2, etc.)
+**Core Constraint**: An issue at level N can only **belong to** (be contained by) issues at level N or higher (N+1, N+2, etc.)
 
-| Relationship | Valid? | Example |
-|-------------|--------|---------|
-| Same level → same level | ✅ Yes | task → task, epic → epic |
-| Lower level → higher level | ✅ Yes | task → epic, epic → milestone |
-| Higher level → lower level | ❌ No | epic → task, milestone → epic |
-| Higher level → same level | ❌ No | milestone → milestone |
+**IMPORTANT**: This validates **organizational membership via labels**, not the dependency graph.
+
+| Relationship | Valid? | Example | Interpretation |
+|-------------|--------|---------|----------------|
+| Same level → same level | ✅ Yes | task → task | Peer organizational grouping |
+| Lower level → higher level | ✅ Yes | task → epic | Task belongs to epic |
+| Higher level → lower level | ❌ No | epic → task | Epic cannot belong to task |
+| Higher level → same level | ❌ No | milestone → milestone | Milestone cannot belong to peer |
+
+**Dependency DAG vs Type Hierarchy**:
+
+```
+ORGANIZATIONAL HIERARCHY (validated by type system):
+  milestone:v1.0 (level 3)
+    ├── epic:auth (level 2) - belongs to milestone
+    │   └── task:login (level 1) - belongs to auth epic
+    └── epic:api (level 2) - belongs to milestone
+        └── task:endpoints (level 1) - belongs to api epic
+
+DEPENDENCY DAG (separate, not validated by type system):
+  milestone:v1.0
+    ← task:login (needs v1.0 to be defined before work starts)
+    ← task:endpoints (contributes to v1.0 completion)
+  
+  task:login
+    ← task:jwt-validation (sequential work dependency)
+```
 
 ### Key Constraints
 
-1. **Hierarchy flows upward**: Lower-level issues can depend on higher-level issues (broader containers)
-2. **No reverse dependencies**: Higher-level issues cannot depend on lower-level issues
-3. **Peer dependencies allowed**: Issues at the same level can depend on each other
+1. **Hierarchy flows upward**: Lower-level issues can **belong to** higher-level containers (organizational membership via labels)
+2. **No reverse containment**: Higher-level containers cannot **belong to** lower-level issues
+3. **Peer relationships allowed**: Issues at the same level can share organizational groupings
 4. **Flexible expansion**: New levels can be added above or below existing levels
 5. **Configurable defaults**: Default type (e.g., "task") is configurable per repository
+6. **DAG independence**: The dependency graph is separate and can express any logical relationships (even task → milestone)
 
 ---
 
@@ -259,13 +407,52 @@ pub fn default_hierarchy_config() -> HierarchyConfig {
 
 ## Implementation Design
 
+### Error Strategy
+
+Following Rust best practices and jit's library-first architecture:
+
+```rust
+// Use thiserror for strongly-typed errors in library code
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum HierarchyError {
+    #[error("Missing type label. Add one of: {valid_types}")]
+    MissingTypeLabel { valid_types: String },
+    
+    #[error("Multiple type labels found: {labels:?}. Issue must have exactly one type label")]
+    MultipleTypeLabels { labels: Vec<String> },
+    
+    #[error("Unknown type '{type_name}'. Valid types: {valid_types}")]
+    UnknownType { type_name: String, valid_types: String },
+    
+    #[error("Hierarchy violation: {reason}")]
+    HierarchyViolation { reason: String },
+}
+
+#[derive(Debug, Error)]
+pub enum ConfigError {
+    #[error("Duplicate type '{type_name}' found in multiple levels: {levels:?}")]
+    DuplicateType { type_name: String, levels: Vec<u8> },
+    
+    #[error("Default type '{default_type}' not found in any hierarchy level")]
+    DefaultTypeNotInLevels { default_type: String },
+    
+    #[error("Strategic type '{type_name}' not found in any hierarchy level")]
+    StrategicTypeNotInLevels { type_name: String },
+}
+
+// CLI layer converts to user-friendly messages
+// Library layer returns strongly-typed Result<T, HierarchyError>
+```
+
 ### Core Validation Module
 
 ```rust
 // crates/jit/src/type_hierarchy.rs
 
 use std::collections::HashMap;
-use anyhow::{anyhow, Result};
+use thiserror::Error;
 
 /// Hierarchy configuration loaded from .jit/config.toml
 #[derive(Debug, Clone, PartialEq)]
@@ -336,43 +523,68 @@ impl HierarchyConfig {
 }
 
 /// Extract issue type from labels
-pub fn extract_type(labels: &[String]) -> Result<String, ValidationError> {
+/// Normalizes to lowercase and trims whitespace
+pub fn extract_type(labels: &[String], config: &HierarchyConfig) -> Result<String, HierarchyError> {
     let type_labels: Vec<_> = labels.iter()
         .filter(|l| l.starts_with("type:"))
         .collect();
     
     if type_labels.is_empty() {
-        return Err(ValidationError::MissingTypeLabel);
+        let valid_types = format_valid_types(config);
+        return Err(HierarchyError::MissingTypeLabel { valid_types });
     }
     
     if type_labels.len() > 1 {
-        return Err(ValidationError::MultipleTypeLabels(
-            type_labels.iter().map(|s| s.to_string()).collect()
-        ));
+        return Err(HierarchyError::MultipleTypeLabels {
+            labels: type_labels.iter().map(|s| s.to_string()).collect()
+        });
     }
     
-    let type_name = type_labels[0].strip_prefix("type:").unwrap();
-    Ok(type_name.to_string())
+    // Normalize: lowercase and trim whitespace
+    let type_name = type_labels[0]
+        .strip_prefix("type:")
+        .unwrap()
+        .to_lowercase()
+        .trim()
+        .to_string();
+    
+    Ok(type_name)
 }
 
-/// Validate type hierarchy constraints
+/// Format valid types for error messages
+fn format_valid_types(config: &HierarchyConfig) -> String {
+    let mut all_types: Vec<String> = config.levels.values()
+        .flat_map(|types| types.iter().cloned())
+        .collect();
+    all_types.sort();
+    all_types.dedup();
+    all_types.join(", ")
+}
+
+/// Validate type hierarchy constraints for organizational membership
+/// 
+/// IMPORTANT: This validates that labels indicate proper containment hierarchy.
+/// It does NOT restrict the dependency DAG - issues can have logical dependencies
+/// on any other issues regardless of type.
+/// 
+/// For example:
+/// - A task can depend on a milestone (logical dependency: "needs v1.0 to start")
+/// - But a milestone cannot BELONG TO a task (organizational violation)
 pub fn validate_hierarchy(
     config: &HierarchyConfig,
     child_type: &str,
     parent_type: &str,
-) -> Result<(), HierarchyViolation> {
+) -> Result<(), HierarchyError> {
     if !config.can_depend_on(child_type, parent_type) {
         let child_level = config.get_level(child_type).unwrap_or(0);
         let parent_level = config.get_level(parent_type).unwrap_or(0);
         
-        return Err(HierarchyViolation {
-            child: child_type.to_string(),
-            parent: parent_type.to_string(),
-            child_level,
-            parent_level,
+        return Err(HierarchyError::HierarchyViolation {
             reason: format!(
-                "{} (level {}) cannot depend on {} (level {}). \
-                 Hierarchy flows upward: lower-level issues can only depend on same or higher-level issues.",
+                "{} (level {}) cannot belong to {} (level {}).\n\
+                 Organizational hierarchy flows upward: lower-level issues belong to higher-level containers.\n\
+                 Note: This validates labels/membership, not the dependency DAG.\n\
+                 If you need a logical dependency, the DAG allows any relationships.",
                 child_type, child_level, parent_type, parent_level
             ),
         });
@@ -453,22 +665,6 @@ pub fn validate_orphans(
 }
 
 #[derive(Debug)]
-pub enum ValidationError {
-    MissingTypeLabel,
-    MultipleTypeLabels(Vec<String>),
-    UnknownType(String),
-}
-
-#[derive(Debug)]
-pub struct HierarchyViolation {
-    pub child: String,
-    pub parent: String,
-    pub child_level: u8,
-    pub parent_level: u8,
-    pub reason: String,
-}
-
-#[derive(Debug)]
 pub enum ValidationWarning {
     MissingStrategicLabel {
         type_name: String,
@@ -477,6 +673,77 @@ pub enum ValidationWarning {
     OrphanedLeaf {
         type_name: String,
     },
+}
+
+/// Validation report for batch validation
+#[derive(Debug, Default)]
+pub struct ValidationReport {
+    pub errors: Vec<(String, HierarchyError)>,        // (issue_id, error)
+    pub warnings: Vec<(String, ValidationWarning)>,   // (issue_id, warning)
+    pub violations: Vec<(String, String, String)>,    // (issue_id, dep_id, reason)
+}
+
+impl ValidationReport {
+    pub fn new() -> Self {
+        Self::default()
+    }
+    
+    pub fn add_error(&mut self, issue_id: &str, error: HierarchyError) {
+        self.errors.push((issue_id.to_string(), error));
+    }
+    
+    pub fn add_warning(&mut self, issue_id: &str, warning: ValidationWarning) {
+        self.warnings.push((issue_id.to_string(), warning));
+    }
+    
+    pub fn add_violation(&mut self, issue_id: &str, dep_id: &str, reason: String) {
+        self.violations.push((issue_id.to_string(), dep_id.to_string(), reason));
+    }
+    
+    pub fn has_errors(&self) -> bool {
+        !self.errors.is_empty() || !self.violations.is_empty()
+    }
+    
+    pub fn has_warnings(&self) -> bool {
+        !self.warnings.is_empty()
+    }
+}
+
+/// Config validation
+pub fn validate_hierarchy_config(config: &HierarchyConfig) -> Result<(), ConfigError> {
+    // Check for duplicate types across levels
+    let mut type_to_levels: HashMap<String, Vec<u8>> = HashMap::new();
+    for (level, types) in &config.levels {
+        for type_name in types {
+            type_to_levels.entry(type_name.clone())
+                .or_default()
+                .push(*level);
+        }
+    }
+    
+    for (type_name, levels) in type_to_levels {
+        if levels.len() > 1 {
+            return Err(ConfigError::DuplicateType { type_name, levels });
+        }
+    }
+    
+    // Check default_type exists in levels
+    if config.get_level(&config.default_type).is_none() {
+        return Err(ConfigError::DefaultTypeNotInLevels {
+            default_type: config.default_type.clone()
+        });
+    }
+    
+    // Check all strategic types exist in levels
+    for strategic_type in &config.strategic_types {
+        if config.get_level(strategic_type).is_none() {
+            return Err(ConfigError::StrategicTypeNotInLevels {
+                type_name: strategic_type.clone()
+            });
+        }
+    }
+    
+    Ok(())
 }
 ```
 
@@ -884,7 +1151,7 @@ default_type = "task"
 3 = ["milestone"]
 ```
 
-**Template: extended (5 levels)**
+**Template: extended (5 levels)** - *Inspired by `generic-hierarchy-model.md`*
 ```toml
 [type_hierarchy]
 default_type = "task"
@@ -896,7 +1163,7 @@ default_type = "task"
 4 = ["program", "portfolio"]
 ```
 
-**Template: agile (4 levels, story-centric)**
+**Template: agile (4 levels, story-centric)** - *Inspired by `generic-hierarchy-model.md`*
 ```toml
 [type_hierarchy]
 default_type = "story"
@@ -907,7 +1174,7 @@ default_type = "story"
 3 = ["release"]
 ```
 
-**Template: minimal (2 levels)**
+**Template: minimal (2 levels)** - *Inspired by `generic-hierarchy-model.md`*
 ```toml
 [type_hierarchy]
 default_type = "task"
@@ -918,7 +1185,90 @@ default_type = "task"
 
 ---
 
-## Migration Strategy
+## Concrete Implementation Plan
+
+Based on reviewer feedback, here's a structured 4-phase implementation aligned with jit's architecture:
+
+### Phase A: Core Module and Config Parsing (2-3 hours)
+
+**Goal**: Pure functional validation library with no side effects.
+
+**Files to create/modify**:
+- `crates/jit/src/type_hierarchy.rs` (new)
+- `crates/jit/src/lib.rs` (add module)
+
+**Deliverables**:
+1. `HierarchyConfig` struct with validation
+2. Error enums using `thiserror`:
+   - `HierarchyError` for runtime validation
+   - `ConfigError` for configuration issues
+3. Pure functions:
+   - `extract_type(labels, config) -> Result<String, HierarchyError>`
+   - `validate_hierarchy(config, child_type, parent_type) -> Result<(), HierarchyError>`
+   - `validate_strategic_labels(config, type_name, labels) -> Vec<ValidationWarning>`
+   - `validate_orphans(config, type_name, labels) -> Vec<ValidationWarning>`
+   - `validate_hierarchy_config(config) -> Result<(), ConfigError>`
+4. `default_hierarchy_config() -> HierarchyConfig`
+5. `ValidationReport` struct for batch operations
+6. Unit tests (15-20 tests):
+   - Config validation (duplicates, missing defaults)
+   - Level extraction and normalization
+   - Strategic type detection
+   - Orphan detection
+7. Property-based tests (5-10 tests):
+   - Hierarchy transitivity
+   - No cycles possible from upward flow
+   - Unknown types under different strictness levels
+
+**Acceptance criteria**:
+- All tests passing
+- Zero clippy warnings
+- All public functions have doc comments with examples
+- Config validation catches common mistakes
+
+---
+
+### Phase B: CLI Integration (1-2 hours)
+
+**Goal**: Integrate hierarchy validation into existing commands.
+
+**Files to modify**:
+- `crates/jit/src/commands.rs`
+- `crates/jit/src/cli.rs`
+
+**Deliverables**:
+1. **`create_issue` integration**:
+   - Auto-add `type:{default}` if no `type:*` label present
+   - Validate type exists in hierarchy (error if unknown under strict)
+   - Warn on strategic consistency issues (use `--force` to bypass)
+   - Warn on orphaned leaves (use `--orphan` to acknowledge)
+   - Log auto-additions with `info!()`
+2. **`add_dependency` integration**:
+   - Validate hierarchy constraints BEFORE cycle detection
+   - Error on reverse flow with helpful message:
+     ```
+     Error: Hierarchy violation: milestone (level 3) cannot belong to epic (level 2)
+     Hint: Did you mean: jit dep add <epic_id> <milestone_id>?
+     Note: This validates organizational membership, not the DAG.
+          If you need a logical dependency (task needs milestone done),
+          the DAG allows any relationships.
+     ```
+   - Keep cycle detection separate and run second
+3. **`validate` command extension**:
+   - Add `--type-hierarchy` flag
+   - Produce `ValidationReport` with typed errors/warnings/violations
+   - Support `--json` output for machine consumption
+   - Non-interactive `--yes` mode for CI/automation
+4. **Config loading**:
+   - `load_hierarchy_config() -> Result<HierarchyConfig>`
+   - Fallback to `default_hierarchy_config()` if no config file
+   - Validate config on load
+   - Cache config in `CommandExecutor` to avoid repeated parsing
+
+**CLI flags**:
+- `--force`: Bypass validation warnings
+- `--orphan`: Explicitly allow orphaned leaves
+- `--yes`: Non-interactive mode (auto-accept fixes)
 
 ### Phase 1: Add Validation Module (2-3 hours)
 1. Create `type_hierarchy.rs` with validation logic
@@ -1642,7 +1992,39 @@ echo "Migration complete!"
 
 ## Future Enhancements
 
-### Phase 7: Advanced Features (Deferred)
+### Phase 5+: Ideas from `generic-hierarchy-model.md` (Deferred)
+
+These features from the earlier hierarchy model exploration are worth considering for future implementation:
+
+1. **Runtime Hierarchy Modification** (from `generic-hierarchy-model.md`)
+   - `jit hierarchy add-level <name> --order N`
+   - `jit hierarchy remove-level <name>`
+   - `jit hierarchy reorder <name> --order N`
+   - **Benefit**: Dynamic hierarchy adjustments without manual TOML editing
+   - **Complexity**: Requires migration of existing issues on level changes
+   - **Status**: Defer until post-1.0, templates sufficient for MVP
+
+2. **Explicit Order Field** (from `generic-hierarchy-model.md`)
+   - Add `order` field to level definitions in config
+   - Example: `{ types: ["epic"], order: 2, description: "..." }`
+   - **Benefit**: Makes level relationships explicit, easier to reason about
+   - **Current**: Implicit via HashMap keys (level numbers)
+   - **Status**: Consider for schema v2
+
+3. **Membership Namespace Field** (from `generic-hierarchy-model.md`)
+   - Add `membership_namespace` field per level
+   - Example: `{ types: ["epic"], membership_namespace: "epic" }`
+   - **Benefit**: More self-documenting than `label_associations` map
+   - **Current**: Using `label_associations` map
+   - **Status**: Consider for schema v2
+
+4. **Enhanced Query API** (partially from `generic-hierarchy-model.md`)
+   - `jit query level <name>` - Query by level name
+   - `jit query above-level <order>` - Query strategic view by numeric order
+   - `jit query membership <namespace:value>` - Query by membership label
+   - **Status**: Implement query patterns in Phase B/C
+
+### Phase 7: Advanced Features (New Ideas)
 
 1. **Hierarchy Visualization**
    - Generate hierarchy diagram: `jit config show-hierarchy --diagram`
@@ -1672,6 +2054,8 @@ echo "Migration complete!"
 ---
 
 ## Appendix: Configuration Examples
+
+*Note: These examples are adapted from `docs/generic-hierarchy-model.md` to the current config format.*
 
 ### Example 1: Jira-Style Hierarchy
 ```toml
@@ -1710,4 +2094,19 @@ default_type = "story"
 5 = ["solution"]
 [type_hierarchy.strategic]
 types = ["epic", "capability", "solution"]
+```
+
+### Example 4: Research Team (Custom) - *From `generic-hierarchy-model.md`*
+```toml
+[type_hierarchy]
+default_type = "analysis"
+[type_hierarchy.levels]
+1 = ["analysis"]
+2 = ["experiment"]
+3 = ["initiative"]
+[type_hierarchy.strategic]
+types = ["initiative", "experiment"]
+[type_hierarchy.label_associations]
+initiative = "initiative"
+experiment = "experiment"
 ```

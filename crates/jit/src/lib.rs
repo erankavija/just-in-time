@@ -5,13 +5,16 @@
 
 pub mod cli;
 pub mod commands;
+pub mod config;
 pub mod domain;
 pub mod graph;
+pub mod hierarchy_templates;
 pub mod labels;
 pub mod output;
 pub mod schema;
 pub mod search;
 pub mod storage;
+pub mod type_hierarchy;
 pub mod visualization;
 
 // Re-export commonly used types
