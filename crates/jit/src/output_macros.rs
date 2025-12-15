@@ -11,7 +11,7 @@
 macro_rules! output_message {
     ($json:expr, $($arg:tt)*) => {
         if $json {
-            use output::JsonOutput;
+            use jit::output::JsonOutput;
             use serde_json::json;
             let msg = format!($($arg)*);
             let output = JsonOutput::success(json!({"message": msg}));
@@ -36,7 +36,7 @@ macro_rules! output_message {
 macro_rules! output_data {
     ($json:expr, $data:expr, $human_block:block) => {
         if $json {
-            use output::JsonOutput;
+            use jit::output::JsonOutput;
             let output = JsonOutput::success(&$data);
             println!("{}", output.to_json_string()?);
         } else {
@@ -61,7 +61,7 @@ macro_rules! output_data {
 macro_rules! output_json {
     ($json:expr, $json_data:expr, $human_block:block) => {
         if $json {
-            use output::JsonOutput;
+            use jit::output::JsonOutput;
             let output = JsonOutput::success($json_data);
             println!("{}", output.to_json_string()?);
         } else {

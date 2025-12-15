@@ -1,6 +1,5 @@
 //! Integration tests for type hierarchy auto-fix functionality
 
-use std::fs;
 use std::process::Command;
 use tempfile::TempDir;
 

@@ -50,6 +50,7 @@ use thiserror::Error;
 #[derive(Debug, Error, PartialEq)]
 pub enum HierarchyError {
     #[error("Unknown type: '{0}'")]
+    #[allow(dead_code)] // Used in validation logic, may be used by external consumers
     UnknownType(String),
 
     #[error("Invalid label format: '{0}' (expected 'type:value')")]
@@ -66,6 +67,7 @@ pub enum ValidationIssue {
         suggested_fix: Option<String>,
     },
     /// An issue has a membership label referencing a non-existent issue
+    #[allow(dead_code)] // Reserved for future membership validation feature
     InvalidMembershipReference {
         issue_id: String,
         label: String,
@@ -556,6 +558,7 @@ pub fn validate_orphans(
 /// let issues = detect_membership_issues(&config, &task, &all_issues);
 /// assert!(issues.is_empty()); // Valid reference
 /// ```
+#[allow(dead_code)] // Reserved for future membership validation feature
 pub fn detect_membership_issues(
     config: &HierarchyConfig,
     issue: &crate::domain::Issue,

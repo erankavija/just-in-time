@@ -1,7 +1,6 @@
-use jit::config::{HierarchyConfigToml, JitConfig, ValidationConfig};
+use jit::config::JitConfig;
 use jit::storage::{IssueStore, JsonFileStorage};
 use jit::CommandExecutor;
-use std::collections::HashMap;
 use tempfile::TempDir;
 
 #[test]

@@ -825,7 +825,7 @@ impl LabelNamespaces {
                     self.namespaces.insert(
                         namespace.clone(),
                         LabelNamespace::new(
-                            &format!("{} organizational grouping", type_name),
+                            format!("{} organizational grouping", type_name),
                             false,
                             true,
                         ),

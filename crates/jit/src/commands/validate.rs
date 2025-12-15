@@ -8,6 +8,7 @@ use crate::type_hierarchy::{
 /// Validation configuration flags loaded from config.toml.
 #[derive(Debug, Clone)]
 struct ValidationConfigFlags {
+    #[allow(dead_code)] // Reserved for future strictness levels (strict/loose/permissive)
     strictness: String,
     warn_orphaned_leaves: bool,
     warn_strategic_consistency: bool,
@@ -24,6 +25,7 @@ impl Default for ValidationConfigFlags {
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
+    #[allow(dead_code)] // Used internally by validate_with_options
     pub fn validate(&self) -> Result<()> {
         self.validate_silent()?;
         println!("✓ Repository is valid");

@@ -11,29 +11,19 @@
 //! - Priority-based issue management
 //! - Agent coordination support
 
-mod cli;
-mod commands;
-mod config;
-mod domain;
-mod graph;
-mod hierarchy_templates;
-mod labels;
-mod output;
+// Binary-specific module (not in library)
 mod output_macros;
-mod storage;
-mod type_hierarchy;
-mod visualization;
 
 use anyhow::{anyhow, Result};
 use clap::Parser;
-use cli::{
+use jit::cli::{
     Cli, Commands, DepCommands, DocCommands, EventCommands, GateCommands, GraphCommands,
     IssueCommands, RegistryCommands,
 };
-use commands::{parse_priority, parse_state, CommandExecutor};
-use output::ExitCode;
+use jit::commands::{parse_priority, parse_state, CommandExecutor};
+use jit::output::ExitCode;
+use jit::storage::{IssueStore, JsonFileStorage};
 use std::env;
-use storage::{IssueStore, JsonFileStorage};
 
 /// Helper to determine exit code from error message
 fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
@@ -125,7 +115,7 @@ fn run() -> Result<()> {
 
             // If a template is specified, update the labels config with the hierarchy
             if let Some(template_name) = hierarchy_template {
-                let template = hierarchy_templates::HierarchyTemplate::get(template_name)
+                let template = jit::hierarchy_templates::HierarchyTemplate::get(template_name)
                     .ok_or_else(|| anyhow!("Unknown hierarchy template: {}", template_name))?;
 
                 let mut namespaces = executor.storage().load_label_namespaces()?;
@@ -174,7 +164,7 @@ fn run() -> Result<()> {
 
                         // Check for warnings unless --force is set
                         if !force {
-                            use crate::type_hierarchy::ValidationWarning;
+                            use jit::type_hierarchy::ValidationWarning;
 
                             let warnings = executor.check_warnings(&id)?;
 
@@ -229,7 +219,7 @@ fn run() -> Result<()> {
                     let issues = executor.list_issues(state_filter, assignee, priority_filter)?;
 
                     if json {
-                        use output::JsonOutput;
+                        use jit::output::JsonOutput;
                         use serde_json::json;
 
                         // Count issues by state
@@ -272,7 +262,7 @@ fn run() -> Result<()> {
                     )?;
 
                     if json {
-                        use output::JsonOutput;
+                        use jit::output::JsonOutput;
                         use serde_json::json;
 
                         let output = JsonOutput::success(json!({
@@ -321,7 +311,7 @@ fn run() -> Result<()> {
                         });
                     }
                     Err(e) => {
-                        handle_json_error!(json, e, output::JsonError::issue_not_found(&id));
+                        handle_json_error!(json, e, jit::output::JsonError::issue_not_found(&id));
                     }
                 },
                 IssueCommands::Update {
@@ -379,7 +369,7 @@ fn run() -> Result<()> {
                     let subtask_ids = executor.breakdown_issue(&parent_id, subtasks)?;
 
                     if json {
-                        use output::JsonOutput;
+                        use jit::output::JsonOutput;
                         let response = serde_json::json!({
                             "parent_id": parent_id,
                             "subtask_ids": subtask_ids,
@@ -452,9 +442,9 @@ fn run() -> Result<()> {
                 json,
             } => match executor.add_dependency(&from_id, &to_id) {
                 Ok(result) => {
-                    use commands::DependencyAddResult;
+                    use jit::commands::DependencyAddResult;
                     if json {
-                        use output::JsonOutput;
+                        use jit::output::JsonOutput;
                         let (status, message) = match result {
                             DependencyAddResult::Added => {
                                 ("added", format!("{} now depends on {}", from_id, to_id))
@@ -494,7 +484,7 @@ fn run() -> Result<()> {
                 }
                 Err(e) => {
                     if json {
-                        use output::JsonError;
+                        use jit::output::JsonError;
                         let error_str = e.to_string();
                         let json_error = if error_str.contains("cycle") {
                             JsonError::cycle_detected(&from_id, &to_id)
@@ -521,7 +511,7 @@ fn run() -> Result<()> {
             } => match executor.remove_dependency(&from_id, &to_id) {
                 Ok(_) => {
                     if json {
-                        use output::JsonOutput;
+                        use jit::output::JsonOutput;
                         let response = serde_json::json!({
                             "from_id": from_id,
                             "to_id": to_id,
@@ -538,7 +528,7 @@ fn run() -> Result<()> {
                 }
                 Err(e) => {
                     if json {
-                        use output::JsonError;
+                        use jit::output::JsonError;
                         let error_str = e.to_string();
                         let json_error = if error_str.contains("not found") {
                             if error_str.contains(&from_id) {
@@ -562,7 +552,7 @@ fn run() -> Result<()> {
                 match executor.add_gate(&id, gate_key.clone()) {
                     Ok(_) => {
                         if json {
-                            use output::JsonOutput;
+                            use jit::output::JsonOutput;
                             let response = serde_json::json!({
                                 "issue_id": id,
                                 "gate_key": gate_key,
@@ -576,7 +566,7 @@ fn run() -> Result<()> {
                     }
                     Err(e) => {
                         if json {
-                            use output::JsonError;
+                            use jit::output::JsonError;
                             let error_str = e.to_string();
                             let json_error = if error_str.contains("Issue")
                                 && error_str.contains("not found")
@@ -604,7 +594,7 @@ fn run() -> Result<()> {
             } => match executor.pass_gate(&id, gate_key.clone(), by) {
                 Ok(_) => {
                     if json {
-                        use output::JsonOutput;
+                        use jit::output::JsonOutput;
                         let response = serde_json::json!({
                             "issue_id": id,
                             "gate_key": gate_key,
@@ -619,7 +609,7 @@ fn run() -> Result<()> {
                 }
                 Err(e) => {
                     if json {
-                        use output::JsonError;
+                        use jit::output::JsonError;
                         let json_error = JsonError::new("GATE_ERROR", e.to_string());
                         println!("{}", json_error.to_json_string()?);
                         std::process::exit(json_error.exit_code().code());
@@ -636,7 +626,7 @@ fn run() -> Result<()> {
             } => match executor.fail_gate(&id, gate_key.clone(), by) {
                 Ok(_) => {
                     if json {
-                        use output::JsonOutput;
+                        use jit::output::JsonOutput;
                         let response = serde_json::json!({
                             "issue_id": id,
                             "gate_key": gate_key,
@@ -651,7 +641,7 @@ fn run() -> Result<()> {
                 }
                 Err(e) => {
                     if json {
-                        use output::JsonError;
+                        use jit::output::JsonError;
                         let json_error = JsonError::new("GATE_ERROR", e.to_string());
                         println!("{}", json_error.to_json_string()?);
                         std::process::exit(json_error.exit_code().code());
@@ -666,7 +656,7 @@ fn run() -> Result<()> {
                 if let Some(issue_id) = id {
                     let issues = executor.show_graph(&issue_id)?;
                     if json {
-                        use output::{GraphShowResponse, JsonOutput};
+                        use jit::output::{GraphShowResponse, JsonOutput};
 
                         let response = GraphShowResponse {
                             issue_id: issue_id.clone(),
@@ -685,7 +675,7 @@ fn run() -> Result<()> {
                     // Show all dependencies as a graph
                     let all_issues = executor.list_issues(None, None, None)?;
                     if json {
-                        use output::{DependencyPair, GraphShowAllResponse, JsonOutput};
+                        use jit::output::{DependencyPair, GraphShowAllResponse, JsonOutput};
 
                         let mut deps = Vec::new();
                         for issue in &all_issues {
@@ -723,7 +713,7 @@ fn run() -> Result<()> {
             GraphCommands::Downstream { id, json } => {
                 let issues = executor.show_downstream(&id)?;
                 if json {
-                    use output::{GraphDownstreamResponse, JsonOutput};
+                    use jit::output::{GraphDownstreamResponse, JsonOutput};
 
                     let response = GraphDownstreamResponse {
                         issue_id: id.clone(),
@@ -742,7 +732,7 @@ fn run() -> Result<()> {
             GraphCommands::Roots { json } => {
                 let issues = executor.show_roots()?;
                 if json {
-                    use output::{GraphRootsResponse, JsonOutput};
+                    use jit::output::{GraphRootsResponse, JsonOutput};
 
                     let response = GraphRootsResponse {
                         roots: issues.clone(),
@@ -772,7 +762,7 @@ fn run() -> Result<()> {
             RegistryCommands::List { json } => {
                 let gates = executor.list_gates()?;
                 if json {
-                    use output::{GateDefinition, JsonOutput, RegistryListResponse};
+                    use jit::output::{GateDefinition, JsonOutput, RegistryListResponse};
 
                     let gate_defs: Vec<GateDefinition> = gates
                         .iter()
@@ -814,7 +804,7 @@ fn run() -> Result<()> {
             RegistryCommands::Show { key, json } => {
                 let gate = executor.show_gate_definition(&key)?;
                 if json {
-                    use output::{GateDefinition, JsonOutput};
+                    use jit::output::{GateDefinition, JsonOutput};
 
                     let gate_def = GateDefinition {
                         key: gate.key.clone(),
@@ -887,10 +877,10 @@ fn run() -> Result<()> {
             }
         },
         Commands::Query(query_cmd) => match query_cmd {
-            cli::QueryCommands::Ready { json } => {
+            jit::cli::QueryCommands::Ready { json } => {
                 let issues = executor.query_ready()?;
                 if json {
-                    use output::{JsonOutput, ReadyQueryResponse};
+                    use jit::output::{JsonOutput, ReadyQueryResponse};
 
                     let response = ReadyQueryResponse {
                         issues: issues.clone(),
@@ -906,10 +896,10 @@ fn run() -> Result<()> {
                     println!("\nTotal: {}", issues.len());
                 }
             }
-            cli::QueryCommands::Blocked { json } => {
+            jit::cli::QueryCommands::Blocked { json } => {
                 let blocked = executor.query_blocked()?;
                 if json {
-                    use output::{
+                    use jit::output::{
                         BlockedIssue, BlockedQueryResponse, BlockedReason, BlockedReasonType,
                         JsonOutput,
                     };
@@ -955,10 +945,10 @@ fn run() -> Result<()> {
                     println!("\nTotal: {}", blocked.len());
                 }
             }
-            cli::QueryCommands::Assignee { assignee, json } => {
+            jit::cli::QueryCommands::Assignee { assignee, json } => {
                 let issues = executor.query_by_assignee(&assignee)?;
                 if json {
-                    use output::{AssigneeQueryResponse, JsonOutput};
+                    use jit::output::{AssigneeQueryResponse, JsonOutput};
 
                     let response = AssigneeQueryResponse {
                         assignee: assignee.clone(),
@@ -978,11 +968,11 @@ fn run() -> Result<()> {
                     println!("\nTotal: {}", issues.len());
                 }
             }
-            cli::QueryCommands::State { state, json } => match parse_state(&state) {
+            jit::cli::QueryCommands::State { state, json } => match parse_state(&state) {
                 Ok(parsed_state) => {
                     let issues = executor.query_by_state(parsed_state)?;
                     if json {
-                        use output::{JsonOutput, StateQueryResponse};
+                        use jit::output::{JsonOutput, StateQueryResponse};
 
                         let response = StateQueryResponse {
                             state: parsed_state,
@@ -1001,7 +991,7 @@ fn run() -> Result<()> {
                 }
                 Err(e) => {
                     if json {
-                        use output::JsonError;
+                        use jit::output::JsonError;
                         let json_error = JsonError::invalid_state(&state);
                         println!("{}", json_error.to_json_string()?);
                         std::process::exit(json_error.exit_code().code());
@@ -1010,11 +1000,11 @@ fn run() -> Result<()> {
                     }
                 }
             },
-            cli::QueryCommands::Priority { priority, json } => match parse_priority(&priority) {
+            jit::cli::QueryCommands::Priority { priority, json } => match parse_priority(&priority) {
                 Ok(parsed_priority) => {
                     let issues = executor.query_by_priority(parsed_priority)?;
                     if json {
-                        use output::{JsonOutput, PriorityQueryResponse};
+                        use jit::output::{JsonOutput, PriorityQueryResponse};
 
                         let response = PriorityQueryResponse {
                             priority: parsed_priority,
@@ -1033,7 +1023,7 @@ fn run() -> Result<()> {
                 }
                 Err(e) => {
                     if json {
-                        use output::JsonError;
+                        use jit::output::JsonError;
                         let json_error = JsonError::invalid_priority(&priority);
                         println!("{}", json_error.to_json_string()?);
                         std::process::exit(json_error.exit_code().code());
@@ -1042,11 +1032,11 @@ fn run() -> Result<()> {
                     }
                 }
             },
-            cli::QueryCommands::Label { pattern, json } => {
+            jit::cli::QueryCommands::Label { pattern, json } => {
                 match executor.query_by_label(&pattern) {
                     Ok(issues) => {
                         if json {
-                            use output::{JsonOutput, LabelQueryResponse};
+                            use jit::output::{JsonOutput, LabelQueryResponse};
                             let response = LabelQueryResponse {
                                 pattern: pattern.clone(),
                                 issues: issues.clone(),
@@ -1064,7 +1054,7 @@ fn run() -> Result<()> {
                     }
                     Err(e) => {
                         if json {
-                            use output::JsonError;
+                            use jit::output::JsonError;
                             let json_error = JsonError::new("INVALID_LABEL_PATTERN", e.to_string())
                                 .with_suggestion("Use 'namespace:value' for exact match or 'namespace:*' for wildcard");
                             println!("{}", json_error.to_json_string()?);
@@ -1075,10 +1065,10 @@ fn run() -> Result<()> {
                     }
                 }
             }
-            cli::QueryCommands::Strategic { json } => match executor.query_strategic() {
+            jit::cli::QueryCommands::Strategic { json } => match executor.query_strategic() {
                 Ok(issues) => {
                     if json {
-                        use output::{JsonOutput, StrategicQueryResponse};
+                        use jit::output::{JsonOutput, StrategicQueryResponse};
                         let response = StrategicQueryResponse {
                             issues: issues.clone(),
                             count: issues.len(),
@@ -1095,7 +1085,7 @@ fn run() -> Result<()> {
                 }
                 Err(e) => {
                     if json {
-                        use output::JsonError;
+                        use jit::output::JsonError;
                         let json_error = JsonError::new("QUERY_FAILED", e.to_string());
                         println!("{}", json_error.to_json_string()?);
                         std::process::exit(json_error.exit_code().code());
@@ -1106,10 +1096,10 @@ fn run() -> Result<()> {
             },
         },
         Commands::Label(label_cmd) => match label_cmd {
-            cli::LabelCommands::Namespaces { json } => {
+            jit::cli::LabelCommands::Namespaces { json } => {
                 let namespaces = executor.storage().load_label_namespaces()?;
                 if json {
-                    use output::JsonOutput;
+                    use jit::output::JsonOutput;
                     let output = JsonOutput::success(namespaces);
                     println!("{}", output.to_json_string()?);
                 } else {
@@ -1123,10 +1113,10 @@ fn run() -> Result<()> {
                     }
                 }
             }
-            cli::LabelCommands::Values { namespace, json } => {
+            jit::cli::LabelCommands::Values { namespace, json } => {
                 let values = executor.list_label_values(&namespace)?;
                 if json {
-                    use output::JsonOutput;
+                    use jit::output::JsonOutput;
                     let output = JsonOutput::success(serde_json::json!({
                         "namespace": namespace,
                         "values": values,
@@ -1141,7 +1131,7 @@ fn run() -> Result<()> {
                     println!("\nTotal: {}", values.len());
                 }
             }
-            cli::LabelCommands::AddNamespace {
+            jit::cli::LabelCommands::AddNamespace {
                 name,
                 description,
                 unique,
@@ -1150,7 +1140,7 @@ fn run() -> Result<()> {
             } => {
                 executor.add_label_namespace(&name, &description, unique, strategic)?;
                 if json {
-                    use output::JsonOutput;
+                    use jit::output::JsonOutput;
                     let output = JsonOutput::success(serde_json::json!({
                         "namespace": name,
                         "description": description,
@@ -1164,12 +1154,12 @@ fn run() -> Result<()> {
             }
         },
         Commands::Config(config_cmd) => match config_cmd {
-            cli::ConfigCommands::ShowHierarchy { json } => {
+            jit::cli::ConfigCommands::ShowHierarchy { json } => {
                 let namespaces = executor.storage().load_label_namespaces()?;
                 let hierarchy = namespaces.get_type_hierarchy();
 
                 if json {
-                    use output::JsonOutput;
+                    use jit::output::JsonOutput;
                     println!("{}", JsonOutput::success(hierarchy).to_json_string()?);
                 } else {
                     println!("Type Hierarchy:\n");
@@ -1180,11 +1170,11 @@ fn run() -> Result<()> {
                     }
                 }
             }
-            cli::ConfigCommands::ListTemplates { json } => {
-                let templates = hierarchy_templates::HierarchyTemplate::all();
+            jit::cli::ConfigCommands::ListTemplates { json } => {
+                let templates = jit::hierarchy_templates::HierarchyTemplate::all();
 
                 if json {
-                    use output::JsonOutput;
+                    use jit::output::JsonOutput;
                     use serde_json::json;
                     let template_data: Vec<_> = templates
                         .iter()
@@ -1230,7 +1220,7 @@ fn run() -> Result<()> {
             match search(&jit_dir, &query, options) {
                 Ok(results) => {
                     if json {
-                        use output::JsonOutput;
+                        use jit::output::JsonOutput;
                         use serde_json::json;
 
                         let output = JsonOutput::success(json!({
@@ -1272,7 +1262,7 @@ fn run() -> Result<()> {
                 }
                 Err(e) => {
                     if json {
-                        use output::JsonError;
+                        use jit::output::JsonError;
 
                         let error_code = if e.to_string().contains("not installed") {
                             "RIPGREP_NOT_FOUND"
@@ -1303,7 +1293,7 @@ fn run() -> Result<()> {
         }
         Commands::Status { json } => {
             if json {
-                use output::JsonOutput;
+                use jit::output::JsonOutput;
 
                 let summary = executor.get_status()?;
                 let output = JsonOutput::success(&summary);
@@ -1323,7 +1313,7 @@ fn run() -> Result<()> {
                 let fixes_applied = executor.validate_with_fix(true, dry_run, json)?;
 
                 if json {
-                    use output::JsonOutput;
+                    use jit::output::JsonOutput;
                     use serde_json::json;
 
                     let output = JsonOutput::success(json!({
@@ -1346,8 +1336,8 @@ fn run() -> Result<()> {
                 let warnings = executor.collect_all_warnings()?;
 
                 if json {
-                    use crate::type_hierarchy::ValidationWarning;
-                    use output::JsonOutput;
+                    use jit::type_hierarchy::ValidationWarning;
+                    use jit::output::JsonOutput;
                     use serde_json::json;
 
                     let warnings_json: Vec<_> = warnings
@@ -1390,7 +1380,7 @@ fn run() -> Result<()> {
                     println!("✓ Repository validation passed");
 
                     if !warnings.is_empty() {
-                        use crate::type_hierarchy::ValidationWarning;
+                        use jit::type_hierarchy::ValidationWarning;
 
                         println!(
                             "\nWarnings: {}",
