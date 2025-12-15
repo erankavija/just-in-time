@@ -58,17 +58,22 @@ See [INSTALL.md](INSTALL.md) for all installation options.
 # 1. Initialize in your project (creates .jit/ directory)
 jit init
 
-# 2. Create your first issue with labels
+# 2. Create your first issue (labels optional!)
+jit issue create --title "Implement login feature" --priority high
+
+# OR with labels for hierarchy and organization
 jit issue create --title "Implement login feature" \
   --label "type:epic" --label "milestone:v1.0" --priority high
 
-# 3. Setup coordinator for agent orchestration  
-jit coordinator init-config
-
-# That's it! Now agents can create issues, claim work, and coordinate.
+# 3. That's it! Start tracking work
+jit status
+jit issue list
 ```
 
-**Note:** All data is stored in `.jit/` directory (similar to `.git/`). Override with `JIT_DATA_DIR` environment variable if needed.
+**Note:** 
+- All data is stored in `.jit/` directory (similar to `.git/`)
+- **Labels are optional** - use them when you need organizational structure
+- Override storage location with `JIT_DATA_DIR` environment variable
 
 See [EXAMPLE.md](EXAMPLE.md) for complete workflows.
 
