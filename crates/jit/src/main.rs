@@ -1000,7 +1000,8 @@ fn run() -> Result<()> {
                     }
                 }
             },
-            jit::cli::QueryCommands::Priority { priority, json } => match parse_priority(&priority) {
+            jit::cli::QueryCommands::Priority { priority, json } => match parse_priority(&priority)
+            {
                 Ok(parsed_priority) => {
                     let issues = executor.query_by_priority(parsed_priority)?;
                     if json {
@@ -1336,8 +1337,8 @@ fn run() -> Result<()> {
                 let warnings = executor.collect_all_warnings()?;
 
                 if json {
-                    use jit::type_hierarchy::ValidationWarning;
                     use jit::output::JsonOutput;
+                    use jit::type_hierarchy::ValidationWarning;
                     use serde_json::json;
 
                     let warnings_json: Vec<_> = warnings

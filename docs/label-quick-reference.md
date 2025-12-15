@@ -240,3 +240,108 @@ When creating an issue, ask:
 - **`milestone:*`** = What release it **BELONGS TO** (optional, multiple allowed)
 - **Strategic view** = Filter by `epic:*` or `milestone:*` presence
 - **Always add `type:*`** to every issue!
+
+---
+
+## ⚠️ Labels vs Dependencies: Parallel but Orthogonal
+
+### Same Direction, Different Purposes
+
+Labels (membership) and dependencies (work order) naturally align:
+
+```
+Task: Login
+  ├─ label "epic:auth" → belongs to Epic: Auth
+  └─ dependency of Epic → required by Epic: Auth
+  
+Epic: Auth
+  ├─ label "milestone:v1.0" → belongs to Milestone: v1.0
+  └─ dependency of Milestone → required by Milestone: v1.0
+
+Both flow: Task → Epic → Milestone
+```
+
+### What They Mean
+
+**Labels** = Organizational membership
+- "This task is part of the auth epic"
+- Purpose: Grouping, filtering, reporting
+- Query: `jit query label "epic:auth"`
+
+**Dependencies** = Work requirements  
+- "The auth epic requires this task to complete"
+- Purpose: Workflow control, blocking, state transitions
+- Query: `jit query ready` (unblocked work)
+
+### Key: They're Independent
+
+✅ **Labels without dependencies** (just grouping)
+```bash
+jit issue create --title "Login" --label "type:task" --label "epic:auth"
+jit issue create --title "Logout" --label "type:task" --label "epic:auth"
+# No dependencies → Both tasks ready immediately
+# Still grouped by epic:auth for queries
+```
+
+✅ **Dependencies without matching labels** (just ordering)
+```bash
+jit issue create --title "Deploy v1.0" --label "type:task" --label "milestone:v2.0"
+jit issue create --title "v1.0 Release" --label "type:milestone" --label "milestone:v1.0"
+jit dep add DEPLOY V1_RELEASE
+# Deploy (v2.0 work) depends on v1.0 Release completing
+# Different organizational scopes, but clear work order
+```
+
+✅ **Both together** (recommended for most workflows)
+```bash
+# Create epic and tasks with matching labels
+EPIC=$(jit issue create --title "Auth Epic" --label "type:epic" --label "epic:auth" | awk '{print $NF}')
+TASK=$(jit issue create --title "Login Task" --label "type:task" --label "epic:auth" | awk '{print $NF}')
+
+# Add dependency for workflow control
+jit dep add $EPIC $TASK
+# Now: Labels group them + Dependencies control workflow
+```
+
+### Asymmetry: Dependencies are More Flexible
+
+**Membership (labels)**: Hierarchical
+- Task belongs to Epic ✅
+- Epic belongs to Milestone ✅
+- Milestone belongs to Task ❌ (doesn't make sense)
+
+**Work order (dependencies)**: Arbitrary DAG
+- Task is required by Epic ✅
+- Epic is required by Milestone ✅
+- Milestone is required by Future Task ✅ (sequential releases!)
+
+**Example**:
+```bash
+# v2.0 planning task depends on v1.0 release milestone
+jit dep add V2_PLANNING_TASK V1_RELEASE_MILESTONE
+# Valid: Future work waits for past milestone
+# But: V1 milestone cannot "belong to" v2.0 task (labels don't work this way)
+```
+
+### Research Workflow Example
+
+```bash
+# Research paper
+PAPER=$(jit issue create --title "Survey Paper: Vector DBs" \
+  --label "type:paper" --label "paper:vector-survey")
+
+# Literature reviews
+LIT1=$(jit issue create --title "Review: Qdrant" \
+  --label "type:research" --label "paper:vector-survey")
+LIT2=$(jit issue create --title "Review: Milvus" \
+  --label "type:research" --label "paper:vector-survey")
+
+# Paper depends on reviews
+jit dep add $PAPER $LIT1
+jit dep add $PAPER $LIT2
+
+# Labels: All part of vector-survey paper (grouping)
+# Dependencies: Paper writing waits for reviews (workflow)
+```
+
+**See also**: `docs/dependency-vs-labels-clarity.md` for complete explanation
