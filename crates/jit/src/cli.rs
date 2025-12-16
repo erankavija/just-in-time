@@ -24,10 +24,6 @@ pub struct Cli {
     #[arg(long)]
     pub schema: bool,
 
-    /// Export command schema using automatic generation (for testing)
-    #[arg(long)]
-    pub schema_auto: bool,
-
     #[command(subcommand)]
     pub command: Option<Commands>,
 }

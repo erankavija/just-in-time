@@ -83,15 +83,6 @@ fn run() -> Result<()> {
         return Ok(());
     }
 
-    if cli.schema_auto {
-        // Deprecated: kept for backwards compatibility, same as --schema
-        use jit::CommandSchema;
-        let schema = CommandSchema::generate();
-        let json = serde_json::to_string_pretty(&schema)?;
-        println!("{}", json);
-        return Ok(());
-    }
-
     // Ensure command is provided
     let command = cli
         .command
