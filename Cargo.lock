@@ -834,6 +834,7 @@ dependencies = [
  "anyhow",
  "axum",
  "axum-test",
+ "clap",
  "git2",
  "jit",
  "serde",

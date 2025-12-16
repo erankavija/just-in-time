@@ -7,6 +7,7 @@ mod routes;
 
 use anyhow::Result;
 use axum::Router;
+use clap::Parser;
 use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
 use tracing::info;
@@ -14,8 +15,26 @@ use tracing::info;
 use jit::commands::CommandExecutor;
 use jit::storage::JsonFileStorage;
 
+/// JIT REST API Server
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    /// Path to JIT repository (.jit directory)
+    ///
+    /// Can also be set via JIT_DATA_DIR environment variable.
+    /// Defaults to ./.jit if not specified.
+    #[arg(short, long, env = "JIT_DATA_DIR", default_value = ".jit")]
+    data_dir: String,
+
+    /// Address to bind the server to
+    #[arg(short, long, default_value = "0.0.0.0:3000")]
+    bind: String,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
+    let args = Args::parse();
+
     // Initialize tracing
     tracing_subscriber::fmt()
         .with_target(false)
@@ -25,21 +44,19 @@ async fn main() -> Result<()> {
     info!("Starting JIT API Server...");
 
     // Initialize storage and command executor
-    // Note: JsonFileStorage expects the .jit directory path
-    let data_dir = std::env::var("JIT_DATA_DIR").unwrap_or_else(|_| String::from(".jit"));
-    let storage = JsonFileStorage::new(&data_dir);
+    let storage = JsonFileStorage::new(&args.data_dir);
 
     // Validate repository exists
     storage.validate().map_err(|e| {
         anyhow::anyhow!(
             "Failed to initialize storage: {}\n\n\
              The server requires a JIT repository to be initialized.\n\
-             Run 'jit init' in the repository directory, or set JIT_DATA_DIR to point to an existing repository.",
+             Run 'jit init' in the repository directory, or use --data-dir to point to an existing repository.",
             e
         )
     })?;
 
-    info!("Using JIT repository at: {}", data_dir);
+    info!("Using JIT repository at: {}", args.data_dir);
     let executor = Arc::new(CommandExecutor::new(storage));
 
     // Build CORS layer for local development
@@ -55,10 +72,8 @@ async fn main() -> Result<()> {
         .layer(tower_http::trace::TraceLayer::new_for_http());
 
     // Start server
-    // Bind to 0.0.0.0 to accept connections from all network interfaces
-    let addr = "0.0.0.0:3000";
-    let listener = tokio::net::TcpListener::bind(addr).await?;
-    info!("Server listening on http://{}", addr);
+    let listener = tokio::net::TcpListener::bind(&args.bind).await?;
+    info!("Server listening on http://{}", args.bind);
 
     axum::serve(listener, app).await?;
 
