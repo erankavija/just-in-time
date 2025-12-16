@@ -109,6 +109,27 @@ function generateToolFromCommand(name, cmd, parentPath = "") {
     }
   }
   
+  // Add flags as properties
+  if (cmd.flags) {
+    for (const flag of cmd.flags) {
+      // Handle array types: convert array<string> or array[string] to proper JSON Schema
+      const isArray = flag.type === "array<string>" || flag.type === "array[string]" || flag.type === "array";
+      
+      properties[flag.name] = {
+        type: isArray ? "array" : flag.type,
+        description: flag.description || `${flag.name} flag`,
+      };
+      
+      if (isArray) {
+        properties[flag.name].items = { type: "string" };
+      }
+      
+      if (flag.required) {
+        required.push(flag.name);
+      }
+    }
+  }
+  
   return {
     name: toolName,
     description: cmd.description,

@@ -317,8 +317,15 @@ impl<S: IssueStore> CommandExecutor<S> {
                 )
             })?;
 
+        // Get repository root (parent of .jit directory)
+        let repo_root = self
+            .storage
+            .root()
+            .parent()
+            .ok_or_else(|| anyhow!("Invalid storage path"))?;
+
         // Try git first if available
-        if let Ok(repo) = Repository::open(".") {
+        if let Ok(repo) = Repository::open(repo_root) {
             // Determine which commit to view
             let reference = if let Some(at) = at_commit {
                 at
@@ -341,7 +348,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         // Fallback: read directly from filesystem
-        let file_path = std::path::Path::new(&doc.path);
+        let file_path = repo_root.join(&doc.path);
         if !file_path.exists() {
             return Err(anyhow!("Document file not found: {}", path));
         }
@@ -375,8 +382,15 @@ impl<S: IssueStore> CommandExecutor<S> {
                 )
             })?;
 
+        // Get repository root (parent of .jit directory)
+        let repo_root = self
+            .storage
+            .root()
+            .parent()
+            .ok_or_else(|| anyhow!("Invalid storage path"))?;
+
         // Try to get history from git, return empty list if not available
-        if let Ok(repo) = Repository::open(".") {
+        if let Ok(repo) = Repository::open(repo_root) {
             if let Ok(history) = self.get_file_history(&repo, path) {
                 return Ok(history);
             }
@@ -415,8 +429,15 @@ impl<S: IssueStore> CommandExecutor<S> {
                 )
             })?;
 
+        // Get repository root (parent of .jit directory)
+        let repo_root = self
+            .storage
+            .root()
+            .parent()
+            .ok_or_else(|| anyhow!("Invalid storage path"))?;
+
         // Try to get diff from git, return error message if not available
-        if let Ok(repo) = Repository::open(".") {
+        if let Ok(repo) = Repository::open(repo_root) {
             let to_ref = to.unwrap_or("HEAD");
 
             // Try to get content at both commits

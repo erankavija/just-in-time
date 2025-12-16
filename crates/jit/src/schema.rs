@@ -67,6 +67,8 @@ pub struct Flag {
     /// Flag type
     #[serde(rename = "type")]
     pub flag_type: String,
+    /// Whether flag is required
+    pub required: bool,
     /// Description
     pub description: String,
 }
@@ -199,6 +201,7 @@ impl CommandSchema {
             .unwrap_or_else(|| arg.get_id().to_string());
 
         let flag_type = Self::infer_flag_type(arg);
+        let required = arg.is_required_set();
 
         // Get description, with fallback for common flags
         let description = arg
@@ -216,6 +219,7 @@ impl CommandSchema {
         Flag {
             name,
             flag_type,
+            required,
             description,
         }
     }
