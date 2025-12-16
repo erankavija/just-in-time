@@ -145,7 +145,7 @@ fn run() -> Result<()> {
             match issue_cmd {
                 IssueCommands::Create {
                     title,
-                    desc,
+                    description,
                     priority,
                     gate,
                     label,
@@ -154,7 +154,7 @@ fn run() -> Result<()> {
                     json,
                 } => {
                     let prio = parse_priority(&priority)?;
-                    let id = executor.create_issue(title, desc, prio, gate, label)?;
+                    let id = executor.create_issue(title, description, prio, gate, label)?;
 
                     if json {
                         let issue = storage.load_issue(&id)?;
@@ -317,7 +317,7 @@ fn run() -> Result<()> {
                 IssueCommands::Update {
                     id,
                     title,
-                    desc,
+                    description,
                     priority,
                     state,
                     label,
@@ -326,7 +326,15 @@ fn run() -> Result<()> {
                 } => {
                     let prio = priority.map(|p| parse_priority(&p)).transpose()?;
                     let st = state.map(|s| parse_state(&s)).transpose()?;
-                    executor.update_issue(&id, title, desc, prio, st, label, remove_label)?;
+                    executor.update_issue(
+                        &id,
+                        title,
+                        description,
+                        prio,
+                        st,
+                        label,
+                        remove_label,
+                    )?;
 
                     if json {
                         let issue = storage.load_issue(&id)?;
@@ -351,11 +359,11 @@ fn run() -> Result<()> {
                 IssueCommands::Breakdown {
                     parent_id,
                     subtask_titles,
-                    subtask_descs,
+                    subtask_descriptions,
                     json,
                 } => {
                     // Pad descriptions with empty strings if not enough provided
-                    let mut descs = subtask_descs.clone();
+                    let mut descs = subtask_descriptions.clone();
                     while descs.len() < subtask_titles.len() {
                         descs.push(String::new());
                     }
@@ -790,11 +798,11 @@ fn run() -> Result<()> {
             RegistryCommands::Add {
                 key,
                 title,
-                desc,
+                description,
                 auto,
                 example,
             } => {
-                executor.add_gate_definition(key.clone(), title, desc, auto, example)?;
+                executor.add_gate_definition(key.clone(), title, description, auto, example)?;
                 println!("Added gate definition: {}", key);
             }
             RegistryCommands::Remove { key } => {

@@ -50,10 +50,10 @@ fn test_schema_create_issue_args() {
         .get("create")
         .unwrap();
 
-    // Should have title, desc, priority, gate flags (not args, since they use --flag syntax)
+    // Should have title, description, priority, gate flags (not args, since they use --flag syntax)
     let flags = &create_cmd.flags;
     assert!(flags.iter().any(|f| f.name == "title"));
-    assert!(flags.iter().any(|f| f.name == "desc"));
+    assert!(flags.iter().any(|f| f.name == "description"));
     assert!(flags.iter().any(|f| f.name == "priority"));
     assert!(flags.iter().any(|f| f.name == "gate"));
 

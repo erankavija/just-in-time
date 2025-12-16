@@ -139,8 +139,8 @@ pub enum IssueCommands {
         #[arg(short, long)]
         title: String,
 
-        #[arg(short, long, default_value = "")]
-        desc: String,
+        #[arg(short = 'd', long = "description", default_value = "")]
+        description: String,
 
         #[arg(short, long, default_value = "normal")]
         priority: String,
@@ -213,8 +213,8 @@ pub enum IssueCommands {
         #[arg(short, long)]
         title: Option<String>,
 
-        #[arg(short, long)]
-        desc: Option<String>,
+        #[arg(short = 'd', long = "description")]
+        description: Option<String>,
 
         #[arg(short, long)]
         priority: Option<String>,
@@ -252,8 +252,8 @@ pub enum IssueCommands {
         subtask_titles: Vec<String>,
 
         /// Subtask descriptions (optional, must match number of subtasks)
-        #[arg(long = "desc")]
-        subtask_descs: Vec<String>,
+        #[arg(long = "description")]
+        subtask_descriptions: Vec<String>,
 
         /// Output as JSON for machine consumption
         #[arg(long)]
@@ -549,8 +549,8 @@ pub enum RegistryCommands {
         #[arg(short, long)]
         title: String,
 
-        #[arg(short, long, default_value = "")]
-        desc: String,
+        #[arg(short = 'd', long = "description", default_value = "")]
+        description: String,
 
         #[arg(short, long)]
         auto: bool,
