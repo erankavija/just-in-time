@@ -351,6 +351,9 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         };
 
+        // Check if repository has any commits (HEAD exists)
+        let has_commits = repo.head().is_ok();
+
         for issue in issues {
             for doc in &issue.documents {
                 // Validate commit hash if specified
@@ -363,25 +366,44 @@ impl<S: IssueStore> CommandExecutor<S> {
                             doc.path
                         ));
                     }
-                }
 
-                // Validate file exists (at HEAD if no commit specified)
-                let reference = if let Some(ref commit_hash) = doc.commit {
-                    commit_hash.as_str()
+                    // Validate file exists at the specified commit
+                    if self
+                        .check_file_exists_in_git(&repo, &doc.path, commit_hash)
+                        .is_err()
+                    {
+                        return Err(anyhow!(
+                            "Invalid document reference in issue '{}': file '{}' not found at commit {}",
+                            issue.id,
+                            doc.path,
+                            commit_hash
+                        ));
+                    }
                 } else {
-                    "HEAD"
-                };
-
-                if self
-                    .check_file_exists_in_git(&repo, &doc.path, reference)
-                    .is_err()
-                {
-                    return Err(anyhow!(
-                        "Invalid document reference in issue '{}': file '{}' not found at {}",
-                        issue.id,
-                        doc.path,
-                        reference
-                    ));
+                    // No commit specified - check working tree or HEAD
+                    if has_commits {
+                        // Repository has commits - validate against HEAD
+                        if self
+                            .check_file_exists_in_git(&repo, &doc.path, "HEAD")
+                            .is_err()
+                        {
+                            return Err(anyhow!(
+                                "Invalid document reference in issue '{}': file '{}' not found at HEAD",
+                                issue.id,
+                                doc.path
+                            ));
+                        }
+                    } else {
+                        // Repository has no commits - check working tree only
+                        let path = std::path::Path::new(&doc.path);
+                        if !path.exists() {
+                            return Err(anyhow!(
+                                "Invalid document reference in issue '{}': file '{}' not found in working tree (repository has no commits yet)",
+                                issue.id,
+                                doc.path
+                            ));
+                        }
+                    }
                 }
             }
         }
