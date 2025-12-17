@@ -254,7 +254,7 @@ export function GraphView({ onNodeClick, viewMode = 'tactical', labelFilters = [
             target: edge.from, // Swap: dependent goes on the right
             sourceHandle: 'right' as const,
             targetHandle: 'left' as const,
-            type: 'smoothstep' as const,
+            type: 'simplebezier' as const,
             animated: false,
             style: {
               stroke: edgeColor,
