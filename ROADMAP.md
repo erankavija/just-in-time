@@ -102,7 +102,7 @@ Separate jit-dispatch orchestrator, storage abstraction, generic DAG, CLI consis
 - `TESTING.md` - Test strategy
 - `EXAMPLE.md` - Workflows and examples
 
-### Phase 5: Quality Gate System (In Design)
+### Phase 5: Quality Gate System
 
 **Design Complete:**
 - ✅ **Gate Framework Design**: Comprehensive design for automated quality gates
@@ -119,16 +119,21 @@ Separate jit-dispatch orchestrator, storage abstraction, generic DAG, CLI consis
   - Quick setup templates
   - See: `docs/gate-examples.md`
 
-**Next: Implementation (Phase 5.1)**
-- [ ] Core infrastructure: versioned Gate and GateRunResult structs
-- [ ] Exec checker with timeout, output capture, Git commit recording
-- [ ] Postcheck execution on issue completion
-- [ ] Precheck execution on starting work  
+**Phase 5.1: Core Infrastructure (In Progress)**
+- ✅ Core infrastructure: versioned Gate and GateRunResult structs
+- ✅ Exec checker with timeout, output capture, Git commit recording (graceful degradation)
+- ✅ Postcheck execution on issue completion (auto-transitions to Done if all pass)
+- ✅ Precheck execution on starting work (blocks transition if fails)
+- ✅ Gate checking methods: check_gate, check_all_gates, run_prechecks, run_postchecks
+- ✅ Structured result storage in `.jit/gate-runs/`
+- ✅ State transition integration (update_issue_state with hooks)
+- ✅ Working directory logic (repo root for production, current_dir for tests)
+- ✅ Comprehensive test coverage (8 gate_check tests, 173 total tests passing)
 - [ ] CLI commands: define, check, pass/fail gates
-- [ ] Structured result storage in `.jit/gate-runs/`
-- [ ] Event logging for all gate operations
+- [ ] Enhanced gate definition command with stage/mode/checker
+- [ ] Event logging for gate check operations (partial)
 
-**Future Extensions (Phase 5.2+)**:
+**Phase 5.2: Future Extensions**
 - [ ] Additional checker types (docker, http, artifact)
 - [ ] Gate dependencies and parallelization
 - [ ] Conditional gates
@@ -139,9 +144,9 @@ Separate jit-dispatch orchestrator, storage abstraction, generic DAG, CLI consis
 
 ## Current Focus
 
-**System Status**: Production-ready for core use case
+**System Status**: Production-ready for core use case + gate infrastructure implemented
 
-**In Design Phase**: Quality gate system for automated checks and TDD workflows
+**Active Development**: Phase 5.1 - Quality gate system CLI commands
 
 **Completed Features:**
 - Issue tracking with dependency graphs
