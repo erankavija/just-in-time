@@ -1,0 +1,25 @@
+{
+  "id": "3342dc7c-5ef2-44c3-a65e-d3c5c81277e9",
+  "title": "Implement gate preview command",
+  "description": "Add 'jit gate preview <issue>' to run prechecks without state change. Cache results for 5 minutes. Returns JSON with predicted precheck results for agent discoverability.",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "tdd-reminder",
+    "tests",
+    "clippy",
+    "fmt",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:phase5.2",
+    "milestone:v1.0",
+    "component:cli"
+  ]
+}

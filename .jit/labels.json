@@ -1,0 +1,46 @@
+{
+  "schema_version": 2,
+  "namespaces": {
+    "epic": {
+      "description": "epic organizational grouping",
+      "unique": false,
+      "strategic": true
+    },
+    "type": {
+      "description": "Issue type (bug, feature, task, etc.)",
+      "unique": true,
+      "strategic": false
+    },
+    "team": {
+      "description": "Owning team",
+      "unique": true,
+      "strategic": false
+    },
+    "component": {
+      "description": "Technical component or subsystem",
+      "unique": false,
+      "strategic": false
+    },
+    "milestone": {
+      "description": "milestone organizational grouping",
+      "unique": false,
+      "strategic": true
+    },
+    "story": {
+      "description": "story organizational grouping",
+      "unique": false,
+      "strategic": true
+    }
+  },
+  "type_hierarchy": {
+    "task": 4,
+    "milestone": 1,
+    "epic": 2,
+    "story": 3
+  },
+  "label_associations": {
+    "story": "story",
+    "milestone": "milestone",
+    "epic": "epic"
+  }
+}

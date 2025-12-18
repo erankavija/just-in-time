@@ -1,0 +1,21 @@
+{
+  "id": "d6dc4dfa-6784-43a8-8b8a-761bd5a3f38a",
+  "title": "Update EXAMPLE.md with gate commands",
+  "description": "Add comprehensive gate command examples to EXAMPLE.md including TDD workflow and all gate commands",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:docs",
+    "milestone:v1.0",
+    "component:docs"
+  ]
+}

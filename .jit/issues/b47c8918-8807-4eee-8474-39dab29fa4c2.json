@@ -1,0 +1,21 @@
+{
+  "id": "b47c8918-8807-4eee-8474-39dab29fa4c2",
+  "title": "Update AGENT-QUICKSTART.md with gates",
+  "description": "Add gate usage examples and workflows to agent quickstart guide",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:docs",
+    "milestone:v1.0",
+    "component:docs"
+  ]
+}

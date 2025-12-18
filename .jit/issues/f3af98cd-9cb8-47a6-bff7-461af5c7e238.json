@@ -1,0 +1,24 @@
+{
+  "id": "f3af98cd-9cb8-47a6-bff7-461af5c7e238",
+  "title": "Enhance gate error messages",
+  "description": "Show relevant output excerpts on failure, suggest fixes based on common patterns, link to full logs in .jit/gate-runs/",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "tests",
+    "clippy",
+    "fmt",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:phase5.2",
+    "milestone:v1.0",
+    "component:cli"
+  ]
+}

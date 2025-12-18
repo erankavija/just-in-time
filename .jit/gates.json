@@ -1,0 +1,80 @@
+{
+  "gates": {
+    "code-review": {
+      "version": 1,
+      "key": "code-review",
+      "title": "Code Review",
+      "description": "Human review of changes",
+      "stage": "postcheck",
+      "mode": "manual",
+      "reserved": {},
+      "auto": false,
+      "example_integration": null
+    },
+    "tests": {
+      "version": 1,
+      "key": "tests",
+      "title": "All Tests Pass",
+      "description": "Full test suite must pass",
+      "stage": "postcheck",
+      "mode": "auto",
+      "checker": {
+        "type": "exec",
+        "command": "cargo test --lib",
+        "timeout_seconds": 300,
+        "working_dir": null,
+        "env": {}
+      },
+      "reserved": {},
+      "auto": true,
+      "example_integration": null
+    },
+    "clippy": {
+      "version": 1,
+      "key": "clippy",
+      "title": "Clippy Lints Pass",
+      "description": "Zero clippy warnings allowed",
+      "stage": "postcheck",
+      "mode": "auto",
+      "checker": {
+        "type": "exec",
+        "command": "cargo clippy --lib -- -D warnings",
+        "timeout_seconds": 120,
+        "working_dir": null,
+        "env": {}
+      },
+      "reserved": {},
+      "auto": true,
+      "example_integration": null
+    },
+    "tdd-reminder": {
+      "version": 1,
+      "key": "tdd-reminder",
+      "title": "TDD Reminder",
+      "description": "Write tests first",
+      "stage": "precheck",
+      "mode": "manual",
+      "reserved": {},
+      "auto": false,
+      "example_integration": null
+    },
+    "fmt": {
+      "version": 1,
+      "key": "fmt",
+      "title": "Code Formatted",
+      "description": "Code must be formatted with cargo fmt",
+      "stage": "postcheck",
+      "mode": "auto",
+      "checker": {
+        "type": "exec",
+        "command": "cargo fmt -- --check",
+        "timeout_seconds": 30,
+        "working_dir": null,
+        "env": {}
+      },
+      "reserved": {},
+      "auto": true,
+      "example_integration": null
+    }
+  }
+}

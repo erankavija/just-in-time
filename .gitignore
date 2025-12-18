@@ -2,8 +2,7 @@
 **/target/
 
 # Jit database (local to each developer)
-.jit/
-data/
+*/.jit/
 
 # MCP Server (Node.js)
 mcp-server/node_modules/**

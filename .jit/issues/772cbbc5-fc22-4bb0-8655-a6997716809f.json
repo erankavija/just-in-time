@@ -1,0 +1,25 @@
+{
+  "id": "772cbbc5-fc22-4bb0-8655-a6997716809f",
+  "title": "Implement gate runs query command",
+  "description": "Add 'jit gate runs <gate-key>' to show all runs of a specific gate across all issues",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "tdd-reminder",
+    "tests",
+    "clippy",
+    "fmt",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:phase5.2",
+    "milestone:v1.0",
+    "component:cli"
+  ]
+}

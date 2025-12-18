@@ -1,0 +1,25 @@
+{
+  "id": "aa54c441-f9ae-414f-b244-21e5fcdd1977",
+  "title": "Implement gate history command",
+  "description": "Add 'jit gate history <issue>' to show all gate runs with filtering by status and time range",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "tdd-reminder",
+    "tests",
+    "clippy",
+    "fmt",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:phase5.2",
+    "milestone:v1.0",
+    "component:cli"
+  ]
+}

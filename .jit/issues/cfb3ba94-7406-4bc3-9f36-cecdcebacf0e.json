@@ -1,0 +1,24 @@
+{
+  "id": "cfb3ba94-7406-4bc3-9f36-cecdcebacf0e",
+  "title": "Documentation: Gate System & Production Use",
+  "description": "Comprehensive documentation for gate system, workflows, and production usage",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "d6dc4dfa-6784-43a8-8b8a-761bd5a3f38a",
+    "baa723de-93bb-4ec7-8883-0a464bca9b30",
+    "b47c8918-8807-4eee-8474-39dab29fa4c2"
+  ],
+  "gates_required": [
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:epic",
+    "epic:docs",
+    "milestone:v1.0"
+  ]
+}
