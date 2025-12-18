@@ -200,6 +200,94 @@ impl<S: IssueStore> CommandExecutor<S> {
         self.storage.delete_issue(id)
     }
 
+    /// Update issue state with precheck/postcheck hooks
+    ///
+    /// This method runs prechecks before transitioning to InProgress
+    /// and postchecks when transitioning to Gated.
+    pub fn update_issue_state(&self, id: &str, new_state: State) -> Result<()> {
+        let issue = self.storage.load_issue(id)?;
+        let old_state = issue.state;
+
+        // Handle prechecks for Ready -> InProgress transition
+        if old_state == State::Ready && new_state == State::InProgress {
+            self.run_prechecks(id)?;
+        }
+
+        // Reload issue after prechecks (which may have modified it)
+        let mut issue = self.storage.load_issue(id)?;
+
+        // Validate state transition
+        match new_state {
+            State::Ready => {
+                // Check dependencies only (gates don't block Ready)
+                let issues = self.storage.list_issues()?;
+                let issue_refs: Vec<&Issue> = issues.iter().collect();
+                let resolved: HashMap<String, &Issue> =
+                    issue_refs.iter().map(|i| (i.id.clone(), *i)).collect();
+
+                if issue.is_blocked(&resolved) {
+                    return Err(anyhow!(
+                        "Cannot transition to Ready: issue blocked by incomplete dependencies"
+                    ));
+                }
+            }
+            State::Done => {
+                // Check both dependencies and gates
+                let issues = self.storage.list_issues()?;
+                let issue_refs: Vec<&Issue> = issues.iter().collect();
+                let resolved: HashMap<String, &Issue> =
+                    issue_refs.iter().map(|i| (i.id.clone(), *i)).collect();
+
+                if issue.is_blocked(&resolved) {
+                    return Err(anyhow!(
+                        "Cannot transition to Done: issue blocked by incomplete dependencies"
+                    ));
+                }
+
+                // If gates not passed, transition to Gated instead
+                if issue.has_unpassed_gates() {
+                    issue.state = State::Gated;
+                } else {
+                    issue.state = State::Done;
+                }
+            }
+            State::Gated => {
+                // Run postchecks when moving to Gated
+                issue.state = State::Gated;
+                self.storage.save_issue(&issue)?;
+                
+                // Log state change event
+                let event = Event::new_issue_state_changed(issue.id.clone(), old_state, State::Gated);
+                self.storage.append_event(&event)?;
+                
+                // Run postchecks (which may auto-transition to Done)
+                self.run_postchecks(id)?;
+                return Ok(());
+            }
+            _ => {
+                issue.state = new_state;
+            }
+        }
+
+        // Save and log
+        if old_state != issue.state {
+            self.storage.save_issue(&issue)?;
+            
+            let event = Event::new_issue_state_changed(issue.id.clone(), old_state, issue.state);
+            self.storage.append_event(&event)?;
+
+            // Log completion event if transitioning to Done
+            if issue.state == State::Done {
+                let event = Event::new_issue_completed(issue.id.clone());
+                self.storage.append_event(&event)?;
+            }
+        } else {
+            self.storage.save_issue(&issue)?;
+        }
+
+        Ok(())
+    }
+
     pub fn assign_issue(&self, id: &str, assignee: String) -> Result<()> {
         let mut issue = self.storage.load_issue(id)?;
         issue.assignee = Some(assignee);

@@ -21,6 +21,7 @@ mod dependency;
 mod document;
 mod events;
 mod gate;
+mod gate_check;
 mod graph;
 mod issue;
 mod labels;
