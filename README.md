@@ -347,6 +347,39 @@ jit coordinator stop
 | **Atomic Operations** | `claim` ensures no race conditions between agents |
 | **Graph Queries** | Understand upstream/downstream dependencies |
 
+## Issue Lifecycle
+
+Issues progress through states with automated quality checks:
+
+```
+backlog → ready → in_progress → gated → done
+           ↑         ↓            ↓
+           └──── prechecks    postchecks
+              (validate)    (verify quality)
+```
+
+**States:**
+- **backlog**: Has incomplete dependencies
+- **ready**: Dependencies done, available to start
+- **in_progress**: Work actively happening
+- **gated**: Work complete, awaiting quality gate approval
+- **done**: All gates passed, complete
+
+**Quality Gates:**
+- **Prechecks** run before work starts (e.g., TDD: verify tests exist)
+- **Postchecks** run after work completes (e.g., run tests, lint, security scans)
+- Gates can be **manual** (human approval) or **automated** (script execution)
+
+See [docs/ci-gate-integration-design.md](docs/ci-gate-integration-design.md) for gate details.
+| **Strategic Views** | Filter and visualize high-level planning vs tactical work |
+| **Configurable Rules** | Customize type hierarchies and validation per repository |
+| **Coordinator Daemon** | Automatically dispatches ready work to available agents |
+| **Priority Dispatch** | Critical work gets assigned first |
+| **Event Log** | Full audit trail—every action logged to `.jit/events.jsonl` |
+| **Git-Friendly Storage** | Plain JSON files you can version, diff, and merge |
+| **Atomic Operations** | `claim` ensures no race conditions between agents |
+| **Graph Queries** | Understand upstream/downstream dependencies |
+
 ## Issue Hierarchy & Organization
 
 JIT supports organizing work with **labels-based hierarchies**:
