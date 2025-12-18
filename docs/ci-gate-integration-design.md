@@ -2,11 +2,36 @@
 
 **Status**: Planning  
 **Date**: 2025-12-17  
-**Version**: 1.0
+**Version**: 1.1  
+**Last Updated**: 2025-12-18
 
 ## Overview
 
 Add automated checking capabilities to the quality gate system, enabling both manual checklist-style gates and automated script execution. The system must be simple and intuitive for AI agents to understand and use.
+
+## Design Philosophy
+
+### Simple v1, Future-Proof Foundation
+
+**Core principle**: Single concept, stable contracts
+- One "gate" abstraction with versioned schema
+- One "result" schema for all outcomes
+- Add capabilities by extending, not changing contracts
+- Issue-first today, commit-aware for future PR/branch protection
+
+**Intentional v1 Scope (Keep It Simple)**:
+- Only `exec` checker type (shell commands)
+- Sequential execution (no parallelism or ordering)
+- Two stages: precheck and postcheck
+- Basic timeouts and output capture
+- Clear warning: "this runs commands in your environment"
+
+**Non-Goals for v1** (add later if needed):
+- No parallel gate execution or dependency ordering
+- No conditional gates or matrices
+- No sandboxing/containers (just timeouts)
+- No RBAC beyond "manual pass/fail with --by"
+- No background schedulers (trigger on state changes only)
 
 ## Core Principles
 
@@ -196,35 +221,57 @@ Prechecks run **on-demand** when an agent attempts to transition to `in_progress
 - Cannot pre-filter issues by precheck status
 - Acceptable because prechecks should be fast (setup validation, not long-running tests)
 
-## Gate Definition Schema
+## Gate Definition Schema (Versioned, Stable)
 
 ```json
 {
+  "version": 1,
   "gates": {
-    "<gate-key>": {
-      "key": "string (unique identifier)",
-      "title": "string (human-readable name)",
-      "description": "string (what this gate checks)",
-      "stage": "precheck | postcheck",
-      "auto": "boolean (true = can auto-execute, false = manual only)",
+    "unit-tests": {
+      "version": 1,
+      "key": "unit-tests",
+      "title": "Unit Tests",
+      "description": "Run project unit tests",
+      "stage": "postcheck",
+      "mode": "auto",
       "checker": {
-        "type": "command",
-        "command": "string (shell command to run)",
-        "timeout_seconds": "integer (max execution time)",
-        "working_dir": "string (optional, default: repo root)",
+        "type": "exec",
+        "command": "cargo test --lib",
+        "timeout_seconds": 300,
+        "working_dir": ".",
         "env": {
-          "KEY": "value (optional environment variables)"
+          "RUST_BACKTRACE": "1"
         }
-      }
+      },
+      "reserved": {}
+    },
+    "code-review": {
+      "version": 1,
+      "key": "code-review",
+      "title": "Code Review",
+      "description": "Human review of code quality",
+      "stage": "postcheck",
+      "mode": "manual",
+      "reserved": {}
     }
   }
 }
 ```
 
 **Field semantics for AI agents:**
+- `version`: Schema version (enables future evolution without breaking changes)
+- `key`: Unique identifier (stable, treat as API)
 - `stage`: When does this gate run? `precheck` = before work, `postcheck` = after work
-- `auto`: Can a computer pass this gate automatically? `true` = yes (has checker), `false` = no (human only)
-- `checker`: Present only if `auto: true`, defines how to automatically check
+- `mode`: Can a computer pass this gate automatically? `auto` = yes (has checker), `manual` = no (human only)
+- `checker`: Present only if `mode: auto`, defines how to automatically check
+- `checker.type`: Always `"exec"` in v1 (future: `"docker"`, `"http"`, `"artifact"`)
+- `reserved`: Empty object for future extensions without schema breaking
+
+**Future-proofing:**
+- Adding new checker types: Just add new `type` values, old `exec` checkers still work
+- Adding gate dependencies: Add `depends_on: []` field later, existing gates ignore it
+- Adding conditionals: Add `when: {}` field later, use `status: "skipped"` in results
+- Schema evolution: Bump `version`, handle both old and new formats
 
 ## Example Gate Configurations
 
@@ -403,19 +450,66 @@ jit issue update <issue-id> --state gated
 6. If any fail: stay in `gated` state
 7. Show results of all checks
 
-## Issue Context for Checkers
+## Gate Result Schema (Normalized, Commit-Aware)
 
-Checkers receive issue metadata via environment variables:
+Every gate execution produces a structured result, stored for audit and future analysis:
 
-```bash
-JIT_ISSUE_ID=abc123
-JIT_ISSUE_TITLE="Implement login API"
-JIT_ISSUE_STATE=in_progress
-JIT_ISSUE_PRIORITY=high
-JIT_ISSUE_ASSIGNEE=copilot:worker-1
+```json
+{
+  "schema_version": 1,
+  "run_id": "01HQZX...",
+  "gate_key": "unit-tests",
+  "stage": "postcheck",
+  "subject": {
+    "type": "issue",
+    "repo": "erankavija/just-in-time",
+    "issue_id": "abc123",
+    "commit": "7f8a9b2c...",
+    "branch": "feature/auth"
+  },
+  "status": "passed",
+  "started_at": "2025-12-18T12:00:00Z",
+  "completed_at": "2025-12-18T12:00:02Z",
+  "duration_ms": 2345,
+  "executor": {
+    "mode": "auto",
+    "runner_id": "local",
+    "env_profile": "default"
+  },
+  "evidence": {
+    "exit_code": 0,
+    "stdout_path": ".jit/gate-runs/01HQZX.../stdout.log",
+    "stderr_path": ".jit/gate-runs/01HQZX.../stderr.log",
+    "command": "cargo test --lib"
+  },
+  "by": "auto:runner-1",
+  "message": "All 142 tests passed",
+  "reserved": {}
+}
 ```
 
-Checkers can also read full issue JSON via stdin (future enhancement).
+**Status values:**
+- `passed`: Check succeeded
+- `failed`: Check failed (expected failure, e.g., tests failed)
+- `error`: Unexpected error (timeout, command not found, crash)
+- `skipped`: Not applicable (future: for conditional gates)
+- `pending`: Not yet run (for manual gates)
+
+**Subject field (commit-aware)**:
+- Records Git commit and branch even in v1
+- Enables future PR/commit-centric workflows without schema changes
+- Issue-first today, but data model supports more tomorrow
+
+**Storage**:
+- Gate run results: `.jit/gate-runs/<run-id>/`
+  - `result.json` - structured result
+  - `stdout.log` - command output
+  - `stderr.log` - error output
+
+**Future extensions:**
+- PR/branch protection: Already recording commit/branch
+- Multi-subject runs: `subject.type` can become `"pr"`, `"commit"`, etc.
+- External CI ingestion: Same schema for artifact/http checker results
 
 ## Example: TDD Workflow
 
@@ -590,66 +684,196 @@ Example:
 
 ## Implementation Plan
 
-### Phase 1: Core Infrastructure
-- [ ] Add `stage` field to `Gate` struct (default: `postcheck`)
-- [ ] Add `checker` field to `Gate` struct (optional)
-- [ ] Implement `GateChecker` struct for command execution
-- [ ] Implement command executor with timeout, env vars, working dir
-- [ ] Add checker result capture (exit code, stdout, stderr, duration)
+### Phase 1: MVP - Core Infrastructure (Simple & Stable)
 
-### Phase 2: Postcheck Implementation
-- [ ] Hook postcheck execution into `complete_issue` command
-- [ ] Hook postcheck execution into `update_state(Gated)` transition
-- [ ] Auto-transition to `done` if all postchecks pass
-- [ ] Add `jit gate check <issue> <gate>` command
-- [ ] Add `jit gate check-all <issue>` command
-- [ ] Event logging for all auto-checks
+**Scope**: Minimum viable product with stable contracts
 
-### Phase 3: Precheck Implementation
-- [ ] Hook precheck execution into `update_state(InProgress)` transition
-- [ ] Block transition if any precheck fails
-- [ ] Clear error messages for precheck failures
-- [ ] Support manual prechecks (must be passed before starting)
+- [ ] **Data Model**
+  - Add `version` field to Gate struct (default: 1)
+  - Add `mode` field: `"manual"` or `"auto"` (replaces `auto: bool`)
+  - Add `reserved` field (empty HashMap) for future extensions
+  - Implement GateRunResult struct with full schema above
+  - Store run results in `.jit/gate-runs/<run-id>/`
 
-### Phase 4: Enhanced CLI
-- [ ] Add `jit gate define` command with `--stage`, `--checker-command` flags
-- [ ] Add `jit gate test <key>` for testing checkers
-- [ ] Add `jit issue complete <id>` convenience command
-- [ ] Improve output formatting for check results
-- [ ] Add `--json` output for all gate commands
+- [ ] **Checker Infrastructure**
+  - Implement `exec` checker only (type: `"exec"`)
+  - Command executor with timeout, working directory, env vars
+  - Capture exit code, stdout, stderr, duration
+  - Per-issue lock to prevent concurrent runs
+  - Record Git commit/branch if available (for future-proofing)
 
-### Phase 5: Documentation & Examples
-- [ ] TDD precheck script example
-- [ ] Common gate configurations (tests, lint, security)
-- [ ] AI agent workflow examples
-- [ ] Troubleshooting guide
+- [ ] **Postcheck Implementation**
+  - Hook into `complete_issue` command
+  - Hook into `update_state(Gated)` transition
+  - Sequential execution (no parallelism)
+  - Auto-transition to `done` if all postchecks pass
+  - Store structured results in `.jit/gate-runs/`
 
-## Future Enhancements
+- [ ] **Precheck Implementation**
+  - Hook into `update_state(InProgress)` transition
+  - Block transition if any precheck fails
+  - Clear error messages showing which checks failed
+  - Support manual prechecks (must be passed before starting)
 
-### Additional Checker Types
-- `type: "script"` - Run script file with issue JSON on stdin
-- `type: "docker"` - Run checker in container
-- `type: "http"` - Call HTTP endpoint with issue data
-- `type: "artifact"` - Read result from file (for external CI)
+- [ ] **CLI Commands**
+  - `jit gate define <key>` with `--stage`, `--mode`, `--checker-command`
+  - `jit gate list` and `jit gate show <key>`
+  - `jit gate check <issue> <gate>` - run single gate
+  - `jit gate check-all <issue>` - run all auto gates
+  - `jit gate pass/fail <issue> <gate> --by <who>` - manual gates
+  - All commands support `--json` for machine-readable output
+  - Clear warning: "This runs commands in your environment"
 
-### Advanced Features
-- Parallel gate execution
-- Gate dependencies (gate B only runs if gate A passes)
-- Conditional gates (only run if labels/context match)
-- Gate result caching
-- Coordinator auto-retry for transient failures
-- Gate execution history and trends
+- [ ] **Security & Safety**
+  - Timeout enforcement (kill process after timeout)
+  - Clear warning on first gate definition
+  - No sandboxing in v1 (document limitation)
+  - Log all command executions to event log
 
-### Configuration Options
-```json
-{
-  "gate_execution": {
-    "parallel": true,
-    "max_concurrent": 4,
-    "retry_transient_failures": true,
-    "cache_results": false
-  }
+- [ ] **Testing**
+  - Unit tests for checker execution
+  - Integration tests for state transitions
+  - Property tests for concurrent gate execution prevention
+  - Test timeout handling
+  - Test result persistence and retrieval
+
+### Phase 2: Agent-Friendly Additions (Still Simple)
+
+- [ ] **Precheck Preview**
+  - `jit gate preview <issue-id>` - run prechecks without state change
+  - Cache result for 5 minutes
+  - Gives agents discoverability without triggering lazy eval
+  - Returns `--json` with predicted precheck results
+
+- [ ] **Enhanced Observability**
+  - `jit gate history <issue>` - show all gate runs for an issue
+  - `jit gate runs <gate-key>` - show all runs of a specific gate
+  - Filter by status, time range
+
+- [ ] **Improved Error Messages**
+  - Show relevant output excerpts on failure
+  - Suggest fixes based on common patterns
+  - Link to full logs in `.jit/gate-runs/`
+
+### Phase 3: Advanced Features (Future Extensions)
+
+**Only implement if needed:**
+
+- [ ] Parallel gate execution (add `allow_parallel` field)
+- [ ] Gate dependencies (add `depends_on` field)
+- [ ] Conditional gates (add `when` conditions, use `skipped` status)
+- [ ] Docker checker type (`{"type": "docker", "image": "..."}`)
+- [ ] HTTP checker type (`{"type": "http", "url": "..."}`)
+- [ ] Artifact checker type (`{"type": "artifact", "path": "..."}`)
+- [ ] Gate templates/presets (`jit gate define --preset rust-tdd`)
+- [ ] Coordinator auto-retry for transient failures
+- [ ] Multi-approver gates (RBAC layer)
+- [ ] PR/branch protection integration
+
+## Minimal Internal Data Model
+
+**Keep it simple, make it stable:**
+
+```rust
+// Gate definition (versioned)
+pub struct Gate {
+    pub version: u32,           // Schema version (default: 1)
+    pub key: String,            // Stable identifier
+    pub title: String,
+    pub description: String,
+    pub stage: GateStage,       // precheck | postcheck
+    pub mode: GateMode,         // manual | auto
+    pub checker: Option<GateChecker>,
+    pub reserved: HashMap<String, serde_json::Value>,  // Future extensions
 }
+
+pub enum GateStage {
+    Precheck,
+    Postcheck,
+}
+
+pub enum GateMode {
+    Manual,
+    Auto,
+}
+
+// Checker (typed, extensible)
+pub struct GateChecker {
+    pub checker_type: CheckerType,
+    // Type-specific fields
+    pub command: Option<String>,        // For exec type
+    pub timeout_seconds: u64,
+    pub working_dir: Option<String>,
+    pub env: HashMap<String, String>,
+}
+
+pub enum CheckerType {
+    Exec,
+    // Future: Docker, Http, Artifact
+}
+
+// Gate run result (normalized, commit-aware)
+pub struct GateRunResult {
+    pub schema_version: u32,
+    pub run_id: String,
+    pub gate_key: String,
+    pub stage: GateStage,
+    pub subject: GateSubject,
+    pub status: GateRunStatus,
+    pub started_at: DateTime<Utc>,
+    pub completed_at: Option<DateTime<Utc>>,
+    pub duration_ms: Option<u64>,
+    pub executor: ExecutorInfo,
+    pub evidence: ExecutionEvidence,
+    pub by: Option<String>,
+    pub message: Option<String>,
+    pub reserved: HashMap<String, serde_json::Value>,
+}
+
+pub struct GateSubject {
+    pub subject_type: String,    // "issue" (future: "pr", "commit")
+    pub repo: String,
+    pub issue_id: String,
+    pub commit: Option<String>,  // Git SHA (future-proofing)
+    pub branch: Option<String>,  // Git branch (future-proofing)
+}
+
+pub enum GateRunStatus {
+    Passed,
+    Failed,
+    Error,
+    Skipped,   // Future: for conditional gates
+    Pending,
+}
+
+pub struct ExecutionEvidence {
+    pub exit_code: Option<i32>,
+    pub stdout_path: PathBuf,
+    pub stderr_path: PathBuf,
+    pub command: Option<String>,
+}
+```
+
+**Storage layout:**
+```
+.jit/
+  gates.json              # Gate definitions
+  gate-runs/              # Run results
+    01HQZX.../
+      result.json         # Structured result
+      stdout.log          # Command output
+      stderr.log          # Error output
+  issues/                 # Issue files (existing)
+    abc123.json
+      "gates_required": ["unit-tests", "review"]
+      "gates_status": {
+        "unit-tests": {
+          "status": "passed",
+          "last_run_id": "01HQZX...",
+          "updated_by": "auto:runner-1",
+          "updated_at": "2025-12-18T12:00:00Z"
+        }
+      }
 ```
 
 ## Design Decisions
@@ -753,3 +977,10 @@ JIT_ISSUE_STATE=ready
   - Issue stays in `ready` state if prechecks fail (no new state needed)
   - "Blocked" state remains clear: blocked by dependencies only
 - 2025-12-17: Added comprehensive state transition diagrams and reference tables
+- 2025-12-18: Refined design for simplicity and future-proofing
+  - Versioned, stable schemas for gates and results
+  - Commit-aware subject field for future PR/branch workflows
+  - Typed checker interface (only `exec` in v1, extensible later)
+  - Simplified scope: no parallelism, dependencies, or conditionals in v1
+  - Clear MVP scope vs. future extensions
+  - Structured result storage in `.jit/gate-runs/`
