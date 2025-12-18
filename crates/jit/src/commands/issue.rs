@@ -255,11 +255,12 @@ impl<S: IssueStore> CommandExecutor<S> {
                 // Run postchecks when moving to Gated
                 issue.state = State::Gated;
                 self.storage.save_issue(&issue)?;
-                
+
                 // Log state change event
-                let event = Event::new_issue_state_changed(issue.id.clone(), old_state, State::Gated);
+                let event =
+                    Event::new_issue_state_changed(issue.id.clone(), old_state, State::Gated);
                 self.storage.append_event(&event)?;
-                
+
                 // Run postchecks (which may auto-transition to Done)
                 self.run_postchecks(id)?;
                 return Ok(());
@@ -272,7 +273,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Save and log
         if old_state != issue.state {
             self.storage.save_issue(&issue)?;
-            
+
             let event = Event::new_issue_state_changed(issue.id.clone(), old_state, issue.state);
             self.storage.append_event(&event)?;
 

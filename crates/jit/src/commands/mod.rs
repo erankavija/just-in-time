@@ -22,6 +22,7 @@ mod document;
 mod events;
 mod gate;
 mod gate_check;
+mod gate_cli_tests;
 mod graph;
 mod issue;
 mod labels;

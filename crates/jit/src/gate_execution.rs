@@ -135,10 +135,7 @@ struct WaitResult {
     timed_out: bool,
 }
 
-fn wait_with_timeout(
-    child: &mut std::process::Child,
-    timeout: Duration,
-) -> Result<WaitResult> {
+fn wait_with_timeout(child: &mut std::process::Child, timeout: Duration) -> Result<WaitResult> {
     let start = Instant::now();
 
     loop {

@@ -324,55 +324,57 @@ impl IssueStore for JsonFileStorage {
     fn save_gate_run_result(&self, result: &crate::domain::GateRunResult) -> Result<()> {
         // Create gate-runs directory if it doesn't exist
         let gate_runs_dir = self.root.join("gate-runs");
-        fs::create_dir_all(&gate_runs_dir)
-            .context("Failed to create gate-runs directory")?;
+        fs::create_dir_all(&gate_runs_dir).context("Failed to create gate-runs directory")?;
 
         // Create directory for this run
         let run_dir = gate_runs_dir.join(&result.run_id);
-        fs::create_dir_all(&run_dir)
-            .context("Failed to create run directory")?;
+        fs::create_dir_all(&run_dir).context("Failed to create run directory")?;
 
         // Save result.json
         let result_path = run_dir.join("result.json");
-        let json = serde_json::to_string_pretty(result)
-            .context("Failed to serialize gate run result")?;
-        fs::write(&result_path, json)
-            .context("Failed to write gate run result")?;
+        let json =
+            serde_json::to_string_pretty(result).context("Failed to serialize gate run result")?;
+        fs::write(&result_path, json).context("Failed to write gate run result")?;
 
         Ok(())
     }
 
     fn load_gate_run_result(&self, run_id: &str) -> Result<crate::domain::GateRunResult> {
         let result_path = self.root.join("gate-runs").join(run_id).join("result.json");
-        
+
         if !result_path.exists() {
             anyhow::bail!("Gate run '{}' not found", run_id);
         }
 
-        let contents = fs::read_to_string(&result_path)
-            .context("Failed to read gate run result")?;
-        let result = serde_json::from_str(&contents)
-            .context("Failed to deserialize gate run result")?;
-        
+        let contents =
+            fs::read_to_string(&result_path).context("Failed to read gate run result")?;
+        let result =
+            serde_json::from_str(&contents).context("Failed to deserialize gate run result")?;
+
         Ok(result)
     }
 
-    fn list_gate_runs_for_issue(&self, issue_id: &str) -> Result<Vec<crate::domain::GateRunResult>> {
+    fn list_gate_runs_for_issue(
+        &self,
+        issue_id: &str,
+    ) -> Result<Vec<crate::domain::GateRunResult>> {
         let gate_runs_dir = self.root.join("gate-runs");
-        
+
         if !gate_runs_dir.exists() {
             return Ok(Vec::new());
         }
 
         let mut results = Vec::new();
-        
+
         for entry in fs::read_dir(&gate_runs_dir)? {
             let entry = entry?;
             if entry.file_type()?.is_dir() {
                 let result_path = entry.path().join("result.json");
                 if result_path.exists() {
                     let contents = fs::read_to_string(&result_path)?;
-                    if let Ok(result) = serde_json::from_str::<crate::domain::GateRunResult>(&contents) {
+                    if let Ok(result) =
+                        serde_json::from_str::<crate::domain::GateRunResult>(&contents)
+                    {
                         if result.issue_id == issue_id {
                             results.push(result);
                         }

@@ -547,6 +547,262 @@ fn run() -> Result<()> {
             },
         },
         Commands::Gate(gate_cmd) => match gate_cmd {
+            GateCommands::Define {
+                key,
+                title,
+                description,
+                stage,
+                mode,
+                checker_command,
+                timeout,
+                working_dir,
+                json,
+            } => {
+                use jit::domain::{GateChecker, GateMode, GateStage};
+
+                // Parse stage
+                let gate_stage = match stage.to_lowercase().as_str() {
+                    "precheck" => GateStage::Precheck,
+                    "postcheck" => GateStage::Postcheck,
+                    _ => {
+                        eprintln!(
+                            "Error: Invalid stage '{}'. Use 'precheck' or 'postcheck'",
+                            stage
+                        );
+                        std::process::exit(2);
+                    }
+                };
+
+                // Parse mode
+                let gate_mode = match mode.to_lowercase().as_str() {
+                    "manual" => GateMode::Manual,
+                    "auto" => GateMode::Auto,
+                    _ => {
+                        eprintln!("Error: Invalid mode '{}'. Use 'manual' or 'auto'", mode);
+                        std::process::exit(2);
+                    }
+                };
+
+                // Build checker if command provided
+                let checker = checker_command.map(|cmd| GateChecker::Exec {
+                    command: cmd,
+                    timeout_seconds: timeout,
+                    working_dir: working_dir.clone(),
+                    env: std::collections::HashMap::new(),
+                });
+
+                match executor.define_gate(
+                    key.clone(),
+                    title.clone(),
+                    description.clone(),
+                    gate_stage,
+                    gate_mode,
+                    checker,
+                ) {
+                    Ok(_) => {
+                        if json {
+                            use jit::output::JsonOutput;
+                            let response = serde_json::json!({
+                                "gate_key": key,
+                                "message": format!("Defined gate '{}'", key)
+                            });
+                            let output = JsonOutput::success(response);
+                            println!("{}", output.to_json_string()?);
+                        } else {
+                            println!("Defined gate '{}'", key);
+                        }
+                    }
+                    Err(e) => {
+                        if json {
+                            use jit::output::JsonError;
+                            let json_error = JsonError::new("GATE_ERROR", e.to_string());
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
+                        } else {
+                            return Err(e);
+                        }
+                    }
+                }
+            }
+            GateCommands::List { json } => match executor.list_gates() {
+                Ok(gates) => {
+                    if json {
+                        use jit::output::JsonOutput;
+                        let output = JsonOutput::success(gates);
+                        println!("{}", output.to_json_string()?);
+                    } else {
+                        if gates.is_empty() {
+                            println!("No gates defined");
+                        } else {
+                            println!("Gates:");
+                            for gate in gates {
+                                println!(
+                                    "  {} - {} ({:?}, {:?})",
+                                    gate.key, gate.title, gate.stage, gate.mode
+                                );
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    if json {
+                        use jit::output::JsonError;
+                        let json_error = JsonError::new("GATE_ERROR", e.to_string());
+                        println!("{}", json_error.to_json_string()?);
+                        std::process::exit(json_error.exit_code().code());
+                    } else {
+                        return Err(e);
+                    }
+                }
+            },
+            GateCommands::Show { key, json } => match executor.show_gate_definition(&key) {
+                Ok(gate) => {
+                    if json {
+                        use jit::output::JsonOutput;
+                        let output = JsonOutput::success(gate);
+                        println!("{}", output.to_json_string()?);
+                    } else {
+                        println!("Gate: {}", gate.key);
+                        println!("  Title: {}", gate.title);
+                        println!("  Description: {}", gate.description);
+                        println!("  Stage: {:?}", gate.stage);
+                        println!("  Mode: {:?}", gate.mode);
+                        if let Some(checker) = gate.checker {
+                            match checker {
+                                jit::domain::GateChecker::Exec {
+                                    command,
+                                    timeout_seconds,
+                                    working_dir,
+                                    ..
+                                } => {
+                                    println!("  Checker:");
+                                    println!("    Command: {}", command);
+                                    println!("    Timeout: {}s", timeout_seconds);
+                                    if let Some(wd) = working_dir {
+                                        println!("    Working dir: {}", wd);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    if json {
+                        use jit::output::JsonError;
+                        let json_error = JsonError::gate_not_found(&key);
+                        println!("{}", json_error.to_json_string()?);
+                        std::process::exit(json_error.exit_code().code());
+                    } else {
+                        return Err(e);
+                    }
+                }
+            },
+            GateCommands::Remove { key, json } => match executor.remove_gate_definition(&key) {
+                Ok(_) => {
+                    if json {
+                        use jit::output::JsonOutput;
+                        let response = serde_json::json!({
+                            "gate_key": key,
+                            "message": format!("Removed gate '{}'", key)
+                        });
+                        let output = JsonOutput::success(response);
+                        println!("{}", output.to_json_string()?);
+                    } else {
+                        println!("Removed gate '{}'", key);
+                    }
+                }
+                Err(e) => {
+                    if json {
+                        use jit::output::JsonError;
+                        let json_error = JsonError::gate_not_found(&key);
+                        println!("{}", json_error.to_json_string()?);
+                        std::process::exit(json_error.exit_code().code());
+                    } else {
+                        return Err(e);
+                    }
+                }
+            },
+            GateCommands::Check { id, gate_key, json } => {
+                match executor.check_gate(&id, &gate_key) {
+                    Ok(result) => {
+                        if json {
+                            use jit::output::JsonOutput;
+                            let output = JsonOutput::success(result);
+                            println!("{}", output.to_json_string()?);
+                        } else {
+                            match result.status {
+                                jit::domain::GateRunStatus::Passed => {
+                                    println!("✓ Gate '{}' passed for issue {}", gate_key, id);
+                                }
+                                jit::domain::GateRunStatus::Failed => {
+                                    println!("✗ Gate '{}' failed for issue {}", gate_key, id);
+                                    if !result.stderr.is_empty() {
+                                        eprintln!(
+                                            "  Error: {}",
+                                            result.stderr.lines().next().unwrap_or("")
+                                        );
+                                    }
+                                }
+                                jit::domain::GateRunStatus::Error => {
+                                    println!("✗ Gate '{}' error for issue {}", gate_key, id);
+                                    eprintln!("  {}", result.stderr);
+                                }
+                                _ => {
+                                    println!("Gate '{}' status: {:?}", gate_key, result.status);
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        if json {
+                            use jit::output::JsonError;
+                            let json_error = JsonError::new("GATE_CHECK_ERROR", e.to_string());
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
+                        } else {
+                            return Err(e);
+                        }
+                    }
+                }
+            }
+            GateCommands::CheckAll { id, json } => match executor.check_all_gates(&id) {
+                Ok(results) => {
+                    if json {
+                        use jit::output::JsonOutput;
+                        let output = JsonOutput::success(results);
+                        println!("{}", output.to_json_string()?);
+                    } else {
+                        if results.is_empty() {
+                            println!("No automated gates to check for issue {}", id);
+                        } else {
+                            println!("Checking gates for issue {}:", id);
+                            for result in results {
+                                match result.status {
+                                    jit::domain::GateRunStatus::Passed => {
+                                        println!("  ✓ {} passed", result.gate_key);
+                                    }
+                                    jit::domain::GateRunStatus::Failed => {
+                                        println!("  ✗ {} failed", result.gate_key);
+                                    }
+                                    _ => {
+                                        println!("  {} - {:?}", result.gate_key, result.status);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    if json {
+                        use jit::output::JsonError;
+                        let json_error = JsonError::new("GATE_CHECK_ERROR", e.to_string());
+                        println!("{}", json_error.to_json_string()?);
+                        std::process::exit(json_error.exit_code().code());
+                    } else {
+                        return Err(e);
+                    }
+                }
+            },
             GateCommands::Add { id, gate_key, json } => {
                 match executor.add_gate(&id, gate_key.clone()) {
                     Ok(_) => {

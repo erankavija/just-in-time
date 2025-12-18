@@ -347,6 +347,67 @@ pub enum DepCommands {
 
 #[derive(Subcommand)]
 pub enum GateCommands {
+    /// Define a new gate in the registry
+    Define {
+        /// Unique gate key
+        key: String,
+
+        /// Human-readable title
+        #[arg(short, long)]
+        title: String,
+
+        /// Description of what this gate checks
+        #[arg(short = 'd', long)]
+        description: String,
+
+        /// Gate stage: precheck or postcheck
+        #[arg(short, long, default_value = "postcheck")]
+        stage: String,
+
+        /// Gate mode: manual or auto
+        #[arg(short, long, default_value = "manual")]
+        mode: String,
+
+        /// Command to execute for automated gates
+        #[arg(long)]
+        checker_command: Option<String>,
+
+        /// Timeout in seconds for checker command
+        #[arg(long, default_value = "300")]
+        timeout: u64,
+
+        /// Working directory for checker (relative to repo root)
+        #[arg(long)]
+        working_dir: Option<String>,
+
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// List all gate definitions
+    List {
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Show gate definition details
+    Show {
+        /// Gate key
+        key: String,
+
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Remove a gate definition from the registry
+    Remove {
+        /// Gate key
+        key: String,
+
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Add a gate requirement to an issue
     Add {
         /// Issue ID
@@ -354,6 +415,27 @@ pub enum GateCommands {
 
         /// Gate key (from registry)
         gate_key: String,
+
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Check a single gate for an issue (run automated checker)
+    Check {
+        /// Issue ID
+        id: String,
+
+        /// Gate key
+        gate_key: String,
+
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Check all automated gates for an issue
+    CheckAll {
+        /// Issue ID
+        id: String,
 
         #[arg(long)]
         json: bool,

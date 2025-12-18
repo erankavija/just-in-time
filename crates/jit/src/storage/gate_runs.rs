@@ -85,7 +85,7 @@ mod tests {
         // List runs for issue
         let runs = storage.list_gate_runs_for_issue("issue-123").unwrap();
         assert_eq!(runs.len(), 3);
-        
+
         // Verify we got all runs
         let run_ids: Vec<_> = runs.iter().map(|r| r.run_id.as_str()).collect();
         assert!(run_ids.contains(&"run-0"));
@@ -138,7 +138,7 @@ mod tests {
 
         storage.save_gate_run_result(&result).unwrap();
         let loaded = storage.load_gate_run_result("test-run-nogit").unwrap();
-        
+
         assert!(loaded.commit.is_none());
         assert!(loaded.branch.is_none());
     }

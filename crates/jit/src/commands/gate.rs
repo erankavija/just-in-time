@@ -115,6 +115,56 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(())
     }
 
+    /// Define a new gate with full control over stage, mode, and checker
+    pub fn define_gate(
+        &self,
+        key: String,
+        title: String,
+        description: String,
+        stage: crate::domain::GateStage,
+        mode: crate::domain::GateMode,
+        checker: Option<crate::domain::GateChecker>,
+    ) -> Result<()> {
+        let mut registry = self.storage.load_gate_registry()?;
+
+        if registry.gates.contains_key(&key) {
+            return Err(anyhow!("Gate '{}' already exists", key));
+        }
+
+        // Validate: auto gates must have checker
+        if mode == crate::domain::GateMode::Auto && checker.is_none() {
+            return Err(anyhow!(
+                "Automated gates must have a checker configured. Add --checker-command or use --mode manual"
+            ));
+        }
+
+        // For manual gates, ignore any provided checker
+        let final_checker = if mode == crate::domain::GateMode::Manual {
+            None
+        } else {
+            checker
+        };
+
+        registry.gates.insert(
+            key.clone(),
+            Gate {
+                version: 1,
+                key,
+                title,
+                description,
+                stage,
+                mode,
+                checker: final_checker,
+                reserved: std::collections::HashMap::new(),
+                auto: mode == crate::domain::GateMode::Auto,
+                example_integration: None,
+            },
+        );
+
+        self.storage.save_gate_registry(&registry)?;
+        Ok(())
+    }
+
     pub fn remove_gate_definition(&self, key: &str) -> Result<()> {
         let mut registry = self.storage.load_gate_registry()?;
 

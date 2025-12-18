@@ -9,10 +9,10 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+pub mod gate_runs;
 pub mod json;
 pub mod lock;
 pub mod memory;
-pub mod gate_runs;
 
 // Re-export for convenience
 pub use json::JsonFileStorage;
@@ -152,7 +152,8 @@ pub trait IssueStore: Clone {
     /// # Errors
     ///
     /// Returns an error if results cannot be loaded.
-    fn list_gate_runs_for_issue(&self, issue_id: &str) -> Result<Vec<crate::domain::GateRunResult>>;
+    fn list_gate_runs_for_issue(&self, issue_id: &str)
+        -> Result<Vec<crate::domain::GateRunResult>>;
 
     /// Get the root directory path for this storage backend.
     ///

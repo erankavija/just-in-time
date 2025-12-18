@@ -146,7 +146,10 @@ impl IssueStore for InMemoryStorage {
             .ok_or_else(|| anyhow!("Gate run '{}' not found", run_id))
     }
 
-    fn list_gate_runs_for_issue(&self, issue_id: &str) -> Result<Vec<crate::domain::GateRunResult>> {
+    fn list_gate_runs_for_issue(
+        &self,
+        issue_id: &str,
+    ) -> Result<Vec<crate::domain::GateRunResult>> {
         Ok(self
             .gate_runs
             .lock()

@@ -11,10 +11,14 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// and returns the run result.
     pub fn check_gate(&self, issue_id: &str, gate_key: &str) -> Result<GateRunResult> {
         let issue = self.storage.load_issue(issue_id)?;
-        
+
         // Verify gate is required for this issue
         if !issue.gates_required.contains(&gate_key.to_string()) {
-            anyhow::bail!("Gate '{}' is not required for issue '{}'", gate_key, issue_id);
+            anyhow::bail!(
+                "Gate '{}' is not required for issue '{}'",
+                gate_key,
+                issue_id
+            );
         }
 
         // Load gate definition
@@ -26,7 +30,10 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Check if gate is automated
         if gate.mode != GateMode::Auto {
-            anyhow::bail!("Gate '{}' is manual and cannot be automatically checked", gate_key);
+            anyhow::bail!(
+                "Gate '{}' is manual and cannot be automatically checked",
+                gate_key
+            );
         }
 
         // Get checker
@@ -38,16 +45,21 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Execute the checker
         // Determine working directory: repo root (parent of .jit dir)
         // For InMemoryStorage in tests, parent of "." is "", so fallback to current_dir
-        let repo_root = self.storage.root()
+        let repo_root = self
+            .storage
+            .root()
             .parent()
             .filter(|p| !p.as_os_str().is_empty())
             .map(|p| p.to_path_buf())
-            .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")));
-        
+            .unwrap_or_else(|| {
+                std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."))
+            });
+
         let working_dir = match checker {
-            crate::domain::GateChecker::Exec { working_dir: Some(subdir), .. } => {
-                repo_root.join(subdir)
-            }
+            crate::domain::GateChecker::Exec {
+                working_dir: Some(subdir),
+                ..
+            } => repo_root.join(subdir),
             _ => repo_root,
         };
 
@@ -80,8 +92,16 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Log event
         let event = match result.status {
-            GateRunStatus::Passed => Event::new_gate_passed(issue_id.to_string(), gate_key.to_string(), result.by.clone()),
-            _ => Event::new_gate_failed(issue_id.to_string(), gate_key.to_string(), result.by.clone()),
+            GateRunStatus::Passed => Event::new_gate_passed(
+                issue_id.to_string(),
+                gate_key.to_string(),
+                result.by.clone(),
+            ),
+            _ => Event::new_gate_failed(
+                issue_id.to_string(),
+                gate_key.to_string(),
+                result.by.clone(),
+            ),
         };
         self.storage.append_event(&event)?;
 
@@ -137,7 +157,8 @@ impl<S: IssueStore> CommandExecutor<S> {
                         GateMode::Manual => {
                             // Check if manual precheck already passed
                             let gate_status = issue.gates_status.get(gate_key);
-                            if !matches!(gate_status, Some(state) if state.status == GateStatus::Passed) {
+                            if !matches!(gate_status, Some(state) if state.status == GateStatus::Passed)
+                            {
                                 anyhow::bail!(
                                     "Manual precheck '{}' has not been passed. Pass it first with: jit gate pass {} {}",
                                     gate_key, issue_id, gate_key
@@ -156,8 +177,15 @@ impl<S: IssueStore> CommandExecutor<S> {
                     format!(
                         "  ✗ {} (exit {}): {}",
                         key,
-                        result.exit_code.map(|c| c.to_string()).unwrap_or_else(|| "timeout".to_string()),
-                        result.stderr.lines().next().unwrap_or_else(|| result.stdout.lines().next().unwrap_or(""))
+                        result
+                            .exit_code
+                            .map(|c| c.to_string())
+                            .unwrap_or_else(|| "timeout".to_string()),
+                        result.stderr.lines().next().unwrap_or_else(|| result
+                            .stdout
+                            .lines()
+                            .next()
+                            .unwrap_or(""))
                     )
                 })
                 .collect();
@@ -239,7 +267,9 @@ mod tests {
         let issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         executor.storage.save_issue(&issue).unwrap();
-        executor.add_gate(&issue_id, "test-gate".to_string()).unwrap();
+        executor
+            .add_gate(&issue_id, "test-gate".to_string())
+            .unwrap();
 
         // Check the gate
         let result = executor.check_gate(&issue_id, "test-gate").unwrap();
@@ -285,7 +315,9 @@ mod tests {
         let issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         executor.storage.save_issue(&issue).unwrap();
-        executor.add_gate(&issue_id, "failing-gate".to_string()).unwrap();
+        executor
+            .add_gate(&issue_id, "failing-gate".to_string())
+            .unwrap();
 
         // Check the gate
         let result = executor.check_gate(&issue_id, "failing-gate").unwrap();
@@ -326,7 +358,9 @@ mod tests {
         let issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         executor.storage.save_issue(&issue).unwrap();
-        executor.add_gate(&issue_id, "manual-gate".to_string()).unwrap();
+        executor
+            .add_gate(&issue_id, "manual-gate".to_string())
+            .unwrap();
 
         // Try to check the gate - should fail
         let result = executor.check_gate(&issue_id, "manual-gate");
@@ -411,15 +445,19 @@ mod tests {
         issue.state = State::Ready;
         let issue_id = issue.id.clone();
         executor.storage.save_issue(&issue).unwrap();
-        executor.add_gate(&issue_id, "precheck".to_string()).unwrap();
+        executor
+            .add_gate(&issue_id, "precheck".to_string())
+            .unwrap();
 
         // Try to start work - should run prechecks
-        executor.update_issue_state(&issue_id, State::InProgress).unwrap();
+        executor
+            .update_issue_state(&issue_id, State::InProgress)
+            .unwrap();
 
         // Verify prechecks ran and issue transitioned
         let issue = executor.storage.load_issue(&issue_id).unwrap();
         assert_eq!(issue.state, State::InProgress);
-        
+
         let gate_state = issue.gates_status.get("precheck").unwrap();
         assert_eq!(gate_state.status, crate::domain::GateStatus::Passed);
     }
@@ -457,7 +495,9 @@ mod tests {
         issue.state = State::Ready;
         let issue_id = issue.id.clone();
         executor.storage.save_issue(&issue).unwrap();
-        executor.add_gate(&issue_id, "precheck-fail".to_string()).unwrap();
+        executor
+            .add_gate(&issue_id, "precheck-fail".to_string())
+            .unwrap();
 
         // Try to start work - should fail
         let result = executor.update_issue_state(&issue_id, State::InProgress);
@@ -502,15 +542,19 @@ mod tests {
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
         executor.storage.save_issue(&issue).unwrap();
-        executor.add_gate(&issue_id, "postcheck".to_string()).unwrap();
+        executor
+            .add_gate(&issue_id, "postcheck".to_string())
+            .unwrap();
 
         // Complete work
-        executor.update_issue_state(&issue_id, State::Gated).unwrap();
+        executor
+            .update_issue_state(&issue_id, State::Gated)
+            .unwrap();
 
         // Verify postchecks ran and issue transitioned to done
         let issue = executor.storage.load_issue(&issue_id).unwrap();
         assert_eq!(issue.state, State::Done);
-        
+
         let gate_state = issue.gates_status.get("postcheck").unwrap();
         assert_eq!(gate_state.status, crate::domain::GateStatus::Passed);
     }
@@ -548,15 +592,19 @@ mod tests {
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
         executor.storage.save_issue(&issue).unwrap();
-        executor.add_gate(&issue_id, "postcheck-fail".to_string()).unwrap();
+        executor
+            .add_gate(&issue_id, "postcheck-fail".to_string())
+            .unwrap();
 
         // Complete work
-        executor.update_issue_state(&issue_id, State::Gated).unwrap();
+        executor
+            .update_issue_state(&issue_id, State::Gated)
+            .unwrap();
 
         // Verify postchecks ran but issue stayed in gated
         let issue = executor.storage.load_issue(&issue_id).unwrap();
         assert_eq!(issue.state, State::Gated);
-        
+
         let gate_state = issue.gates_status.get("postcheck-fail").unwrap();
         assert_eq!(gate_state.status, crate::domain::GateStatus::Failed);
     }
