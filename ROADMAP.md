@@ -17,10 +17,18 @@ Separate jit-dispatch orchestrator, storage abstraction, generic DAG, CLI consis
 **Deferred Items:**
 - [ ] Stalled work detection
 - [ ] Bulk operations
-- [ ] CI integration: read artifacts to auto-pass gates
 - [ ] Pull-based agent mode
 - [ ] Metrics reporting
 - [ ] Webhooks for orchestrator events
+
+**CI/Quality Gates - In Design Phase:**
+- [x] **Gate Design**: Comprehensive design for automated quality gates (see docs/ci-gate-integration-design.md)
+  - Prechecks (before work) and postchecks (after work)
+  - Manual gates (reminders, checklists) and automated gates (script execution)
+  - Versioned schemas for future-proofing
+  - TDD workflow support with example configurations
+- [ ] **Gate Implementation**: MVP with exec checker, state transition hooks, and result storage
+- [ ] **Gate Examples**: Rust, Python, JavaScript templates (see docs/gate-examples.md)
 
 ### Phase 4: Advanced Features & Production Hardening
 
@@ -94,11 +102,62 @@ Separate jit-dispatch orchestrator, storage abstraction, generic DAG, CLI consis
 - `TESTING.md` - Test strategy
 - `EXAMPLE.md` - Workflows and examples
 
+### Phase 5: Quality Gate System (In Design)
+
+**Design Complete:**
+- ✅ **Gate Framework Design**: Comprehensive design for automated quality gates
+  - Two stages: prechecks (before work) and postchecks (after work)  
+  - Two modes: manual (reminders, checklists) and automated (script execution)
+  - Versioned schemas for future extensions (docker, http, artifact checkers)
+  - Commit-aware result storage for future PR/branch protection
+  - See: `docs/ci-gate-integration-design.md`
+
+- ✅ **Example Configurations**: Practical gate configurations
+  - TDD workflow examples (Rust, Python, JavaScript)
+  - Context validation patterns (manual and automated)
+  - Security gates (audit, secret detection)
+  - Quick setup templates
+  - See: `docs/gate-examples.md`
+
+**Next: Implementation (Phase 5.1)**
+- [ ] Core infrastructure: versioned Gate and GateRunResult structs
+- [ ] Exec checker with timeout, output capture, Git commit recording
+- [ ] Postcheck execution on issue completion
+- [ ] Precheck execution on starting work  
+- [ ] CLI commands: define, check, pass/fail gates
+- [ ] Structured result storage in `.jit/gate-runs/`
+- [ ] Event logging for all gate operations
+
+**Future Extensions (Phase 5.2+)**:
+- [ ] Additional checker types (docker, http, artifact)
+- [ ] Gate dependencies and parallelization
+- [ ] Conditional gates
+- [ ] PR/branch protection integration
+- [ ] External CI result ingestion
+
 ---
 
 ## Current Focus
 
 **System Status**: Production-ready for core use case
+
+**In Design Phase**: Quality gate system for automated checks and TDD workflows
+
+**Completed Features:**
+- Issue tracking with dependency graphs
+- Label hierarchy with type validation
+- Knowledge management with document linking
+- Interactive web UI with strategic views
+- MCP server for AI agent integration
+- Multi-agent safe concurrent operations
+
+**Recommended Next Steps:**
+1. Implement gate system MVP (Phase 5.1)
+2. Use gates in production to validate design
+3. Gather feedback on agent usability
+4. Implement advanced gate features as needed
+
+---
 
 **Core Features Complete:**
 - Issue tracking with dependency graphs

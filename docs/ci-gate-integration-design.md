@@ -930,7 +930,18 @@ JIT_ISSUE_STATE=ready
 - Original design: `docs/design.md`
 - Gate implementation: `crates/jit/src/commands/gate.rs`
 - Domain model: `crates/jit/src/domain.rs`
-- Roadmap: `ROADMAP.md` (Phase 3 - deferred CI integration)
+- Roadmap: `ROADMAP.md` (Phase 5 - Quality Gate System)
+
+## Practical Examples
+
+See [gate-examples.md](gate-examples.md) for comprehensive examples including:
+- TDD workflow with quality checks (Rust, Python, JavaScript)
+- Context validation patterns (manual checklists, automated validation)
+- Security-focused gates (audit, secret detection, SAST)
+- Performance gates (benchmarks, binary size)
+- Quick setup templates (minimal, standard, comprehensive)
+
+**Key Philosophy**: Prechecks remind, postchecks enforce.
 
 ## State Transition Reference
 
