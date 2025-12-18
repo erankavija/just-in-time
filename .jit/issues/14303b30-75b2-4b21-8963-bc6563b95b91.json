@@ -16,7 +16,20 @@
   ],
   "gates_status": {},
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "docs/ci-gate-integration-design.md",
+      "commit": null,
+      "label": "Design Document",
+      "doc_type": null
+    },
+    {
+      "path": "docs/gate-examples.md",
+      "commit": null,
+      "label": "Examples",
+      "doc_type": null
+    }
+  ],
   "labels": [
     "type:epic",
     "epic:phase5.2",

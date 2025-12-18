@@ -14,7 +14,14 @@
   ],
   "gates_status": {},
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "ROADMAP.md",
+      "commit": null,
+      "label": "Roadmap",
+      "doc_type": null
+    }
+  ],
   "labels": [
     "type:milestone",
     "milestone:v1.0"
