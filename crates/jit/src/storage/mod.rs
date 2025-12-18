@@ -12,6 +12,7 @@ use std::collections::HashMap;
 pub mod json;
 pub mod lock;
 pub mod memory;
+pub mod gate_runs;
 
 // Re-export for convenience
 pub use json::JsonFileStorage;
@@ -131,6 +132,27 @@ pub trait IssueStore: Clone {
     ) -> Result<std::collections::HashMap<String, crate::domain::LabelNamespace>> {
         Ok(self.load_label_namespaces()?.namespaces)
     }
+
+    /// Save a gate run result.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the result cannot be persisted.
+    fn save_gate_run_result(&self, result: &crate::domain::GateRunResult) -> Result<()>;
+
+    /// Load a gate run result by run ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the result does not exist or cannot be deserialized.
+    fn load_gate_run_result(&self, run_id: &str) -> Result<crate::domain::GateRunResult>;
+
+    /// List all gate run results for a specific issue.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if results cannot be loaded.
+    fn list_gate_runs_for_issue(&self, issue_id: &str) -> Result<Vec<crate::domain::GateRunResult>>;
 
     /// Get the root directory path for this storage backend.
     ///

@@ -36,6 +36,7 @@ pub struct InMemoryStorage {
     gate_registry: Arc<Mutex<GateRegistry>>,
     events: Arc<Mutex<Vec<Event>>>,
     label_namespaces: Arc<Mutex<crate::domain::LabelNamespaces>>,
+    gate_runs: Arc<Mutex<HashMap<String, crate::domain::GateRunResult>>>,
 }
 
 impl InMemoryStorage {
@@ -47,6 +48,7 @@ impl InMemoryStorage {
             gate_registry: Arc::new(Mutex::new(GateRegistry::default())),
             events: Arc::new(Mutex::new(Vec::new())),
             label_namespaces: Arc::new(Mutex::new(crate::domain::LabelNamespaces::new())),
+            gate_runs: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 }
@@ -125,6 +127,34 @@ impl IssueStore for InMemoryStorage {
     fn root(&self) -> &std::path::Path {
         // In-memory storage doesn't have a real root, return current directory
         std::path::Path::new(".")
+    }
+
+    fn save_gate_run_result(&self, result: &crate::domain::GateRunResult) -> Result<()> {
+        self.gate_runs
+            .lock()
+            .unwrap()
+            .insert(result.run_id.clone(), result.clone());
+        Ok(())
+    }
+
+    fn load_gate_run_result(&self, run_id: &str) -> Result<crate::domain::GateRunResult> {
+        self.gate_runs
+            .lock()
+            .unwrap()
+            .get(run_id)
+            .cloned()
+            .ok_or_else(|| anyhow!("Gate run '{}' not found", run_id))
+    }
+
+    fn list_gate_runs_for_issue(&self, issue_id: &str) -> Result<Vec<crate::domain::GateRunResult>> {
+        Ok(self
+            .gate_runs
+            .lock()
+            .unwrap()
+            .values()
+            .filter(|r| r.issue_id == issue_id)
+            .cloned()
+            .collect())
     }
 }
 
