@@ -119,7 +119,7 @@ Separate jit-dispatch orchestrator, storage abstraction, generic DAG, CLI consis
   - Quick setup templates
   - See: `docs/gate-examples.md`
 
-**Phase 5.1: Core Infrastructure (In Progress)**
+**Phase 5.1: Core Infrastructure (✅ Complete)**
 - ✅ Core infrastructure: versioned Gate and GateRunResult structs
 - ✅ Exec checker with timeout, output capture, Git commit recording (graceful degradation)
 - ✅ Postcheck execution on issue completion (auto-transitions to Done if all pass)
@@ -128,25 +128,42 @@ Separate jit-dispatch orchestrator, storage abstraction, generic DAG, CLI consis
 - ✅ Structured result storage in `.jit/gate-runs/`
 - ✅ State transition integration (update_issue_state with hooks)
 - ✅ Working directory logic (repo root for production, current_dir for tests)
-- ✅ Comprehensive test coverage (8 gate_check tests, 173 total tests passing)
-- [ ] CLI commands: define, check, pass/fail gates
-- [ ] Enhanced gate definition command with stage/mode/checker
-- [ ] Event logging for gate check operations (partial)
+- ✅ Comprehensive test coverage (17 gate CLI tests + 173 existing = 190 total tests passing)
+- ✅ CLI commands: define, list, show, remove, check, check-all gates
+- ✅ Enhanced gate definition command with stage/mode/checker
+- ✅ Event logging for gate check operations
+- ✅ JSON output support for all gate commands
 
-**Phase 5.2: Future Extensions**
+**Phase 5.2: Agent-Friendly Additions**
+- [ ] **Precheck Preview**: `jit gate preview <issue-id>` - run prechecks without state change
+  - Cache result for 5 minutes
+  - Gives agents discoverability without triggering lazy eval
+  - Returns `--json` with predicted precheck results
+- [ ] **Enhanced Observability**:
+  - `jit gate history <issue>` - show all gate runs for an issue
+  - `jit gate runs <gate-key>` - show all runs of a specific gate
+  - Filter by status, time range
+- [ ] **Improved Error Messages**:
+  - Show relevant output excerpts on failure
+  - Suggest fixes based on common patterns
+  - Link to full logs in `.jit/gate-runs/`
+
+**Phase 5.3: Advanced Features (Future)**
 - [ ] Additional checker types (docker, http, artifact)
 - [ ] Gate dependencies and parallelization
-- [ ] Conditional gates
+- [ ] Conditional gates (when conditions, use `skipped` status)
 - [ ] PR/branch protection integration
 - [ ] External CI result ingestion
+- [ ] Gate templates/presets (`jit gate define --preset rust-tdd`)
+- [ ] Multi-approver gates (RBAC layer)
 
 ---
 
 ## Current Focus
 
-**System Status**: Production-ready for core use case + gate infrastructure implemented
+**System Status**: Production-ready with complete gate system (Phase 5.1)
 
-**Active Development**: Phase 5.1 - Quality gate system CLI commands
+**Latest Completion**: Phase 5.1 - Quality gate system CLI (2025-12-18)
 
 **Completed Features:**
 - Issue tracking with dependency graphs
@@ -155,12 +172,14 @@ Separate jit-dispatch orchestrator, storage abstraction, generic DAG, CLI consis
 - Interactive web UI with strategic views
 - MCP server for AI agent integration
 - Multi-agent safe concurrent operations
+- Quality gate system with automated checkers
 
 **Recommended Next Steps:**
-1. Implement gate system MVP (Phase 5.1)
-2. Use gates in production to validate design
-3. Gather feedback on agent usability
-4. Implement advanced gate features as needed
+1. **Use in production**: Apply gate system to real workflows (TDD, CI/CD integration)
+2. **Documentation**: Update user guides with gate examples
+3. **Agent testing**: Validate gate usability with AI agents
+4. **Phase 5.2**: Implement agent-friendly additions (gate preview, enhanced observability)
+5. **Phase 5.3**: Add advanced features based on production feedback
 
 ---
 
