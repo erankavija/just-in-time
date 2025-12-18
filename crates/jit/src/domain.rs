@@ -216,16 +216,127 @@ impl DocumentReference {
 /// A quality gate definition in the registry
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Gate {
+    /// Schema version for future evolution
+    #[serde(default = "default_gate_version")]
+    pub version: u32,
     /// Unique identifier for this gate type
     pub key: String,
     /// Human-readable name
     pub title: String,
     /// Explanation of what this gate checks
     pub description: String,
-    /// Whether automation can pass this gate
+    /// Gate execution stage
+    pub stage: GateStage,
+    /// Gate mode (manual or automated)
+    pub mode: GateMode,
+    /// Checker configuration for automated gates
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub checker: Option<GateChecker>,
+    /// Reserved for future extensions
+    #[serde(default)]
+    pub reserved: HashMap<String, serde_json::Value>,
+    /// Deprecated: kept for backwards compatibility
+    #[serde(default)]
     pub auto: bool,
-    /// Example of how to integrate with this gate
+    /// Deprecated: kept for backwards compatibility
     pub example_integration: Option<String>,
+}
+
+fn default_gate_version() -> u32 {
+    1
+}
+
+/// Gate execution stage
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GateStage {
+    /// Runs before work starts (ready → in_progress)
+    Precheck,
+    /// Runs after work completes (in_progress → gated)
+    Postcheck,
+}
+
+/// Gate execution mode
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GateMode {
+    /// Requires manual pass/fail
+    Manual,
+    /// Can be automatically checked
+    Auto,
+}
+
+/// Gate checker configuration
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum GateChecker {
+    /// Execute a shell command
+    Exec {
+        /// Command to execute
+        command: String,
+        /// Timeout in seconds
+        timeout_seconds: u64,
+        /// Optional working directory (relative to repo root)
+        working_dir: Option<String>,
+        /// Environment variables
+        #[serde(default)]
+        env: HashMap<String, String>,
+    },
+}
+
+/// Result of a gate execution
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GateRunResult {
+    /// Schema version for future evolution
+    pub schema_version: u32,
+    /// Unique run identifier
+    pub run_id: String,
+    /// Gate key that was executed
+    pub gate_key: String,
+    /// Stage at which gate was executed
+    pub stage: GateStage,
+    /// Issue ID
+    pub issue_id: String,
+    /// Git commit (if available)
+    pub commit: Option<String>,
+    /// Git branch (if available)
+    pub branch: Option<String>,
+    /// Result status
+    pub status: GateRunStatus,
+    /// When execution started
+    pub started_at: DateTime<Utc>,
+    /// When execution completed
+    pub completed_at: Option<DateTime<Utc>>,
+    /// Duration in milliseconds
+    pub duration_ms: Option<u64>,
+    /// Exit code (for command execution)
+    pub exit_code: Option<i32>,
+    /// Standard output
+    pub stdout: String,
+    /// Standard error
+    pub stderr: String,
+    /// Command that was executed
+    pub command: String,
+    /// Who triggered this execution
+    pub by: Option<String>,
+    /// Optional message
+    pub message: Option<String>,
+}
+
+/// Gate run status
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GateRunStatus {
+    /// Check succeeded
+    Passed,
+    /// Check failed (expected failure, e.g., tests failed)
+    Failed,
+    /// Unexpected error (timeout, command not found, crash)
+    Error,
+    /// Not yet run (for manual gates)
+    Pending,
+    /// Not applicable (future: for conditional gates)
+    Skipped,
 }
 
 /// System event types for audit log

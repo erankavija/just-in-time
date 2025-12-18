@@ -239,9 +239,14 @@ mod tests {
 
             let mut new_registry = GateRegistry::default();
             let gate = crate::domain::Gate {
+                version: 1,
                 key: "test-gate".to_string(),
                 title: "Test Gate".to_string(),
                 description: "A test gate".to_string(),
+                stage: crate::domain::GateStage::Postcheck,
+                mode: crate::domain::GateMode::Manual,
+                checker: None,
+                reserved: std::collections::HashMap::new(),
                 auto: false,
                 example_integration: None,
             };

@@ -7,6 +7,7 @@ pub mod cli;
 pub mod commands;
 pub mod config;
 pub mod domain;
+pub mod gate_execution;
 pub mod graph;
 pub mod hierarchy_templates;
 pub mod labels;

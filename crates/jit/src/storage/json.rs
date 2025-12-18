@@ -459,9 +459,14 @@ mod tests {
         assert!(registry.gates.is_empty());
 
         let gate = Gate {
+            version: 1,
             key: "review".to_string(),
             title: "Code Review".to_string(),
             description: "Manual code review".to_string(),
+            stage: crate::domain::GateStage::Postcheck,
+            mode: crate::domain::GateMode::Manual,
+            checker: None,
+            reserved: std::collections::HashMap::new(),
             auto: false,
             example_integration: None,
         };

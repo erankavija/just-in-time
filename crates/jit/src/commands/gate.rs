@@ -94,9 +94,18 @@ impl<S: IssueStore> CommandExecutor<S> {
         registry.gates.insert(
             key.clone(),
             Gate {
+                version: 1,
                 key,
                 title,
                 description,
+                stage: crate::domain::GateStage::Postcheck, // Default to postcheck for backwards compat
+                mode: if auto {
+                    crate::domain::GateMode::Auto
+                } else {
+                    crate::domain::GateMode::Manual
+                },
+                checker: None,
+                reserved: std::collections::HashMap::new(),
                 auto,
                 example_integration,
             },
