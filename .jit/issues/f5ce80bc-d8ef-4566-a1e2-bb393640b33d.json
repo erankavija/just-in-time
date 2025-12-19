@@ -1,0 +1,25 @@
+{
+  "id": "f5ce80bc-d8ef-4566-a1e2-bb393640b33d",
+  "title": "Implement bulk operations support",
+  "description": "Add comprehensive bulk operations support to enable efficient batch modifications on multiple issues matching filter criteria. Implement boolean query language supporting label, state, priority, and assignee filters with AND/OR operations. Add bulk-update command with dry-run mode for safe preview. Support batch operations for state changes, label additions/removals, and assignments. Use atomic per-issue file operations with comprehensive error reporting for partial failures. Return JSON summary with counts of matched, modified, and skipped issues. This feature is essential for managing large workspaces efficiently, reducing overhead for both human users and AI agents when operating at scale.",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "tdd-reminder",
+    "tests",
+    "clippy",
+    "fmt",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:production-stability",
+    "milestone:v1.0",
+    "component:cli"
+  ]
+}

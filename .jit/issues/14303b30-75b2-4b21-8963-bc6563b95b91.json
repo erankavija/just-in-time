@@ -7,9 +7,11 @@
   "assignee": null,
   "dependencies": [
     "3342dc7c-5ef2-44c3-a65e-d3c5c81277e9",
-    "772cbbc5-fc22-4bb0-8655-a6997716809f",
     "aa54c441-f9ae-414f-b244-21e5fcdd1977",
-    "f3af98cd-9cb8-47a6-bff7-461af5c7e238"
+    "772cbbc5-fc22-4bb0-8655-a6997716809f",
+    "f3af98cd-9cb8-47a6-bff7-461af5c7e238",
+    "93d1caf7-1f6e-4d6c-a64d-42546401ebe4",
+    "0ce16136-0999-4f94-944f-01d195f42565"
   ],
   "gates_required": [
     "code-review"

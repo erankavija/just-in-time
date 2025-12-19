@@ -1,0 +1,24 @@
+{
+  "id": "0587a73a-be52-465c-a2f2-dcac1cb4ebe6",
+  "title": "Implement comprehensive error recovery",
+  "description": "Conduct systematic audit and improvement of error handling across all I/O operations to ensure graceful recovery from all common failure modes. Implement detection and recovery for partial writes, corrupted JSON, lock timeouts, missing file references, and network errors. Add comprehensive validation command (jit validate) with auto-fix capability for common issues like orphaned locks, broken references, and schema violations. Implement failure injection tests for each error category to verify recovery mechanisms. Add detailed error logging with context and create operator runbook for error recovery procedures. This work is critical for production stability and ensuring no data loss or corruption under adverse conditions.",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "tests",
+    "clippy",
+    "fmt",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:production-stability",
+    "milestone:v1.0",
+    "component:core"
+  ]
+}

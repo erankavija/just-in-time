@@ -1,0 +1,25 @@
+{
+  "id": "0ce16136-0999-4f94-944f-01d195f42565",
+  "title": "Improve gate CLI help text clarity",
+  "description": "Improve clarity of gate-related CLI help text to better distinguish gates from labels and guide users to the correct commands. Update help text for 'jit issue create --gate' flag to explicitly mention that gate keys must exist in the registry and provide examples (e.g., 'code-review', 'tests', 'clippy'). Add similar clarifications to 'jit gate add' help text. Include examples in help output showing both single and multiple gate usage patterns. Update INSTALL.md or user documentation to explain the gate vs. label distinction clearly, emphasizing that gates are quality checkpoints defined in the registry, while labels are arbitrary key-value tags for organization. This improvement helps both human users and AI agents understand the gate system correctly without trial-and-error, reducing confusion between the two similar-looking but distinct concepts.",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "tdd-reminder",
+    "tests",
+    "clippy",
+    "fmt",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:phase5.2",
+    "milestone:v1.0",
+    "component:cli"
+  ]
+}

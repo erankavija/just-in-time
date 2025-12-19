@@ -1,0 +1,22 @@
+{
+  "id": "13c69884-dfe9-4a62-b2ef-59fa4d2f76f3",
+  "title": "Add web UI state transition buttons",
+  "description": "Add interactive state transition controls to web UI, enabling users to modify issue state and trigger gates directly from the browser without CLI context switching. Implement REST API endpoints for state transitions, issue claiming, gate execution, and bulk operations. Add UI components: state transition buttons (Start Work, Submit for Review, Mark Done, Block/Unblock), assignment controls (Claim, Unclaim, Reassign), and gate controls (Run Precheck/Postcheck, View Results). Support bulk operations with multi-select checkboxes in list view. Use optimistic UI updates with rollback on error and comprehensive error handling with toast notifications. Document security implications and recommend deployment with firewall rules (authentication/RBAC deferred to v1.1+). This enhancement significantly improves usability by enabling common operations directly in the web interface.",
+  "state": "ready",
+  "priority": "low",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "tests",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:production-polish",
+    "milestone:v1.0",
+    "component:web"
+  ]
+}

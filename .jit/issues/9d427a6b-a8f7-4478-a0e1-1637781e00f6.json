@@ -1,0 +1,30 @@
+{
+  "id": "9d427a6b-a8f7-4478-a0e1-1637781e00f6",
+  "title": "Epic: Production Polish",
+  "description": "Improve user experience and reduce friction through gate templates/presets and web UI state transition buttons. Gate templates encode best practices for common workflows (Rust/Python/JavaScript TDD, security audits) and reduce setup time from minutes to seconds. Web UI enhancements enable direct state transitions and gate execution from the browser, eliminating constant context switching to CLI. While not strictly required for functionality, these quality-of-life improvements significantly enhance usability for both human users and AI agents.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "13c69884-dfe9-4a62-b2ef-59fa4d2f76f3",
+    "56b7e503-c4c8-4509-96c5-ae40e37d3132"
+  ],
+  "gates_required": [
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [
+    {
+      "path": "docs/production-polish-design.md",
+      "commit": null,
+      "label": "Design Document",
+      "doc_type": "design"
+    }
+  ],
+  "labels": [
+    "type:epic",
+    "epic:production-polish",
+    "milestone:v1.0"
+  ]
+}

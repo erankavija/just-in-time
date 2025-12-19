@@ -1,0 +1,25 @@
+{
+  "id": "c802a9b0-79df-4ce3-b129-2f86fff3c9ce",
+  "title": "Implement stalled work detection",
+  "description": "Implement automatic stalled work detection to identify issues that are stuck or abandoned, enabling timely intervention. Add 'jit query stalled' command that detects multiple stall patterns: in-progress issues exceeding time thresholds (default 7 days), orphaned assignments with inactive assignees (3+ days), blocked issues with stalled dependencies, high-priority ready issues never claimed, and gated issues without gate check attempts. Support configurable thresholds globally and per-label via .jit/config/stall-detection.json. Return detailed stall information including stall type, duration, last activity timestamp, and suggested remediation actions. Enable JSON output for integration with monitoring and alerting systems. This capability is critical for AI agent coordination, ensuring continuous progress and detecting coordination failures early.",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "tdd-reminder",
+    "tests",
+    "clippy",
+    "fmt",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:observability",
+    "milestone:v1.0",
+    "component:cli"
+  ]
+}

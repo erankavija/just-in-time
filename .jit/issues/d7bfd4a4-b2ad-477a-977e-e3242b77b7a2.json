@@ -1,0 +1,30 @@
+{
+  "id": "d7bfd4a4-b2ad-477a-977e-e3242b77b7a2",
+  "title": "Epic: Production Observability",
+  "description": "Provide comprehensive observability into system health and workflow performance through metrics reporting and stalled work detection. This epic delivers actionable insights for monitoring issue tracker state, measuring workflow velocity and cycle times, tracking gate effectiveness, and automatically identifying stuck or abandoned work. For AI agent orchestration, observability is critical to detect coordination failures and ensure agents make continuous progress. Metrics can be exported to Prometheus for integration with existing monitoring infrastructure.",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "c802a9b0-79df-4ce3-b129-2f86fff3c9ce",
+    "713ff59d-5d50-4401-b48c-3966bf82f319"
+  ],
+  "gates_required": [
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [
+    {
+      "path": "docs/observability-design.md",
+      "commit": null,
+      "label": "Design Document",
+      "doc_type": "design"
+    }
+  ],
+  "labels": [
+    "type:epic",
+    "epic:observability",
+    "milestone:v1.0"
+  ]
+}

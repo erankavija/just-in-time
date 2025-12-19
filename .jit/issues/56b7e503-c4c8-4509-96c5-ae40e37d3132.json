@@ -1,0 +1,25 @@
+{
+  "id": "56b7e503-c4c8-4509-96c5-ae40e37d3132",
+  "title": "Implement gate templates and presets",
+  "description": "Implement gate templates and presets system to reduce setup time and encode best practices for common workflows. Add 'jit gate preset' commands: list (show available presets), show (display preset details), apply (create gates from preset on issue), and create (save custom presets). Include built-in presets for rust-tdd, python-tdd, js-tdd, security-audit, and minimal workflows, embedding proven gate configurations directly in binary. Support custom user-defined presets in .jit/config/gate-presets/. Enable customization via parameters when applying presets (timeout overrides, skip prechecks/postchecks, include/exclude specific gates). This feature dramatically improves onboarding and reduces boilerplate, enabling users and agents to set up quality gates in seconds rather than minutes by leveraging battle-tested configurations.",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "tdd-reminder",
+    "tests",
+    "clippy",
+    "fmt",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:production-polish",
+    "milestone:v1.0",
+    "component:cli"
+  ]
+}

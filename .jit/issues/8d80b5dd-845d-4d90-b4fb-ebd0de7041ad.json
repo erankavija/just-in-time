@@ -1,0 +1,21 @@
+{
+  "id": "8d80b5dd-845d-4d90-b4fb-ebd0de7041ad",
+  "title": "Create performance benchmark suite",
+  "description": "Establish performance baselines for the issue tracker at scale using criterion.rs benchmark suite. Create realistic test scenarios with 1000+ issues and complex dependency graphs. Measure query operations (list, filter, search), graph exports, bulk operations, and gate execution overhead. Set performance targets (queries <100ms, graph export <500ms, bulk ops <1s for 100 issues). Generate performance plots showing scaling characteristics and document results in docs/performance.md. Add benchmark CI job to track performance over time and detect regressions. These benchmarks validate production readiness claims and ensure acceptable performance at scale, providing confidence for v1.0 release.",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:production-stability",
+    "milestone:v1.0",
+    "component:core"
+  ]
+}

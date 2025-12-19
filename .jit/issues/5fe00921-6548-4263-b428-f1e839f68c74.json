@@ -1,0 +1,31 @@
+{
+  "id": "5fe00921-6548-4263-b428-f1e839f68c74",
+  "title": "Epic: Production Stability",
+  "description": "Ensure production-grade reliability and performance for v1.0 release through bulk operations support, comprehensive error recovery mechanisms, and performance benchmarking. This epic addresses critical requirements for handling real-world workloads at scale (1000+ issues) and ensuring graceful recovery from all common failure modes without data loss or corruption. These capabilities are essential for stable production deployments.",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "f5ce80bc-d8ef-4566-a1e2-bb393640b33d",
+    "0587a73a-be52-465c-a2f2-dcac1cb4ebe6",
+    "8d80b5dd-845d-4d90-b4fb-ebd0de7041ad"
+  ],
+  "gates_required": [
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [
+    {
+      "path": "docs/production-stability-design.md",
+      "commit": null,
+      "label": "Design Document",
+      "doc_type": "design"
+    }
+  ],
+  "labels": [
+    "type:epic",
+    "epic:production-stability",
+    "milestone:v1.0"
+  ]
+}
