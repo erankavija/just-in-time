@@ -25,6 +25,7 @@
   --state-in-progress: #3B82F6; /* Blue - active work */
   --state-gated: #F59E0B;       /* Amber - awaiting approval */
   --state-done: #8B5CF6;        /* Purple - completed */
+  --state-rejected: #EF4444;    /* Red - won't implement */
   --state-archived: #9CA3AF;    /* Light gray - inactive */
   
   /* Font */
@@ -55,6 +56,7 @@
   --state-in-progress: #2563EB; /* Blue - active work */
   --state-gated: #D97706;       /* Amber - awaiting approval */
   --state-done: #7C3AED;        /* Purple - completed */
+  --state-rejected: #DC2626;    /* Red - won't implement */
   --state-archived: #9CA3AF;    /* Light gray - inactive */
 }
 

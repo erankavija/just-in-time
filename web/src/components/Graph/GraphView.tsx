@@ -24,6 +24,7 @@ const stateColors: Record<State, string> = {
   in_progress: 'var(--state-in-progress)',
   gated: 'var(--state-gated)',
   done: 'var(--state-done)',
+  rejected: 'var(--state-rejected)',
   archived: 'var(--state-archived)',
 };
 

@@ -2,17 +2,18 @@ import { describe, it, expect } from 'vitest';
 import type { State } from '../../../types/models';
 
 describe('IssueDetail state emojis', () => {
-  it('should have emojis for all 6 states', () => {
+  it('should have emojis for all 7 states', () => {
     const stateEmoji: Record<State, string> = {
       backlog: '⏸️',
       ready: '🟢',
       in_progress: '🟡',
       gated: '🟠',
       done: '✅',
+      rejected: '❌',
       archived: '📦',
     };
 
-    expect(Object.keys(stateEmoji)).toHaveLength(6);
+    expect(Object.keys(stateEmoji)).toHaveLength(7);
     expect(stateEmoji.backlog).toBe('⏸️');
     expect(stateEmoji.gated).toBe('🟠');
   });
@@ -24,7 +25,7 @@ describe('IssueDetail state emojis', () => {
       in_progress: '🟡',
       gated: '🟠',
       done: '✅',
-      archived: '��',
+      archived: '📦',
     };
 
     const emojis = Object.values(stateEmoji);
