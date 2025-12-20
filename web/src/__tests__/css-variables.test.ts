@@ -25,12 +25,13 @@ describe('CSS state variables', () => {
     expect(openMatches).toBeNull();
   });
 
-  it('should define all 6 state colors', () => {
+  it('should define all 7 state colors', () => {
     expect(cssContent).toContain('--state-backlog:');
     expect(cssContent).toContain('--state-ready:');
     expect(cssContent).toContain('--state-in-progress:');
     expect(cssContent).toContain('--state-gated:');
     expect(cssContent).toContain('--state-done:');
+    expect(cssContent).toContain('--state-rejected:');
     expect(cssContent).toContain('--state-archived:');
   });
 });

@@ -9,7 +9,7 @@ describe('IssueDetail state emojis', () => {
       in_progress: '🟡',
       gated: '🟠',
       done: '✅',
-      rejected: '❌',
+      rejected: '🗑️',
       archived: '📦',
     };
 
@@ -25,6 +25,7 @@ describe('IssueDetail state emojis', () => {
       in_progress: '🟡',
       gated: '🟠',
       done: '✅',
+      rejected: '🗑️',
       archived: '📦',
     };
 

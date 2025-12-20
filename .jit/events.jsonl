@@ -208,3 +208,4 @@
 {"type":"gate_passed","id":"124220ad-2ecc-4711-bcda-6d2dbe05addf","issue_id":"4051ee7d-24e7-4b02-9238-b4fb2a6aa0d4","timestamp":"2025-12-20T22:02:12.369364091Z","gate_key":"code-review","updated_by":null}
 {"type":"issue_state_changed","id":"6c089a06-6248-48ba-887e-4c239839c4f9","issue_id":"4051ee7d-24e7-4b02-9238-b4fb2a6aa0d4","timestamp":"2025-12-20T22:02:42.469660576Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"cac41afa-ccea-4336-812d-b38afc4ee945","issue_id":"4051ee7d-24e7-4b02-9238-b4fb2a6aa0d4","timestamp":"2025-12-20T22:02:42.469679236Z"}
+{"type":"issue_claimed","id":"b22530aa-896d-4dc5-acba-5dd8f00165ee","issue_id":"90575086-fcfe-4b0d-82b5-fc00c4daace7","timestamp":"2025-12-20T22:06:03.100502123Z","assignee":"agent:copilot-current-session"}

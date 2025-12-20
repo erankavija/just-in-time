@@ -4,7 +4,7 @@
   "description": "Update web UI to support the new Rejected state:\n- Add 'rejected' to State type in models.ts  \n- Add rejected emoji in IssueDetail.tsx (e.g., ❌ or 🚫)\n- Add rejected color in GraphView.tsx using --state-rejected CSS variable\n- Update state emoji tests (expect 7 states instead of 6)\n- Update state colors tests (expect 7 states instead of 6)\n- Add --state-rejected CSS variable definition",
   "state": "gated",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:copilot-current-session",
   "dependencies": [],
   "gates_required": [
     "tests",

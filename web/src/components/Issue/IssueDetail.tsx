@@ -96,7 +96,7 @@ export function IssueDetail({ issueId, allIssues = [], onNavigate }: IssueDetail
     in_progress: '🟡',
     gated: '🟠',
     done: '✅',
-    rejected: '❌',
+    rejected: '🗑️',
     archived: '📦',
   };
 
