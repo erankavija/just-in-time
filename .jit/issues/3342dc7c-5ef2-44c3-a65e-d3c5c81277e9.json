@@ -1,8 +1,8 @@
 {
   "id": "3342dc7c-5ef2-44c3-a65e-d3c5c81277e9",
   "title": "Implement gate preview command",
-  "description": "Add 'jit gate preview <issue>' to run prechecks without state change. Cache results for 5 minutes. Returns JSON with predicted precheck results for agent discoverability.",
-  "state": "ready",
+  "description": "DECISION: Won't implement - unnecessary complexity for marginal value. Current workflow already solves the problem: jit issue claim fails fast with clear error messages. Agents can attempt to claim and handle error - no preview needed. Proposed caching layer introduces complexity without addressing real user pain. See attached analysis document.",
+  "state": "gated",
   "priority": "high",
   "assignee": null,
   "dependencies": [],
@@ -15,11 +15,19 @@
   ],
   "gates_status": {},
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "docs/gate-preview-analysis.md",
+      "commit": null,
+      "label": "Closure Analysis",
+      "doc_type": "analysis"
+    }
+  ],
   "labels": [
     "type:task",
     "epic:phase5.2",
     "milestone:v1.0",
-    "component:cli"
+    "component:cli",
+    "resolution:wont-fix"
   ]
 }
