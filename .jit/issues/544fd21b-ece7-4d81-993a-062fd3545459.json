@@ -5,7 +5,9 @@
   "state": "ready",
   "priority": "high",
   "assignee": null,
-  "dependencies": [],
+  "dependencies": [
+    "0ce16136-0999-4f94-944f-01d195f42565"
+  ],
   "gates_required": [
     "tdd-reminder",
     "tests",
