@@ -1,6 +1,7 @@
 //! Quality gate operations
 
 use super::*;
+use crate::domain::GateMode;
 
 impl<S: IssueStore> CommandExecutor<S> {
     pub fn add_gate(&self, issue_id: &str, gate_key: String) -> Result<()> {
@@ -21,6 +22,17 @@ impl<S: IssueStore> CommandExecutor<S> {
                 "Gate '{}' is not required for this issue",
                 gate_key
             ));
+        }
+
+        // Check if gate is automated - reject manual pass/fail
+        let registry = self.storage.load_gate_registry()?;
+        if let Some(gate) = registry.gates.get(&gate_key) {
+            if gate.mode == GateMode::Auto {
+                return Err(anyhow!(
+                    "Gate '{}' is automated and cannot be manually passed. Use 'jit gate check {} {}' to run the checker.",
+                    gate_key, issue_id, gate_key
+                ));
+            }
         }
 
         issue.gates_status.insert(
@@ -52,6 +64,17 @@ impl<S: IssueStore> CommandExecutor<S> {
                 "Gate '{}' is not required for this issue",
                 gate_key
             ));
+        }
+
+        // Check if gate is automated - reject manual pass/fail
+        let registry = self.storage.load_gate_registry()?;
+        if let Some(gate) = registry.gates.get(&gate_key) {
+            if gate.mode == GateMode::Auto {
+                return Err(anyhow!(
+                    "Gate '{}' is automated and cannot be manually failed. Use 'jit gate check {} {}' to run the checker.",
+                    gate_key, issue_id, gate_key
+                ));
+            }
         }
 
         issue.gates_status.insert(
@@ -184,5 +207,168 @@ impl<S: IssueStore> CommandExecutor<S> {
             .get(key)
             .cloned()
             .ok_or_else(|| anyhow!("Gate '{}' not found", key))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::{Gate, GateChecker, GateMode, GateStage};
+    use crate::storage::InMemoryStorage;
+    use std::collections::HashMap;
+
+    fn setup() -> CommandExecutor<InMemoryStorage> {
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+        CommandExecutor::new(storage)
+    }
+
+    #[test]
+    fn test_manual_pass_of_automated_gate_should_fail() {
+        let executor = setup();
+
+        // Define an automated gate
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        registry.gates.insert(
+            "auto-gate".to_string(),
+            Gate {
+                version: 1,
+                key: "auto-gate".to_string(),
+                title: "Automated Gate".to_string(),
+                description: "Auto gate".to_string(),
+                stage: GateStage::Postcheck,
+                mode: GateMode::Auto,
+                checker: Some(GateChecker::Exec {
+                    command: "exit 0".to_string(),
+                    timeout_seconds: 10,
+                    working_dir: None,
+                    env: HashMap::new(),
+                }),
+                reserved: HashMap::new(),
+                auto: true,
+                example_integration: None,
+            },
+        );
+        executor.storage.save_gate_registry(&registry).unwrap();
+
+        // Create issue with the gate
+        let issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(&issue).unwrap();
+        executor
+            .add_gate(&issue_id, "auto-gate".to_string())
+            .unwrap();
+
+        // Try to manually pass automated gate - should fail
+        let result = executor.pass_gate(
+            &issue_id,
+            "auto-gate".to_string(),
+            Some("human:test".to_string()),
+        );
+
+        assert!(result.is_err(), "Manual pass of automated gate should fail");
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("automated") || err_msg.contains("jit gate check"),
+            "Error should mention automation or suggest using 'jit gate check'"
+        );
+    }
+
+    #[test]
+    fn test_manual_fail_of_automated_gate_should_fail() {
+        let executor = setup();
+
+        // Define an automated gate
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        registry.gates.insert(
+            "auto-gate".to_string(),
+            Gate {
+                version: 1,
+                key: "auto-gate".to_string(),
+                title: "Automated Gate".to_string(),
+                description: "Auto gate".to_string(),
+                stage: GateStage::Postcheck,
+                mode: GateMode::Auto,
+                checker: Some(GateChecker::Exec {
+                    command: "exit 1".to_string(),
+                    timeout_seconds: 10,
+                    working_dir: None,
+                    env: HashMap::new(),
+                }),
+                reserved: HashMap::new(),
+                auto: true,
+                example_integration: None,
+            },
+        );
+        executor.storage.save_gate_registry(&registry).unwrap();
+
+        // Create issue with the gate
+        let issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(&issue).unwrap();
+        executor
+            .add_gate(&issue_id, "auto-gate".to_string())
+            .unwrap();
+
+        // Try to manually fail automated gate - should also be rejected
+        let result = executor.fail_gate(
+            &issue_id,
+            "auto-gate".to_string(),
+            Some("human:test".to_string()),
+        );
+
+        assert!(result.is_err(), "Manual fail of automated gate should fail");
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("automated") || err_msg.contains("jit gate check"),
+            "Error should mention automation or suggest using 'jit gate check'"
+        );
+    }
+
+    #[test]
+    fn test_manual_pass_of_manual_gate_should_succeed() {
+        let executor = setup();
+
+        // Define a manual gate
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        registry.gates.insert(
+            "manual-gate".to_string(),
+            Gate {
+                version: 1,
+                key: "manual-gate".to_string(),
+                title: "Manual Gate".to_string(),
+                description: "Manual gate".to_string(),
+                stage: GateStage::Postcheck,
+                mode: GateMode::Manual,
+                checker: None,
+                reserved: HashMap::new(),
+                auto: false,
+                example_integration: None,
+            },
+        );
+        executor.storage.save_gate_registry(&registry).unwrap();
+
+        // Create issue with the gate
+        let issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(&issue).unwrap();
+        executor
+            .add_gate(&issue_id, "manual-gate".to_string())
+            .unwrap();
+
+        // Manual pass of manual gate should succeed
+        let result = executor.pass_gate(
+            &issue_id,
+            "manual-gate".to_string(),
+            Some("human:reviewer".to_string()),
+        );
+        assert!(result.is_ok(), "Manual pass of manual gate should succeed");
+
+        // Verify gate is marked as passed
+        let issue = executor.storage.load_issue(&issue_id).unwrap();
+        assert_eq!(
+            issue.gates_status.get("manual-gate").unwrap().status,
+            crate::domain::GateStatus::Passed
+        );
     }
 }

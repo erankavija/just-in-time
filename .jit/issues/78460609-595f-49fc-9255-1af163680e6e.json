@@ -2,10 +2,12 @@
   "id": "78460609-595f-49fc-9255-1af163680e6e",
   "title": "Prevent manual pass/fail of automated gates",
   "description": "Automated gates (mode=auto) should only be passable via their checker command execution (jit gate check). Currently, you can manually pass automated gates like fmt/tests/clippy with 'jit gate pass', which defeats the purpose of automation. Add validation in pass_gate/fail_gate to reject manual operations on automated gates. Users should use 'jit gate check' instead, which runs the checker and auto-passes/fails based on exit code.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "high",
-  "assignee": null,
-  "dependencies": [],
+  "assignee": "agent:copilot",
+  "dependencies": [
+    "544fd21b-ece7-4d81-993a-062fd3545459"
+  ],
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -20,6 +22,7 @@
     "type:task",
     "component:cli",
     "epic:phase5.2",
-    "milestone:v1.0"
+    "milestone:v1.0",
+    "epic:ai-agent-validation"
   ]
 }

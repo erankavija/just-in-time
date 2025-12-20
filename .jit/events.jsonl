@@ -51,3 +51,5 @@
 {"type":"issue_state_changed","id":"bbfd0897-10a7-4f05-9fe4-7614ada06adc","issue_id":"544fd21b-ece7-4d81-993a-062fd3545459","timestamp":"2025-12-20T08:37:58.933426040Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"f69f4236-6044-4493-a2bd-08bbcbc825eb","issue_id":"544fd21b-ece7-4d81-993a-062fd3545459","timestamp":"2025-12-20T08:37:58.933457300Z"}
 {"type":"issue_created","id":"76c9f722-0f52-4f19-b514-3e2d10b0a8f5","issue_id":"78460609-595f-49fc-9255-1af163680e6e","timestamp":"2025-12-20T08:40:58.488626226Z","title":"Prevent manual pass/fail of automated gates","priority":"high"}
+{"type":"issue_claimed","id":"cc1293d3-7239-4e1e-bf72-91ff3e622242","issue_id":"78460609-595f-49fc-9255-1af163680e6e","timestamp":"2025-12-20T08:47:05.345053026Z","assignee":"agent:copilot"}
+{"type":"issue_state_changed","id":"88d78f1c-7cd0-4c19-9ca6-3b19ea74cb6e","issue_id":"78460609-595f-49fc-9255-1af163680e6e","timestamp":"2025-12-20T08:47:05.345083386Z","from":"ready","to":"in_progress"}
