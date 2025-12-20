@@ -1,6 +1,21 @@
 {
   "schema_version": 2,
   "namespaces": {
+    "component": {
+      "description": "Technical component or subsystem",
+      "unique": false,
+      "strategic": false
+    },
+    "resolution": {
+      "description": "Issue resolution status (e.g., wont-fix, duplicate, invalid)",
+      "unique": true,
+      "strategic": false
+    },
+    "story": {
+      "description": "story organizational grouping",
+      "unique": false,
+      "strategic": true
+    },
     "epic": {
       "description": "epic organizational grouping",
       "unique": false,
@@ -11,36 +26,27 @@
       "unique": true,
       "strategic": false
     },
-    "team": {
-      "description": "Owning team",
-      "unique": true,
-      "strategic": false
-    },
-    "component": {
-      "description": "Technical component or subsystem",
-      "unique": false,
-      "strategic": false
-    },
     "milestone": {
       "description": "milestone organizational grouping",
       "unique": false,
       "strategic": true
     },
-    "story": {
-      "description": "story organizational grouping",
-      "unique": false,
-      "strategic": true
+    "team": {
+      "description": "Owning team",
+      "unique": true,
+      "strategic": false
     }
   },
   "type_hierarchy": {
-    "task": 4,
-    "milestone": 1,
     "epic": 2,
-    "story": 3
+    "milestone": 1,
+    "story": 3,
+    "task": 4,
+    "bug": 4
   },
   "label_associations": {
     "story": "story",
-    "milestone": "milestone",
-    "epic": "epic"
+    "epic": "epic",
+    "milestone": "milestone"
   }
 }

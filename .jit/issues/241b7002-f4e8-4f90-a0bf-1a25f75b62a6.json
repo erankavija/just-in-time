@@ -19,11 +19,6 @@
       "updated_by": "agent:copilot",
       "updated_at": "2025-12-20T17:48:55.538024298Z"
     },
-    "tdd-reminder": {
-      "status": "passed",
-      "updated_by": "agent:copilot",
-      "updated_at": "2025-12-20T17:45:30.003468582Z"
-    },
     "tests": {
       "status": "passed",
       "updated_by": "auto:executor",
@@ -38,12 +33,19 @@
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2025-12-20T17:48:49.316272219Z"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": "agent:copilot",
+      "updated_at": "2025-12-20T17:45:30.003468582Z"
     }
   },
   "context": {},
   "documents": [],
   "labels": [
     "type:task",
-    "component:cli"
+    "component:cli",
+    "epic:phase5.2",
+    "milestone:v1.0"
   ]
 }
