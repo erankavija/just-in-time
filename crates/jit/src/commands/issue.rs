@@ -251,6 +251,12 @@ impl<S: IssueStore> CommandExecutor<S> {
                     issue.state = State::Done;
                 }
             }
+            State::Rejected => {
+                // Rejected bypasses all validation - no gates or dependencies required
+                // This allows closing issues that won't be implemented without
+                // needing to pass quality gates or wait for dependencies
+                issue.state = State::Rejected;
+            }
             State::Gated => {
                 // Run postchecks when moving to Gated
                 issue.state = State::Gated;
@@ -592,5 +598,85 @@ mod tests {
         let issue = executor.storage.load_issue(&issue_id).unwrap();
         assert_eq!(issue.state, State::InProgress);
         assert_eq!(issue.assignee, Some("agent:test".to_string()));
+    }
+
+    #[test]
+    fn test_rejected_state_bypasses_gates() {
+        let executor = setup();
+
+        // Create issue with gates
+        let mut issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        issue.state = State::InProgress;
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(&issue).unwrap();
+
+        // Add gates that haven't been passed
+        executor.add_gate(&issue_id, "tests".to_string()).unwrap();
+        executor
+            .add_gate(&issue_id, "code-review".to_string())
+            .unwrap();
+
+        // Transition to Rejected should succeed without passing gates
+        let result = executor.update_issue_state(&issue_id, State::Rejected);
+        assert!(
+            result.is_ok(),
+            "Rejected state should bypass gate validation"
+        );
+
+        // Verify state is Rejected
+        let issue = executor.storage.load_issue(&issue_id).unwrap();
+        assert_eq!(issue.state, State::Rejected);
+    }
+
+    #[test]
+    fn test_rejected_state_bypasses_dependencies() {
+        let executor = setup();
+
+        // Create dependency
+        let mut dep = crate::domain::Issue::new("Dependency".to_string(), "Dep".to_string());
+        dep.state = State::InProgress; // Not done
+        let dep_id = dep.id.clone();
+        executor.storage.save_issue(&dep).unwrap();
+
+        // Create issue that depends on it
+        let mut issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        issue.dependencies.push(dep_id.clone());
+        issue.state = State::Backlog; // Blocked
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(&issue).unwrap();
+
+        // Transition to Rejected should succeed even with incomplete dependencies
+        let result = executor.update_issue_state(&issue_id, State::Rejected);
+        assert!(
+            result.is_ok(),
+            "Rejected state should bypass dependency checks"
+        );
+
+        // Verify state is Rejected
+        let issue = executor.storage.load_issue(&issue_id).unwrap();
+        assert_eq!(issue.state, State::Rejected);
+    }
+
+    #[test]
+    fn test_done_state_still_enforces_gates() {
+        let executor = setup();
+
+        // Create issue with unpassed gates
+        let mut issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        issue.state = State::InProgress;
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(&issue).unwrap();
+        executor.add_gate(&issue_id, "tests".to_string()).unwrap();
+
+        // Transition to Done should fail (gates not passed)
+        let result = executor.update_issue_state(&issue_id, State::Done);
+        assert!(
+            result.is_err(),
+            "Done state should still enforce gate validation"
+        );
+
+        // Verify state transitioned to Gated (not Done)
+        let issue = executor.storage.load_issue(&issue_id).unwrap();
+        assert_eq!(issue.state, State::Gated);
     }
 }
