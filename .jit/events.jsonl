@@ -32,3 +32,10 @@
 {"type":"issue_created","id":"77ed54f4-9bc8-4294-bd4d-dd1527678c83","issue_id":"93d1caf7-1f6e-4d6c-a64d-42546401ebe4","timestamp":"2025-12-19T23:47:24.277988188Z","title":"Add gate modification flags to issue update command","priority":"high"}
 {"type":"issue_claimed","id":"930f18ac-c466-47cf-9857-fce630abd08f","issue_id":"0ce16136-0999-4f94-944f-01d195f42565","timestamp":"2025-12-20T00:16:16.360743181Z","assignee":"agent:copilot"}
 {"type":"issue_state_changed","id":"28740a10-6b76-46b8-a7cd-71e2e31b170a","issue_id":"0ce16136-0999-4f94-944f-01d195f42565","timestamp":"2025-12-20T00:16:16.360770311Z","from":"ready","to":"in_progress"}
+{"type":"gate_passed","id":"79fca352-4083-40e8-973d-a799e373511c","issue_id":"0ce16136-0999-4f94-944f-01d195f42565","timestamp":"2025-12-20T00:19:53.909478572Z","gate_key":"tdd-reminder","updated_by":"agent:copilot"}
+{"type":"gate_passed","id":"8fbaee7d-5887-4648-bc60-e24c0d8849ab","issue_id":"0ce16136-0999-4f94-944f-01d195f42565","timestamp":"2025-12-20T00:20:23.807192726Z","gate_key":"code-review","updated_by":"agent:copilot"}
+{"type":"gate_passed","id":"b35807c3-c078-4cd3-8719-ff57de0cef1a","issue_id":"0ce16136-0999-4f94-944f-01d195f42565","timestamp":"2025-12-20T00:20:32.835696089Z","gate_key":"fmt","updated_by":"agent:copilot"}
+{"type":"gate_passed","id":"4a91db5a-6edd-4d99-893f-9f136fa6a680","issue_id":"0ce16136-0999-4f94-944f-01d195f42565","timestamp":"2025-12-20T00:20:35.326188351Z","gate_key":"clippy","updated_by":"agent:copilot"}
+{"type":"gate_passed","id":"a5437c73-f787-47d5-96d8-41e285d9052d","issue_id":"0ce16136-0999-4f94-944f-01d195f42565","timestamp":"2025-12-20T00:20:37.772768321Z","gate_key":"tests","updated_by":"agent:copilot"}
+{"type":"issue_state_changed","id":"99430eee-c546-478a-8bca-770184e471b4","issue_id":"0ce16136-0999-4f94-944f-01d195f42565","timestamp":"2025-12-20T00:20:40.667715530Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"8f50a151-edbd-4d7d-bd16-4d4069ee9508","issue_id":"0ce16136-0999-4f94-944f-01d195f42565","timestamp":"2025-12-20T00:20:40.667738220Z"}
