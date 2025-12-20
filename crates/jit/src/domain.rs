@@ -983,6 +983,10 @@ pub struct LabelNamespaces {
     /// e.g., "epic" -> "epic", "release" -> "milestone"
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label_associations: Option<HashMap<String, String>>,
+    /// List of type names that are considered strategic (optional)
+    /// e.g., ["milestone", "epic"]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub strategic_types: Option<Vec<String>>,
 }
 
 impl LabelNamespaces {
@@ -993,6 +997,7 @@ impl LabelNamespaces {
             namespaces: HashMap::new(),
             type_hierarchy: None,
             label_associations: None,
+            strategic_types: None,
         }
     }
 
@@ -1049,11 +1054,15 @@ impl LabelNamespaces {
         label_associations.insert("epic".to_string(), "epic".to_string());
         label_associations.insert("story".to_string(), "story".to_string());
 
+        // Default strategic types (levels 1-2: milestone, epic)
+        let strategic_types = vec!["milestone".to_string(), "epic".to_string()];
+
         let mut config = Self {
             schema_version: 2,
             namespaces,
             type_hierarchy: Some(type_hierarchy),
             label_associations: Some(label_associations),
+            strategic_types: Some(strategic_types),
         };
 
         // Dynamically create membership namespaces from label_associations

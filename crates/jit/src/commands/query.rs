@@ -154,14 +154,21 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::labels as label_utils;
 
         let namespaces = self.storage.load_label_namespaces()?;
-        let strategic_namespaces: Vec<String> = namespaces
-            .namespaces
-            .iter()
-            .filter(|(_, ns)| ns.strategic)
-            .map(|(name, _)| name.clone())
-            .collect();
 
-        if strategic_namespaces.is_empty() {
+        // Get strategic types from config, or fall back to hierarchy-based approach
+        let strategic_types: Vec<String> = if let Some(ref types) = namespaces.strategic_types {
+            types.clone()
+        } else {
+            // Fallback: use hierarchy levels 1-2
+            let type_hierarchy = namespaces.get_type_hierarchy();
+            type_hierarchy
+                .iter()
+                .filter(|(_, &level)| level <= 2)
+                .map(|(type_name, _)| type_name.clone())
+                .collect()
+        };
+
+        if strategic_types.is_empty() {
             return Ok(Vec::new());
         }
 
@@ -169,9 +176,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         let filtered = issues
             .into_iter()
             .filter(|issue| {
+                // Check if issue has type:X label where X is a strategic type
                 issue.labels.iter().any(|label| {
-                    if let Ok((ns, _)) = label_utils::parse_label(label) {
-                        strategic_namespaces.contains(&ns)
+                    if let Ok((ns, value)) = label_utils::parse_label(label) {
+                        ns == "type" && strategic_types.contains(&value)
                     } else {
                         false
                     }

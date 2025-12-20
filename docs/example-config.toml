@@ -8,6 +8,11 @@
 # Default: { milestone = 1, epic = 2, story = 3, task = 4 }
 types = { milestone = 1, epic = 2, story = 3, task = 4 }
 
+# List of type names that are considered strategic (for query strategic)
+# Default: ["milestone", "epic"] (levels 1-2)
+# Fully configurable - you can mark ANY types as strategic regardless of level
+strategic_types = ["milestone", "epic"]
+
 # Type name to membership label namespace mapping
 # Example: epic type uses "epic:*" labels for membership
 # Default: { milestone = "milestone", epic = "epic", story = "story" }

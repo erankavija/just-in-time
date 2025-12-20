@@ -14,7 +14,7 @@
     "story": {
       "description": "story organizational grouping",
       "unique": false,
-      "strategic": true
+      "strategic": false
     },
     "component": {
       "description": "Technical component or subsystem",
@@ -48,5 +48,9 @@
     "story": "story",
     "milestone": "milestone",
     "epic": "epic"
-  }
+  },
+  "strategic_types": [
+    "milestone",
+    "epic"
+  ]
 }
