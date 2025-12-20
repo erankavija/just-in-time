@@ -58,6 +58,7 @@ pub struct StatusSummary {
     pub in_progress: usize,
     pub gated: usize,
     pub done: usize,
+    pub rejected: usize, // New: count of rejected issues
     pub blocked: usize,
     pub total: usize,
 }

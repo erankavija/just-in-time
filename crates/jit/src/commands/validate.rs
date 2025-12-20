@@ -441,6 +441,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         println!("  Ready: {}", summary.ready);
         println!("  In Progress: {}", summary.in_progress);
         println!("  Done: {}", summary.done);
+        println!("  Rejected: {}", summary.rejected);
         println!("  Blocked: {}", summary.blocked);
 
         Ok(())
@@ -460,6 +461,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .count();
         let gated = issues.iter().filter(|i| i.state == State::Gated).count();
         let done = issues.iter().filter(|i| i.state == State::Done).count();
+        let rejected = issues.iter().filter(|i| i.state == State::Rejected).count();
         let blocked = issues.iter().filter(|i| i.is_blocked(&resolved)).count();
 
         Ok(StatusSummary {
@@ -467,6 +469,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             ready,
             in_progress,
             done,
+            rejected,
             blocked,
             gated,
             total: issues.len(),
