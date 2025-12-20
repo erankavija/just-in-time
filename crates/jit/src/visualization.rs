@@ -49,6 +49,7 @@ pub fn export_dot(graph: &DependencyGraph<Issue>) -> String {
             State::InProgress => "yellow",
             State::Gated => "orange",
             State::Done => "lightgreen",
+            State::Rejected => "pink",
             State::Archived => "gray",
         };
         output.push_str(&format!(
@@ -107,6 +108,7 @@ pub fn export_mermaid(graph: &DependencyGraph<Issue>) -> String {
             State::InProgress => "inprogress",
             State::Gated => "gated",
             State::Done => "done",
+            State::Rejected => "rejected",
             State::Archived => "archived",
         };
         output.push_str(&format!(

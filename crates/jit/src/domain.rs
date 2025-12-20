@@ -20,10 +20,22 @@ pub enum State {
     InProgress,
     /// Work complete, awaiting quality gate approval
     Gated,
-    /// Completed
+    /// Completed successfully
     Done,
+    /// Won't implement (bypasses gates)
+    Rejected,
     /// No longer relevant
     Archived,
+}
+
+impl State {
+    /// Check if this state is terminal (Done or Rejected)
+    ///
+    /// Terminal states represent closure - either successful completion (Done)
+    /// or decision not to implement (Rejected). Both unblock dependent issues.
+    pub fn is_terminal(self) -> bool {
+        matches!(self, State::Done | State::Rejected)
+    }
 }
 
 /// Issue priority level
@@ -113,13 +125,13 @@ impl Issue {
 
     /// Check if this issue is blocked by incomplete dependencies
     ///
-    /// Returns true if any dependency is not done.
+    /// Returns true if any dependency is not in a terminal state (Done or Rejected).
     /// Note: Gates do not block work from starting, only from completing.
     pub fn is_blocked(&self, resolved_issues: &HashMap<String, &Issue>) -> bool {
-        // Check if any dependency is not done
+        // Check if any dependency is not in a terminal state
         self.dependencies
             .iter()
-            .any(|dep_id| !matches!(resolved_issues.get(dep_id), Some(issue) if issue.state == State::Done))
+            .any(|dep_id| !matches!(resolved_issues.get(dep_id), Some(issue) if issue.state.is_terminal()))
     }
 
     /// Check if this issue has unpassed gates
@@ -885,6 +897,53 @@ mod tests {
         issue.labels.retain(|l| l != "component:backend");
         assert_eq!(issue.labels.len(), 1);
         assert_eq!(issue.labels[0], "priority:high");
+    }
+
+    // Tests for Rejected state
+    #[test]
+    fn test_rejected_state_serialization() {
+        let json = serde_json::to_string(&State::Rejected).unwrap();
+        assert_eq!(json, "\"rejected\"");
+    }
+
+    #[test]
+    fn test_rejected_state_deserialization() {
+        let state: State = serde_json::from_str("\"rejected\"").unwrap();
+        assert_eq!(state, State::Rejected);
+    }
+
+    #[test]
+    fn test_is_terminal_returns_true_for_done() {
+        assert!(State::Done.is_terminal());
+    }
+
+    #[test]
+    fn test_is_terminal_returns_true_for_rejected() {
+        assert!(State::Rejected.is_terminal());
+    }
+
+    #[test]
+    fn test_is_terminal_returns_false_for_non_terminal_states() {
+        assert!(!State::Backlog.is_terminal());
+        assert!(!State::Ready.is_terminal());
+        assert!(!State::InProgress.is_terminal());
+        assert!(!State::Gated.is_terminal());
+        assert!(!State::Archived.is_terminal());
+    }
+
+    #[test]
+    fn test_issue_not_blocked_when_dependency_is_rejected() {
+        let mut issue = Issue::new("Dependent".to_string(), "Desc".to_string());
+        let mut dependency = Issue::new("Dependency".to_string(), "Desc".to_string());
+        dependency.state = State::Rejected;
+
+        issue.dependencies.push(dependency.id.clone());
+
+        let mut resolved = HashMap::new();
+        resolved.insert(dependency.id.clone(), &dependency);
+
+        // Rejected dependencies should unblock, like Done
+        assert!(!issue.is_blocked(&resolved));
     }
 }
 
