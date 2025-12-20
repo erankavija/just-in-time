@@ -450,7 +450,8 @@ jit issue create --label "type:epic" --label "milestone:v1.0"
 jit query label "epic:*"
 jit query strategic
 
-# Quality Gates  
+# Quality Gates (enforce quality checkpoints - different from labels!)
+jit gate define unit-tests --title "Unit Tests" --mode auto --checker-command "cargo test"
 jit gate add <issue> unit-tests
 jit gate pass <issue> unit-tests
 

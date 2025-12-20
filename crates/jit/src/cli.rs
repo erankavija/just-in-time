@@ -46,6 +46,15 @@ pub enum Commands {
     Dep(DepCommands),
 
     /// Gate management commands
+    ///
+    /// Gates are quality checkpoints (tests, reviews, scans) that enforce workflow quality.
+    /// Unlike labels (which are arbitrary tags for organization), gates have executable logic
+    /// and block state transitions until they pass.
+    ///
+    /// Common workflow:
+    ///   1. Define gates in registry: jit gate define code-review --title "Code Review" ...
+    ///   2. Add to issues: jit issue create --gate code-review ...
+    ///   3. Execute gates: jit gate pass <issue> code-review
     #[command(subcommand)]
     Gate(GateCommands),
 
@@ -141,7 +150,10 @@ pub enum IssueCommands {
         #[arg(short, long, default_value = "normal")]
         priority: String,
 
-        /// Gate keys (comma-separated or multiple --gate flags)
+        /// Gate keys from registry to require (e.g., 'tests', 'code-review').
+        /// Gates are quality checkpoints that must pass before issue completion.
+        /// Use comma-separated (--gate tests,clippy) or multiple flags (--gate tests --gate clippy).
+        /// Gates must be defined in registry first with 'jit gate define'.
         #[arg(short, long, value_delimiter = ',')]
         gate: Vec<String>,
 
@@ -409,11 +421,18 @@ pub enum GateCommands {
     },
 
     /// Add a gate requirement to an issue
+    ///
+    /// Gates are quality checkpoints (e.g., tests, reviews) that must pass before
+    /// an issue can transition to ready or done states. Gate keys must exist in the
+    /// registry - use 'jit gate list' to see available gates or 'jit gate define'
+    /// to create new ones.
+    ///
+    /// Example: jit gate add abc123 code-review
     Add {
         /// Issue ID
         id: String,
 
-        /// Gate key (from registry)
+        /// Gate key from registry (e.g., 'tests', 'code-review', 'clippy')
         gate_key: String,
 
         #[arg(long)]

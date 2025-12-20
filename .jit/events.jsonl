@@ -30,3 +30,5 @@
 {"type":"issue_state_changed","id":"153d8b4c-3459-428e-b782-52ecbf034c98","issue_id":"4cb2682e-79c6-4e9e-9721-8047db261af6","timestamp":"2025-12-19T23:04:51.024583377Z","from":"ready","to":"backlog"}
 {"type":"issue_created","id":"0f76bf84-98fa-4ae8-9203-40f733334284","issue_id":"0ce16136-0999-4f94-944f-01d195f42565","timestamp":"2025-12-19T23:47:24.275105827Z","title":"Improve gate CLI help text clarity","priority":"normal"}
 {"type":"issue_created","id":"77ed54f4-9bc8-4294-bd4d-dd1527678c83","issue_id":"93d1caf7-1f6e-4d6c-a64d-42546401ebe4","timestamp":"2025-12-19T23:47:24.277988188Z","title":"Add gate modification flags to issue update command","priority":"high"}
+{"type":"issue_claimed","id":"930f18ac-c466-47cf-9857-fce630abd08f","issue_id":"0ce16136-0999-4f94-944f-01d195f42565","timestamp":"2025-12-20T00:16:16.360743181Z","assignee":"agent:copilot"}
+{"type":"issue_state_changed","id":"28740a10-6b76-46b8-a7cd-71e2e31b170a","issue_id":"0ce16136-0999-4f94-944f-01d195f42565","timestamp":"2025-12-20T00:16:16.360770311Z","from":"ready","to":"in_progress"}
