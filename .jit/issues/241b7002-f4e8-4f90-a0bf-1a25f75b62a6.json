@@ -1,0 +1,17 @@
+{
+  "id": "241b7002-f4e8-4f90-a0bf-1a25f75b62a6",
+  "title": "Add --stage option to 'jit registry add' command",
+  "description": "Currently there's no way to create precheck gates via CLI. The 'jit registry add' command should support a --stage option to specify 'precheck' or 'postcheck'. Default should remain 'postcheck' for backward compatibility.",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "component:cli"
+  ]
+}

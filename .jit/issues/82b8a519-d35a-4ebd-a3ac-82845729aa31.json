@@ -1,0 +1,17 @@
+{
+  "id": "82b8a519-d35a-4ebd-a3ac-82845729aa31",
+  "title": "FIX: Precheck gate enforcement not working on claim",
+  "description": "When claiming an issue with manual precheck gates, the system should verify they are passed before allowing the claim. Currently this check is not working - issue 4ae60108 was claimed without passing tdd-reminder precheck. Investigation needed in run_prechecks() and claim_issue() flow.",
+  "state": "ready",
+  "priority": "critical",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:bug",
+    "component:gates"
+  ]
+}

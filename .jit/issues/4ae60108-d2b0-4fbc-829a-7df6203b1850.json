@@ -14,30 +14,30 @@
     "code-review"
   ],
   "gates_status": {
+    "clippy": {
+      "status": "passed",
+      "updated_by": "ci:clippy",
+      "updated_at": "2025-12-20T13:04:21.245785581Z"
+    },
     "code-review": {
       "status": "passed",
       "updated_by": "human:reviewer",
       "updated_at": "2025-12-20T13:04:21.249592976Z"
     },
-    "fmt": {
+    "tests": {
       "status": "passed",
-      "updated_by": "ci:fmt",
-      "updated_at": "2025-12-20T13:04:21.247769414Z"
+      "updated_by": "agent:test",
+      "updated_at": "2025-12-20T13:15:38.080289983Z"
     },
     "tdd-reminder": {
       "status": "passed",
       "updated_by": "agent:copilot",
       "updated_at": "2025-12-20T13:04:21.239880235Z"
     },
-    "tests": {
+    "fmt": {
       "status": "passed",
-      "updated_by": "agent:copilot",
-      "updated_at": "2025-12-20T13:05:24.019955697Z"
-    },
-    "clippy": {
-      "status": "passed",
-      "updated_by": "ci:clippy",
-      "updated_at": "2025-12-20T13:04:21.245785581Z"
+      "updated_by": "ci:fmt",
+      "updated_at": "2025-12-20T13:04:21.247769414Z"
     }
   },
   "context": {},

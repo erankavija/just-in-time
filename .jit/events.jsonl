@@ -74,3 +74,6 @@
 {"type":"issue_state_changed","id":"083fc34a-04c9-4668-a8e4-01391d9ea70d","issue_id":"4ae60108-d2b0-4fbc-829a-7df6203b1850","timestamp":"2025-12-20T13:04:25.329264282Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"a9fab423-d9fa-4db4-8972-101b0f0e11cb","issue_id":"4ae60108-d2b0-4fbc-829a-7df6203b1850","timestamp":"2025-12-20T13:04:25.329293222Z"}
 {"type":"gate_passed","id":"263eff93-d535-4b3d-962a-c5e9ea237920","issue_id":"4ae60108-d2b0-4fbc-829a-7df6203b1850","timestamp":"2025-12-20T13:05:24.020114088Z","gate_key":"tests","updated_by":"agent:copilot"}
+{"type":"gate_passed","id":"84aea033-7180-4ab9-a321-a99e16723154","issue_id":"4ae60108-d2b0-4fbc-829a-7df6203b1850","timestamp":"2025-12-20T13:15:38.080454413Z","gate_key":"tests","updated_by":"agent:test"}
+{"type":"issue_created","id":"4e212986-9119-4e39-9934-1fba7172761a","issue_id":"241b7002-f4e8-4f90-a0bf-1a25f75b62a6","timestamp":"2025-12-20T13:20:48.854500915Z","title":"Add --stage option to 'jit registry add' command","priority":"normal"}
+{"type":"issue_created","id":"088cff34-f4a4-45e6-976c-29bd831a0682","issue_id":"82b8a519-d35a-4ebd-a3ac-82845729aa31","timestamp":"2025-12-20T13:20:56.011778747Z","title":"FIX: Precheck gate enforcement not working on claim","priority":"critical"}
