@@ -1,0 +1,27 @@
+{
+  "id": "c4738097-cdfd-4fe8-a279-a6ee7f2e1ce9",
+  "title": "Add convenience command: jit issue reject",
+  "description": "Add 'jit issue reject <id>' convenience command that shortcuts to '--state rejected'. Optionally accept --reason flag that adds resolution:* label. Example: 'jit issue reject <id> --reason wont-fix' sets state to rejected and adds 'resolution:wont-fix' label. Keep it simple - just a convenience wrapper.",
+  "state": "backlog",
+  "priority": "low",
+  "assignee": null,
+  "dependencies": [
+    "db7fdd9a-6bf7-4eff-88ee-5874d3c61cff"
+  ],
+  "gates_required": [
+    "tdd-reminder",
+    "tests",
+    "clippy",
+    "fmt",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:rejection-state",
+    "milestone:v1.0",
+    "component:cli"
+  ]
+}

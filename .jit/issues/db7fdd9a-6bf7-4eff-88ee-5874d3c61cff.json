@@ -1,0 +1,27 @@
+{
+  "id": "db7fdd9a-6bf7-4eff-88ee-5874d3c61cff",
+  "title": "Implement gate bypass for Rejected state",
+  "description": "Update update_issue_state() in commands/issue.rs to bypass gate validation when transitioning to Rejected state. Add should_check_gates() helper that returns true for Done, false for Rejected. Allow direct transition from any state to Rejected without gate enforcement. Add tests verifying Rejected bypasses both prechecks and postchecks.",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "0b7723c5-13d3-4c60-b940-5cade111b02d"
+  ],
+  "gates_required": [
+    "tdd-reminder",
+    "tests",
+    "clippy",
+    "fmt",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:rejection-state",
+    "milestone:v1.0",
+    "component:core"
+  ]
+}
