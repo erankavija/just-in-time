@@ -9,7 +9,7 @@ mod tests {
 
     fn setup_storage() -> (TempDir, JsonFileStorage) {
         let temp = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(temp.path().to_path_buf());
+        let storage = JsonFileStorage::new(temp.path());
         (temp, storage)
     }
 

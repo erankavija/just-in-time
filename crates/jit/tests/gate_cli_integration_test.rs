@@ -2,13 +2,14 @@
 //!
 //! These tests verify the full CLI → CommandExecutor → Storage flow
 
-use assert_cmd::Command;
+use assert_cmd::prelude::*;
 use predicates::prelude::*;
+use std::process::Command;
 use tempfile::TempDir;
 
 fn setup_repo() -> TempDir {
     let temp = TempDir::new().unwrap();
-    let mut cmd = Command::cargo_bin("jit").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
     cmd.current_dir(temp.path()).arg("init").assert().success();
     temp
 }
@@ -18,9 +19,9 @@ fn test_gate_define_manual_via_cli() {
     let temp = setup_repo();
 
     // Define a manual gate
-    let mut cmd = Command::cargo_bin("jit").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
     cmd.current_dir(temp.path())
-        .args(&[
+        .args([
             "gate",
             "define",
             "code-review",
@@ -38,9 +39,9 @@ fn test_gate_define_manual_via_cli() {
         .stdout(predicate::str::contains("Defined gate 'code-review'"));
 
     // Verify gate was created by listing
-    let mut cmd = Command::cargo_bin("jit").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
     cmd.current_dir(temp.path())
-        .args(&["gate", "list"])
+        .args(["gate", "list"])
         .assert()
         .success()
         .stdout(predicate::str::contains("code-review"))
@@ -52,9 +53,9 @@ fn test_gate_define_automated_via_cli() {
     let temp = setup_repo();
 
     // Define an automated gate with checker
-    let mut cmd = Command::cargo_bin("jit").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
     cmd.current_dir(temp.path())
-        .args(&[
+        .args([
             "gate",
             "define",
             "unit-tests",
@@ -76,9 +77,9 @@ fn test_gate_define_automated_via_cli() {
         .stdout(predicate::str::contains("Defined gate 'unit-tests'"));
 
     // Show gate details
-    let mut cmd = Command::cargo_bin("jit").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
     cmd.current_dir(temp.path())
-        .args(&["gate", "show", "unit-tests"])
+        .args(["gate", "show", "unit-tests"])
         .assert()
         .success()
         .stdout(predicate::str::contains("unit-tests"))
@@ -91,9 +92,9 @@ fn test_gate_define_auto_without_checker_fails() {
     let temp = setup_repo();
 
     // Try to define auto gate without checker - should fail
-    let mut cmd = Command::cargo_bin("jit").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
     cmd.current_dir(temp.path())
-        .args(&[
+        .args([
             "gate",
             "define",
             "bad-gate",
@@ -114,9 +115,9 @@ fn test_gate_list_json() {
     let temp = setup_repo();
 
     // Define a gate
-    let mut cmd = Command::cargo_bin("jit").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
     cmd.current_dir(temp.path())
-        .args(&[
+        .args([
             "gate",
             "define",
             "test-gate",
@@ -129,10 +130,10 @@ fn test_gate_list_json() {
         .success();
 
     // List gates in JSON format
-    let mut cmd = Command::cargo_bin("jit").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
     let output = cmd
         .current_dir(temp.path())
-        .args(&["gate", "list", "--json"])
+        .args(["gate", "list", "--json"])
         .assert()
         .success()
         .get_output()
@@ -149,9 +150,9 @@ fn test_gate_show_json() {
     let temp = setup_repo();
 
     // Define a gate
-    let mut cmd = Command::cargo_bin("jit").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
     cmd.current_dir(temp.path())
-        .args(&[
+        .args([
             "gate",
             "define",
             "test-gate",
@@ -164,10 +165,10 @@ fn test_gate_show_json() {
         .success();
 
     // Show gate in JSON format
-    let mut cmd = Command::cargo_bin("jit").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
     let output = cmd
         .current_dir(temp.path())
-        .args(&["gate", "show", "test-gate", "--json"])
+        .args(["gate", "show", "test-gate", "--json"])
         .assert()
         .success()
         .get_output()
@@ -185,9 +186,9 @@ fn test_gate_remove() {
     let temp = setup_repo();
 
     // Define a gate
-    let mut cmd = Command::cargo_bin("jit").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
     cmd.current_dir(temp.path())
-        .args(&[
+        .args([
             "gate",
             "define",
             "test-gate",
@@ -200,17 +201,17 @@ fn test_gate_remove() {
         .success();
 
     // Remove the gate
-    let mut cmd = Command::cargo_bin("jit").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
     cmd.current_dir(temp.path())
-        .args(&["gate", "remove", "test-gate"])
+        .args(["gate", "remove", "test-gate"])
         .assert()
         .success()
         .stdout(predicate::str::contains("Removed gate 'test-gate'"));
 
     // Verify it's gone
-    let mut cmd = Command::cargo_bin("jit").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
     cmd.current_dir(temp.path())
-        .args(&["gate", "show", "test-gate"])
+        .args(["gate", "show", "test-gate"])
         .assert()
         .failure();
 }
@@ -220,9 +221,9 @@ fn test_gate_check_single() {
     let temp = setup_repo();
 
     // Define an automated gate that succeeds
-    let mut cmd = Command::cargo_bin("jit").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
     cmd.current_dir(temp.path())
-        .args(&[
+        .args([
             "gate",
             "define",
             "quick-check",
@@ -241,10 +242,10 @@ fn test_gate_check_single() {
         .success();
 
     // Create an issue with the gate
-    let mut cmd = Command::cargo_bin("jit").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
     let output = cmd
         .current_dir(temp.path())
-        .args(&[
+        .args([
             "issue",
             "create",
             "--title",
@@ -268,9 +269,9 @@ fn test_gate_check_single() {
         .unwrap();
 
     // Check the gate
-    let mut cmd = Command::cargo_bin("jit").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
     cmd.current_dir(temp.path())
-        .args(&["gate", "check", issue_id, "quick-check"])
+        .args(["gate", "check", issue_id, "quick-check"])
         .assert()
         .success()
         .stdout(predicate::str::contains("passed"));
@@ -282,9 +283,9 @@ fn test_gate_check_all() {
 
     // Define two automated gates
     for gate_name in &["gate-1", "gate-2"] {
-        let mut cmd = Command::cargo_bin("jit").unwrap();
+        let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
         cmd.current_dir(temp.path())
-            .args(&[
+            .args([
                 "gate",
                 "define",
                 gate_name,
@@ -302,10 +303,10 @@ fn test_gate_check_all() {
     }
 
     // Create an issue with both gates
-    let mut cmd = Command::cargo_bin("jit").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
     let output = cmd
         .current_dir(temp.path())
-        .args(&[
+        .args([
             "issue",
             "create",
             "--title",
@@ -329,9 +330,9 @@ fn test_gate_check_all() {
         .unwrap();
 
     // Check all gates
-    let mut cmd = Command::cargo_bin("jit").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
     cmd.current_dir(temp.path())
-        .args(&["gate", "check-all", issue_id])
+        .args(["gate", "check-all", issue_id])
         .assert()
         .success()
         .stdout(predicate::str::contains("gate-1"))

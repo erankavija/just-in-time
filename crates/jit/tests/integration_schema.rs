@@ -1,24 +1,14 @@
 //! Integration tests for the --schema flag
-//!
-//! Note: This test uses assert_cmd's `cargo_bin` API which is deprecated in 2.x
-//! in favor of a macro-based approach that doesn't exist yet in stable releases.
-//! The warnings are expected and acceptable for test code until assert_cmd 3.x.
-//!
-//! See: https://github.com/assert-rs/assert_cmd/issues/180
-
-#![allow(deprecated)]
 
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
 use serde_json::Value;
 use std::process::Command;
 
-// Helper macro from assert_cmd docs
-// Suppresses deprecation warning as cargo_bin is the documented approach
-#[allow(deprecated)]
+// Helper macro using the new cargo_bin! approach
 macro_rules! cmd {
     () => {
-        Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap()
+        Command::new(assert_cmd::cargo::cargo_bin!(env!("CARGO_PKG_NAME")))
     };
 }
 

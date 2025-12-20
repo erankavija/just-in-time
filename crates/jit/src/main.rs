@@ -630,17 +630,15 @@ fn run() -> Result<()> {
                         use jit::output::JsonOutput;
                         let output = JsonOutput::success(gates);
                         println!("{}", output.to_json_string()?);
+                    } else if gates.is_empty() {
+                        println!("No gates defined");
                     } else {
-                        if gates.is_empty() {
-                            println!("No gates defined");
-                        } else {
-                            println!("Gates:");
-                            for gate in gates {
-                                println!(
-                                    "  {} - {} ({:?}, {:?})",
-                                    gate.key, gate.title, gate.stage, gate.mode
-                                );
-                            }
+                        println!("Gates:");
+                        for gate in gates {
+                            println!(
+                                "  {} - {} ({:?}, {:?})",
+                                gate.key, gate.title, gate.stage, gate.mode
+                            );
                         }
                     }
                 }
@@ -771,22 +769,20 @@ fn run() -> Result<()> {
                         use jit::output::JsonOutput;
                         let output = JsonOutput::success(results);
                         println!("{}", output.to_json_string()?);
+                    } else if results.is_empty() {
+                        println!("No automated gates to check for issue {}", id);
                     } else {
-                        if results.is_empty() {
-                            println!("No automated gates to check for issue {}", id);
-                        } else {
-                            println!("Checking gates for issue {}:", id);
-                            for result in results {
-                                match result.status {
-                                    jit::domain::GateRunStatus::Passed => {
-                                        println!("  ✓ {} passed", result.gate_key);
-                                    }
-                                    jit::domain::GateRunStatus::Failed => {
-                                        println!("  ✗ {} failed", result.gate_key);
-                                    }
-                                    _ => {
-                                        println!("  {} - {:?}", result.gate_key, result.status);
-                                    }
+                        println!("Checking gates for issue {}:", id);
+                        for result in results {
+                            match result.status {
+                                jit::domain::GateRunStatus::Passed => {
+                                    println!("  ✓ {} passed", result.gate_key);
+                                }
+                                jit::domain::GateRunStatus::Failed => {
+                                    println!("  ✗ {} failed", result.gate_key);
+                                }
+                                _ => {
+                                    println!("  {} - {:?}", result.gate_key, result.status);
                                 }
                             }
                         }
