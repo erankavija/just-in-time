@@ -1,0 +1,33 @@
+{
+  "id": "544fd21b-ece7-4d81-993a-062fd3545459",
+  "title": "Fix claim_issue to enforce prechecks",
+  "description": "claim_issue bypasses precheck enforcement by directly setting state instead of calling update_issue_state(). This breaks TDD workflow. Fix: use update_issue_state() for state transitions.",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "tdd-reminder",
+    "tests",
+    "clippy",
+    "fmt",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [
+    {
+      "path": "docs/gate-enforcement-bug-analysis.md",
+      "commit": "21655d1",
+      "label": "Bug Analysis",
+      "doc_type": "analysis"
+    }
+  ],
+  "labels": [
+    "type:task",
+    "component:cli",
+    "epic:phase5.2",
+    "milestone:v1.0",
+    "epic:ai-agent-validation"
+  ]
+}
