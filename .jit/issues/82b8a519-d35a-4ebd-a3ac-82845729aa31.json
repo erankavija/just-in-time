@@ -1,10 +1,10 @@
 {
   "id": "82b8a519-d35a-4ebd-a3ac-82845729aa31",
   "title": "FIX: Precheck gate enforcement not working on claim",
-  "description": "When claiming an issue with manual precheck gates, the system should verify they are passed before allowing the claim. Currently this check is not working - issue 4ae60108 was claimed without passing tdd-reminder precheck. Investigation needed in run_prechecks() and claim_issue() flow.",
-  "state": "ready",
+  "description": "Investigation revealed that this bug was already fixed in commit f457d23 (Fix claim_issue to enforce precheck gates). The issue #4ae60108 was claimed using an older binary before the fix was applied. Current code correctly enforces precheck gates on claim - test test_claim_issue_enforces_prechecks passes. Verified with fresh test in /tmp showing old binary allows claim while new binary properly rejects it.",
+  "state": "done",
   "priority": "critical",
-  "assignee": null,
+  "assignee": "agent:copilot",
   "dependencies": [],
   "gates_required": [],
   "gates_status": {},
