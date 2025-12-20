@@ -43,3 +43,8 @@
 {"type":"issue_created","id":"16330117-3cc4-4636-8163-3f25897ec628","issue_id":"be0530d3-b304-469e-8651-858378636e09","timestamp":"2025-12-20T00:25:39.398699967Z","title":"Fix claim_issue to enforce prechecks","priority":"high"}
 {"type":"issue_claimed","id":"526753fe-2e33-491e-9857-858745636743","issue_id":"544fd21b-ece7-4d81-993a-062fd3545459","timestamp":"2025-12-20T08:33:40.053684384Z","assignee":"agent:copilot"}
 {"type":"issue_state_changed","id":"c9c2dfef-bf44-485f-87d1-55a40e6f1f6d","issue_id":"544fd21b-ece7-4d81-993a-062fd3545459","timestamp":"2025-12-20T08:33:40.053953704Z","from":"ready","to":"in_progress"}
+{"type":"gate_passed","id":"3ed346cd-7a82-4890-a17e-be38549ac801","issue_id":"544fd21b-ece7-4d81-993a-062fd3545459","timestamp":"2025-12-20T08:37:36.574881700Z","gate_key":"code-review","updated_by":"agent:copilot"}
+{"type":"gate_passed","id":"7704ace2-7b82-4c36-a098-4efff91eb21b","issue_id":"544fd21b-ece7-4d81-993a-062fd3545459","timestamp":"2025-12-20T08:37:37.602127500Z","gate_key":"fmt","updated_by":"agent:copilot"}
+{"type":"gate_passed","id":"01b03ddc-c468-40d6-b3c1-6cb536ba57d8","issue_id":"544fd21b-ece7-4d81-993a-062fd3545459","timestamp":"2025-12-20T08:37:38.192797150Z","gate_key":"clippy","updated_by":"agent:copilot"}
+{"type":"gate_passed","id":"929cd966-4b40-4c89-8e38-414405c4e41a","issue_id":"544fd21b-ece7-4d81-993a-062fd3545459","timestamp":"2025-12-20T08:37:39.171697324Z","gate_key":"tests","updated_by":"agent:copilot"}
+{"type":"gate_passed","id":"7ef4f8f6-22ac-4a73-9c38-78ff4262d3c8","issue_id":"544fd21b-ece7-4d81-993a-062fd3545459","timestamp":"2025-12-20T08:37:40.689343867Z","gate_key":"tdd-reminder","updated_by":"agent:copilot"}
