@@ -1,31 +1,6 @@
 {
   "schema_version": 2,
   "namespaces": {
-    "component": {
-      "description": "Technical component or subsystem",
-      "unique": false,
-      "strategic": false
-    },
-    "resolution": {
-      "description": "Issue resolution status (e.g., wont-fix, duplicate, invalid)",
-      "unique": true,
-      "strategic": false
-    },
-    "story": {
-      "description": "story organizational grouping",
-      "unique": false,
-      "strategic": true
-    },
-    "epic": {
-      "description": "epic organizational grouping",
-      "unique": false,
-      "strategic": true
-    },
-    "type": {
-      "description": "Issue type (bug, feature, task, etc.)",
-      "unique": true,
-      "strategic": false
-    },
     "milestone": {
       "description": "milestone organizational grouping",
       "unique": false,
@@ -35,18 +10,43 @@
       "description": "Owning team",
       "unique": true,
       "strategic": false
+    },
+    "story": {
+      "description": "story organizational grouping",
+      "unique": false,
+      "strategic": true
+    },
+    "component": {
+      "description": "Technical component or subsystem",
+      "unique": false,
+      "strategic": false
+    },
+    "type": {
+      "description": "Issue type (bug, feature, task, etc.)",
+      "unique": true,
+      "strategic": false
+    },
+    "resolution": {
+      "description": "Reason for issue closure (wont-fix, duplicate, obsolete, etc.)",
+      "unique": true,
+      "strategic": false
+    },
+    "epic": {
+      "description": "epic organizational grouping",
+      "unique": false,
+      "strategic": true
     }
   },
   "type_hierarchy": {
-    "epic": 2,
     "milestone": 1,
+    "epic": 2,
     "story": 3,
     "task": 4,
     "bug": 4
   },
   "label_associations": {
     "story": "story",
-    "epic": "epic",
-    "milestone": "milestone"
+    "milestone": "milestone",
+    "epic": "epic"
   }
 }
