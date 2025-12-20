@@ -358,7 +358,12 @@ impl<S: IssueStore> CommandExecutor<S> {
             for doc in &issue.documents {
                 // Validate commit hash if specified
                 if let Some(ref commit_hash) = doc.commit {
-                    if repo.find_commit(git2::Oid::from_str(commit_hash)?).is_err() {
+                    // Use revparse to resolve short hashes
+                    let resolved_oid = repo.revparse_single(commit_hash)
+                        .and_then(|obj| obj.peel_to_commit())
+                        .map(|commit| commit.id());
+                    
+                    if resolved_oid.is_err() {
                         return Err(anyhow!(
                             "Invalid document reference in issue '{}': commit '{}' not found for '{}'",
                             issue.id,
