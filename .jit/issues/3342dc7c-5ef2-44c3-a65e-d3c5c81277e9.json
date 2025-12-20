@@ -2,7 +2,7 @@
   "id": "3342dc7c-5ef2-44c3-a65e-d3c5c81277e9",
   "title": "Implement gate preview command",
   "description": "DECISION: Won't implement - unnecessary complexity for marginal value. Current workflow already solves the problem: jit issue claim fails fast with clear error messages. Agents can attempt to claim and handle error - no preview needed. Proposed caching layer introduces complexity without addressing real user pain. See attached analysis document.",
-  "state": "gated",
+  "state": "done",
   "priority": "high",
   "assignee": null,
   "dependencies": [],
@@ -13,7 +13,33 @@
     "fmt",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_by": "agent:copilot",
+      "updated_at": "2025-12-20T19:23:26.348798081Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-20T19:23:19.787979316Z"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": "agent:copilot",
+      "updated_at": "2025-12-20T19:22:13.569442816Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-20T19:23:10.397046505Z"
+    },
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-20T19:23:19.582851306Z"
+    }
+  },
   "context": {},
   "documents": [
     {
