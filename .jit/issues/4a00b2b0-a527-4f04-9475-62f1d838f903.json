@@ -6,8 +6,9 @@
   "priority": "critical",
   "assignee": null,
   "dependencies": [
+    "4cb2682e-79c6-4e9e-9721-8047db261af6",
     "544fd21b-ece7-4d81-993a-062fd3545459",
-    "4cb2682e-79c6-4e9e-9721-8047db261af6"
+    "4ae60108-d2b0-4fbc-829a-7df6203b1850"
   ],
   "gates_required": [
     "code-review"

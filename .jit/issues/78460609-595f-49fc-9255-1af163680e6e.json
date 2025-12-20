@@ -2,7 +2,7 @@
   "id": "78460609-595f-49fc-9255-1af163680e6e",
   "title": "Prevent manual pass/fail of automated gates",
   "description": "Automated gates (mode=auto) should only be passable via their checker command execution (jit gate check). Currently, you can manually pass automated gates like fmt/tests/clippy with 'jit gate pass', which defeats the purpose of automation. Add validation in pass_gate/fail_gate to reject manual operations on automated gates. Users should use 'jit gate check' instead, which runs the checker and auto-passes/fails based on exit code.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "high",
   "assignee": "agent:copilot",
   "dependencies": [
@@ -15,7 +15,33 @@
     "fmt",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": "agent:copilot",
+      "updated_at": "2025-12-20T11:12:13.697501505Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-20T08:55:12.404961713Z"
+    },
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-20T08:55:14.173648429Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-20T08:54:59.240822424Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "agent:copilot",
+      "updated_at": "2025-12-20T08:55:10.969801536Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
