@@ -189,4 +189,11 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         Ok(filtered)
     }
+
+    pub fn query_closed(&self) -> Result<Vec<Issue>> {
+        let issues = self.storage.list_issues()?;
+        let filtered: Vec<Issue> = issues.into_iter().filter(|i| i.state.is_closed()).collect();
+
+        Ok(filtered)
+    }
 }

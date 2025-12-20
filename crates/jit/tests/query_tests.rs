@@ -446,3 +446,80 @@ fn test_query_by_priority() {
     assert_eq!(json["data"]["count"], 1);
     assert_eq!(json["data"]["issues"][0]["priority"], "critical");
 }
+
+#[test]
+fn test_query_closed_returns_done_and_rejected() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    // Create issues with different states
+    let output1 = Command::new(&jit)
+        .args(["issue", "create", "-t", "Completed", "-d", "Done task"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let id1 = String::from_utf8_lossy(&output1.stdout)
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+
+    let output2 = Command::new(&jit)
+        .args(["issue", "create", "-t", "Rejected", "-d", "Won't do"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let id2 = String::from_utf8_lossy(&output2.stdout)
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+
+    let output3 = Command::new(&jit)
+        .args(["issue", "create", "-t", "Ready", "-d", "Still open"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let _id3 = String::from_utf8_lossy(&output3.stdout)
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+
+    // Set states
+    Command::new(&jit)
+        .args(["issue", "update", &id1, "--state", "done"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    Command::new(&jit)
+        .args(["issue", "reject", &id2])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    // Query closed issues
+    let output = Command::new(&jit)
+        .args(["query", "closed", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+
+    // Should return both Done and Rejected
+    assert_eq!(json["data"]["count"], 2);
+
+    let issue_ids: Vec<String> = json["data"]["issues"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|i| i["id"].as_str().unwrap().to_string())
+        .collect();
+
+    assert!(issue_ids.contains(&id1));
+    assert!(issue_ids.contains(&id2));
+}

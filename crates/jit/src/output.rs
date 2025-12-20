@@ -429,6 +429,13 @@ pub struct StrategicQueryResponse {
     pub count: usize,
 }
 
+/// Response for `query closed` command
+#[derive(Debug, Serialize)]
+pub struct ClosedQueryResponse {
+    pub issues: Vec<Issue>,
+    pub count: usize,
+}
+
 // ============================================================================
 // Graph Response Types
 // ============================================================================

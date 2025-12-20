@@ -1415,6 +1415,24 @@ fn run() -> Result<()> {
                     }
                 }
             },
+            jit::cli::QueryCommands::Closed { json } => {
+                let issues = executor.query_closed()?;
+                if json {
+                    use jit::output::{ClosedQueryResponse, JsonOutput};
+                    let response = ClosedQueryResponse {
+                        issues: issues.clone(),
+                        count: issues.len(),
+                    };
+                    let output = JsonOutput::success(response);
+                    println!("{}", output.to_json_string()?);
+                } else {
+                    println!("Closed issues (Done or Rejected):");
+                    for issue in &issues {
+                        println!("  {} | {} | {:?}", issue.id, issue.title, issue.state);
+                    }
+                    println!("\nTotal: {}", issues.len());
+                }
+            }
         },
         Commands::Label(label_cmd) => match label_cmd {
             jit::cli::LabelCommands::Namespaces { json } => {

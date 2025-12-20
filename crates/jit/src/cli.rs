@@ -758,6 +758,12 @@ pub enum QueryCommands {
         #[arg(long)]
         json: bool,
     },
+
+    /// Query closed issues (Done or Rejected states)
+    Closed {
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Subcommand)]
