@@ -2,7 +2,7 @@
   "id": "544fd21b-ece7-4d81-993a-062fd3545459",
   "title": "Fix claim_issue to enforce prechecks",
   "description": "claim_issue bypasses precheck enforcement by directly setting state instead of calling update_issue_state(). This breaks TDD workflow. Fix: use update_issue_state() for state transitions.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "high",
   "assignee": "agent:copilot",
   "dependencies": [
@@ -21,16 +21,6 @@
       "updated_by": "agent:copilot",
       "updated_at": "2025-12-20T08:37:39.171547814Z"
     },
-    "code-review": {
-      "status": "passed",
-      "updated_by": "agent:copilot",
-      "updated_at": "2025-12-20T08:37:36.574723780Z"
-    },
-    "tdd-reminder": {
-      "status": "passed",
-      "updated_by": "agent:copilot",
-      "updated_at": "2025-12-20T08:37:40.686105873Z"
-    },
     "fmt": {
       "status": "passed",
       "updated_by": "agent:copilot",
@@ -40,6 +30,16 @@
       "status": "passed",
       "updated_by": "agent:copilot",
       "updated_at": "2025-12-20T08:37:38.192658530Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "agent:copilot",
+      "updated_at": "2025-12-20T08:37:36.574723780Z"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": "agent:copilot",
+      "updated_at": "2025-12-20T08:37:40.686105873Z"
     }
   },
   "context": {},

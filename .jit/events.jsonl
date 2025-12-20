@@ -48,3 +48,6 @@
 {"type":"gate_passed","id":"01b03ddc-c468-40d6-b3c1-6cb536ba57d8","issue_id":"544fd21b-ece7-4d81-993a-062fd3545459","timestamp":"2025-12-20T08:37:38.192797150Z","gate_key":"clippy","updated_by":"agent:copilot"}
 {"type":"gate_passed","id":"929cd966-4b40-4c89-8e38-414405c4e41a","issue_id":"544fd21b-ece7-4d81-993a-062fd3545459","timestamp":"2025-12-20T08:37:39.171697324Z","gate_key":"tests","updated_by":"agent:copilot"}
 {"type":"gate_passed","id":"7ef4f8f6-22ac-4a73-9c38-78ff4262d3c8","issue_id":"544fd21b-ece7-4d81-993a-062fd3545459","timestamp":"2025-12-20T08:37:40.689343867Z","gate_key":"tdd-reminder","updated_by":"agent:copilot"}
+{"type":"issue_state_changed","id":"bbfd0897-10a7-4f05-9fe4-7614ada06adc","issue_id":"544fd21b-ece7-4d81-993a-062fd3545459","timestamp":"2025-12-20T08:37:58.933426040Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"f69f4236-6044-4493-a2bd-08bbcbc825eb","issue_id":"544fd21b-ece7-4d81-993a-062fd3545459","timestamp":"2025-12-20T08:37:58.933457300Z"}
+{"type":"issue_created","id":"76c9f722-0f52-4f19-b514-3e2d10b0a8f5","issue_id":"78460609-595f-49fc-9255-1af163680e6e","timestamp":"2025-12-20T08:40:58.488626226Z","title":"Prevent manual pass/fail of automated gates","priority":"high"}
