@@ -255,3 +255,142 @@ fn test_exit_code_help_and_version() {
     assert!(status.success());
     assert_eq!(status.code(), Some(0));
 }
+
+#[test]
+fn test_exit_code_state_transition_blocked_by_gates() {
+    let temp_dir = setup_test_env();
+
+    // Define a gate
+    let status = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["registry", "add", "--title", "Tests", "tests"])
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    // Create issue with gate
+    let output = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args([
+            "issue",
+            "create",
+            "--title",
+            "Test issue",
+            "--gate",
+            "tests",
+            "--json",
+        ])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let id = json["id"].as_str().expect("id should exist");
+
+    // Mark as ready
+    let status = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["issue", "update", id, "--state", "ready"])
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    // Try to transition to done without passing gate - should fail with exit code 4
+    let output = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["issue", "update", id, "--state", "done"])
+        .output()
+        .unwrap();
+
+    // Should return exit code 4 (validation failed)
+    assert!(!output.status.success());
+    assert_eq!(output.status.code(), Some(4));
+
+    // Error message should mention the gate
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("gate") || stderr.contains("tests"));
+    assert!(stderr.contains("gated") || stderr.contains("not passed"));
+
+    // Verify issue is in gated state (auto-transition happened)
+    let output = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["issue", "show", id, "--json"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["data"]["state"], "gated");
+
+    // Now pass the gate and verify transition to done succeeds
+    let status = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["gate", "pass", id, "tests"])
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    // Should auto-transition to done
+    let output = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["issue", "show", id, "--json"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["data"]["state"], "done");
+}
+
+#[test]
+fn test_exit_code_state_transition_blocked_by_gates_json() {
+    let temp_dir = setup_test_env();
+
+    // Define a gate
+    let status = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["registry", "add", "--title", "Tests", "tests"])
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    // Create issue with gate
+    let output = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args([
+            "issue",
+            "create",
+            "--title",
+            "Test issue",
+            "--gate",
+            "tests",
+            "--json",
+        ])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let id = json["id"].as_str().expect("id should exist");
+
+    // Try to transition to done with --json flag - should get JSON error
+    let output = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["issue", "update", id, "--state", "done", "--json"])
+        .output()
+        .unwrap();
+
+    // Should return exit code 4 (validation failed)
+    assert_eq!(output.status.code(), Some(4));
+
+    // Should have valid JSON error output
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["success"], false);
+    assert!(
+        json["error"]["code"].as_str().unwrap().contains("GATE")
+            || json["error"]["code"]
+                .as_str()
+                .unwrap()
+                .contains("VALIDATION")
+    );
+
+    // Error should mention gate blocking
+    let error_msg = json["error"]["message"].as_str().unwrap();
+    assert!(error_msg.contains("gate") || error_msg.contains("tests"));
+}

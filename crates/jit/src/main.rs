@@ -41,6 +41,9 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
     // Check error message patterns
     if error_msg.contains("not found") || error_msg.contains("no such file") {
         ExitCode::NotFound
+    } else if error_msg.contains("gate validation failed") {
+        // Gate blocking should return validation failed
+        ExitCode::ValidationFailed
     } else if error_msg.contains("cycle") || error_msg.contains("invalid dependency") {
         ExitCode::ValidationFailed
     } else if error_msg.contains("already exists") {
@@ -317,7 +320,8 @@ fn run() -> Result<()> {
                 } => {
                     let prio = priority.map(|p| parse_priority(&p)).transpose()?;
                     let st = state.map(|s| parse_state(&s)).transpose()?;
-                    executor.update_issue(
+
+                    match executor.update_issue(
                         &id,
                         title,
                         description,
@@ -325,13 +329,31 @@ fn run() -> Result<()> {
                         st,
                         label,
                         remove_label,
-                    )?;
-
-                    if json {
-                        let issue = storage.load_issue(&id)?;
-                        println!("{}", serde_json::to_string_pretty(&issue)?);
-                    } else {
-                        println!("Updated issue: {}", id);
+                    ) {
+                        Ok(()) => {
+                            if json {
+                                let issue = storage.load_issue(&id)?;
+                                println!("{}", serde_json::to_string_pretty(&issue)?);
+                            } else {
+                                println!("Updated issue: {}", id);
+                            }
+                        }
+                        Err(e) => {
+                            // Check if this is a gate validation error
+                            let error_msg = e.to_string();
+                            let json_error = if error_msg.contains("Gate validation failed") {
+                                // Reload issue to get unpassed gates
+                                let issue = storage.load_issue(&id)?;
+                                let unpassed = issue.get_unpassed_gates();
+                                jit::output::JsonError::gate_validation_failed(&unpassed, &id)
+                            } else if error_msg.contains("not found") {
+                                jit::output::JsonError::issue_not_found(&id)
+                            } else {
+                                // Generic error - use the JsonError::new directly
+                                jit::output::JsonError::new("GENERIC_ERROR", &error_msg)
+                            };
+                            handle_json_error!(json, e, json_error);
+                        }
                     }
                 }
                 IssueCommands::Delete { id, json } => {

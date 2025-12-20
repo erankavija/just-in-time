@@ -132,6 +132,17 @@ impl Issue {
             .any(|gate_key| !matches!(self.gates_status.get(gate_key), Some(gate_state) if gate_state.status == GateStatus::Passed))
     }
 
+    /// Get list of unpassed gates
+    ///
+    /// Returns a vector of gate keys that have not yet passed.
+    pub fn get_unpassed_gates(&self) -> Vec<String> {
+        self.gates_required
+            .iter()
+            .filter(|gate_key| !matches!(self.gates_status.get(*gate_key), Some(gate_state) if gate_state.status == GateStatus::Passed))
+            .cloned()
+            .collect()
+    }
+
     /// Check if this issue should auto-transition to Ready state
     /// A Backlog issue transitions to Ready when it becomes unblocked
     pub fn should_auto_transition_to_ready(

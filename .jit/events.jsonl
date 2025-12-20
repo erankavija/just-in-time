@@ -64,3 +64,13 @@
 {"type":"issue_state_changed","id":"4dafac87-1061-451e-956a-8e4006891118","issue_id":"78460609-595f-49fc-9255-1af163680e6e","timestamp":"2025-12-20T11:12:13.700582689Z","from":"gated","to":"done"}
 {"type":"issue_completed","id":"8fa77445-440d-44dc-bdfc-4e7e92121b4c","issue_id":"78460609-595f-49fc-9255-1af163680e6e","timestamp":"2025-12-20T11:12:13.700602719Z"}
 {"type":"issue_created","id":"d7530116-f3b3-43ab-a8dc-9de9201d136a","issue_id":"4ae60108-d2b0-4fbc-829a-7df6203b1850","timestamp":"2025-12-20T11:26:13.720974363Z","title":"Improve state transition feedback when gates block completion","priority":"high"}
+{"type":"issue_claimed","id":"431b01e2-2a5f-4092-b4e0-3011767643a0","issue_id":"4ae60108-d2b0-4fbc-829a-7df6203b1850","timestamp":"2025-12-20T12:56:39.417502191Z","assignee":"agent:copilot-session-1"}
+{"type":"issue_state_changed","id":"45ae08ee-f4ef-496c-8536-b51ccca8c030","issue_id":"4ae60108-d2b0-4fbc-829a-7df6203b1850","timestamp":"2025-12-20T12:56:39.417522561Z","from":"ready","to":"in_progress"}
+{"type":"gate_passed","id":"d0031a62-2937-4177-b94a-a8205daacdea","issue_id":"4ae60108-d2b0-4fbc-829a-7df6203b1850","timestamp":"2025-12-20T13:04:21.240034865Z","gate_key":"tdd-reminder","updated_by":"agent:copilot"}
+{"type":"gate_passed","id":"99f3579a-b40f-4b94-8b96-e07629afcd33","issue_id":"4ae60108-d2b0-4fbc-829a-7df6203b1850","timestamp":"2025-12-20T13:04:21.243270769Z","gate_key":"tests","updated_by":"ci:test-runner"}
+{"type":"gate_passed","id":"a76ece2c-23ae-4796-b853-789bbf28b650","issue_id":"4ae60108-d2b0-4fbc-829a-7df6203b1850","timestamp":"2025-12-20T13:04:21.245907402Z","gate_key":"clippy","updated_by":"ci:clippy"}
+{"type":"gate_passed","id":"1a23094c-e00d-49ed-a987-70508ec2c95f","issue_id":"4ae60108-d2b0-4fbc-829a-7df6203b1850","timestamp":"2025-12-20T13:04:21.247867264Z","gate_key":"fmt","updated_by":"ci:fmt"}
+{"type":"gate_passed","id":"69f363a5-6a30-40d8-b1e3-bb6724f9ead9","issue_id":"4ae60108-d2b0-4fbc-829a-7df6203b1850","timestamp":"2025-12-20T13:04:21.249683636Z","gate_key":"code-review","updated_by":"human:reviewer"}
+{"type":"issue_state_changed","id":"083fc34a-04c9-4668-a8e4-01391d9ea70d","issue_id":"4ae60108-d2b0-4fbc-829a-7df6203b1850","timestamp":"2025-12-20T13:04:25.329264282Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"a9fab423-d9fa-4db4-8972-101b0f0e11cb","issue_id":"4ae60108-d2b0-4fbc-829a-7df6203b1850","timestamp":"2025-12-20T13:04:25.329293222Z"}
+{"type":"gate_passed","id":"263eff93-d535-4b3d-962a-c5e9ea237920","issue_id":"4ae60108-d2b0-4fbc-829a-7df6203b1850","timestamp":"2025-12-20T13:05:24.020114088Z","gate_key":"tests","updated_by":"agent:copilot"}

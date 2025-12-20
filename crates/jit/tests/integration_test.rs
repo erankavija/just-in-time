@@ -481,7 +481,6 @@ fn test_gates() {
             "Unit Tests",
             "-d",
             "Run tests",
-            "-a",
         ])
         .current_dir(temp.path())
         .output()

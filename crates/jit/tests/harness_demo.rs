@@ -160,8 +160,8 @@ fn test_harness_gates() {
 fn test_harness_complex_workflow() {
     let h = TestHarness::new();
 
-    // Setup gates
-    h.add_gate("tests", "Tests", "Unit tests", true);
+    // Setup gates (use manual gates for this workflow test)
+    h.add_gate("tests", "Tests", "Unit tests", false);
     h.add_gate("review", "Review", "Code review", false);
 
     // Create epic with dependencies

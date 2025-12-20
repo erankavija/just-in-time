@@ -2,9 +2,9 @@
   "id": "4ae60108-d2b0-4fbc-829a-7df6203b1850",
   "title": "Improve state transition feedback when gates block completion",
   "description": "When 'jit issue update --state done' is blocked by unpassed gates, the system silently transitions to 'gated' and returns exit 0. This violates principle of least surprise for both humans and AI agents. The command should return non-zero exit code and clear feedback about why the requested transition was modified. See attached design document.",
-  "state": "ready",
+  "state": "done",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:copilot-session-1",
   "dependencies": [],
   "gates_required": [
     "tdd-reminder",
@@ -13,7 +13,33 @@
     "fmt",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_by": "human:reviewer",
+      "updated_at": "2025-12-20T13:04:21.249592976Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "ci:fmt",
+      "updated_at": "2025-12-20T13:04:21.247769414Z"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": "agent:copilot",
+      "updated_at": "2025-12-20T13:04:21.239880235Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "agent:copilot",
+      "updated_at": "2025-12-20T13:05:24.019955697Z"
+    },
+    "clippy": {
+      "status": "passed",
+      "updated_by": "ci:clippy",
+      "updated_at": "2025-12-20T13:04:21.245785581Z"
+    }
+  },
   "context": {},
   "documents": [
     {

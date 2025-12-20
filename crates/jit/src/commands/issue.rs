@@ -160,9 +160,9 @@ impl<S: IssueStore> CommandExecutor<S> {
                     ));
                 }
 
-                // If gates not passed, transition to Gated instead
+                // If gates not passed, transition to Gated and return error
                 if issue.has_unpassed_gates() {
-                    issue.state = State::Gated;
+                    return self.handle_gate_blocking(&mut issue, old_state);
                 } else {
                     issue.state = State::Done;
                 }
@@ -244,9 +244,9 @@ impl<S: IssueStore> CommandExecutor<S> {
                     ));
                 }
 
-                // If gates not passed, transition to Gated instead
+                // If gates not passed, transition to Gated and return error
                 if issue.has_unpassed_gates() {
-                    issue.state = State::Gated;
+                    return self.handle_gate_blocking(&mut issue, old_state);
                 } else {
                     issue.state = State::Done;
                 }
@@ -445,6 +445,29 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         Ok(())
+    }
+
+    /// Helper to handle gate blocking when transitioning to Done
+    ///
+    /// Transitions issue to Gated, saves, logs, and returns error with clear feedback
+    fn handle_gate_blocking(&self, issue: &mut Issue, old_state: State) -> Result<()> {
+        let unpassed = issue.get_unpassed_gates();
+        issue.state = State::Gated;
+
+        // Save the state change before returning error
+        self.storage.save_issue(issue)?;
+
+        // Log state change event
+        let event = Event::new_issue_state_changed(issue.id.clone(), old_state, State::Gated);
+        self.storage.append_event(&event)?;
+
+        Err(anyhow!(
+            "Gate validation failed: Cannot transition to 'done' - {} gate(s) not passed: {}\n\
+             → Issue automatically transitioned to 'gated' (awaiting gate approval)\n\
+             The issue will auto-transition to 'done' when all gates pass.",
+            unpassed.len(),
+            unpassed.join(", ")
+        ))
     }
 }
 

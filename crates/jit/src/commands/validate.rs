@@ -359,10 +359,11 @@ impl<S: IssueStore> CommandExecutor<S> {
                 // Validate commit hash if specified
                 if let Some(ref commit_hash) = doc.commit {
                     // Use revparse to resolve short hashes
-                    let resolved_oid = repo.revparse_single(commit_hash)
+                    let resolved_oid = repo
+                        .revparse_single(commit_hash)
                         .and_then(|obj| obj.peel_to_commit())
                         .map(|commit| commit.id());
-                    
+
                     if resolved_oid.is_err() {
                         return Err(anyhow!(
                             "Invalid document reference in issue '{}': commit '{}' not found for '{}'",

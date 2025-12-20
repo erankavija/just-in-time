@@ -296,6 +296,29 @@ impl JsonError {
         .with_details(serde_json::json!({"invalid_priority": priority}))
         .with_suggestion("Valid priorities are: low, normal, high, critical")
     }
+
+    pub fn gate_validation_failed(unpassed_gates: &[String], issue_id: &str) -> Self {
+        Self::new(
+            ErrorCode::VALIDATION_FAILED,
+            format!(
+                "Cannot transition to 'done' - {} gate(s) not passed: {}",
+                unpassed_gates.len(),
+                unpassed_gates.join(", ")
+            ),
+        )
+        .with_details(serde_json::json!({
+            "issue_id": issue_id,
+            "requested_state": "done",
+            "actual_state": "gated",
+            "unpassed_gates": unpassed_gates
+        }))
+        .with_suggestion("Issue automatically transitioned to 'gated' (awaiting gate approval)")
+        .with_suggestion("The issue will auto-transition to 'done' when all gates pass")
+        .with_suggestion(format!(
+            "To complete: jit gate pass {} <gate_key>",
+            issue_id
+        ))
+    }
 }
 
 /// Metadata included in all responses
