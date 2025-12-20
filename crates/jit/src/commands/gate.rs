@@ -24,17 +24,17 @@ impl<S: IssueStore> CommandExecutor<S> {
             ));
         }
 
-        // Check if gate is automated - reject manual pass/fail
+        // Check if gate is automated - if so, run the checker instead
         let registry = self.storage.load_gate_registry()?;
         if let Some(gate) = registry.gates.get(&gate_key) {
             if gate.mode == GateMode::Auto {
-                return Err(anyhow!(
-                    "Gate '{}' is automated and cannot be manually passed. Use 'jit gate check {} {}' to run the checker.",
-                    gate_key, issue_id, gate_key
-                ));
+                // Smart behavior: auto-run the checker
+                self.check_gate(issue_id, &gate_key)?;
+                return Ok(());
             }
         }
 
+        // Manual gate: mark as passed
         issue.gates_status.insert(
             gate_key.clone(),
             GateState {
@@ -237,10 +237,10 @@ mod tests {
     }
 
     #[test]
-    fn test_manual_pass_of_automated_gate_should_fail() {
+    fn test_pass_of_automated_gate_runs_checker() {
         let executor = setup();
 
-        // Define an automated gate
+        // Define an automated gate that will pass
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
             "auto-gate".to_string(),
@@ -272,26 +272,31 @@ mod tests {
             .add_gate(&issue_id, "auto-gate".to_string())
             .unwrap();
 
-        // Try to manually pass automated gate - should fail
+        // Smart pass should auto-run the checker
         let result = executor.pass_gate(
             &issue_id,
             "auto-gate".to_string(),
             Some("human:test".to_string()),
         );
 
-        assert!(result.is_err(), "Manual pass of automated gate should fail");
-        let err_msg = result.unwrap_err().to_string();
         assert!(
-            err_msg.contains("automated") || err_msg.contains("jit gate check"),
-            "Error should mention automation or suggest using 'jit gate check'"
+            result.is_ok(),
+            "Pass of automated gate should run checker and succeed"
+        );
+
+        // Verify gate is marked as passed
+        let issue = executor.storage.load_issue(&issue_id).unwrap();
+        assert_eq!(
+            issue.gates_status.get("auto-gate").unwrap().status,
+            crate::domain::GateStatus::Passed
         );
     }
 
     #[test]
-    fn test_manual_fail_of_automated_gate_should_fail() {
+    fn test_pass_of_automated_gate_that_fails() {
         let executor = setup();
 
-        // Define an automated gate
+        // Define an automated gate that will fail
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
             "auto-gate".to_string(),
@@ -323,18 +328,20 @@ mod tests {
             .add_gate(&issue_id, "auto-gate".to_string())
             .unwrap();
 
-        // Try to manually fail automated gate - should also be rejected
-        let result = executor.fail_gate(
+        // Smart pass runs the checker, which fails
+        let result = executor.pass_gate(
             &issue_id,
             "auto-gate".to_string(),
             Some("human:test".to_string()),
         );
 
-        assert!(result.is_err(), "Manual fail of automated gate should fail");
-        let err_msg = result.unwrap_err().to_string();
-        assert!(
-            err_msg.contains("automated") || err_msg.contains("jit gate check"),
-            "Error should mention automation or suggest using 'jit gate check'"
+        assert!(result.is_ok(), "Pass should succeed even if checker fails");
+
+        // Verify gate is marked as failed (checker failed)
+        let issue = executor.storage.load_issue(&issue_id).unwrap();
+        assert_eq!(
+            issue.gates_status.get("auto-gate").unwrap().status,
+            crate::domain::GateStatus::Failed
         );
     }
 
