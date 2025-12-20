@@ -90,6 +90,7 @@ impl TestHarness {
                 description.to_string(),
                 auto,
                 None,
+                "postcheck".to_string(), // Default to postcheck
             )
             .unwrap();
     }

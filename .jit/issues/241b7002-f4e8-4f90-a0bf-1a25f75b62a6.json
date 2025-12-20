@@ -2,9 +2,9 @@
   "id": "241b7002-f4e8-4f90-a0bf-1a25f75b62a6",
   "title": "Add --stage option to 'jit registry add' command",
   "description": "Currently there's no way to create precheck gates via CLI. The 'jit registry add' command should support a --stage option to specify 'precheck' or 'postcheck'. Default should remain 'postcheck' for backward compatibility.",
-  "state": "ready",
+  "state": "done",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:copilot",
   "dependencies": [],
   "gates_required": [
     "tdd-reminder",
@@ -13,7 +13,33 @@
     "fmt",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_by": "agent:copilot",
+      "updated_at": "2025-12-20T17:48:55.538024298Z"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": "agent:copilot",
+      "updated_at": "2025-12-20T17:45:30.003468582Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-20T17:48:48.110927901Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-20T17:48:50.722007752Z"
+    },
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-20T17:48:49.316272219Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [

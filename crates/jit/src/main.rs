@@ -1045,6 +1045,14 @@ fn run() -> Result<()> {
                             description: g.description.clone(),
                             auto: g.auto,
                             example_integration: g.example_integration.clone(),
+                            stage: match g.stage {
+                                jit::domain::GateStage::Precheck => "precheck".to_string(),
+                                jit::domain::GateStage::Postcheck => "postcheck".to_string(),
+                            },
+                            mode: match g.mode {
+                                jit::domain::GateMode::Manual => "manual".to_string(),
+                                jit::domain::GateMode::Auto => "auto".to_string(),
+                            },
                         })
                         .collect();
 
@@ -1066,8 +1074,16 @@ fn run() -> Result<()> {
                 description,
                 auto,
                 example,
+                stage,
             } => {
-                executor.add_gate_definition(key.clone(), title, description, auto, example)?;
+                executor.add_gate_definition(
+                    key.clone(),
+                    title,
+                    description,
+                    auto,
+                    example,
+                    stage,
+                )?;
                 println!("Added gate definition: {}", key);
             }
             RegistryCommands::Remove { key } => {
@@ -1085,6 +1101,14 @@ fn run() -> Result<()> {
                         description: gate.description.clone(),
                         auto: gate.auto,
                         example_integration: gate.example_integration.clone(),
+                        stage: match gate.stage {
+                            jit::domain::GateStage::Precheck => "precheck".to_string(),
+                            jit::domain::GateStage::Postcheck => "postcheck".to_string(),
+                        },
+                        mode: match gate.mode {
+                            jit::domain::GateMode::Manual => "manual".to_string(),
+                            jit::domain::GateMode::Auto => "auto".to_string(),
+                        },
                     };
                     let output = JsonOutput::success(gate_def);
                     println!("{}", output.to_json_string()?);
@@ -1094,6 +1118,8 @@ fn run() -> Result<()> {
                     println!("Description: {}", gate.description);
                     println!("Auto: {}", gate.auto);
                     println!("Example Integration: {:?}", gate.example_integration);
+                    println!("Stage: {:?}", gate.stage);
+                    println!("Mode: {:?}", gate.mode);
                 }
             }
         },

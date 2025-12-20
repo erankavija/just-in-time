@@ -107,12 +107,25 @@ impl<S: IssueStore> CommandExecutor<S> {
         description: String,
         auto: bool,
         example_integration: Option<String>,
+        stage_str: String,
     ) -> Result<()> {
         let mut registry = self.storage.load_gate_registry()?;
 
         if registry.gates.contains_key(&key) {
             return Err(anyhow!("Gate '{}' already exists", key));
         }
+
+        // Parse stage string
+        let stage = match stage_str.to_lowercase().as_str() {
+            "precheck" => crate::domain::GateStage::Precheck,
+            "postcheck" => crate::domain::GateStage::Postcheck,
+            _ => {
+                return Err(anyhow!(
+                    "Invalid stage '{}'. Must be 'precheck' or 'postcheck'",
+                    stage_str
+                ))
+            }
+        };
 
         registry.gates.insert(
             key.clone(),
@@ -121,7 +134,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 key,
                 title,
                 description,
-                stage: crate::domain::GateStage::Postcheck, // Default to postcheck for backwards compat
+                stage,
                 mode: if auto {
                     crate::domain::GateMode::Auto
                 } else {

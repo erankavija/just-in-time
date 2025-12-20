@@ -81,3 +81,12 @@
 {"type":"issue_state_changed","id":"70101d07-596d-413b-9e8e-8679169da4c0","issue_id":"82b8a519-d35a-4ebd-a3ac-82845729aa31","timestamp":"2025-12-20T17:25:16.139793586Z","from":"ready","to":"in_progress"}
 {"type":"issue_state_changed","id":"325cd24f-810a-46d5-85ea-d675dae865bc","issue_id":"82b8a519-d35a-4ebd-a3ac-82845729aa31","timestamp":"2025-12-20T17:34:35.495636764Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"9fbac452-d414-4f70-83eb-b1a8462466f5","issue_id":"82b8a519-d35a-4ebd-a3ac-82845729aa31","timestamp":"2025-12-20T17:34:35.495662204Z"}
+{"type":"gate_passed","id":"feabad1c-d549-43fe-adab-d63bce995b06","issue_id":"241b7002-f4e8-4f90-a0bf-1a25f75b62a6","timestamp":"2025-12-20T17:45:30.003601782Z","gate_key":"tdd-reminder","updated_by":"agent:copilot"}
+{"type":"issue_state_changed","id":"7e5c7174-d68b-4c42-b7e8-d5f10aa05c7e","issue_id":"241b7002-f4e8-4f90-a0bf-1a25f75b62a6","timestamp":"2025-12-20T17:45:32.883052406Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"b720256b-f02c-4ffe-b529-9a80eecc9d65","issue_id":"241b7002-f4e8-4f90-a0bf-1a25f75b62a6","timestamp":"2025-12-20T17:45:32.886006190Z","assignee":"agent:copilot"}
+{"type":"gate_passed","id":"14f99079-b4b7-4763-9bdf-3f5737ace72b","issue_id":"241b7002-f4e8-4f90-a0bf-1a25f75b62a6","timestamp":"2025-12-20T17:48:49.314196517Z","gate_key":"tests","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"7138b3b5-589c-4805-83f6-59ea5ad25438","issue_id":"241b7002-f4e8-4f90-a0bf-1a25f75b62a6","timestamp":"2025-12-20T17:48:50.719743089Z","gate_key":"clippy","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"e62e9116-7c63-4466-869d-57d01c3e250a","issue_id":"241b7002-f4e8-4f90-a0bf-1a25f75b62a6","timestamp":"2025-12-20T17:48:51.024670495Z","gate_key":"fmt","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"2412f557-1335-4441-9501-7bdca7f02dea","issue_id":"241b7002-f4e8-4f90-a0bf-1a25f75b62a6","timestamp":"2025-12-20T17:48:55.538163978Z","gate_key":"code-review","updated_by":"agent:copilot"}
+{"type":"issue_state_changed","id":"2c657879-94b9-475f-9395-ebef43fbf8f7","issue_id":"241b7002-f4e8-4f90-a0bf-1a25f75b62a6","timestamp":"2025-12-20T17:48:58.684119953Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"725dcc76-bc84-4e43-af47-07c0f47c43d1","issue_id":"241b7002-f4e8-4f90-a0bf-1a25f75b62a6","timestamp":"2025-12-20T17:48:58.684146503Z"}

@@ -491,6 +491,8 @@ pub struct GateDefinition {
     pub description: String,
     pub auto: bool,
     pub example_integration: Option<String>,
+    pub stage: String,
+    pub mode: String,
 }
 
 #[cfg(test)]

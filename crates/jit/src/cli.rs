@@ -654,6 +654,10 @@ pub enum RegistryCommands {
 
         #[arg(short, long)]
         example: Option<String>,
+
+        /// Gate execution stage (precheck or postcheck)
+        #[arg(short, long, default_value = "postcheck")]
+        stage: String,
     },
 
     /// Remove a gate definition
