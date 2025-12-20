@@ -2,9 +2,9 @@
   "id": "544fd21b-ece7-4d81-993a-062fd3545459",
   "title": "Fix claim_issue to enforce prechecks",
   "description": "claim_issue bypasses precheck enforcement by directly setting state instead of calling update_issue_state(). This breaks TDD workflow. Fix: use update_issue_state() for state transitions.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:copilot",
   "dependencies": [
     "0ce16136-0999-4f94-944f-01d195f42565"
   ],

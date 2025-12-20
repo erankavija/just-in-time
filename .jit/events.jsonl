@@ -41,3 +41,5 @@
 {"type":"issue_completed","id":"8f50a151-edbd-4d7d-bd16-4d4069ee9508","issue_id":"0ce16136-0999-4f94-944f-01d195f42565","timestamp":"2025-12-20T00:20:40.667738220Z"}
 {"type":"issue_created","id":"70d37e7e-a05b-46d4-a9c4-3a4e02839e7f","issue_id":"544fd21b-ece7-4d81-993a-062fd3545459","timestamp":"2025-12-20T00:25:33.991016730Z","title":"Fix claim_issue to enforce prechecks","priority":"high"}
 {"type":"issue_created","id":"16330117-3cc4-4636-8163-3f25897ec628","issue_id":"be0530d3-b304-469e-8651-858378636e09","timestamp":"2025-12-20T00:25:39.398699967Z","title":"Fix claim_issue to enforce prechecks","priority":"high"}
+{"type":"issue_claimed","id":"526753fe-2e33-491e-9857-858745636743","issue_id":"544fd21b-ece7-4d81-993a-062fd3545459","timestamp":"2025-12-20T08:33:40.053684384Z","assignee":"agent:copilot"}
+{"type":"issue_state_changed","id":"c9c2dfef-bf44-485f-87d1-55a40e6f1f6d","issue_id":"544fd21b-ece7-4d81-993a-062fd3545459","timestamp":"2025-12-20T08:33:40.053953704Z","from":"ready","to":"in_progress"}

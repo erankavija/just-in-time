@@ -297,31 +297,28 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     pub fn claim_issue(&self, id: &str, assignee: String) -> Result<()> {
-        let mut issue = self.storage.load_issue(id)?;
+        let issue = self.storage.load_issue(id)?;
 
         if issue.assignee.is_some() {
             return Err(anyhow!("Issue is already assigned"));
         }
 
         let old_state = issue.state;
-        issue.assignee = Some(assignee.clone());
 
-        // Transition to InProgress if Ready
-        if issue.state == State::Ready {
-            issue.state = State::InProgress;
+        // If Ready, try to transition to InProgress first (this enforces prechecks)
+        if old_state == State::Ready {
+            self.update_issue_state(id, State::InProgress)?;
         }
 
+        // If we get here, prechecks passed (or issue wasn't Ready)
+        // Now assign the issue
+        let mut issue = self.storage.load_issue(id)?;
+        issue.assignee = Some(assignee.clone());
         self.storage.save_issue(&issue)?;
 
-        // Log event
+        // Log assignment event
         let event = Event::new_issue_claimed(issue.id.clone(), assignee);
         self.storage.append_event(&event)?;
-
-        // Log state change if needed
-        if old_state != issue.state {
-            let event = Event::new_issue_state_changed(issue.id.clone(), old_state, issue.state);
-            self.storage.append_event(&event)?;
-        }
 
         Ok(())
     }
@@ -448,5 +445,129 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::{Gate, GateMode, GateStage, State};
+    use crate::storage::InMemoryStorage;
+    use std::collections::HashMap;
+
+    fn setup() -> CommandExecutor<InMemoryStorage> {
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+        CommandExecutor::new(storage)
+    }
+
+    #[test]
+    fn test_claim_issue_enforces_prechecks() {
+        let executor = setup();
+
+        // Define a manual precheck gate (TDD reminder)
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        registry.gates.insert(
+            "tdd-reminder".to_string(),
+            Gate {
+                version: 1,
+                key: "tdd-reminder".to_string(),
+                title: "TDD Reminder".to_string(),
+                description: "Write tests first".to_string(),
+                stage: GateStage::Precheck,
+                mode: GateMode::Manual,
+                checker: None,
+                reserved: HashMap::new(),
+                auto: false,
+                example_integration: None,
+            },
+        );
+        executor.storage.save_gate_registry(&registry).unwrap();
+
+        // Create issue with precheck gate
+        let mut issue = crate::domain::Issue::new("Test task".to_string(), "Test".to_string());
+        issue.state = State::Ready;
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(&issue).unwrap();
+        executor
+            .add_gate(&issue_id, "tdd-reminder".to_string())
+            .unwrap();
+
+        // Try to claim the issue - should fail because precheck hasn't passed
+        let result = executor.claim_issue(&issue_id, "agent:test".to_string());
+
+        // Currently this test FAILS because claim_issue bypasses prechecks
+        // After fix, claiming should fail with "Manual precheck 'tdd-reminder' has not been passed"
+        assert!(
+            result.is_err(),
+            "Claiming should fail when precheck gate hasn't passed"
+        );
+        assert!(result.unwrap_err().to_string().contains("tdd-reminder"));
+
+        // Verify issue is still Ready, not InProgress
+        let issue = executor.storage.load_issue(&issue_id).unwrap();
+        assert_eq!(
+            issue.state,
+            State::Ready,
+            "Issue should remain Ready when precheck fails"
+        );
+        assert!(
+            issue.assignee.is_none(),
+            "Issue should not be assigned when precheck fails"
+        );
+    }
+
+    #[test]
+    fn test_claim_issue_succeeds_when_prechecks_pass() {
+        let executor = setup();
+
+        // Define a manual precheck gate
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        registry.gates.insert(
+            "tdd-reminder".to_string(),
+            Gate {
+                version: 1,
+                key: "tdd-reminder".to_string(),
+                title: "TDD Reminder".to_string(),
+                description: "Write tests first".to_string(),
+                stage: GateStage::Precheck,
+                mode: GateMode::Manual,
+                checker: None,
+                reserved: HashMap::new(),
+                auto: false,
+                example_integration: None,
+            },
+        );
+        executor.storage.save_gate_registry(&registry).unwrap();
+
+        // Create issue with precheck gate
+        let mut issue = crate::domain::Issue::new("Test task".to_string(), "Test".to_string());
+        issue.state = State::Ready;
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(&issue).unwrap();
+        executor
+            .add_gate(&issue_id, "tdd-reminder".to_string())
+            .unwrap();
+
+        // Pass the precheck manually
+        executor
+            .pass_gate(
+                &issue_id,
+                "tdd-reminder".to_string(),
+                Some("human:dev".to_string()),
+            )
+            .unwrap();
+
+        // Now claiming should succeed
+        let result = executor.claim_issue(&issue_id, "agent:test".to_string());
+        assert!(
+            result.is_ok(),
+            "Claiming should succeed when precheck passes"
+        );
+
+        // Verify issue transitioned to InProgress and is assigned
+        let issue = executor.storage.load_issue(&issue_id).unwrap();
+        assert_eq!(issue.state, State::InProgress);
+        assert_eq!(issue.assignee, Some("agent:test".to_string()));
     }
 }
