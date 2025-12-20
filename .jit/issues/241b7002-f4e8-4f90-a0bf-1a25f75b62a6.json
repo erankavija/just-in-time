@@ -6,7 +6,13 @@
   "priority": "normal",
   "assignee": null,
   "dependencies": [],
-  "gates_required": [],
+  "gates_required": [
+    "tdd-reminder",
+    "tests",
+    "clippy",
+    "fmt",
+    "code-review"
+  ],
   "gates_status": {},
   "context": {},
   "documents": [],
