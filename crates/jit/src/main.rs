@@ -440,6 +440,27 @@ fn run() -> Result<()> {
                         println!("Unassigned issue: {}", id);
                     }
                 }
+                IssueCommands::Reject { id, reason, json } => {
+                    use jit::domain::State;
+
+                    // Update state to rejected
+                    executor.update_issue_state(&id, State::Rejected)?;
+
+                    // Add resolution label if reason provided
+                    if let Some(ref reason_value) = reason {
+                        let label = format!("resolution:{}", reason_value);
+                        executor.add_label(&id, &label)?;
+                    }
+
+                    if json {
+                        let issue = storage.load_issue(&id)?;
+                        println!("{}", serde_json::to_string_pretty(&issue)?);
+                    } else if let Some(reason_value) = reason {
+                        println!("Rejected issue: {} (reason: {})", id, reason_value);
+                    } else {
+                        println!("Rejected issue: {}", id);
+                    }
+                }
                 IssueCommands::Release { id, reason, json } => {
                     executor.release_issue(&id, &reason)?;
 

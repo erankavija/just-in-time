@@ -703,3 +703,70 @@ fn test_auto_transition_when_dependency_done() {
         "Task B should auto-transition to Ready when dependency is done"
     );
 }
+
+// ============================================================================
+// Workflow Test: Reject convenience command
+// ============================================================================
+
+#[test]
+fn test_reject_convenience_command() {
+    let temp = setup_test_repo();
+
+    // Create an issue
+    let output = run_jit(
+        &temp,
+        &[
+            "issue",
+            "create",
+            "-t",
+            "Won't fix task",
+            "--priority",
+            "low",
+        ],
+    );
+    assert!(output.status.success());
+    let task_id = extract_id(&String::from_utf8_lossy(&output.stdout));
+
+    // Reject it with reason
+    let output = run_jit(
+        &temp,
+        &["issue", "reject", &task_id, "--reason", "wont-fix"],
+    );
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Rejected issue"));
+    assert!(stdout.contains("wont-fix"));
+
+    // Verify state is Rejected and has resolution label (check with --json)
+    let output = run_jit(&temp, &["issue", "show", &task_id, "--json"]);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("\"state\":\"rejected\"") || stdout.contains("\"state\": \"rejected\"")
+    );
+    assert!(stdout.contains("resolution:wont-fix"));
+}
+
+#[test]
+fn test_reject_without_reason() {
+    let temp = setup_test_repo();
+
+    // Create an issue
+    let output = run_jit(
+        &temp,
+        &["issue", "create", "-t", "Task", "--priority", "normal"],
+    );
+    assert!(output.status.success());
+    let task_id = extract_id(&String::from_utf8_lossy(&output.stdout));
+
+    // Reject without reason
+    let output = run_jit(&temp, &["issue", "reject", &task_id]);
+    assert!(output.status.success());
+
+    // Verify state is Rejected but no resolution label
+    let output = run_jit(&temp, &["issue", "show", &task_id, "--json"]);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("\"state\":\"rejected\"") || stdout.contains("\"state\": \"rejected\"")
+    );
+    assert!(!stdout.contains("resolution:"));
+}

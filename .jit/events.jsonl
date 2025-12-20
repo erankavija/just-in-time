@@ -190,3 +190,12 @@
 {"type":"issue_state_changed","id":"a6e845f7-9c0a-4657-a63c-887f1c52e93e","issue_id":"df0b551f-c60e-4c6f-951c-5a796a1c5635","timestamp":"2025-12-20T21:39:06.725701563Z","from":"gated","to":"done"}
 {"type":"issue_completed","id":"798a68d2-aae9-4a49-ad7a-2e16753df623","issue_id":"df0b551f-c60e-4c6f-951c-5a796a1c5635","timestamp":"2025-12-20T21:39:06.725726713Z"}
 {"type":"issue_state_changed","id":"548ce478-c952-482d-8386-3a7e950fdab8","issue_id":"c4738097-cdfd-4fe8-a279-a6ee7f2e1ce9","timestamp":"2025-12-20T21:39:06.731132210Z","from":"backlog","to":"ready"}
+{"type":"issue_state_changed","id":"6d125d35-c44d-4040-99c9-d907eeb0f946","issue_id":"c4738097-cdfd-4fe8-a279-a6ee7f2e1ce9","timestamp":"2025-12-20T21:41:09.692307569Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"fbef07f7-9feb-43a0-95c3-2c0b074ca1f4","issue_id":"c4738097-cdfd-4fe8-a279-a6ee7f2e1ce9","timestamp":"2025-12-20T21:41:10.580482837Z","assignee":"agent:copilot-session"}
+{"type":"gate_passed","id":"ee32ff27-0422-4357-b1da-78e2ba0a80d8","issue_id":"c4738097-cdfd-4fe8-a279-a6ee7f2e1ce9","timestamp":"2025-12-20T21:41:11.812085975Z","gate_key":"tdd-reminder","updated_by":"agent:copilot-session"}
+{"type":"gate_passed","id":"fbdcf5a9-446e-4136-a15f-f77a86ff5a74","issue_id":"c4738097-cdfd-4fe8-a279-a6ee7f2e1ce9","timestamp":"2025-12-20T21:46:20.370420769Z","gate_key":"tests","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"fc8f992f-7b04-458a-981d-ab8ad49d2d2c","issue_id":"c4738097-cdfd-4fe8-a279-a6ee7f2e1ce9","timestamp":"2025-12-20T21:46:20.575806299Z","gate_key":"clippy","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"2de84f78-b656-44e6-a9a7-956e3ebbcbfd","issue_id":"c4738097-cdfd-4fe8-a279-a6ee7f2e1ce9","timestamp":"2025-12-20T21:46:20.881695916Z","gate_key":"fmt","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"570e81e0-584d-463e-882b-0de7920dff4f","issue_id":"c4738097-cdfd-4fe8-a279-a6ee7f2e1ce9","timestamp":"2025-12-20T21:46:20.884688779Z","gate_key":"code-review","updated_by":"human:user"}
+{"type":"issue_state_changed","id":"4a8a96de-d10c-4e64-9f9d-b6c60cb7c375","issue_id":"c4738097-cdfd-4fe8-a279-a6ee7f2e1ce9","timestamp":"2025-12-20T21:46:50.460771972Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"0ac1b284-8165-4f38-9df5-e057a4e6d8ef","issue_id":"c4738097-cdfd-4fe8-a279-a6ee7f2e1ce9","timestamp":"2025-12-20T21:46:50.460796022Z"}

@@ -2,9 +2,9 @@
   "id": "c4738097-cdfd-4fe8-a279-a6ee7f2e1ce9",
   "title": "Add convenience command: jit issue reject",
   "description": "Add 'jit issue reject <id>' convenience command that shortcuts to '--state rejected'. Optionally accept --reason flag that adds resolution:* label. Example: 'jit issue reject <id> --reason wont-fix' sets state to rejected and adds 'resolution:wont-fix' label. Keep it simple - just a convenience wrapper.",
-  "state": "ready",
+  "state": "done",
   "priority": "low",
-  "assignee": null,
+  "assignee": "agent:copilot-session",
   "dependencies": [
     "277afb61-f6a3-46c5-b555-78041a408017",
     "db7fdd9a-6bf7-4eff-88ee-5874d3c61cff"
@@ -16,7 +16,33 @@
     "fmt",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-20T21:46:19.165171951Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "human:user",
+      "updated_at": "2025-12-20T21:46:20.883862418Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-20T21:46:20.578229621Z"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": "agent:copilot-session",
+      "updated_at": "2025-12-20T21:41:11.808751902Z"
+    },
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-20T21:46:20.372883651Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [

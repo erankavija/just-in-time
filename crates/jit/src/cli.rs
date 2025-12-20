@@ -301,6 +301,19 @@ pub enum IssueCommands {
         json: bool,
     },
 
+    /// Reject an issue (convenience for --state rejected)
+    Reject {
+        /// Issue ID
+        id: String,
+
+        /// Reason for rejection (adds resolution:REASON label)
+        #[arg(long)]
+        reason: Option<String>,
+
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Release an issue from its assignee (for timeout recovery)
     Release {
         /// Issue ID
