@@ -1,0 +1,48 @@
+{
+  "id": "df0b551f-c60e-4c6f-951c-5a796a1c5635",
+  "title": "Auto-transition issues to Ready when dependencies complete",
+  "description": "Issues remain in Backlog state even when all dependencies are in terminal states (Done/Rejected). Expected: When an issue's last dependency completes, it should automatically transition from Backlog to Ready. Actual: Issues stay in Backlog and require manual 'jit issue update --state ready'. Example: Issue c4738097 had two dependencies (277afb61 and db7fdd9a), both Done, but remained in Backlog. This affects workflow automation and agent coordination - agents can't discover newly-ready work without manual intervention.",
+  "state": "done",
+  "priority": "high",
+  "assignee": "agent:copilot-session",
+  "dependencies": [],
+  "gates_required": [
+    "tdd-reminder",
+    "tests",
+    "clippy",
+    "fmt",
+    "code-review"
+  ],
+  "gates_status": {
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-20T21:38:17.322736298Z"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": "agent:copilot-session",
+      "updated_at": "2025-12-20T21:31:59.194504710Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "human:user",
+      "updated_at": "2025-12-20T21:38:17.833336125Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-20T21:38:07.343935751Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-20T21:38:54.665929334Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:bug"
+  ]
+}

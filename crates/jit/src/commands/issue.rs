@@ -188,7 +188,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Check if any dependent issues can now transition to ready (after save!)
         if let Some(s) = state {
-            if s == State::Done {
+            if s.is_terminal() {
                 self.check_auto_transitions()?;
             }
         }

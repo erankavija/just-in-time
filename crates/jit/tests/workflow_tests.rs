@@ -489,3 +489,217 @@ fn test_workflow_graph_visualization() {
     assert!(stdout.contains(&feature_b));
     assert!(stdout.contains(&integration));
 }
+
+// ============================================================================
+// Workflow Test: Auto-transition to Ready on Rejected dependency
+// ============================================================================
+
+#[test]
+fn test_auto_transition_when_dependency_rejected() {
+    let temp = setup_test_repo();
+
+    // Create two issues: B depends on A
+    let output = run_jit(
+        &temp,
+        &["issue", "create", "-t", "Task A", "--priority", "normal"],
+    );
+    assert!(output.status.success());
+    let task_a = extract_id(&String::from_utf8_lossy(&output.stdout));
+
+    let output = run_jit(
+        &temp,
+        &["issue", "create", "-t", "Task B", "--priority", "normal"],
+    );
+    assert!(output.status.success());
+    let task_b = extract_id(&String::from_utf8_lossy(&output.stdout));
+
+    // Add dependency: B depends on A
+    let output = run_jit(&temp, &["dep", "add", &task_b, &task_a]);
+    assert!(output.status.success());
+
+    // Verify B is in Backlog (blocked by A)
+    let output = run_jit(&temp, &["issue", "show", &task_b]);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("State: Backlog"),
+        "Task B should be blocked"
+    );
+
+    // Reject task A (terminal state, should unblock B)
+    let output = run_jit(&temp, &["issue", "update", &task_a, "--state", "rejected"]);
+    assert!(output.status.success());
+
+    // Verify B auto-transitioned to Ready
+    let output = run_jit(&temp, &["issue", "show", &task_b]);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("State: Ready"),
+        "Task B should auto-transition to Ready when dependency is rejected"
+    );
+}
+
+// ============================================================================
+// Workflow Test: Auto-transition with multiple dependencies
+// ============================================================================
+
+#[test]
+fn test_auto_transition_when_multiple_dependencies_complete() {
+    let temp = setup_test_repo();
+
+    // Create three issues: C depends on both A and B
+    let output = run_jit(
+        &temp,
+        &["issue", "create", "-t", "Task A", "--priority", "normal"],
+    );
+    assert!(output.status.success());
+    let task_a = extract_id(&String::from_utf8_lossy(&output.stdout));
+
+    let output = run_jit(
+        &temp,
+        &["issue", "create", "-t", "Task B", "--priority", "normal"],
+    );
+    assert!(output.status.success());
+    let task_b = extract_id(&String::from_utf8_lossy(&output.stdout));
+
+    let output = run_jit(
+        &temp,
+        &["issue", "create", "-t", "Task C", "--priority", "normal"],
+    );
+    assert!(output.status.success());
+    let task_c = extract_id(&String::from_utf8_lossy(&output.stdout));
+
+    // Add dependencies: C depends on both A and B
+    let output = run_jit(&temp, &["dep", "add", &task_c, &task_a]);
+    assert!(output.status.success());
+    let output = run_jit(&temp, &["dep", "add", &task_c, &task_b]);
+    assert!(output.status.success());
+
+    // Verify C is in Backlog (blocked by A and B)
+    let output = run_jit(&temp, &["issue", "show", &task_c]);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("State: Backlog"),
+        "Task C should be blocked"
+    );
+
+    // Complete task A
+    let output = run_jit(&temp, &["issue", "update", &task_a, "--state", "done"]);
+    assert!(output.status.success());
+
+    // C should still be in Backlog (B not done yet)
+    let output = run_jit(&temp, &["issue", "show", &task_c]);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("State: Backlog"),
+        "Task C should still be blocked by B"
+    );
+
+    // Complete task B (now all dependencies done)
+    let output = run_jit(&temp, &["issue", "update", &task_b, "--state", "done"]);
+    assert!(output.status.success());
+
+    // Verify C auto-transitioned to Ready
+    let output = run_jit(&temp, &["issue", "show", &task_c]);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("State: Ready"),
+        "Task C should auto-transition to Ready when both dependencies are done"
+    );
+}
+
+// ============================================================================
+// Workflow Test: Auto-transition with mixed terminal states
+// ============================================================================
+
+#[test]
+fn test_auto_transition_with_mixed_terminal_states() {
+    let temp = setup_test_repo();
+
+    // Create three issues: C depends on both A and B
+    let output = run_jit(
+        &temp,
+        &["issue", "create", "-t", "Task A", "--priority", "normal"],
+    );
+    assert!(output.status.success());
+    let task_a = extract_id(&String::from_utf8_lossy(&output.stdout));
+
+    let output = run_jit(
+        &temp,
+        &["issue", "create", "-t", "Task B", "--priority", "normal"],
+    );
+    assert!(output.status.success());
+    let task_b = extract_id(&String::from_utf8_lossy(&output.stdout));
+
+    let output = run_jit(
+        &temp,
+        &["issue", "create", "-t", "Task C", "--priority", "normal"],
+    );
+    assert!(output.status.success());
+    let task_c = extract_id(&String::from_utf8_lossy(&output.stdout));
+
+    // Add dependencies: C depends on both A and B
+    let output = run_jit(&temp, &["dep", "add", &task_c, &task_a]);
+    assert!(output.status.success());
+    let output = run_jit(&temp, &["dep", "add", &task_c, &task_b]);
+    assert!(output.status.success());
+
+    // Complete A with Done, reject B (both terminal)
+    let output = run_jit(&temp, &["issue", "update", &task_a, "--state", "done"]);
+    assert!(output.status.success());
+
+    let output = run_jit(&temp, &["issue", "update", &task_b, "--state", "rejected"]);
+    assert!(output.status.success());
+
+    // Verify C auto-transitioned to Ready (both dependencies in terminal states)
+    let output = run_jit(&temp, &["issue", "show", &task_c]);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("State: Ready"),
+        "Task C should auto-transition to Ready when dependencies are in terminal states (Done/Rejected)"
+    );
+}
+
+// ============================================================================
+// Workflow Test: Auto-transition to Ready on Done dependency
+// ============================================================================
+
+#[test]
+fn test_auto_transition_when_dependency_done() {
+    let temp = setup_test_repo();
+
+    // Create two issues: B depends on A
+    let output = run_jit(
+        &temp,
+        &["issue", "create", "-t", "Task A", "--priority", "normal"],
+    );
+    assert!(output.status.success());
+    let task_a = extract_id(&String::from_utf8_lossy(&output.stdout));
+
+    let output = run_jit(
+        &temp,
+        &["issue", "create", "-t", "Task B", "--priority", "normal"],
+    );
+    assert!(output.status.success());
+    let task_b = extract_id(&String::from_utf8_lossy(&output.stdout));
+
+    // Add dependency: B depends on A
+    let output = run_jit(&temp, &["dep", "add", &task_b, &task_a]);
+    assert!(output.status.success());
+
+    // Verify B is in Backlog
+    let output = run_jit(&temp, &["issue", "show", &task_b]);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("State: Backlog"));
+
+    // Complete task A (terminal state, should unblock B)
+    let output = run_jit(&temp, &["issue", "update", &task_a, "--state", "done"]);
+    assert!(output.status.success());
+
+    // Verify B auto-transitioned to Ready
+    let output = run_jit(&temp, &["issue", "show", &task_b]);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("State: Ready"),
+        "Task B should auto-transition to Ready when dependency is done"
+    );
+}

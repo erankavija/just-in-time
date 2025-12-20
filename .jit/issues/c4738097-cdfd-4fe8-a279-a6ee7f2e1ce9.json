@@ -2,7 +2,7 @@
   "id": "c4738097-cdfd-4fe8-a279-a6ee7f2e1ce9",
   "title": "Add convenience command: jit issue reject",
   "description": "Add 'jit issue reject <id>' convenience command that shortcuts to '--state rejected'. Optionally accept --reason flag that adds resolution:* label. Example: 'jit issue reject <id> --reason wont-fix' sets state to rejected and adds 'resolution:wont-fix' label. Keep it simple - just a convenience wrapper.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "low",
   "assignee": null,
   "dependencies": [
