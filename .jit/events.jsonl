@@ -209,3 +209,14 @@
 {"type":"issue_state_changed","id":"6c089a06-6248-48ba-887e-4c239839c4f9","issue_id":"4051ee7d-24e7-4b02-9238-b4fb2a6aa0d4","timestamp":"2025-12-20T22:02:42.469660576Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"cac41afa-ccea-4336-812d-b38afc4ee945","issue_id":"4051ee7d-24e7-4b02-9238-b4fb2a6aa0d4","timestamp":"2025-12-20T22:02:42.469679236Z"}
 {"type":"issue_claimed","id":"b22530aa-896d-4dc5-acba-5dd8f00165ee","issue_id":"90575086-fcfe-4b0d-82b5-fc00c4daace7","timestamp":"2025-12-20T22:06:03.100502123Z","assignee":"agent:copilot-current-session"}
+{"type":"issue_created","id":"3287fd03-9d15-4be4-92c0-c07bcb6d01c0","issue_id":"7b7df884-8335-4c2a-8555-a7d5a541a0f0","timestamp":"2025-12-20T22:14:08.906954536Z","title":"Fix strategic/tactical view to follow issue type labels","priority":"high"}
+{"type":"issue_state_changed","id":"25f72912-2da6-4748-812d-6fdcb2a64150","issue_id":"7b7df884-8335-4c2a-8555-a7d5a541a0f0","timestamp":"2025-12-20T22:14:20.901228868Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"b9c06f20-b4c2-4c17-97fe-469e35e93008","issue_id":"7b7df884-8335-4c2a-8555-a7d5a541a0f0","timestamp":"2025-12-20T22:14:20.904108202Z","assignee":"agent:copilot-current-session"}
+{"type":"gate_passed","id":"2906ee4b-df8c-4a33-85e8-cf64119b66e8","issue_id":"7b7df884-8335-4c2a-8555-a7d5a541a0f0","timestamp":"2025-12-20T22:16:52.873996470Z","gate_key":"tests","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"d2739b52-20e7-48bc-8ad9-a0b98c04b85f","issue_id":"7b7df884-8335-4c2a-8555-a7d5a541a0f0","timestamp":"2025-12-20T22:16:52.876862954Z","gate_key":"code-review","updated_by":null}
+{"type":"issue_state_changed","id":"43457d9c-7b51-435a-b64f-a39b8e4d2254","issue_id":"7b7df884-8335-4c2a-8555-a7d5a541a0f0","timestamp":"2025-12-20T22:16:52.879415527Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"7bf9b52d-726d-48b3-82ba-bc257f0202c1","issue_id":"7b7df884-8335-4c2a-8555-a7d5a541a0f0","timestamp":"2025-12-20T22:16:52.879444667Z"}
+{"type":"gate_passed","id":"ec4bdb83-f565-4730-8542-946c1e8e2558","issue_id":"90575086-fcfe-4b0d-82b5-fc00c4daace7","timestamp":"2025-12-20T22:16:59.171557437Z","gate_key":"tests","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"1b33a6bf-ee58-42c8-8140-c5ef22ab59dc","issue_id":"90575086-fcfe-4b0d-82b5-fc00c4daace7","timestamp":"2025-12-20T22:16:59.174540551Z","gate_key":"code-review","updated_by":null}
+{"type":"issue_state_changed","id":"11ea8660-e416-4ea4-86fb-d5d523e757cd","issue_id":"90575086-fcfe-4b0d-82b5-fc00c4daace7","timestamp":"2025-12-20T22:16:59.174660751Z","from":"gated","to":"done"}
+{"type":"issue_completed","id":"ea9af189-c061-4fb7-a874-e7959ff4de7e","issue_id":"90575086-fcfe-4b0d-82b5-fc00c4daace7","timestamp":"2025-12-20T22:16:59.174673731Z"}

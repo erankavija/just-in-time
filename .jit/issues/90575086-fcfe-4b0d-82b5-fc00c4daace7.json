@@ -2,7 +2,7 @@
   "id": "90575086-fcfe-4b0d-82b5-fc00c4daace7",
   "title": "Add Rejected state to web UI",
   "description": "Update web UI to support the new Rejected state:\n- Add 'rejected' to State type in models.ts  \n- Add rejected emoji in IssueDetail.tsx (e.g., ❌ or 🚫)\n- Add rejected color in GraphView.tsx using --state-rejected CSS variable\n- Update state emoji tests (expect 7 states instead of 6)\n- Update state colors tests (expect 7 states instead of 6)\n- Add --state-rejected CSS variable definition",
-  "state": "gated",
+  "state": "done",
   "priority": "high",
   "assignee": "agent:copilot-current-session",
   "dependencies": [],
@@ -10,7 +10,18 @@
     "tests",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-20T22:16:57.966583480Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2025-12-20T22:16:59.173823320Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [

@@ -1,0 +1,32 @@
+{
+  "id": "7b7df884-8335-4c2a-8555-a7d5a541a0f0",
+  "title": "Fix strategic/tactical view to follow issue type labels",
+  "description": "The Web UI strategic/tactical view toggle is not filtering by type labels correctly. It should show only issues with strategic type labels (milestone, epic) in strategic view, and all others in tactical view. Currently it's not respecting the type hierarchy.",
+  "state": "done",
+  "priority": "high",
+  "assignee": "agent:copilot-current-session",
+  "dependencies": [],
+  "gates_required": [
+    "tests",
+    "code-review"
+  ],
+  "gates_status": {
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-20T22:16:51.669599823Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2025-12-20T22:16:52.876042533Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:bug",
+    "component:web",
+    "milestone:v1.0"
+  ]
+}

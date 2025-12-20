@@ -92,7 +92,7 @@ describe('graphFilter', () => {
     });
 
     it('shows strategic nodes (milestone) when strategic filter enabled', () => {
-      const node = createNode('1', ['milestone:v1.0', 'component:api']);
+      const node = createNode('1', ['type:milestone', 'milestone:v1.0', 'component:api']);
       const filters: GraphFilter[] = [createStrategicFilter(true)];
       const result = applyFiltersToNode(node, filters);
       
@@ -101,7 +101,7 @@ describe('graphFilter', () => {
     });
 
     it('shows strategic nodes (epic) when strategic filter enabled', () => {
-      const node = createNode('1', ['epic:auth']);
+      const node = createNode('1', ['type:epic', 'epic:auth']);
       const filters: GraphFilter[] = [createStrategicFilter(true)];
       const result = applyFiltersToNode(node, filters);
       
@@ -181,7 +181,7 @@ describe('graphFilter', () => {
     });
 
     it('shows strategic node normally when both filters match', () => {
-      const node = createNode('1', ['milestone:v1.0']);
+      const node = createNode('1', ['type:milestone', 'milestone:v1.0']);
       const filters: GraphFilter[] = [
         createStrategicFilter(true),
         createLabelFilter(['milestone:*']),
@@ -193,7 +193,7 @@ describe('graphFilter', () => {
     });
 
     it('dims strategic node when label filter does not match', () => {
-      const node = createNode('1', ['milestone:v1.0']);
+      const node = createNode('1', ['type:milestone', 'milestone:v1.0']);
       const filters: GraphFilter[] = [
         createStrategicFilter(true),
         createLabelFilter(['epic:*']),

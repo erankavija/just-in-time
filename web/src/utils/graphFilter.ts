@@ -1,5 +1,8 @@
 import type { GraphNode, GraphEdge } from '../types/models';
 
+// Default strategic types - should be fetched from API/config in the future
+const DEFAULT_STRATEGIC_TYPES = ['milestone', 'epic'];
+
 /**
  * Filter configuration for graph visualization
  * Supports multiple independent filter types that can be combined
@@ -11,6 +14,7 @@ export interface GraphFilter {
 
 export interface StrategicFilterConfig {
   enabled: boolean;
+  strategicTypes?: string[]; // Optional: defaults to DEFAULT_STRATEGIC_TYPES
 }
 
 export interface LabelFilterConfig {
@@ -53,10 +57,15 @@ export function applyFiltersToNode(
     if (filter.type === 'strategic') {
       const config = filter.config as StrategicFilterConfig;
       if (config.enabled) {
+        const strategicTypes = config.strategicTypes || DEFAULT_STRATEGIC_TYPES;
         // Strategic filter HIDES non-strategic nodes
-        const isStrategic = node.labels.some(label => 
-          label.startsWith('milestone:') || label.startsWith('epic:')
-        );
+        const isStrategic = node.labels.some(label => {
+          if (label.startsWith('type:')) {
+            const typeValue = label.substring(5);
+            return strategicTypes.includes(typeValue);
+          }
+          return false;
+        });
         if (!isStrategic) {
           shouldHide = true;
         }

@@ -1,5 +1,9 @@
 import type { GraphNode, GraphEdge } from '../types/models';
 
+// Default strategic types - should be fetched from API in the future
+// Currently matches the default configuration in labels.json
+const DEFAULT_STRATEGIC_TYPES = ['milestone', 'epic'];
+
 /**
  * Stats for downstream dependencies of a node
  */
@@ -12,13 +16,19 @@ export interface DownstreamStats {
 }
 
 /**
- * Filter nodes to only strategic ones (milestone or epic labels)
+ * Filter nodes to only strategic ones (type:milestone or type:epic labels)
+ * TODO: Fetch strategic_types from API instead of hardcoding
  */
-export function filterStrategicNodes(nodes: GraphNode[]): GraphNode[] {
+export function filterStrategicNodes(nodes: GraphNode[], strategicTypes: string[] = DEFAULT_STRATEGIC_TYPES): GraphNode[] {
   return nodes.filter(node => 
-    node.labels.some(label => 
-      label.startsWith('milestone:') || label.startsWith('epic:')
-    )
+    node.labels.some(label => {
+      // Check if label is type:X where X is in strategicTypes
+      if (label.startsWith('type:')) {
+        const typeValue = label.substring(5); // Remove 'type:' prefix
+        return strategicTypes.includes(typeValue);
+      }
+      return false;
+    })
   );
 }
 

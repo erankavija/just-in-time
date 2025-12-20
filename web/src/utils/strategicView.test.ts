@@ -13,9 +13,9 @@ describe('Strategic View Filtering', () => {
   });
 
   describe('filterStrategicNodes', () => {
-    it('should return nodes with milestone labels', () => {
+    it('should return nodes with type:milestone labels', () => {
       const nodes: GraphNode[] = [
-        createNode('1', 'Milestone', ['milestone:v1.0']),
+        createNode('1', 'Milestone', ['type:milestone', 'milestone:v1.0']),
         createNode('2', 'Task', ['component:backend']),
       ];
 
@@ -25,10 +25,10 @@ describe('Strategic View Filtering', () => {
       expect(result[0].id).toBe('1');
     });
 
-    it('should return nodes with epic labels', () => {
+    it('should return nodes with type:epic labels', () => {
       const nodes: GraphNode[] = [
-        createNode('1', 'Epic', ['epic:auth']),
-        createNode('2', 'Task', ['type:feature']),
+        createNode('1', 'Epic', ['type:epic', 'epic:auth']),
+        createNode('2', 'Task', ['type:task']),
       ];
 
       const result = filterStrategicNodes(nodes);
@@ -37,11 +37,11 @@ describe('Strategic View Filtering', () => {
       expect(result[0].id).toBe('1');
     });
 
-    it('should return nodes with both milestone and epic labels', () => {
+    it('should return nodes with both type:milestone and type:epic labels', () => {
       const nodes: GraphNode[] = [
-        createNode('1', 'Milestone', ['milestone:v1.0']),
-        createNode('2', 'Epic', ['epic:auth']),
-        createNode('3', 'Task', ['component:backend']),
+        createNode('1', 'Milestone', ['type:milestone', 'milestone:v1.0']),
+        createNode('2', 'Epic', ['type:epic', 'epic:auth']),
+        createNode('3', 'Task', ['type:task', 'component:backend']),
       ];
 
       const result = filterStrategicNodes(nodes);
@@ -52,7 +52,7 @@ describe('Strategic View Filtering', () => {
 
     it('should return empty array when no strategic nodes', () => {
       const nodes: GraphNode[] = [
-        createNode('1', 'Task', ['component:backend']),
+        createNode('1', 'Task', ['type:task', 'component:backend']),
         createNode('2', 'Task', ['type:feature']),
       ];
 
@@ -63,14 +63,25 @@ describe('Strategic View Filtering', () => {
 
     it('should handle nodes with multiple labels', () => {
       const nodes: GraphNode[] = [
-        createNode('1', 'Task', ['milestone:v1.0', 'epic:auth', 'component:backend']),
-        createNode('2', 'Task', ['component:backend', 'type:feature']),
+        createNode('1', 'Epic', ['type:epic', 'epic:auth', 'milestone:v1.0', 'component:backend']),
+        createNode('2', 'Task', ['type:task', 'component:backend']),
       ];
 
       const result = filterStrategicNodes(nodes);
       
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe('1');
+    });
+
+    it('should not match milestone: or epic: prefixes without type:', () => {
+      const nodes: GraphNode[] = [
+        createNode('1', 'Task', ['milestone:v1.0', 'epic:auth', 'component:backend']),
+        createNode('2', 'Task', ['type:task']),
+      ];
+
+      const result = filterStrategicNodes(nodes);
+      
+      expect(result).toHaveLength(0);
     });
 
     it('should handle empty labels array', () => {
@@ -124,10 +135,10 @@ describe('Strategic View Filtering', () => {
   describe('calculateDownstreamStats', () => {
     it('should calculate stats for node with dependencies', () => {
       const nodes: GraphNode[] = [
-        createNode('1', 'Epic', ['epic:auth']),
-        { ...createNode('2', 'Task1', ['component:backend']), state: 'done' },
-        { ...createNode('3', 'Task2', ['component:backend']), state: 'in_progress' },
-        { ...createNode('4', 'Task3', ['component:backend']), state: 'ready', blocked: true },
+        createNode('1', 'Epic', ['type:epic', 'epic:auth']),
+        { ...createNode('2', 'Task1', ['type:task', 'component:backend']), state: 'done' },
+        { ...createNode('3', 'Task2', ['type:task', 'component:backend']), state: 'in_progress' },
+        { ...createNode('4', 'Task3', ['type:task', 'component:backend']), state: 'ready', blocked: true },
       ];
       const edges: GraphEdge[] = [
         { from: '1', to: '2' },
@@ -146,9 +157,9 @@ describe('Strategic View Filtering', () => {
 
     it('should handle transitive dependencies', () => {
       const nodes: GraphNode[] = [
-        createNode('1', 'Epic', ['epic:auth']),
-        createNode('2', 'Task1', ['component:backend']),
-        { ...createNode('3', 'Task2', ['component:backend']), state: 'done' },
+        createNode('1', 'Epic', ['type:epic', 'epic:auth']),
+        createNode('2', 'Task1', ['type:task', 'component:backend']),
+        { ...createNode('3', 'Task2', ['type:task', 'component:backend']), state: 'done' },
       ];
       const edges: GraphEdge[] = [
         { from: '1', to: '2' },
@@ -163,7 +174,7 @@ describe('Strategic View Filtering', () => {
 
     it('should return zero stats for node with no dependencies', () => {
       const nodes: GraphNode[] = [
-        createNode('1', 'Task', ['component:backend']),
+        createNode('1', 'Task', ['type:task', 'component:backend']),
       ];
       const edges: GraphEdge[] = [];
 
@@ -178,8 +189,8 @@ describe('Strategic View Filtering', () => {
 
     it('should not count the node itself in stats', () => {
       const nodes: GraphNode[] = [
-        createNode('1', 'Epic', ['epic:auth']),
-        createNode('2', 'Task', ['component:backend']),
+        createNode('1', 'Epic', ['type:epic', 'epic:auth']),
+        createNode('2', 'Task', ['type:task', 'component:backend']),
       ];
       const edges: GraphEdge[] = [
         { from: '1', to: '2' },
@@ -192,10 +203,10 @@ describe('Strategic View Filtering', () => {
 
     it('should handle diamond dependencies without double counting', () => {
       const nodes: GraphNode[] = [
-        createNode('1', 'Epic', ['epic:auth']),
-        createNode('2', 'Task1', ['component:backend']),
-        createNode('3', 'Task2', ['component:backend']),
-        createNode('4', 'Task3', ['component:backend']),
+        createNode('1', 'Epic', ['type:epic', 'epic:auth']),
+        createNode('2', 'Task1', ['type:task', 'component:backend']),
+        createNode('3', 'Task2', ['type:task', 'component:backend']),
+        createNode('4', 'Task3', ['type:task', 'component:backend']),
       ];
       const edges: GraphEdge[] = [
         { from: '1', to: '2' },
