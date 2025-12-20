@@ -1,0 +1,46 @@
+{
+  "id": "277afb61-f6a3-46c5-b555-78041a408017",
+  "title": "Add tests for parse_state and parse_priority CLI parsers",
+  "description": "The parse_state() and parse_priority() functions in commands/mod.rs lack unit tests, which allowed the Rejected state to be added to the State enum without updating the CLI parser. Add comprehensive tests covering all valid states and priorities, case-insensitive matching, aliases (e.g., 'open' -> Backlog), and error cases for invalid inputs. This will prevent similar gaps in future state additions.",
+  "state": "done",
+  "priority": "normal",
+  "assignee": "agent:copilot-session",
+  "dependencies": [],
+  "gates_required": [
+    "tdd-reminder",
+    "tests",
+    "clippy",
+    "fmt",
+    "code-review"
+  ],
+  "gates_status": {
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-20T21:25:07.704872727Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-20T21:25:07.910025937Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-20T21:25:06.498038188Z"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": "agent:copilot-session",
+      "updated_at": "2025-12-20T21:18:55.360778537Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "human:user",
+      "updated_at": "2025-12-20T21:25:26.337008324Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": []
+}

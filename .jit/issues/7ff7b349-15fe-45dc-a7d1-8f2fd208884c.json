@@ -2,9 +2,9 @@
   "id": "7ff7b349-15fe-45dc-a7d1-8f2fd208884c",
   "title": "Update status reporting for Rejected state",
   "description": "Update 'jit status' command to display Rejected count separately from Done. Show both in summary output. Update status calculation logic to distinguish terminal states. Format: 'Done: 6, Rejected: 1' to clearly show outcomes. Update JSON output schema to include rejected count.",
-  "state": "backlog",
+  "state": "done",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:copilot-session-1",
   "dependencies": [
     "0b7723c5-13d3-4c60-b940-5cade111b02d"
   ],
@@ -15,7 +15,33 @@
     "fmt",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-20T20:28:46.660088913Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "human:user",
+      "updated_at": "2025-12-20T20:28:46.965336050Z"
+    },
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-20T20:28:45.253940690Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-20T20:28:43.146723229Z"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": "agent:copilot-session-1",
+      "updated_at": "2025-12-20T20:25:57.637093382Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [

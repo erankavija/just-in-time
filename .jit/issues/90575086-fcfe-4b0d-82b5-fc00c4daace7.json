@@ -1,0 +1,22 @@
+{
+  "id": "90575086-fcfe-4b0d-82b5-fc00c4daace7",
+  "title": "Add Rejected state to web UI",
+  "description": "Update web UI to support the new Rejected state:\n- Add 'rejected' to State type in models.ts  \n- Add rejected emoji in IssueDetail.tsx (e.g., ❌ or 🚫)\n- Add rejected color in GraphView.tsx using --state-rejected CSS variable\n- Update state emoji tests (expect 7 states instead of 6)\n- Update state colors tests (expect 7 states instead of 6)\n- Add --state-rejected CSS variable definition",
+  "state": "gated",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "tests",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:rejection-state",
+    "milestone:v1.0",
+    "component:web"
+  ]
+}

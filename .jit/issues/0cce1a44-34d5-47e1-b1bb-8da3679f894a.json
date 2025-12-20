@@ -1,0 +1,17 @@
+{
+  "id": "0cce1a44-34d5-47e1-b1bb-8da3679f894a",
+  "title": "Fix strategic query to check type label, not membership labels",
+  "description": "Current bug: query_strategic() returns any issue with epic:* or milestone:* labels, which incorrectly includes tactical tasks that belong to epics/milestones.\n\nExpected behavior: Only issues with type:epic or type:milestone should be strategic.\n\nRoot cause: Strategic query checks if issue has ANY label from strategic namespaces (epic, milestone), but should check if issue has a TYPE label matching strategic types.\n\nFix: Update query_strategic() to check type_hierarchy for strategic types (levels 1-2), then filter issues by type:epic or type:milestone labels.\n\nConfiguration consideration: Currently hardcoded level <= 2 for strategic threshold. Should add strategic_threshold config parameter for full flexibility (e.g., strategic_threshold=1 means only level-1 types). For now, level <= 2 works for default hierarchy.",
+  "state": "done",
+  "priority": "critical",
+  "assignee": "agent:copilot-session-1",
+  "dependencies": [],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:bug",
+    "component:cli"
+  ]
+}

@@ -2,7 +2,7 @@
   "id": "4051ee7d-24e7-4b02-9238-b4fb2a6aa0d4",
   "title": "Add query support for closed issues",
   "description": "Add 'jit query closed' command that returns both Done and Rejected issues. Implement is_closed() helper for State enum. Update query commands to support the closed meta-state. Ensure --json output works correctly. Add tests for querying closed issues.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "normal",
   "assignee": null,
   "dependencies": [

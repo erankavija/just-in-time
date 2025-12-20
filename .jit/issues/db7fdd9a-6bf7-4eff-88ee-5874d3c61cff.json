@@ -2,9 +2,9 @@
   "id": "db7fdd9a-6bf7-4eff-88ee-5874d3c61cff",
   "title": "Implement gate bypass for Rejected state",
   "description": "Update update_issue_state() in commands/issue.rs to bypass gate validation when transitioning to Rejected state. Add should_check_gates() helper that returns true for Done, false for Rejected. Allow direct transition from any state to Rejected without gate enforcement. Add tests verifying Rejected bypasses both prechecks and postchecks.",
-  "state": "backlog",
+  "state": "done",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:copilot-session-1",
   "dependencies": [
     "0b7723c5-13d3-4c60-b940-5cade111b02d"
   ],
@@ -15,7 +15,33 @@
     "fmt",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-20T20:19:40.098943183Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "human:user",
+      "updated_at": "2025-12-20T20:19:41.811348534Z"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": "agent:copilot-session-1",
+      "updated_at": "2025-12-20T20:17:48.824693687Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-20T20:19:41.506061487Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-20T20:19:38.891544863Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [

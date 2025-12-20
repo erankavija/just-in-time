@@ -10,14 +10,14 @@ fn test_query_strategic_returns_milestone_issues() {
     let executor = CommandExecutor::new(storage);
     executor.init().unwrap();
 
-    // Create issues with strategic labels
+    // Create issues with strategic types
     let milestone_id = executor
         .create_issue(
             "Release v1.0".to_string(),
             "".to_string(),
             Priority::High,
             vec![],
-            vec!["milestone:v1.0".to_string()],
+            vec!["type:milestone".to_string(), "milestone:v1.0".to_string()],
         )
         .unwrap();
 
@@ -50,7 +50,7 @@ fn test_query_strategic_returns_epic_issues() {
             "".to_string(),
             Priority::High,
             vec![],
-            vec!["epic:auth".to_string()],
+            vec!["type:epic".to_string(), "epic:auth".to_string()],
         )
         .unwrap();
 
@@ -72,7 +72,7 @@ fn test_query_strategic_returns_both_milestone_and_epic() {
             "".to_string(),
             Priority::High,
             vec![],
-            vec!["milestone:v1.0".to_string()],
+            vec!["type:milestone".to_string(), "milestone:v1.0".to_string()],
         )
         .unwrap();
 
@@ -82,7 +82,7 @@ fn test_query_strategic_returns_both_milestone_and_epic() {
             "".to_string(),
             Priority::High,
             vec![],
-            vec!["epic:auth".to_string()],
+            vec!["type:epic".to_string(), "epic:auth".to_string()],
         )
         .unwrap();
 
@@ -142,16 +142,16 @@ fn test_query_strategic_includes_mixed_labels() {
     let executor = CommandExecutor::new(storage);
     executor.init().unwrap();
 
-    // Issue with both strategic and tactical labels
+    // Issue with both strategic type and tactical labels
     let mixed_id = executor
         .create_issue(
-            "Auth bug fix".to_string(),
+            "Auth milestone".to_string(),
             "".to_string(),
             Priority::High,
             vec![],
             vec![
+                "type:milestone".to_string(),
                 "milestone:v1.0".to_string(),
-                "type:bug".to_string(),
                 "component:auth".to_string(),
             ],
         )
@@ -169,25 +169,41 @@ fn test_query_strategic_with_custom_strategic_namespace() {
     let executor = CommandExecutor::new(storage);
     executor.init().unwrap();
 
-    // Add custom strategic namespace
+    // Add custom strategic namespace (marked strategic but not in type hierarchy)
     executor
         .add_label_namespace("initiative", "Company-wide initiatives", false, true)
         .unwrap();
 
-    let initiative_id = executor
+    // Create issue with initiative label but no strategic type
+    let _initiative_id = executor
         .create_issue(
             "Digital transformation".to_string(),
             "".to_string(),
             Priority::Critical,
             vec![],
-            vec!["initiative:cloud-migration".to_string()],
+            vec![
+                "initiative:cloud-migration".to_string(),
+                "type:task".to_string(),
+            ],
+        )
+        .unwrap();
+
+    // Create issue with strategic type
+    let milestone_id = executor
+        .create_issue(
+            "Launch".to_string(),
+            "".to_string(),
+            Priority::Critical,
+            vec![],
+            vec!["type:milestone".to_string()],
         )
         .unwrap();
 
     let strategic = executor.query_strategic().unwrap();
 
+    // Only the milestone should be returned (strategic query is type-based)
     assert_eq!(strategic.len(), 1);
-    assert_eq!(strategic[0].id, initiative_id);
+    assert_eq!(strategic[0].id, milestone_id);
 }
 
 #[test]

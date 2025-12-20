@@ -233,34 +233,24 @@ fn test_label_hierarchy_complete_workflow() {
     // PHASE 4: Strategic View
     // ========================================================================
 
-    // Query strategic issues - returns issues with labels from namespaces marked strategic=true
-    // In default config: milestone, epic, and story namespaces are strategic
-    // Issues with ANY label from a strategic namespace will be returned
+    // Query strategic issues - returns issues with type:X where X is a strategic type
+    // In default hierarchy: milestone (level 1) and epic (level 2) are strategic
+    // Task (level 4) is NOT strategic, even if it has epic:auth labels
     let output = run_jit(&temp, &["query", "strategic"]);
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
 
-    // All these issues have strategic labels (milestone:v1.0 or epic:auth)
+    // Strategic issues (type:milestone and type:epic)
     assert!(
         stdout.contains(&milestone_id),
-        "Has milestone:v1.0 (strategic namespace)"
+        "Has type:milestone (strategic)"
     );
-    assert!(
-        stdout.contains(&epic_id),
-        "Has epic:auth and milestone:v1.0 (strategic namespaces)"
-    );
-    assert!(
-        stdout.contains(&task1_id),
-        "Has epic:auth (strategic namespace)"
-    );
-    assert!(
-        stdout.contains(&task2_id),
-        "Has epic:auth (strategic namespace)"
-    );
-    assert!(
-        stdout.contains(&task3_id),
-        "Has epic:auth (strategic namespace)"
-    );
+    assert!(stdout.contains(&epic_id), "Has type:epic (strategic)");
+
+    // Tasks are NOT strategic (level 4 in hierarchy)
+    assert!(!stdout.contains(&task1_id), "type:task is not strategic");
+    assert!(!stdout.contains(&task2_id), "type:task is not strategic");
+    assert!(!stdout.contains(&task3_id), "type:task is not strategic");
 
     // Verify component namespace is NOT strategic by checking namespace config
     let output = run_jit(&temp, &["label", "namespaces", "--json"]);

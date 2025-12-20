@@ -6,6 +6,7 @@
   "priority": "low",
   "assignee": null,
   "dependencies": [
+    "277afb61-f6a3-46c5-b555-78041a408017",
     "db7fdd9a-6bf7-4eff-88ee-5874d3c61cff"
   ],
   "gates_required": [

@@ -2,9 +2,9 @@
   "id": "0b7723c5-13d3-4c60-b940-5cade111b02d",
   "title": "Add Rejected state to State enum",
   "description": "Add Rejected variant to State enum in domain.rs. Update serde serialization to support 'rejected' string. Add is_terminal() helper method that returns true for Done and Rejected states.",
-  "state": "ready",
+  "state": "done",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:copilot-session-1",
   "dependencies": [],
   "gates_required": [
     "tdd-reminder",
@@ -13,7 +13,33 @@
     "fmt",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-20T19:56:43.612086683Z"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": "agent:copilot-session-1",
+      "updated_at": "2025-12-20T19:52:33.105670119Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "human:user",
+      "updated_at": "2025-12-20T19:58:59.515307842Z"
+    },
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-20T19:56:41.805348152Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-20T19:56:38.095283708Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [

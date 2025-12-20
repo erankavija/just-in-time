@@ -6,12 +6,11 @@
   "priority": "high",
   "assignee": null,
   "dependencies": [
-    "c4738097-cdfd-4fe8-a279-a6ee7f2e1ce9",
-    "db7fdd9a-6bf7-4eff-88ee-5874d3c61cff",
     "b336446d-e2fe-46d7-8652-e574bb114e3e",
-    "0b7723c5-13d3-4c60-b940-5cade111b02d",
+    "90575086-fcfe-4b0d-82b5-fc00c4daace7",
     "7ff7b349-15fe-45dc-a7d1-8f2fd208884c",
-    "4051ee7d-24e7-4b02-9238-b4fb2a6aa0d4"
+    "4051ee7d-24e7-4b02-9238-b4fb2a6aa0d4",
+    "c4738097-cdfd-4fe8-a279-a6ee7f2e1ce9"
   ],
   "gates_required": [
     "code-review"
