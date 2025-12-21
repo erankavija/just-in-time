@@ -52,6 +52,7 @@ impl TestHarness {
     }
 
     /// Create an issue with priority
+    #[allow(dead_code)]
     pub fn create_issue_with_priority(&self, title: &str, priority: Priority) -> String {
         self.executor
             .create_issue(title.to_string(), String::new(), priority, vec![], vec![])
@@ -59,6 +60,7 @@ impl TestHarness {
     }
 
     /// Create an issue that's ready to work on
+    #[allow(dead_code)]
     pub fn create_ready_issue(&self, title: &str) -> String {
         let id = self.create_issue(title);
         self.executor
@@ -82,6 +84,7 @@ impl TestHarness {
     }
 
     /// Add a gate definition to the registry
+    #[allow(dead_code)]
     pub fn add_gate(&self, key: &str, title: &str, description: &str, auto: bool) {
         self.executor
             .add_gate_definition(

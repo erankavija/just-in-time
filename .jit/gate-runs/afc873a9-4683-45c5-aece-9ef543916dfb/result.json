@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "afc873a9-4683-45c5-aece-9ef543916dfb",
+  "gate_key": "clippy",
+  "stage": "postcheck",
+  "issue_id": "003f9f83-4e8a-4a5f-8e48-44f6f48a7c17",
+  "commit": "99f36e277746e7b90bd58d6b94742d24730614c2",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2025-12-21T22:56:55.383135458Z",
+  "completed_at": "2025-12-21T22:56:56.786283250Z",
+  "duration_ms": 1403,
+  "exit_code": 101,
+  "stdout": "",
+  "stderr": "    Checking jit-dispatch v0.1.0 (/home/vkaskivuo/Projects/just-in-time/crates/dispatch)\n    Checking jit v0.2.0 (/home/vkaskivuo/Projects/just-in-time/crates/jit)\nerror: using `Result.or_else(|x| Err(y))`, which is more succinctly expressed as `map_err(|x| y)`\n   --> crates/jit/src/storage/json.rs:205:20\n    |\n205 |               return self\n    |  ____________________^\n206 | |                 .load_issue(partial_id)\n207 | |                 .map(|issue| issue.id)\n208 | |                 .or_else(|_| Err(anyhow!(\"Issue not found: {}\", partial_id)));\n    | |_____________________________________________________________________________^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.91.0/index.html#bind_instead_of_map\n    = note: `-D clippy::bind-instead-of-map` implied by `-D warnings`\n    = help: to override `-D warnings` add `#[allow(clippy::bind_instead_of_map)]`\nhelp: try\n    |\n205 ~             return self\n206 +                 .load_issue(partial_id)\n207 ~                 .map(|issue| issue.id).map_err(|_| anyhow!(\"Issue not found: {}\", partial_id));\n    |\n\nerror: using `Result.or_else(|x| Err(y))`, which is more succinctly expressed as `map_err(|x| y)`\n  --> crates/jit/src/storage/memory.rs:94:20\n   |\n94 |               return self\n   |  ____________________^\n95 | |                 .load_issue(partial_id)\n96 | |                 .map(|issue| issue.id)\n97 | |                 .or_else(|_| Err(anyhow!(\"Issue not found: {}\", partial_id)));\n   | |_____________________________________________________________________________^\n   |\n   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.91.0/index.html#bind_instead_of_map\nhelp: try\n   |\n94 ~             return self\n95 +                 .load_issue(partial_id)\n96 ~                 .map(|issue| issue.id).map_err(|_| anyhow!(\"Issue not found: {}\", partial_id));\n   |\n\nerror: could not compile `jit` (lib) due to 2 previous errors\n",
+  "command": "cargo clippy --lib -- -D warnings",
+  "by": "auto:executor",
+  "message": null
+}

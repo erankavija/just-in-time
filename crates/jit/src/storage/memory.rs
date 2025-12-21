@@ -94,7 +94,7 @@ impl IssueStore for InMemoryStorage {
             return self
                 .load_issue(partial_id)
                 .map(|issue| issue.id)
-                .or_else(|_| Err(anyhow!("Issue not found: {}", partial_id)));
+                .map_err(|_| anyhow!("Issue not found: {}", partial_id));
         }
 
         // Minimum length check
