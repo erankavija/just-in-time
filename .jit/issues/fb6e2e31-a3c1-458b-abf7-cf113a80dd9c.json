@@ -1,0 +1,27 @@
+{
+  "id": "fb6e2e31-a3c1-458b-abf7-cf113a80dd9c",
+  "title": "Implement jit doc check-links",
+  "description": "Implement link validation to detect broken links and assets before archival operations.\n\n## Rationale\n\nMoving documents can break links if not careful. Need validation to detect issues before archival and provide confidence that links remain intact.\n\n## Acceptance Criteria\n\n### 1. Implement jit doc check-links\n\nCommand: jit doc check-links [--scope all|issue:ID] [--json]\n\nFunctionality:\n- Validate all documents in scope\n- Check asset existence (working tree or git)\n- Validate internal doc links resolve\n- Detect broken relative vs root-relative links\n- Warn on potential issues, don't fail unless severe\n\nValidation checks:\n- Asset existence\n- Asset reachability  \n- Internal doc links\n- Relative path safety\n\nHuman-readable output shows summary with errors and warnings.\nJSON output provides structured results for automation.\n\n### 2. Scope Options\n\n- --scope all: Check all documents\n- --scope issue:ID: Check only docs for specific issue\n- Default: all\n\n### 3. Exit Codes\n\n- 0: All documents valid\n- 1: Errors found (missing assets, broken links)\n- 2: Only warnings (potential issues)\n\n### 4. Integration Tests\n\n- Check doc with all valid links\n- Check doc with missing assets\n- Check doc with broken internal links\n- Check doc with risky relative links\n- Scope filtering works\n- JSON output validates\n\n### 5. Documentation\n\n- Help text with examples\n- User guide section\n- Include in authoring conventions\n\n## Dependencies\n\n- Task 9: jit doc assets commands\n\n## Success Metrics\n\n- Validation catches broken links\n- Helpful error messages with suggestions\n- JSON output for automation\n- Tests cover edge cases",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "631bdd97-275a-46c1-ad0f-5c5db61ab23f"
+  ],
+  "gates_required": [
+    "tdd-reminder",
+    "tests",
+    "clippy",
+    "fmt",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:docs-lifecycle",
+    "milestone:v1.0",
+    "component:cli"
+  ]
+}

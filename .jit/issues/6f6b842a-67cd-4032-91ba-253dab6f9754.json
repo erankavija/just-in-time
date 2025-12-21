@@ -1,0 +1,21 @@
+{
+  "id": "6f6b842a-67cd-4032-91ba-253dab6f9754",
+  "title": "Consolidate duplicate documentation",
+  "description": "Consolidate multiple documents covering the same topics into single comprehensive guides. Reduces duplication and creates canonical references.\n\n## Rationale\n\nCurrently have 4+ docs on labels/hierarchy and 3+ docs for agent usage. Creates confusion and maintenance burden. Consolidate into single authoritative sources.\n\n## Acceptance Criteria\n\n### 1. Consolidate Label Documentation → docs/guides/labels.md\n\nMerge into single comprehensive guide:\n- label-conventions.md (684 lines)\n- label-quick-reference.md\n- dependency-vs-labels-clarity.md\n- Extract current behavior summary from archived type-hierarchy docs\n\nContent should include:\n- Label format and namespace rules\n- Type hierarchy usage (milestone, epic, task, etc.)\n- Strategic vs tactical classification\n- Dependency vs label distinction\n- Agent usage patterns\n- Quick reference section\n- Configuration examples\n\nUse  for main source file to preserve history.\n\n### 2. Consolidate Agent Documentation → Enhanced AGENT-QUICKSTART.md\n\nIntegrate into single comprehensive agent guide:\n- agent-context-mcp.md (449 lines)\n- agent-project-initialization-guide.md (621 lines)\n- getting-started-complete.md (915 lines)\n\nAdd missing content:\n- Gate workflow examples\n- Documentation lifecycle usage\n- MCP tool reference\n\nUse  for main file to preserve history.\n\n### 3. Remove Obsolete Speculative Docs\n\nRemove future features that should be tracked as issues:\n- auth-design.md (create future issue if needed)\n- billing-design.md (create future issue if needed)\n\n### 4. Update References\n\n- Find and update all internal references to consolidated/removed docs\n- Update README.md links\n- Verify all cross-references work\n\n## Success Metrics\n\n- 4+ label docs → 1 comprehensive guide\n- 3+ agent docs → 1 comprehensive guide\n- No duplicate content\n- All references updated\n- Git history preserved",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:docs-lifecycle",
+    "milestone:v1.0",
+    "component:docs"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "id": "ac99db8b-85a8-4865-8199-a1ea76017650",
+  "title": "Archive completed bug analyses",
+  "description": "Move bug analysis documents for completed fixes to archive. These are linked to done issues and should be archived immediately per policy.\n\n## Acceptance Criteria\n\n- Create  directory\n- Move completed bug analysis docs:\n  - gate-enforcement-bug-analysis.md (linked to done issue)\n  - gate-preview-analysis.md (linked to done issue)\n  - state-transition-feedback-design.md (linked to done issue)\n- Verify jit doc references still work after move\n- Document references preserved in issue metadata\n\n## Notes\n\nThese docs are linked to completed issues. The  command should still work after moving the files, as it uses the path stored in issue metadata.\n\n## Success Metrics\n\n- 3 bug analysis docs moved to archive\n- jit doc commands still functional\n- Links preserved in issue metadata",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:docs-lifecycle",
+    "milestone:v1.0",
+    "component:docs"
+  ]
+}

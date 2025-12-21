@@ -1,0 +1,19 @@
+{
+  "id": "ed5241de-d5b7-47ea-b156-58d978b42eeb",
+  "title": "Archive pre-jit historical documentation",
+  "description": "Move historical implementation records created before jit dogfooding to organized archive structure. These documents have no corresponding jit issues and represent pre-dogfooding work.\n\n## Acceptance Criteria\n\n- Create  directory structure:\n  -  - Type hierarchy implementation docs\n  -  - Label system implementation docs\n  -  - Refactoring plan docs\n  -  - Session notes\n  -  - Historical bug analyses\n- Move ~20 historical docs to appropriate archive subdirs\n- Verify all files moved successfully\n- Update .gitignore if needed\n\n## Files to Archive\n\nPre-jit historical documents (~20 files):\n- type-hierarchy-enforcement-proposal.md (2112 lines)\n- type-hierarchy-implementation-summary.md\n- label-hierarchy-implementation-plan.md\n- label-enforcement-proposal.md\n- labels-config-consolidation.md\n- label-hierarchy-audit-plan.md\n- week1-completion-report.md\n- refactoring-plan-binary-to-library.md\n- generic-dag-refactoring.md\n- generic-hierarchy-model.md\n- orchestrator-separation.md\n- state-model-refactoring.md\n- document-search-performance.md\n- session-2025-12-02-complete.md\n- session-2025-12-02-mcp-server.md\n- session-2025-12-03-frontend.md\n- session-2025-12-14-membership-validation.md\n- session-2025-12-15-phase-h-implementation.md\n- session-notes-hierarchy-bug-fix.md\n- test-warnings-resolution.md\n\n## Success Metrics\n\n- docs/ cleaner by ~20 files\n- Historical docs organized by category\n- Still searchable via jit search",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:docs-lifecycle",
+    "milestone:v1.0",
+    "component:docs"
+  ]
+}

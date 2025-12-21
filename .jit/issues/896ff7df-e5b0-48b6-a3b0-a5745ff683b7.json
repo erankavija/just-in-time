@@ -1,0 +1,28 @@
+{
+  "id": "896ff7df-e5b0-48b6-a3b0-a5745ff683b7",
+  "title": "Implement jit doc archive with assets",
+  "description": "Implement safe document archival that moves docs with per-doc assets and validates link integrity.\n\n## Rationale\n\nCore archival operation that must preserve link integrity. This is the payoff for asset management - safely archive docs without breaking anything.\n\n## Acceptance Criteria\n\n### 1. Implement jit doc archive\n\nCommand: jit doc archive PATH [--type CATEGORY] [--dry-run] [--force]\n\nFunctionality:\n- Compute destination in .jit/docs/archive/\n- Validate link integrity before move\n- Move document and per-doc assets atomically\n- Update issue metadata with new path\n- Log document_archived event\n\nValidation logic:\n- Per-doc assets: OK to move (relative links preserved)\n- Shared assets with root-relative links: OK  \n- Shared assets with relative links: FAIL\n- Linked to active issue: Refuse unless --force\n\n### 2. Archival Process\n\n1. Resolve document format and scan assets\n2. Classify assets (per-doc vs shared)\n3. Compute destination path\n4. Validate links (fail fast if would break)\n5. Preview move plan (if --dry-run)\n6. Execute atomically\n7. Verify links still work post-move\n\n### 3. Parameters\n\n- PATH: Document to archive (repo-relative)\n- --type CATEGORY: Archive category (features, bug-fixes, etc.)\n- --dry-run: Show plan without executing\n- --force: Override active issue check\n\n### 4. Atomic Operation\n\nUse temp directory + atomic rename pattern for safety.\nAll-or-nothing file moves with rollback on error.\n\n### 5. Integration Tests\n\n- Archive doc with per-doc assets → success\n- Archive doc with root-relative shared assets → success\n- Archive doc with relative shared links → failure\n- Archive doc linked to active issue → failure (unless --force)\n- Dry-run doesn't mutate\n- Rollback on error\n- Issue metadata updated correctly\n\n### 6. Documentation\n\n- Help text with examples\n- User guide section showing archival workflow\n- Include in docs/README.md\n\n## Dependencies\n\n- Task 10: jit doc check-links\n\n## Out of Scope (Phase 2)\n\n- Link rewriting implementation\n- Batch archival (see jit doc sweep)\n\n## Success Metrics\n\n- Safe archival with link preservation\n- Atomic operations (no partial moves)\n- Clear validation and error messages\n- Tests cover success and failure paths",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "fb6e2e31-a3c1-458b-abf7-cf113a80dd9c"
+  ],
+  "gates_required": [
+    "tdd-reminder",
+    "tests",
+    "clippy",
+    "fmt",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:docs-lifecycle",
+    "milestone:v1.0",
+    "component:cli",
+    "component:core"
+  ]
+}
