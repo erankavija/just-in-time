@@ -21,7 +21,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Validate label format
         label_utils::validate_label(label)?;
 
-        let mut issue = self.storage.load_issue(issue_id)?;
+        let full_id = self.storage.resolve_issue_id(issue_id)?;
+        let mut issue = self.storage.load_issue(&full_id)?;
 
         // Check uniqueness constraint
         let (namespace, _) = label_utils::parse_label(label)?;

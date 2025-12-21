@@ -10,14 +10,15 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Runs the gate checker if it's an automated gate, updates the issue status,
     /// and returns the run result.
     pub fn check_gate(&self, issue_id: &str, gate_key: &str) -> Result<GateRunResult> {
-        let issue = self.storage.load_issue(issue_id)?;
+        let full_id = self.storage.resolve_issue_id(issue_id)?;
+        let issue = self.storage.load_issue(&full_id)?;
 
         // Verify gate is required for this issue
         if !issue.gates_required.contains(&gate_key.to_string()) {
             anyhow::bail!(
                 "Gate '{}' is not required for issue '{}'",
                 gate_key,
-                issue_id
+                full_id
             );
         }
 
@@ -65,7 +66,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let result = gate_execution::execute_gate_checker(
             gate_key,
-            issue_id,
+            &full_id,
             gate.stage,
             checker,
             &working_dir,
@@ -75,7 +76,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         self.storage.save_gate_run_result(&result)?;
 
         // Update issue gate status
-        let mut issue = self.storage.load_issue(issue_id)?;
+        let mut issue = self.storage.load_issue(&full_id)?;
         issue.gates_status.insert(
             gate_key.to_string(),
             GateState {
@@ -93,12 +94,12 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Log event
         let event = match result.status {
             GateRunStatus::Passed => Event::new_gate_passed(
-                issue_id.to_string(),
+                full_id.clone(),
                 gate_key.to_string(),
                 result.by.clone(),
             ),
             _ => Event::new_gate_failed(
-                issue_id.to_string(),
+                full_id.clone(),
                 gate_key.to_string(),
                 result.by.clone(),
             ),
@@ -112,7 +113,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// Returns the results of all automated gate checks.
     pub fn check_all_gates(&self, issue_id: &str) -> Result<Vec<GateRunResult>> {
-        let issue = self.storage.load_issue(issue_id)?;
+        let full_id = self.storage.resolve_issue_id(issue_id)?;
+        let issue = self.storage.load_issue(&full_id)?;
         let registry = self.storage.load_gate_registry()?;
 
         let mut results = Vec::new();
@@ -120,7 +122,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         for gate_key in &issue.gates_required {
             if let Some(gate) = registry.gates.get(gate_key) {
                 if gate.mode == GateMode::Auto {
-                    match self.check_gate(issue_id, gate_key) {
+                    match self.check_gate(&full_id, gate_key) {
                         Ok(result) => results.push(result),
                         Err(e) => {
                             // Log error but continue checking other gates
@@ -138,7 +140,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// Returns Ok(()) if all prechecks pass, Err otherwise.
     pub(crate) fn run_prechecks(&self, issue_id: &str) -> Result<()> {
-        let issue = self.storage.load_issue(issue_id)?;
+        let full_id = self.storage.resolve_issue_id(issue_id)?;
+        let issue = self.storage.load_issue(&full_id)?;
         let registry = self.storage.load_gate_registry()?;
 
         let mut failed_gates = Vec::new();
@@ -149,7 +152,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     match gate.mode {
                         GateMode::Auto => {
                             // Run automated precheck
-                            let result = self.check_gate(issue_id, gate_key)?;
+                            let result = self.check_gate(&full_id, gate_key)?;
                             if result.status != GateRunStatus::Passed {
                                 failed_gates.push((gate_key.clone(), result));
                             }
@@ -161,7 +164,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                             {
                                 anyhow::bail!(
                                     "Manual precheck '{}' has not been passed. Pass it first with: jit gate pass {} {}",
-                                    gate_key, issue_id, gate_key
+                                    gate_key, full_id, gate_key
                                 );
                             }
                         }
@@ -203,20 +206,21 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// Runs all automated postchecks and auto-transitions to Done if all pass.
     pub(crate) fn run_postchecks(&self, issue_id: &str) -> Result<()> {
-        let issue = self.storage.load_issue(issue_id)?;
+        let full_id = self.storage.resolve_issue_id(issue_id)?;
+        let issue = self.storage.load_issue(&full_id)?;
         let registry = self.storage.load_gate_registry()?;
 
         for gate_key in &issue.gates_required {
             if let Some(gate) = registry.gates.get(gate_key) {
                 if gate.stage == GateStage::Postcheck && gate.mode == GateMode::Auto {
                     // Run automated postcheck (errors are logged but don't fail)
-                    let _ = self.check_gate(issue_id, gate_key);
+                    let _ = self.check_gate(&full_id, gate_key);
                 }
             }
         }
 
         // Try to auto-transition to done
-        self.auto_transition_to_done(issue_id)?;
+        self.auto_transition_to_done(&full_id)?;
 
         Ok(())
     }

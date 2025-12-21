@@ -9,7 +9,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         subtasks: Vec<(String, String)>,
     ) -> Result<Vec<String>> {
         // Load parent issue
-        let parent = self.storage.load_issue(parent_id)?;
+        let full_parent_id = self.storage.resolve_issue_id(parent_id)?;
+        let parent = self.storage.load_issue(&full_parent_id)?;
         let original_deps = parent.dependencies.clone();
 
         // Create subtasks with inherited priority and labels
@@ -34,12 +35,12 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Make parent depend on all subtasks
         for subtask_id in &subtask_ids {
-            self.add_dependency(parent_id, subtask_id)?;
+            self.add_dependency(&full_parent_id, subtask_id)?;
         }
 
         // Remove parent's original dependencies (now transitive through subtasks)
         for dep_id in &original_deps {
-            self.remove_dependency(parent_id, dep_id)?;
+            self.remove_dependency(&full_parent_id, dep_id)?;
         }
 
         Ok(subtask_ids)

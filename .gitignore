@@ -1,8 +1,8 @@
 /target/
 **/target/
 
-# Jit database (local to each developer)
-*/.jit/
+# Jit lock files (temporary coordination)
+.jit/**/*.lock
 
 # MCP Server (Node.js)
 mcp-server/node_modules/**

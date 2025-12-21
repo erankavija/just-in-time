@@ -208,16 +208,17 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// This method runs prechecks before transitioning to InProgress
     /// and postchecks when transitioning to Gated.
     pub fn update_issue_state(&self, id: &str, new_state: State) -> Result<()> {
-        let issue = self.storage.load_issue(id)?;
+        let full_id = self.storage.resolve_issue_id(id)?;
+        let issue = self.storage.load_issue(&full_id)?;
         let old_state = issue.state;
 
         // Handle prechecks for Ready -> InProgress transition
         if old_state == State::Ready && new_state == State::InProgress {
-            self.run_prechecks(id)?;
+            self.run_prechecks(&full_id)?;
         }
 
         // Reload issue after prechecks (which may have modified it)
-        let mut issue = self.storage.load_issue(id)?;
+        let mut issue = self.storage.load_issue(&full_id)?;
 
         // Validate state transition
         match new_state {
@@ -271,7 +272,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 self.storage.append_event(&event)?;
 
                 // Run postchecks (which may auto-transition to Done)
-                self.run_postchecks(id)?;
+                self.run_postchecks(&full_id)?;
                 return Ok(());
             }
             _ => {
@@ -403,10 +404,11 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     pub(super) fn auto_transition_to_ready(&self, issue_id: &str) -> Result<bool> {
+        let full_id = self.storage.resolve_issue_id(issue_id)?;
         let issues = self.storage.list_issues()?;
         let resolved: HashMap<String, &Issue> = issues.iter().map(|i| (i.id.clone(), i)).collect();
 
-        let mut issue = self.storage.load_issue(issue_id)?;
+        let mut issue = self.storage.load_issue(&full_id)?;
 
         if issue.should_auto_transition_to_ready(&resolved) {
             let old_state = issue.state;
@@ -424,7 +426,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     pub(super) fn auto_transition_to_done(&self, issue_id: &str) -> Result<bool> {
-        let mut issue = self.storage.load_issue(issue_id)?;
+        let full_id = self.storage.resolve_issue_id(issue_id)?;
+        let mut issue = self.storage.load_issue(&full_id)?;
 
         if issue.should_auto_transition_to_done() {
             let old_state = issue.state;

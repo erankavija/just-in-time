@@ -4,7 +4,8 @@ use super::*;
 
 impl<S: IssueStore> CommandExecutor<S> {
     pub fn show_graph(&self, issue_id: &str) -> Result<Vec<Issue>> {
-        let issue = self.storage.load_issue(issue_id)?;
+        let full_id = self.storage.resolve_issue_id(issue_id)?;
+        let issue = self.storage.load_issue(&full_id)?;
         let mut result = vec![issue.clone()];
 
         // Recursively get dependencies
@@ -27,11 +28,12 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     pub fn show_downstream(&self, issue_id: &str) -> Result<Vec<Issue>> {
+        let full_id = self.storage.resolve_issue_id(issue_id)?;
         let issues = self.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
         let graph = DependencyGraph::new(&issue_refs);
 
-        let dependents = graph.get_transitive_dependents(issue_id);
+        let dependents = graph.get_transitive_dependents(&full_id);
         Ok(dependents.into_iter().cloned().collect())
     }
 

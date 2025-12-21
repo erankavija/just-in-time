@@ -15,7 +15,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::domain::DocumentReference;
         use crate::output::{JsonError, JsonOutput};
 
-        let mut issue = self.storage.load_issue(issue_id).inspect_err(|_| {
+        let full_id = self.storage.resolve_issue_id(issue_id)?;
+        let mut issue = self.storage.load_issue(&full_id).inspect_err(|_| {
             if json {
                 let err = JsonError::issue_not_found(issue_id);
                 println!("{}", err.to_json_string().unwrap());
@@ -34,12 +35,12 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         if json {
             let output = JsonOutput::success(serde_json::json!({
-                "issue_id": issue_id,
+                "issue_id": full_id,
                 "document": doc_ref,
             }));
             println!("{}", output.to_json_string()?);
         } else {
-            println!("Added document reference to issue {}", issue_id);
+            println!("Added document reference to issue {}", full_id);
             println!("  Path: {}", path);
             if let Some(c) = commit {
                 println!("  Commit: {}", c);
@@ -58,7 +59,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     pub fn list_document_references(&self, issue_id: &str, json: bool) -> Result<()> {
         use crate::output::{JsonError, JsonOutput};
 
-        let issue = self.storage.load_issue(issue_id).inspect_err(|_| {
+        let full_id = self.storage.resolve_issue_id(issue_id)?;
+        let issue = self.storage.load_issue(&full_id).inspect_err(|_| {
             if json {
                 let err = JsonError::issue_not_found(issue_id);
                 println!("{}", err.to_json_string().unwrap());
@@ -67,15 +69,15 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         if json {
             let output = JsonOutput::success(serde_json::json!({
-                "issue_id": issue_id,
+                "issue_id": full_id,
                 "documents": issue.documents,
                 "count": issue.documents.len(),
             }));
             println!("{}", output.to_json_string()?);
         } else if issue.documents.is_empty() {
-            println!("No document references for issue {}", issue_id);
+            println!("No document references for issue {}", full_id);
         } else {
-            println!("Document references for issue {}:", issue_id);
+            println!("Document references for issue {}:", full_id);
             for doc in &issue.documents {
                 print!("  - {}", doc.path);
                 if let Some(ref label) = doc.label {
@@ -100,7 +102,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     pub fn remove_document_reference(&self, issue_id: &str, path: &str, json: bool) -> Result<()> {
         use crate::output::{JsonError, JsonOutput};
 
-        let mut issue = self.storage.load_issue(issue_id).inspect_err(|_| {
+        let full_id = self.storage.resolve_issue_id(issue_id)?;
+        let mut issue = self.storage.load_issue(&full_id).inspect_err(|_| {
             if json {
                 let err = JsonError::issue_not_found(issue_id);
                 println!("{}", err.to_json_string().unwrap());
@@ -113,7 +116,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         if issue.documents.len() == original_len {
             let err_msg = format!(
                 "Document reference {} not found in issue {}",
-                path, issue_id
+                path, full_id
             );
             if json {
                 let err = JsonError::new("DOCUMENT_NOT_FOUND", &err_msg)
@@ -127,14 +130,14 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         if json {
             let output = JsonOutput::success(serde_json::json!({
-                "issue_id": issue_id,
+                "issue_id": full_id,
                 "removed_path": path,
             }));
             println!("{}", output.to_json_string()?);
         } else {
             println!(
                 "Removed document reference {} from issue {}",
-                path, issue_id
+                path, full_id
             );
         }
 
@@ -149,7 +152,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     ) -> Result<()> {
         use git2::Repository;
 
-        let issue = self.storage.load_issue(issue_id)?;
+        let full_id = self.storage.resolve_issue_id(issue_id)?;
+        let issue = self.storage.load_issue(&full_id)?;
 
         let doc = issue
             .documents
@@ -159,7 +163,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 anyhow!(
                     "Document reference {} not found in issue {}",
                     path,
-                    issue_id
+                    full_id
                 )
             })?;
 
@@ -198,7 +202,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     pub fn document_history(&self, issue_id: &str, path: &str, json: bool) -> Result<()> {
         use git2::Repository;
 
-        let issue = self.storage.load_issue(issue_id)?;
+        let full_id = self.storage.resolve_issue_id(issue_id)?;
+        let issue = self.storage.load_issue(&full_id)?;
 
         // Verify document reference exists
         issue
@@ -209,7 +214,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 anyhow!(
                     "Document reference {} not found in issue {}",
                     path,
-                    issue_id
+                    full_id
                 )
             })?;
 
@@ -245,7 +250,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     ) -> Result<()> {
         use git2::Repository;
 
-        let issue = self.storage.load_issue(issue_id)?;
+        let full_id = self.storage.resolve_issue_id(issue_id)?;
+        let issue = self.storage.load_issue(&full_id)?;
 
         // Verify document reference exists
         issue
@@ -256,7 +262,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 anyhow!(
                     "Document reference {} not found in issue {}",
                     path,
-                    issue_id
+                    full_id
                 )
             })?;
 
