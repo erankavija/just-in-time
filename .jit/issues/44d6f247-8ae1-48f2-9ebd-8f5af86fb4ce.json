@@ -1,0 +1,24 @@
+{
+  "id": "44d6f247-8ae1-48f2-9ebd-8f5af86fb4ce",
+  "title": "Add API endpoint for label configuration and use in Web UI",
+  "description": "The Web UI currently hardcodes strategic_types as ['milestone', 'epic']. This should be fetched from the backend API.\n\nBackend work:\n- Add GET /api/config/labels endpoint that returns LabelNamespaces (includes strategic_types)\n- Ensure it reads from .jit/labels.json\n\nFrontend work:  \n- Add apiClient.getConfig() or apiClient.getLabelConfig() method\n- Fetch config on app initialization or when GraphView mounts\n- Pass strategic_types to filterStrategicNodes() and createStrategicFilter()\n- Remove DEFAULT_STRATEGIC_TYPES hardcoding\n\nThis allows repositories to customize which types are considered strategic without changing Web UI code.",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "7b7df884-8335-4c2a-8555-a7d5a541a0f0"
+  ],
+  "gates_required": [
+    "tests",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "component:api",
+    "component:web",
+    "milestone:v1.0"
+  ]
+}

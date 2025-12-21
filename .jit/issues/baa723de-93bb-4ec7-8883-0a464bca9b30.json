@@ -2,10 +2,12 @@
   "id": "baa723de-93bb-4ec7-8883-0a464bca9b30",
   "title": "Create gate system user guide",
   "description": "Write docs/gate-user-guide.md with setup, common workflows, troubleshooting, and best practices",
-  "state": "ready",
+  "state": "backlog",
   "priority": "high",
   "assignee": null,
-  "dependencies": [],
+  "dependencies": [
+    "71373e37-bb30-41d2-af0c-f08f381e027e"
+  ],
   "gates_required": [
     "code-review"
   ],

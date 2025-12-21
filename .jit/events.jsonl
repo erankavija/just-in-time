@@ -220,3 +220,9 @@
 {"type":"gate_passed","id":"1b33a6bf-ee58-42c8-8140-c5ef22ab59dc","issue_id":"90575086-fcfe-4b0d-82b5-fc00c4daace7","timestamp":"2025-12-20T22:16:59.174540551Z","gate_key":"code-review","updated_by":null}
 {"type":"issue_state_changed","id":"11ea8660-e416-4ea4-86fb-d5d523e757cd","issue_id":"90575086-fcfe-4b0d-82b5-fc00c4daace7","timestamp":"2025-12-20T22:16:59.174660751Z","from":"gated","to":"done"}
 {"type":"issue_completed","id":"ea9af189-c061-4fb7-a874-e7959ff4de7e","issue_id":"90575086-fcfe-4b0d-82b5-fc00c4daace7","timestamp":"2025-12-20T22:16:59.174673731Z"}
+{"type":"issue_created","id":"434c2968-2540-4cbe-901d-16167e2493af","issue_id":"44d6f247-8ae1-48f2-9ebd-8f5af86fb4ce","timestamp":"2025-12-20T22:24:02.044689259Z","title":"Add API endpoint for label configuration and use in Web UI","priority":"normal"}
+{"type":"issue_created","id":"07eb66e1-df80-4082-bba4-3fc82a87f05b","issue_id":"71373e37-bb30-41d2-af0c-f08f381e027e","timestamp":"2025-12-20T23:36:57.212303057Z","title":"Epic: Documentation Lifecycle and Reorganization","priority":"high"}
+{"type":"issue_state_changed","id":"099c7f99-acb5-431e-80b9-73fab8d339d4","issue_id":"b47c8918-8807-4eee-8474-39dab29fa4c2","timestamp":"2025-12-20T23:38:09.472537285Z","from":"ready","to":"backlog"}
+{"type":"issue_state_changed","id":"7c4f603a-e07a-4d74-be8c-5da9a77eae6b","issue_id":"baa723de-93bb-4ec7-8883-0a464bca9b30","timestamp":"2025-12-20T23:38:11.103577530Z","from":"ready","to":"backlog"}
+{"type":"issue_state_changed","id":"0065f8cc-e581-4d4a-b855-e71bb8561452","issue_id":"d6dc4dfa-6784-43a8-8b8a-761bd5a3f38a","timestamp":"2025-12-20T23:38:11.929584165Z","from":"ready","to":"backlog"}
+{"type":"issue_state_changed","id":"05e6a6a5-2879-4531-a429-8b0c2294060e","issue_id":"b336446d-e2fe-46d7-8652-e574bb114e3e","timestamp":"2025-12-20T23:45:52.374101730Z","from":"ready","to":"backlog"}

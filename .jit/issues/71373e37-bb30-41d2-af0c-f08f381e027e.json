@@ -1,0 +1,28 @@
+{
+  "id": "71373e37-bb30-41d2-af0c-f08f381e027e",
+  "title": "Epic: Documentation Lifecycle and Reorganization",
+  "description": "Establish clear documentation lifecycle and reorganize existing documentation to support sustainable growth. This epic addresses the current problem where docs/ mixes active guides, design specs, implementation records, and session notes (54 files), making it hard to find current documentation and unsustainable as more features are added.\n\n## Problem Statement\n\nCurrently:\n- 54 files in docs/ mixing active guides, historical records, session notes\n- 20+ historical docs from before jit dogfooding (not linked to issues)\n- No clear lifecycle for design docs (accumulate forever in docs/)\n- Duplication (4+ docs on labels/hierarchy)\n- Poor discoverability\n\n## Solution: Three-Stage Lifecycle\n\n1. **Active** (docs/design/) - Linked to in-progress issues\n2. **Recent** (docs/design/) - Completed, kept 1-2 releases for reference\n3. **Archived** (.jit/docs/archive/) - Moved after retention period\n\n## Proposed Structure\n\n\n\n## Archive Policy by Category\n\n| Category | Archive? | When |\n|----------|----------|------|\n| User Guides | NEVER | Permanent, update in place |\n| Architecture | RARELY | Only if major redesign |\n| Development | NEVER | Permanent reference |\n| Feature Designs | YES | 1-2 releases after completion |\n| Bug Analyses | YES | Immediately after fix |\n| Session Notes | YES | Immediately (or use issue context) |\n| Visions | YES | When implemented/rejected |\n\n## Benefits\n\n1. Clean docs/ - only active/recent/permanent docs visible\n2. Clear lifecycle - design doc → archive when done\n3. Searchable history - jit search works in archives\n4. Issue linkage preserved - archived docs still linked via jit\n5. Scalable - won't accumulate 100s of files\n6. Dogfooding - uses jit's document tracking\n7. Consolidation - remove duplication (4+ label docs → 1)\n\n## Scope\n\nThis epic will:\n- Archive 20+ pre-jit historical docs to .jit/docs/archive/pre-jit/\n- Archive 3 completed bug analyses to .jit/docs/archive/bug-fixes/\n- Reorganize active docs into guides/design/architecture/development/vision/\n- Consolidate duplicates (label docs, agent docs, gate docs)\n- Create docs/README.md with archive policy and navigation\n- Update root README.md links\n- Remove obsolete docs (auth-design.md, billing-design.md)\n\n## Out of Scope (Future)\n\n- Automated archiving (jit doc archive command)\n- Retrospective issues for pre-jit work\n- Archive trigger automation\n\n## Success Metrics\n\n- docs/ reduced from 54 to ~25 active files (52% reduction)\n- No duplicate content on same topics\n- Clear navigation via docs/README.md\n- Archive policy documented\n- All internal links working\n- Gate documentation complete and comprehensive\n\n## Implementation Phases\n\nSee linked document for detailed 4-phase implementation plan:\n1. Archive pre-jit historical docs (30 min)\n2. Archive completed bug fixes (10 min)\n3. Reorganize active docs into new structure (1 hour)\n4. Consolidate duplicates and create navigation (1-2 hours)\n\nTotal estimated effort: 3-4 hours",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [
+    {
+      "path": "docs/documentation-lifecycle-strategy.md",
+      "commit": null,
+      "label": "Implementation Strategy",
+      "doc_type": "design"
+    }
+  ],
+  "labels": [
+    "type:epic",
+    "epic:docs-lifecycle",
+    "milestone:v1.0",
+    "component:docs"
+  ]
+}
