@@ -295,3 +295,6 @@
 {"type":"gate_passed","id":"f423f3d7-db67-470d-9e63-2bfc6a55a750","issue_id":"003f9f83-4e8a-4a5f-8e48-44f6f48a7c17","timestamp":"2025-12-21T22:08:06.584068710Z","gate_key":"tdd-reminder","updated_by":null}
 {"type":"issue_state_changed","id":"3756c140-bf66-4768-be3c-bbadf39a475d","issue_id":"003f9f83-4e8a-4a5f-8e48-44f6f48a7c17","timestamp":"2025-12-21T22:08:11.280966442Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"0e2de9d7-a11e-4daf-9a64-408460bd3489","issue_id":"003f9f83-4e8a-4a5f-8e48-44f6f48a7c17","timestamp":"2025-12-21T22:08:11.283787761Z","assignee":"agent:copilot-cli"}
+{"type":"issue_created","id":"9b9950e0-dd19-46c7-a70a-e80b26e6a243","issue_id":"0a658bc6-46a7-4d6e-8ed8-af49c442a0ea","timestamp":"2025-12-21T22:48:16.039882111Z","title":"Add event logging for transitive reduction fixes","priority":"normal"}
+{"type":"issue_created","id":"b0874821-8157-4348-a91d-24809f9d9f5d","issue_id":"7d6218cf-22df-4971-bf79-5ad6af0f88e4","timestamp":"2025-12-21T22:48:24.835711958Z","title":"Add event logging for transitive reduction fixes","priority":"normal"}
+{"type":"issue_created","id":"5fe5c0d7-c0b6-417c-9964-658ecec8bdaa","issue_id":"9072e447-02f7-4efa-ab25-04eac073f1ac","timestamp":"2025-12-21T22:48:39.259812023Z","title":"Add property-based tests for short hash resolution","priority":"normal"}
