@@ -520,21 +520,23 @@ File locking ensures data consistency. See [docs/file-locking-usage.md](docs/fil
 
 ## Documentation
 
+**[📖 Documentation Home](docs/README.md)** - Navigation, archival policy, and authoring conventions
+
 ### Getting Started
 - [INSTALL.md](INSTALL.md) - Installation guide (binaries, Docker, from source)
 - [EXAMPLE.md](EXAMPLE.md) - Complete agent orchestration walkthrough
+- [CONTRIBUTOR-QUICKSTART.md](CONTRIBUTOR-QUICKSTART.md) - Get productive in 5 minutes
 - [DEPLOYMENT.md](DEPLOYMENT.md) - Production deployment guide
 
-### Core Features
-- [docs/design.md](docs/design.md) - Detailed design specifications
-- [docs/label-conventions.md](docs/label-conventions.md) - Issue hierarchy and labels usage
-- [docs/example-config.toml](docs/example-config.toml) - Configuration examples
-- [docs/file-locking-usage.md](docs/file-locking-usage.md) - Multi-agent concurrency guide
+### Core Design
+- [docs/design.md](docs/design.md) - Core architecture and design principles
+- [docs/documentation-lifecycle-design.md](docs/documentation-lifecycle-design.md) - Documentation management approach
 
 ### Development
 - [ROADMAP.md](ROADMAP.md) - Development phases and progress
 - [TESTING.md](TESTING.md) - Testing strategy and best practices
-- [docs/storage-abstraction.md](docs/storage-abstraction.md) - Pluggable backend design
+
+**Note:** Our documentation follows a **domain-agnostic structure** that works for software development, research, or knowledge work. See [docs/README.md](docs/README.md) for the full organization and conventions.
 
 ## Architecture
 
