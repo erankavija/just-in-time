@@ -1,7 +1,7 @@
 {
   "id": "44104a30-5cfb-4127-bd39-57688f7619bc",
   "title": "Support bulk operations for gates, labels, and dependencies",
-  "description": "Enable adding multiple items in single command: 'jit gate add ISSUE gate1 gate2 gate3', 'jit dep add FROM to1 to2 to3'. Reduces command count, improves scripting, enables atomic transactions. Verify labels already support bulk (comma-separated).",
+  "description": "Enable adding multiple items in single command: 'jit gate add ISSUE gate1 gate2 gate3', 'jit dep add FROM to1 to2 to3'. Reduces command count, improves scripting, enables atomic transactions. Verify labels already support bulk (comma-separated). Note: This is complementary to issue f5ce80bc (bulk operations on multiple issues) - this issue focuses on adding multiple items to a SINGLE issue, while f5ce80bc handles batch updates across MULTIPLE issues.",
   "state": "ready",
   "priority": "normal",
   "assignee": null,
