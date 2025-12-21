@@ -27,6 +27,12 @@
       "commit": null,
       "label": "Implementation Plan",
       "doc_type": "design"
+    },
+    {
+      "path": "docs/session-2025-12-21-short-hash-progress.md",
+      "commit": null,
+      "label": "Session Notes",
+      "doc_type": "notes"
     }
   ],
   "labels": [
