@@ -1,0 +1,30 @@
+{
+  "id": "003f9f83-4e8a-4a5f-8e48-44f6f48a7c17",
+  "title": "Support short hash issue IDs in CLI",
+  "description": "Enable users to reference issues with short UUID prefixes (like git short hashes) instead of full UUIDs. Implement resolve_issue_id() to match unique prefixes (min 4 chars), update all CLI commands, and provide clear errors for ambiguous or missing matches. Maintains backward compatibility with full UUIDs.",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "code-review",
+    "tests",
+    "clippy",
+    "fmt",
+    "tdd-reminder"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [
+    {
+      "path": "docs/short-hash-implementation-plan.md",
+      "commit": null,
+      "label": "Implementation Plan",
+      "doc_type": "design"
+    }
+  ],
+  "labels": [
+    "type:task",
+    "epic:agent-friendly"
+  ]
+}

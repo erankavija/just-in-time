@@ -273,3 +273,4 @@
 {"type":"issue_state_changed","id":"dc7ba8a4-88e8-4eed-a70d-37f7bfdcadd8","issue_id":"e22fa014-b7c6-40fd-af48-128658f32928","timestamp":"2025-12-21T19:28:46.065039626Z","from":"ready","to":"backlog"}
 {"type":"issue_created","id":"944e7be2-fc5d-4e06-bf49-11c317b25dad","issue_id":"94f873c8-8508-44b0-b036-ff61c2a9716d","timestamp":"2025-12-21T19:44:16.802990482Z","title":"Epic: Documentation Lifecycle Phase 2 - Ergonomics & Automation","priority":"high"}
 {"type":"issue_state_changed","id":"11019901-479b-493a-810e-4a609b106e6d","issue_id":"94f873c8-8508-44b0-b036-ff61c2a9716d","timestamp":"2025-12-21T19:44:47.093390038Z","from":"ready","to":"backlog"}
+{"type":"issue_created","id":"5feff8d6-a82b-4ecd-95e1-ba1693217e2e","issue_id":"003f9f83-4e8a-4a5f-8e48-44f6f48a7c17","timestamp":"2025-12-21T20:04:25.278961260Z","title":"Support short hash issue IDs in CLI","priority":"high"}
