@@ -316,3 +316,4 @@
 {"type":"issue_state_changed","id":"0e8cc9b2-5827-47f9-a8e3-3ce47e074f43","issue_id":"003f9f83-4e8a-4a5f-8e48-44f6f48a7c17","timestamp":"2025-12-21T22:59:38.671055393Z","from":"done","to":"gated"}
 {"type":"issue_state_changed","id":"da2afeb0-08f4-46f6-a789-dfd484c8d83c","issue_id":"003f9f83-4e8a-4a5f-8e48-44f6f48a7c17","timestamp":"2025-12-21T23:00:27.670755149Z","from":"gated","to":"done"}
 {"type":"issue_completed","id":"d55572ca-014d-47de-bcfd-1e0893825fba","issue_id":"003f9f83-4e8a-4a5f-8e48-44f6f48a7c17","timestamp":"2025-12-21T23:00:27.670790739Z"}
+{"type":"issue_state_changed","id":"56501b8d-ae33-4bb5-8bc8-4e013e0e8365","issue_id":"0a658bc6-46a7-4d6e-8ed8-af49c442a0ea","timestamp":"2025-12-21T23:22:21.935579405Z","from":"ready","to":"rejected"}
