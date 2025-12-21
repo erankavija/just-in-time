@@ -271,3 +271,5 @@
 {"type":"issue_state_changed","id":"a8f9f051-c530-42f6-b227-69259ca91a7d","issue_id":"896ff7df-e5b0-48b6-a3b0-a5745ff683b7","timestamp":"2025-12-21T19:28:46.059837064Z","from":"ready","to":"backlog"}
 {"type":"issue_state_changed","id":"7f610b3b-6879-4cea-9c4d-ebee34962361","issue_id":"a8f2f04b-f5e4-4cf7-9af4-7d714a2f7139","timestamp":"2025-12-21T19:28:46.062367695Z","from":"ready","to":"backlog"}
 {"type":"issue_state_changed","id":"dc7ba8a4-88e8-4eed-a70d-37f7bfdcadd8","issue_id":"e22fa014-b7c6-40fd-af48-128658f32928","timestamp":"2025-12-21T19:28:46.065039626Z","from":"ready","to":"backlog"}
+{"type":"issue_created","id":"944e7be2-fc5d-4e06-bf49-11c317b25dad","issue_id":"94f873c8-8508-44b0-b036-ff61c2a9716d","timestamp":"2025-12-21T19:44:16.802990482Z","title":"Epic: Documentation Lifecycle Phase 2 - Ergonomics & Automation","priority":"high"}
+{"type":"issue_state_changed","id":"11019901-479b-493a-810e-4a609b106e6d","issue_id":"94f873c8-8508-44b0-b036-ff61c2a9716d","timestamp":"2025-12-21T19:44:47.093390038Z","from":"ready","to":"backlog"}

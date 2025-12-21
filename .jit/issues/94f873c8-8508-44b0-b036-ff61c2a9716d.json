@@ -1,0 +1,30 @@
+{
+  "id": "94f873c8-8508-44b0-b036-ff61c2a9716d",
+  "title": "Epic: Documentation Lifecycle Phase 2 - Ergonomics & Automation",
+  "description": "Phase 2 builds on Phase 1 asset management foundations, adding automation, link rewriting, and quality-of-life improvements. Transforms documentation lifecycle from manual validation process into streamlined, automated system.\n\n## Problem Statement\n\n**Phase 1 delivers** safe manual archival with asset tracking, but requires:\n- One-doc-at-a-time archival operations\n- Manual cleanup of old documentation  \n- Cannot handle shared assets with relative links\n- Limited format support (Markdown only)\n- No automation based on issue lifecycle\n\n**Phase 2 addresses** ergonomics and automation needs identified through v1.0 usage.\n\n## Solution: Ergonomics & Automation\n\n### Link Rewriting Engine\n- Parse and update links when docs/assets move\n- Enable archival of docs with relative shared links\n- Preserve link semantics (relative vs absolute)\n- Format-specific rewriting via adapters\n\n### Batch Operations (jit doc sweep)\n- Archive multiple docs based on criteria\n- Query by release, date, or issue state\n- Dry-run preview before execution\n- Atomic batch operations with rollback\n\n### Asset Normalization (jit doc assets collect)\n- Convert shared assets to per-doc layout\n- Update all references across documents\n- Enable safe archival of previously blocked docs\n\n### Additional Format Adapters\n- AsciiDoc support (widely used)\n- Optional: reStructuredText (Python ecosystem)\n- Optional: MDX (React documentation)\n\n### LFS Handling\n- Detect LFS pointers in assets\n- Policy-based behavior (require/allow/prefer)\n- Proper snapshot export handling\n\n### Archival Automation\n- Policy-based automatic archival\n- Trigger on issue state transitions\n- Scheduled sweeps\n- Configurable retention periods\n\n## Scope - Features\n\n### In Scope (v1.1)\n1. Link rewriting engine (5 days)\n2. jit doc assets collect (3 days)\n3. jit doc sweep batch archival (5 days)\n4. AsciiDoc adapter (3 days)\n5. LFS pointer handling (2 days)\n6. Optional: reST/MDX adapters (3 days each)\n7. Automation framework (4 days)\n\n### Out of Scope (Future)\n- External asset download automation\n- Rendering/publishing pipelines\n- Cross-repository dependencies\n- WYSIWYG editing integration\n- Automated format conversion\n\n## Dependencies\n\n**Requires:**\n- Phase 1 complete (all 7 tasks)\n- Milestone v1.0 shipped\n- User feedback on Phase 1 ergonomics\n- Real-world usage data\n\n**Blocks:**\n- Advanced snapshot features (Phase 3+)\n- Archive compression/cloud storage\n- Git hook integration",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "9db27a3a-86c5-4d79-9582-9ad68364ea36"
+  ],
+  "gates_required": [
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [
+    {
+      "path": "docs/documentation-lifecycle-phase2-design.md",
+      "commit": null,
+      "label": "Phase 2 Design",
+      "doc_type": "design"
+    }
+  ],
+  "labels": [
+    "type:epic",
+    "epic:docs-lifecycle-p2",
+    "milestone:v1.1",
+    "component:docs"
+  ]
+}
