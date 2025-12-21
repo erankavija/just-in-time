@@ -114,10 +114,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue.documents.retain(|doc| doc.path != path);
 
         if issue.documents.len() == original_len {
-            let err_msg = format!(
-                "Document reference {} not found in issue {}",
-                path, full_id
-            );
+            let err_msg = format!("Document reference {} not found in issue {}", path, full_id);
             if json {
                 let err = JsonError::new("DOCUMENT_NOT_FOUND", &err_msg)
                     .with_suggestion("Run 'jit doc list <issue-id>' to see available documents");
@@ -135,10 +132,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             }));
             println!("{}", output.to_json_string()?);
         } else {
-            println!(
-                "Removed document reference {} from issue {}",
-                path, full_id
-            );
+            println!("Removed document reference {} from issue {}", path, full_id);
         }
 
         Ok(())
@@ -159,13 +153,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .documents
             .iter()
             .find(|d| d.path == path)
-            .ok_or_else(|| {
-                anyhow!(
-                    "Document reference {} not found in issue {}",
-                    path,
-                    full_id
-                )
-            })?;
+            .ok_or_else(|| anyhow!("Document reference {} not found in issue {}", path, full_id))?;
 
         // Determine which commit to view
         let reference = if let Some(at) = at_commit {
@@ -210,13 +198,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .documents
             .iter()
             .find(|d| d.path == path)
-            .ok_or_else(|| {
-                anyhow!(
-                    "Document reference {} not found in issue {}",
-                    path,
-                    full_id
-                )
-            })?;
+            .ok_or_else(|| anyhow!("Document reference {} not found in issue {}", path, full_id))?;
 
         let repo = Repository::open(".").map_err(|e| anyhow!("Not a git repository: {}", e))?;
 
@@ -258,13 +240,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .documents
             .iter()
             .find(|d| d.path == path)
-            .ok_or_else(|| {
-                anyhow!(
-                    "Document reference {} not found in issue {}",
-                    path,
-                    full_id
-                )
-            })?;
+            .ok_or_else(|| anyhow!("Document reference {} not found in issue {}", path, full_id))?;
 
         let repo = Repository::open(".").map_err(|e| anyhow!("Not a git repository: {}", e))?;
 

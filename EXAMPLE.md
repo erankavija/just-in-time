@@ -11,6 +11,11 @@ This example demonstrates a lead Copilot agent orchestrating multiple worker age
 jit issue create --title "Fix login bug"
 jit issue create --title "Add dark mode" --priority high
 jit dep add <issue1> <issue2>
+
+# Use short hashes for convenience (min 4 chars, case-insensitive)
+jit issue show 9db27a3a      # Full: 9db27a3a-86c5-4d79-9582-9ad68364ea36
+jit gate pass 003f tests     # Full: 003f9f83-4e8a-4a5f-8e48-44f6f48a7c17
+jit dep add abc123 def456    # Works with short prefixes
 ```
 
 **Labels add organizational power when you need it:**

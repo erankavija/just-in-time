@@ -73,6 +73,7 @@ jit issue list
 **Note:** 
 - All data is stored in `.jit/` directory (similar to `.git/`)
 - **Labels are optional** - use them when you need organizational structure
+- **Use short hashes** - reference issues with short prefixes (min 4 chars) like git: `jit issue show 003f9f83`
 - Override storage location with `JIT_DATA_DIR` environment variable
 
 See [EXAMPLE.md](EXAMPLE.md) for complete workflows.
@@ -121,6 +122,11 @@ jit status                  # Overview of work state
 jit coordinator agents      # See what each agent is doing
 jit events tail             # Full audit trail
 jit graph show $EPIC        # Visualize dependencies
+
+# Use short hashes for convenience (like git)
+jit issue show 9db27a3a     # Show issue details
+jit gate pass 003f tests    # Pass gate for issue
+jit dep add abc123 def456   # Add dependency
 ```
 
 ## Complete Example Workflow

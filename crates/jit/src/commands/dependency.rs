@@ -63,7 +63,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     pub fn remove_dependency(&self, issue_id: &str, dep_id: &str) -> Result<()> {
         let full_issue_id = self.storage.resolve_issue_id(issue_id)?;
         let full_dep_id = self.storage.resolve_issue_id(dep_id)?;
-        
+
         let mut issue = self.storage.load_issue(&full_issue_id)?;
         issue.dependencies.retain(|d| d != &full_dep_id);
         self.storage.save_issue(&issue)?;

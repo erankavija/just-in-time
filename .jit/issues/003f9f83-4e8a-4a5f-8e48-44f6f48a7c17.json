@@ -14,10 +14,30 @@
     "tdd-reminder"
   ],
   "gates_status": {
+    "clippy": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-21T22:52:21.058838870Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-21T22:52:18.550666659Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-21T22:52:22.465463272Z"
+    },
     "tdd-reminder": {
       "status": "passed",
       "updated_by": null,
       "updated_at": "2025-12-21T22:08:06.583895170Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "agent:copilot-cli",
+      "updated_at": "2025-12-21T22:56:15.461739434Z"
     }
   },
   "context": {},

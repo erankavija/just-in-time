@@ -93,16 +93,10 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Log event
         let event = match result.status {
-            GateRunStatus::Passed => Event::new_gate_passed(
-                full_id.clone(),
-                gate_key.to_string(),
-                result.by.clone(),
-            ),
-            _ => Event::new_gate_failed(
-                full_id.clone(),
-                gate_key.to_string(),
-                result.by.clone(),
-            ),
+            GateRunStatus::Passed => {
+                Event::new_gate_passed(full_id.clone(), gate_key.to_string(), result.by.clone())
+            }
+            _ => Event::new_gate_failed(full_id.clone(), gate_key.to_string(), result.by.clone()),
         };
         self.storage.append_event(&event)?;
 
