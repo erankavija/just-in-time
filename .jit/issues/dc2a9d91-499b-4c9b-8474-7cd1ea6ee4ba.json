@@ -1,0 +1,22 @@
+{
+  "id": "dc2a9d91-499b-4c9b-8474-7cd1ea6ee4ba",
+  "title": "Support bulk operations for gates, labels, and dependencies",
+  "description": "Enable adding multiple items in single command: 'jit gate add ISSUE gate1 gate2 gate3', 'jit dep add FROM to1 to2 to3'. Reduces command count, improves scripting, enables atomic transactions. Verify labels already support bulk (comma-separated).",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "tdd-reminder",
+    "tests",
+    "clippy",
+    "fmt",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task"
+  ]
+}

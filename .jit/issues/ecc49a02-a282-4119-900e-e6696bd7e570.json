@@ -1,0 +1,29 @@
+{
+  "id": "ecc49a02-a282-4119-900e-e6696bd7e570",
+  "title": "Add --quiet flag for scripting and handle broken pipes gracefully",
+  "description": "Add global --quiet/-q flag to suppress non-essential output (success messages, warnings, decorations). Essential data still outputs. Fix broken pipe panics when piping to head/jq. Create OutputContext helper for consistent output handling. Critical for scripting workflows.",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "tdd-reminder",
+    "tests",
+    "clippy",
+    "fmt",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [
+    {
+      "path": "docs/quiet-mode-plan.md",
+      "commit": null,
+      "label": "Implementation Plan",
+      "doc_type": "design"
+    }
+  ],
+  "labels": [
+    "type:task"
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "id": "0db719b1-0e95-44b2-a377-0acbcf9f8bde",
+  "title": "Standardize JSON output format across all CLI commands",
+  "description": "Create consistent JSON envelope format (success/data/error/meta) for all commands with --json flag. Currently some commands output raw JSON objects while others wrap in success/data. This makes scripting and MCP integration difficult. Implement JsonResponse<T> type and update all commands to use it.",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "tdd-reminder",
+    "tests",
+    "clippy",
+    "fmt",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [
+    {
+      "path": "docs/json-output-standardization-plan.md",
+      "commit": null,
+      "label": "Implementation Plan",
+      "doc_type": "design"
+    }
+  ],
+  "labels": [
+    "type:task"
+  ]
+}
