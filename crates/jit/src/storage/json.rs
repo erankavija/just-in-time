@@ -5,7 +5,7 @@
 
 use crate::domain::{Event, Issue};
 use crate::storage::{FileLocker, GateRegistry, IssueStore};
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::fs::{self, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
@@ -193,6 +193,55 @@ impl IssueStore for JsonFileStorage {
         let issue_lock_path = issue_path.with_extension("lock");
         let _lock = self.locker.lock_shared(&issue_lock_path)?;
         self.read_json(&issue_path)
+    }
+
+    fn resolve_issue_id(&self, partial_id: &str) -> Result<String> {
+        // Normalize input: lowercase and remove hyphens
+        let normalized = partial_id.to_lowercase().replace('-', "");
+
+        // Full UUID check (fast path) - 32 hex chars without hyphens
+        if normalized.len() == 32 {
+            // Try loading to verify it exists
+            return self
+                .load_issue(partial_id)
+                .map(|issue| issue.id)
+                .or_else(|_| Err(anyhow!("Issue not found: {}", partial_id)));
+        }
+
+        // Minimum length check
+        if normalized.len() < 4 {
+            return Err(anyhow!("Issue ID prefix must be at least 4 characters"));
+        }
+
+        // Load index and filter
+        let index = self.load_index()?;
+        let matches: Vec<String> = index
+            .all_ids
+            .iter()
+            .filter(|id| id.replace('-', "").to_lowercase().starts_with(&normalized))
+            .cloned()
+            .collect();
+
+        match matches.len() {
+            0 => Err(anyhow!("Issue not found: {}", partial_id)),
+            1 => Ok(matches[0].clone()),
+            _ => {
+                // Load issue titles for better error message
+                let issue_list: Vec<String> = matches
+                    .iter()
+                    .filter_map(|id| {
+                        self.load_issue(id)
+                            .ok()
+                            .map(|issue| format!("{} | {}", &id[..8], issue.title))
+                    })
+                    .collect();
+                Err(anyhow!(
+                    "Ambiguous ID '{}' matches multiple issues:\n  {}",
+                    partial_id,
+                    issue_list.join("\n  ")
+                ))
+            }
+        }
     }
 
     fn delete_issue(&self, id: &str) -> Result<()> {

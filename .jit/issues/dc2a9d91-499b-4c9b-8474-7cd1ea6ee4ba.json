@@ -17,6 +17,8 @@
   "context": {},
   "documents": [],
   "labels": [
-    "type:task"
+    "type:task",
+    "epic:phase5.2",
+    "milestone:v1.0"
   ]
 }

@@ -293,6 +293,47 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
             .cloned()
             .collect()
     }
+
+    /// Find shortest path between two nodes (excluding direct edge).
+    ///
+    /// Returns the shortest path that doesn't use the direct edge from `from` to `to`.
+    /// Useful for reporting alternative paths when detecting redundant dependencies.
+    ///
+    /// Returns a vector of node IDs representing the path, or empty vector if no path exists.
+    pub fn find_shortest_path(&self, from: &str, to: &str) -> Vec<String> {
+        use std::collections::VecDeque;
+
+        let mut queue = VecDeque::new();
+        let mut visited = HashMap::new();
+
+        queue.push_back((from, vec![from.to_string()]));
+
+        while let Some((current, path)) = queue.pop_front() {
+            if current == to && path.len() > 1 {
+                return path;
+            }
+
+            if visited.contains_key(current) {
+                continue;
+            }
+            visited.insert(current, ());
+
+            if let Some(node) = self.nodes.get(current) {
+                for dep in node.dependencies() {
+                    // Skip direct edge from start
+                    if current == from && dep == to {
+                        continue;
+                    }
+
+                    let mut new_path = path.clone();
+                    new_path.push(dep.clone());
+                    queue.push_back((dep.as_str(), new_path));
+                }
+            }
+        }
+
+        vec![]
+    }
 }
 
 #[cfg(test)]

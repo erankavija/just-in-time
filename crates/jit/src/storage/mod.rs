@@ -69,6 +69,39 @@ pub trait IssueStore: Clone {
     /// Returns an error if the issue does not exist or cannot be deserialized.
     fn load_issue(&self, id: &str) -> Result<Issue>;
 
+    /// Resolve a partial issue ID to its full UUID.
+    ///
+    /// Accepts either a full UUID or a unique prefix (minimum 4 characters).
+    /// Returns the full UUID if a unique match is found.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use jit::storage::{IssueStore, InMemoryStorage};
+    /// use jit::domain::Issue;
+    ///
+    /// let storage = InMemoryStorage::new();
+    /// storage.init().unwrap();
+    ///
+    /// let issue = Issue::new("Fix bug".to_string(), "Details".to_string());
+    /// storage.save_issue(&issue).unwrap();
+    ///
+    /// // Can use short prefix
+    /// let full_id = storage.resolve_issue_id(&issue.id[..8]).unwrap();
+    /// assert_eq!(full_id, issue.id);
+    ///
+    /// // Or full UUID
+    /// let full_id = storage.resolve_issue_id(&issue.id).unwrap();
+    /// assert_eq!(full_id, issue.id);
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// - Prefix too short (< 4 chars): "Issue ID prefix must be at least 4 characters"
+    /// - No matching issue found: "Issue not found: {prefix}"
+    /// - Multiple issues match (ambiguous): "Ambiguous ID '{prefix}' matches multiple issues: ..."
+    fn resolve_issue_id(&self, partial_id: &str) -> Result<String>;
+
     /// Delete an issue by ID.
     ///
     /// # Errors

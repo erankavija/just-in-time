@@ -84,6 +84,54 @@ impl IssueStore for InMemoryStorage {
             .ok_or_else(|| anyhow!("Issue not found: {}", id))
     }
 
+    fn resolve_issue_id(&self, partial_id: &str) -> Result<String> {
+        // Normalize input: lowercase and remove hyphens
+        let normalized = partial_id.to_lowercase().replace('-', "");
+
+        // Full UUID check (fast path) - 32 hex chars without hyphens
+        if normalized.len() == 32 {
+            // Verify it exists
+            return self
+                .load_issue(partial_id)
+                .map(|issue| issue.id)
+                .or_else(|_| Err(anyhow!("Issue not found: {}", partial_id)));
+        }
+
+        // Minimum length check
+        if normalized.len() < 4 {
+            return Err(anyhow!("Issue ID prefix must be at least 4 characters"));
+        }
+
+        // Find matching issues
+        let issues = self.issues.lock().unwrap();
+        let matches: Vec<String> = issues
+            .keys()
+            .filter(|id| id.replace('-', "").to_lowercase().starts_with(&normalized))
+            .cloned()
+            .collect();
+
+        match matches.len() {
+            0 => Err(anyhow!("Issue not found: {}", partial_id)),
+            1 => Ok(matches[0].clone()),
+            _ => {
+                // Get titles for better error message
+                let issue_list: Vec<String> = matches
+                    .iter()
+                    .filter_map(|id| {
+                        issues
+                            .get(id)
+                            .map(|issue| format!("{} | {}", &id[..8], issue.title))
+                    })
+                    .collect();
+                Err(anyhow!(
+                    "Ambiguous ID '{}' matches multiple issues:\n  {}",
+                    partial_id,
+                    issue_list.join("\n  ")
+                ))
+            }
+        }
+    }
+
     fn delete_issue(&self, id: &str) -> Result<()> {
         self.issues
             .lock()

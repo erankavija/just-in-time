@@ -51,18 +51,26 @@ impl<S: IssueStore> CommandExecutor<S> {
             return Ok(0);
         }
 
-        // If fix mode is enabled, detect and fix type hierarchy issues
+        // If fix mode is enabled, detect and fix issues
         if fix {
-            let fixes_applied = self.detect_and_fix_hierarchy_issues(dry_run, quiet)?;
+            let mut total_fixes = 0;
+
+            // Fix type hierarchy issues
+            let hierarchy_fixes = self.detect_and_fix_hierarchy_issues(dry_run, quiet)?;
+            total_fixes += hierarchy_fixes;
+
+            // Fix transitive reduction violations (both dry-run and actual fix)
+            let reduction_fixes = self.fix_all_transitive_reductions(dry_run, quiet)?;
+            total_fixes += reduction_fixes;
 
             if !quiet {
                 if dry_run {
                     println!(
                         "\nDry run complete. {} fixes would be applied.",
-                        fixes_applied
+                        total_fixes
                     );
-                } else if fixes_applied > 0 {
-                    println!("\n✓ Applied {} fixes", fixes_applied);
+                } else if total_fixes > 0 {
+                    println!("\n✓ Applied {} fixes", total_fixes);
 
                     // Re-run validation to verify fixes worked
                     self.validate_silent()?;
@@ -72,7 +80,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 }
             }
 
-            return Ok(fixes_applied);
+            return Ok(total_fixes);
         }
 
         // Not in fix mode, just propagate the validation error
@@ -232,6 +240,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         let issue_refs: Vec<&Issue> = issues.iter().collect();
         let graph = DependencyGraph::new(&issue_refs);
         graph.validate_dag()?;
+
+        // Validate transitive reduction (no redundant dependencies)
+        self.validate_transitive_reduction(&graph, &issues)?;
 
         Ok(())
     }
@@ -574,5 +585,127 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         Ok(all_warnings)
+    }
+
+    /// Validate transitive reduction of dependency graph.
+    ///
+    /// Checks that no issue has redundant dependencies - dependencies that are
+    /// already reachable through other dependency paths.
+    fn validate_transitive_reduction(
+        &self,
+        graph: &DependencyGraph<Issue>,
+        issues: &[Issue],
+    ) -> Result<()> {
+        use std::collections::HashSet;
+
+        for issue in issues {
+            if issue.dependencies.is_empty() {
+                continue;
+            }
+
+            // Compute minimal dependency set
+            let reduced = graph.compute_transitive_reduction(&issue.id);
+            let reduced_set: HashSet<_> = reduced.iter().collect();
+
+            // Find redundant edges (in current but not in reduction)
+            for dep_id in &issue.dependencies {
+                if !reduced_set.contains(dep_id) {
+                    // This edge is redundant - find the transitive path
+                    let path = graph.find_shortest_path(&issue.id, dep_id);
+                    let path_str = if path.is_empty() {
+                        "unknown path".to_string()
+                    } else {
+                        path.iter()
+                            .map(|id| &id[..8.min(id.len())])
+                            .collect::<Vec<_>>()
+                            .join(" → ")
+                    };
+
+                    return Err(anyhow!(
+                        "Transitive reduction violation: Issue {} has redundant dependency on {} \
+                         (already reachable via: {}). Run 'jit validate --fix' to remove redundant edges.",
+                        &issue.id[..8],
+                        &dep_id[..8],
+                        path_str
+                    ));
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Fix transitive reduction violations by removing redundant dependencies.
+    ///
+    /// Returns the number of redundant edges removed (not issues fixed).
+    fn fix_transitive_reduction(
+        &mut self,
+        graph: &DependencyGraph<Issue>,
+        issue_id: &str,
+        dry_run: bool,
+    ) -> Result<usize> {
+        let mut issue = self.storage.load_issue(issue_id)?;
+
+        if issue.dependencies.is_empty() {
+            return Ok(0);
+        }
+
+        let reduced = graph.compute_transitive_reduction(issue_id);
+        let current_len = issue.dependencies.len();
+        let reduced_len = reduced.len();
+
+        if current_len == reduced_len {
+            // No redundancies
+            return Ok(0);
+        }
+
+        let redundant_count = current_len - reduced_len;
+
+        if !dry_run {
+            // Actually apply the fix
+            issue.dependencies = reduced.into_iter().collect();
+            self.storage.save_issue(&issue)?;
+        }
+
+        // Note: Event logging for transitive reduction fixes could be added
+        // via a new Event variant in future if needed for audit trail
+
+        Ok(redundant_count)
+    }
+
+    /// Fix transitive reduction violations for all issues.
+    ///
+    /// Returns count of redundant edges fixed (or that would be fixed if dry_run).
+    fn fix_all_transitive_reductions(&mut self, dry_run: bool, quiet: bool) -> Result<usize> {
+        let issues = self.storage.list_issues()?;
+        let issue_refs: Vec<&Issue> = issues.iter().collect();
+        let graph = DependencyGraph::new(&issue_refs);
+
+        let mut total_redundancies = 0;
+
+        for issue in &issues {
+            if issue.dependencies.is_empty() {
+                continue;
+            }
+
+            let fixed_count = self.fix_transitive_reduction(&graph, &issue.id, dry_run)?;
+            if fixed_count > 0 {
+                total_redundancies += fixed_count;
+                if !quiet && !dry_run {
+                    println!(
+                        "Fixed {} redundant {} in issue {}",
+                        fixed_count,
+                        if fixed_count == 1 {
+                            "dependency"
+                        } else {
+                            "dependencies"
+                        },
+                        &issue.id[..8.min(issue.id.len())]
+                    );
+                }
+            }
+        }
+
+        Ok(total_redundancies)
     }
 }

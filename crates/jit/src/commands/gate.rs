@@ -5,7 +5,8 @@ use crate::domain::GateMode;
 
 impl<S: IssueStore> CommandExecutor<S> {
     pub fn add_gate(&self, issue_id: &str, gate_key: String) -> Result<()> {
-        let mut issue = self.storage.load_issue(issue_id)?;
+        let full_id = self.storage.resolve_issue_id(issue_id)?;
+        let mut issue = self.storage.load_issue(&full_id)?;
         if !issue.gates_required.contains(&gate_key) {
             issue.gates_required.push(gate_key.clone());
             // Note: Gates don't block Ready state, only Done state
@@ -15,7 +16,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     pub fn pass_gate(&self, issue_id: &str, gate_key: String, by: Option<String>) -> Result<()> {
-        let mut issue = self.storage.load_issue(issue_id)?;
+        let full_id = self.storage.resolve_issue_id(issue_id)?;
+        let mut issue = self.storage.load_issue(&full_id)?;
 
         if !issue.gates_required.contains(&gate_key) {
             return Err(anyhow!(
@@ -29,7 +31,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         if let Some(gate) = registry.gates.get(&gate_key) {
             if gate.mode == GateMode::Auto {
                 // Smart behavior: auto-run the checker
-                self.check_gate(issue_id, &gate_key)?;
+                self.check_gate(&full_id, &gate_key)?;
                 return Ok(());
             }
         }
@@ -51,13 +53,14 @@ impl<S: IssueStore> CommandExecutor<S> {
         self.storage.append_event(&event)?;
 
         // Check if Gated issue can now transition to Done
-        self.auto_transition_to_done(issue_id)?;
+        self.auto_transition_to_done(&full_id)?;
 
         Ok(())
     }
 
     pub fn fail_gate(&self, issue_id: &str, gate_key: String, by: Option<String>) -> Result<()> {
-        let mut issue = self.storage.load_issue(issue_id)?;
+        let full_id = self.storage.resolve_issue_id(issue_id)?;
+        let mut issue = self.storage.load_issue(&full_id)?;
 
         if !issue.gates_required.contains(&gate_key) {
             return Err(anyhow!(
@@ -72,7 +75,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             if gate.mode == GateMode::Auto {
                 return Err(anyhow!(
                     "Gate '{}' is automated and cannot be manually failed. Use 'jit gate check {} {}' to run the checker.",
-                    gate_key, issue_id, gate_key
+                    gate_key, &full_id, gate_key
                 ));
             }
         }

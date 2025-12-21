@@ -86,7 +86,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     pub fn show_issue(&self, id: &str) -> Result<Issue> {
-        self.storage.load_issue(id)
+        let full_id = self.storage.resolve_issue_id(id)?;
+        self.storage.load_issue(&full_id)
     }
 
     /// Update issue fields.
@@ -108,7 +109,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         add_labels: Vec<String>,
         remove_labels: Vec<String>,
     ) -> Result<()> {
-        let mut issue = self.storage.load_issue(id)?;
+        let full_id = self.storage.resolve_issue_id(id)?;
+        let mut issue = self.storage.load_issue(&full_id)?;
 
         if let Some(t) = title {
             issue.title = t;
@@ -197,7 +199,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     pub fn delete_issue(&self, id: &str) -> Result<()> {
-        self.storage.delete_issue(id)
+        let full_id = self.storage.resolve_issue_id(id)?;
+        self.storage.delete_issue(&full_id)
     }
 
     /// Update issue state with precheck/postcheck hooks
@@ -296,14 +299,16 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     pub fn assign_issue(&self, id: &str, assignee: String) -> Result<()> {
-        let mut issue = self.storage.load_issue(id)?;
+        let full_id = self.storage.resolve_issue_id(id)?;
+        let mut issue = self.storage.load_issue(&full_id)?;
         issue.assignee = Some(assignee);
         self.storage.save_issue(&issue)?;
         Ok(())
     }
 
     pub fn claim_issue(&self, id: &str, assignee: String) -> Result<()> {
-        let issue = self.storage.load_issue(id)?;
+        let full_id = self.storage.resolve_issue_id(id)?;
+        let issue = self.storage.load_issue(&full_id)?;
 
         if issue.assignee.is_some() {
             return Err(anyhow!("Issue is already assigned"));
@@ -313,12 +318,12 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // If Ready, try to transition to InProgress first (this enforces prechecks)
         if old_state == State::Ready {
-            self.update_issue_state(id, State::InProgress)?;
+            self.update_issue_state(&full_id, State::InProgress)?;
         }
 
         // If we get here, prechecks passed (or issue wasn't Ready)
         // Now assign the issue
-        let mut issue = self.storage.load_issue(id)?;
+        let mut issue = self.storage.load_issue(&full_id)?;
         issue.assignee = Some(assignee.clone());
         self.storage.save_issue(&issue)?;
 
@@ -330,14 +335,16 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     pub fn unassign_issue(&self, id: &str) -> Result<()> {
-        let mut issue = self.storage.load_issue(id)?;
+        let full_id = self.storage.resolve_issue_id(id)?;
+        let mut issue = self.storage.load_issue(&full_id)?;
         issue.assignee = None;
         self.storage.save_issue(&issue)?;
         Ok(())
     }
 
     pub fn release_issue(&self, id: &str, reason: &str) -> Result<()> {
-        let mut issue = self.storage.load_issue(id)?;
+        let full_id = self.storage.resolve_issue_id(id)?;
+        let mut issue = self.storage.load_issue(&full_id)?;
         let old_assignee = issue.assignee.clone();
         let old_state = issue.state;
 
@@ -352,7 +359,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Log event
         let event = Event::new_issue_released(
-            id.to_string(),
+            full_id.clone(),
             old_assignee.unwrap_or_default(),
             reason.to_string(),
         );
@@ -360,7 +367,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Log state change if it occurred
         if old_state != issue.state {
-            let event = Event::new_issue_state_changed(id.to_string(), old_state, issue.state);
+            let event = Event::new_issue_state_changed(full_id, old_state, issue.state);
             self.storage.append_event(&event)?;
         }
 

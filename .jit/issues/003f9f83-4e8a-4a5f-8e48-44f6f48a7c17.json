@@ -2,9 +2,9 @@
   "id": "003f9f83-4e8a-4a5f-8e48-44f6f48a7c17",
   "title": "Support short hash issue IDs in CLI",
   "description": "Enable users to reference issues with short UUID prefixes (like git short hashes) instead of full UUIDs. Implement resolve_issue_id() to match unique prefixes (min 4 chars), update all CLI commands, and provide clear errors for ambiguous or missing matches. Maintains backward compatibility with full UUIDs.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:copilot-cli",
   "dependencies": [],
   "gates_required": [
     "code-review",
@@ -13,7 +13,13 @@
     "fmt",
     "tdd-reminder"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2025-12-21T22:08:06.583895170Z"
+    }
+  },
   "context": {},
   "documents": [
     {
