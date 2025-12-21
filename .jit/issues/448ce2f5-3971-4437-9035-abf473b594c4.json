@@ -1,0 +1,23 @@
+{
+  "id": "448ce2f5-3971-4437-9035-abf473b594c4",
+  "title": "Add validation for transitive reduction in dependency DAG",
+  "description": "Ensure dependency DAG maintains transitive reduction invariant - no redundant edges that are already reachable via other paths. Found actual redundancy in Epic 4a00b2b0 with edge to 241b7002 (also reachable via 4cb2682e→14303b30). Implement validation check in 'jit validate', add --fix flag to auto-clean, and add comprehensive tests.",
+  "state": "ready",
+  "priority": "critical",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "tdd-reminder",
+    "tests",
+    "clippy",
+    "fmt",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:production-stability"
+  ]
+}
