@@ -75,7 +75,9 @@ jit query ready --json | head -5
 
 **Issue has design doc?** Read it first - contains acceptance criteria and implementation plan.
 
-**Issue has no design doc?** Check description for requirements, or create a plan in session notes.
+**Issue has no design doc?** Check its epic's dependencies - epics should have design docs or references. Then check issue description for requirements.
+
+**Session notes missing?** Not all issues have them. Check the epic's documents for architectural context.
 
 **Tests failing?** That's expected if you're doing TDD right. Implement to make them pass.
 
@@ -97,6 +99,16 @@ rg "resolve_issue_id" --type rust
 - **Commit often**: Small focused commits with clear messages
 - **No hacks**: Code quality matters - if you're tempted to shortcut, add a TODO issue instead
 
+## Important Rules
+
+**Gate strictness:** Gates may use stricter checks than manual commands (e.g., `clippy` gate uses `-D warnings`). Check gate definition: `jit gate show <gate-key>`.
+
+**Pre-existing issues:** You must fix ALL warnings/errors that block gates, even if they existed before your changes. Pre-existence is never an excuse. Code quality is everyone's responsibility.
+
+**Follow-up issues:** If you discover unrelated work or nice-to-have improvements, propose to create follow-up issues and link them to appropriate epics. Don't expand current issue scope.
+
+**Dependencies matter most:** Use `jit dep add` to express "task B needs task A done first". Epic labels are helpful for organization but dependencies are the critical relationship.
+
 ## What JIT Is
 
 A **CLI-first issue tracker** designed for **AI agents** to orchestrate their own work:
@@ -112,6 +124,6 @@ Everything is in `.jit/` (like `.git/`). Plain JSON files. Version controlled.
 1. Read the linked design doc
 2. Check recent commits for similar work
 3. Look at test files for examples
-4. Ask! (In issue comments, or add session notes)
+4. Ask!!
 
 **That's it!** You're ready to contribute. Pick a ready task and start coding.
