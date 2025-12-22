@@ -14,11 +14,6 @@
     "code-review"
   ],
   "gates_status": {
-    "clippy": {
-      "status": "passed",
-      "updated_by": "ci:clippy",
-      "updated_at": "2025-12-20T13:04:21.245785581Z"
-    },
     "code-review": {
       "status": "passed",
       "updated_by": "human:reviewer",
@@ -34,6 +29,11 @@
       "updated_by": "agent:copilot",
       "updated_at": "2025-12-20T13:04:21.239880235Z"
     },
+    "clippy": {
+      "status": "passed",
+      "updated_by": "ci:clippy",
+      "updated_at": "2025-12-20T13:04:21.245785581Z"
+    },
     "fmt": {
       "status": "passed",
       "updated_by": "ci:fmt",
@@ -43,10 +43,10 @@
   "context": {},
   "documents": [
     {
-      "path": "dev/active/state-transition-feedback-design.md",
+      "path": "dev/archive/bug-fixes/state-transition-feedback-design.md",
       "commit": null,
       "label": "Design Document",
-      "doc_type": "design"
+      "doc_type": null
     }
   ],
   "labels": [

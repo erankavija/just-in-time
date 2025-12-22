@@ -14,6 +14,11 @@
     "code-review"
   ],
   "gates_status": {
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-20T19:23:10.397046505Z"
+    },
     "code-review": {
       "status": "passed",
       "updated_by": "agent:copilot",
@@ -29,11 +34,6 @@
       "updated_by": "agent:copilot",
       "updated_at": "2025-12-20T19:22:13.569442816Z"
     },
-    "tests": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-20T19:23:10.397046505Z"
-    },
     "clippy": {
       "status": "passed",
       "updated_by": "auto:executor",
@@ -43,10 +43,10 @@
   "context": {},
   "documents": [
     {
-      "path": "dev/archive/studies/gate-preview-analysis.md",
+      "path": "dev/archive/bug-fixes/gate-preview-analysis.md",
       "commit": null,
       "label": "Closure Analysis",
-      "doc_type": "analysis"
+      "doc_type": null
     }
   ],
   "labels": [
