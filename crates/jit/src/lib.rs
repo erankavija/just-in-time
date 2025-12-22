@@ -6,6 +6,7 @@
 pub mod cli;
 pub mod commands;
 pub mod config;
+pub mod document;
 pub mod domain;
 pub mod gate_execution;
 pub mod graph;
