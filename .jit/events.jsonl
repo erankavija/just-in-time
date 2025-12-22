@@ -337,3 +337,7 @@
 {"type":"issue_completed","id":"3e8445f4-a78d-4056-8adc-ea5445b86f8b","issue_id":"6f6b842a-67cd-4032-91ba-253dab6f9754","timestamp":"2025-12-22T22:21:35.176344799Z"}
 {"type":"issue_state_changed","id":"5e0b601c-9429-489e-bc68-2404a746c19e","issue_id":"ac99db8b-85a8-4865-8199-a1ea76017650","timestamp":"2025-12-22T22:35:22.259725924Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"27da4029-a984-40b4-b1e2-e057ebc57e62","issue_id":"ac99db8b-85a8-4865-8199-a1ea76017650","timestamp":"2025-12-22T22:35:22.262594676Z","assignee":"agent:copilot-session-1"}
+{"type":"issue_state_changed","id":"1b267014-93aa-4d75-823e-b1d04ebb68c7","issue_id":"ac99db8b-85a8-4865-8199-a1ea76017650","timestamp":"2025-12-22T22:37:09.838049213Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"b930bcce-9208-4297-a1ab-d4f6a7bedd0d","issue_id":"ac99db8b-85a8-4865-8199-a1ea76017650","timestamp":"2025-12-22T22:37:09.838079233Z"}
+{"type":"issue_state_changed","id":"d896f56f-0ec6-4528-9b8c-ec98a423fc26","issue_id":"ac99db8b-85a8-4865-8199-a1ea76017650","timestamp":"2025-12-22T22:40:00.993679833Z","from":"done","to":"in_progress"}
+{"type":"issue_created","id":"f2cde536-2925-4824-bb9c-ae4678392dd9","issue_id":"3977f5da-0025-4785-b1e5-453a61ea1fcd","timestamp":"2025-12-22T22:44:17.171399809Z","title":"Fix short hash resolution in jit issue update --json","priority":"high"}
