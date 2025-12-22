@@ -13,13 +13,13 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { exec } from "child_process";
+import { execFile } from "child_process";
 import { promisify } from "util";
 import { readFileSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // Load JIT schema
@@ -28,16 +28,20 @@ const jitSchema = JSON.parse(readFileSync(schemaPath, "utf-8"));
 
 /**
  * Execute jit CLI command and return parsed JSON output
+ * @param {string[]} cmdArgs - Array of command arguments (not including 'jit')
+ * @param {boolean} useJsonFlag - Whether to add --json flag
  */
-async function runJitCommand(args, useJsonFlag = true) {
-  const jsonFlag = useJsonFlag ? " --json" : "";
-  const cmd = `jit ${args}${jsonFlag}`;
+async function runJitCommand(cmdArgs, useJsonFlag = true) {
+  const args = [...cmdArgs];
+  if (useJsonFlag) {
+    args.push('--json');
+  }
   
-  // Check if command will output JSON (either from useJsonFlag or already in args)
+  // Check if command will output JSON
   const expectsJson = useJsonFlag || args.includes('--json');
   
   try {
-    const { stdout, stderr } = await execAsync(cmd, {
+    const { stdout, stderr } = await execFileAsync('jit', args, {
       maxBuffer: 10 * 1024 * 1024, // 10MB buffer
     });
     
@@ -211,7 +215,7 @@ async function executeTool(name, args) {
   const parts = name.split("_");
   parts.shift(); // Remove 'jit' prefix
   
-  let cliArgs;
+  const cliArgs = [];
   let hasJsonFlag;
   
   if (parts.length >= 2) {
@@ -220,101 +224,91 @@ async function executeTool(name, args) {
     const cmd = parts[0];
     const subcmdParts = parts.slice(1);
     const subcmd = subcmdParts.join("-"); // Convert underscores back to hyphens
-    cliArgs = `${cmd} ${subcmd}`;
+    cliArgs.push(cmd, subcmd);
     hasJsonFlag = supportsJsonFlag(cmd, subcmd);
     
     // Get positional arguments from schema (use hyphens for lookup)
     const positionalArgNames = getPositionalArgs(cmd, subcmd);
     
     if (positionalArgNames) {
-      // Use positional arguments
-      const positionalArgs = [];
+      // Add positional arguments
       for (const argName of positionalArgNames) {
         const value = args[argName];
         if (value !== undefined && value !== "") {
-          positionalArgs.push(`"${value}"`);
+          cliArgs.push(value);
         }
       }
-      cliArgs += positionalArgs.length > 0 ? ` ${positionalArgs.join(" ")}` : "";
       
       // Add any remaining arguments as flags
       const positionalSet = new Set(positionalArgNames);
-      const flagArgs = [];
       for (const [key, value] of Object.entries(args)) {
         if (positionalSet.has(key)) continue;
         
         if (Array.isArray(value)) {
           for (const item of value) {
-            flagArgs.push(`--${key} "${item}"`);
+            cliArgs.push(`--${key}`, item);
           }
         } else if (typeof value === 'boolean') {
           // Boolean flags: only add if true, without value
           if (value) {
-            flagArgs.push(`--${key}`);
+            cliArgs.push(`--${key}`);
           }
         } else if (value !== undefined && value !== "") {
-          flagArgs.push(`--${key} "${value}"`);
+          cliArgs.push(`--${key}`, value);
         }
       }
-      cliArgs += flagArgs.length > 0 ? ` ${flagArgs.join(" ")}` : "";
     } else {
       // All arguments are flags
-      const flagArgs = [];
       for (const [key, value] of Object.entries(args)) {
         if (Array.isArray(value)) {
           for (const item of value) {
-            flagArgs.push(`--${key} "${item}"`);
+            cliArgs.push(`--${key}`, item);
           }
         } else if (typeof value === 'boolean') {
           // Boolean flags: only add if true, without value
           if (value) {
-            flagArgs.push(`--${key}`);
+            cliArgs.push(`--${key}`);
           }
         } else if (value !== undefined && value !== "") {
-          flagArgs.push(`--${key} "${value}"`);
+          cliArgs.push(`--${key}`, value);
         }
       }
-      cliArgs += flagArgs.length > 0 ? ` ${flagArgs.join(" ")}` : "";
     }
   } else {
     // Top-level command: jit_status -> jit status  or jit_search -> jit search
     const cmd = parts[0];
-    cliArgs = cmd;
+    cliArgs.push(cmd);
     
     // Get positional arguments from schema
     const positionalArgNames = getPositionalArgs(cmd, null);
     
     if (positionalArgNames) {
-      // Use positional arguments
-      const positionalArgs = [];
+      // Add positional arguments
       for (const argName of positionalArgNames) {
         const value = args[argName];
         if (value !== undefined && value !== "") {
-          positionalArgs.push(`"${value}"`);
+          cliArgs.push(value);
         }
       }
-      cliArgs += positionalArgs.length > 0 ? ` ${positionalArgs.join(" ")}` : "";
       
       // Add any remaining arguments as flags
       const positionalSet = new Set(positionalArgNames);
-      const flagArgs = [];
       for (const [key, value] of Object.entries(args)) {
         if (positionalSet.has(key)) continue;
         
         if (Array.isArray(value)) {
           for (const item of value) {
-            flagArgs.push(`--${key} "${item}"`);
+            cliArgs.push(`--${key}`, item);
           }
         } else if (typeof value === 'boolean') {
           // Boolean flags: only add if true, without value
           if (value) {
-            flagArgs.push(`--${key}`);
+            cliArgs.push(`--${key}`);
           }
         } else if (value !== undefined && value !== "") {
-          flagArgs.push(`--${key} "${value}"`);
+          cliArgs.push(`--${key}`, value);
         }
       }
-      cliArgs += flagArgs.length > 0 ? ` ${flagArgs.join(" ")}` : "";
     }
     
     // Check if json flag was already added by user

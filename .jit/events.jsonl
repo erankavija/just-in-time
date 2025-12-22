@@ -379,3 +379,8 @@
 {"type":"issue_created","id":"f31f6513-90df-4043-8d63-f50fbc463b53","issue_id":"b6aeb05b-dc02-435f-9ae1-ba0a1c6c63f4","timestamp":"2025-12-22T23:27:52.847081106Z","title":"Bug: issue update with --json flag fails silently","priority":"high"}
 {"type":"issue_created","id":"2e826138-1960-42c3-928e-8bcd55ecf63f","issue_id":"b45ba79e-6f30-41ee-a60f-5df1f7fc2522","timestamp":"2025-12-22T23:29:09.162734711Z","title":"Bug: issue descriptions with code blocks get corrupted","priority":"high"}
 {"type":"issue_state_changed","id":"3d9a100d-f548-447a-9e11-fe73134f60c3","issue_id":"b6aeb05b-dc02-435f-9ae1-ba0a1c6c63f4","timestamp":"2025-12-22T23:29:18.568940621Z","from":"ready","to":"backlog"}
+{"type":"issue_state_changed","id":"216d1cab-53ae-4808-a077-1f0e4f5be831","issue_id":"b45ba79e-6f30-41ee-a60f-5df1f7fc2522","timestamp":"2025-12-22T23:31:44.110080615Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"85810c6c-5ef3-4352-980d-cbdb437c5e75","issue_id":"b45ba79e-6f30-41ee-a60f-5df1f7fc2522","timestamp":"2025-12-22T23:31:44.112907607Z","assignee":"copilot:session-1"}
+{"type":"issue_created","id":"c04e095b-879b-4d69-9118-52166b47c1e6","issue_id":"ca55679a-f70f-46d6-a6e5-a2332ff21f60","timestamp":"2025-12-22T23:32:14.133597457Z","title":"Test description handling","priority":"normal"}
+{"type":"issue_created","id":"d58a4a28-15f6-45b3-9a17-2bab2b4a9e2e","issue_id":"49d3bd27-aac4-494b-8623-64316a368cd0","timestamp":"2025-12-22T23:32:23.340717623Z","title":"Test direct","priority":"normal"}
+{"type":"issue_created","id":"659ad325-5937-4c40-8ace-91725f10d3c4","issue_id":"cca39d5c-dfd2-46c3-961b-fb489275eb34","timestamp":"2025-12-22T23:34:50.158768535Z","title":"Test Fix","priority":"normal"}
