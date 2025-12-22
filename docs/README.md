@@ -1,64 +1,95 @@
 # JIT Documentation
 
-**Welcome to the Just-In-Time documentation.** This guide helps you navigate our documentation, understand archival policies, and follow authoring conventions.
+**Welcome to the Just-In-Time documentation.** This guide helps you navigate our documentation organization.
 
-## Organization Overview
+## Two Documentation Domains
 
-Our documentation is **domain-agnostic** — the structure and conventions work equally well for software development, research projects, knowledge work, or any workflow where you track issues and their context.
+JIT separates documentation into two clear domains:
 
-### Directory Structure
+### 📘 Product Documentation (`docs/`)
+**User-facing, permanent reference** → See [index.md](index.md)
+
+- What JIT is and how to use it
+- Domain-agnostic terminology and examples
+- Follows [Diátaxis](https://diataxis.fr/) framework (tutorials, how-to, reference, explanation)
+- **Never archives** - permanent reference material
+
+**Start here:** [docs/index.md](index.md)
+
+### 🔨 Development Documentation (`dev/`)
+**Contributor-facing, lifecycle-managed** → See [dev/index.md](../dev/index.md)
+
+- How we build JIT
+- Design decisions, architecture, investigations
+- Active work linked to issues
+- **Archives on completion** - keeps workspace focused
+
+**For contributors:** [dev/index.md](../dev/index.md)
+
+---
+
+## Directory Structure
 
 ```
-docs/
-├── README.md              # This file - navigation and conventions
-├── design.md              # Core architecture reference
-├── *.md                   # Active documentation (guides, designs, strategies)
-├── diagrams/              # Shared visual assets
-└── (see .jit/docs/archive/ for completed work)
+docs/                      # PRODUCT DOCUMENTATION (permanent)
+├── index.md              # Product docs landing page
+├── concepts/             # Explanation (what is JIT, core model)
+├── tutorials/            # Learning-oriented (getting started)
+├── how-to/               # Goal-oriented (specific use cases)
+├── reference/            # Information-oriented (CLI, storage, API)
+└── diagrams/             # Shared visual assets
 
-.jit/docs/archive/         # Archived documentation
-├── features/              # Completed feature designs
-├── bug-fixes/             # Bug analysis and fixes
-├── refactorings/          # Architecture changes
-└── sessions/              # Implementation session notes
+dev/                       # DEVELOPMENT DOCUMENTATION (lifecycle-managed)
+├── index.md              # Dev docs landing page
+├── active/               # Designs for in-progress issues
+├── architecture/         # Core system internals (permanent)
+├── vision/               # Future planning
+├── studies/              # Investigations and reference
+├── sessions/             # Development session notes
+└── archive/              # Completed work
+    ├── features/
+    ├── bug-fixes/
+    ├── refactorings/
+    ├── studies/
+    └── sessions/
 ```
 
-**Key principle:** `docs/` contains **active and recently completed** work. Older documentation moves to `.jit/docs/archive/` to keep the workspace focused.
+**Key principle:** `docs/` is for users, `dev/` is for contributors. Archives apply only to `dev/`.
 
-### Domain-Agnostic Approach
+---
 
-This structure adapts to different project types:
+## Archive Policy (Development Docs Only)
 
-- **Software development** (our use): Feature designs in active/, architecture in reference/
-- **Research projects**: Hypotheses and experiments in active/, published papers in archive/
-- **Knowledge work**: Project plans in active/, completed projects in archive/
+**Important:** Archival applies **only to `dev/`** directory. Product docs in `docs/` never archive.
 
-The mechanics are the same: link docs to issues, track lifecycle, archive when done.
+### What Archives
 
-## Archive Policy
+**Subject to archival:**
+- `dev/active/*.md` - When linked issue completes
+- `dev/studies/*.md` - When investigation completes  
+- `dev/sessions/*.md` - After 1-2 releases
 
-### When to Archive
+**Retention:** 1-2 releases after completion
 
-Documents move to archive when:
+### What Never Archives
 
-1. **Issue completes** - Design docs for Done/Rejected issues (retain 1-2 releases)
-2. **Feature ships** - Implementation guides after stabilization
-3. **Manual archival** - You decide a document is historical
+**Permanent documentation:**
+- All of `docs/` (product documentation)
+- `dev/architecture/*.md` (foundational reference)
+- `dev/vision/*.md` (may archive if abandoned)
 
-### Archive Categories
+### Archive Organization
 
-- **features/** - Completed feature designs and implementation plans
-- **bug-fixes/** - Bug analyses and resolution documentation
-- **refactorings/** - Architecture changes and migration guides
-- **sessions/** - Development session notes and progress logs
+```
+dev/archive/
+├── features/       # From dev/active/
+├── bug-fixes/      # From dev/active/
+├── refactorings/   # From dev/active/
+├── studies/        # From dev/studies/
+└── sessions/       # From dev/sessions/
+```
 
-### Retention Periods
-
-- **Active docs**: Current work, linked to in-progress issues
-- **Recently completed**: 1-2 releases after issue completion
-- **Archived**: Permanent, searchable via `jit search`
-
-### Finding Archived Docs
+### Finding Documentation
 
 ```bash
 # Search all documentation (including archives)
@@ -67,8 +98,14 @@ jit search "transitive reduction"
 # View doc from issue (works for archived docs too)
 jit doc show <issue-id> <path>
 
+# Browse product docs
+cat docs/index.md
+
+# Browse development docs  
+cat dev/index.md
+
 # List archived documents
-ls .jit/docs/archive/features/
+ls dev/archive/features/
 ```
 
 ## Authoring Conventions
@@ -96,8 +133,8 @@ docs/
 
 **On archival:** Move both doc and assets directory together:
 ```bash
-mv docs/my-feature-design.md .jit/docs/archive/features/
-mv docs/my-feature-design/ .jit/docs/archive/features/
+mv dev/active/my-feature-design.md dev/archive/features/
+mv dev/active/my-feature-design/ dev/archive/features/
 # Links still work - relative paths preserved
 ```
 
@@ -141,10 +178,10 @@ For external resources:
 
 ### Active Documentation
 
-- **Feature designs**: `docs/short-hash-implementation-plan.md`
-- **Architecture decisions**: `docs/design.md`
-- **Implementation strategies**: `docs/documentation-lifecycle-strategy.md`
-- **Session notes**: `docs/session-2025-12-21-short-hash-progress.md`
+- **Feature designs**: `dev/active/short-hash-implementation-plan.md`
+- **Architecture decisions**: `dev/architecture/core-system-design.md`
+- **Implementation strategies**: `dev/studies/documentation-lifecycle-strategy.md`
+- **Session notes**: `dev/sessions/session-2025-12-21-short-hash-progress.md`
 
 ### Archive Organization
 
@@ -220,21 +257,21 @@ jit doc history <issue-id> <path>
 
 ```bash
 # List archived categories
-ls .jit/docs/archive/
+ls dev/archive/
 
-# View archived document
-cat .jit/docs/archive/features/rejection-state.md
+# View archived document  
+cat dev/archive/features/rejection-state.md
 
 # Or use jit if it's linked to an issue
-jit doc show <issue-id> .jit/docs/archive/features/rejection-state.md
+jit doc show <issue-id> dev/archive/features/rejection-state.md
 ```
 
 ## Related Documentation
 
-- [Documentation Lifecycle Design](documentation-lifecycle-design.md) - Full design specification
-- [Documentation Lifecycle Strategy](documentation-lifecycle-strategy.md) - Implementation approach
-- [Phase 2 Design](documentation-lifecycle-phase2-design.md) - Asset management and snapshots
+- [Documentation Organization Strategy](../dev/studies/documentation-organization-strategy.md) - Full reorganization design
+- [Documentation Lifecycle Design](../dev/active/documentation-lifecycle-design.md) - Lifecycle management
+- [Documentation Lifecycle Phase 2](../dev/active/documentation-lifecycle-phase2-design.md) - Asset management
 
 ---
 
-**Questions?** Check [CONTRIBUTOR-QUICKSTART.md](../CONTRIBUTOR-QUICKSTART.md) or create an issue.
+**Questions?** Check [CONTRIBUTOR-QUICKSTART.md](../CONTRIBUTOR-QUICKSTART.md) or [dev/index.md](../dev/index.md).
