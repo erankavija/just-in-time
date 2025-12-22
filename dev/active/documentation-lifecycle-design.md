@@ -1,16 +1,19 @@
 # Documentation Lifecycle and Knowledge Capture — Design Plan
 
+**Note:** This design was created before the documentation reorganization (Issue 165cf162). References to paths have been updated to reflect the current implementation.
+
 This document consolidates and extends the existing strategy for documentation lifecycle management in JIT, adds first‑class support for binary assets, and generalizes document processing so projects are not limited to Markdown.
 
 Related references:
-- `docs/documentation-lifecycle-strategy.md` (current strategy)
-- `docs/knowledge-management-vision.md` (vision and CLI outline)
+- `documentation-organization-strategy.md` (implemented structure - Phase 1)
+- `documentation-lifecycle-strategy.md` (superseded early strategy)
+- `../vision/knowledge-management-vision.md` (vision and CLI outline)
 - `crates/jit/src/commands/document.rs` (existing document read/history APIs)
 
 ## 1) Goals
 
-- Keep `docs/` focused on active and recently completed work.
-- Preserve complete historical context in `.jit/docs/archive/` without link rot.
+- Keep `dev/active/` focused on active work; `docs/` for permanent product documentation.
+- Preserve complete historical context in `dev/archive/` without link rot.
 - Make snapshots portable and reproducible, including all linked assets.
 - Support multiple documentation formats (not Markdown‑only) via pluggable format adapters.
 - Provide a configurable policy per project (manual by default; optional automation).
@@ -28,12 +31,13 @@ Non‑goals:
 - Rendering/publishing pipelines.
 - Complex cross‑repo document dependency management.
 
-## 3) Current State Summary
+## 3) Current State Summary (Updated)
 
-- Active designs: `docs/design/` (kept 1–2 releases post‑completion).
-- Archived docs: `.jit/docs/archive/<category>/...` with link preservation via JIT references.
-- CLI/API groundwork: `jit doc add/list/remove/show`, `read_document_content`, `get_document_history`.
-- Strategy recommends manual archival initially.
+- **Active designs:** `dev/active/` (linked to in-progress issues)
+- **Archived docs:** `dev/archive/<category>/...` with link preservation via JIT references
+- **Product docs:** `docs/` (permanent, user-facing, never archived)
+- **CLI/API groundwork:** `jit doc add/list/remove/show`, `read_document_content`, `get_document_history`
+- **Strategy:** Manual archival initially (Phase 1 complete)
 
 ## 4) Requirements
 
@@ -54,36 +58,51 @@ Non‑functional:
 
 Add `[documentation]` to `config.toml`. Manual default, with optional automation and asset policies.
 
+**Current implementation (Phase 1):**
 ```toml
 [documentation]
-# Archival policy
+development_root = "dev"
+managed_paths = ["dev/active", "dev/studies", "dev/sessions"]
+archive_root = "dev/archive"
+permanent_paths = ["docs/"]
+```
+
+**Proposed extension (Phase 2 - Asset Management & Automation):**
+```toml
+[documentation]
+# Base configuration (implemented in Phase 1)
+development_root = "dev"
+managed_paths = ["dev/active", "dev/studies", "dev/sessions"]
+archive_root = "dev/archive"
+permanent_paths = ["docs/"]
+
+# Archival automation (Phase 2)
 mode = "manual"        # manual | release | done
 retention_releases = 2 # used by manual/release modes
-archive_root = ".jit/docs/archive"
 
-# Categories (subdirs under archive_root)
+# Categories (subdirs under archive_root) - already created in Phase 1
 categories.design   = "features"
 categories.analysis = "bug-fixes"
 categories.refactor = "refactorings"
 categories.session  = "sessions"
-categories.vision   = "vision"
+categories.study    = "studies"
 
-# Safety & UX
+# Safety & UX (Phase 2)
 strictness = "strict" # strict | loose | permissive
 block_if_linked_to_active_issue = true
 permanent_label = "permanent"
 
+# Asset management (Phase 2)
 [documentation.assets]
 mode = "mixed"            # per-doc | shared | mixed
 per_doc_suffix = "_assets"
-shared_roots = ["docs/assets/"]
+shared_roots = ["docs/diagrams/", "dev/diagrams/"]
 
 external.policy = "exclude"   # exclude | download | allow
 lfs.policy = "allow-pointers" # require | allow-pointers | prefer-working-tree
 
-# Format adapters: enable/disable and per-format overrides
+# Format adapters (Phase 2)
 [documentation.formats]
-# Keys are adapter IDs. Values can be true/false or a table for overrides.
 markdown = true
 asciidoc = true
 restructuredtext = false
@@ -118,13 +137,13 @@ Extend the document reference stored in issue metadata:
 
 ```json
 {
-  "path": "docs/design/webhooks.md",
+  "path": "dev/active/webhooks.md",
   "commit": "abc123",                   // optional
   "doc_type": "design",
   "format": "markdown",                 // adapter id
   "assets": [
     {
-      "path": "docs/design/webhooks_assets/flow.png",
+      "path": "dev/active/webhooks_assets/flow.png",
       "shared": false,
       "hash_sha256": null,
       "mime": "image/png"
@@ -177,7 +196,7 @@ Fallbacks:
 ## 9) Asset Management
 
 Authoring conventions:
-- For a doc `docs/design/feature.md`, use per‑doc assets under `docs/design/feature_assets/` and link relatively: `./feature_assets/diagram.png`.
+- For a doc `dev/active/feature.md`, use per‑doc assets under `dev/active/feature_assets/` and link relatively: `./feature_assets/diagram.png`.
 - For shared assets, prefer stable repo‑root‑relative links: `/docs/assets/shared/logo.png`.
 
 Classification:
@@ -185,7 +204,7 @@ Classification:
 - Shared assets: referenced by multiple docs; remain in place; avoid rewrites.
 
 Archival:
-- Per‑doc assets move with the doc to `.jit/docs/archive/<category>/...`.
+- Per‑doc assets move with the doc to `dev/archive/<category>/...`.
 - Shared assets remain; links must be root‑relative or safely rewritten.
 - Safety: refuse archival if relative shared links would break (unless `--rewrite-links`).
 
@@ -228,13 +247,13 @@ Manifest (example):
   "documents_count": 42,
   "documents": [
     {
-      "path": "docs/design/webhooks.md",
+      "path": "dev/active/webhooks.md",
       "format": "markdown",
       "source": {"type": "git", "commit": "abc123", "blob_sha": "deadbeef"},
       "hash_sha256": "…",
       "assets": [
         {
-          "path": "docs/design/webhooks_assets/flow.png",
+          "path": "dev/active/webhooks_assets/flow.png",
           "source": {"type":"git","commit":"abc123","blob_sha":"…"},
           "hash_sha256": "…",
           "mime": "image/png",

@@ -1,5 +1,22 @@
 # Documentation Lifecycle Strategy
 
+**⚠️ STATUS: SUPERSEDED**
+
+This document describes an earlier approach to documentation lifecycle. It has been superseded by:
+- **[documentation-organization-strategy.md](documentation-organization-strategy.md)** - Current implementation
+- **[../active/documentation-lifecycle-design.md](../active/documentation-lifecycle-design.md)** - Phase 2 design
+
+**Key changes from this document:**
+- Archive location: `.jit/docs/archive/` → **`dev/archive/`** (more visible, git-friendly)
+- Directory structure: Single `docs/` → **Split `docs/` (product) + `dev/` (development)**
+- Active designs: `docs/design/` → **`dev/active/`**
+
+Keeping this document for historical reference only.
+
+---
+
+# Original Content (Historical)
+
 ## Problem Statement
 
 Currently:
