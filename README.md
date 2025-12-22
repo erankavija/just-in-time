@@ -376,7 +376,7 @@ backlog → ready → in_progress → gated → done
 - **Postchecks** run after work completes (e.g., run tests, lint, security scans)
 - Gates can be **manual** (human approval) or **automated** (script execution)
 
-See [docs/ci-gate-integration-design.md](docs/ci-gate-integration-design.md) for gate details.
+See [dev/active/ci-gate-integration-design.md](dev/active/ci-gate-integration-design.md) for gate details.
 | **Strategic Views** | Filter and visualize high-level planning vs tactical work |
 | **Configurable Rules** | Customize type hierarchies and validation per repository |
 | **Coordinator Daemon** | Automatically dispatches ready work to available agents |
@@ -414,7 +414,7 @@ jit query label "epic:*"   # Shows all issues belonging to any epic
 - **Flexible Naming**: Use your own terminology (themes, features, etc.)
 - **Validation**: Warns about orphaned tasks or missing strategic labels
 
-See [docs/label-conventions.md](docs/label-conventions.md) for detailed usage patterns.
+See [dev/studies/label-conventions.md](dev/studies/label-conventions.md) for detailed usage patterns.
 
 ## Configuration
 
@@ -436,7 +436,7 @@ warn_orphaned_leaves = true       # Warn on tasks without parent labels
 warn_strategic_consistency = true # Warn on strategic types missing labels
 ```
 
-See [docs/example-config.toml](docs/example-config.toml) for more examples.
+See [docs/reference/example-config.toml](docs/reference/example-config.toml) for more examples.
 
 ## Commands
 
@@ -516,11 +516,13 @@ jit issue list
 jit issue update <issue-id> --state done
 ```
 
-File locking ensures data consistency. See [docs/file-locking-usage.md](docs/file-locking-usage.md) for details.
+File locking ensures data consistency. See [dev/archive/features/file-locking-usage.md](dev/archive/features/file-locking-usage.md) for details.
 
 ## Documentation
 
-**[📖 Documentation Home](docs/README.md)** - Navigation, archival policy, and authoring conventions
+**[📖 Product Documentation](docs/index.md)** - Tutorials, how-to guides, reference (for users)
+
+**[🔨 Development Documentation](dev/index.md)** - Architecture, active designs (for contributors)
 
 ### Getting Started
 - [INSTALL.md](INSTALL.md) - Installation guide (binaries, Docker, from source)
@@ -529,14 +531,14 @@ File locking ensures data consistency. See [docs/file-locking-usage.md](docs/fil
 - [DEPLOYMENT.md](DEPLOYMENT.md) - Production deployment guide
 
 ### Core Design
-- [docs/design.md](docs/design.md) - Core architecture and design principles
-- [docs/documentation-lifecycle-design.md](docs/documentation-lifecycle-design.md) - Documentation management approach
+- [dev/architecture/core-system-design.md](dev/architecture/core-system-design.md) - Core architecture and design principles
+- [dev/active/documentation-lifecycle-design.md](dev/active/documentation-lifecycle-design.md) - Documentation management approach
 
 ### Development
 - [ROADMAP.md](ROADMAP.md) - Development phases and progress
 - [TESTING.md](TESTING.md) - Testing strategy and best practices
 
-**Note:** Our documentation follows a **domain-agnostic structure** that works for software development, research, or knowledge work. See [docs/README.md](docs/README.md) for the full organization and conventions.
+**Note:** Documentation is split into **product docs** (`docs/` - user-facing, permanent) and **development docs** (`dev/` - contributor-facing, lifecycle-managed). See [docs/README.md](docs/README.md) for organization details.
 
 ## Architecture
 

@@ -68,7 +68,9 @@ jit query ready --json | head -5
 - **ROADMAP.md** - Where we are, where we're going
 - **TESTING.md** - TDD approach, test strategy
 - **.copilot-instructions.md** - Coding standards, patterns to follow
-- **docs/design.md** - Core architecture
+- **dev/architecture/core-system-design.md** - Core architecture
+- **dev/index.md** - Development documentation guide
+- **docs/index.md** - Product documentation (user-facing)
 - **EXAMPLE.md** - Usage examples
 
 ## Common Patterns
@@ -95,7 +97,7 @@ rg "resolve_issue_id" --type rust
 - **Use short hashes**: `jit issue show 003f9f8` instead of full UUID
 - **Check blocked reasons**: `jit query blocked` shows why issues can't start
 - **Follow the gates**: They enforce quality (TDD, tests, clippy, fmt, code-review)
-- **Read session notes**: Issues in progress often have `docs/session-*.md` attached
+- **Read session notes**: Issues in progress often have `dev/sessions/session-*.md` attached
 - **Commit often**: Small focused commits with clear messages
 - **No hacks**: Code quality matters - if you're tempted to shortcut, add a TODO issue instead
 
