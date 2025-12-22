@@ -2,7 +2,7 @@
   "id": "3977f5da-0025-4785-b1e5-453a61ea1fcd",
   "title": "Fix short hash resolution in jit issue update --json",
   "description": "Short hash resolution fails when --json flag is used, breaking MCP tools.\n\nProblem: jit issue update ac99db8b --json --state done fails with 'Failed to read file: ac99db8b.json'\n\nImpact:\n- MCP tools broken (all use --json)\n- Scripting broken\n- UX inconsistency\n- Documented feature broken\n\nRoot cause: Short hash resolution happens AFTER JSON output logic tries to read file.\n\nFix: Resolve short hashes BEFORE any file I/O operations.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "high",
   "assignee": "agent:copilot-session-1",
   "dependencies": [

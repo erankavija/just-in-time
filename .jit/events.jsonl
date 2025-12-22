@@ -347,3 +347,9 @@
 {"type":"issue_claimed","id":"03c587dc-b7b6-4b03-836d-4c1b5b01b34e","issue_id":"3977f5da-0025-4785-b1e5-453a61ea1fcd","timestamp":"2025-12-22T22:45:56.051678263Z","assignee":"agent:copilot-session-1"}
 {"type":"issue_created","id":"bce11ef7-97e5-4d4d-a86c-64ef1530854e","issue_id":"0f68fa81-583a-4b5f-8cf0-0744742bef78","timestamp":"2025-12-22T22:46:55.225643642Z","title":"Test issue for short hash","priority":"low"}
 {"type":"issue_state_changed","id":"629dae05-b06e-490e-91cd-56f47cd6bc5b","issue_id":"0f68fa81-583a-4b5f-8cf0-0744742bef78","timestamp":"2025-12-22T22:47:08.088048846Z","from":"ready","to":"in_progress"}
+{"type":"issue_state_changed","id":"bfd6fc3e-1dea-4cfe-bcb4-76ac7c2fb20f","issue_id":"3977f5da-0025-4785-b1e5-453a61ea1fcd","timestamp":"2025-12-22T22:51:25.169158939Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"287426d6-771a-473c-82c4-d7bdc9e84931","issue_id":"3977f5da-0025-4785-b1e5-453a61ea1fcd","timestamp":"2025-12-22T22:51:25.169209709Z"}
+{"type":"issue_state_changed","id":"dcce0e5c-a67a-49bf-8ca0-1cb2d30c0a6d","issue_id":"ed5241de-d5b7-47ea-b156-58d978b42eeb","timestamp":"2025-12-22T22:56:21.381675158Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"4bf44a83-4e76-40ad-95dd-da1b3c4de482","issue_id":"ed5241de-d5b7-47ea-b156-58d978b42eeb","timestamp":"2025-12-22T22:56:21.384619270Z","assignee":"copilot:session-1"}
+{"type":"issue_state_changed","id":"883e538d-b8a8-4cb7-8973-7571a040c77e","issue_id":"ed5241de-d5b7-47ea-b156-58d978b42eeb","timestamp":"2025-12-22T22:59:29.928914805Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"4b06f169-ff99-4fbf-a439-4843b06e7972","issue_id":"ed5241de-d5b7-47ea-b156-58d978b42eeb","timestamp":"2025-12-22T22:59:29.928944225Z"}
