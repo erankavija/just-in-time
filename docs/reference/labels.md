@@ -1,20 +1,54 @@
-# Label Conventions & Agent Usage
+# JIT Labels Reference
 
-**Date**: 2025-12-07  
-**Status**: Design specification  
-**Goal**: Unambiguous label system that AI agents can use reliably
+**Canonical reference for JIT's label system**
+
+Labels provide organizational membership and classification for issues. This guide covers label format, namespaces, validation rules, and usage patterns.
+
+**Related:** For work ordering and blocking relationships, see [Dependencies](../concepts/dependencies.md)
 
 ---
 
-## Problem Statement
+## Overview
 
-Labels can be ambiguous if not well-designed:
-- `"auth"` vs `"epic:auth"` - which is correct?
-- `"milestone:v1.0"` vs `"milestone-v1.0"` - format confusion
-- `"backend"` vs `"component:backend"` - category unclear
-- Multiple agents creating inconsistent labels
+### What Are Labels?
 
-**Solution**: Enforce structure and provide clear rules.
+Labels are **namespace:value** pairs that provide:
+- **Organizational membership** - Group issues by epic, milestone, component
+- **Classification** - Mark issue types, priorities, status
+- **Filtering** - Query and report on related work
+- **Strategic planning** - Identify high-level vs tactical work
+
+**Example:**
+```bash
+jit issue create --title "Add login" \
+  --label type:task \
+  --label epic:auth \
+  --label component:backend \
+  --label milestone:v1.0
+```
+
+### Labels vs Dependencies
+
+**Labels** (membership/grouping):
+- Purpose: Organization, filtering, reporting
+- Relationship: "belongs to" (many-to-many)
+- Query: `jit query label "epic:auth"` shows all members
+- No workflow impact
+
+**Dependencies** (work order/blocking):
+- Purpose: Work sequencing, blocking relationships
+- Relationship: "is required by" (directed acyclic graph)
+- Query: `jit query blocked` shows blocked issues
+- Blocks workflow until complete
+
+**Example:**
+```
+Task: "Implement JWT"
+  ├─ label "epic:auth"      → belongs to Auth epic (membership)
+  └─ dependency on "Setup DB" → cannot start until DB ready (blocking)
+```
+
+Both can flow the same direction (task → epic → milestone) but serve different purposes and can be used independently.
 
 ---
 
@@ -649,6 +683,159 @@ Agents can parse this to:
 - Discover available namespaces
 - See existing values
 - Understand strategic labels
+
+---
+
+## Configuration
+
+Labels are configured in `.jit/config.toml` under the `[type_hierarchy]` section:
+
+```toml
+[type_hierarchy]
+# Type name to hierarchy level mapping (lower numbers = more strategic)
+types = { milestone = 1, epic = 2, story = 3, task = 4 }
+
+# List of type names that are considered strategic (for query strategic)
+strategic_types = ["milestone", "epic"]
+
+# Type name to membership label namespace mapping
+[type_hierarchy.label_associations]
+epic = "epic"
+milestone = "milestone"
+story = "story"
+```
+
+**Customization examples:**
+
+### Minimal 2-Level Hierarchy
+```toml
+[type_hierarchy]
+types = { epic = 1, task = 2 }
+
+[type_hierarchy.label_associations]
+epic = "epic"
+```
+
+### Extended 5-Level Hierarchy
+```toml
+[type_hierarchy]
+types = { program = 1, milestone = 2, epic = 3, story = 4, task = 5 }
+strategic_types = ["program", "milestone", "epic"]
+
+[type_hierarchy.label_associations]
+program = "program"
+milestone = "milestone"
+epic = "epic"
+story = "story"
+```
+
+### Custom Naming (Theme Instead of Epic)
+```toml
+[type_hierarchy]
+types = { release = 1, theme = 2, task = 3 }
+strategic_types = ["release", "theme"]
+
+[type_hierarchy.label_associations]
+theme = "epic"        # Map theme type to epic namespace
+release = "milestone" # Map release type to milestone namespace
+```
+
+**See also:** [docs/reference/example-config.toml](example-config.toml) for complete configuration examples.
+
+---
+
+## Quick Reference
+
+### The Golden Rules
+
+**Rule 1: Every Issue MUST Have a Type**
+```bash
+# ❌ WRONG - No type label
+jit issue create --title "Login API" --label "epic:auth"
+
+# ✅ CORRECT - Has type label
+jit issue create --title "Login API" --label "type:task" --label "epic:auth"
+```
+
+**Rule 2: Type vs Membership Labels**
+
+| Label | Meaning | Answers |
+|-------|---------|---------|
+| `type:*` | **What it IS** | "What kind of work item?" |
+| `epic:*` | **What it BELONGS TO** | "Which epic does this contribute to?" |
+| `milestone:*` | **What it BELONGS TO** | "Which release is this part of?" |
+
+### Common Patterns
+
+**Creating an Epic:**
+```bash
+jit issue create \
+  --title "User Authentication System" \
+  --label "type:epic" \         # This IS an epic
+  --label "epic:auth" \          # This epic is about auth (group ID)
+  --label "milestone:v1.0"       # This epic is part of v1.0
+```
+
+Why both `type:epic` and `epic:auth`?
+- `type:epic` = Tells you what it **is** (the type)
+- `epic:auth` = Creates a **group identifier** for child tasks to reference
+- Child tasks use `epic:auth` to show membership
+
+**Creating Tasks Under an Epic:**
+```bash
+jit issue create \
+  --title "Implement JWT validation" \
+  --label "type:task" \          # This IS a task
+  --label "epic:auth" \           # Belongs to auth epic
+  --label "milestone:v1.0" \      # Belongs to v1.0 milestone
+  --label "component:backend"     # Additional metadata
+```
+
+**Creating a Milestone:**
+```bash
+jit issue create \
+  --title "Release v1.0" \
+  --label "type:milestone" \     # This IS a milestone
+  --label "milestone:v1.0"       # Self-referential group ID
+```
+
+### Namespace Reference Table
+
+**Required on Every Issue:**
+
+| Namespace | Unique? | Examples | Purpose |
+|-----------|---------|----------|---------|
+| `type:*` | ✅ Yes | `type:task`, `type:epic`, `type:milestone` | Defines what the issue IS |
+
+**Optional Strategic Labels:**
+
+| Namespace | Unique? | Examples | Purpose |
+|-----------|---------|----------|---------|
+| `epic:*` | ❌ No | `epic:auth`, `epic:billing` | Groups work under an epic |
+| `milestone:*` | ❌ No | `milestone:v1.0`, `milestone:q1-2026` | Groups work in a release |
+
+**Optional Metadata Labels:**
+
+| Namespace | Unique? | Examples | Purpose |
+|-----------|---------|----------|---------|
+| `component:*` | ❌ No | `component:backend`, `component:frontend` | Technical area |
+| `team:*` | ✅ Yes | `team:platform`, `team:api` | Owning team |
+| `priority:*` | ✅ Yes | `priority:p0`, `priority:p1` | Priority level |
+| `status:*` | ✅ Yes | `status:needs-review`, `status:blocked` | Additional status markers |
+
+### DO's and DON'Ts
+
+**DO:**
+- ✅ Use `type:task` + `epic:auth` for tasks
+- ✅ Use `type:epic` + `epic:auth` + `milestone:v1.0` for epics
+- ✅ Query by membership: `jit query label "epic:auth"`
+- ✅ Use lowercase for namespaces
+
+**DON'T:**
+- ❌ Skip the `type:` label
+- ❌ Use uppercase in namespaces (`Type:task`)
+- ❌ Use hyphens instead of colons (`epic-auth`)
+- ❌ Create freeform labels without namespaces
 
 ---
 
