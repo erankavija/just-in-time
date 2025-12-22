@@ -16,7 +16,7 @@
   "context": {},
   "documents": [
     {
-      "path": "docs/observability-design.md",
+      "path": "dev/active/observability-design.md",
       "commit": null,
       "label": "Design Document",
       "doc_type": "design"

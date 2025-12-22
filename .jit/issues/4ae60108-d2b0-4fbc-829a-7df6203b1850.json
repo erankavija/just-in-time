@@ -43,7 +43,7 @@
   "context": {},
   "documents": [
     {
-      "path": "docs/state-transition-feedback-design.md",
+      "path": "dev/active/state-transition-feedback-design.md",
       "commit": null,
       "label": "Design Document",
       "doc_type": "design"

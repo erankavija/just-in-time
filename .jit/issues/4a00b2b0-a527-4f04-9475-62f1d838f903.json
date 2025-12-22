@@ -18,7 +18,7 @@
   "context": {},
   "documents": [
     {
-      "path": "docs/agent-validation-design.md",
+      "path": "dev/active/agent-validation-design.md",
       "commit": null,
       "label": "Design Document",
       "doc_type": "design"

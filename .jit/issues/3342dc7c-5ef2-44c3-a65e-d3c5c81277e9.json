@@ -43,7 +43,7 @@
   "context": {},
   "documents": [
     {
-      "path": "docs/gate-preview-analysis.md",
+      "path": "dev/archive/studies/gate-preview-analysis.md",
       "commit": null,
       "label": "Closure Analysis",
       "doc_type": "analysis"

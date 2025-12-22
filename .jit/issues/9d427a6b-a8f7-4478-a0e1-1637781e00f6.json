@@ -16,7 +16,7 @@
   "context": {},
   "documents": [
     {
-      "path": "docs/production-polish-design.md",
+      "path": "dev/active/production-polish-design.md",
       "commit": null,
       "label": "Design Document",
       "doc_type": "design"

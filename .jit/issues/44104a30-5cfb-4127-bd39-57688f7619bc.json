@@ -17,7 +17,7 @@
   "context": {},
   "documents": [
     {
-      "path": "docs/bulk-operations-plan.md",
+      "path": "dev/active/bulk-operations-plan.md",
       "commit": null,
       "label": "Implementation Plan",
       "doc_type": "design"

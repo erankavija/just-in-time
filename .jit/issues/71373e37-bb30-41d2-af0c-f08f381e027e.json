@@ -19,13 +19,13 @@
   "context": {},
   "documents": [
     {
-      "path": "docs/documentation-lifecycle-strategy.md",
+      "path": "dev/studies/documentation-lifecycle-strategy.md",
       "commit": null,
       "label": "Implementation Strategy",
       "doc_type": "design"
     },
     {
-      "path": "docs/documentation-lifecycle-design.md",
+      "path": "dev/active/documentation-lifecycle-design.md",
       "commit": null,
       "label": "Authoritative Design",
       "doc_type": "design"

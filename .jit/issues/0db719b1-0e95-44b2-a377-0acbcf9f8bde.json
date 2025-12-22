@@ -17,7 +17,7 @@
   "context": {},
   "documents": [
     {
-      "path": "docs/json-output-standardization-plan.md",
+      "path": "dev/active/json-output-standardization-plan.md",
       "commit": null,
       "label": "Implementation Plan",
       "doc_type": "design"

@@ -18,7 +18,7 @@
   "context": {},
   "documents": [
     {
-      "path": "docs/production-stability-design.md",
+      "path": "dev/active/production-stability-design.md",
       "commit": null,
       "label": "Design Document",
       "doc_type": "design"

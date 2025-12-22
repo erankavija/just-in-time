@@ -19,7 +19,7 @@
   "context": {},
   "documents": [
     {
-      "path": "docs/rejection-state-design.md",
+      "path": "dev/active/rejection-state-design.md",
       "commit": null,
       "label": "Design Document",
       "doc_type": "design"

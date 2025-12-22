@@ -29,13 +29,13 @@
   "context": {},
   "documents": [
     {
-      "path": "docs/ci-gate-integration-design.md",
+      "path": "dev/active/ci-gate-integration-design.md",
       "commit": null,
       "label": "Design Document",
       "doc_type": null
     },
     {
-      "path": "docs/gate-examples.md",
+      "path": "dev/active/gate-examples.md",
       "commit": null,
       "label": "Examples",
       "doc_type": null

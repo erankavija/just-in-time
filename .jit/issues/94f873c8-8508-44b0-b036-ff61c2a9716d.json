@@ -15,7 +15,7 @@
   "context": {},
   "documents": [
     {
-      "path": "docs/documentation-lifecycle-phase2-design.md",
+      "path": "dev/active/documentation-lifecycle-phase2-design.md",
       "commit": null,
       "label": "Phase 2 Design",
       "doc_type": "design"
