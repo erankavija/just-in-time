@@ -1,0 +1,43 @@
+# JIT Configuration File
+#
+# Place this file at `.jit/config.toml` to customize behavior.
+# All settings are optional - JIT will use sensible defaults if this file doesn't exist.
+
+[documentation]
+# Documentation lifecycle management configuration
+development_root = "dev"  # Root directory for development documentation
+managed_paths = ["dev/active", "dev/studies", "dev/sessions"]  # Paths subject to archival
+archive_root = "dev/archive"  # Where archived docs are stored
+permanent_paths = ["docs/"]  # Paths that never archive
+
+# Archive retention policy:
+# - dev/active/* → Archived when linked issue completes (retention: 1-2 releases)
+# - dev/studies/* → Archived when investigation completes (retention: 1-2 releases)
+# - dev/sessions/* → Archived after 1-2 releases
+# - docs/* → Never archived (permanent product documentation)
+# - dev/architecture/* → Never archived (permanent internal reference)
+# - dev/vision/* → May archive if abandoned
+
+[type_hierarchy]
+# Type name to hierarchy level mapping (lower numbers = more strategic)
+# Default: { milestone = 1, epic = 2, story = 3, task = 4 }
+types = { milestone = 1, epic = 2, story = 3, task = 4 }
+
+# List of type names that are considered strategic (for query strategic)
+# Default: ["milestone", "epic"] (levels 1-2)
+strategic_types = ["milestone", "epic"]
+
+# Type name to membership label namespace mapping
+[type_hierarchy.label_associations]
+epic = "epic"
+milestone = "milestone"
+story = "story"
+
+[validation]
+# Strictness level: "strict", "loose", or "permissive"
+# - "loose": Warnings are informational, errors block (default)
+strictness = "loose"
+
+# Enable/disable specific validation warnings
+warn_orphaned_leaves = true          # Warn on tasks without parent labels
+warn_strategic_consistency = true    # Warn on strategic types missing identifying labels
