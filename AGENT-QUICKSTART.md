@@ -1,241 +1,422 @@
-# JIT Agent Quickstart
+# Agent Quick Start
 
-**Goal**: Test JIT with an AI agent that creates a complete, best-practice project structure.
+**Goal:** Get productive as an AI agent in 5 minutes. Understand JIT structure, label conventions, and MCP tools.
 
-## 🚀 One-Command Setup
+## 1. Core Concepts (2 minutes)
 
-```bash
-# 1. Build JIT
-cargo build --release --workspace
-export PATH="$PWD/target/release:$PATH"
+JIT is a **CLI-first issue tracker** designed for **AI agents**:
+- **Dependency DAG** - "Task B needs Task A done first"
+- **Quality Gates** - "Tests must pass before marking done"
+- **Agent-friendly** - JSON output, atomic operations, MCP tools
+- **Hierarchical labels** - `namespace:value` format for organization
 
-# 2. Create test project
-mkdir ~/jit-agent-test && cd ~/jit-agent-test
-jit init
+Everything is in `.jit/` (like `.git/`). Plain JSON files. Version controlled.
 
-# 3. Run the agent initialization script
-bash ~/Projects/just-in-time/scripts/agent-init-demo-project.sh
+### Issue States
 ```
-
-**That's it!** The script creates a complete project with:
-- 1 Milestone (v1.0 release)
-- 4 Epics (Auth, API, UI, Infrastructure)
-- ~15 Tasks with proper dependencies
-- Quality gates configured
-- Full dependency graph
-
----
-
-## 📋 What Gets Created
-
+open → ready → in_progress → done
+         ↓
+      blocked (has incomplete dependencies or failing gates)
 ```
-Release v1.0 (milestone)
-├── User Authentication (epic)
-│   ├── Create User model (task)
-│   ├── Implement JWT utilities (task)
-│   ├── Build login endpoint (task)
-│   ├── Create auth middleware (task)
-│   └── Write integration tests (task)
-├── RESTful API (epic)
-│   ├── Create router structure (task)
-│   ├── Implement CRUD endpoints (task)
-│   ├── Add error handling (task)
-│   └── Write API tests (task)
-├── Web UI (epic)
-│   ├── Setup React project (task)
-│   ├── Create auth components (task)
-│   ├── Build dashboard (task)
-│   └── Implement API client (task)
-└── Infrastructure (epic)
-    ├── Design database schema (task)
-    ├── Setup migrations (task)
-    └── Configure connection pooling (task)
-```
-
----
-
-## 🎯 Agent Testing Scenarios
-
-### 1. View the Structure
-```bash
-# Strategic overview (milestones + epics)
-jit query strategic
-
-# Full dependency graph
-jit graph show <milestone-id>
-
-# Current status
-jit status
-```
-
-### 2. Start Working
-```bash
-# Mark foundation task as ready
-jit issue update <task-id> --state ready
-
-# Agent claims work
-jit issue claim <task-id> agent:copilot-test
-
-# Complete the work
-jit gate pass <task-id> unit-tests
-jit issue update <task-id> --state done
-```
-
-### 3. Dynamic Issue Creation
-```bash
-# Agent discovers new work needed
-NEW_TASK=$(jit issue create \
-  --title "Add rate limiting" \
-  --label "type:task" \
-  --label "epic:auth" \
-  --label "milestone:v1.0" \
-  --priority critical | grep -oP 'Created issue: \K\S+')
-
-# Add as dependency
-jit dep add <epic-id> $NEW_TASK
-```
-
-### 4. Monitor Progress
-```bash
-jit events tail        # Audit log
-jit query blocked      # What's blocked and why
-jit query ready        # What's ready to work on
-```
-
----
-
-## 🤖 Custom Agent Instructions
-
-If you want your agent to create a DIFFERENT project structure, give it these rules:
 
 ### Label Format (CRITICAL)
-```
-ALL labels MUST use: namespace:value
 
+**ALL labels MUST use**: `namespace:value`
+
+```
 ✅ CORRECT:
-  --label "type:task"
-  --label "epic:auth"
-  --label "milestone:v1.0"
-  --label "component:backend"
+  type:task, epic:auth, milestone:v1.0, component:backend
 
 ❌ WRONG:
-  --label "auth"           (missing namespace)
-  --label "milestone-v1.0" (wrong separator)
-  --label "Type:task"      (uppercase namespace)
+  auth (missing namespace)
+  milestone-v1.0 (wrong separator)
+  Type:task (uppercase namespace)
 ```
 
 ### Required Labels
-1. **type:*** (required, unique - exactly ONE per issue):
-   - `type:milestone` - Release goal
-   - `type:epic` - Large feature
-   - `type:task` - Concrete work
-   - `type:research` - Investigation
-   - `type:bug` - Defect
 
-2. **milestone:*** - Groups work under releases
-3. **epic:*** - Groups tasks under features
-4. **component:*** (optional) - Technical area
+**Every issue must have exactly ONE**:
+```
+type:*
+├─ type:milestone    Release/time-bound goal
+├─ type:epic         Large feature
+├─ type:task         Concrete work item
+├─ type:research     Time-boxed investigation
+└─ type:bug          Defect to fix
+```
 
-### Hierarchy Pattern
+**Organization labels** (optional but recommended):
+```
+milestone:*    Groups work under releases (e.g., milestone:v1.0)
+epic:*         Groups tasks under features (e.g., epic:auth)
+component:*    Technical area (e.g., component:backend, component:web)
+```
+
+---
+
+## 2. Find Your Next Task (1 minute)
+
+### Via CLI
+```bash
+# See what's ready to work on (prioritized)
+jit query ready --json | jq -r '.issues[] | "\(.priority) | \(.id[0:8]) | \(.title)"'
+
+# Claim a task atomically
+jit issue claim <short-hash> agent:your-name
+
+# Check what's blocking progress
+jit query blocked --json
+```
+
+### Via MCP Tools
+
+**Use MCP tools exclusively** - don't fall back to CLI/bash for efficiency.
+
+```javascript
+// Find ready work
+const ready = await jit_query_ready({ json: true });
+
+// Claim atomically
+await jit_issue_claim({
+  id: "01abc123",
+  assignee: "agent:copilot-session-1"
+});
+
+// Check dependencies
+await jit_issue_show({ id: "01abc123", json: true });
+```
+
+---
+
+## 3. MCP Tool Reference
+
+### Parameter Names (Use These!)
+
+**MCP tool parameters match CLI exactly:**
+
+```javascript
+jit_issue_create({
+  title: "string",
+  description: "string",        // Full word (consistent with CLI)
+  label: ["type:task", ...],    // Array, singular form
+  gate: ["tests", "review"],    // Array, singular form  
+  priority: "high"
+})
+```
+
+### Common MCP Tools
+
+**Issue Management:**
+- `jit_issue_create` - Create new issue
+- `jit_issue_show` - Get issue details
+- `jit_issue_list` - List issues with filters
+- `jit_issue_update` - Modify issue (state, labels, priority)
+- `jit_issue_claim` - Atomically claim unassigned issue
+- `jit_issue_claim_next` - Claim next ready issue by priority
+- `jit_issue_search` - Full-text search
+
+**Dependencies:**
+- `jit_dep_add` - Add dependency (FROM depends on TO)
+- `jit_dep_rm` - Remove dependency
+
+**Gates:**
+- `jit_gate_list` - List gate definitions
+- `jit_gate_add` - Add gate requirement to issue
+- `jit_gate_check` - Run automated gate
+- `jit_gate_pass` - Mark gate as passed
+- `jit_gate_fail` - Mark gate as failed
+
+**Queries:**
+- `jit_query_ready` - Issues ready to work on
+- `jit_query_blocked` - Blocked issues with reasons
+- `jit_query_state` - Filter by state
+- `jit_query_priority` - Filter by priority
+- `jit_query_label` - Filter by label pattern
+
+**Graph:**
+- `jit_graph_show` - Show dependency tree
+- `jit_graph_roots` - Find root issues (no dependencies)
+- `jit_graph_downstream` - Show what's blocked by this issue
+
+### Efficiency Tips
+
+✅ **Parallel operations**: Use Promise.all() for creating multiple issues  
+✅ **Chain MCP calls**: Structured JSON responses are easy to parse  
+✅ **Use short hashes**: `jit issue show 01abc` works  
+✅ **Check `--json` output**: All commands support machine-readable format
+
+---
+
+## 4. Work on Tasks (following TDD)
+
+```bash
+# 1. Write tests first
+cargo test <feature_name>  # Should fail
+
+# 2. Implement minimal code to pass
+cargo test <feature_name>  # Should pass
+
+# 3. Run quality checks
+cargo test --workspace --quiet
+cargo clippy --workspace --all-targets
+cargo fmt --all
+
+# 4. Pass gates
+jit gate pass <short-hash> tests
+jit gate pass <short-hash> clippy  
+jit gate pass <short-hash> fmt
+
+# 5. Mark done (auto-transitions if all gates passed)
+jit issue update <short-hash> --state done
+```
+
+### Gate Workflow
+
+Gates are quality checkpoints that must pass before completion:
+
+```bash
+# Add gates to an issue
+jit issue create \
+  --title "Implement parser" \
+  --label "type:task" \
+  --gate tests --gate clippy --gate code-review
+
+# Check gate status
+jit issue show <id> --json | jq '.data.gates_status'
+
+# Run automated gate
+jit gate check <id> tests
+
+# Manual gates
+jit gate pass <id> code-review --by "reviewer:alice"
+```
+
+**Gate strictness:** Gates may use stricter checks than manual commands (e.g., `clippy` gate uses `-D warnings`). Check gate definition: `jit gate show <gate-key>`.
+
+---
+
+## 5. Create Issues & Structure
+
+### Basic Pattern
+
 ```bash
 # Milestone (the release)
-MILESTONE=$(jit issue create \
-  --title "Release v2.0" \
+jit issue create \
+  --title "Release v1.0" \
   --label "type:milestone" \
-  --label "milestone:v2.0" \
-  --priority critical)
+  --label "milestone:v1.0" \
+  --priority critical
 
 # Epic (feature in release)
-EPIC=$(jit issue create \
-  --title "Payment System" \
+jit issue create \
+  --title "User Authentication" \
   --label "type:epic" \
-  --label "epic:payments" \
-  --label "milestone:v2.0" \
-  --priority high)
+  --label "epic:auth" \
+  --label "milestone:v1.0" \
+  --priority high
 
 # Task (work in epic)
-TASK=$(jit issue create \
-  --title "Integrate Stripe API" \
+jit issue create \
+  --title "Implement JWT utilities" \
   --label "type:task" \
-  --label "epic:payments" \
-  --label "milestone:v2.0" \
+  --label "epic:auth" \
+  --label "milestone:v1.0" \
   --label "component:backend" \
   --priority high \
-  --gate unit-tests --gate review)
+  --gate tests --gate code-review
 
-# Dependencies
-jit dep add $MILESTONE $EPIC  # Milestone depends on epic
-jit dep add $EPIC $TASK       # Epic depends on task
+# Add dependencies (FROM depends on TO)
+jit dep add <milestone-id> <epic-id>  # Milestone blocked by epic
+jit dep add <epic-id> <task-id>       # Epic blocked by task
 ```
 
-### Agent Checklist
-After creating structure, verify:
-- [ ] All issues have exactly one `type:*` label
-- [ ] All labels use `namespace:value` format
-- [ ] Dependencies form a valid DAG (no cycles)
-- [ ] Strategic view shows clean hierarchy
-- [ ] `jit validate` passes with no errors
+### Via MCP Tools
+
+```javascript
+// Create milestone
+const milestone = await jit_issue_create({
+  title: "Release v1.0",
+  label: ["type:milestone", "milestone:v1.0"],
+  priority: "critical"
+});
+
+// Create epic
+const epic = await jit_issue_create({
+  title: "User Authentication",
+  label: ["type:epic", "epic:auth", "milestone:v1.0"],
+  priority: "high"
+});
+
+// Create task with gates
+const task = await jit_issue_create({
+  title: "Implement JWT utilities",
+  label: ["type:task", "epic:auth", "milestone:v1.0", "component:backend"],
+  priority: "high",
+  gate: ["tests", "code-review"]
+});
+
+// Add dependencies
+await jit_dep_add({
+  from_id: milestone.data.id,
+  to_id: epic.data.id
+});
+await jit_dep_add({
+  from_id: epic.data.id,
+  to_id: task.data.id
+});
+```
 
 ---
 
-## 📚 Full Documentation
+## 6. Multi-Agent Coordination
 
-- **Complete guide**: `docs/agent-project-initialization-guide.md`
-- **Label conventions**: `docs/label-conventions.md`
-- **Examples**: `EXAMPLE.md`
-- **Design docs**: `docs/design.md`
+JIT supports multiple agents working concurrently:
 
----
-
-## ✅ Success Criteria
-
-Your agent initialized the project correctly if:
-
-1. **Strategic view is clean**:
-   ```bash
-   jit query strategic
-   # Shows: 1 milestone, 3-5 epics
-   ```
-
-2. **No validation errors**:
-   ```bash
-   jit validate
-   # Output: ✅ All checks passed
-   ```
-
-3. **Dependency graph is logical**:
-   ```bash
-   jit graph show <milestone-id>
-   # Shows clear hierarchy: milestone → epics → tasks
-   ```
-
-4. **Foundation tasks are ready**:
-   ```bash
-   jit query ready
-   # Shows 1-2 unblocked tasks you can start with
-   ```
-
----
-
-## 🎉 What's Next?
-
-**Option A: Multi-Agent Orchestration**
-1. Start coordinator: `jit coordinator start`
-2. Let multiple agents claim and work on ready tasks
-3. Monitor: `jit coordinator agents`
-
-**Option B: Single Agent Testing**
-1. Agent claims next task: `jit issue claim-next agent:test`
-2. Complete work, pass gates
-3. Watch dependencies unblock
-
-**Option C: MCP Server Integration**
 ```bash
-cd mcp-server
-npm install && npm run build && npm start
-# Connect to Claude/Copilot for full AI integration
+# Agent claims next available ready issue
+jit issue claim-next agent:worker-1
+
+# Check what's assigned to you
+jit query assignee agent:worker-1 --json
+
+# Release a task if you can't complete it
+jit issue release <id> --reason "timeout"
+
+# Monitor overall progress
+jit status
+jit query blocked  # What's stuck and why
+```
+
+### Coordinator Mode (Optional)
+
+For orchestrated workflows:
+
+```bash
+# Start coordinator daemon
+jit coordinator start
+
+# Agents poll for work
+jit issue claim-next agent:worker-1
+
+# Monitor agents
+jit coordinator agents
+
+# Stop coordinator
+jit coordinator stop
 ```
 
 ---
 
-**Ready to test with AI agents!** 🤖
+## 7. Document Lifecycle
+
+Attach design docs and session notes to issues:
+
+```bash
+# Add document reference
+jit doc add <issue-id> docs/design/auth-spec.md \
+  --label "Design Specification" \
+  --doc-type design
+
+# View document
+jit doc show <issue-id> docs/design/auth-spec.md
+
+# List documents for issue
+jit doc list <issue-id> --json
+
+# View document history
+jit doc history <issue-id> docs/design/auth-spec.md
+
+# Archive when done
+jit doc archive docs/design/auth-spec.md --type features
+```
+
+---
+
+## 8. Validation & Safety
+
+```bash
+# Validate repository integrity
+jit validate
+
+# Fix issues automatically (with preview)
+jit validate --fix --dry-run
+jit validate --fix
+
+# Check dependency graph
+jit graph show --all
+
+# View audit log
+jit events tail -n 50
+jit events query --event-type state_changed --limit 20
+```
+
+---
+
+## Key Files to Know
+
+- **README.md** - Project overview, why JIT exists
+- **ROADMAP.md** - Where we are, where we're going
+- **TESTING.md** - TDD approach, test strategy
+- **.copilot-instructions.md** - Coding standards, patterns to follow
+- **EXAMPLE.md** - Usage examples
+- **docs/reference/labels.md** - Complete label reference
+- **dev/index.md** - Development documentation guide
+
+---
+
+## Common Patterns
+
+### Issue has design doc?
+Read it first - contains acceptance criteria and implementation plan.
+
+### Issue has no design doc?
+Check its epic's dependencies - epics should have design docs or references. Then check issue description for requirements.
+
+### Session notes missing?
+Not all issues have them. Check the epic's documents for architectural context.
+
+### Tests failing?
+That's expected if you're doing TDD right. Implement to make them pass.
+
+### Need to understand code?
+```bash
+# Find where something is used
+rg "function_name" crates/
+
+# Find examples of a pattern
+rg "resolve_issue_id" --type rust
+```
+
+---
+
+## Pro Tips
+
+- **Use short hashes**: `jit issue show 01abc` instead of full UUID
+- **Check blocked reasons**: `jit query blocked` shows why issues can't start
+- **Follow the gates**: They enforce quality (TDD, tests, clippy, fmt, code-review)
+- **Read session notes**: Issues in progress often have `dev/sessions/session-*.md` attached
+- **Commit often**: Small focused commits with clear messages
+- **No hacks**: Code quality matters - if you're tempted to shortcut, add a TODO issue instead
+
+---
+
+## Important Rules
+
+**Gate strictness:** Gates may use stricter checks than manual commands (e.g., `clippy` gate uses `-D warnings`). Check gate definition: `jit gate show <gate-key>`.
+
+**Pre-existing issues:** You must fix ALL warnings/errors that block gates, even if they existed before your changes. Pre-existence is never an excuse.
+
+**Follow-up issues:** If you discover unrelated work or nice-to-have improvements, propose to create follow-up issues and link them to appropriate epics. Don't expand current issue scope.
+
+**Dependencies matter most:** Use `jit dep add` to express "task B needs task A done first". Epic labels are helpful for organization but dependencies are the critical relationship.
+
+---
+
+## When Stuck
+
+1. Read the linked design doc
+2. Check recent commits for similar work
+3. Look at test files for examples
+4. Ask for guidance!
+
+**That's it!** You're ready to work with JIT as an AI agent. Pick a ready task and start coding.

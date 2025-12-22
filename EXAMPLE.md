@@ -433,10 +433,10 @@ jit query label "component:backend"
 
 ## Next Steps
 
-- **Read the complete guide**: See [docs/getting-started-complete.md](docs/getting-started-complete.md)
-- **Label conventions**: See [docs/label-conventions.md](docs/label-conventions.md)
-- **Label quick reference**: See [docs/label-quick-reference.md](docs/label-quick-reference.md)
-- **Design documentation**: See [docs/design.md](docs/design.md)
+- **AI agent quickstart**: See [AGENT-QUICKSTART.md](AGENT-QUICKSTART.md)
+- **Contributor quickstart**: See [CONTRIBUTOR-QUICKSTART.md](CONTRIBUTOR-QUICKSTART.md)
+- **Label reference**: See [docs/reference/labels.md](docs/reference/labels.md)
+- **Design documentation**: See [dev/active/](dev/active/)
 - **Web UI**: Start `jit-server` and access http://localhost:5173
 - **MCP integration**: Connect to Claude/GPT-4 with the MCP server
 

@@ -36,8 +36,6 @@ Design documents for **features currently in progress**, linked to open issues i
 - [web-ui-architecture.md](architecture/web-ui-architecture.md) - Web UI design
 - [graph-filtering-architecture.md](architecture/graph-filtering-architecture.md) - Graph query design
 - [cli-and-mcp-strategy.md](architecture/cli-and-mcp-strategy.md) - CLI and MCP integration
-- [agent-context-mcp.md](architecture/agent-context-mcp.md) - Agent quick reference
-- [agent-project-initialization-guide.md](architecture/agent-project-initialization-guide.md) - Agent onboarding
 
 ### 🔮 [vision/](vision/) - Future Planning
 **Forward-looking explorations** and vision documents for future features.
@@ -99,8 +97,8 @@ archive/        → After 1-2 releases
 - [web-ui-architecture.md](architecture/web-ui-architecture.md) - Web UI design
 
 ### Development Guides
-- [agent-context-mcp.md](architecture/agent-context-mcp.md) - Quick reference for MCP agents
-- [agent-project-initialization-guide.md](architecture/agent-project-initialization-guide.md) - Agent onboarding
+- See [AGENT-QUICKSTART.md](../AGENT-QUICKSTART.md) - Comprehensive agent guide
+- See [CONTRIBUTOR-QUICKSTART.md](../CONTRIBUTOR-QUICKSTART.md) - Contributor guide
 
 ### Reference
 - [studies/architecture-pitfalls.md](studies/architecture-pitfalls.md) - Common pitfalls
