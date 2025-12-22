@@ -2,7 +2,7 @@
   "id": "9112af40-3d32-4b21-8eda-51d65f5ce405",
   "title": "Add asset discovery and scanning",
   "description": "Implement asset discovery logic that scans documents using format adapters, classifies assets as per-doc vs shared, and resolves paths.\n\n## Rationale\n\nDocuments reference assets (images, diagrams). Need to discover these references, resolve paths correctly, and classify whether they're per-doc (move with doc) or shared (stay in place).\n\n## Acceptance Criteria\n\n### 1. Implement Asset Discovery\n\nCreate :\n\n\n\n### 2. Implement Asset Classification\n\n_assets/\n\n### 3. Path Resolution\n\n- Relative paths () → resolve to repo root\n- Root-relative paths () → already absolute\n- External URLs () → mark as external\n- Handle  in paths correctly\n- Validate no path escape (security)\n\n### 4. MIME Type Detection\n\nUse file extension mapping:\n-  → \n- ,  → \n-  → \n-  → \n- etc.\n\n### 5. Hash Computation\n\n- Compute SHA256 for binary assets\n- Use git blob SHA if available\n- Handle missing files gracefully (warn, don't fail)\n\n### 6. Integration Tests\n\n- Scan doc with per-doc assets\n- Scan doc with shared assets\n- Scan doc with external URLs\n- Scan doc with missing assets (warns)\n- Classification: single vs multi-reference\n- Path resolution edge cases\n\n## Dependencies\n\n- Task 6: Format adapter registry\n\n## Success Metrics\n\n- Asset scanning functional for Markdown\n- Classification logic correct\n- Path resolution handles all cases\n- Tests cover edge cases\n- Performance acceptable (100s of docs/assets)",
-  "state": "in_progress",
+  "state": "done",
   "priority": "high",
   "assignee": "copilot:session-1",
   "dependencies": [
@@ -16,10 +16,30 @@
     "code-review"
   ],
   "gates_status": {
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-22T23:21:34.936071128Z"
+    },
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-22T23:21:34.936677699Z"
+    },
     "tdd-reminder": {
       "status": "passed",
       "updated_by": "copilot:session-1",
       "updated_at": "2025-12-22T23:16:51.182201639Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "copilot:session-1",
+      "updated_at": "2025-12-22T23:21:34.940268231Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-22T23:21:34.938961600Z"
     }
   },
   "context": {},

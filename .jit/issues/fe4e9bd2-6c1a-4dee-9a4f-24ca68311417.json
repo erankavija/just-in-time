@@ -2,7 +2,7 @@
   "id": "fe4e9bd2-6c1a-4dee-9a4f-24ca68311417",
   "title": "Extend document metadata schema",
   "description": "Extend the document reference schema in issue metadata to include format and assets. Update JSON serialization and storage layer.\n\n## Rationale\n\nIssue metadata currently tracks document path and commit. Need to extend to track document format and associated assets for proper asset management.\n\n## Acceptance Criteria\n\n### 1. Extend DocumentReference Struct\n\nUpdate :\n\n\n\n### 2. Update jit doc add Command\n\nModify :\n\n\n\nAdd CLI flag:  (default: true)\n\n### 3. Backward Compatibility\n\n- Existing docs have \n- JSON deserialization handles missing fields\n- No migration needed - populate on next \n\n### 4. Storage Layer Updates\n\n- Update issue JSON schema version if needed\n- Ensure serialization includes new fields\n- Test round-trip ser/de\n\n### 5. Unit Tests\n\n- Schema ser/de with new fields\n- Backward compat: old JSON without format/assets\n- Forward compat: new JSON with format/assets\n- Default values work correctly\n\n### 6. Integration Tests\n\n-  populates format and assets\n- Verify metadata persisted to issue JSON\n-  shows format and asset count\n- Round-trip: add, read, verify\n\n## Dependencies\n\n- Task 7: Asset discovery and scanning\n\n## Success Metrics\n\n- Schema extended with format and assets\n- Backward compatible with existing data\n- jit doc add populates new fields\n- Tests verify ser/de and persistence",
-  "state": "backlog",
+  "state": "ready",
   "priority": "high",
   "assignee": null,
   "dependencies": [

@@ -1,0 +1,21 @@
+{
+  "id": "b6aeb05b-dc02-435f-9ae1-ba0a1c6c63f4",
+  "title": "Bug: issue update with --json flag fails silently",
+  "description": "## Bug Description\n\n`jit issue update <id> --state done --json` fails silently without updating the issue state or providing error output. The same command without `--json` flag works correctly.\n\n## Steps to Reproduce\n\n1. Have an issue with all gates passed\n2. Run: `jit issue update 9112af40 --state done --json`\n3. Observe: Command exits with error, no JSON error output, issue state unchanged\n4. Run: `jit issue update 9112af40 --state done` (without --json flag)\n5. Observe: Works correctly, issue state updated to done\n\n## Expected Behavior\n\nEither:\n- Command succeeds and outputs JSON success response\n- Command fails and outputs JSON error with clear message\n\n## Actual Behavior\n\n- Command fails silently with no JSON output\n- Issue state remains unchanged\n- No error details provided\n\n## Context\n\nDiscovered during implementation of issue 9112af40. All gates were passed (tests, clippy, fmt, code-review), but state transition to done failed only when using --json flag.\n\n## Environment\n\n- Jit version: 0.2.0\n- Issue state: in_progress, all gates passed\n- Short hash resolution working correctly (issue e22fa014 completed)\n\n## Possible Root Causes\n\n1. Short hash resolution might fail in JSON mode for update command\n2. Error handling in JSON mode might suppress error details\n3. State transition validation might not produce JSON-formatted errors\n\n## Acceptance Criteria\n\n- `jit issue update <short-hash> --state done --json` works correctly\n- JSON error output provided if state transition fails\n- Consistent behavior between JSON and non-JSON modes\n- Test coverage for JSON mode state transitions",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "9112af40-3d32-4b21-8eda-51d65f5ce405",
+    "b45ba79e-6f30-41ee-a60f-5df1f7fc2522"
+  ],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:bug",
+    "component:cli",
+    "area:json-output"
+  ]
+}
