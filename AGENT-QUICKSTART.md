@@ -270,11 +270,14 @@ await jit_dep_add({
 
 ## 6. Multi-Agent Coordination
 
-JIT supports multiple agents working concurrently:
+JIT supports multiple agents working concurrently through atomic claim operations:
 
 ```bash
-# Agent claims next available ready issue
+# Agent claims next available ready issue (atomic)
 jit issue claim-next agent:worker-1
+
+# Or claim specific issue atomically
+jit issue claim <short-hash> agent:worker-1
 
 # Check what's assigned to you
 jit query assignee agent:worker-1 --json
@@ -285,25 +288,16 @@ jit issue release <id> --reason "timeout"
 # Monitor overall progress
 jit status
 jit query blocked  # What's stuck and why
+jit query ready    # What's available to claim
 ```
 
-### Coordinator Mode (Optional)
+**How it works:**
+- `claim` and `claim-next` are atomic file operations (no race conditions)
+- Multiple agents can safely poll for ready work
+- Each agent claims issues with unique assignee ID (e.g., `agent:worker-1`, `agent:worker-2`)
+- Agents coordinate through the shared `.jit/` repository state
 
-For orchestrated workflows:
-
-```bash
-# Start coordinator daemon
-jit coordinator start
-
-# Agents poll for work
-jit issue claim-next agent:worker-1
-
-# Monitor agents
-jit coordinator agents
-
-# Stop coordinator
-jit coordinator stop
-```
+**Note:** Coordinator daemon (`jit-dispatch`) is planned but not yet implemented. Current multi-agent support is decentralized - agents independently poll and claim work.
 
 ---
 
