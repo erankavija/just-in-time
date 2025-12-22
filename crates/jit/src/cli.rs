@@ -54,7 +54,7 @@ pub enum Commands {
     /// Common workflow:
     ///   1. Define gates in registry: jit gate define code-review --title "Code Review" ...
     ///   2. Add to issues: jit issue create --gate code-review ...
-    ///   3. Execute gates: jit gate pass <issue> code-review
+    ///   3. Execute gates: jit gate pass \<issue\> code-review
     #[command(subcommand)]
     Gate(GateCommands),
 
