@@ -318,11 +318,14 @@ fn run() -> Result<()> {
                     remove_label,
                     json,
                 } => {
+                    // Resolve short hash to full UUID first
+                    let full_id = storage.resolve_issue_id(&id)?;
+
                     let prio = priority.map(|p| parse_priority(&p)).transpose()?;
                     let st = state.map(|s| parse_state(&s)).transpose()?;
 
                     match executor.update_issue(
-                        &id,
+                        &full_id,
                         title,
                         description,
                         prio,
@@ -332,10 +335,10 @@ fn run() -> Result<()> {
                     ) {
                         Ok(()) => {
                             if json {
-                                let issue = storage.load_issue(&id)?;
+                                let issue = storage.load_issue(&full_id)?;
                                 println!("{}", serde_json::to_string_pretty(&issue)?);
                             } else {
-                                println!("Updated issue: {}", id);
+                                println!("Updated issue: {}", full_id);
                             }
                         }
                         Err(e) => {
@@ -343,11 +346,11 @@ fn run() -> Result<()> {
                             let error_msg = e.to_string();
                             let json_error = if error_msg.contains("Gate validation failed") {
                                 // Reload issue to get unpassed gates
-                                let issue = storage.load_issue(&id)?;
+                                let issue = storage.load_issue(&full_id)?;
                                 let unpassed = issue.get_unpassed_gates();
-                                jit::output::JsonError::gate_validation_failed(&unpassed, &id)
+                                jit::output::JsonError::gate_validation_failed(&unpassed, &full_id)
                             } else if error_msg.contains("not found") {
-                                jit::output::JsonError::issue_not_found(&id)
+                                jit::output::JsonError::issue_not_found(&full_id)
                             } else {
                                 // Generic error - use the JsonError::new directly
                                 jit::output::JsonError::new("GENERIC_ERROR", &error_msg)
@@ -411,64 +414,70 @@ fn run() -> Result<()> {
                     }
                 }
                 IssueCommands::Assign { id, assignee, json } => {
-                    executor.assign_issue(&id, assignee)?;
+                    let full_id = storage.resolve_issue_id(&id)?;
+                    executor.assign_issue(&full_id, assignee)?;
 
                     if json {
-                        let issue = storage.load_issue(&id)?;
+                        let issue = storage.load_issue(&full_id)?;
                         println!("{}", serde_json::to_string_pretty(&issue)?);
                     } else {
-                        println!("Assigned issue: {}", id);
+                        println!("Assigned issue: {}", full_id);
                     }
                 }
                 IssueCommands::Claim { id, assignee, json } => {
-                    executor.claim_issue(&id, assignee)?;
+                    let full_id = storage.resolve_issue_id(&id)?;
+                    executor.claim_issue(&full_id, assignee)?;
 
                     if json {
-                        let issue = storage.load_issue(&id)?;
+                        let issue = storage.load_issue(&full_id)?;
                         println!("{}", serde_json::to_string_pretty(&issue)?);
                     } else {
-                        println!("Claimed issue: {}", id);
+                        println!("Claimed issue: {}", full_id);
                     }
                 }
                 IssueCommands::Unassign { id, json } => {
-                    executor.unassign_issue(&id)?;
+                    let full_id = storage.resolve_issue_id(&id)?;
+                    executor.unassign_issue(&full_id)?;
 
                     if json {
-                        let issue = storage.load_issue(&id)?;
+                        let issue = storage.load_issue(&full_id)?;
                         println!("{}", serde_json::to_string_pretty(&issue)?);
                     } else {
-                        println!("Unassigned issue: {}", id);
+                        println!("Unassigned issue: {}", full_id);
                     }
                 }
                 IssueCommands::Reject { id, reason, json } => {
                     use jit::domain::State;
 
+                    let full_id = storage.resolve_issue_id(&id)?;
+
                     // Update state to rejected
-                    executor.update_issue_state(&id, State::Rejected)?;
+                    executor.update_issue_state(&full_id, State::Rejected)?;
 
                     // Add resolution label if reason provided
                     if let Some(ref reason_value) = reason {
                         let label = format!("resolution:{}", reason_value);
-                        executor.add_label(&id, &label)?;
+                        executor.add_label(&full_id, &label)?;
                     }
 
                     if json {
-                        let issue = storage.load_issue(&id)?;
+                        let issue = storage.load_issue(&full_id)?;
                         println!("{}", serde_json::to_string_pretty(&issue)?);
                     } else if let Some(reason_value) = reason {
-                        println!("Rejected issue: {} (reason: {})", id, reason_value);
+                        println!("Rejected issue: {} (reason: {})", full_id, reason_value);
                     } else {
-                        println!("Rejected issue: {}", id);
+                        println!("Rejected issue: {}", full_id);
                     }
                 }
                 IssueCommands::Release { id, reason, json } => {
-                    executor.release_issue(&id, &reason)?;
+                    let full_id = storage.resolve_issue_id(&id)?;
+                    executor.release_issue(&full_id, &reason)?;
 
                     if json {
-                        let issue = storage.load_issue(&id)?;
+                        let issue = storage.load_issue(&full_id)?;
                         println!("{}", serde_json::to_string_pretty(&issue)?);
                     } else {
-                        println!("Released issue: {} (reason: {})", id, reason);
+                        println!("Released issue: {} (reason: {})", full_id, reason);
                     }
                 }
                 IssueCommands::ClaimNext { assignee, filter } => {

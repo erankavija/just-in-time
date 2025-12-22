@@ -770,3 +770,63 @@ fn test_reject_without_reason() {
     );
     assert!(!stdout.contains("resolution:"));
 }
+
+#[test]
+fn test_short_hash_with_json_flag() {
+    let temp = setup_test_repo();
+
+    // Create an issue
+    let output = run_jit(
+        &temp,
+        &[
+            "issue",
+            "create",
+            "-t",
+            "Test short hash",
+            "--priority",
+            "low",
+        ],
+    );
+    assert!(output.status.success());
+    let full_id = extract_id(&String::from_utf8_lossy(&output.stdout));
+    let short_hash = &full_id[..8];
+
+    // Test update with short hash and --json (previously broken)
+    let output = run_jit(
+        &temp,
+        &[
+            "issue",
+            "update",
+            short_hash,
+            "--json",
+            "--state",
+            "in_progress",
+        ],
+    );
+    assert!(
+        output.status.success(),
+        "Short hash with --json should work"
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains(&full_id), "Should return full ID in JSON");
+    assert!(stdout.contains("in_progress") || stdout.contains("in-progress"));
+
+    // Test other commands with short hash and --json
+    let output = run_jit(&temp, &["issue", "show", short_hash, "--json"]);
+    assert!(output.status.success());
+
+    let output = run_jit(
+        &temp,
+        &["issue", "assign", short_hash, "agent:test", "--json"],
+    );
+    assert!(output.status.success());
+
+    let output = run_jit(&temp, &["issue", "unassign", short_hash, "--json"]);
+    assert!(output.status.success());
+
+    let output = run_jit(
+        &temp,
+        &["issue", "reject", short_hash, "--reason", "test", "--json"],
+    );
+    assert!(output.status.success());
+}
