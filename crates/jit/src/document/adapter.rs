@@ -169,11 +169,6 @@ impl DocFormatAdapter for MarkdownAdapter {
             if let Some(path_match) = cap.get(1) {
                 let path = path_match.as_str().trim();
 
-                // Skip external URLs
-                if path.starts_with("http://") || path.starts_with("https://") {
-                    continue;
-                }
-
                 // Skip anchor-only links
                 if path.starts_with('#') {
                     continue;
@@ -191,7 +186,7 @@ impl DocFormatAdapter for MarkdownAdapter {
                     path
                 };
 
-                // Add non-empty paths
+                // Add non-empty paths (including external URLs)
                 if !path_without_anchor.is_empty() {
                     assets.insert(path_without_anchor.to_string());
                 }
@@ -255,7 +250,7 @@ And a link: [Guide](../docs/guide.md)
     }
 
     #[test]
-    fn test_markdown_scan_assets_excludes_external_urls() {
+    fn test_markdown_scan_assets_includes_external_urls() {
         let adapter = MarkdownAdapter;
         let content = r#"
 External image: ![External](https://example.com/image.png)
@@ -264,7 +259,9 @@ Local image: ![Local](local.png)
         "#;
 
         let assets = adapter.scan_assets(content);
-        assert_eq!(assets.len(), 1);
+        assert_eq!(assets.len(), 3);
+        assert!(assets.contains("https://example.com/image.png"));
+        assert!(assets.contains("http://example.com"));
         assert!(assets.contains("local.png"));
     }
 

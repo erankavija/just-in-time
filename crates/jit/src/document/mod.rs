@@ -5,5 +5,7 @@
 //! asset scanning and link rewriting are isolated in adapter implementations.
 
 mod adapter;
+mod assets;
 
 pub use adapter::{AdapterRegistry, DocFormatAdapter, MarkdownAdapter};
+pub use assets::{Asset, AssetScanner, AssetType};
