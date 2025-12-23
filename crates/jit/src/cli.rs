@@ -598,6 +598,31 @@ pub enum DocCommands {
         #[arg(long)]
         to: Option<String>,
     },
+
+    /// Asset management commands
+    Assets {
+        #[command(subcommand)]
+        command: AssetCommands,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum AssetCommands {
+    /// List assets for a document
+    List {
+        /// Issue ID
+        id: String,
+
+        /// Path to document
+        path: String,
+
+        /// Rescan document to refresh asset metadata
+        #[arg(long, default_value_t = false)]
+        rescan: bool,
+
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Subcommand)]

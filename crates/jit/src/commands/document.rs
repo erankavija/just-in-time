@@ -596,4 +596,173 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         Ok(commits)
     }
+
+    pub fn list_document_assets(
+        &self,
+        issue_id: &str,
+        path: &str,
+        rescan: bool,
+        json: bool,
+    ) -> Result<()> {
+        use crate::document::{AdapterRegistry, AssetScanner, AssetType};
+        use crate::output::{JsonError, JsonOutput};
+        use anyhow::anyhow;
+        use std::fs;
+        use std::path::Path;
+
+        let full_id = self.storage.resolve_issue_id(issue_id)?;
+        let mut issue = self.storage.load_issue(&full_id).inspect_err(|_| {
+            if json {
+                let err = JsonError::issue_not_found(issue_id);
+                println!("{}", err.to_json_string().unwrap());
+            }
+        })?;
+
+        // Find the document in the issue
+        let doc_index = issue
+            .documents
+            .iter()
+            .position(|d| d.path == path)
+            .ok_or_else(|| anyhow!("Document '{}' not linked to issue {}", path, issue_id))?;
+
+        // Get repository root
+        let repo_root = self
+            .storage
+            .root()
+            .parent()
+            .ok_or_else(|| anyhow!("Invalid storage path"))?;
+
+        let doc_path = repo_root.join(path);
+
+        // Rescan if requested
+        let assets = if rescan {
+            if let Ok(content) = fs::read_to_string(&doc_path) {
+                let registry = AdapterRegistry::with_builtins();
+                let scanner = AssetScanner::new(registry, repo_root);
+                let scanned_assets = scanner
+                    .scan_document(Path::new(path), &content)
+                    .unwrap_or_else(|e| {
+                        eprintln!("Warning: Failed to scan assets: {}", e);
+                        Vec::new()
+                    });
+
+                // Update the document with rescanned assets
+                issue.documents[doc_index].assets = scanned_assets.clone();
+                self.storage.save_issue(&issue)?;
+
+                scanned_assets
+            } else {
+                eprintln!("Warning: Could not read document at {}", path);
+                issue.documents[doc_index].assets.clone()
+            }
+        } else {
+            issue.documents[doc_index].assets.clone()
+        };
+
+        // Check if assets actually exist
+        let assets_with_status: Vec<_> = assets
+            .iter()
+            .map(|asset| {
+                let exists = match &asset.resolved_path {
+                    Some(p) => repo_root.join(p).exists(),
+                    None => false,
+                };
+                (asset, exists)
+            })
+            .collect();
+
+        // Categorize assets
+        let per_doc: Vec<_> = assets_with_status
+            .iter()
+            .filter(|(a, _)| !a.is_shared && a.asset_type == AssetType::Local)
+            .collect();
+        let shared: Vec<_> = assets_with_status
+            .iter()
+            .filter(|(a, _)| a.is_shared && a.asset_type == AssetType::Local)
+            .collect();
+        let external: Vec<_> = assets_with_status
+            .iter()
+            .filter(|(a, _)| a.asset_type == AssetType::External)
+            .collect();
+        let missing: Vec<_> = assets_with_status
+            .iter()
+            .filter(|(a, _)| a.asset_type == AssetType::Missing)
+            .collect();
+
+        if json {
+            let output = JsonOutput::success(serde_json::json!({
+                "issue_id": full_id,
+                "document_path": path,
+                "assets": assets,
+                "summary": {
+                    "total": assets.len(),
+                    "per_doc": per_doc.len(),
+                    "shared": shared.len(),
+                    "external": external.len(),
+                    "missing": missing.len(),
+                },
+            }));
+            println!("{}", output.to_json_string()?);
+        } else {
+            println!("Assets for document {} (issue {}):", path, &full_id[..8]);
+
+            if assets.is_empty() {
+                println!("  No assets found for this document");
+                return Ok(());
+            }
+
+            if !per_doc.is_empty() {
+                println!("\nPer-document assets:");
+                for (asset, exists) in &per_doc {
+                    let status = if *exists { "✓" } else { "✗" };
+                    println!("  {} {}", status, asset.original_path);
+                    if let Some(ref resolved) = asset.resolved_path {
+                        println!("     → {}", resolved.display());
+                    }
+                    if let Some(ref mime) = asset.mime_type {
+                        println!("     MIME: {}", mime);
+                    }
+                }
+            }
+
+            if !shared.is_empty() {
+                println!("\nShared assets:");
+                for (asset, exists) in &shared {
+                    let status = if *exists { "✓" } else { "✗" };
+                    println!("  {} {}", status, asset.original_path);
+                    if let Some(ref resolved) = asset.resolved_path {
+                        println!("     → {}", resolved.display());
+                    }
+                }
+            }
+
+            if !external.is_empty() {
+                println!("\nExternal URLs:");
+                for (asset, _) in &external {
+                    println!("  🌐 {}", asset.original_path);
+                }
+            }
+
+            if !missing.is_empty() {
+                println!("\n⚠ Missing assets:");
+                for (asset, _) in &missing {
+                    println!("  ✗ {}", asset.original_path);
+                    if let Some(ref resolved) = asset.resolved_path {
+                        println!("     Expected at: {}", resolved.display());
+                    }
+                }
+            }
+
+            println!(
+                "\nSummary: {} total ({} per-doc, {} shared, {} external, {} missing)",
+                assets.len(),
+                per_doc.len(),
+                shared.len(),
+                external.len(),
+                missing.len()
+            );
+        }
+
+        Ok(())
+    }
 }

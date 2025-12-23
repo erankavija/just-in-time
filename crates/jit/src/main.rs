@@ -1206,6 +1206,16 @@ fn run() -> Result<()> {
             DocCommands::Diff { id, path, from, to } => {
                 executor.document_diff(&id, &path, &from, to.as_deref())?;
             }
+            DocCommands::Assets { command } => match command {
+                jit::cli::AssetCommands::List {
+                    id,
+                    path,
+                    rescan,
+                    json,
+                } => {
+                    executor.list_document_assets(&id, &path, rescan, json)?;
+                }
+            },
         },
         Commands::Query(query_cmd) => match query_cmd {
             jit::cli::QueryCommands::Ready { json } => {
