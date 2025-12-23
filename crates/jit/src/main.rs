@@ -1178,6 +1178,7 @@ fn run() -> Result<()> {
                 commit,
                 label,
                 doc_type,
+                skip_scan,
                 json,
             } => {
                 executor.add_document_reference(
@@ -1186,6 +1187,7 @@ fn run() -> Result<()> {
                     commit.as_deref(),
                     label.as_deref(),
                     doc_type.as_deref(),
+                    skip_scan,
                     json,
                 )?;
             }

@@ -203,6 +203,12 @@ pub struct DocumentReference {
     pub label: Option<String>,
     /// Document type hint (e.g., "design", "implementation", "notes")
     pub doc_type: Option<String>,
+    /// Document format (e.g., "markdown", "asciidoc", "rst")
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub format: Option<String>,
+    /// Assets referenced by this document (images, diagrams, etc.)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub assets: Vec<crate::document::Asset>,
 }
 
 impl DocumentReference {
@@ -214,6 +220,8 @@ impl DocumentReference {
             commit: None,
             label: None,
             doc_type: None,
+            format: None,
+            assets: Vec::new(),
         }
     }
 
@@ -225,6 +233,8 @@ impl DocumentReference {
             commit: Some(commit),
             label: None,
             doc_type: None,
+            format: None,
+            assets: Vec::new(),
         }
     }
 
@@ -239,6 +249,20 @@ impl DocumentReference {
     #[allow(dead_code)]
     pub fn with_type(mut self, doc_type: String) -> Self {
         self.doc_type = Some(doc_type);
+        self
+    }
+
+    /// Builder method to add format
+    #[allow(dead_code)]
+    pub fn with_format(mut self, format: String) -> Self {
+        self.format = Some(format);
+        self
+    }
+
+    /// Builder method to set assets
+    #[allow(dead_code)]
+    pub fn with_assets(mut self, assets: Vec<crate::document::Asset>) -> Self {
+        self.assets = assets;
         self
     }
 }
@@ -951,6 +975,148 @@ mod tests {
 
         // Rejected dependencies should unblock, like Done
         assert!(!issue.is_blocked(&resolved));
+    }
+
+    // Tests for extended DocumentReference schema with format and assets
+
+    #[test]
+    fn test_document_reference_with_format_and_assets() {
+        use crate::document::Asset;
+        use std::path::PathBuf;
+
+        let doc = DocumentReference {
+            path: "docs/design.md".to_string(),
+            commit: None,
+            label: Some("Design Doc".to_string()),
+            doc_type: Some("design".to_string()),
+            format: Some("markdown".to_string()),
+            assets: vec![Asset {
+                original_path: "./logo.png".to_string(),
+                resolved_path: Some(PathBuf::from("docs/logo.png")),
+                asset_type: crate::document::AssetType::Local,
+                mime_type: Some("image/png".to_string()),
+                content_hash: Some("sha256:abc123".to_string()),
+                is_shared: false,
+            }],
+        };
+
+        assert_eq!(doc.format, Some("markdown".to_string()));
+        assert_eq!(doc.assets.len(), 1);
+        assert_eq!(doc.assets[0].original_path, "./logo.png");
+    }
+
+    #[test]
+    fn test_document_reference_serialization_with_new_fields() {
+        use crate::document::Asset;
+        use std::path::PathBuf;
+
+        let doc = DocumentReference {
+            path: "docs/design.md".to_string(),
+            commit: None,
+            label: Some("Design Doc".to_string()),
+            doc_type: Some("design".to_string()),
+            format: Some("markdown".to_string()),
+            assets: vec![Asset {
+                original_path: "./logo.png".to_string(),
+                resolved_path: Some(PathBuf::from("docs/logo.png")),
+                asset_type: crate::document::AssetType::Local,
+                mime_type: Some("image/png".to_string()),
+                content_hash: Some("sha256:abc123".to_string()),
+                is_shared: false,
+            }],
+        };
+
+        let json = serde_json::to_string(&doc).unwrap();
+        let deserialized: DocumentReference = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(doc, deserialized);
+        assert_eq!(deserialized.format, Some("markdown".to_string()));
+        assert_eq!(deserialized.assets.len(), 1);
+    }
+
+    #[test]
+    fn test_document_reference_backward_compatibility() {
+        // Old JSON without format and assets fields
+        let old_json = r#"{
+            "path": "docs/design.md",
+            "commit": null,
+            "label": "Design Doc",
+            "doc_type": "design"
+        }"#;
+
+        let doc: DocumentReference = serde_json::from_str(old_json).unwrap();
+
+        assert_eq!(doc.path, "docs/design.md");
+        assert_eq!(doc.label, Some("Design Doc".to_string()));
+        assert_eq!(doc.doc_type, Some("design".to_string()));
+        // New fields should have default values
+        assert_eq!(doc.format, None);
+        assert_eq!(doc.assets.len(), 0);
+    }
+
+    #[test]
+    fn test_document_reference_forward_compatibility() {
+        use crate::document::Asset;
+        use std::path::PathBuf;
+
+        // New JSON with format and assets
+        let doc = DocumentReference {
+            path: "docs/design.md".to_string(),
+            commit: None,
+            label: Some("Design".to_string()),
+            doc_type: Some("design".to_string()),
+            format: Some("markdown".to_string()),
+            assets: vec![
+                Asset {
+                    original_path: "./arch.png".to_string(),
+                    resolved_path: Some(PathBuf::from("docs/arch.png")),
+                    asset_type: crate::document::AssetType::Local,
+                    mime_type: Some("image/png".to_string()),
+                    content_hash: Some("sha256:def456".to_string()),
+                    is_shared: false,
+                },
+                Asset {
+                    original_path: "https://example.com/logo.svg".to_string(),
+                    resolved_path: None,
+                    asset_type: crate::document::AssetType::External,
+                    mime_type: Some("image/svg+xml".to_string()),
+                    content_hash: None,
+                    is_shared: false,
+                },
+            ],
+        };
+
+        let json = serde_json::to_string_pretty(&doc).unwrap();
+        let deserialized: DocumentReference = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(deserialized.format, Some("markdown".to_string()));
+        assert_eq!(deserialized.assets.len(), 2);
+        assert_eq!(
+            deserialized.assets[0].mime_type,
+            Some("image/png".to_string())
+        );
+        assert_eq!(
+            deserialized.assets[1].original_path,
+            "https://example.com/logo.svg"
+        );
+    }
+
+    #[test]
+    fn test_document_reference_empty_assets() {
+        let doc = DocumentReference {
+            path: "docs/notes.md".to_string(),
+            commit: None,
+            label: None,
+            doc_type: Some("notes".to_string()),
+            format: Some("markdown".to_string()),
+            assets: vec![],
+        };
+
+        let json = serde_json::to_string(&doc).unwrap();
+        let deserialized: DocumentReference = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(doc, deserialized);
+        assert_eq!(deserialized.assets.len(), 0);
     }
 }
 

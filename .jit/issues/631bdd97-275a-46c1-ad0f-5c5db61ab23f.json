@@ -2,7 +2,7 @@
   "id": "631bdd97-275a-46c1-ad0f-5c5db61ab23f",
   "title": "Implement jit doc assets commands",
   "description": "Add CLI commands to inspect and list assets for documents.\n\n## Rationale\n\nUsers need to see what assets are associated with documents, verify classification (per-doc vs shared), and understand asset status before archival.\n\n## Acceptance Criteria\n\n### 1. Implement jit doc assets list\n\nCommand: jit doc assets list ISSUE-ID PATH [--rescan] [--json]\n\nFunctionality:\n- Show assets for a document from metadata\n- Display: path, type (per-doc/shared), MIME, hash, exists status\n- Support --rescan to refresh from current content\n- Support --json for machine-readable output\n\nHuman-readable output shows:\n- Per-doc assets with status\n- Shared assets  \n- External URLs\n- Missing assets (if any)\n\nJSON output includes full metadata with summary counts.\n\n### 2. Error Handling\n\n- Issue not found → clear error\n- Document not linked to issue → clear error\n- Document file missing → warn, show metadata\n- No assets → \"No assets found for this document\"\n\n### 3. Integration Tests\n\n- List assets for doc with various asset types\n- Rescan updates metadata\n- JSON output validates\n- Missing document handled gracefully\n\n### 4. Documentation\n\n- Help text with examples\n- User guide section\n- Include in docs/README.md examples\n\n## Dependencies\n\n- Task 8: Extended metadata schema\n\n## Success Metrics\n\n- Command functional and user-friendly\n- Supports both human and JSON output\n- --rescan works correctly\n- Tests cover all scenarios",
-  "state": "backlog",
+  "state": "ready",
   "priority": "high",
   "assignee": null,
   "dependencies": [

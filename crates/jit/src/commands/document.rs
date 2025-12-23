@@ -3,6 +3,7 @@
 use super::*;
 
 impl<S: IssueStore> CommandExecutor<S> {
+    #[allow(clippy::too_many_arguments)] // CLI command parameters - refactoring would reduce clarity
     pub fn add_document_reference(
         &self,
         issue_id: &str,
@@ -10,10 +11,15 @@ impl<S: IssueStore> CommandExecutor<S> {
         commit: Option<&str>,
         label: Option<&str>,
         doc_type: Option<&str>,
+        skip_scan: bool,
         json: bool,
     ) -> Result<()> {
+        use crate::document::{AdapterRegistry, AssetScanner};
         use crate::domain::DocumentReference;
         use crate::output::{JsonError, JsonOutput};
+        use anyhow::anyhow;
+        use std::fs;
+        use std::path::Path;
 
         let full_id = self.storage.resolve_issue_id(issue_id)?;
         let mut issue = self.storage.load_issue(&full_id).inspect_err(|_| {
@@ -23,11 +29,55 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         })?;
 
+        // Get repository root (parent of .jit directory)
+        let repo_root = self
+            .storage
+            .root()
+            .parent()
+            .ok_or_else(|| anyhow!("Invalid storage path"))?;
+
+        let doc_path = repo_root.join(path);
+
+        // Detect format and scan assets unless --skip-scan
+        let (format, assets) = if skip_scan {
+            (None, Vec::new())
+        } else if let Ok(content) = fs::read_to_string(&doc_path) {
+            // Detect format using adapter registry
+            let registry = AdapterRegistry::with_builtins();
+            let format = registry
+                .resolve(path, &content)
+                .map(|adapter| adapter.id().to_string());
+
+            // Scan for assets
+            let assets = if format.is_some() {
+                let scanner = AssetScanner::new(registry, repo_root);
+                scanner
+                    .scan_document(Path::new(path), &content)
+                    .unwrap_or_else(|e| {
+                        eprintln!("Warning: Failed to scan assets: {}", e);
+                        Vec::new()
+                    })
+            } else {
+                Vec::new()
+            };
+
+            (format, assets)
+        } else {
+            // File doesn't exist or can't be read - skip scanning but don't fail
+            eprintln!(
+                "Warning: Could not read document at {} - skipping asset scan",
+                path
+            );
+            (None, Vec::new())
+        };
+
         let doc_ref = DocumentReference {
             path: path.to_string(),
             commit: commit.map(String::from),
             label: label.map(String::from),
             doc_type: doc_type.map(String::from),
+            format,
+            assets,
         };
 
         issue.documents.push(doc_ref.clone());
@@ -50,6 +100,12 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
             if let Some(t) = doc_type {
                 println!("  Type: {}", t);
+            }
+            if let Some(f) = &doc_ref.format {
+                println!("  Format: {}", f);
+            }
+            if !doc_ref.assets.is_empty() {
+                println!("  Assets: {} discovered", doc_ref.assets.len());
             }
         }
 

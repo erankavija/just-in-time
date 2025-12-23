@@ -528,6 +528,10 @@ pub enum DocCommands {
         #[arg(short = 't', long)]
         doc_type: Option<String>,
 
+        /// Skip scanning document for assets (default: false)
+        #[arg(long, default_value_t = false)]
+        skip_scan: bool,
+
         #[arg(long)]
         json: bool,
     },
