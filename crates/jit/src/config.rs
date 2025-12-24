@@ -15,6 +15,8 @@ pub struct JitConfig {
     pub type_hierarchy: Option<HierarchyConfigToml>,
     /// Validation behavior configuration (optional).
     pub validation: Option<ValidationConfig>,
+    /// Documentation lifecycle configuration (optional).
+    pub documentation: Option<DocumentationConfig>,
 }
 
 /// Type hierarchy configuration from TOML.
@@ -37,6 +39,60 @@ pub struct ValidationConfig {
     pub warn_strategic_consistency: Option<bool>,
 }
 
+/// Documentation lifecycle management configuration.
+#[derive(Debug, Clone, Deserialize)]
+pub struct DocumentationConfig {
+    /// Root directory for development documentation (default: "dev").
+    pub development_root: Option<String>,
+    /// Paths subject to archival (default: ["dev/active", "dev/studies", "dev/sessions"]).
+    pub managed_paths: Option<Vec<String>>,
+    /// Where archived docs are stored (default: "dev/archive").
+    pub archive_root: Option<String>,
+    /// Paths that never archive (default: ["docs/"]).
+    pub permanent_paths: Option<Vec<String>>,
+    /// Archive category mappings (e.g., design -> features).
+    pub categories: Option<HashMap<String, String>>,
+}
+
+impl DocumentationConfig {
+    /// Get development root with default fallback.
+    pub fn development_root(&self) -> String {
+        self.development_root
+            .clone()
+            .unwrap_or_else(|| "dev".to_string())
+    }
+
+    /// Get managed paths with default fallback.
+    pub fn managed_paths(&self) -> Vec<String> {
+        self.managed_paths.clone().unwrap_or_else(|| {
+            vec![
+                "dev/active".to_string(),
+                "dev/studies".to_string(),
+                "dev/sessions".to_string(),
+            ]
+        })
+    }
+
+    /// Get archive root with default fallback.
+    pub fn archive_root(&self) -> String {
+        self.archive_root
+            .clone()
+            .unwrap_or_else(|| "dev/archive".to_string())
+    }
+
+    /// Get permanent paths with default fallback.
+    pub fn permanent_paths(&self) -> Vec<String> {
+        self.permanent_paths
+            .clone()
+            .unwrap_or_else(|| vec!["docs/".to_string()])
+    }
+
+    /// Get category mapping (key: category ID, value: archive subdirectory).
+    pub fn categories(&self) -> HashMap<String, String> {
+        self.categories.clone().unwrap_or_default()
+    }
+}
+
 impl JitConfig {
     /// Load configuration from `.jit/config.toml` if it exists.
     ///
@@ -50,6 +106,7 @@ impl JitConfig {
             return Ok(JitConfig {
                 type_hierarchy: None,
                 validation: None,
+                documentation: None,
             });
         }
 

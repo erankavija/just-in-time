@@ -1053,13 +1053,222 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Archive a document with its assets
     pub fn archive_document(
         &self,
-        _path: &str,
-        _category: &str,
-        _dry_run: bool,
-        _force: bool,
+        path: &str,
+        category: &str,
+        dry_run: bool,
+        force: bool,
     ) -> Result<()> {
-        // TODO: Implement document archival
-        // This is a stub to make tests compile
-        anyhow::bail!("Document archival not yet implemented")
+        use crate::config::JitConfig;
+        use anyhow::{anyhow, Context};
+        use std::path::Path;
+
+        // 1. Load configuration
+        let config = JitConfig::load(self.storage.root())?;
+        let doc_config = config
+            .documentation
+            .ok_or_else(|| anyhow!("No [documentation] configuration found in .jit/config.toml"))?;
+
+        // 2. Validate category exists
+        let categories = doc_config.categories();
+        let archive_subdir = categories.get(category).ok_or_else(|| {
+            anyhow!(
+                "Category '{}' not configured in [documentation.categories]",
+                category
+            )
+        })?;
+
+        // 3. Get repository root
+        let repo_root = self
+            .storage
+            .root()
+            .parent()
+            .ok_or_else(|| anyhow!("Invalid storage path"))?;
+
+        let doc_path = Path::new(path);
+
+        // 4. Validate document is archivable
+        self.validate_archivable(doc_path, &doc_config, repo_root)?;
+
+        // 5. Compute destination path
+        let dest_path = self.compute_destination(doc_path, archive_subdir, &doc_config)?;
+
+        if dry_run {
+            println!("✓ Archival plan (--dry-run)\n");
+            println!("  Source: {}", path);
+            println!("  Destination: {}", dest_path.display());
+            println!("  Category: {}", category);
+            println!("\n  Run without --dry-run to execute.");
+            return Ok(());
+        }
+
+        // 6. Check for active issue links (unless --force)
+        if !force {
+            let active_issues = self.check_active_issue_links(path)?;
+            if !active_issues.is_empty() {
+                return Err(anyhow!(
+                    "⚠️  Warning: document linked to {} active issue(s):\n{}\n\nUse --force to archive anyway.",
+                    active_issues.len(),
+                    active_issues.join("\n")
+                ));
+            }
+        }
+
+        // 7. Perform atomic move
+        let full_src = repo_root.join(doc_path);
+        let full_dest = repo_root.join(&dest_path);
+
+        // Create destination directory
+        if let Some(parent) = full_dest.parent() {
+            std::fs::create_dir_all(parent).context("Failed to create destination directory")?;
+        }
+
+        // Move the file
+        std::fs::rename(&full_src, &full_dest).context("Failed to move document")?;
+
+        // 8. Update issue metadata
+        let updated_issues = self.update_issue_metadata(path, dest_path.to_str().unwrap())?;
+
+        // 9. Log event
+        let event = crate::domain::Event::new_document_archived(
+            path.to_string(),
+            dest_path.to_str().unwrap().to_string(),
+            category.to_string(),
+            updated_issues.len(),
+        );
+        self.storage.append_event(&event)?;
+
+        println!("✓ Archived successfully");
+        println!("  {} → {}", path, dest_path.display());
+        if !updated_issues.is_empty() {
+            println!("  Updated {} issue(s)", updated_issues.len());
+        }
+
+        Ok(())
+    }
+
+    /// Validate that a document can be archived
+    fn validate_archivable(
+        &self,
+        doc_path: &std::path::Path,
+        doc_config: &crate::config::DocumentationConfig,
+        repo_root: &std::path::Path,
+    ) -> Result<()> {
+        use anyhow::anyhow;
+
+        let path_str = doc_path.to_str().unwrap_or("");
+
+        // Check if path is in managed paths
+        let managed_paths = doc_config.managed_paths();
+        let is_managed = managed_paths.iter().any(|p| path_str.starts_with(p));
+
+        if !is_managed {
+            return Err(anyhow!(
+                "❌ Cannot archive: document not in managed path\n\n  Document: {}\n\n  Only documents in managed paths can be archived: {}",
+                path_str,
+                managed_paths.join(", ")
+            ));
+        }
+
+        // Check if path is in permanent paths
+        let permanent_paths = doc_config.permanent_paths();
+        let is_permanent = permanent_paths.iter().any(|p| path_str.starts_with(p));
+
+        if is_permanent {
+            return Err(anyhow!(
+                "❌ Cannot archive: document is in permanent path\n\n  Document: {}\n\n  Permanent paths cannot be archived: {}",
+                path_str,
+                permanent_paths.join(", ")
+            ));
+        }
+
+        // Check if file exists
+        let full_path = repo_root.join(doc_path);
+        if !full_path.exists() {
+            return Err(anyhow!("❌ Document not found: {}", path_str));
+        }
+
+        Ok(())
+    }
+
+    /// Compute destination path for archived document
+    fn compute_destination(
+        &self,
+        doc_path: &std::path::Path,
+        archive_subdir: &str,
+        doc_config: &crate::config::DocumentationConfig,
+    ) -> Result<std::path::PathBuf> {
+        use anyhow::anyhow;
+        use std::path::Path;
+
+        let path_str = doc_path.to_str().unwrap_or("");
+        let managed_paths = doc_config.managed_paths();
+
+        // Strip managed path prefix
+        let relative_path = managed_paths
+            .iter()
+            .find_map(|prefix| {
+                if path_str.starts_with(prefix) {
+                    Some(
+                        path_str
+                            .strip_prefix(prefix)
+                            .unwrap()
+                            .trim_start_matches('/'),
+                    )
+                } else {
+                    None
+                }
+            })
+            .ok_or_else(|| anyhow!("Path not in managed paths"))?;
+
+        // Build destination: archive_root/category/relative_path
+        let archive_root = doc_config.archive_root();
+        Ok(Path::new(&archive_root)
+            .join(archive_subdir)
+            .join(relative_path))
+    }
+
+    /// Check for active issues linking to this document
+    fn check_active_issue_links(&self, path: &str) -> Result<Vec<String>> {
+        let issues = self.storage.list_issues()?;
+
+        let active_issues: Vec<String> = issues
+            .iter()
+            .filter(|issue| {
+                !issue.state.is_terminal() && issue.documents.iter().any(|doc| doc.path == path)
+            })
+            .map(|issue| {
+                format!(
+                    "  - {}: {} (state: {:?})",
+                    &issue.id[..8],
+                    issue.title,
+                    issue.state
+                )
+            })
+            .collect();
+
+        Ok(active_issues)
+    }
+
+    /// Update issue metadata to reflect new document path
+    fn update_issue_metadata(&self, old_path: &str, new_path: &str) -> Result<Vec<String>> {
+        let mut issues = self.storage.list_issues()?;
+        let mut updated = Vec::new();
+
+        for issue in &mut issues {
+            let mut changed = false;
+            for doc in &mut issue.documents {
+                if doc.path == old_path {
+                    doc.path = new_path.to_string();
+                    changed = true;
+                }
+            }
+
+            if changed {
+                self.storage.save_issue(issue)?;
+                updated.push(issue.id.clone());
+            }
+        }
+
+        Ok(updated)
     }
 }

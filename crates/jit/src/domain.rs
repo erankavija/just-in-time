@@ -482,6 +482,21 @@ pub enum Event {
         /// Reason for release
         reason: String,
     },
+    /// Document was archived
+    DocumentArchived {
+        /// Event ID
+        id: String,
+        /// When this occurred
+        timestamp: DateTime<Utc>,
+        /// Source path
+        source: String,
+        /// Destination path
+        destination: String,
+        /// Archive category
+        category: String,
+        /// Number of issues updated
+        issues_updated: usize,
+    },
 }
 
 impl Event {
@@ -559,6 +574,23 @@ impl Event {
         }
     }
 
+    /// Create a document archived event
+    pub fn new_document_archived(
+        source: String,
+        destination: String,
+        category: String,
+        issues_updated: usize,
+    ) -> Self {
+        Event::DocumentArchived {
+            id: Uuid::new_v4().to_string(),
+            timestamp: Utc::now(),
+            source,
+            destination,
+            category,
+            issues_updated,
+        }
+    }
+
     /// Get the issue ID associated with this event
     pub fn get_issue_id(&self) -> &str {
         match self {
@@ -569,6 +601,7 @@ impl Event {
             Event::GateFailed { issue_id, .. } => issue_id,
             Event::IssueCompleted { issue_id, .. } => issue_id,
             Event::IssueReleased { issue_id, .. } => issue_id,
+            Event::DocumentArchived { .. } => "", // No associated issue
         }
     }
 
@@ -582,6 +615,7 @@ impl Event {
             Event::GateFailed { .. } => "gate_failed",
             Event::IssueCompleted { .. } => "issue_completed",
             Event::IssueReleased { .. } => "issue_released",
+            Event::DocumentArchived { .. } => "document_archived",
         }
     }
 }
