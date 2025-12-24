@@ -29,6 +29,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
+      - name: Free Disk Space
+        run: |
+          # Free up disk space on GitHub Actions runners
+          # Remove unnecessary tools and packages to make room for Rust builds
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          df -h
+      
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -38,9 +49,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
@@ -72,6 +83,16 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      
+      - name: Free Disk Space
+        run: |
+          # Free up disk space on GitHub Actions runners
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          df -h
       
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
