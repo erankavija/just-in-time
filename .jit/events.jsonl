@@ -441,3 +441,7 @@
 {"type":"gate_passed","id":"070bf816-4afc-439a-b76f-9cc780e75aae","issue_id":"fb6e2e31-a3c1-458b-abf7-cf113a80dd9c","timestamp":"2025-12-24T19:28:59.519850562Z","gate_key":"code-review","updated_by":"copilot:session-1"}
 {"type":"issue_state_changed","id":"c7376af2-b292-4f60-877f-4db530953172","issue_id":"fb6e2e31-a3c1-458b-abf7-cf113a80dd9c","timestamp":"2025-12-24T19:28:59.521092963Z","from":"gated","to":"done"}
 {"type":"issue_completed","id":"8c71658b-ec33-4506-8846-397d4618b940","issue_id":"fb6e2e31-a3c1-458b-abf7-cf113a80dd9c","timestamp":"2025-12-24T19:28:59.521117023Z"}
+{"type":"issue_created","id":"73198fe1-e2fc-4013-aff7-1bb42cf64801","issue_id":"55ef1ff6-4baf-4b72-893a-c26082bdf06a","timestamp":"2025-12-24T22:31:07.849793112Z","title":"Bug: Issues don't auto-transition from Backlog to Ready when dependencies complete","priority":"high"}
+{"type":"issue_state_changed","id":"c317d614-a880-4bda-ab11-85d2100c1cb2","issue_id":"55ef1ff6-4baf-4b72-893a-c26082bdf06a","timestamp":"2025-12-24T22:31:39.751613449Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"28568db8-dbdb-46f8-b979-0208cdae645e","issue_id":"55ef1ff6-4baf-4b72-893a-c26082bdf06a","timestamp":"2025-12-24T22:31:39.752872519Z","assignee":"copilot:session-1"}
+{"type":"issue_state_changed","id":"f193ae29-3133-4157-aca2-bb1681a05b48","issue_id":"896ff7df-e5b0-48b6-a3b0-a5745ff683b7","timestamp":"2025-12-24T22:33:02.253649213Z","from":"backlog","to":"ready"}

@@ -1,0 +1,19 @@
+{
+  "id": "55ef1ff6-4baf-4b72-893a-c26082bdf06a",
+  "title": "Bug: Issues don't auto-transition from Backlog to Ready when dependencies complete",
+  "description": "## Problem\n\nIssues remain in Backlog state even when all dependencies are completed and the issue should automatically transition to Ready state.\n\n## Observed Behavior\n\nIssue 896ff7df (\"Implement jit doc archive with assets\") has:\n- State: Backlog\n- Dependencies: [\"fb6e2e31-a3c1-458b-abf7-cf113a80dd9c\"]\n- Dependency fb6e2e31 state: Done (all gates passed)\n\nExpected: Issue should automatically transition to Ready state\nActual: Issue remains in Backlog state\n\nManual state update attempt also failed:\n```\njit issue update 896ff7df --state ready\n# Command reported success but state remained 'backlog'\n```\n\n## Impact\n\n- Breaks automated workflow - issues don't become available for work automatically\n- Users must manually monitor and update state transitions\n- Reduces effectiveness of dependency-driven task management\n- Critical for agent-based workflows that rely on `jit query ready`\n\n## Expected Behavior\n\nWhen all dependencies of a Backlog issue transition to Done state:\n1. System should automatically check if issue is now unblocked\n2. If unblocked, automatically transition issue from Backlog → Ready\n3. Issue should appear in `jit query ready` output\n\n## Steps to Reproduce\n\n1. Create issue A with no dependencies\n2. Create issue B with dependency on issue A (B depends on A)\n3. Issue B should be in Backlog state\n4. Complete issue A (transition to Done)\n5. Check issue B state\n6. BUG: Issue B remains in Backlog instead of transitioning to Ready\n\n## Related Code\n\nLikely in state transition logic and dependency resolution.\n\n## Severity\n\nHigh - affects core workflow automation",
+  "state": "in_progress",
+  "priority": "high",
+  "assignee": "copilot:session-1",
+  "dependencies": [],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:bug",
+    "epic:production-stability",
+    "component:core",
+    "milestone:v1.0"
+  ]
+}

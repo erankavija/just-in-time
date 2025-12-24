@@ -149,6 +149,8 @@ impl<S: IssueStore> CommandExecutor<S> {
                         "Cannot transition to Ready: issue blocked by incomplete dependencies"
                     ));
                 }
+
+                issue.state = State::Ready;
             } else if s == State::Done {
                 // Check both dependencies and gates
                 let issues = self.storage.list_issues()?;
@@ -234,6 +236,8 @@ impl<S: IssueStore> CommandExecutor<S> {
                         "Cannot transition to Ready: issue blocked by incomplete dependencies"
                     ));
                 }
+
+                issue.state = State::Ready;
             }
             State::Done => {
                 // Check both dependencies and gates
@@ -688,5 +692,48 @@ mod tests {
         // Verify state transitioned to Gated (not Done)
         let issue = executor.storage.load_issue(&issue_id).unwrap();
         assert_eq!(issue.state, State::Gated);
+    }
+
+    #[test]
+    fn test_manual_transition_to_ready_state_actually_changes_state() {
+        let executor = setup();
+
+        // Create dependency issue that is Done
+        let mut dep = crate::domain::Issue::new("Dependency".to_string(), "Dep".to_string());
+        dep.state = State::Done;
+        let dep_id = dep.id.clone();
+        executor.storage.save_issue(&dep).unwrap();
+
+        // Create issue in Backlog that depends on the Done dependency
+        let mut issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        issue.state = State::Backlog;
+        issue.dependencies.push(dep_id.clone());
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(&issue).unwrap();
+
+        // Manually transition to Ready should succeed (dependency is done)
+        let result = executor.update_issue(
+            &issue_id,
+            None,               // title
+            None,               // description
+            None,               // priority
+            Some(State::Ready), // state
+            vec![],             // add_labels
+            vec![],             // remove_labels
+        );
+
+        assert!(
+            result.is_ok(),
+            "Transition to Ready should succeed when unblocked"
+        );
+
+        // BUG: Issue state is NOT updated to Ready, it remains Backlog
+        // After fix, this assertion should pass
+        let issue = executor.storage.load_issue(&issue_id).unwrap();
+        assert_eq!(
+            issue.state,
+            State::Ready,
+            "Issue state should be Ready after manual transition"
+        );
     }
 }

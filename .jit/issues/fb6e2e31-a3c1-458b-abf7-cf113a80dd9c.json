@@ -16,6 +16,16 @@
     "code-review"
   ],
   "gates_status": {
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": "copilot:session-1",
+      "updated_at": "2025-12-24T18:56:18.286645379Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-24T19:01:03.338077203Z"
+    },
     "fmt": {
       "status": "passed",
       "updated_by": "auto:executor",
@@ -30,16 +40,6 @@
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2025-12-24T19:01:04.543163408Z"
-    },
-    "tdd-reminder": {
-      "status": "passed",
-      "updated_by": "copilot:session-1",
-      "updated_at": "2025-12-24T18:56:18.286645379Z"
-    },
-    "tests": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-24T19:01:03.338077203Z"
     }
   },
   "context": {},
