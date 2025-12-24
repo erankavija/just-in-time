@@ -1048,3 +1048,18 @@ fn check_asset_in_git(repo: &Option<git2::Repository>, path: &std::path::Path) -
     }
     false
 }
+
+impl<S: IssueStore> CommandExecutor<S> {
+    /// Archive a document with its assets
+    pub fn archive_document(
+        &self,
+        _path: &str,
+        _category: &str,
+        _dry_run: bool,
+        _force: bool,
+    ) -> Result<()> {
+        // TODO: Implement document archival
+        // This is a stub to make tests compile
+        anyhow::bail!("Document archival not yet implemented")
+    }
+}

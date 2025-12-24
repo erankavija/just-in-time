@@ -615,6 +615,24 @@ pub enum DocCommands {
         #[arg(long)]
         json: bool,
     },
+
+    /// Archive a document with its assets
+    Archive {
+        /// Document path to archive (repo-relative)
+        path: String,
+
+        /// Archive category (must be configured in config.toml)
+        #[arg(long = "type")]
+        category: String,
+
+        /// Show plan without executing
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Override safety checks (allow archival of docs linked to active issues)
+        #[arg(long)]
+        force: bool,
+    },
 }
 
 #[derive(Subcommand)]

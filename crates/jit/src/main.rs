@@ -1220,6 +1220,14 @@ fn run() -> Result<()> {
                 let exit_code = executor.check_document_links(&scope, json)?;
                 std::process::exit(exit_code);
             }
+            DocCommands::Archive {
+                path,
+                category,
+                dry_run,
+                force,
+            } => {
+                executor.archive_document(&path, &category, dry_run, force)?;
+            }
         },
         Commands::Query(query_cmd) => match query_cmd {
             jit::cli::QueryCommands::Ready { json } => {
