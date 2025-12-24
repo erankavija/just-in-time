@@ -29,6 +29,12 @@
       "commit": null,
       "label": "Authoritative Design",
       "doc_type": "design"
+    },
+    {
+      "path": "dev/active/authoring-conventions-draft.md",
+      "commit": null,
+      "label": "Authoring Conventions (Draft)",
+      "doc_type": "design"
     }
   ],
   "labels": [

@@ -6,6 +6,8 @@
 
 mod adapter;
 mod assets;
+mod link_validator;
 
 pub use adapter::{AdapterRegistry, DocFormatAdapter, MarkdownAdapter};
 pub use assets::{Asset, AssetScanner, AssetType};
+pub use link_validator::{InternalLink, LinkType, LinkValidationResult, LinkValidator};

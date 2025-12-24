@@ -1216,6 +1216,10 @@ fn run() -> Result<()> {
                     executor.list_document_assets(&id, &path, rescan, json)?;
                 }
             },
+            DocCommands::CheckLinks { scope, json } => {
+                let exit_code = executor.check_document_links(&scope, json)?;
+                std::process::exit(exit_code);
+            }
         },
         Commands::Query(query_cmd) => match query_cmd {
             jit::cli::QueryCommands::Ready { json } => {

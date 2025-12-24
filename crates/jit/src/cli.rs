@@ -604,6 +604,17 @@ pub enum DocCommands {
         #[command(subcommand)]
         command: AssetCommands,
     },
+
+    /// Check document links and assets for validity
+    CheckLinks {
+        /// Scope of validation (all or issue:ID)
+        #[arg(long, default_value = "all")]
+        scope: String,
+
+        /// Output results in JSON format
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Subcommand)]

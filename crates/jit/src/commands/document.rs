@@ -765,4 +765,286 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         Ok(())
     }
+
+    /// Check document links and assets for validity
+    ///
+    /// Returns exit code: 0 (all valid), 1 (errors), 2 (warnings only)
+    pub fn check_document_links(&self, scope: &str, json: bool) -> Result<i32> {
+        use crate::document::{AssetType, LinkValidationResult, LinkValidator};
+        use crate::output::{JsonError, JsonOutput};
+        use anyhow::anyhow;
+        use std::path::PathBuf;
+
+        // Get repository root
+        let repo_root = self
+            .storage
+            .root()
+            .parent()
+            .ok_or_else(|| anyhow!("Invalid storage path"))?;
+
+        // Parse scope and get documents to check
+        let issues = if scope == "all" {
+            self.storage.list_issues()?
+        } else if let Some(issue_id) = scope.strip_prefix("issue:") {
+            let full_id = self.storage.resolve_issue_id(issue_id)?;
+            let issue = self.storage.load_issue(&full_id).inspect_err(|_| {
+                if json {
+                    let err = JsonError::issue_not_found(issue_id);
+                    println!("{}", err.to_json_string().unwrap());
+                }
+            })?;
+            vec![issue]
+        } else {
+            return Err(anyhow!(
+                "Invalid scope '{}'. Use 'all' or 'issue:ID'",
+                scope
+            ));
+        };
+
+        // Collect all documents to check
+        let mut all_documents = Vec::new();
+        let mut all_document_paths = Vec::new();
+        for issue in &issues {
+            for doc in &issue.documents {
+                all_documents.push((issue.id.clone(), doc));
+                all_document_paths.push(PathBuf::from(&doc.path));
+            }
+        }
+
+        if all_documents.is_empty() {
+            if json {
+                let output = JsonOutput::success(serde_json::json!({
+                    "valid": true,
+                    "errors": [],
+                    "warnings": [],
+                    "summary": {
+                        "total_documents": 0,
+                        "valid": 0,
+                        "errors": 0,
+                        "warnings": 0,
+                    }
+                }));
+                println!("{}", output.to_json_string()?);
+            } else {
+                println!("No documents found to check");
+            }
+            return Ok(0);
+        }
+
+        // Create link validator
+        let link_validator = LinkValidator::new(repo_root.to_path_buf(), all_document_paths);
+
+        // Try to open git repository for checking versioned assets
+        let git_repo = git2::Repository::discover(repo_root).ok();
+
+        // Validate each document
+        let mut errors = Vec::new();
+        let mut warnings = Vec::new();
+
+        for (issue_id, doc) in &all_documents {
+            let doc_path = repo_root.join(&doc.path);
+
+            // Check if document file exists
+            if !doc_path.exists() {
+                errors.push(serde_json::json!({
+                    "issue_id": issue_id,
+                    "document": doc.path,
+                    "type": "missing_document",
+                    "message": format!("Document file not found: {}", doc.path),
+                }));
+                continue;
+            }
+
+            // Check assets
+            for asset in &doc.assets {
+                match asset.asset_type {
+                    AssetType::Local => {
+                        if let Some(ref resolved) = asset.resolved_path {
+                            let asset_path = repo_root.join(resolved);
+                            let exists_in_working_tree = asset_path.exists();
+                            let exists_in_git = if !exists_in_working_tree {
+                                // Check if asset exists in git
+                                check_asset_in_git(&git_repo, resolved)
+                            } else {
+                                false
+                            };
+
+                            if !exists_in_working_tree && !exists_in_git {
+                                errors.push(serde_json::json!({
+                                    "issue_id": issue_id,
+                                    "document": doc.path,
+                                    "type": "missing_asset",
+                                    "asset": asset.original_path,
+                                    "resolved": resolved.display().to_string(),
+                                    "message": format!("Asset not found: {}", asset.original_path),
+                                }));
+                            } else {
+                                // Check if path is risky (deep relative traversal)
+                                let parent_count = asset.original_path.matches("../").count();
+                                if parent_count >= 2 {
+                                    warnings.push(serde_json::json!({
+                                        "issue_id": issue_id,
+                                        "document": doc.path,
+                                        "type": "risky_asset_path",
+                                        "asset": asset.original_path,
+                                        "message": format!(
+                                            "Deep relative path '{}' may break if document is moved",
+                                            asset.original_path
+                                        ),
+                                    }));
+                                }
+                            }
+                        }
+                    }
+                    AssetType::Missing => {
+                        errors.push(serde_json::json!({
+                            "issue_id": issue_id,
+                            "document": doc.path,
+                            "type": "missing_asset",
+                            "asset": asset.original_path,
+                            "message": format!("Asset classified as missing: {}", asset.original_path),
+                        }));
+                    }
+                    AssetType::External => {
+                        // External URLs are just warnings
+                        warnings.push(serde_json::json!({
+                            "issue_id": issue_id,
+                            "document": doc.path,
+                            "type": "external_asset",
+                            "asset": asset.original_path,
+                            "message": format!("External URL (not validated): {}", asset.original_path),
+                        }));
+                    }
+                }
+            }
+
+            // Check internal document links
+            let doc_path_rel = PathBuf::from(&doc.path);
+            match link_validator.scan_document_links(&doc_path_rel) {
+                Ok(links) => {
+                    for link in links {
+                        match link_validator.validate_link(&doc_path_rel, &link) {
+                            LinkValidationResult::Broken { reason } => {
+                                errors.push(serde_json::json!({
+                                    "issue_id": issue_id,
+                                    "document": doc.path,
+                                    "type": "broken_link",
+                                    "link": link.target,
+                                    "line": link.line_number,
+                                    "message": reason,
+                                }));
+                            }
+                            LinkValidationResult::Risky { warning } => {
+                                warnings.push(serde_json::json!({
+                                    "issue_id": issue_id,
+                                    "document": doc.path,
+                                    "type": "risky_link",
+                                    "link": link.target,
+                                    "line": link.line_number,
+                                    "message": warning,
+                                }));
+                            }
+                            LinkValidationResult::Valid => {}
+                        }
+                    }
+                }
+                Err(e) => {
+                    warnings.push(serde_json::json!({
+                        "issue_id": issue_id,
+                        "document": doc.path,
+                        "type": "scan_error",
+                        "message": format!("Failed to scan document for links: {}", e),
+                    }));
+                }
+            }
+        }
+
+        // Determine exit code
+        let exit_code = if !errors.is_empty() {
+            1 // Errors found
+        } else if !warnings.is_empty() {
+            2 // Only warnings
+        } else {
+            0 // All valid
+        };
+
+        // Output results
+        if json {
+            let output = JsonOutput::success(serde_json::json!({
+                "valid": errors.is_empty(),
+                "errors": errors,
+                "warnings": warnings,
+                "summary": {
+                    "total_documents": all_documents.len(),
+                    "valid": all_documents.len() - errors.len(),
+                    "errors": errors.len(),
+                    "warnings": warnings.len(),
+                }
+            }));
+            println!("{}", output.to_json_string()?);
+        } else {
+            println!(
+                "Checking {} document(s) in scope '{}'...\n",
+                all_documents.len(),
+                scope
+            );
+
+            if !errors.is_empty() {
+                println!("❌ Errors found ({}):", errors.len());
+                for error in &errors {
+                    println!(
+                        "  {} ({}): {}",
+                        error["document"].as_str().unwrap_or(""),
+                        error["type"].as_str().unwrap_or(""),
+                        error["message"].as_str().unwrap_or("")
+                    );
+                }
+                println!();
+            }
+
+            if !warnings.is_empty() {
+                println!("⚠️  Warnings ({}):", warnings.len());
+                for warning in &warnings {
+                    println!(
+                        "  {} ({}): {}",
+                        warning["document"].as_str().unwrap_or(""),
+                        warning["type"].as_str().unwrap_or(""),
+                        warning["message"].as_str().unwrap_or("")
+                    );
+                }
+                println!();
+            }
+
+            if errors.is_empty() && warnings.is_empty() {
+                println!("✅ All documents valid!");
+            }
+
+            println!(
+                "Summary: {} document(s) checked, {} error(s), {} warning(s)",
+                all_documents.len(),
+                errors.len(),
+                warnings.len()
+            );
+        }
+
+        Ok(exit_code)
+    }
+}
+
+/// Check if an asset exists in git repository
+fn check_asset_in_git(repo: &Option<git2::Repository>, path: &std::path::Path) -> bool {
+    if let Some(repo) = repo {
+        // Try to find the file in HEAD
+        if let Ok(head) = repo.head() {
+            if let Some(target) = head.target() {
+                if let Ok(commit) = repo.find_commit(target) {
+                    if let Ok(tree) = commit.tree() {
+                        let path_str = path.to_str().unwrap_or("");
+                        return tree.get_path(std::path::Path::new(path_str)).is_ok();
+                    }
+                }
+            }
+        }
+    }
+    false
 }
