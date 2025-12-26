@@ -92,6 +92,21 @@ export function GraphView({ onNodeClick, viewMode = 'tactical', labelFilters = [
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [nodeStats, setNodeStats] = useState<Map<string, DownstreamStats>>(new Map());
+  const [strategicTypes, setStrategicTypes] = useState<string[]>(['milestone', 'epic']); // Default fallback
+
+  // Fetch strategic types from API on mount
+  useEffect(() => {
+    const fetchStrategicTypes = async () => {
+      try {
+        const types = await apiClient.getStrategicTypes();
+        setStrategicTypes(types);
+      } catch (err) {
+        console.warn('Failed to fetch strategic types, using defaults:', err);
+        // Keep default values
+      }
+    };
+    fetchStrategicTypes();
+  }, []);
 
   const loadGraph = useCallback(async () => {
     try {
@@ -102,7 +117,7 @@ export function GraphView({ onNodeClick, viewMode = 'tactical', labelFilters = [
       // Build filter configuration
       const filters: GraphFilter[] = [];
       if (viewMode === 'strategic') {
-        filters.push(createStrategicFilter(true));
+        filters.push(createStrategicFilter(true, strategicTypes));
       }
       if (labelFilters.length > 0) {
         filters.push(createLabelFilter(labelFilters));
@@ -282,7 +297,7 @@ export function GraphView({ onNodeClick, viewMode = 'tactical', labelFilters = [
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setNodes, setEdges, viewMode, labelFilters]); // nodeStats is setState, not a dependency
+  }, [setNodes, setEdges, viewMode, labelFilters, strategicTypes]); // nodeStats is setState, not a dependency
 
   useEffect(() => {
     loadGraph();

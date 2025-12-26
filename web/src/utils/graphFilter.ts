@@ -137,10 +137,10 @@ export function matchesPattern(label: string, pattern: string): boolean {
 /**
  * Create a strategic filter configuration
  */
-export function createStrategicFilter(enabled: boolean): GraphFilter {
+export function createStrategicFilter(enabled: boolean, strategicTypes?: string[]): GraphFilter {
   return {
     type: 'strategic',
-    config: { enabled },
+    config: { enabled, strategicTypes },
   };
 }
 

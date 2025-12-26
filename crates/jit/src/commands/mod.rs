@@ -81,7 +81,7 @@ pub enum DependencyAddResult {
 /// (JSON files, SQLite, in-memory, etc.).
 pub struct CommandExecutor<S: IssueStore> {
     storage: S,
-    config_manager: ConfigManager,
+    pub config_manager: ConfigManager,
 }
 
 impl<S: IssueStore> CommandExecutor<S> {

@@ -109,3 +109,21 @@ export interface DocumentDiff {
   to: string;
   diff: string;
 }
+
+export interface NamespaceInfo {
+  description: string;
+  unique: boolean;
+}
+
+export interface ConfigStrategicTypes {
+  strategic_types: string[];
+}
+
+export interface ConfigHierarchy {
+  types: Record<string, number>;
+  strategic_types: string[];
+}
+
+export interface ConfigNamespaces {
+  namespaces: Record<string, NamespaceInfo>;
+}

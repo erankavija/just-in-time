@@ -1,14 +1,19 @@
-# JIT Configuration File
+# JIT Configuration File (Schema v2)
 #
-# Place this file at `.jit/config.toml` to customize type hierarchy and validation behavior.
+# Place this file at `.jit/config.toml` to customize type hierarchy, validation, and namespace registry.
 # All settings are optional - JIT will use sensible defaults if this file doesn't exist.
+
+[version]
+# Schema version - required for new features
+# Schema v2 introduced namespace registry and enhanced validation
+schema = 2
 
 [type_hierarchy]
 # Type name to hierarchy level mapping (lower numbers = more strategic)
 # Default: { milestone = 1, epic = 2, story = 3, task = 4 }
 types = { milestone = 1, epic = 2, story = 3, task = 4 }
 
-# List of type names that are considered strategic (for query strategic)
+# List of type names that are considered strategic (for 'jit query strategic')
 # Default: ["milestone", "epic"] (levels 1-2)
 # Fully configurable - you can mark ANY types as strategic regardless of level
 strategic_types = ["milestone", "epic"]
@@ -22,19 +27,67 @@ milestone = "milestone"
 story = "story"
 
 [validation]
-# Strictness level: "strict", "loose", or "permissive"
-# - "strict": All validations block operations (future feature)
-# - "loose": Warnings are informational, errors block (default)
-# - "permissive": Everything is informational (future feature)
-strictness = "loose"
+# Auto-assign default type when missing (optional)
+# If set, issues without a type:* label will automatically get this type
+# default_type = "task"
 
-# Enable/disable specific validation warnings
-warn_orphaned_leaves = true          # Warn on tasks without parent labels (epic:*, milestone:*)
-warn_strategic_consistency = true    # Warn on strategic types missing identifying labels
+# Require type:* label on all issues (default: false)
+# When true, creating an issue without a type label fails (unless default_type is set)
+require_type_label = false
+
+# Label format validation regex (optional)
+# Validates that all labels follow the format: namespace:value
+# Example: "^[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9._-]*$"
+# label_regex = '^[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9._-]*$'
+
+# Reject malformed labels vs warn (default: false)
+# When true, operations fail if labels don't match label_regex
+# When false, warnings are logged but operations proceed
+reject_malformed_labels = false
+
+# Enforce namespace registry (default: false)
+# When true, only namespaces defined in [namespaces.*] sections can be used
+# When false, any namespace can be used (registry is for documentation only)
+enforce_namespace_registry = false
+
+# Namespace registry - replaces labels.json (schema v2)
+# Each [namespaces.X] section defines a label namespace
+
+[namespaces.type]
+description = "Issue type (hierarchical)"
+unique = true  # Only one type:* label allowed per issue
+examples = ["type:task", "type:story", "type:epic", "type:milestone"]
+
+[namespaces.epic]
+description = "Epic membership - which epic does this issue belong to?"
+unique = false  # Issues can belong to multiple epics
+examples = ["epic:auth", "epic:production-stability"]
+
+[namespaces.milestone]
+description = "Milestone membership - which milestone is this issue part of?"
+unique = false
+examples = ["milestone:v1.0", "milestone:mvp"]
+
+[namespaces.component]
+description = "Component or system area affected"
+unique = false
+examples = ["component:api", "component:web", "component:cli"]
+
+[namespaces.priority]
+description = "Priority level (alternative to priority field)"
+unique = true
+examples = ["priority:critical", "priority:high"]
+
+# Add more namespaces as needed for your workflow
+# [namespaces.team]
+# description = "Team ownership"
+# unique = false
+# examples = ["team:backend", "team:frontend"]
 
 # Example: Minimal 2-level hierarchy
 # [type_hierarchy]
 # types = { epic = 1, task = 2 }
+# strategic_types = ["epic"]
 # 
 # [type_hierarchy.label_associations]
 # epic = "epic"
@@ -42,6 +95,7 @@ warn_strategic_consistency = true    # Warn on strategic types missing identifyi
 # Example: Extended 5-level hierarchy
 # [type_hierarchy]
 # types = { program = 1, milestone = 2, epic = 3, story = 4, task = 5 }
+# strategic_types = ["program", "milestone", "epic"]
 # 
 # [type_hierarchy.label_associations]
 # program = "program"
@@ -51,6 +105,7 @@ warn_strategic_consistency = true    # Warn on strategic types missing identifyi
 # Example: Custom naming (theme instead of epic)
 # [type_hierarchy]
 # types = { release = 1, theme = 2, task = 3 }
+# strategic_types = ["release", "theme"]
 # 
 # [type_hierarchy.label_associations]
 # theme = "epic"

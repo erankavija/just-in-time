@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Issue, GraphData, StatusSummary, DocumentContent, DocumentHistory, DocumentDiff } from '../types/models';
+import type { Issue, GraphData, StatusSummary, DocumentContent, DocumentHistory, DocumentDiff, ConfigHierarchy, ConfigNamespaces } from '../types/models';
 
 // Use relative URL or construct from current host to avoid CORS issues
 const API_BASE = window.location.hostname === 'localhost' 
@@ -94,6 +94,21 @@ export const apiClient = {
     params.set('path', path);
     if (commit) params.set('commit', commit);
     const response = await api.get(`/documents?${params.toString()}`);
+    return response.data;
+  },
+
+  async getStrategicTypes(): Promise<string[]> {
+    const response = await api.get('/config/strategic-types');
+    return response.data.strategic_types;
+  },
+
+  async getHierarchy(): Promise<ConfigHierarchy> {
+    const response = await api.get('/config/hierarchy');
+    return response.data;
+  },
+
+  async getNamespaces(): Promise<ConfigNamespaces> {
+    const response = await api.get('/config/namespaces');
     return response.data;
   },
 };

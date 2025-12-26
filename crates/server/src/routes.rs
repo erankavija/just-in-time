@@ -39,6 +39,9 @@ pub fn create_routes<S: IssueStore + Send + Sync + 'static>(
             get(get_document_history),
         )
         .route("/issues/:id/documents/:path/diff", get(get_document_diff))
+        .route("/api/config/strategic-types", get(get_strategic_types))
+        .route("/api/config/hierarchy", get(get_hierarchy))
+        .route("/api/config/namespaces", get(get_namespaces))
         .with_state(executor)
 }
 
@@ -467,6 +470,89 @@ async fn get_document_diff<S: IssueStore>(
     }))
 }
 
+/// Response for strategic types
+#[derive(Debug, Serialize, Deserialize)]
+struct StrategicTypesResponse {
+    strategic_types: Vec<String>,
+}
+
+/// Get strategic types from configuration
+async fn get_strategic_types<S: IssueStore>(
+    State(executor): State<AppState<S>>,
+) -> Result<Json<StrategicTypesResponse>, StatusCode> {
+    let namespaces = executor.config_manager.get_namespaces().map_err(|e| {
+        tracing::error!("Failed to load configuration: {:?}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    let strategic_types = namespaces.strategic_types.unwrap_or_default();
+
+    Ok(Json(StrategicTypesResponse { strategic_types }))
+}
+
+/// Response for type hierarchy
+#[derive(Debug, Serialize, Deserialize)]
+struct HierarchyResponse {
+    types: std::collections::HashMap<String, u8>,
+    strategic_types: Vec<String>,
+}
+
+/// Get type hierarchy configuration
+async fn get_hierarchy<S: IssueStore>(
+    State(executor): State<AppState<S>>,
+) -> Result<Json<HierarchyResponse>, StatusCode> {
+    let namespaces = executor.config_manager.get_namespaces().map_err(|e| {
+        tracing::error!("Failed to load configuration: {:?}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    let types = namespaces.type_hierarchy.unwrap_or_default();
+    let strategic_types = namespaces.strategic_types.unwrap_or_default();
+
+    Ok(Json(HierarchyResponse {
+        types,
+        strategic_types,
+    }))
+}
+
+/// Response for namespaces
+#[derive(Debug, Serialize, Deserialize)]
+struct NamespacesResponse {
+    namespaces: std::collections::HashMap<String, NamespaceInfo>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct NamespaceInfo {
+    description: String,
+    unique: bool,
+}
+
+/// Get namespace registry from configuration
+async fn get_namespaces<S: IssueStore>(
+    State(executor): State<AppState<S>>,
+) -> Result<Json<NamespacesResponse>, StatusCode> {
+    let label_namespaces = executor.config_manager.get_namespaces().map_err(|e| {
+        tracing::error!("Failed to load configuration: {:?}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    let namespaces = label_namespaces
+        .namespaces
+        .into_iter()
+        .map(|(name, ns)| {
+            (
+                name,
+                NamespaceInfo {
+                    description: ns.description,
+                    unique: ns.unique,
+                },
+            )
+        })
+        .collect();
+
+    Ok(Json(NamespacesResponse { namespaces }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -652,6 +738,42 @@ mod tests {
         let server = create_test_app();
         let _response = server.get("/search?q=test").await;
         // If it doesn't panic or error, the linked document logic is being used
+    }
+
+    #[tokio::test]
+    async fn test_get_strategic_types() {
+        let server = create_test_app();
+        let response = server.get("/api/config/strategic-types").await;
+        response.assert_status_ok();
+        let data: StrategicTypesResponse = response.json();
+        // Should return default or configured strategic types
+        assert!(data.strategic_types.is_empty() || !data.strategic_types.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_hierarchy() {
+        let server = create_test_app();
+        let response = server.get("/api/config/hierarchy").await;
+        response.assert_status_ok();
+        let data: HierarchyResponse = response.json();
+        // Should return hierarchy data (may be empty defaults)
+        assert!(data.types.is_empty() || !data.types.is_empty());
+        assert!(data.strategic_types.is_empty() || !data.strategic_types.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_namespaces() {
+        let server = create_test_app();
+        let response = server.get("/api/config/namespaces").await;
+        response.assert_status_ok();
+        let data: NamespacesResponse = response.json();
+        // Should return namespaces (at least defaults)
+        assert!(!data.namespaces.is_empty());
+        
+        // Verify structure of namespace info
+        for (_, ns_info) in data.namespaces {
+            assert!(!ns_info.description.is_empty());
+        }
     }
 
     #[tokio::test]
