@@ -9,15 +9,27 @@ impl<S: IssueStore> CommandExecutor<S> {
         description: String,
         priority: Priority,
         gates: Vec<String>,
-        labels: Vec<String>,
+        mut labels: Vec<String>,
     ) -> Result<String> {
+        // Get configuration for validation
+        let config = self.config_manager.load()?;
+        let namespaces = self.config_manager.get_namespaces()?;
+
+        // Apply default type if configured and missing
+        if let Some(ref validation_config) = config.validation {
+            let validator = crate::validation::IssueValidator::new(
+                validation_config.clone(),
+                namespaces.clone(),
+            );
+            validator.apply_default_type(&mut labels);
+        }
+
         // Validate all labels
         for label_str in &labels {
             label_utils::validate_label(label_str)?;
         }
 
         // Check uniqueness constraints
-        let namespaces = self.config_manager.get_namespaces()?;
         let mut unique_namespaces_seen = std::collections::HashSet::new();
 
         for label_str in &labels {
@@ -37,6 +49,20 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue.priority = priority;
         issue.gates_required = gates;
         issue.labels = labels;
+
+        // Validate the issue with configured rules
+        if let Some(ref validation_config) = config.validation {
+            let validator = crate::validation::IssueValidator::new(
+                validation_config.clone(),
+                namespaces.clone(),
+            );
+            let warnings = validator.validate(&issue)?;
+
+            // Log warnings if any
+            for warning in warnings {
+                eprintln!("⚠️  Warning: {}", warning);
+            }
+        }
 
         // Auto-transition to Ready if no dependencies (gates don't block Ready)
         if issue.dependencies.is_empty() {

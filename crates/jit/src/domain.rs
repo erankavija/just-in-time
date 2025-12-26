@@ -130,6 +130,25 @@ impl Issue {
         }
     }
 
+    /// Create a new issue with labels
+    #[cfg(test)]
+    pub fn new_with_labels(title: String, description: String, labels: Vec<String>) -> Self {
+        Self {
+            id: Uuid::new_v4().to_string(),
+            title,
+            description,
+            state: State::Backlog,
+            priority: Priority::Normal,
+            assignee: None,
+            dependencies: Vec::new(),
+            gates_required: Vec::new(),
+            gates_status: HashMap::new(),
+            context: HashMap::new(),
+            documents: Vec::new(),
+            labels,
+        }
+    }
+
     /// Check if this issue is blocked by incomplete dependencies
     ///
     /// Returns true if any dependency is not in a terminal state (Done or Rejected).

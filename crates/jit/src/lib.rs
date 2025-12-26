@@ -18,6 +18,7 @@ pub mod schema;
 pub mod search;
 pub mod storage;
 pub mod type_hierarchy;
+pub mod validation;
 pub mod visualization;
 
 // Re-export commonly used types
