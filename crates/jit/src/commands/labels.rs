@@ -46,6 +46,20 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         issue.labels.push(label.to_string());
+
+        // Validate the updated issue with configured rules
+        let config = self.config_manager.load()?;
+        if let Some(ref validation_config) = config.validation {
+            let validator =
+                crate::validation::IssueValidator::new(validation_config.clone(), namespaces);
+            let warnings = validator.validate(&issue)?;
+
+            // Log warnings if any
+            for warning in warnings {
+                eprintln!("⚠️  Warning: {}", warning);
+            }
+        }
+
         self.storage.save_issue(&issue)?;
         Ok(())
     }

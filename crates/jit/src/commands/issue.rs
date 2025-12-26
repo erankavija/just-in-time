@@ -159,6 +159,21 @@ impl<S: IssueStore> CommandExecutor<S> {
             issue.labels.retain(|l| l != label);
         }
 
+        // Validate the updated issue with configured rules
+        let config = self.config_manager.load()?;
+        let namespaces = self.config_manager.get_namespaces()?;
+
+        if let Some(ref validation_config) = config.validation {
+            let validator =
+                crate::validation::IssueValidator::new(validation_config.clone(), namespaces);
+            let warnings = validator.validate(&issue)?;
+
+            // Log warnings if any
+            for warning in warnings {
+                eprintln!("⚠️  Warning: {}", warning);
+            }
+        }
+
         let old_state = issue.state;
 
         if let Some(s) = state {
