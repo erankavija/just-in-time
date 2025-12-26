@@ -450,3 +450,7 @@
 {"type":"gate_passed","id":"25c28357-73da-4e83-8fb4-21c6ebf80a58","issue_id":"896ff7df-e5b0-48b6-a3b0-a5745ff683b7","timestamp":"2025-12-24T22:39:18.904658223Z","gate_key":"tdd-reminder","updated_by":"copilot:session-1"}
 {"type":"issue_state_changed","id":"784d2f06-fe5d-4279-8bcd-60b214b043fa","issue_id":"896ff7df-e5b0-48b6-a3b0-a5745ff683b7","timestamp":"2025-12-24T22:39:23.806738216Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"0ca66a7f-e757-4a70-bcaf-25e61682cf08","issue_id":"896ff7df-e5b0-48b6-a3b0-a5745ff683b7","timestamp":"2025-12-24T22:39:23.806920416Z","assignee":"copilot:session-1"}
+{"type":"issue_created","id":"97b579ff-8343-44e6-a245-678db1e03b75","issue_id":"bac2a42b-160b-45bc-8ba0-357822d0a1ae","timestamp":"2025-12-26T20:05:06.076222967Z","title":"Consolidate configuration into single source of truth","priority":"high"}
+{"type":"gate_passed","id":"a66a7822-496b-4f50-a7a8-6b134b5c4515","issue_id":"bac2a42b-160b-45bc-8ba0-357822d0a1ae","timestamp":"2025-12-26T20:08:34.798365045Z","gate_key":"tdd-reminder","updated_by":null}
+{"type":"issue_state_changed","id":"4451506b-44c0-4eb9-9cea-1cd9ba11a797","issue_id":"bac2a42b-160b-45bc-8ba0-357822d0a1ae","timestamp":"2025-12-26T20:08:39.836630872Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"9b450584-bc83-4c16-b471-5e9b92e89831","issue_id":"bac2a42b-160b-45bc-8ba0-357822d0a1ae","timestamp":"2025-12-26T20:08:39.837116893Z","assignee":"agent:copilot-cli"}

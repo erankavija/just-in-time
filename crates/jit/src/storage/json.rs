@@ -340,20 +340,53 @@ impl IssueStore for JsonFileStorage {
     }
 
     fn load_label_namespaces(&self) -> Result<crate::domain::LabelNamespaces> {
-        let path = self.root.join("labels.json");
+        // Try to load from config.toml first
+        let config = crate::config::JitConfig::load(&self.root)?;
 
-        if !path.exists() {
-            return Ok(crate::domain::LabelNamespaces::new());
+        // If config has namespaces, use those
+        if let Some(namespaces_config) = config.namespaces {
+            let mut namespaces = std::collections::HashMap::new();
+            for (name, ns_config) in namespaces_config {
+                namespaces.insert(
+                    name,
+                    crate::domain::LabelNamespace::new(ns_config.description, ns_config.unique),
+                );
+            }
+
+            // Build full namespace registry from config
+            let mut result = crate::domain::LabelNamespaces {
+                schema_version: config.version.map(|v| v.schema).unwrap_or(2),
+                namespaces,
+                type_hierarchy: config.type_hierarchy.as_ref().map(|h| h.types.clone()),
+                label_associations: config
+                    .type_hierarchy
+                    .as_ref()
+                    .and_then(|h| h.label_associations.clone()),
+                strategic_types: config
+                    .type_hierarchy
+                    .as_ref()
+                    .and_then(|h| h.strategic_types.clone()),
+            };
+
+            // Sync membership namespaces from label_associations
+            result.sync_membership_namespaces();
+
+            return Ok(result);
         }
 
-        let data = fs::read_to_string(&path).context("Failed to read labels.json")?;
-        let mut namespaces: crate::domain::LabelNamespaces =
-            serde_json::from_str(&data).context("Failed to deserialize labels.json")?;
+        // Fallback: load from labels.json (deprecated) if it exists
+        let path = self.root.join("labels.json");
+        if path.exists() {
+            eprintln!("⚠️  Warning: labels.json is deprecated. Migrate to config.toml namespaces section.");
+            let data = fs::read_to_string(&path).context("Failed to read labels.json")?;
+            let mut namespaces: crate::domain::LabelNamespaces =
+                serde_json::from_str(&data).context("Failed to deserialize labels.json")?;
+            namespaces.sync_membership_namespaces();
+            return Ok(namespaces);
+        }
 
-        // Dynamically register membership namespaces from label_associations
-        namespaces.sync_membership_namespaces();
-
-        Ok(namespaces)
+        // No config and no labels.json - return defaults
+        Ok(crate::domain::LabelNamespaces::with_defaults())
     }
 
     fn save_label_namespaces(&self, namespaces: &crate::domain::LabelNamespaces) -> Result<()> {

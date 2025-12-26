@@ -30,12 +30,10 @@ fn test_namespace_has_correct_properties() {
     // type should be unique
     let type_ns = namespaces.get("type").unwrap();
     assert!(type_ns.unique);
-    assert!(!type_ns.strategic);
 
-    // milestone should be strategic and non-unique
+    // milestone should be non-unique
     let milestone_ns = namespaces.get("milestone").unwrap();
     assert!(!milestone_ns.unique);
-    assert!(milestone_ns.strategic);
 }
 
 #[test]
@@ -183,7 +181,6 @@ fn test_add_custom_namespace() {
             "priority",
             "Custom priority labels",
             false, // not unique
-            false, // not strategic
         )
         .unwrap();
 

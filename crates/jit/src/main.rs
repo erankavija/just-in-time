@@ -1480,7 +1480,6 @@ fn run() -> Result<()> {
                         println!("  {}", name);
                         println!("    Description: {}", ns.description);
                         println!("    Unique: {}", ns.unique);
-                        println!("    Strategic: {}", ns.strategic);
                         println!();
                     }
                 }
@@ -1507,17 +1506,15 @@ fn run() -> Result<()> {
                 name,
                 description,
                 unique,
-                strategic,
                 json,
             } => {
-                executor.add_label_namespace(&name, &description, unique, strategic)?;
+                executor.add_label_namespace(&name, &description, unique)?;
                 if json {
                     use jit::output::JsonOutput;
                     let output = JsonOutput::success(serde_json::json!({
                         "namespace": name,
                         "description": description,
-                        "unique": unique,
-                        "strategic": strategic
+                        "unique": unique
                     }));
                     println!("{}", output.to_json_string()?);
                 } else {

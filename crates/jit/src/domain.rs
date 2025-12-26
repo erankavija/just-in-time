@@ -1161,17 +1161,14 @@ pub struct LabelNamespace {
     pub description: String,
     /// Whether only one label from this namespace can be applied per issue
     pub unique: bool,
-    /// Whether this namespace is used for strategic planning (milestones, epics)
-    pub strategic: bool,
 }
 
 impl LabelNamespace {
     /// Create a new namespace with given properties
-    pub fn new(description: impl Into<String>, unique: bool, strategic: bool) -> Self {
+    pub fn new(description: impl Into<String>, unique: bool) -> Self {
         Self {
             description: description.into(),
             unique,
-            strategic,
         }
     }
 }
@@ -1220,7 +1217,6 @@ impl LabelNamespaces {
                         LabelNamespace::new(
                             format!("{} organizational grouping", type_name),
                             false,
-                            true,
                         ),
                     );
                 }
@@ -1235,18 +1231,15 @@ impl LabelNamespaces {
         // Core system namespaces (not derived from hierarchy)
         namespaces.insert(
             "component".to_string(),
-            LabelNamespace::new("Technical component or subsystem", false, false),
+            LabelNamespace::new("Technical component or subsystem", false),
         );
 
         namespaces.insert(
             "type".to_string(),
-            LabelNamespace::new("Issue type (bug, feature, task, etc.)", true, false),
+            LabelNamespace::new("Issue type (bug, feature, task, etc.)", true),
         );
 
-        namespaces.insert(
-            "team".to_string(),
-            LabelNamespace::new("Owning team", true, false),
-        );
+        namespaces.insert("team".to_string(), LabelNamespace::new("Owning team", true));
 
         // Default type hierarchy
         let mut type_hierarchy = HashMap::new();

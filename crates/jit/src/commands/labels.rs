@@ -69,17 +69,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(result)
     }
 
-    pub fn add_label_namespace(
-        &self,
-        name: &str,
-        description: &str,
-        unique: bool,
-        strategic: bool,
-    ) -> Result<()> {
+    pub fn add_label_namespace(&self, name: &str, description: &str, unique: bool) -> Result<()> {
         let mut namespaces = self.storage.load_label_namespaces()?;
         namespaces.add(
             name.to_string(),
-            crate::domain::LabelNamespace::new(description, unique, strategic),
+            crate::domain::LabelNamespace::new(description, unique),
         );
         self.storage.save_label_namespaces(&namespaces)?;
         Ok(())

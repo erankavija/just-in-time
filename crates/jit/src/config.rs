@@ -11,12 +11,23 @@ use std::path::Path;
 /// Root configuration structure loaded from `.jit/config.toml`.
 #[derive(Debug, Clone, Deserialize)]
 pub struct JitConfig {
+    /// Schema version for migrations (optional).
+    pub version: Option<VersionConfig>,
     /// Type hierarchy configuration (optional).
     pub type_hierarchy: Option<HierarchyConfigToml>,
     /// Validation behavior configuration (optional).
     pub validation: Option<ValidationConfig>,
     /// Documentation lifecycle configuration (optional).
     pub documentation: Option<DocumentationConfig>,
+    /// Label namespace registry (optional - replaces labels.json).
+    pub namespaces: Option<HashMap<String, NamespaceConfig>>,
+}
+
+/// Schema version configuration.
+#[derive(Debug, Clone, Deserialize)]
+pub struct VersionConfig {
+    /// Schema version number (default: 1).
+    pub schema: u32,
 }
 
 /// Type hierarchy configuration from TOML.
@@ -26,6 +37,8 @@ pub struct HierarchyConfigToml {
     pub types: HashMap<String, u8>,
     /// Type name to membership label namespace mapping (optional).
     pub label_associations: Option<HashMap<String, String>>,
+    /// List of type names considered strategic (optional).
+    pub strategic_types: Option<Vec<String>>,
 }
 
 /// Validation behavior configuration.
@@ -33,6 +46,16 @@ pub struct HierarchyConfigToml {
 pub struct ValidationConfig {
     /// Strictness level: "strict", "loose", or "permissive".
     pub strictness: Option<String>,
+    /// Default type when none specified (optional).
+    pub default_type: Option<String>,
+    /// Require exactly one type:* label per issue (default: false).
+    pub require_type_label: Option<bool>,
+    /// Label format regex (optional).
+    pub label_regex: Option<String>,
+    /// Reject malformed labels (default: false).
+    pub reject_malformed_labels: Option<bool>,
+    /// Enforce namespace registry (default: false).
+    pub enforce_namespace_registry: Option<bool>,
     /// Warn on orphaned leaf-level issues (default: true).
     pub warn_orphaned_leaves: Option<bool>,
     /// Warn on strategic issues without matching labels (default: true).
@@ -93,6 +116,18 @@ impl DocumentationConfig {
     }
 }
 
+/// Label namespace configuration from TOML.
+/// Replaces the namespace definitions in labels.json.
+#[derive(Debug, Clone, Deserialize)]
+pub struct NamespaceConfig {
+    /// Human-readable description.
+    pub description: String,
+    /// Whether only one label from this namespace can be applied per issue.
+    pub unique: bool,
+    /// Example labels (optional, for documentation).
+    pub examples: Option<Vec<String>>,
+}
+
 impl JitConfig {
     /// Load configuration from `.jit/config.toml` if it exists.
     ///
@@ -104,9 +139,11 @@ impl JitConfig {
         if !config_path.exists() {
             // No config file - return empty config (will use defaults)
             return Ok(JitConfig {
+                version: None,
                 type_hierarchy: None,
                 validation: None,
                 documentation: None,
+                namespaces: None,
             });
         }
 
@@ -196,5 +233,147 @@ types = { epic = 1, task = 2 }
 
         let result = JitConfig::load(temp_dir.path());
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_schema_v2_with_version() {
+        let config_toml = r#"
+[version]
+schema = 2
+
+[type_hierarchy]
+types = { milestone = 1, epic = 2, task = 3 }
+strategic_types = ["milestone", "epic"]
+
+[type_hierarchy.label_associations]
+milestone = "milestone"
+epic = "epic"
+"#;
+        let config: JitConfig = toml::from_str(config_toml).unwrap();
+
+        assert!(config.version.is_some());
+        assert_eq!(config.version.unwrap().schema, 2);
+
+        let hierarchy = config.type_hierarchy.unwrap();
+        assert_eq!(
+            hierarchy.strategic_types,
+            Some(vec!["milestone".to_string(), "epic".to_string()])
+        );
+    }
+
+    #[test]
+    fn test_parse_validation_with_new_fields() {
+        let config_toml = r#"
+[validation]
+default_type = "task"
+require_type_label = true
+label_regex = '^[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9._-]*$'
+reject_malformed_labels = true
+enforce_namespace_registry = true
+warn_orphaned_leaves = false
+"#;
+        let config: JitConfig = toml::from_str(config_toml).unwrap();
+
+        let validation = config.validation.unwrap();
+        assert_eq!(validation.default_type, Some("task".to_string()));
+        assert_eq!(validation.require_type_label, Some(true));
+        assert_eq!(
+            validation.label_regex,
+            Some("^[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9._-]*$".to_string())
+        );
+        assert_eq!(validation.reject_malformed_labels, Some(true));
+        assert_eq!(validation.enforce_namespace_registry, Some(true));
+        assert_eq!(validation.warn_orphaned_leaves, Some(false));
+    }
+
+    #[test]
+    fn test_parse_namespaces_from_toml() {
+        let config_toml = r#"
+[namespaces.type]
+description = "Issue type (hierarchical)"
+unique = true
+examples = ["type:task", "type:epic"]
+
+[namespaces.epic]
+description = "Feature or initiative membership"
+unique = false
+examples = ["epic:auth", "epic:billing"]
+
+[namespaces.component]
+description = "Technical area"
+unique = false
+"#;
+        let config: JitConfig = toml::from_str(config_toml).unwrap();
+
+        let namespaces = config.namespaces.unwrap();
+        assert_eq!(namespaces.len(), 3);
+
+        let type_ns = &namespaces["type"];
+        assert_eq!(type_ns.description, "Issue type (hierarchical)");
+        assert!(type_ns.unique);
+        assert_eq!(
+            type_ns.examples,
+            Some(vec!["type:task".to_string(), "type:epic".to_string()])
+        );
+
+        let epic_ns = &namespaces["epic"];
+        assert!(!epic_ns.unique);
+
+        let component_ns = &namespaces["component"];
+        assert!(component_ns.examples.is_none());
+    }
+
+    #[test]
+    fn test_parse_full_schema_v2_config() {
+        let config_toml = r#"
+[version]
+schema = 2
+
+[type_hierarchy]
+types = { milestone = 1, epic = 2, story = 3, task = 4 }
+strategic_types = ["milestone", "epic"]
+
+[type_hierarchy.label_associations]
+milestone = "milestone"
+epic = "epic"
+story = "story"
+
+[validation]
+default_type = "task"
+require_type_label = true
+warn_orphaned_leaves = true
+warn_strategic_consistency = true
+
+[namespaces.type]
+description = "Issue type"
+unique = true
+
+[namespaces.epic]
+description = "Epic membership"
+unique = false
+"#;
+        let config: JitConfig = toml::from_str(config_toml).unwrap();
+
+        // Version
+        assert_eq!(config.version.unwrap().schema, 2);
+
+        // Hierarchy
+        let hierarchy = config.type_hierarchy.unwrap();
+        assert_eq!(hierarchy.types.len(), 4);
+        assert_eq!(
+            hierarchy.strategic_types,
+            Some(vec!["milestone".to_string(), "epic".to_string()])
+        );
+
+        // Validation
+        let validation = config.validation.unwrap();
+        assert_eq!(validation.default_type, Some("task".to_string()));
+        assert_eq!(validation.require_type_label, Some(true));
+
+        // Namespaces
+        let namespaces = config.namespaces.unwrap();
+        assert_eq!(namespaces.len(), 2);
+        assert!(namespaces["type"].unique);
+        assert!(!namespaces["epic"].unique);
     }
 }

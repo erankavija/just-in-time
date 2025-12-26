@@ -169,9 +169,9 @@ fn test_query_strategic_with_custom_strategic_namespace() {
     let executor = CommandExecutor::new(storage);
     executor.init().unwrap();
 
-    // Add custom strategic namespace (marked strategic but not in type hierarchy)
+    // Add custom namespace (strategic classification is type-based, not namespace-based)
     executor
-        .add_label_namespace("initiative", "Company-wide initiatives", false, true)
+        .add_label_namespace("initiative", "Company-wide initiatives", false)
         .unwrap();
 
     // Create issue with initiative label but no strategic type

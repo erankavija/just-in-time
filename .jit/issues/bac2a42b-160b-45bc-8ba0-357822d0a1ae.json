@@ -1,0 +1,44 @@
+{
+  "id": "bac2a42b-160b-45bc-8ba0-357822d0a1ae",
+  "title": "Consolidate configuration into single source of truth",
+  "description": "Eliminate configuration fragmentation by consolidating .jit/labels.json into .jit/config.toml, removing misleading namespace strategic flags, and enabling API-driven configuration for web UI. Add missing validation settings (default_type, require_type_label, label_regex) and provide migration tooling for existing repos. This refactoring eliminates duplicate hierarchy data, clarifies that strategic classification is type-based only, and ensures single source of truth for all configuration.",
+  "state": "in_progress",
+  "priority": "high",
+  "assignee": "agent:copilot-cli",
+  "dependencies": [],
+  "gates_required": [
+    "code-review",
+    "tests",
+    "clippy",
+    "fmt",
+    "tdd-reminder"
+  ],
+  "gates_status": {
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2025-12-26T20:08:34.797914110Z"
+    }
+  },
+  "context": {},
+  "documents": [
+    {
+      "path": "dev/active/config-consolidation-plan.md",
+      "commit": null,
+      "label": null,
+      "doc_type": null,
+      "format": "markdown"
+    },
+    {
+      "path": "dev/sessions/session-2025-12-26-config-consolidation.md",
+      "commit": null,
+      "label": null,
+      "doc_type": null,
+      "format": "markdown"
+    }
+  ],
+  "labels": [
+    "type:story",
+    "epic:production-stability"
+  ]
+}

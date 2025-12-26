@@ -1,33 +1,34 @@
-# JIT Configuration File
+# JIT Configuration File (Schema v2)
 #
-# Place this file at `.jit/config.toml` to customize behavior.
-# All settings are optional - JIT will use sensible defaults if this file doesn't exist.
+# Single source of truth for all configuration.
+# Strategic classification is determined EXCLUSIVELY by type labels.
+
+[version]
+schema = 2
 
 [documentation]
 # Documentation lifecycle management configuration
-development_root = "dev"  # Root directory for development documentation
-managed_paths = ["dev/active", "dev/studies", "dev/sessions"]  # Paths subject to archival
-archive_root = "dev/archive"  # Where archived docs are stored
-permanent_paths = ["docs/"]  # Paths that never archive
+development_root = "dev"
+managed_paths = ["dev/active", "dev/studies", "dev/sessions"]
+archive_root = "dev/archive"
+permanent_paths = ["docs/"]
 
-# Archive retention policy:
-# - dev/active/* → Archived when linked issue completes (retention: 1-2 releases)
-# - dev/studies/* → Archived when investigation completes (retention: 1-2 releases)
-# - dev/sessions/* → Archived after 1-2 releases
-# - docs/* → Never archived (permanent product documentation)
-# - dev/architecture/* → Never archived (permanent internal reference)
-# - dev/vision/* → May archive if abandoned
+# Archive categories
+[documentation.categories]
+design = "features"
+analysis = "bug-fixes"
+refactor = "refactorings"
+session = "sessions"
+study = "studies"
 
 [type_hierarchy]
-# Type name to hierarchy level mapping (lower numbers = more strategic)
-# Default: { milestone = 1, epic = 2, story = 3, task = 4 }
+# Type name to hierarchy level mapping (lower = more strategic)
 types = { milestone = 1, epic = 2, story = 3, task = 4 }
 
-# List of type names that are considered strategic (for query strategic)
-# Default: ["milestone", "epic"] (levels 1-2)
+# Strategic types - used by 'query strategic' command
 strategic_types = ["milestone", "epic"]
 
-# Type name to membership label namespace mapping
+# Type → membership label namespace mapping
 [type_hierarchy.label_associations]
 epic = "epic"
 milestone = "milestone"
@@ -35,9 +36,57 @@ story = "story"
 
 [validation]
 # Strictness level: "strict", "loose", or "permissive"
-# - "loose": Warnings are informational, errors block (default)
 strictness = "loose"
 
+# Default type when none specified
+default_type = "task"
+
+# Require exactly one type:* label per issue
+require_type_label = false
+
+# Label format validation
+label_regex = '^[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9._-]*$'
+reject_malformed_labels = false
+enforce_namespace_registry = false
+
 # Enable/disable specific validation warnings
-warn_orphaned_leaves = true          # Warn on tasks without parent labels
-warn_strategic_consistency = true    # Warn on strategic types missing identifying labels
+warn_orphaned_leaves = true
+warn_strategic_consistency = true
+
+# Label namespace registry (replaces labels.json)
+# NO "strategic" flags - strategic is derived from type labels only
+
+[namespaces.type]
+description = "Issue type (hierarchical). Exactly one per issue."
+unique = true
+examples = ["type:task", "type:story", "type:epic", "type:milestone"]
+
+[namespaces.epic]
+description = "Feature or initiative membership"
+unique = false
+examples = ["epic:auth", "epic:production-stability"]
+
+[namespaces.milestone]
+description = "Release or time-bounded goal membership"
+unique = false
+examples = ["milestone:v1.0", "milestone:2026-q1"]
+
+[namespaces.story]
+description = "Story membership (optional)"
+unique = false
+examples = ["story:user-login", "story:checkout"]
+
+[namespaces.component]
+description = "Technical area or subsystem"
+unique = false
+examples = ["component:backend", "component:frontend", "component:cli"]
+
+[namespaces.team]
+description = "Owning team"
+unique = true
+examples = ["team:core", "team:platform"]
+
+[namespaces.resolution]
+description = "Reason for issue closure"
+unique = true
+examples = ["resolution:wont-fix", "resolution:duplicate", "resolution:obsolete"]

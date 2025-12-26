@@ -854,10 +854,6 @@ pub enum LabelCommands {
         #[arg(long)]
         unique: bool,
 
-        /// Namespace is for strategic planning (appears in strategic queries)
-        #[arg(long)]
-        strategic: bool,
-
         #[arg(long)]
         json: bool,
     },
