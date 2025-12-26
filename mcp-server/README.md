@@ -229,12 +229,19 @@ cd ..
 Run the automated test suite:
 
 ```bash
+# Ensure jit is in PATH first
+cd ..
+cargo build --release
+export PATH="$(pwd)/target/release:$PATH"
+
+# Run tests
+cd mcp-server
 npm test
 ```
 
 The test suite verifies:
 - MCP protocol initialization
-- Tool listing (33 tools)
+- Tool listing (59 tools after config consolidation)
 - Schema correctness (new `backlog` and `gated` states)
 - Tool execution and error handling
 - Invalid tool/argument rejection
