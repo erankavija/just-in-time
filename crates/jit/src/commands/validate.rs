@@ -248,7 +248,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     fn validate_labels(&self, issues: &[Issue]) -> Result<()> {
-        let namespaces = self.storage.load_label_namespaces()?;
+        let namespaces = self.config_manager.get_namespaces()?;
 
         for issue in issues {
             // Check label format

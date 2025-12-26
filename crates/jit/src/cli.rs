@@ -840,23 +840,6 @@ pub enum LabelCommands {
         #[arg(long)]
         json: bool,
     },
-
-    /// Add a custom label namespace
-    AddNamespace {
-        /// Namespace name (lowercase alphanumeric with hyphens)
-        name: String,
-
-        /// Human-readable description
-        #[arg(short, long)]
-        description: String,
-
-        /// Only one label from this namespace per issue
-        #[arg(long)]
-        unique: bool,
-
-        #[arg(long)]
-        json: bool,
-    },
 }
 
 #[derive(Subcommand)]

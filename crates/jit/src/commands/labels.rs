@@ -26,7 +26,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Check uniqueness constraint
         let (namespace, _) = label_utils::parse_label(label)?;
-        let namespaces = self.storage.load_label_namespaces()?;
+        let namespaces = self.config_manager.get_namespaces()?;
 
         if let Some(ns_config) = namespaces.get(&namespace) {
             if ns_config.unique {
@@ -67,15 +67,5 @@ impl<S: IssueStore> CommandExecutor<S> {
         let mut result: Vec<String> = values.into_iter().collect();
         result.sort();
         Ok(result)
-    }
-
-    pub fn add_label_namespace(&self, name: &str, description: &str, unique: bool) -> Result<()> {
-        let mut namespaces = self.storage.load_label_namespaces()?;
-        namespaces.add(
-            name.to_string(),
-            crate::domain::LabelNamespace::new(description, unique),
-        );
-        self.storage.save_label_namespaces(&namespaces)?;
-        Ok(())
     }
 }

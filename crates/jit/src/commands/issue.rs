@@ -17,7 +17,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         // Check uniqueness constraints
-        let namespaces = self.storage.load_label_namespaces()?;
+        let namespaces = self.config_manager.get_namespaces()?;
         let mut unique_namespaces_seen = std::collections::HashSet::new();
 
         for label_str in &labels {

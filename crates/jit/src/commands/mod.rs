@@ -31,6 +31,7 @@ mod search;
 mod validate;
 
 // Common imports used across modules
+use crate::config_manager::ConfigManager;
 use crate::domain::{Event, Gate, GateState, GateStatus, Issue, Priority, State};
 use crate::graph::DependencyGraph;
 use crate::labels as label_utils;
@@ -80,12 +81,17 @@ pub enum DependencyAddResult {
 /// (JSON files, SQLite, in-memory, etc.).
 pub struct CommandExecutor<S: IssueStore> {
     storage: S,
+    config_manager: ConfigManager,
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
     /// Create a new command executor with the given storage
     pub fn new(storage: S) -> Self {
-        Self { storage }
+        let config_manager = ConfigManager::new(storage.root());
+        Self {
+            storage,
+            config_manager,
+        }
     }
 
     /// Get reference to the storage backend

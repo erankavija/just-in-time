@@ -107,20 +107,40 @@ fn run() -> Result<()> {
         Commands::Init { hierarchy_template } => {
             executor.init()?;
 
-            // If a template is specified, update the labels config with the hierarchy
+            // If a template is specified, write it to config.toml
             if let Some(template_name) = hierarchy_template {
                 let template = jit::hierarchy_templates::HierarchyTemplate::get(template_name)
                     .ok_or_else(|| anyhow!("Unknown hierarchy template: {}", template_name))?;
 
-                let mut namespaces = executor.storage().load_label_namespaces()?;
-                namespaces.type_hierarchy = Some(template.hierarchy);
-                namespaces.label_associations = Some(template.label_associations);
-                namespaces.schema_version = 2;
+                // Generate config.toml content with the template
+                let config_path = jit_dir.join("config.toml");
+                let config_content = format!(
+                    r#"[version]
+schema = 2
 
-                // Dynamically create/update membership namespaces
-                namespaces.sync_membership_namespaces();
+[type_hierarchy]
+types = {}
+strategic_types = {}
 
-                executor.storage().save_label_namespaces(&namespaces)?;
+[type_hierarchy.label_associations]
+{}
+
+# Add namespace definitions below
+# [namespaces.type]
+# description = "Issue type (hierarchical)"
+# unique = true
+"#,
+                    toml::to_string(&template.hierarchy)?,
+                    toml::to_string(&template.get_strategic_types())?,
+                    template
+                        .label_associations
+                        .iter()
+                        .map(|(k, v)| format!("{} = \"{}\"", k, v))
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                );
+
+                std::fs::write(&config_path, config_content)?;
 
                 println!("Initialized with '{}' hierarchy template", template_name);
             }
@@ -1469,7 +1489,9 @@ fn run() -> Result<()> {
         },
         Commands::Label(label_cmd) => match label_cmd {
             jit::cli::LabelCommands::Namespaces { json } => {
-                let namespaces = executor.storage().load_label_namespaces()?;
+                use jit::config_manager::ConfigManager;
+                let config_mgr = ConfigManager::new(&jit_dir);
+                let namespaces = config_mgr.get_namespaces()?;
                 if json {
                     use jit::output::JsonOutput;
                     let output = JsonOutput::success(namespaces);
@@ -1502,29 +1524,12 @@ fn run() -> Result<()> {
                     println!("\nTotal: {}", values.len());
                 }
             }
-            jit::cli::LabelCommands::AddNamespace {
-                name,
-                description,
-                unique,
-                json,
-            } => {
-                executor.add_label_namespace(&name, &description, unique)?;
-                if json {
-                    use jit::output::JsonOutput;
-                    let output = JsonOutput::success(serde_json::json!({
-                        "namespace": name,
-                        "description": description,
-                        "unique": unique
-                    }));
-                    println!("{}", output.to_json_string()?);
-                } else {
-                    println!("Added label namespace '{}'", name);
-                }
-            }
         },
         Commands::Config(config_cmd) => match config_cmd {
             jit::cli::ConfigCommands::ShowHierarchy { json } => {
-                let namespaces = executor.storage().load_label_namespaces()?;
+                use jit::config_manager::ConfigManager;
+                let config_mgr = ConfigManager::new(&jit_dir);
+                let namespaces = config_mgr.get_namespaces()?;
                 let hierarchy = namespaces.get_type_hierarchy();
 
                 if json {

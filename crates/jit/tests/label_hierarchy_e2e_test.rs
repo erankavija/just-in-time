@@ -252,13 +252,16 @@ fn test_label_hierarchy_complete_workflow() {
     assert!(!stdout.contains(&task2_id), "type:task is not strategic");
     assert!(!stdout.contains(&task3_id), "type:task is not strategic");
 
-    // Verify component namespace is NOT strategic by checking namespace config
+    // Verify namespace configuration exists
     let output = run_jit(&temp, &["label", "namespaces", "--json"]);
     let json: serde_json::Value =
         serde_json::from_str(&String::from_utf8_lossy(&output.stdout)).unwrap();
-    assert_eq!(json["data"]["namespaces"]["component"]["strategic"], false);
-    assert_eq!(json["data"]["namespaces"]["milestone"]["strategic"], true);
-    assert_eq!(json["data"]["namespaces"]["epic"]["strategic"], true);
+
+    // Strategic classification is type-based, not namespace-based
+    // Namespaces no longer have a "strategic" field
+    assert!(json["data"]["namespaces"]["component"].is_object());
+    assert!(json["data"]["namespaces"]["milestone"].is_object());
+    assert!(json["data"]["namespaces"]["epic"].is_object());
 
     // ========================================================================
     // PHASE 5: Validation

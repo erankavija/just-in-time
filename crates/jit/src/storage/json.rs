@@ -154,12 +154,8 @@ impl IssueStore for JsonFileStorage {
             fs::File::create(&events_path).context("Failed to create events file")?;
         }
 
-        // Create label-namespaces.json with defaults if it doesn't exist
-        let namespaces_path = self.root.join("label-namespaces.json");
-        if !namespaces_path.exists() {
-            let namespaces = crate::domain::LabelNamespaces::with_defaults();
-            self.save_label_namespaces(&namespaces)?;
-        }
+        // Config.toml is managed by humans, not auto-created
+        // Use ConfigManager to access configuration
 
         Ok(())
     }
@@ -337,70 +333,6 @@ impl IssueStore for JsonFileStorage {
         }
 
         Ok(events)
-    }
-
-    fn load_label_namespaces(&self) -> Result<crate::domain::LabelNamespaces> {
-        // Try to load from config.toml first
-        let config = crate::config::JitConfig::load(&self.root)?;
-
-        // If config has namespaces, use those
-        if let Some(namespaces_config) = config.namespaces {
-            let mut namespaces = std::collections::HashMap::new();
-            for (name, ns_config) in namespaces_config {
-                namespaces.insert(
-                    name,
-                    crate::domain::LabelNamespace::new(ns_config.description, ns_config.unique),
-                );
-            }
-
-            // Build full namespace registry from config
-            let mut result = crate::domain::LabelNamespaces {
-                schema_version: config.version.map(|v| v.schema).unwrap_or(2),
-                namespaces,
-                type_hierarchy: config.type_hierarchy.as_ref().map(|h| h.types.clone()),
-                label_associations: config
-                    .type_hierarchy
-                    .as_ref()
-                    .and_then(|h| h.label_associations.clone()),
-                strategic_types: config
-                    .type_hierarchy
-                    .as_ref()
-                    .and_then(|h| h.strategic_types.clone()),
-            };
-
-            // Sync membership namespaces from label_associations
-            result.sync_membership_namespaces();
-
-            return Ok(result);
-        }
-
-        // Fallback: load from labels.json (deprecated) if it exists
-        let path = self.root.join("labels.json");
-        if path.exists() {
-            eprintln!("⚠️  Warning: labels.json is deprecated. Migrate to config.toml namespaces section.");
-            let data = fs::read_to_string(&path).context("Failed to read labels.json")?;
-            let mut namespaces: crate::domain::LabelNamespaces =
-                serde_json::from_str(&data).context("Failed to deserialize labels.json")?;
-            namespaces.sync_membership_namespaces();
-            return Ok(namespaces);
-        }
-
-        // No config and no labels.json - return defaults
-        Ok(crate::domain::LabelNamespaces::with_defaults())
-    }
-
-    fn save_label_namespaces(&self, namespaces: &crate::domain::LabelNamespaces) -> Result<()> {
-        let path = self.root.join("labels.json");
-        let temp_path = self.root.join("labels.json.tmp");
-
-        let json = serde_json::to_string_pretty(namespaces)
-            .context("Failed to serialize label namespaces")?;
-
-        // Atomic write: temp file + rename
-        fs::write(&temp_path, json).context("Failed to write temporary labels.json")?;
-        fs::rename(&temp_path, &path).context("Failed to rename temporary labels.json")?;
-
-        Ok(())
     }
 
     fn save_gate_run_result(&self, result: &crate::domain::GateRunResult) -> Result<()> {

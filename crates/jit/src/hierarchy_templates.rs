@@ -27,6 +27,15 @@ impl HierarchyTemplate {
         Self::all().into_iter().find(|t| t.name == name)
     }
 
+    /// Get strategic types (levels 1-2) from hierarchy
+    pub fn get_strategic_types(&self) -> Vec<String> {
+        self.hierarchy
+            .iter()
+            .filter(|(_, &level)| level <= 2)
+            .map(|(name, _)| name.clone())
+            .collect()
+    }
+
     /// Default 4-level hierarchy: milestone → epic → story → task
     ///
     /// Note: This is a factory method for the "default template", not the Default trait.
@@ -119,12 +128,14 @@ impl HierarchyTemplate {
 
 /// Load hierarchy configuration from storage.
 ///
-/// Reads the type_hierarchy and label_associations from .jit/labels.json
+/// Reads the type_hierarchy and label_associations from config.toml
 /// or returns the default config.
 pub fn get_hierarchy_config<S: crate::storage::IssueStore>(
     storage: &S,
 ) -> anyhow::Result<crate::type_hierarchy::HierarchyConfig> {
-    let namespaces = storage.load_label_namespaces()?;
+    use crate::config_manager::ConfigManager;
+    let config_mgr = ConfigManager::new(storage.root());
+    let namespaces = config_mgr.get_namespaces()?;
 
     if let Some(type_hierarchy) = namespaces.type_hierarchy {
         // Load label_associations or use empty map

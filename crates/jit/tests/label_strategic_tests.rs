@@ -169,10 +169,8 @@ fn test_query_strategic_with_custom_strategic_namespace() {
     let executor = CommandExecutor::new(storage);
     executor.init().unwrap();
 
-    // Add custom namespace (strategic classification is type-based, not namespace-based)
-    executor
-        .add_label_namespace("initiative", "Company-wide initiatives", false)
-        .unwrap();
+    // Strategic classification is type-based, not namespace-based
+    // No need to add custom namespace - config handles this
 
     // Create issue with initiative label but no strategic type
     let _initiative_id = executor

@@ -153,7 +153,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     pub fn query_strategic(&self) -> Result<Vec<Issue>> {
         use crate::labels as label_utils;
 
-        let namespaces = self.storage.load_label_namespaces()?;
+        let namespaces = self.config_manager.get_namespaces()?;
 
         // Get strategic types from config, or fall back to hierarchy-based approach
         let strategic_types: Vec<String> = if let Some(ref types) = namespaces.strategic_types {
