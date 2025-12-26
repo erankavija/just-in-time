@@ -14,7 +14,15 @@
   ],
   "gates_status": {},
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "dev/active/config-consolidation-documentation-requirements.md",
+      "commit": null,
+      "label": "Documentation Requirements",
+      "doc_type": null,
+      "format": "markdown"
+    }
+  ],
   "labels": [
     "type:task",
     "component:api",
