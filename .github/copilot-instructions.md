@@ -200,6 +200,7 @@ Before suggesting code, ensure:
 - [ ] DAG invariant maintained (no cycles in dependencies)
 - [ ] Atomic file operations (write temp + rename)
 - [ ] Event logging for state changes
+- [ ] git is optional for jit unless strictly needed for a feature
 
 **Testing & Documentation:**
 - [ ] Public APIs have comprehensive doc comments with examples
