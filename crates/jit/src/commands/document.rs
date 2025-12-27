@@ -1106,15 +1106,26 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         if dry_run {
             println!("✓ Archival plan (--dry-run)\n");
-            println!("  Source: {}", path);
-            println!("  Destination: {}", dest_path.display());
-            println!("  Category: {}", category);
+            println!("  Document:");
+            println!("    📄 {}", path);
+            println!("       → {}", dest_path.display());
+            println!("\n  Category: {}", category);
+
             if !per_doc_assets.is_empty() {
-                println!("\n  Assets to move:");
+                println!("\n  Assets to move ({}):", per_doc_assets.len());
                 for asset in &per_doc_assets {
-                    println!("    ✓ {}", asset.display());
+                    // Compute destination for asset
+                    let asset_rel = asset
+                        .strip_prefix(doc_path.parent().unwrap_or(Path::new("")))
+                        .unwrap_or(asset);
+                    let asset_dest = dest_path.parent().unwrap().join(asset_rel);
+                    println!("    🖼️  {}", asset.display());
+                    println!("       → {}", asset_dest.display());
                 }
+            } else {
+                println!("\n  No per-doc assets found");
             }
+
             println!("\n  Run without --dry-run to execute.");
             return Ok(());
         }
@@ -1135,10 +1146,13 @@ impl<S: IssueStore> CommandExecutor<S> {
         self.atomic_archive_move(doc_path, &dest_path, &per_doc_assets, repo_root)?;
         let assets_moved = per_doc_assets.len();
 
-        // 8. Update issue metadata
+        // 8. Verify links still work post-move
+        self.verify_post_archival_links(&dest_path, &per_doc_assets, repo_root)?;
+
+        // 9. Update issue metadata
         let updated_issues = self.update_issue_metadata(path, dest_path.to_str().unwrap())?;
 
-        // 9. Log event
+        // 10. Log event
         let event = crate::domain::Event::new_document_archived(
             path.to_string(),
             dest_path.to_str().unwrap().to_string(),
@@ -1416,19 +1430,36 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         if !risky_links.is_empty() {
+            let source_depth = source_path.components().count();
+            let dest_depth = dest_path.components().count();
+            let doc_dir = source_path.parent().and_then(|p| p.to_str()).unwrap_or("");
+            let doc_name = source_path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("doc");
+
             return Err(anyhow!(
                 "❌ Cannot archive: would break {} relative link(s) to shared assets\n\n\
                 Document: {}\n\
-                Destination: {}\n\n\
-                Risky links:\n{}\n\n\
+                Destination: {}\n\
+                Depth change: {} → {} (relative links will break)\n\n\
+                Problematic links:\n{}\n\n\
                 Solutions:\n\
-                1. Move assets to per-doc location (assets/ or <doc-name>_assets/)\n\
-                2. Change to root-relative links (start with /)\n\
+                1. Move shared assets to per-doc location:\n\
+                   mkdir {}/assets\n\
+                   mv <shared-asset> {}/assets/\n\
+                   Update link: ![...](assets/<filename>)\n\n\
+                2. Change to root-relative link (starts with /):\n\
+                   ![...](/<path-from-repo-root>)\n\n\
                 3. Remove the links before archiving",
                 risky_links.len(),
                 doc_path,
                 dest_path.display(),
-                risky_links.join("\n")
+                source_depth,
+                dest_depth,
+                risky_links.join("\n"),
+                doc_dir,
+                doc_name
             ));
         }
 
@@ -1562,6 +1593,88 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Cleanup temp directory
         cleanup_temp();
+
+        Ok(())
+    }
+
+    /// Verify that links still work after archival.
+    ///
+    /// This function scans the archived document and verifies that all per-doc
+    /// asset references are valid at the new location.
+    ///
+    /// # Arguments
+    ///
+    /// * `dest_doc` - Path to the archived document (relative to repo root)
+    /// * `per_doc_assets` - List of per-doc assets that were moved with document
+    /// * `repo_root` - Repository root path
+    ///
+    /// # Errors
+    ///
+    /// Returns error if:
+    /// - Document cannot be read at new location
+    /// - Asset scanning fails
+    /// - Any per-doc asset reference is broken (file doesn't exist)
+    fn verify_post_archival_links(
+        &self,
+        dest_doc: &std::path::Path,
+        per_doc_assets: &[std::path::PathBuf],
+        repo_root: &std::path::Path,
+    ) -> Result<()> {
+        use crate::document::{AdapterRegistry, AssetScanner};
+        use anyhow::Context;
+        use std::collections::HashSet;
+        use std::fs;
+
+        // Read archived document content
+        let full_path = repo_root.join(dest_doc);
+        let content = fs::read_to_string(&full_path).with_context(|| {
+            format!(
+                "Failed to read archived document for verification: {}",
+                dest_doc.display()
+            )
+        })?;
+
+        // Scan for asset references in archived document
+        let registry = AdapterRegistry::with_builtins();
+        let scanner = AssetScanner::new(registry, repo_root);
+        let assets = scanner
+            .scan_document(dest_doc, &content)
+            .map_err(|e| anyhow::anyhow!("Post-archival asset scan failed: {}", e))?;
+
+        // Build set of expected per-doc assets at new location
+        let per_doc_set: HashSet<_> = per_doc_assets.iter().collect();
+
+        // Check each asset reference
+        let mut broken_links = Vec::new();
+        for asset in &assets {
+            if let Some(ref resolved) = asset.resolved_path {
+                // If this is a per-doc asset that should have moved
+                if per_doc_set.contains(resolved) {
+                    // Verify the file exists at the new location
+                    let asset_full = repo_root.join(resolved);
+                    if !asset_full.exists() {
+                        broken_links.push(format!(
+                            "  - {} → {} (file not found)",
+                            asset.original_path,
+                            resolved.display()
+                        ));
+                    }
+                }
+            }
+        }
+
+        if !broken_links.is_empty() {
+            return Err(anyhow::anyhow!(
+                "❌ Post-archival verification failed: {} broken link(s)\n\n\
+                Document: {}\n\n\
+                Broken links:\n{}\n\n\
+                This indicates an error in the archival process. The document has been moved\n\
+                but some asset links are broken. Please report this as a bug.",
+                broken_links.len(),
+                dest_doc.display(),
+                broken_links.join("\n")
+            ));
+        }
 
         Ok(())
     }

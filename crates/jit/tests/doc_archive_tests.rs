@@ -693,3 +693,623 @@ Database config: ![Config](assets/database/config.json)
         "Database config content preserved"
     );
 }
+
+#[test]
+fn test_archive_fails_when_linked_to_active_issue() {
+    let repo = TestRepo::new();
+    repo.init_jit();
+
+    repo.write_file(
+        ".jit/config.toml",
+        r#"
+[documentation]
+development_root = "dev"
+managed_paths = ["dev/active", "dev/studies", "dev/sessions"]
+archive_root = "dev/archive"
+permanent_paths = ["docs/"]
+
+[documentation.categories]
+design = "features"
+"#,
+    );
+    repo.commit("Add config");
+
+    // Create a document
+    repo.write_file(
+        "dev/active/important-design.md",
+        "# Important Design\n\nThis is critical work.",
+    );
+    repo.commit("Add important design");
+
+    // Create an issue
+    let create_output =
+        repo.run_jit(&["issue", "create", "--title", "Implement important feature"]);
+    assert!(
+        create_output.status.success(),
+        "Issue creation should succeed"
+    );
+
+    // Extract issue ID from output
+    let stdout = String::from_utf8_lossy(&create_output.stdout);
+    let issue_id = stdout
+        .lines()
+        .find(|line| line.contains("Created issue"))
+        .and_then(|line| line.split_whitespace().nth(2))
+        .expect("Extract issue ID");
+
+    // Transition to in-progress state
+    let update_output = repo.run_jit(&["issue", "update", issue_id, "--state", "InProgress"]);
+    assert!(
+        update_output.status.success(),
+        "Issue update to InProgress should succeed"
+    );
+
+    // Link the document to the active issue
+    let link_output = repo.run_jit(&[
+        "doc",
+        "add",
+        issue_id,
+        "dev/active/important-design.md",
+        "--label",
+        "Design",
+    ]);
+    assert!(
+        link_output.status.success(),
+        "Document linking should succeed"
+    );
+
+    // Attempt to archive WITHOUT --force - should FAIL
+    let archive_output = repo.run_jit(&[
+        "doc",
+        "archive",
+        "dev/active/important-design.md",
+        "--type",
+        "design",
+    ]);
+
+    let stderr = String::from_utf8_lossy(&archive_output.stderr);
+
+    assert!(
+        !archive_output.status.success(),
+        "Archive should fail when linked to active issue\nstderr: {}",
+        stderr
+    );
+
+    // Document should remain in place
+    assert!(
+        repo.file_exists("dev/active/important-design.md"),
+        "Document should not be archived"
+    );
+    assert!(
+        !repo.file_exists("dev/archive/features/important-design.md"),
+        "Document should not be in archive"
+    );
+
+    // Error should mention active issue
+    assert!(
+        stderr.contains("active") || stderr.contains("in-progress") || stderr.contains("issue"),
+        "Error should explain active issue problem\nstderr: {}",
+        stderr
+    );
+
+    // Now attempt WITH --force - should SUCCEED
+    let force_output = repo.run_jit(&[
+        "doc",
+        "archive",
+        "dev/active/important-design.md",
+        "--type",
+        "design",
+        "--force",
+    ]);
+
+    let force_stdout = String::from_utf8_lossy(&force_output.stdout);
+    let force_stderr = String::from_utf8_lossy(&force_output.stderr);
+
+    assert!(
+        force_output.status.success(),
+        "Archive with --force should succeed\nstdout: {}\nstderr: {}",
+        force_stdout,
+        force_stderr
+    );
+
+    // Document should now be archived
+    assert!(
+        repo.file_exists("dev/archive/features/important-design.md"),
+        "Document should be archived with --force"
+    );
+    assert!(
+        !repo.file_exists("dev/active/important-design.md"),
+        "Source document should be removed with --force"
+    );
+}
+
+#[test]
+fn test_archive_fails_for_permanent_docs() {
+    let repo = TestRepo::new();
+    repo.init_jit();
+
+    repo.write_file(
+        ".jit/config.toml",
+        r#"
+[documentation]
+development_root = "dev"
+managed_paths = ["dev/active", "dev/studies", "dev/sessions"]
+archive_root = "dev/archive"
+permanent_paths = ["docs/", "dev/architecture/"]
+
+[documentation.categories]
+design = "features"
+"#,
+    );
+    repo.commit("Add config");
+
+    // Create permanent documents in protected paths
+    repo.write_file(
+        "docs/user-guide.md",
+        "# User Guide\n\nPermanent documentation.",
+    );
+    repo.write_file(
+        "dev/architecture/core-design.md",
+        "# Core Architecture\n\nPermanent design.",
+    );
+    repo.commit("Add permanent docs");
+
+    // Attempt to archive docs/user-guide.md
+    let output1 = repo.run_jit(&["doc", "archive", "docs/user-guide.md", "--type", "design"]);
+
+    let stderr1 = String::from_utf8_lossy(&output1.stderr);
+
+    assert!(
+        !output1.status.success(),
+        "Archive should fail for docs/ path\nstderr: {}",
+        stderr1
+    );
+
+    assert!(
+        stderr1.contains("permanent") || stderr1.contains("protected") || stderr1.contains("docs/"),
+        "Error should explain permanent path protection\nstderr: {}",
+        stderr1
+    );
+
+    // Document should remain in place
+    assert!(
+        repo.file_exists("docs/user-guide.md"),
+        "Permanent doc should not be archived"
+    );
+
+    // Attempt to archive dev/architecture/core-design.md
+    let output2 = repo.run_jit(&[
+        "doc",
+        "archive",
+        "dev/architecture/core-design.md",
+        "--type",
+        "design",
+    ]);
+
+    let stderr2 = String::from_utf8_lossy(&output2.stderr);
+
+    assert!(
+        !output2.status.success(),
+        "Archive should fail for dev/architecture/ path\nstderr: {}",
+        stderr2
+    );
+
+    assert!(
+        repo.file_exists("dev/architecture/core-design.md"),
+        "Architecture doc should not be archived"
+    );
+}
+
+#[test]
+fn test_dry_run_no_mutation() {
+    let repo = TestRepo::new();
+    repo.init_jit();
+
+    repo.write_file(
+        ".jit/config.toml",
+        r#"
+[documentation]
+development_root = "dev"
+managed_paths = ["dev/active", "dev/studies", "dev/sessions"]
+archive_root = "dev/archive"
+permanent_paths = ["docs/"]
+
+[documentation.categories]
+design = "features"
+"#,
+    );
+    repo.commit("Add config");
+
+    // Create document with assets
+    repo.write_file(
+        "dev/active/test-design.md",
+        r#"# Test Design
+
+![Diagram](assets/diagram.png)
+![Chart](assets/chart.svg)
+"#,
+    );
+    repo.write_file("dev/active/assets/diagram.png", "diagram data");
+    repo.write_file("dev/active/assets/chart.svg", "chart data");
+    repo.commit("Add test design with assets");
+
+    // Run archive with --dry-run
+    let output = repo.run_jit(&[
+        "doc",
+        "archive",
+        "dev/active/test-design.md",
+        "--type",
+        "design",
+        "--dry-run",
+    ]);
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    // Should succeed
+    assert!(
+        output.status.success(),
+        "Dry-run should succeed\nstdout: {}\nstderr: {}",
+        stdout,
+        stderr
+    );
+
+    // Output should show the plan
+    assert!(
+        stdout.contains("dry-run") || stdout.contains("plan") || stdout.contains("would"),
+        "Output should indicate dry-run mode\nstdout: {}",
+        stdout
+    );
+
+    // CRITICAL: Source files should still exist (no mutation)
+    assert!(
+        repo.file_exists("dev/active/test-design.md"),
+        "Source document should remain after dry-run"
+    );
+    assert!(
+        repo.file_exists("dev/active/assets/diagram.png"),
+        "Source asset diagram.png should remain after dry-run"
+    );
+    assert!(
+        repo.file_exists("dev/active/assets/chart.svg"),
+        "Source asset chart.svg should remain after dry-run"
+    );
+
+    // CRITICAL: Destination files should NOT exist
+    assert!(
+        !repo.file_exists("dev/archive/features/test-design.md"),
+        "Destination document should not exist after dry-run"
+    );
+    assert!(
+        !repo.file_exists("dev/archive/features/assets/diagram.png"),
+        "Destination asset should not exist after dry-run"
+    );
+    assert!(
+        !repo.file_exists("dev/archive/features/assets/chart.svg"),
+        "Destination asset should not exist after dry-run"
+    );
+
+    // Verify no event was logged (check events.jsonl doesn't contain document_archived)
+    let events_path = repo.path().join(".jit/data/events.jsonl");
+    if events_path.exists() {
+        let events = fs::read_to_string(&events_path).expect("Read events");
+        assert!(
+            !events.contains("document_archived"),
+            "No document_archived event should be logged during dry-run"
+        );
+    }
+}
+
+#[test]
+fn test_issue_metadata_updates_after_archive() {
+    let repo = TestRepo::new();
+    repo.init_jit();
+
+    repo.write_file(
+        ".jit/config.toml",
+        r#"
+[documentation]
+development_root = "dev"
+managed_paths = ["dev/active", "dev/studies", "dev/sessions"]
+archive_root = "dev/archive"
+permanent_paths = ["docs/"]
+
+[documentation.categories]
+design = "features"
+"#,
+    );
+    repo.commit("Add config");
+
+    // Create a document
+    repo.write_file(
+        "dev/active/feature-design.md",
+        "# Feature Design\n\nDetailed design for feature.",
+    );
+    repo.commit("Add feature design");
+
+    // Create an issue
+    let create_output = repo.run_jit(&["issue", "create", "--title", "Completed feature"]);
+    assert!(
+        create_output.status.success(),
+        "Issue creation should succeed"
+    );
+
+    let stdout = String::from_utf8_lossy(&create_output.stdout);
+    let issue_id = stdout
+        .lines()
+        .find(|line| line.contains("Created issue"))
+        .and_then(|line| line.split_whitespace().nth(2))
+        .expect("Extract issue ID");
+
+    // Transition to done state (so archival is allowed)
+    let update_output = repo.run_jit(&["issue", "update", issue_id, "--state", "Done"]);
+    assert!(
+        update_output.status.success(),
+        "Issue update to Done should succeed"
+    );
+
+    // Link the document to the issue
+    let link_output = repo.run_jit(&[
+        "doc",
+        "add",
+        issue_id,
+        "dev/active/feature-design.md",
+        "--label",
+        "Design",
+    ]);
+    assert!(
+        link_output.status.success(),
+        "Document linking should succeed"
+    );
+
+    // Verify initial document path in issue
+    let show_before = repo.run_jit(&["issue", "show", issue_id, "--json"]);
+    assert!(show_before.status.success(), "Issue show should succeed");
+    let json_before = String::from_utf8_lossy(&show_before.stdout);
+    assert!(
+        json_before.contains("dev/active/feature-design.md"),
+        "Issue should reference original path"
+    );
+
+    // Archive the document
+    let archive_output = repo.run_jit(&[
+        "doc",
+        "archive",
+        "dev/active/feature-design.md",
+        "--type",
+        "design",
+    ]);
+
+    let archive_stdout = String::from_utf8_lossy(&archive_output.stdout);
+    let archive_stderr = String::from_utf8_lossy(&archive_output.stderr);
+
+    assert!(
+        archive_output.status.success(),
+        "Archive should succeed\nstdout: {}\nstderr: {}",
+        archive_stdout,
+        archive_stderr
+    );
+
+    // Load issue and verify DocumentReference.path updated to new location
+    let show_after = repo.run_jit(&["issue", "show", issue_id, "--json"]);
+    assert!(
+        show_after.status.success(),
+        "Issue show after archive should succeed"
+    );
+    let json_after = String::from_utf8_lossy(&show_after.stdout);
+
+    // Should now reference archived path
+    assert!(
+        json_after.contains("dev/archive/features/feature-design.md"),
+        "Issue should reference archived path\nJSON: {}",
+        json_after
+    );
+
+    // Should NOT contain old path
+    assert!(
+        !json_after.contains("dev/active/feature-design.md"),
+        "Issue should not reference old path\nJSON: {}",
+        json_after
+    );
+}
+
+#[test]
+fn test_doc_show_works_post_archival() {
+    let repo = TestRepo::new();
+    repo.init_jit();
+
+    repo.write_file(
+        ".jit/config.toml",
+        r#"
+[documentation]
+development_root = "dev"
+managed_paths = ["dev/active", "dev/studies", "dev/sessions"]
+archive_root = "dev/archive"
+permanent_paths = ["docs/"]
+
+[documentation.categories]
+session = "sessions"
+"#,
+    );
+    repo.commit("Add config");
+
+    // Create a document
+    repo.write_file(
+        "dev/sessions/session-42.md",
+        "# Session 42\n\nSession notes for task completion.",
+    );
+    repo.commit("Add session notes");
+
+    // Create an issue
+    let create_output = repo.run_jit(&["issue", "create", "--title", "Complete task 42"]);
+    assert!(
+        create_output.status.success(),
+        "Issue creation should succeed"
+    );
+
+    let stdout = String::from_utf8_lossy(&create_output.stdout);
+    let issue_id = stdout
+        .lines()
+        .find(|line| line.contains("Created issue"))
+        .and_then(|line| line.split_whitespace().nth(2))
+        .expect("Extract issue ID");
+
+    // Transition to done state (so archival is allowed)
+    let update_output = repo.run_jit(&["issue", "update", issue_id, "--state", "done"]);
+    assert!(
+        update_output.status.success(),
+        "Issue update to Done should succeed"
+    );
+
+    let link_output = repo.run_jit(&[
+        "doc",
+        "add",
+        issue_id,
+        "dev/sessions/session-42.md",
+        "--label",
+        "Session Notes",
+    ]);
+    assert!(
+        link_output.status.success(),
+        "Document linking should succeed"
+    );
+
+    // Verify doc show works before archival
+    let show_before = repo.run_jit(&["doc", "show", issue_id, "dev/sessions/session-42.md"]);
+    assert!(
+        show_before.status.success(),
+        "Doc show should work before archival"
+    );
+    let stdout_before = String::from_utf8_lossy(&show_before.stdout);
+    assert!(
+        stdout_before.contains("Session 42") || stdout_before.contains("session-42.md"),
+        "Doc show should display document info"
+    );
+
+    // Archive the document
+    let archive_output = repo.run_jit(&[
+        "doc",
+        "archive",
+        "dev/sessions/session-42.md",
+        "--type",
+        "session",
+    ]);
+
+    let archive_stdout = String::from_utf8_lossy(&archive_output.stdout);
+    let archive_stderr = String::from_utf8_lossy(&archive_output.stderr);
+
+    assert!(
+        archive_output.status.success(),
+        "Archive should succeed\nstdout: {}\nstderr: {}",
+        archive_stdout,
+        archive_stderr
+    );
+
+    // Commit the archived file to git (doc show reads from git)
+    repo.commit("Archive session");
+
+    // Verify doc show still works after archival
+    let show_after = repo.run_jit(&[
+        "doc",
+        "show",
+        issue_id,
+        "dev/archive/sessions/session-42.md",
+    ]);
+
+    let stdout_after = String::from_utf8_lossy(&show_after.stdout);
+    let stderr_after = String::from_utf8_lossy(&show_after.stderr);
+
+    assert!(
+        show_after.status.success(),
+        "Doc show should work after archival\nstdout: {}\nstderr: {}",
+        stdout_after,
+        stderr_after
+    );
+
+    // Should display archived document content
+    assert!(
+        stdout_after.contains("Session 42"),
+        "Doc show should display archived document content\nstdout: {}",
+        stdout_after
+    );
+}
+
+#[test]
+fn test_archive_preserves_asset_references() {
+    // Test that verifies archived document's asset references remain valid
+    // This is what post-archival verification checks
+    let repo = TestRepo::new();
+    repo.init_jit();
+
+    repo.write_file(
+        ".jit/config.toml",
+        r#"
+[documentation]
+development_root = "dev"
+managed_paths = ["dev/active"]
+archive_root = "dev/archive"
+permanent_paths = ["docs/"]
+
+[documentation.categories]
+design = "features"
+"#,
+    );
+    repo.commit("Add config");
+
+    // Create document with nested per-doc assets
+    repo.write_file(
+        "dev/active/feature-design.md",
+        r#"# Feature Design
+
+![Icon](assets/icons/icon.svg)
+![Screenshot](assets/screens/main.png)
+"#,
+    );
+    repo.write_file("dev/active/assets/icons/icon.svg", "svg data");
+    repo.write_file("dev/active/assets/screens/main.png", "png data");
+    repo.commit("Add design with nested assets");
+
+    // Archive the document
+    let output = repo.run_jit(&[
+        "doc",
+        "archive",
+        "dev/active/feature-design.md",
+        "--type",
+        "design",
+    ]);
+
+    assert!(
+        output.status.success(),
+        "Archive should succeed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    // Verify all assets exist at their new locations
+    // Post-archival verification should have checked this
+    assert!(
+        repo.file_exists("dev/archive/features/feature-design.md"),
+        "Document should be archived"
+    );
+    assert!(
+        repo.file_exists("dev/archive/features/assets/icons/icon.svg"),
+        "Nested asset icon.svg should be accessible"
+    );
+    assert!(
+        repo.file_exists("dev/archive/features/assets/screens/main.png"),
+        "Nested asset main.png should be accessible"
+    );
+
+    // Verify document content still references correct relative paths
+    let archived_content =
+        std::fs::read_to_string(repo.path().join("dev/archive/features/feature-design.md"))
+            .expect("Read archived document");
+
+    assert!(
+        archived_content.contains("assets/icons/icon.svg"),
+        "Document should still reference assets with relative paths"
+    );
+    assert!(
+        archived_content.contains("assets/screens/main.png"),
+        "Document should still reference assets with relative paths"
+    );
+}
