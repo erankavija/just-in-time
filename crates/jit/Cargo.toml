@@ -29,9 +29,10 @@ similar = "2.6"
 regex = "1.12.2"
 toml = "0.8"
 sha2 = "0.10"
+tar = "0.4"
+tempfile = { workspace = true }
 
 [dev-dependencies]
-tempfile = { workspace = true }
 assert_cmd = { workspace = true }
 predicates = { workspace = true }
 proptest = { workspace = true }

@@ -510,13 +510,169 @@ This is a read-only export. Future versions may support:
 
         Ok(())
     }
+
+    /// Export snapshot with all phases
+    pub fn export(
+        &self,
+        scope: &SnapshotScope,
+        mode: &SourceMode,
+        format: &SnapshotFormat,
+        out_path: Option<&Path>,
+    ) -> Result<String> {
+        // Phase 2: Enumerate issues
+        let issues = self.enumerate_issues(scope)?;
+        
+        if issues.is_empty() {
+            return Err(anyhow!("No issues found in scope: {}", scope.to_string()));
+        }
+
+        // Phase 2: Extract documents
+        let doc_refs = self.extract_documents(&issues);
+
+        // Phase 3: Create document snapshots
+        let mut doc_snapshots = Vec::new();
+        for doc_ref in &doc_refs {
+            match self.create_document_snapshot(doc_ref, mode) {
+                Ok(snapshot) => doc_snapshots.push(snapshot),
+                Err(e) => {
+                    eprintln!("Warning: Failed to snapshot {}: {}", doc_ref.path, e);
+                    // Continue with other documents
+                }
+            }
+        }
+
+        // Phase 4: Assembly - create temp directory and populate it
+        let temp_dir = tempfile::TempDir::new()?;
+        let base = temp_dir.path();
+
+        // Copy .jit state
+        self.copy_jit_state(base, &issues)?;
+
+        // Write documents and assets
+        for doc in &doc_snapshots {
+            self.write_document_to_snapshot(base, doc, mode)?;
+        }
+
+        // Generate manifest
+        let manifest = self.generate_manifest(&issues, &doc_snapshots, mode)?;
+        let manifest_json = serde_json::to_string_pretty(&manifest)?;
+        std::fs::write(base.join("manifest.json"), manifest_json)?;
+
+        // Generate README
+        let readme = self.generate_readme(&manifest);
+        std::fs::write(base.join("README.md"), readme)?;
+
+        // Generate checksums
+        self.generate_checksums_file(base, &doc_snapshots)?;
+
+        // Phase 5: Package
+        let output_path = self.determine_output_path(out_path)?;
+        
+        match format {
+            SnapshotFormat::Directory => {
+                self.package_as_directory(temp_dir, &output_path, &manifest)?;
+            }
+            SnapshotFormat::Tar => {
+                self.package_as_tar(temp_dir, &output_path, &manifest)?;
+            }
+        }
+
+        Ok(output_path.to_string_lossy().to_string())
+    }
+
+    /// Determine output path with default timestamp-based naming
+    fn determine_output_path(&self, out_path: Option<&Path>) -> Result<std::path::PathBuf> {
+        if let Some(path) = out_path {
+            Ok(path.to_path_buf())
+        } else {
+            // Generate default name: snapshot-YYYYMMDD-HHMMSS
+            let now = chrono::Local::now();
+            let default_name = format!("snapshot-{}", now.format("%Y%m%d-%H%M%S"));
+            Ok(std::path::PathBuf::from(default_name))
+        }
+    }
+
+    /// Package snapshot as directory
+    fn package_as_directory(
+        &self,
+        temp_dir: tempfile::TempDir,
+        out_path: &Path,
+        manifest: &SnapshotManifest,
+    ) -> Result<()> {
+        // Check if output path already exists
+        if out_path.exists() {
+            return Err(anyhow!("Output path already exists: {}", out_path.display()));
+        }
+
+        // Atomic rename from temp to final destination
+        std::fs::rename(temp_dir.path(), out_path)?;
+
+        println!("✓ Snapshot exported to: {}", out_path.display());
+        println!("  {} issues", manifest.issues.count);
+        println!("  {} documents", manifest.documents.count);
+
+        Ok(())
+    }
+
+    /// Package snapshot as tar archive
+    fn package_as_tar(
+        &self,
+        temp_dir: tempfile::TempDir,
+        out_path: &Path,
+        manifest: &SnapshotManifest,
+    ) -> Result<()> {
+        use tar::Builder;
+        use std::fs::File;
+
+        // Check if output path already exists
+        if out_path.exists() {
+            return Err(anyhow!("Output path already exists: {}", out_path.display()));
+        }
+
+        let tar_file = File::create(out_path)?;
+        let mut tar = Builder::new(tar_file);
+
+        // Get the base directory name from output path
+        let base_name = out_path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("snapshot");
+
+        // Add all files from temp directory with base directory prefix
+        for entry in std::fs::read_dir(temp_dir.path())? {
+            let entry = entry?;
+            let path = entry.path();
+            let name = path
+                .file_name()
+                .ok_or_else(|| anyhow!("Invalid file name"))?;
+            
+            let archive_path = format!("{}/{}", base_name, name.to_string_lossy());
+            
+            if path.is_dir() {
+                tar.append_dir_all(&archive_path, &path)?;
+            } else {
+                tar.append_path_with_name(&path, &archive_path)?;
+            }
+        }
+
+        tar.finish()?;
+
+        println!("✓ Snapshot exported to: {}", out_path.display());
+        println!("  {} issues", manifest.issues.count);
+        println!("  {} documents", manifest.documents.count);
+        println!("  Archive: {} bytes", out_path.metadata()?.len());
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::domain::{DocumentReference, Issue};
+    use crate::snapshot::{IssuesInfo, MetadataInfo, RepoInfo, SnapshotManifest, VerificationInfo};
     use crate::storage::InMemoryStorage;
+    use std::collections::HashMap;
 
     #[test]
     fn test_source_mode_both_at_and_working_tree() {
@@ -721,5 +877,69 @@ mod tests {
         let docs = exporter.extract_documents(&[]);
         
         assert_eq!(docs.len(), 0);
+    }
+
+    #[test]
+    fn test_generate_readme() {
+        let storage = InMemoryStorage::new();
+        let exporter = SnapshotExporter::new(storage);
+        
+        let manifest = SnapshotManifest {
+            version: "1".to_string(),
+            created_at: "2025-12-27T23:00:00Z".to_string(),
+            created_by: "test".to_string(),
+            repo: RepoInfo {
+                path: "/test/repo".to_string(),
+                remote: Some("https://github.com/test/repo".to_string()),
+                commit: Some("abc123".to_string()),
+                branch: Some("main".to_string()),
+                dirty: false,
+                source: "git".to_string(),
+            },
+            scope: "all".to_string(),
+            issues: IssuesInfo {
+                count: 5,
+                states: HashMap::new(),
+                files: vec![],
+            },
+            documents: crate::snapshot::DocumentsInfo {
+                count: 10,
+                items: vec![],
+            },
+            metadata: MetadataInfo {
+                link_policy: "preserve".to_string(),
+                external_assets_policy: "exclude".to_string(),
+                lfs_policy: "allow-pointers".to_string(),
+            },
+            verification: VerificationInfo {
+                total_files: 15,
+                total_bytes: 100000,
+                instructions: "test".to_string(),
+            },
+        };
+        
+        let readme = exporter.generate_readme(&manifest);
+        
+        assert!(readme.contains("# JIT Snapshot Export"));
+        assert!(readme.contains("5 issues"));
+        assert!(readme.contains("10 documents"));
+        assert!(readme.contains("/test/repo"));
+        assert!(readme.contains("abc123"));
+    }
+
+    #[test]
+    fn test_determine_output_path() {
+        let storage = InMemoryStorage::new();
+        let exporter = SnapshotExporter::new(storage);
+        
+        // With explicit path
+        let explicit = std::path::Path::new("my-snapshot");
+        let result = exporter.determine_output_path(Some(explicit)).unwrap();
+        assert_eq!(result, explicit);
+        
+        // With default (timestamp-based)
+        let default = exporter.determine_output_path(None).unwrap();
+        let name = default.file_name().unwrap().to_str().unwrap();
+        assert!(name.starts_with("snapshot-"));
     }
 }
