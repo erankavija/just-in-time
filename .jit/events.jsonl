@@ -466,3 +466,4 @@
 {"type":"gate_passed","id":"11a80bd5-c052-4763-bf2a-bb4f0fc081aa","issue_id":"44d6f247-8ae1-48f2-9ebd-8f5af86fb4ce","timestamp":"2025-12-26T22:06:53.921587209Z","gate_key":"code-review","updated_by":null}
 {"type":"issue_state_changed","id":"13dc3a2a-0f42-47b1-b678-a77c60a11b91","issue_id":"44d6f247-8ae1-48f2-9ebd-8f5af86fb4ce","timestamp":"2025-12-26T22:06:58.746360573Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"bcd830b6-ee06-469e-8046-e7512012a65d","issue_id":"44d6f247-8ae1-48f2-9ebd-8f5af86fb4ce","timestamp":"2025-12-26T22:06:58.746451244Z"}
+{"type":"issue_created","id":"fd07fbdc-2189-4153-9e84-47ff76c2e9eb","issue_id":"32f804f1-9c96-40d4-b9aa-94e3fbf1cd7d","timestamp":"2025-12-27T20:47:03.229031692Z","title":"CLI ergonomics improvements","priority":"normal"}

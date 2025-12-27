@@ -1,0 +1,18 @@
+{
+  "id": "32f804f1-9c96-40d4-b9aa-94e3fbf1cd7d",
+  "title": "CLI ergonomics improvements",
+  "description": "Collection of CLI UX improvements identified during agent usage.\n\n## Improvements Identified\n\n### 1. Accept Plural Flags\n**Current:** Must use --label multiple times: --label \"type:task\" --label \"epic:foo\"\n**Improvement:** Support plural form for better ergonomics\n- jit issue create --title \"...\" --labels \"type:task\" \"epic:foo\" \"component:cli\"\n- Also: --deps for multiple dependencies, --gates for multiple gates\n\n### 2. Smart Assignee Handling\n**Current:** jit issue claim <id> agent:copilot - must type prefix\n**Improvement:** Auto-detect assignee type or use shortcuts\n- jit issue claim <id> copilot → auto-prefix with agent:\n- jit claim <id> → defaults to current user/session from config\n\n### 3. Workflow Shortcuts\n**Current:** Multiple commands to complete an issue\n**Improvements:**\n- jit issue complete <id> → passes all required gates and marks done\n- jit gate pass <id> --all → batch pass multiple gates\n\n### 4. Discovery Commands\n**Current:** Complex jq queries to find next work\n**Improvements:**\n- jit next → shows top priority ready issue\n- jit next --claim → claims it automatically\n- jit issue find API endpoint → fuzzy search by title/description\n\n### 5. Issue Context Memory\n**Improvement:** Remember current working issue in .jit/.current-issue\n- jit show → shows current issue (no ID needed)\n- jit gate pass tests → applies to current issue\n- jit switch <id> → change current issue\n\n### 6. Better Dependency Display\n**Current:** Shows dependencies as raw UUIDs\n**Improvement:** Show short hash + title + state\nExample: Dependencies: #003f9f8 (Config consolidation) [done]\n\n### 7. Undo Operations\n- jit issue unclaim <id> → remove assignee\n- jit gate unpass <id> <key> → mark gate as pending again\n\n### 8. Bulk Operations\n- jit label add milestone:v1.0 --all-ready → label all ready issues\n- jit issue update --state gated --query type:task → batch update\n\n## Priority\nLow-Medium - QoL improvements that significantly enhance developer experience.\n\n## Implementation Notes\n- Start with highest-impact items (plural flags, discovery commands, workflow shortcuts)\n- Maintain backward compatibility\n- Consider shell completion\n- All shortcuts optional - explicit commands still work",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:production-polish",
+    "component:cli"
+  ]
+}
