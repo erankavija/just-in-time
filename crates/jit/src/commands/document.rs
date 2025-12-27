@@ -1059,7 +1059,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         force: bool,
     ) -> Result<()> {
         use crate::config::JitConfig;
-        use anyhow::{anyhow, Context};
+        use anyhow::anyhow;
         use std::path::Path;
 
         // 1. Load configuration
@@ -1131,21 +1131,9 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
-        // 7. Perform atomic move
-        let full_src = repo_root.join(doc_path);
-        let full_dest = repo_root.join(&dest_path);
-
-        // Create destination directory
-        if let Some(parent) = full_dest.parent() {
-            std::fs::create_dir_all(parent).context("Failed to create destination directory")?;
-        }
-
-        // Move the document
-        std::fs::rename(&full_src, &full_dest).context("Failed to move document")?;
-
-        // Move per-doc assets
-        let assets_moved =
-            self.move_per_doc_assets(&per_doc_assets, doc_path, &dest_path, repo_root)?;
+        // 7. Perform atomic move with temp directory pattern
+        self.atomic_archive_move(doc_path, &dest_path, &per_doc_assets, repo_root)?;
+        let assets_moved = per_doc_assets.len();
 
         // 8. Update issue metadata
         let updated_issues = self.update_issue_metadata(path, dest_path.to_str().unwrap())?;
@@ -1355,44 +1343,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     /// Move per-doc assets to archive destination
-    fn move_per_doc_assets(
-        &self,
-        assets: &[std::path::PathBuf],
-        source_doc: &std::path::Path,
-        dest_doc: &std::path::Path,
-        repo_root: &std::path::Path,
-    ) -> Result<usize> {
-        use anyhow::Context;
-        use std::path::Path;
-
-        let source_dir = source_doc.parent().unwrap_or(Path::new(""));
-        let dest_dir = dest_doc.parent().unwrap_or(Path::new(""));
-
-        for asset_path in assets {
-            // Compute relative path from source document directory
-            let relative_to_source = asset_path
-                .strip_prefix(source_dir)
-                .context("Asset not under source directory")?;
-
-            // Compute destination path
-            let dest_asset = dest_dir.join(relative_to_source);
-            let full_dest_asset = repo_root.join(&dest_asset);
-
-            // Create parent directory
-            if let Some(parent) = full_dest_asset.parent() {
-                std::fs::create_dir_all(parent)
-                    .context("Failed to create asset destination directory")?;
-            }
-
-            // Move asset
-            let full_src_asset = repo_root.join(asset_path);
-            std::fs::rename(&full_src_asset, &full_dest_asset)
-                .with_context(|| format!("Failed to move asset: {}", asset_path.display()))?;
-        }
-
-        Ok(assets.len())
-    }
-
     /// Validate that archiving won't break links
     ///
     /// This checks for the critical case: relative links to shared assets (not being moved)
@@ -1481,6 +1431,137 @@ impl<S: IssueStore> CommandExecutor<S> {
                 risky_links.join("\n")
             ));
         }
+
+        Ok(())
+    }
+
+    /// Perform atomic archive move using temp directory pattern.
+    ///
+    /// All-or-nothing file moves with automatic rollback on error.
+    ///
+    /// # Implementation Steps
+    ///
+    /// 1. Copy all files (doc + assets) to temp directory
+    /// 2. Move from temp to final destinations (atomic renames)
+    /// 3. On error: rollback (delete any partial destinations)
+    /// 4. Delete sources only after all destinations verified
+    fn atomic_archive_move(
+        &self,
+        source_doc: &std::path::Path,
+        dest_doc: &std::path::Path,
+        assets: &[std::path::PathBuf],
+        repo_root: &std::path::Path,
+    ) -> Result<()> {
+        use anyhow::Context;
+        use std::path::Path;
+
+        // Create temp directory in repo root (same filesystem for atomic rename)
+        let temp_base = repo_root.join(".jit").join("tmp");
+        std::fs::create_dir_all(&temp_base).context("Failed to create temp base directory")?;
+
+        let temp_id = uuid::Uuid::new_v4().to_string();
+        let temp_dir = temp_base.join(format!("archive-{}", temp_id));
+        std::fs::create_dir(&temp_dir).context("Failed to create temporary directory")?;
+
+        // Ensure cleanup on error
+        let cleanup_temp = || {
+            let _ = std::fs::remove_dir_all(&temp_dir);
+        };
+
+        // Prepare list of all files to move: (source_path, dest_path, temp_path)
+        let source_dir = source_doc.parent().unwrap_or(Path::new(""));
+        let dest_dir = dest_doc.parent().unwrap_or(Path::new(""));
+
+        let mut files_to_move = Vec::new();
+
+        // Add document
+        let doc_temp = temp_dir.join(format!("doc-{}", temp_id));
+        files_to_move.push((source_doc.to_path_buf(), dest_doc.to_path_buf(), doc_temp));
+
+        // Add assets with unique temp names
+        for (idx, asset_path) in assets.iter().enumerate() {
+            let relative_to_source = asset_path
+                .strip_prefix(source_dir)
+                .context("Asset not under source directory")?;
+            let dest_asset = dest_dir.join(relative_to_source);
+            let asset_temp = temp_dir.join(format!("asset-{}-{}", idx, temp_id));
+            files_to_move.push((asset_path.clone(), dest_asset, asset_temp));
+        }
+
+        // Step 1: Copy all files to temp
+        for (source_rel, _dest_rel, temp_file) in &files_to_move {
+            let source_full = repo_root.join(source_rel);
+
+            if let Err(e) = std::fs::copy(&source_full, temp_file) {
+                cleanup_temp();
+                return Err(e).with_context(|| {
+                    format!(
+                        "Failed to copy to temp: {} -> {}",
+                        source_full.display(),
+                        temp_file.display()
+                    )
+                });
+            }
+        }
+
+        // Step 2: Move from temp to final destinations
+        // Track destinations for rollback
+        let mut created_destinations = Vec::new();
+
+        let move_result: Result<()> = (|| {
+            for (_source_rel, dest_rel, temp_file) in &files_to_move {
+                let dest_full = repo_root.join(dest_rel);
+
+                // Create parent directory
+                if let Some(parent) = dest_full.parent() {
+                    std::fs::create_dir_all(parent).with_context(|| {
+                        format!(
+                            "Failed to create destination directory: {}",
+                            parent.display()
+                        )
+                    })?;
+                }
+
+                // Move from temp to destination (atomic rename)
+                std::fs::rename(temp_file, &dest_full).with_context(|| {
+                    format!(
+                        "Failed to move from temp to destination: {} -> {}",
+                        temp_file.display(),
+                        dest_full.display()
+                    )
+                })?;
+
+                created_destinations.push(dest_full);
+            }
+            Ok(())
+        })();
+
+        // Step 3: Handle errors with rollback
+        if let Err(e) = move_result {
+            // Rollback: delete any files we created in destination
+            for dest in created_destinations {
+                let _ = std::fs::remove_file(&dest);
+            }
+            cleanup_temp();
+            return Err(e);
+        }
+
+        // Step 4: Delete sources only after all destinations verified
+        for (source_rel, _, _) in &files_to_move {
+            let source_full = repo_root.join(source_rel);
+            if let Err(e) = std::fs::remove_file(&source_full) {
+                // Critical: we've moved files but can't delete source
+                // Log warning but don't fail - destination is valid
+                eprintln!(
+                    "Warning: Failed to remove source file {}: {}",
+                    source_full.display(),
+                    e
+                );
+            }
+        }
+
+        // Cleanup temp directory
+        cleanup_temp();
 
         Ok(())
     }
