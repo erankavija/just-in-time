@@ -235,3 +235,147 @@ design = "features"
         "Asset flow.svg should be in archive"
     );
 }
+
+#[test]
+fn test_archive_with_shared_root_relative_links() {
+    let repo = TestRepo::new();
+    repo.init_jit();
+
+    // Configure archive categories
+    repo.write_file(
+        ".jit/config.toml",
+        r#"
+[documentation]
+development_root = "dev"
+managed_paths = ["dev/active", "dev/studies", "dev/sessions"]
+archive_root = "dev/archive"
+permanent_paths = ["docs/"]
+
+[documentation.categories]
+design = "features"
+"#,
+    );
+    repo.commit("Add config");
+
+    // Create shared assets in docs/
+    repo.write_file("docs/diagrams/shared-logo.png", "shared logo");
+    repo.write_file("docs/images/banner.jpg", "shared banner");
+
+    // Create document with root-relative links to shared assets
+    repo.write_file(
+        "dev/active/feature-y-design.md",
+        r#"# Feature Y Design
+
+Company logo: ![Logo](/docs/diagrams/shared-logo.png)
+
+Banner: ![Banner](/docs/images/banner.jpg)
+"#,
+    );
+    repo.commit("Add feature Y with root-relative links");
+
+    // Archive the document - should succeed because root-relative links stay valid
+    let output = repo.run_jit(&[
+        "doc",
+        "archive",
+        "dev/active/feature-y-design.md",
+        "--type",
+        "design",
+    ]);
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    // Should succeed
+    assert!(
+        output.status.success(),
+        "Archive should succeed with root-relative links\nstdout: {}\nstderr: {}",
+        stdout,
+        stderr
+    );
+
+    // Document should be archived
+    assert!(
+        repo.file_exists("dev/archive/features/feature-y-design.md"),
+        "Document should be archived"
+    );
+
+    // Shared assets should stay in place (not moved)
+    assert!(
+        repo.file_exists("docs/diagrams/shared-logo.png"),
+        "Shared asset should stay in docs/"
+    );
+    assert!(
+        repo.file_exists("docs/images/banner.jpg"),
+        "Shared asset should stay in docs/"
+    );
+}
+
+#[test]
+fn test_archive_fails_with_relative_shared_links() {
+    let repo = TestRepo::new();
+    repo.init_jit();
+
+    // Configure archive categories
+    repo.write_file(
+        ".jit/config.toml",
+        r#"
+[documentation]
+development_root = "dev"
+managed_paths = ["dev/active", "dev/studies", "dev/sessions"]
+archive_root = "dev/archive"
+permanent_paths = ["docs/"]
+
+[documentation.categories]
+design = "features"
+"#,
+    );
+    repo.commit("Add config");
+
+    // Create shared assets outside managed paths
+    repo.write_file("shared/common-diagram.png", "shared diagram");
+
+    // Create document with relative link to shared asset (will break when archived)
+    repo.write_file(
+        "dev/active/feature-z-design.md",
+        r#"# Feature Z Design
+
+See diagram: ![Diagram](../../shared/common-diagram.png)
+"#,
+    );
+    repo.commit("Add feature Z with relative shared link");
+
+    // Archive the document - should FAIL because relative link would break
+    let output = repo.run_jit(&[
+        "doc",
+        "archive",
+        "dev/active/feature-z-design.md",
+        "--type",
+        "design",
+    ]);
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    // Should fail
+    assert!(
+        !output.status.success(),
+        "Archive should fail with relative shared links\nstderr: {}",
+        stderr
+    );
+
+    // Document should NOT be archived (stayed in place)
+    assert!(
+        repo.file_exists("dev/active/feature-z-design.md"),
+        "Document should remain in dev/active/ after failed archive"
+    );
+    assert!(
+        !repo.file_exists("dev/archive/features/feature-z-design.md"),
+        "Document should not be in archive after failed validation"
+    );
+
+    // Error message should mention the link issue
+    assert!(
+        stderr.contains("link") || stderr.contains("relative") || stderr.contains("break"),
+        "Error should explain the link problem\nstderr: {}",
+        stderr
+    );
+}

@@ -1095,6 +1095,15 @@ impl<S: IssueStore> CommandExecutor<S> {
         // 5a. Scan document for assets
         let per_doc_assets = self.scan_and_classify_assets(path, repo_root)?;
 
+        // 5b. Validate link integrity - check for risky relative links to shared assets
+        self.validate_archive_link_integrity(
+            path,
+            &per_doc_assets,
+            doc_path,
+            &dest_path,
+            repo_root,
+        )?;
+
         if dry_run {
             println!("✓ Archival plan (--dry-run)\n");
             println!("  Source: {}", path);
@@ -1382,5 +1391,97 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         Ok(assets.len())
+    }
+
+    /// Validate that archiving won't break links
+    ///
+    /// This checks for the critical case: relative links to shared assets (not being moved)
+    /// would break after the document is moved to the archive.
+    fn validate_archive_link_integrity(
+        &self,
+        doc_path: &str,
+        per_doc_assets: &[std::path::PathBuf],
+        source_path: &std::path::Path,
+        dest_path: &std::path::Path,
+        repo_root: &std::path::Path,
+    ) -> Result<()> {
+        use crate::document::{AdapterRegistry, AssetScanner};
+        use anyhow::{anyhow, Context};
+        use std::collections::HashSet;
+        use std::fs;
+        use std::path::Path;
+
+        let full_path = repo_root.join(doc_path);
+        let content = fs::read_to_string(&full_path).with_context(|| {
+            format!("Failed to read document for link validation: {}", doc_path)
+        })?;
+
+        // Scan for all assets
+        let registry = AdapterRegistry::with_builtins();
+        let scanner = AssetScanner::new(registry, repo_root);
+        let all_assets = scanner
+            .scan_document(Path::new(doc_path), &content)
+            .map_err(|e| anyhow!("Asset scan failed: {}", e))?;
+
+        // Build set of per-doc assets for quick lookup
+        let per_doc_set: HashSet<_> = per_doc_assets.iter().collect();
+
+        // Check each asset
+        let mut risky_links = Vec::new();
+        for asset in &all_assets {
+            // Skip external assets
+            if matches!(asset.asset_type, crate::document::AssetType::External) {
+                continue;
+            }
+
+            // Check if this is a shared asset (not in per-doc set)
+            let is_shared = if let Some(ref resolved) = asset.resolved_path {
+                !per_doc_set.contains(resolved)
+            } else {
+                false
+            };
+
+            if is_shared {
+                // Shared asset - check if link is relative (not root-relative)
+                if !asset.original_path.starts_with('/')
+                    && !asset.original_path.starts_with("http://")
+                    && !asset.original_path.starts_with("https://")
+                {
+                    // This is a relative link to a shared asset
+                    // It will break when the document moves to a different directory depth
+
+                    // Compute path depths to determine if link will break
+                    let source_depth = source_path.components().count();
+                    let dest_depth = dest_path.components().count();
+
+                    // If depth changes, relative links to shared assets will break
+                    if source_depth != dest_depth {
+                        risky_links.push(format!(
+                            "  - {} (relative link to shared asset)",
+                            asset.original_path
+                        ));
+                    }
+                }
+            }
+        }
+
+        if !risky_links.is_empty() {
+            return Err(anyhow!(
+                "❌ Cannot archive: would break {} relative link(s) to shared assets\n\n\
+                Document: {}\n\
+                Destination: {}\n\n\
+                Risky links:\n{}\n\n\
+                Solutions:\n\
+                1. Move assets to per-doc location (assets/ or <doc-name>_assets/)\n\
+                2. Change to root-relative links (start with /)\n\
+                3. Remove the links before archiving",
+                risky_links.len(),
+                doc_path,
+                dest_path.display(),
+                risky_links.join("\n")
+            ));
+        }
+
+        Ok(())
     }
 }
