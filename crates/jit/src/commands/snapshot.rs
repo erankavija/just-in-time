@@ -93,22 +93,13 @@ impl<S: IssueStore> SnapshotExporter<S> {
                 let issue = self.storage.load_issue(id)?;
                 Ok(vec![issue])
             }
-            SnapshotScope::Epic(epic_id) => {
-                // Epic scope collects all issues with the epic label
-                // First resolve the epic ID to full UUID if needed
-                let epic_full_id = self.storage.resolve_issue_id(epic_id)?;
-                
-                // Get all issues and filter by epic label
+            SnapshotScope::Label { namespace, value } => {
+                // Filter issues by label "namespace:value"
+                let target_label = format!("{}:{}", namespace, value);
                 let all_issues = self.storage.list_issues()?;
                 let matching_issues: Vec<Issue> = all_issues
                     .into_iter()
-                    .filter(|issue| {
-                        // Check if issue has the epic label
-                        issue.labels.iter().any(|label| {
-                            label.starts_with("epic:")
-                                && label.strip_prefix("epic:").unwrap() == epic_full_id
-                        })
-                    })
+                    .filter(|issue| issue.labels.contains(&target_label))
                     .collect();
                 
                 Ok(matching_issues)
@@ -192,33 +183,81 @@ mod tests {
     }
 
     #[test]
-    fn test_enumerate_issues_epic() {
-        let mut storage = InMemoryStorage::new();
+    fn test_enumerate_issues_label_epic() {
+        let storage = InMemoryStorage::new();
         storage.init().unwrap();
         
-        // Create epic and child issues
-        let epic = Issue::new("Epic".to_string(), String::new());
-        let epic_id = epic.id.clone();
-        storage.save_issue(&epic).unwrap();
+        // Create issues with epic labels
+        let mut issue1 = Issue::new("Issue 1".to_string(), String::new());
+        issue1.labels.push("epic:auth".to_string());
+        storage.save_issue(&issue1).unwrap();
         
-        let mut child1 = Issue::new("Child 1".to_string(), String::new());
-        child1.labels.push(format!("epic:{}", epic_id));
-        storage.save_issue(&child1).unwrap();
+        let mut issue2 = Issue::new("Issue 2".to_string(), String::new());
+        issue2.labels.push("epic:auth".to_string());
+        storage.save_issue(&issue2).unwrap();
         
-        let mut child2 = Issue::new("Child 2".to_string(), String::new());
-        child2.labels.push(format!("epic:{}", epic_id));
-        storage.save_issue(&child2).unwrap();
+        // Create issue with different epic
+        let mut issue3 = Issue::new("Issue 3".to_string(), String::new());
+        issue3.labels.push("epic:billing".to_string());
+        storage.save_issue(&issue3).unwrap();
         
         // Create unrelated issue
-        let other = Issue::new("Other".to_string(), String::new());
-        storage.save_issue(&other).unwrap();
+        let issue4 = Issue::new("Issue 4".to_string(), String::new());
+        storage.save_issue(&issue4).unwrap();
         
         let exporter = SnapshotExporter::new(storage.clone());
         let issues = exporter
-            .enumerate_issues(&SnapshotScope::Epic(epic_id.clone()))
+            .enumerate_issues(&SnapshotScope::Label {
+                namespace: "epic".to_string(),
+                value: "auth".to_string(),
+            })
             .unwrap();
         
         assert_eq!(issues.len(), 2);
-        assert!(issues.iter().all(|i| i.labels.contains(&format!("epic:{}", epic_id))));
+        assert!(issues.iter().all(|i| i.labels.contains(&"epic:auth".to_string())));
+    }
+
+    #[test]
+    fn test_enumerate_issues_label_milestone() {
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+        
+        let mut issue1 = Issue::new("Issue 1".to_string(), String::new());
+        issue1.labels.push("milestone:v1.0".to_string());
+        storage.save_issue(&issue1).unwrap();
+        
+        let mut issue2 = Issue::new("Issue 2".to_string(), String::new());
+        issue2.labels.push("milestone:v2.0".to_string());
+        storage.save_issue(&issue2).unwrap();
+        
+        let exporter = SnapshotExporter::new(storage.clone());
+        let issues = exporter
+            .enumerate_issues(&SnapshotScope::Label {
+                namespace: "milestone".to_string(),
+                value: "v1.0".to_string(),
+            })
+            .unwrap();
+        
+        assert_eq!(issues.len(), 1);
+        assert_eq!(issues[0].labels, vec!["milestone:v1.0"]);
+    }
+
+    #[test]
+    fn test_enumerate_issues_label_no_matches() {
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+        
+        let issue = Issue::new("Issue".to_string(), String::new());
+        storage.save_issue(&issue).unwrap();
+        
+        let exporter = SnapshotExporter::new(storage.clone());
+        let issues = exporter
+            .enumerate_issues(&SnapshotScope::Label {
+                namespace: "epic".to_string(),
+                value: "nonexistent".to_string(),
+            })
+            .unwrap();
+        
+        assert_eq!(issues.len(), 0);
     }
 }

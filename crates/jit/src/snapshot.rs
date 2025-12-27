@@ -142,21 +142,35 @@ pub enum SnapshotScope {
     All,
     /// Export a single issue
     Issue(String),
-    /// Export an epic and all its downstream dependencies
-    Epic(String),
+    /// Export all issues with a specific label
+    Label { namespace: String, value: String },
 }
 
 impl SnapshotScope {
-    /// Parse scope from string format: "all" | "issue:ID" | "epic:ID"
+    /// Parse scope from string format: "all" | "issue:ID" | "label:namespace:value"
     pub fn parse(s: &str) -> Result<Self> {
         if s == "all" {
             Ok(SnapshotScope::All)
         } else if let Some(id) = s.strip_prefix("issue:") {
             Ok(SnapshotScope::Issue(id.to_string()))
-        } else if let Some(id) = s.strip_prefix("epic:") {
-            Ok(SnapshotScope::Epic(id.to_string()))
+        } else if let Some(label_part) = s.strip_prefix("label:") {
+            // Parse "namespace:value" from label:namespace:value
+            let parts: Vec<&str> = label_part.splitn(2, ':').collect();
+            if parts.len() != 2 {
+                return Err(anyhow!(
+                    "Invalid label scope format: '{}'. Expected 'label:namespace:value'",
+                    s
+                ));
+            }
+            Ok(SnapshotScope::Label {
+                namespace: parts[0].to_string(),
+                value: parts[1].to_string(),
+            })
         } else {
-            Err(anyhow!("Invalid scope format: '{}'. Expected 'all', 'issue:ID', or 'epic:ID'", s))
+            Err(anyhow!(
+                "Invalid scope format: '{}'. Expected 'all', 'issue:ID', or 'label:namespace:value'",
+                s
+            ))
         }
     }
 
@@ -165,7 +179,7 @@ impl SnapshotScope {
         match self {
             SnapshotScope::All => "all".to_string(),
             SnapshotScope::Issue(id) => format!("issue:{}", id),
-            SnapshotScope::Epic(id) => format!("epic:{}", id),
+            SnapshotScope::Label { namespace, value } => format!("label:{}:{}", namespace, value),
         }
     }
 }
@@ -248,13 +262,39 @@ mod tests {
     }
 
     #[test]
-    fn test_scope_parse_epic() {
-        let scope = SnapshotScope::parse("epic:def456").unwrap();
+    fn test_scope_parse_label() {
+        let scope = SnapshotScope::parse("label:epic:auth").unwrap();
         match &scope {
-            SnapshotScope::Epic(id) => assert_eq!(id, "def456"),
-            _ => panic!("Expected Epic variant"),
+            SnapshotScope::Label { namespace, value } => {
+                assert_eq!(namespace, "epic");
+                assert_eq!(value, "auth");
+            }
+            _ => panic!("Expected Label variant"),
         }
-        assert_eq!(scope.to_string(), "epic:def456");
+        assert_eq!(scope.to_string(), "label:epic:auth");
+    }
+
+    #[test]
+    fn test_scope_parse_label_milestone() {
+        let scope = SnapshotScope::parse("label:milestone:v1.0").unwrap();
+        match &scope {
+            SnapshotScope::Label { namespace, value } => {
+                assert_eq!(namespace, "milestone");
+                assert_eq!(value, "v1.0");
+            }
+            _ => panic!("Expected Label variant"),
+        }
+        assert_eq!(scope.to_string(), "label:milestone:v1.0");
+    }
+
+    #[test]
+    fn test_scope_parse_label_missing_value() {
+        let result = SnapshotScope::parse("label:epic");
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Expected 'label:namespace:value'"));
     }
 
     #[test]
