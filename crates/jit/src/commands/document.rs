@@ -1312,14 +1312,28 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Identify per-doc assets (in assets/ or <doc-name>_assets/ subdirectories)
         let doc_dir = Path::new(doc_path).parent().unwrap_or(Path::new(""));
+
+        // Extract document name without extension for matching <doc-name>_assets/ pattern
+        let doc_name = Path::new(doc_path)
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("");
+
         let per_doc_assets: Vec<std::path::PathBuf> = assets
             .iter()
             .filter_map(|asset| {
                 if let Some(ref resolved) = asset.resolved_path {
-                    // Check if asset is in same directory as doc or in assets/ subdirectory
+                    // Check if asset is in document's directory
                     if let Ok(stripped) = resolved.strip_prefix(doc_dir) {
-                        // Asset is under document's directory
-                        if stripped.starts_with("assets/") || stripped.starts_with("assets\\") {
+                        let path_str = stripped.to_string_lossy();
+                        // Asset is per-doc if it's in:
+                        // 1. assets/ subdirectory
+                        // 2. <doc-name>_assets/ subdirectory
+                        if path_str.starts_with("assets/")
+                            || path_str.starts_with("assets\\")
+                            || path_str.starts_with(&format!("{}_assets/", doc_name))
+                            || path_str.starts_with(&format!("{}_assets\\", doc_name))
+                        {
                             return Some(resolved.clone());
                         }
                     }

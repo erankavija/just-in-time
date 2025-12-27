@@ -152,3 +152,86 @@ design = "features"
         "Asset should be in archive with document"
     );
 }
+
+#[test]
+fn test_archive_doc_with_doc_name_assets_pattern() {
+    let repo = TestRepo::new();
+    repo.init_jit();
+
+    // Configure archive categories
+    repo.write_file(
+        ".jit/config.toml",
+        r#"
+[documentation]
+development_root = "dev"
+managed_paths = ["dev/active", "dev/studies", "dev/sessions"]
+archive_root = "dev/archive"
+permanent_paths = ["docs/"]
+
+[documentation.categories]
+design = "features"
+"#,
+    );
+    repo.commit("Add config");
+
+    // Create a document with per-doc assets using <doc-name>_assets/ pattern
+    repo.write_file(
+        "dev/active/abcd-design.md",
+        r#"# ABCD Design
+
+![Architecture](abcd-design_assets/arch.png)
+![Flow](abcd-design_assets/flow.svg)
+"#,
+    );
+    repo.write_file("dev/active/abcd-design_assets/arch.png", "fake png");
+    repo.write_file("dev/active/abcd-design_assets/flow.svg", "fake svg");
+    repo.commit("Add ABCD design with named assets");
+
+    // Archive the document
+    let output = repo.run_jit(&[
+        "doc",
+        "archive",
+        "dev/active/abcd-design.md",
+        "--type",
+        "design",
+    ]);
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    // Should succeed
+    assert!(
+        output.status.success(),
+        "Archive should succeed\nstdout: {}\nstderr: {}",
+        stdout,
+        stderr
+    );
+
+    // Source document and assets should be gone
+    assert!(
+        !repo.file_exists("dev/active/abcd-design.md"),
+        "Source document should be moved"
+    );
+    assert!(
+        !repo.file_exists("dev/active/abcd-design_assets/arch.png"),
+        "Source asset arch.png should be moved"
+    );
+    assert!(
+        !repo.file_exists("dev/active/abcd-design_assets/flow.svg"),
+        "Source asset flow.svg should be moved"
+    );
+
+    // Destination document and assets should exist
+    assert!(
+        repo.file_exists("dev/archive/features/abcd-design.md"),
+        "Document should be in archive"
+    );
+    assert!(
+        repo.file_exists("dev/archive/features/abcd-design_assets/arch.png"),
+        "Asset arch.png should be in archive"
+    );
+    assert!(
+        repo.file_exists("dev/archive/features/abcd-design_assets/flow.svg"),
+        "Asset flow.svg should be in archive"
+    );
+}
