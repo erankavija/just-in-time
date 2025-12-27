@@ -479,3 +479,6 @@
 {"type":"issue_state_changed","id":"96dc8390-269e-42c3-9e75-da970d85c44d","issue_id":"896ff7df-e5b0-48b6-a3b0-a5745ff683b7","timestamp":"2025-12-27T22:39:58.626326065Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"503e4c13-f4b9-43fb-bc92-6c40784d3db1","issue_id":"896ff7df-e5b0-48b6-a3b0-a5745ff683b7","timestamp":"2025-12-27T22:39:58.626396606Z"}
 {"type":"issue_state_changed","id":"d58b770b-a0b8-4fef-a94a-5228d4afbcdb","issue_id":"a8f2f04b-f5e4-4cf7-9af4-7d714a2f7139","timestamp":"2025-12-27T22:39:58.734629844Z","from":"backlog","to":"ready"}
+{"type":"gate_passed","id":"1971d8df-3b15-4266-b95a-5b874b9a3185","issue_id":"a8f2f04b-f5e4-4cf7-9af4-7d714a2f7139","timestamp":"2025-12-27T23:07:41.342061312Z","gate_key":"tdd-reminder","updated_by":null}
+{"type":"issue_state_changed","id":"c0b7e777-f353-483e-8496-12c93fa8080a","issue_id":"a8f2f04b-f5e4-4cf7-9af4-7d714a2f7139","timestamp":"2025-12-27T23:07:41.593799784Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"3fccfaed-df97-4524-8c02-ed0e199cf4c9","issue_id":"a8f2f04b-f5e4-4cf7-9af4-7d714a2f7139","timestamp":"2025-12-27T23:07:41.594927676Z","assignee":"copilot:session-1766876861"}

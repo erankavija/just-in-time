@@ -16,6 +16,7 @@ pub mod labels;
 pub mod output;
 pub mod schema;
 pub mod search;
+pub mod snapshot;
 pub mod storage;
 pub mod type_hierarchy;
 pub mod validation;
