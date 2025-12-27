@@ -4,6 +4,7 @@ version = "0.2.0"
 edition.workspace = true
 license.workspace = true
 description = "CLI-first issue tracker with dependency graphs and quality gates"
+default-run = "jit"
 
 [lib]
 name = "jit"

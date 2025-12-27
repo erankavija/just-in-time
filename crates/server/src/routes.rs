@@ -769,7 +769,7 @@ mod tests {
         let data: NamespacesResponse = response.json();
         // Should return namespaces (at least defaults)
         assert!(!data.namespaces.is_empty());
-        
+
         // Verify structure of namespace info
         for (_, ns_info) in data.namespaces {
             assert!(!ns_info.description.is_empty());

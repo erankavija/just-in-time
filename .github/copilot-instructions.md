@@ -6,10 +6,13 @@ This document provides guidelines for GitHub Copilot when working on the `just-i
 
 `just-in-time` (jit) is a repository-local issue tracker that implements:
 - Explicit dependency graphs (DAG) between issues
+- Optional and configurable issue typing and hierarchy based on labels
 - Quality gating with automated and manual gates
-- Coordinator-based agent orchestration
 - Machine-consumable plaintext storage (JSON files)
 - Event logging for audit trail and observability
+- (future) Coordinator-based agent orchestration
+
+**Note:** We eat our own dog food - `just-in-time` is used to track issues in this very repository! 
 
 ## Core Design Principles
 
@@ -105,16 +108,16 @@ let state = if issue.has_blocking_dependencies() {
 - **Assignee format**: `{type}:{identifier}` (e.g., "copilot:session-1")
 - Use issue tracking and workflow terminology from Jira/GitHub Issues
 
-## Module Structure
+## Repository Structure
 
-- **cli/**: Command-line interface using `clap` - entry point for all commands
-- **core/**: Core domain models (Issue, Gate, State, Assignee) - functional style preferred
-- **storage/**: File I/O operations, JSON serialization with `serde` - functional APIs, atomic writes
-- **graph/**: Dependency graph operations, cycle detection, DAG traversal - functional style preferred
-- **gates/**: Gate evaluation, state transitions, blocking logic - functional style preferred
-- **coordinator/**: Agent orchestration daemon, event log, dispatch logic - may use mutable state
-- **error.rs**: Error types and Result aliases using `thiserror`
-- **tests/**: Comprehensive test suites including property-based tests
+- **/crates/jit**: Main crate implementing core functionality
+- **/crates/jit-server**: HTTP server wrapper around jit CLI, used with the web UI
+- **/crates/jit-dispatch**: Agent dispatcher and orchestration logic
+- **dev/**: Development documents, design notes and plans
+- **docs/**: User documentation and guides
+- **mcp-server/**: MCP server for agentic use of jit
+- **scripts/**: Utility scripts for setup, testing, deployment
+- **web/**: Web UI for visualizing (and managing) issues
 
 ## Common Patterns
 
@@ -209,8 +212,9 @@ Before suggesting code, ensure:
 
 ## Resources
 
-- `docs/design.md` - comprehensive design
+- `cargo run -- --help` - jit CLI usage
+- `dev/` - storage for development documents
+- `docs/` - user documentation
 - `cargo test` - run tests
 - `cargo clippy` - lint (zero warnings required)
 - `cargo fmt` - format code
-- `cargo run -- --help` - CLI usage

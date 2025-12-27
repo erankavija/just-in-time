@@ -4,7 +4,7 @@
 [![Docker](https://github.com/erankavija/just-in-time/actions/workflows/docker.yml/badge.svg)](https://github.com/erankavija/just-in-time/actions/workflows/docker.yml)
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
 
-**Enable AI agents to orchestrate their own work.** A repository-local CLI issue tracker that lets a lead agent break down complex tasks and coordinate multiple worker agents—with dependency management, quality gates, and full observability.
+**Orchestrate, automate and supervise the work of AI agents.** A repository-local CLI issue tracker that enables defining complex workflows, quality control and project planning with AI agents.
 
 ## Why JIT?
 
@@ -12,12 +12,11 @@ Traditional issue trackers are designed for humans. JIT is designed for **AI age
 
 - 🤖 **Agent-First**: Copilot agents can create issues, claim work, and coordinate with each other
 - 🔗 **Dependency DAG**: Express "Task B needs Task A" with automatic blocking and cycle detection  
+- 🏗️ **Issue Hierarchy**: Organize work with configurable issue types, hierarchy levels and strategic/tactical views
 - ✅ **Quality Gates**: Enforce tests, reviews, scans before work can proceed
-- 🏗️ **Issue Hierarchy**: Organize work with epics, milestones, and strategic/tactical views
 - ⚙️ **Configurable**: Customize type hierarchies and validation rules per repository
 - 🔒 **Multi-Agent Safe**: File locking prevents race conditions with concurrent agents
 - 📊 **Full Observability**: Event log tracks every action for debugging agent behavior
-- 🎯 **Priority Dispatch**: Coordinator automatically assigns critical work first
 - 📁 **Git-Friendly**: All state in plain JSON—version, diff, and merge like code
 
 ## Use Cases
