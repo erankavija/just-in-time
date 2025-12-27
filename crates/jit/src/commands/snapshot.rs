@@ -1,15 +1,20 @@
 //! Snapshot export command implementation
 
-use crate::domain::Issue;
-use crate::snapshot::{SnapshotFormat, SnapshotScope, SourceMode};
+use crate::document::{AdapterRegistry, AssetScanner};
+use crate::domain::{DocumentReference, Issue};
+use crate::snapshot::{
+    compute_sha256, AssetSnapshot, DocumentSnapshot, SnapshotFormat, SnapshotScope, SourceInfo,
+    SourceMode,
+};
 use crate::storage::IssueStore;
-use anyhow::{anyhow, Result};
-use std::path::PathBuf;
+use anyhow::{anyhow, Context, Result};
+use std::path::Path;
 
 /// Options for snapshot export
+#[allow(dead_code)]
 pub struct SnapshotExportOptions {
     /// Output path (default: snapshot-YYYYMMDD-HHMMSS)
-    pub out: Option<PathBuf>,
+    pub out: Option<std::path::PathBuf>,
     /// Output format
     pub format: SnapshotFormat,
     /// Scope of export
@@ -106,12 +111,155 @@ impl<S: IssueStore> SnapshotExporter<S> {
             }
         }
     }
+
+    /// Extract document references from issues
+    pub fn extract_documents(&self, issues: &[Issue]) -> Vec<DocumentReference> {
+        let mut docs = Vec::new();
+        let mut seen_paths = std::collections::HashSet::new();
+        
+        for issue in issues {
+            for doc_ref in &issue.documents {
+                // Deduplicate by path
+                if seen_paths.insert(doc_ref.path.clone()) {
+                    docs.push(doc_ref.clone());
+                }
+            }
+        }
+        
+        docs
+    }
+
+    /// Read file content from git at specific commit
+    fn read_from_git(
+        &self,
+        repo: &git2::Repository,
+        path: &str,
+        reference: &str,
+    ) -> Result<(Vec<u8>, SourceInfo)> {
+        let obj = repo
+            .revparse_single(reference)
+            .with_context(|| format!("Failed to resolve git reference: {}", reference))?;
+        let commit = obj
+            .peel_to_commit()
+            .with_context(|| format!("Reference '{}' is not a commit", reference))?;
+        let tree = commit.tree()?;
+        
+        let entry = tree
+            .get_path(Path::new(path))
+            .with_context(|| format!("Path '{}' not found in commit {}", path, reference))?;
+        let blob = repo.find_blob(entry.id())?;
+        
+        let content = blob.content().to_vec();
+        
+        Ok((
+            content,
+            SourceInfo {
+                type_: "git".to_string(),
+                commit: Some(commit.id().to_string()),
+                blob_sha: Some(entry.id().to_string()),
+            },
+        ))
+    }
+
+    /// Read file content from working tree filesystem
+    fn read_from_filesystem(&self, path: &str) -> Result<(Vec<u8>, SourceInfo)> {
+        // Get repository root (parent of .jit directory)
+        let repo_root = self
+            .storage
+            .root()
+            .parent()
+            .ok_or_else(|| anyhow!("Invalid storage path"))?;
+        
+        let full_path = repo_root.join(path);
+        let content = std::fs::read(&full_path)
+            .with_context(|| format!("Failed to read file: {}", path))?;
+        
+        Ok((
+            content,
+            SourceInfo {
+                type_: "filesystem".to_string(),
+                commit: None,
+                blob_sha: None,
+            },
+        ))
+    }
+
+    /// Read content based on source mode
+    fn read_content(&self, path: &str, mode: &SourceMode) -> Result<(Vec<u8>, SourceInfo)> {
+        match mode {
+            SourceMode::Git { commit } => {
+                let repo = git2::Repository::open(".")?;
+                self.read_from_git(&repo, path, commit)
+            }
+            SourceMode::WorkingTree => self.read_from_filesystem(path),
+        }
+    }
+
+    /// Create document snapshot with assets
+    pub fn create_document_snapshot(
+        &self,
+        doc_ref: &DocumentReference,
+        mode: &SourceMode,
+    ) -> Result<DocumentSnapshot> {
+        // Read document content
+        let (content, source) = self.read_content(&doc_ref.path, mode)?;
+        let hash = compute_sha256(&content);
+        
+        // Scan for assets if not already in doc_ref
+        let repo_root = self
+            .storage
+            .root()
+            .parent()
+            .ok_or_else(|| anyhow!("Invalid storage path"))?;
+        
+        // Create new adapter registry for scanning
+        let registry = AdapterRegistry::with_builtins();
+        let scanner = AssetScanner::new(registry, repo_root);
+        let content_str = String::from_utf8_lossy(&content);
+        let assets = scanner
+            .scan_document(Path::new(&doc_ref.path), &content_str)
+            .unwrap_or_default();
+        
+        // Create asset snapshots
+        let mut asset_snapshots = Vec::new();
+        for asset in &assets {
+            if let Some(resolved_path) = &asset.resolved_path {
+                // Only include local assets that exist
+                if matches!(asset.asset_type, crate::document::AssetType::Local) {
+                    if let Ok((asset_content, asset_source)) =
+                        self.read_content(&resolved_path.to_string_lossy(), mode)
+                    {
+                        asset_snapshots.push(AssetSnapshot {
+                            path: resolved_path.to_string_lossy().to_string(),
+                            source: asset_source,
+                            hash_sha256: compute_sha256(&asset_content),
+                            mime: asset.mime_type.clone().unwrap_or_else(|| "application/octet-stream".to_string()),
+                            size_bytes: asset_content.len(),
+                            shared: asset.is_shared,
+                        });
+                    }
+                }
+            }
+        }
+        
+        Ok(DocumentSnapshot {
+            path: doc_ref.path.clone(),
+            format: doc_ref
+                .format
+                .clone()
+                .unwrap_or_else(|| "markdown".to_string()),
+            size_bytes: content.len(),
+            source,
+            hash_sha256: hash,
+            assets: asset_snapshots,
+        })
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::Issue;
+    use crate::domain::{DocumentReference, Issue};
     use crate::storage::InMemoryStorage;
 
     #[test]
@@ -259,5 +407,63 @@ mod tests {
             .unwrap();
         
         assert_eq!(issues.len(), 0);
+    }
+
+    #[test]
+    fn test_extract_documents() {
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+        
+        let mut issue1 = Issue::new("Issue 1".to_string(), String::new());
+        issue1.documents.push(DocumentReference {
+            path: "docs/design.md".to_string(),
+            commit: None,
+            label: None,
+            doc_type: None,
+            format: None,
+            assets: vec![],
+        });
+        storage.save_issue(&issue1).unwrap();
+        
+        let mut issue2 = Issue::new("Issue 2".to_string(), String::new());
+        issue2.documents.push(DocumentReference {
+            path: "docs/impl.md".to_string(),
+            commit: None,
+            label: None,
+            doc_type: None,
+            format: None,
+            assets: vec![],
+        });
+        // Duplicate document reference
+        issue2.documents.push(DocumentReference {
+            path: "docs/design.md".to_string(),
+            commit: None,
+            label: None,
+            doc_type: None,
+            format: None,
+            assets: vec![],
+        });
+        storage.save_issue(&issue2).unwrap();
+        
+        let exporter = SnapshotExporter::new(storage.clone());
+        let issues = vec![issue1, issue2];
+        let docs = exporter.extract_documents(&issues);
+        
+        // Should be deduplicated
+        assert_eq!(docs.len(), 2);
+        let paths: Vec<_> = docs.iter().map(|d| d.path.as_str()).collect();
+        assert!(paths.contains(&"docs/design.md"));
+        assert!(paths.contains(&"docs/impl.md"));
+    }
+
+    #[test]
+    fn test_extract_documents_empty() {
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+        
+        let exporter = SnapshotExporter::new(storage.clone());
+        let docs = exporter.extract_documents(&[]);
+        
+        assert_eq!(docs.len(), 0);
     }
 }
