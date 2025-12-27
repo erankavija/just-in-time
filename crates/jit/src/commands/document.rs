@@ -1092,11 +1092,20 @@ impl<S: IssueStore> CommandExecutor<S> {
         // 5. Compute destination path
         let dest_path = self.compute_destination(doc_path, archive_subdir, &doc_config)?;
 
+        // 5a. Scan document for assets
+        let per_doc_assets = self.scan_and_classify_assets(path, repo_root)?;
+
         if dry_run {
             println!("✓ Archival plan (--dry-run)\n");
             println!("  Source: {}", path);
             println!("  Destination: {}", dest_path.display());
             println!("  Category: {}", category);
+            if !per_doc_assets.is_empty() {
+                println!("\n  Assets to move:");
+                for asset in &per_doc_assets {
+                    println!("    ✓ {}", asset.display());
+                }
+            }
             println!("\n  Run without --dry-run to execute.");
             return Ok(());
         }
@@ -1122,8 +1131,12 @@ impl<S: IssueStore> CommandExecutor<S> {
             std::fs::create_dir_all(parent).context("Failed to create destination directory")?;
         }
 
-        // Move the file
+        // Move the document
         std::fs::rename(&full_src, &full_dest).context("Failed to move document")?;
+
+        // Move per-doc assets
+        let assets_moved =
+            self.move_per_doc_assets(&per_doc_assets, doc_path, &dest_path, repo_root)?;
 
         // 8. Update issue metadata
         let updated_issues = self.update_issue_metadata(path, dest_path.to_str().unwrap())?;
@@ -1139,6 +1152,9 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         println!("✓ Archived successfully");
         println!("  {} → {}", path, dest_path.display());
+        if assets_moved > 0 {
+            println!("  Moved {} asset(s)", assets_moved);
+        }
         if !updated_issues.is_empty() {
             println!("  Updated {} issue(s)", updated_issues.len());
         }
@@ -1270,5 +1286,87 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         Ok(updated)
+    }
+
+    /// Scan document and classify assets as per-doc vs shared
+    fn scan_and_classify_assets(
+        &self,
+        doc_path: &str,
+        repo_root: &std::path::Path,
+    ) -> Result<Vec<std::path::PathBuf>> {
+        use crate::document::{AdapterRegistry, AssetScanner};
+        use anyhow::Context;
+        use std::fs;
+        use std::path::Path;
+
+        let full_path = repo_root.join(doc_path);
+        let content = fs::read_to_string(&full_path)
+            .with_context(|| format!("Failed to read document: {}", doc_path))?;
+
+        // Scan for assets
+        let registry = AdapterRegistry::with_builtins();
+        let scanner = AssetScanner::new(registry, repo_root);
+        let assets = scanner
+            .scan_document(Path::new(doc_path), &content)
+            .map_err(|e| anyhow::anyhow!("Asset scan failed: {}", e))?;
+
+        // Identify per-doc assets (in assets/ or <doc-name>_assets/ subdirectories)
+        let doc_dir = Path::new(doc_path).parent().unwrap_or(Path::new(""));
+        let per_doc_assets: Vec<std::path::PathBuf> = assets
+            .iter()
+            .filter_map(|asset| {
+                if let Some(ref resolved) = asset.resolved_path {
+                    // Check if asset is in same directory as doc or in assets/ subdirectory
+                    if let Ok(stripped) = resolved.strip_prefix(doc_dir) {
+                        // Asset is under document's directory
+                        if stripped.starts_with("assets/") || stripped.starts_with("assets\\") {
+                            return Some(resolved.clone());
+                        }
+                    }
+                }
+                None
+            })
+            .collect();
+
+        Ok(per_doc_assets)
+    }
+
+    /// Move per-doc assets to archive destination
+    fn move_per_doc_assets(
+        &self,
+        assets: &[std::path::PathBuf],
+        source_doc: &std::path::Path,
+        dest_doc: &std::path::Path,
+        repo_root: &std::path::Path,
+    ) -> Result<usize> {
+        use anyhow::Context;
+        use std::path::Path;
+
+        let source_dir = source_doc.parent().unwrap_or(Path::new(""));
+        let dest_dir = dest_doc.parent().unwrap_or(Path::new(""));
+
+        for asset_path in assets {
+            // Compute relative path from source document directory
+            let relative_to_source = asset_path
+                .strip_prefix(source_dir)
+                .context("Asset not under source directory")?;
+
+            // Compute destination path
+            let dest_asset = dest_dir.join(relative_to_source);
+            let full_dest_asset = repo_root.join(&dest_asset);
+
+            // Create parent directory
+            if let Some(parent) = full_dest_asset.parent() {
+                std::fs::create_dir_all(parent)
+                    .context("Failed to create asset destination directory")?;
+            }
+
+            // Move asset
+            let full_src_asset = repo_root.join(asset_path);
+            std::fs::rename(&full_src_asset, &full_dest_asset)
+                .with_context(|| format!("Failed to move asset: {}", asset_path.display()))?;
+        }
+
+        Ok(assets.len())
     }
 }

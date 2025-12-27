@@ -142,6 +142,13 @@ design = "features"
         "Document should be in archive"
     );
 
-    // TODO: Asset handling not yet implemented
-    // Assets should be moved when we implement full asset archival
+    // Assets should be moved with the document
+    assert!(
+        !repo.file_exists("dev/active/assets/diagram.png"),
+        "Source asset should be moved"
+    );
+    assert!(
+        repo.file_exists("dev/archive/features/assets/diagram.png"),
+        "Asset should be in archive with document"
+    );
 }
