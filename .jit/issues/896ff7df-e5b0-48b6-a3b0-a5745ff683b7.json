@@ -29,6 +29,39 @@
       "commit": null,
       "label": "Implementation Guide",
       "doc_type": "design"
+    },
+    {
+      "path": "dev/sessions/session-2025-12-27-doc-archive.md",
+      "commit": null,
+      "label": "Session Notes",
+      "doc_type": "session",
+      "format": "markdown",
+      "assets": [
+        {
+          "original_path": "assets/common-diagram.png",
+          "resolved_path": "dev/sessions/assets/common-diagram.png",
+          "asset_type": "missing",
+          "mime_type": null,
+          "content_hash": null,
+          "is_shared": false
+        },
+        {
+          "original_path": "/shared/common-diagram.png",
+          "resolved_path": "shared/common-diagram.png",
+          "asset_type": "missing",
+          "mime_type": null,
+          "content_hash": null,
+          "is_shared": false
+        },
+        {
+          "original_path": "../../shared/common-diagram.png",
+          "resolved_path": "shared/common-diagram.png",
+          "asset_type": "missing",
+          "mime_type": null,
+          "content_hash": null,
+          "is_shared": false
+        }
+      ]
     }
   ],
   "labels": [
