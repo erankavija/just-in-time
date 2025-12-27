@@ -1807,7 +1807,7 @@ strategic_types = {}
                 json,
             } => {
                 use jit::commands::snapshot::SnapshotExporter;
-                use jit::snapshot::{SnapshotFormat, SnapshotScope, SourceMode};
+                use jit::snapshot::{SnapshotFormat, SnapshotScope};
 
                 // Parse scope
                 let snapshot_scope = SnapshotScope::parse(&scope)
