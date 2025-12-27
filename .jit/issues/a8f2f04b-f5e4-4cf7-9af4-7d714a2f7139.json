@@ -17,7 +17,15 @@
   ],
   "gates_status": {},
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "dev/active/snapshot-export-implementation-plan.md",
+      "commit": null,
+      "label": "Implementation Plan",
+      "doc_type": "design",
+      "format": "markdown"
+    }
+  ],
   "labels": [
     "type:task",
     "epic:docs-lifecycle",

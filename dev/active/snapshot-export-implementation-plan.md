@@ -32,10 +32,18 @@ Options:
   --out <PATH>              Output path (default: snapshot-YYYYMMDD-HHMMSS)
   --format <FORMAT>         Output format: dir | tar (default: dir)
   --scope <SCOPE>           Scope: all | issue:ID | epic:ID (default: all)
-  --committed-only          Reject if uncommitted docs/assets exist
+  --at <COMMIT>             Git commit/tag to export (requires git)
+  --working-tree            Export from working tree instead of git
+  --committed-only          Reject if uncommitted docs/assets (requires git, implies --at HEAD)
   --force                   Skip repository validation
   --json                    Output metadata in JSON
 ```
+
+**Git Behavior:**
+- **Default (no --at, no --working-tree):** Use git if available (export from HEAD), fall back to working tree
+- **--at <commit>:** Requires git, exports from specified commit
+- **--working-tree:** Never uses git, reads from filesystem
+- **--committed-only:** Requires git, validates files match HEAD
 
 ## Snapshot Structure
 
@@ -73,9 +81,10 @@ Based on design §10, manifest.json provides complete provenance and verificatio
   "repo": {
     "path": "/home/user/project",
     "remote": "https://github.com/user/project.git",
-    "commit": "abc123def456...",
-    "branch": "main",
-    "dirty": false
+    "commit": "abc123def456...",     // null if --working-tree
+    "branch": "main",                // null if --working-tree or detached
+    "dirty": false,                  // always false with --committed-only
+    "source": "git"                  // "git" | "working-tree"
   },
   "scope": "all",
   "issues": {
@@ -99,18 +108,18 @@ Based on design §10, manifest.json provides complete provenance and verificatio
         "format": "markdown",
         "size_bytes": 4096,
         "source": {
-          "type": "git",
-          "commit": "abc123",
-          "blob_sha": "deadbeef"
+          "type": "git",                    // "git" | "filesystem"
+          "commit": "abc123",               // null if filesystem
+          "blob_sha": "deadbeef"            // null if filesystem
         },
         "hash_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
         "assets": [
           {
             "path": "dev/active/webhooks_assets/flow.png",
             "source": {
-              "type": "git",
-              "commit": "abc123",
-              "blob_sha": "cafebabe"
+              "type": "git",                // "git" | "filesystem"
+              "commit": "abc123",           // null if filesystem  
+              "blob_sha": "cafebabe"        // null if filesystem
             },
             "hash_sha256": "...",
             "mime": "image/png",
@@ -199,9 +208,64 @@ fn validate_before_export(&self) -> Result<()> {
 }
 ```
 
-**Committed-Only Check:**
+**Source Mode Detection:**
 ```rust
-fn check_committed_only(&self, docs: &[DocumentRef]) -> Result<()> {
+enum SourceMode {
+    Git { commit: String },      // Read from git at specific commit
+    WorkingTree,                 // Read from filesystem
+}
+
+fn determine_source_mode(
+    at_commit: Option<&str>,
+    working_tree: bool,
+    committed_only: bool,
+) -> Result<SourceMode> {
+    match (at_commit, working_tree, committed_only) {
+        (Some(_), true, _) => {
+            Err(anyhow!("Cannot use both --at and --working-tree"))
+        }
+        (Some(commit), _, _) => {
+            // Explicit commit requires git
+            if Repository::open(".").is_err() {
+                return Err(anyhow!("--at requires git repository"));
+            }
+            Ok(SourceMode::Git { commit: commit.to_string() })
+        }
+        (_, true, _) => {
+            // Explicit working tree - no git needed
+            Ok(SourceMode::WorkingTree)
+        }
+        (None, false, true) => {
+            // --committed-only implies --at HEAD
+            if Repository::open(".").is_err() {
+                return Err(anyhow!("--committed-only requires git repository"));
+            }
+            Ok(SourceMode::Git { commit: "HEAD".to_string() })
+        }
+        (None, false, false) => {
+            // Default: use git if available, else working tree
+            if let Ok(repo) = Repository::open(".") {
+                let head = repo.head()?.peel_to_commit()?;
+                Ok(SourceMode::Git { commit: head.id().to_string() })
+            } else {
+                Ok(SourceMode::WorkingTree)
+            }
+        }
+    }
+}
+```
+
+**Committed-Only Check (git mode only):**
+```rust
+fn check_committed_only(&self, docs: &[DocumentRef], mode: &SourceMode) -> Result<()> {
+    let SourceMode::Git { commit } = mode else {
+        return Ok(()); // Not applicable for working tree mode
+    };
+    
+    if commit != "HEAD" {
+        return Ok(()); // Not checking historical commits
+    }
+    
     let repo = Repository::open(".")?;
     
     for doc in docs {
@@ -270,15 +334,31 @@ fn enumerate_documents(&self, issues: &[Issue]) -> Result<Vec<DocumentSnapshot>>
 
 ### Phase 2: Content Extraction
 
-**Read document from git:**
+**Read content based on source mode:**
 
 ```rust
-fn read_document_from_git(
+fn read_content(
+    &self,
+    path: &str,
+    mode: &SourceMode,
+) -> Result<(Vec<u8>, SourceInfo)> {
+    match mode {
+        SourceMode::Git { commit } => {
+            let repo = Repository::open(".")?;
+            self.read_from_git(&repo, path, commit)
+        }
+        SourceMode::WorkingTree => {
+            self.read_from_filesystem(path)
+        }
+    }
+}
+
+fn read_from_git(
     &self,
     repo: &Repository,
     path: &str,
     reference: &str,
-) -> Result<(Vec<u8>, String)> {
+) -> Result<(Vec<u8>, SourceInfo)> {
     // reference is "HEAD", commit SHA, or tag
     let obj = repo.revparse_single(reference)?;
     let commit = obj.peel_to_commit()?;
@@ -288,9 +368,29 @@ fn read_document_from_git(
     let blob = repo.find_blob(entry.id())?;
     
     let content = blob.content().to_vec();
-    let blob_sha = entry.id().to_string();
     
-    Ok((content, blob_sha))
+    Ok((content, SourceInfo {
+        type_: "git".to_string(),
+        commit: Some(commit.id().to_string()),
+        blob_sha: Some(entry.id().to_string()),
+    }))
+}
+
+fn read_from_filesystem(&self, path: &str) -> Result<(Vec<u8>, SourceInfo)> {
+    use std::fs;
+    
+    let full_path = self.storage.root().parent()
+        .ok_or_else(|| anyhow!("Invalid storage path"))?
+        .join(path);
+    
+    let content = fs::read(&full_path)
+        .with_context(|| format!("Failed to read file: {}", path))?;
+    
+    Ok((content, SourceInfo {
+        type_: "filesystem".to_string(),
+        commit: None,
+        blob_sha: None,
+    }))
 }
 ```
 
@@ -309,12 +409,13 @@ fn compute_sha256(data: &[u8]) -> String {
 **Create document snapshot:**
 
 ```rust
-fn create_document_snapshot(&self, doc_ref: &DocumentRef) -> Result<DocumentSnapshot> {
-    let repo = Repository::open(".")?;
-    let reference = doc_ref.commit.as_deref().unwrap_or("HEAD");
-    
+fn create_document_snapshot(
+    &self,
+    doc_ref: &DocumentRef,
+    mode: &SourceMode,
+) -> Result<DocumentSnapshot> {
     // Read document content
-    let (content, blob_sha) = self.read_document_from_git(&repo, &doc_ref.path, reference)?;
+    let (content, source) = self.read_content(&doc_ref.path, mode)?;
     let hash = compute_sha256(&content);
     
     // Get assets (from metadata or re-scan)
@@ -327,18 +428,14 @@ fn create_document_snapshot(&self, doc_ref: &DocumentRef) -> Result<DocumentSnap
     
     // Create asset snapshots
     let asset_snapshots = assets.iter()
-        .map(|asset| self.create_asset_snapshot(&repo, asset, reference))
+        .map(|asset| self.create_asset_snapshot(asset, mode))
         .collect::<Result<Vec<_>>>()?;
     
     Ok(DocumentSnapshot {
         path: doc_ref.path.clone(),
         format: doc_ref.format.clone().unwrap_or_else(|| "markdown".to_string()),
         size_bytes: content.len(),
-        source: SourceInfo {
-            type_: "git".to_string(),
-            commit: repo.head()?.peel_to_commit()?.id().to_string(),
-            blob_sha,
-        },
+        source,
         hash_sha256: hash,
         assets: asset_snapshots,
     })
@@ -476,9 +573,10 @@ pub struct SnapshotManifest {
 pub struct RepoInfo {
     pub path: String,
     pub remote: Option<String>,
-    pub commit: String,
-    pub branch: Option<String>,
+    pub commit: Option<String>,        // null if working-tree mode
+    pub branch: Option<String>,        // null if working-tree or detached
     pub dirty: bool,
+    pub source: String,                // "git" | "working-tree"
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -494,9 +592,9 @@ pub struct DocumentSnapshot {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SourceInfo {
     #[serde(rename = "type")]
-    pub type_: String,
-    pub commit: String,
-    pub blob_sha: String,
+    pub type_: String,                 // "git" | "filesystem"
+    pub commit: Option<String>,        // null if filesystem
+    pub blob_sha: Option<String>,      // null if filesystem
 }
 
 pub enum SnapshotScope {
@@ -509,7 +607,53 @@ pub enum SnapshotFormat {
     Directory,
     Tar,
 }
+
+pub enum SourceMode {
+    Git { commit: String },
+    WorkingTree,
+}
 ```
+
+## Git-Optional Design
+
+**Key Principle:** Snapshot export should work with or without git, following jit's core philosophy that git is optional.
+
+**Behavior Matrix:**
+
+| Flags | Git Available | Behavior |
+|-------|---------------|----------|
+| (none) | Yes | Export from HEAD |
+| (none) | No | Export from working tree |
+| `--at <commit>` | Yes | Export from specified commit |
+| `--at <commit>` | No | **ERROR**: requires git |
+| `--working-tree` | Yes | Export from working tree (ignore git) |
+| `--working-tree` | No | Export from working tree |
+| `--committed-only` | Yes | Export from HEAD, validate no uncommitted |
+| `--committed-only` | No | **ERROR**: requires git |
+
+**Manifest Differences:**
+
+**Git mode:**
+```json
+"source": {
+  "type": "git",
+  "commit": "abc123",
+  "blob_sha": "deadbeef"
+}
+```
+
+**Working tree mode:**
+```json
+"source": {
+  "type": "filesystem",
+  "commit": null,
+  "blob_sha": null
+}
+```
+
+**Reproducibility:**
+- Git mode: Reproducible (same commit → same snapshot)
+- Working tree mode: NOT reproducible (working tree can change)
 
 ## Testing Strategy
 
