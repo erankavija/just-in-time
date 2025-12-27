@@ -467,3 +467,15 @@
 {"type":"issue_state_changed","id":"13dc3a2a-0f42-47b1-b678-a77c60a11b91","issue_id":"44d6f247-8ae1-48f2-9ebd-8f5af86fb4ce","timestamp":"2025-12-26T22:06:58.746360573Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"bcd830b6-ee06-469e-8046-e7512012a65d","issue_id":"44d6f247-8ae1-48f2-9ebd-8f5af86fb4ce","timestamp":"2025-12-26T22:06:58.746451244Z"}
 {"type":"issue_created","id":"fd07fbdc-2189-4153-9e84-47ff76c2e9eb","issue_id":"32f804f1-9c96-40d4-b9aa-94e3fbf1cd7d","timestamp":"2025-12-27T20:47:03.229031692Z","title":"CLI ergonomics improvements","priority":"normal"}
+{"type":"issue_created","id":"4e649350-a869-45f6-9f12-55aa81f9414b","issue_id":"408ed86a-12a5-45ec-8623-5739e14b1cb7","timestamp":"2025-12-27T22:17:16.381958329Z","title":"Make doc show work without git","priority":"normal"}
+{"type":"issue_state_changed","id":"0a973c54-130a-4f8d-8da5-74038541007f","issue_id":"408ed86a-12a5-45ec-8623-5739e14b1cb7","timestamp":"2025-12-27T22:17:51.576409165Z","from":"ready","to":"backlog"}
+{"type":"gate_passed","id":"8b702aa7-188c-4b36-a6e4-bd1205c827a1","issue_id":"896ff7df-e5b0-48b6-a3b0-a5745ff683b7","timestamp":"2025-12-27T22:18:10.058626331Z","gate_key":"tests","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"2dd823c0-b189-4502-9381-8d35846c4616","issue_id":"896ff7df-e5b0-48b6-a3b0-a5745ff683b7","timestamp":"2025-12-27T22:18:14.791051033Z","gate_key":"clippy","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"8d3bbd18-4b9b-4e4a-a4ad-e265fee45e1c","issue_id":"896ff7df-e5b0-48b6-a3b0-a5745ff683b7","timestamp":"2025-12-27T22:18:15.752001316Z","gate_key":"fmt","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"eacd53aa-3295-4398-a8e2-ffc579b615c0","issue_id":"896ff7df-e5b0-48b6-a3b0-a5745ff683b7","timestamp":"2025-12-27T22:39:45.612822626Z","gate_key":"tests","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"91d7001f-99d5-4c09-a5e0-2c2a27a600ce","issue_id":"896ff7df-e5b0-48b6-a3b0-a5745ff683b7","timestamp":"2025-12-27T22:39:48.934118338Z","gate_key":"clippy","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"371162b8-0bca-4558-9e88-61c80f804b5a","issue_id":"896ff7df-e5b0-48b6-a3b0-a5745ff683b7","timestamp":"2025-12-27T22:39:49.789980552Z","gate_key":"fmt","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"4777e914-c413-48df-b1c5-b32a66cbd976","issue_id":"896ff7df-e5b0-48b6-a3b0-a5745ff683b7","timestamp":"2025-12-27T22:39:50.006544709Z","gate_key":"code-review","updated_by":null}
+{"type":"issue_state_changed","id":"96dc8390-269e-42c3-9e75-da970d85c44d","issue_id":"896ff7df-e5b0-48b6-a3b0-a5745ff683b7","timestamp":"2025-12-27T22:39:58.626326065Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"503e4c13-f4b9-43fb-bc92-6c40784d3db1","issue_id":"896ff7df-e5b0-48b6-a3b0-a5745ff683b7","timestamp":"2025-12-27T22:39:58.626396606Z"}
+{"type":"issue_state_changed","id":"d58b770b-a0b8-4fef-a94a-5228d4afbcdb","issue_id":"a8f2f04b-f5e4-4cf7-9af4-7d714a2f7139","timestamp":"2025-12-27T22:39:58.734629844Z","from":"backlog","to":"ready"}
