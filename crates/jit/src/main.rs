@@ -14,7 +14,7 @@
 // Binary-specific module (not in library)
 mod output_macros;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 use jit::cli::{
     Cli, Commands, DepCommands, DocCommands, EventCommands, GateCommands, GraphCommands,
@@ -1795,6 +1795,62 @@ strategic_types = {}
                 }
             }
         }
+        Commands::Snapshot(snapshot_cmd) => match snapshot_cmd {
+            jit::cli::SnapshotCommands::Export {
+                out,
+                format,
+                scope,
+                at,
+                working_tree,
+                committed_only,
+                force,
+                json,
+            } => {
+                use jit::commands::snapshot::SnapshotExporter;
+                use jit::snapshot::{SnapshotFormat, SnapshotScope, SourceMode};
+
+                // Parse scope
+                let snapshot_scope = SnapshotScope::parse(&scope)
+                    .with_context(|| format!("Invalid scope: {}", scope))?;
+
+                // Parse format
+                let snapshot_format = SnapshotFormat::parse(&format)
+                    .with_context(|| format!("Invalid format: {}", format))?;
+
+                // Determine source mode
+                let source_mode = SnapshotExporter::<jit::JsonFileStorage>::determine_source_mode(
+                    at.as_deref(),
+                    working_tree,
+                    committed_only,
+                )?;
+
+                // TODO: Add validation unless --force
+                if !force {
+                    executor.validate_silent()?;
+                }
+
+                // Create exporter and export
+                let exporter = SnapshotExporter::new(storage);
+                let output_path = exporter.export(
+                    &snapshot_scope,
+                    &source_mode,
+                    &snapshot_format,
+                    out.as_deref().map(std::path::Path::new),
+                )?;
+
+                if json {
+                    use jit::output::JsonOutput;
+                    use serde_json::json;
+
+                    let output_data = json!({
+                        "path": output_path,
+                        "format": format,
+                        "scope": scope,
+                    });
+                    println!("{}", JsonOutput::success(output_data).to_json_string()?);
+                }
+            }
+        },
     }
 
     Ok(())

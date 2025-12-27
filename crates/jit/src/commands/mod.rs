@@ -28,7 +28,7 @@ mod issue;
 mod labels;
 mod query;
 mod search;
-mod snapshot;
+pub mod snapshot;
 mod validate;
 
 // Common imports used across modules

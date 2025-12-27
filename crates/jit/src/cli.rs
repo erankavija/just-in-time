@@ -86,6 +86,10 @@ pub enum Commands {
     #[command(subcommand)]
     Config(ConfigCommands),
 
+    /// Snapshot export commands
+    #[command(subcommand)]
+    Snapshot(SnapshotCommands),
+
     /// Search issues and documents
     Search {
         /// Search query string
@@ -852,6 +856,73 @@ pub enum ConfigCommands {
 
     /// List available hierarchy templates
     ListTemplates {
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum SnapshotCommands {
+    /// Archive a complete snapshot of issues and documents
+    ///
+    /// Creates a portable snapshot containing:
+    /// - Issue state (.jit/issues/*.json)
+    /// - Documents referenced by issues
+    /// - Assets (images, diagrams) used in documents  
+    /// - Manifest with SHA256 hashes for verification
+    /// - README with instructions
+    ///
+    /// Snapshots are self-contained and can be archived, transferred, or audited.
+    /// They preserve complete provenance (git commit, source mode, timestamps).
+    ///
+    /// Examples:
+    ///   # Export all issues to directory
+    ///   jit snapshot export
+    ///
+    ///   # Export specific epic as tar archive
+    ///   jit snapshot export --scope label:epic:auth --format tar --out auth-snapshot.tar
+    ///
+    ///   # Export from specific git commit
+    ///   jit snapshot export --at abc123 --out release-v1.0
+    ///
+    ///   # Export only working tree files (no git)
+    ///   jit snapshot export --working-tree
+    Export {
+        /// Output path (default: snapshot-YYYYMMDD-HHMMSS)
+        #[arg(long)]
+        out: Option<String>,
+
+        /// Output format: dir or tar
+        #[arg(long, default_value = "dir")]
+        format: String,
+
+        /// Scope: all (default), issue:ID, or label:namespace:value
+        ///
+        /// Examples:
+        ///   --scope all                    All issues
+        ///   --scope issue:abc123           Single issue
+        ///   --scope label:epic:auth        Issues with label epic:auth
+        ///   --scope label:milestone:v1.0   Issues in milestone v1.0
+        #[arg(long, default_value = "all")]
+        scope: String,
+
+        /// Git commit/tag to export (requires git repository)
+        #[arg(long)]
+        at: Option<String>,
+
+        /// Export from working tree instead of git
+        #[arg(long)]
+        working_tree: bool,
+
+        /// Reject if uncommitted docs/assets exist (requires git, implies --at HEAD)
+        #[arg(long)]
+        committed_only: bool,
+
+        /// Skip repository validation before export
+        #[arg(long)]
+        force: bool,
+
+        /// Output metadata as JSON instead of human-readable format
         #[arg(long)]
         json: bool,
     },
