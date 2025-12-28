@@ -1,0 +1,24 @@
+{
+  "id": "8507f8e7-300a-45b6-95a4-44b66c7d9663",
+  "title": "Story: CLI Ergonomics & Output Standardization",
+  "description": "Improve CLI ergonomics for agents and scripting with standardized JSON output, quiet mode, and bulk operations.\n\n## Goal\nMake jit CLI more agent-friendly and scriptable by standardizing output formats and adding bulk operation support.\n\n## Tasks\n- Standardize JSON output format across all commands\n- Add --quiet flag for scripting workflows\n- Support bulk operations for gates, labels, and dependencies\n\n## Success Criteria\n- All commands with --json flag use consistent JsonResponse envelope\n- --quiet flag suppresses decorative output while preserving essential data\n- Broken pipe errors handled gracefully\n- Bulk operations work atomically\n\n## Benefits\n- Easier to script and automate\n- Better MCP integration\n- Reduced command count for common workflows\n- Improved agent experience",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "0ce16136-0999-4f94-944f-01d195f42565",
+    "0db719b1-0e95-44b2-a377-0acbcf9f8bde",
+    "44104a30-5cfb-4127-bd39-57688f7619bc",
+    "ecc49a02-a282-4119-900e-e6696bd7e570"
+  ],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:story",
+    "epic:agent-friendly",
+    "milestone:v1.0",
+    "story:cli-ergonomics"
+  ]
+}

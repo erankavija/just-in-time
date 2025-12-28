@@ -511,3 +511,14 @@
 {"type":"issue_state_changed","id":"a248db37-ad73-4a8d-b007-cf115bb7a46a","issue_id":"b47c8918-8807-4eee-8474-39dab29fa4c2","timestamp":"2025-12-28T01:16:20.073540324Z","from":"backlog","to":"ready"}
 {"type":"issue_state_changed","id":"e2501cdd-b6bd-4c79-a569-13e5c04243fd","issue_id":"b336446d-e2fe-46d7-8652-e574bb114e3e","timestamp":"2025-12-28T01:16:20.121475075Z","from":"backlog","to":"ready"}
 {"type":"document_archived","id":"80b0a37e-2ed6-4b92-8ae8-50513d0a8e2c","timestamp":"2025-12-28T01:16:34.180967111Z","source":"dev/active/authoring-conventions-draft.md","destination":"dev/archive/studies/authoring-conventions-draft.md","category":"study","issues_updated":2}
+{"type":"issue_created","id":"d2238ad0-cdf5-4fe3-a83e-a77d8caf6a17","issue_id":"8507f8e7-300a-45b6-95a4-44b66c7d9663","timestamp":"2025-12-28T21:32:42.199966078Z","title":"Story: CLI Ergonomics & Output Standardization","priority":"high"}
+{"type":"issue_created","id":"7e954c3a-dafd-440b-879a-56405f98a30c","issue_id":"16982211-7ed9-4b8a-9ca6-d024ed7fa255","timestamp":"2025-12-28T21:32:56.272473341Z","title":"Story: Gate Command Enhancements","priority":"high"}
+{"type":"issue_created","id":"0353b701-2293-487b-b641-cd67e61fa147","issue_id":"95128759-9e96-4adf-8c3a-1cc26a653670","timestamp":"2025-12-28T21:33:07.491067703Z","title":"Story: Quality & Polish","priority":"normal"}
+{"type":"issue_state_changed","id":"18c6c177-cea2-4079-9eea-8ac433d2a25d","issue_id":"8507f8e7-300a-45b6-95a4-44b66c7d9663","timestamp":"2025-12-28T21:33:17.872512345Z","from":"ready","to":"backlog"}
+{"type":"issue_state_changed","id":"85a43bab-2e05-4de6-9f16-5c7608798b02","issue_id":"16982211-7ed9-4b8a-9ca6-d024ed7fa255","timestamp":"2025-12-28T21:33:25.842353322Z","from":"ready","to":"backlog"}
+{"type":"issue_state_changed","id":"16b9f58c-9262-4841-883f-8011cef467e5","issue_id":"95128759-9e96-4adf-8c3a-1cc26a653670","timestamp":"2025-12-28T21:33:34.052287577Z","from":"ready","to":"backlog"}
+{"type":"issue_state_changed","id":"6f2cafbc-ca38-430c-a7ce-fed252652575","issue_id":"14303b30-75b2-4b21-8963-bc6563b95b91","timestamp":"2025-12-28T21:33:57.000913180Z","from":"backlog","to":"ready"}
+{"type":"issue_state_changed","id":"5e8c435c-fcb9-4835-94d3-a0b9d0794a2c","issue_id":"14303b30-75b2-4b21-8963-bc6563b95b91","timestamp":"2025-12-28T21:34:04.992329987Z","from":"ready","to":"backlog"}
+{"type":"issue_state_changed","id":"3b0d29c7-d4ae-460d-99af-612d607d2e36","issue_id":"44104a30-5cfb-4127-bd39-57688f7619bc","timestamp":"2025-12-28T21:34:12.743457212Z","from":"ready","to":"rejected"}
+{"type":"issue_state_changed","id":"ea79eb13-96dd-4dd2-a850-5275dc23d592","issue_id":"44104a30-5cfb-4127-bd39-57688f7619bc","timestamp":"2025-12-28T21:47:17.978017659Z","from":"rejected","to":"ready"}
+{"type":"issue_state_changed","id":"fd215205-7783-4b17-a607-60a506fa64ed","issue_id":"dc2a9d91-499b-4c9b-8474-7cd1ea6ee4ba","timestamp":"2025-12-28T21:47:18.005649261Z","from":"ready","to":"rejected"}

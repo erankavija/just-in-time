@@ -1,0 +1,22 @@
+{
+  "id": "95128759-9e96-4adf-8c3a-1cc26a653670",
+  "title": "Story: Quality & Polish",
+  "description": "Add testing and audit trail improvements for production readiness.\n\n## Goal\nImprove test coverage and event logging for better quality and observability.\n\n## Tasks\n- Add event logging for transitive reduction fixes\n- Add property-based tests for short hash resolution\n\n## Success Criteria\n- Transitive reduction fixes logged in event stream\n- Property-based tests cover short hash edge cases\n- 100% test coverage for dependency validation\n\n## Benefits\n- Better audit trail for automatic fixes\n- Increased confidence in short hash resolution\n- Improved test coverage for graph operations",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "7d6218cf-22df-4971-bf79-5ad6af0f88e4",
+    "9072e447-02f7-4efa-ab25-04eac073f1ac"
+  ],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:story",
+    "epic:agent-friendly",
+    "milestone:v1.0",
+    "story:quality-polish"
+  ]
+}
