@@ -522,3 +522,4 @@
 {"type":"issue_state_changed","id":"3b0d29c7-d4ae-460d-99af-612d607d2e36","issue_id":"44104a30-5cfb-4127-bd39-57688f7619bc","timestamp":"2025-12-28T21:34:12.743457212Z","from":"ready","to":"rejected"}
 {"type":"issue_state_changed","id":"ea79eb13-96dd-4dd2-a850-5275dc23d592","issue_id":"44104a30-5cfb-4127-bd39-57688f7619bc","timestamp":"2025-12-28T21:47:17.978017659Z","from":"rejected","to":"ready"}
 {"type":"issue_state_changed","id":"fd215205-7783-4b17-a607-60a506fa64ed","issue_id":"dc2a9d91-499b-4c9b-8474-7cd1ea6ee4ba","timestamp":"2025-12-28T21:47:18.005649261Z","from":"ready","to":"rejected"}
+{"type":"issue_state_changed","id":"e1aaa5ca-9b9a-4124-88a3-2bb4661c14e8","issue_id":"408ed86a-12a5-45ec-8623-5739e14b1cb7","timestamp":"2025-12-28T21:52:33.101233745Z","from":"backlog","to":"ready"}

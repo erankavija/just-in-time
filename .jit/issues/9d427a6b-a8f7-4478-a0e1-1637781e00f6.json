@@ -6,9 +6,10 @@
   "priority": "normal",
   "assignee": null,
   "dependencies": [
-    "32f804f1-9c96-40d4-b9aa-94e3fbf1cd7d",
+    "56b7e503-c4c8-4509-96c5-ae40e37d3132",
     "13c69884-dfe9-4a62-b2ef-59fa4d2f76f3",
-    "56b7e503-c4c8-4509-96c5-ae40e37d3132"
+    "408ed86a-12a5-45ec-8623-5739e14b1cb7",
+    "32f804f1-9c96-40d4-b9aa-94e3fbf1cd7d"
   ],
   "gates_required": [
     "code-review"
