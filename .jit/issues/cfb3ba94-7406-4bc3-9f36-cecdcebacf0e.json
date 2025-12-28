@@ -27,6 +27,23 @@
       "commit": null,
       "label": "Reference",
       "doc_type": null
+    },
+    {
+      "path": "dev/studies/documentation-organization-strategy.md",
+      "commit": null,
+      "label": null,
+      "doc_type": "reference",
+      "format": "markdown",
+      "assets": [
+        {
+          "original_path": "https://diataxis.fr/",
+          "resolved_path": null,
+          "asset_type": "external",
+          "mime_type": null,
+          "content_hash": null,
+          "is_shared": false
+        }
+      ]
     }
   ],
   "labels": [
