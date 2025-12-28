@@ -487,6 +487,9 @@ impl<S: IssueStore> CommandExecutor<S> {
             let event = Event::new_issue_completed(issue.id.clone());
             self.storage.append_event(&event)?;
 
+            // Check if any dependent issues can now transition to ready
+            self.check_auto_transitions()?;
+
             Ok(true)
         } else {
             Ok(false)
