@@ -50,9 +50,7 @@ impl<S: IssueStore> SnapshotExporter<S> {
         committed_only: bool,
     ) -> Result<SourceMode> {
         match (at_commit, working_tree, committed_only) {
-            (Some(_), true, _) => {
-                Err(anyhow!("Cannot use both --at and --working-tree"))
-            }
+            (Some(_), true, _) => Err(anyhow!("Cannot use both --at and --working-tree")),
             (Some(commit), _, _) => {
                 // Explicit commit requires git
                 if git2::Repository::open(".").is_err() {
@@ -107,7 +105,7 @@ impl<S: IssueStore> SnapshotExporter<S> {
                     .into_iter()
                     .filter(|issue| issue.labels.contains(&target_label))
                     .collect();
-                
+
                 Ok(matching_issues)
             }
         }
@@ -117,7 +115,7 @@ impl<S: IssueStore> SnapshotExporter<S> {
     pub fn extract_documents(&self, issues: &[Issue]) -> Vec<DocumentReference> {
         let mut docs = Vec::new();
         let mut seen_paths = std::collections::HashSet::new();
-        
+
         for issue in issues {
             for doc_ref in &issue.documents {
                 // Deduplicate by path
@@ -126,7 +124,7 @@ impl<S: IssueStore> SnapshotExporter<S> {
                 }
             }
         }
-        
+
         docs
     }
 
@@ -144,14 +142,14 @@ impl<S: IssueStore> SnapshotExporter<S> {
             .peel_to_commit()
             .with_context(|| format!("Reference '{}' is not a commit", reference))?;
         let tree = commit.tree()?;
-        
+
         let entry = tree
             .get_path(Path::new(path))
             .with_context(|| format!("Path '{}' not found in commit {}", path, reference))?;
         let blob = repo.find_blob(entry.id())?;
-        
+
         let content = blob.content().to_vec();
-        
+
         Ok((
             content,
             SourceInfo {
@@ -170,11 +168,11 @@ impl<S: IssueStore> SnapshotExporter<S> {
             .root()
             .parent()
             .ok_or_else(|| anyhow!("Invalid storage path"))?;
-        
+
         let full_path = repo_root.join(path);
-        let content = std::fs::read(&full_path)
-            .with_context(|| format!("Failed to read file: {}", path))?;
-        
+        let content =
+            std::fs::read(&full_path).with_context(|| format!("Failed to read file: {}", path))?;
+
         Ok((
             content,
             SourceInfo {
@@ -205,14 +203,14 @@ impl<S: IssueStore> SnapshotExporter<S> {
         // Read document content
         let (content, source) = self.read_content(&doc_ref.path, mode)?;
         let hash = compute_sha256(&content);
-        
+
         // Scan for assets if not already in doc_ref
         let repo_root = self
             .storage
             .root()
             .parent()
             .ok_or_else(|| anyhow!("Invalid storage path"))?;
-        
+
         // Create new adapter registry for scanning
         let registry = AdapterRegistry::with_builtins();
         let scanner = AssetScanner::new(registry, repo_root);
@@ -220,7 +218,7 @@ impl<S: IssueStore> SnapshotExporter<S> {
         let assets = scanner
             .scan_document(Path::new(&doc_ref.path), &content_str)
             .unwrap_or_default();
-        
+
         // Create asset snapshots
         let mut asset_snapshots = Vec::new();
         for asset in &assets {
@@ -234,7 +232,10 @@ impl<S: IssueStore> SnapshotExporter<S> {
                             path: resolved_path.to_string_lossy().to_string(),
                             source: asset_source,
                             hash_sha256: compute_sha256(&asset_content),
-                            mime: asset.mime_type.clone().unwrap_or_else(|| "application/octet-stream".to_string()),
+                            mime: asset
+                                .mime_type
+                                .clone()
+                                .unwrap_or_else(|| "application/octet-stream".to_string()),
                             size_bytes: asset_content.len(),
                             shared: asset.is_shared,
                         });
@@ -242,7 +243,7 @@ impl<S: IssueStore> SnapshotExporter<S> {
                 }
             }
         }
-        
+
         Ok(DocumentSnapshot {
             path: doc_ref.path.clone(),
             format: doc_ref
@@ -421,11 +422,7 @@ This is a read-only export. Future versions may support:
 "#,
             created = manifest.created_at,
             repo_path = manifest.repo.path,
-            commit = manifest
-                .repo
-                .commit
-                .as_deref()
-                .unwrap_or("working-tree"),
+            commit = manifest.repo.commit.as_deref().unwrap_or("working-tree"),
             scope = manifest.scope,
             issue_count = manifest.issues.count,
             doc_count = manifest.documents.count,
@@ -521,9 +518,9 @@ This is a read-only export. Future versions may support:
     ) -> Result<String> {
         // Phase 2: Enumerate issues
         let issues = self.enumerate_issues(scope)?;
-        
+
         if issues.is_empty() {
-            return Err(anyhow!("No issues found in scope: {}", scope.to_string()));
+            return Err(anyhow!("No issues found in scope: {}", scope));
         }
 
         // Phase 2: Extract documents
@@ -567,7 +564,7 @@ This is a read-only export. Future versions may support:
 
         // Phase 5: Package
         let output_path = self.determine_output_path(out_path)?;
-        
+
         match format {
             SnapshotFormat::Directory => {
                 self.package_as_directory(temp_dir, &output_path, &manifest)?;
@@ -601,7 +598,10 @@ This is a read-only export. Future versions may support:
     ) -> Result<()> {
         // Check if output path already exists
         if out_path.exists() {
-            return Err(anyhow!("Output path already exists: {}", out_path.display()));
+            return Err(anyhow!(
+                "Output path already exists: {}",
+                out_path.display()
+            ));
         }
 
         // Atomic rename from temp to final destination
@@ -621,12 +621,15 @@ This is a read-only export. Future versions may support:
         out_path: &Path,
         manifest: &SnapshotManifest,
     ) -> Result<()> {
-        use tar::Builder;
         use std::fs::File;
+        use tar::Builder;
 
         // Check if output path already exists
         if out_path.exists() {
-            return Err(anyhow!("Output path already exists: {}", out_path.display()));
+            return Err(anyhow!(
+                "Output path already exists: {}",
+                out_path.display()
+            ));
         }
 
         let tar_file = File::create(out_path)?;
@@ -645,9 +648,9 @@ This is a read-only export. Future versions may support:
             let name = path
                 .file_name()
                 .ok_or_else(|| anyhow!("Invalid file name"))?;
-            
+
             let archive_path = format!("{}/{}", base_name, name.to_string_lossy());
-            
+
             if path.is_dir() {
                 tar.append_dir_all(&archive_path, &path)?;
             } else {
@@ -676,11 +679,8 @@ mod tests {
 
     #[test]
     fn test_source_mode_both_at_and_working_tree() {
-        let result = SnapshotExporter::<InMemoryStorage>::determine_source_mode(
-            Some("abc123"),
-            true,
-            false,
-        );
+        let result =
+            SnapshotExporter::<InMemoryStorage>::determine_source_mode(Some("abc123"), true, false);
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
@@ -690,9 +690,7 @@ mod tests {
 
     #[test]
     fn test_source_mode_explicit_working_tree() {
-        let result = SnapshotExporter::<InMemoryStorage>::determine_source_mode(
-            None, true, false,
-        );
+        let result = SnapshotExporter::<InMemoryStorage>::determine_source_mode(None, true, false);
         assert!(result.is_ok());
         matches!(result.unwrap(), SourceMode::WorkingTree);
     }
@@ -700,9 +698,7 @@ mod tests {
     #[test]
     fn test_source_mode_default_no_git() {
         // In a non-git directory, should fall back to working tree
-        let result = SnapshotExporter::<InMemoryStorage>::determine_source_mode(
-            None, false, false,
-        );
+        let result = SnapshotExporter::<InMemoryStorage>::determine_source_mode(None, false, false);
         assert!(result.is_ok());
         // Result depends on whether we're in a git repo, so we just verify it doesn't error
     }
@@ -711,16 +707,16 @@ mod tests {
     fn test_enumerate_issues_all() {
         let mut storage = InMemoryStorage::new();
         storage.init().unwrap();
-        
+
         // Create a couple of issues
         let issue1 = Issue::new("Issue 1".to_string(), String::new());
         let issue2 = Issue::new("Issue 2".to_string(), String::new());
         storage.save_issue(&issue1).unwrap();
         storage.save_issue(&issue2).unwrap();
-        
+
         let exporter = SnapshotExporter::new(storage.clone());
         let issues = exporter.enumerate_issues(&SnapshotScope::All).unwrap();
-        
+
         assert_eq!(issues.len(), 2);
     }
 
@@ -728,16 +724,16 @@ mod tests {
     fn test_enumerate_issues_single() {
         let mut storage = InMemoryStorage::new();
         storage.init().unwrap();
-        
+
         let issue = Issue::new("Test Issue".to_string(), String::new());
         let issue_id = issue.id.clone();
         storage.save_issue(&issue).unwrap();
-        
+
         let exporter = SnapshotExporter::new(storage.clone());
         let issues = exporter
             .enumerate_issues(&SnapshotScope::Issue(issue_id.clone()))
             .unwrap();
-        
+
         assert_eq!(issues.len(), 1);
         assert_eq!(issues[0].id, issue_id);
     }
@@ -746,25 +742,25 @@ mod tests {
     fn test_enumerate_issues_label_epic() {
         let storage = InMemoryStorage::new();
         storage.init().unwrap();
-        
+
         // Create issues with epic labels
         let mut issue1 = Issue::new("Issue 1".to_string(), String::new());
         issue1.labels.push("epic:auth".to_string());
         storage.save_issue(&issue1).unwrap();
-        
+
         let mut issue2 = Issue::new("Issue 2".to_string(), String::new());
         issue2.labels.push("epic:auth".to_string());
         storage.save_issue(&issue2).unwrap();
-        
+
         // Create issue with different epic
         let mut issue3 = Issue::new("Issue 3".to_string(), String::new());
         issue3.labels.push("epic:billing".to_string());
         storage.save_issue(&issue3).unwrap();
-        
+
         // Create unrelated issue
         let issue4 = Issue::new("Issue 4".to_string(), String::new());
         storage.save_issue(&issue4).unwrap();
-        
+
         let exporter = SnapshotExporter::new(storage.clone());
         let issues = exporter
             .enumerate_issues(&SnapshotScope::Label {
@@ -772,24 +768,26 @@ mod tests {
                 value: "auth".to_string(),
             })
             .unwrap();
-        
+
         assert_eq!(issues.len(), 2);
-        assert!(issues.iter().all(|i| i.labels.contains(&"epic:auth".to_string())));
+        assert!(issues
+            .iter()
+            .all(|i| i.labels.contains(&"epic:auth".to_string())));
     }
 
     #[test]
     fn test_enumerate_issues_label_milestone() {
         let storage = InMemoryStorage::new();
         storage.init().unwrap();
-        
+
         let mut issue1 = Issue::new("Issue 1".to_string(), String::new());
         issue1.labels.push("milestone:v1.0".to_string());
         storage.save_issue(&issue1).unwrap();
-        
+
         let mut issue2 = Issue::new("Issue 2".to_string(), String::new());
         issue2.labels.push("milestone:v2.0".to_string());
         storage.save_issue(&issue2).unwrap();
-        
+
         let exporter = SnapshotExporter::new(storage.clone());
         let issues = exporter
             .enumerate_issues(&SnapshotScope::Label {
@@ -797,7 +795,7 @@ mod tests {
                 value: "v1.0".to_string(),
             })
             .unwrap();
-        
+
         assert_eq!(issues.len(), 1);
         assert_eq!(issues[0].labels, vec!["milestone:v1.0"]);
     }
@@ -806,10 +804,10 @@ mod tests {
     fn test_enumerate_issues_label_no_matches() {
         let storage = InMemoryStorage::new();
         storage.init().unwrap();
-        
+
         let issue = Issue::new("Issue".to_string(), String::new());
         storage.save_issue(&issue).unwrap();
-        
+
         let exporter = SnapshotExporter::new(storage.clone());
         let issues = exporter
             .enumerate_issues(&SnapshotScope::Label {
@@ -817,7 +815,7 @@ mod tests {
                 value: "nonexistent".to_string(),
             })
             .unwrap();
-        
+
         assert_eq!(issues.len(), 0);
     }
 
@@ -825,7 +823,7 @@ mod tests {
     fn test_extract_documents() {
         let storage = InMemoryStorage::new();
         storage.init().unwrap();
-        
+
         let mut issue1 = Issue::new("Issue 1".to_string(), String::new());
         issue1.documents.push(DocumentReference {
             path: "docs/design.md".to_string(),
@@ -836,7 +834,7 @@ mod tests {
             assets: vec![],
         });
         storage.save_issue(&issue1).unwrap();
-        
+
         let mut issue2 = Issue::new("Issue 2".to_string(), String::new());
         issue2.documents.push(DocumentReference {
             path: "docs/impl.md".to_string(),
@@ -856,11 +854,11 @@ mod tests {
             assets: vec![],
         });
         storage.save_issue(&issue2).unwrap();
-        
+
         let exporter = SnapshotExporter::new(storage.clone());
         let issues = vec![issue1, issue2];
         let docs = exporter.extract_documents(&issues);
-        
+
         // Should be deduplicated
         assert_eq!(docs.len(), 2);
         let paths: Vec<_> = docs.iter().map(|d| d.path.as_str()).collect();
@@ -872,10 +870,10 @@ mod tests {
     fn test_extract_documents_empty() {
         let storage = InMemoryStorage::new();
         storage.init().unwrap();
-        
+
         let exporter = SnapshotExporter::new(storage.clone());
         let docs = exporter.extract_documents(&[]);
-        
+
         assert_eq!(docs.len(), 0);
     }
 
@@ -883,7 +881,7 @@ mod tests {
     fn test_generate_readme() {
         let storage = InMemoryStorage::new();
         let exporter = SnapshotExporter::new(storage);
-        
+
         let manifest = SnapshotManifest {
             version: "1".to_string(),
             created_at: "2025-12-27T23:00:00Z".to_string(),
@@ -917,9 +915,9 @@ mod tests {
                 instructions: "test".to_string(),
             },
         };
-        
+
         let readme = exporter.generate_readme(&manifest);
-        
+
         assert!(readme.contains("# JIT Snapshot Export"));
         assert!(readme.contains("5 issues"));
         assert!(readme.contains("10 documents"));
@@ -931,12 +929,12 @@ mod tests {
     fn test_determine_output_path() {
         let storage = InMemoryStorage::new();
         let exporter = SnapshotExporter::new(storage);
-        
+
         // With explicit path
         let explicit = std::path::Path::new("my-snapshot");
         let result = exporter.determine_output_path(Some(explicit)).unwrap();
         assert_eq!(result, explicit);
-        
+
         // With default (timestamp-based)
         let default = exporter.determine_output_path(None).unwrap();
         let name = default.file_name().unwrap().to_str().unwrap();

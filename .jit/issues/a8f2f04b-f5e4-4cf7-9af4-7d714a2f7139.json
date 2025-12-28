@@ -2,7 +2,7 @@
   "id": "a8f2f04b-f5e4-4cf7-9af4-7d714a2f7139",
   "title": "Implement snapshot export (basic)",
   "description": "Implement basic snapshot export capability to create portable archives of issues + docs + assets.\n\n## Rationale\n\nCritical for handoffs, audits, compliance, and reproducibility. Export complete issue state with all documents and assets at a specific point in time.\n\n## Acceptance Criteria\n\n### 1. Implement jit snapshot export\n\nCommand: jit snapshot export [--out PATH] [--format tar|dir] [--scope all|issue:ID|epic:ID] [--committed-only]\n\nFunctionality:\n- Enumerate documents in scope from issue metadata\n- Read content at HEAD using read_document_content\n- Include assets (from metadata, re-scan as fallback)\n- Mirror repo layout in snapshot\n- Compute SHA256 for all content\n- Generate manifest.json with provenance\n- Package to tar or directory\n\n### 2. Snapshot Structure\n\nDirectory layout mirrors repo with manifest.json and auto-generated README.\n\n### 3. Manifest Format\n\nJSON manifest includes:\n- Creation metadata (timestamp, repo, scope, commit)\n- Issue list with summaries\n- Document list with full provenance\n- Asset list with hashes and metadata\n- Verification instructions\n\n### 4. Parameters\n\n- --out PATH: Output path (default: snapshot-TIMESTAMP)\n- --format tar|dir: Output format\n- --scope: all | issue:ID | epic:ID\n- --committed-only: Refuse if uncommitted docs/assets\n\n### 5. Content Extraction\n\n- Use existing read_document_content for documents\n- Read binary assets from git blobs at HEAD\n- Compute SHA256 hashes for verification\n- Track provenance (commit, blob SHA)\n\n### 6. Non-Mutating Guarantee\n\n- Never writes to repo\n- Read-only operations on git\n- Uses temp directory for assembly\n- Atomic output\n\n### 7. Integration Tests\n\n- Export all issues to dir\n- Export single issue to tar\n- Export epic with dependencies\n- Verify manifest integrity (hashes match)\n- Committed-only mode rejects working tree changes\n- Missing assets handled gracefully\n- Scope filtering works correctly\n\n### 8. Documentation\n\n- Help text with examples\n- User guide section on snapshots\n- Use cases: handoffs, audits, archival\n- Verification instructions\n\n## Dependencies\n\n- Task 11: jit doc archive with assets\n\n## Out of Scope (Phase 2+)\n\n- Zip format support\n- Compression (gzip)\n- External asset download\n- LFS handling\n- Link rewriting in snapshot\n\n## Success Metrics\n\n- Snapshot export functional for dir and tar\n- Manifest complete with provenance\n- Non-mutating (read-only)\n- Reproducible (same commit → same snapshot)\n- Tests verify integrity",
-  "state": "in_progress",
+  "state": "gated",
   "priority": "high",
   "assignee": "copilot:session-1766876861",
   "dependencies": [
@@ -16,6 +16,21 @@
     "code-review"
   ],
   "gates_status": {
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-28T00:00:55.988530843Z"
+    },
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-28T00:01:05.985953796Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-28T00:01:12.643619323Z"
+    },
     "tdd-reminder": {
       "status": "passed",
       "updated_by": null,

@@ -173,13 +173,14 @@ impl SnapshotScope {
             ))
         }
     }
+}
 
-    /// Convert scope to string representation
-    pub fn to_string(&self) -> String {
+impl std::fmt::Display for SnapshotScope {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SnapshotScope::All => "all".to_string(),
-            SnapshotScope::Issue(id) => format!("issue:{}", id),
-            SnapshotScope::Label { namespace, value } => format!("label:{}:{}", namespace, value),
+            SnapshotScope::All => write!(f, "all"),
+            SnapshotScope::Issue(id) => write!(f, "issue:{}", id),
+            SnapshotScope::Label { namespace, value } => write!(f, "label:{}:{}", namespace, value),
         }
     }
 }
@@ -301,7 +302,10 @@ mod tests {
     fn test_scope_parse_invalid() {
         let result = SnapshotScope::parse("invalid:123");
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Invalid scope format"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid scope format"));
     }
 
     #[test]
