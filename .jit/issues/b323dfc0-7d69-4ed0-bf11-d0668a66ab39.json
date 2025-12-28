@@ -1,0 +1,19 @@
+{
+  "id": "b323dfc0-7d69-4ed0-bf11-d0668a66ab39",
+  "title": "Fix Markdown adapter to skip code blocks in link detection",
+  "description": "## Problem\n\nThe Markdown format adapter detects links in code blocks/examples and treats them as real links. This causes archival to fail when documentation includes examples of anti-patterns.\n\n## Reproduction\n\nAttempting to archive the authoring conventions draft fails:\n\n```bash\njit doc archive dev/active/authoring-conventions-draft.md --type study\n# Error: Asset scan failed: Path escape detected: ../../../other-repo/doc.md\n```\n\nThe problematic content is in a code block showing what NOT to do.\n\n## Expected Behavior\n\nLink detection should skip:\n- Fenced code blocks (\\`\\`\\` ... \\`\\`\\`)\n- Inline code (\\`...\\`)\n- Indented code blocks (4+ spaces)\n\n## Impact\n\n- First real archival attempt fails\n- Blocks completion of epic 71373e37\n- Documentation about safe patterns cannot be safely archived\n- Embarrassing failure on dogfooding\n\n## Solution\n\nUpdate `crates/jit/src/document/adapter/markdown.rs`:\n1. Parse Markdown to identify code block boundaries\n2. Skip link detection within code blocks\n3. Use pulldown-cmark or simple state machine\n4. Add tests with code block examples\n\n## Acceptance Criteria\n\n- [ ] Markdown adapter skips fenced code blocks\n- [ ] Markdown adapter skips inline code\n- [ ] Markdown adapter skips indented code blocks\n- [ ] Archival of authoring-conventions-draft.md succeeds\n- [ ] Tests cover code block edge cases\n- [ ] All existing tests still pass",
+  "state": "done",
+  "priority": "high",
+  "assignee": "agent:copilot-cli",
+  "dependencies": [],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "component:core",
+    "epic:docs-lifecycle",
+    "milestone:v1.0"
+  ]
+}

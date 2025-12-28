@@ -2,7 +2,7 @@
   "id": "b336446d-e2fe-46d7-8652-e574bb114e3e",
   "title": "Update documentation for Rejected state",
   "description": "Update EXAMPLE.md and AGENT-QUICKSTART.md with rejection workflow examples. Document state transition diagram including Rejected. Explain gate bypass behavior. Add examples of using resolution:* labels with Rejected state. Update README.md state machine diagram.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "normal",
   "assignee": null,
   "dependencies": [

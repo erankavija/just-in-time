@@ -1,13 +1,14 @@
 //! Integration tests for snapshot export CLI
 
-use assert_cmd::Command;
+use assert_cmd::assert::OutputAssertExt;
 use predicates::prelude::*;
 use std::fs;
+use std::process::Command;
 use tempfile::TempDir;
 
 #[test]
 fn test_snapshot_export_help() {
-    let mut cmd = Command::cargo_bin("jit").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
     cmd.arg("snapshot").arg("--help");
 
     cmd.assert()
@@ -18,7 +19,7 @@ fn test_snapshot_export_help() {
 
 #[test]
 fn test_snapshot_export_subcommand_help() {
-    let mut cmd = Command::cargo_bin("jit").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
     cmd.arg("snapshot").arg("export").arg("--help");
 
     cmd.assert()
@@ -33,7 +34,7 @@ fn test_snapshot_export_subcommand_help() {
 fn test_snapshot_export_requires_init() {
     let temp = TempDir::new().unwrap();
 
-    let mut cmd = Command::cargo_bin("jit").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
     cmd.current_dir(temp.path()).arg("snapshot").arg("export");
 
     cmd.assert()
@@ -46,25 +47,23 @@ fn test_snapshot_export_all_directory() {
     let temp = TempDir::new().unwrap();
 
     // Initialize jit
-    Command::cargo_bin("jit")
-        .unwrap()
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
         .arg("init")
         .assert()
         .success();
 
     // Create a test issue
-    Command::cargo_bin("jit")
-        .unwrap()
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(&["issue", "create", "--title", "Test Issue"])
+        .args(["issue", "create", "--title", "Test Issue"])
         .assert()
         .success();
 
     // Export snapshot
-    let mut cmd = Command::cargo_bin("jit").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
     cmd.current_dir(temp.path())
-        .args(&["snapshot", "export", "--out", "test-snapshot"]);
+        .args(["snapshot", "export", "--out", "test-snapshot"]);
 
     cmd.assert()
         .success()
@@ -86,24 +85,22 @@ fn test_snapshot_export_tar_format() {
     let temp = TempDir::new().unwrap();
 
     // Initialize and create issue
-    Command::cargo_bin("jit")
-        .unwrap()
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
         .arg("init")
         .assert()
         .success();
 
-    Command::cargo_bin("jit")
-        .unwrap()
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(&["issue", "create", "--title", "Test"])
+        .args(["issue", "create", "--title", "Test"])
         .assert()
         .success();
 
     // Export as tar
-    let mut cmd = Command::cargo_bin("jit").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
     cmd.current_dir(temp.path())
-        .args(&["snapshot", "export", "--format", "tar", "--out", "test.tar"]);
+        .args(["snapshot", "export", "--format", "tar", "--out", "test.tar"]);
 
     cmd.assert()
         .success()
@@ -121,18 +118,16 @@ fn test_snapshot_export_label_scope() {
     let temp = TempDir::new().unwrap();
 
     // Initialize
-    Command::cargo_bin("jit")
-        .unwrap()
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
         .arg("init")
         .assert()
         .success();
 
     // Create issues with different labels
-    Command::cargo_bin("jit")
-        .unwrap()
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(&[
+        .args([
             "issue",
             "create",
             "--title",
@@ -143,10 +138,9 @@ fn test_snapshot_export_label_scope() {
         .assert()
         .success();
 
-    Command::cargo_bin("jit")
-        .unwrap()
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(&[
+        .args([
             "issue",
             "create",
             "--title",
@@ -157,10 +151,9 @@ fn test_snapshot_export_label_scope() {
         .assert()
         .success();
 
-    Command::cargo_bin("jit")
-        .unwrap()
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(&[
+        .args([
             "issue",
             "create",
             "--title",
@@ -172,8 +165,8 @@ fn test_snapshot_export_label_scope() {
         .success();
 
     // Export only epic:auth scope
-    let mut cmd = Command::cargo_bin("jit").unwrap();
-    cmd.current_dir(temp.path()).args(&[
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
+    cmd.current_dir(temp.path()).args([
         "snapshot",
         "export",
         "--scope",
@@ -199,23 +192,21 @@ fn test_snapshot_export_default_naming() {
     let temp = TempDir::new().unwrap();
 
     // Initialize and create issue
-    Command::cargo_bin("jit")
-        .unwrap()
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
         .arg("init")
         .assert()
         .success();
 
-    Command::cargo_bin("jit")
-        .unwrap()
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(&["issue", "create", "--title", "Test"])
+        .args(["issue", "create", "--title", "Test"])
         .assert()
         .success();
 
     // Export without --out (should use timestamp-based name)
-    let mut cmd = Command::cargo_bin("jit").unwrap();
-    cmd.current_dir(temp.path()).args(&["snapshot", "export"]);
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
+    cmd.current_dir(temp.path()).args(["snapshot", "export"]);
 
     cmd.assert()
         .success()
@@ -227,24 +218,22 @@ fn test_snapshot_export_json_output() {
     let temp = TempDir::new().unwrap();
 
     // Initialize and create issue
-    Command::cargo_bin("jit")
-        .unwrap()
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
         .arg("init")
         .assert()
         .success();
 
-    Command::cargo_bin("jit")
-        .unwrap()
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(&["issue", "create", "--title", "Test"])
+        .args(["issue", "create", "--title", "Test"])
         .assert()
         .success();
 
     // Export with --json
-    let mut cmd = Command::cargo_bin("jit").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
     cmd.current_dir(temp.path())
-        .args(&["snapshot", "export", "--out", "test-json", "--json"]);
+        .args(["snapshot", "export", "--out", "test-json", "--json"]);
 
     cmd.assert()
         .success()
@@ -256,17 +245,16 @@ fn test_snapshot_export_json_output() {
 fn test_snapshot_export_invalid_scope() {
     let temp = TempDir::new().unwrap();
 
-    Command::cargo_bin("jit")
-        .unwrap()
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
         .arg("init")
         .assert()
         .success();
 
     // Try invalid scope format
-    let mut cmd = Command::cargo_bin("jit").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
     cmd.current_dir(temp.path())
-        .args(&["snapshot", "export", "--scope", "invalid"]);
+        .args(["snapshot", "export", "--scope", "invalid"]);
 
     cmd.assert()
         .failure()
@@ -277,32 +265,29 @@ fn test_snapshot_export_invalid_scope() {
 fn test_snapshot_export_output_exists() {
     let temp = TempDir::new().unwrap();
 
-    Command::cargo_bin("jit")
-        .unwrap()
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
         .arg("init")
         .assert()
         .success();
 
-    Command::cargo_bin("jit")
-        .unwrap()
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(&["issue", "create", "--title", "Test"])
+        .args(["issue", "create", "--title", "Test"])
         .assert()
         .success();
 
     // First export
-    Command::cargo_bin("jit")
-        .unwrap()
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(&["snapshot", "export", "--out", "existing"])
+        .args(["snapshot", "export", "--out", "existing"])
         .assert()
         .success();
 
     // Try to export to same location
-    let mut cmd = Command::cargo_bin("jit").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
     cmd.current_dir(temp.path())
-        .args(&["snapshot", "export", "--out", "existing"]);
+        .args(["snapshot", "export", "--out", "existing"]);
 
     cmd.assert()
         .failure()

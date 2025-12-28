@@ -490,3 +490,24 @@
 {"type":"issue_state_changed","id":"27ad361c-b239-4d10-b6d3-59395315c7a0","issue_id":"a8f2f04b-f5e4-4cf7-9af4-7d714a2f7139","timestamp":"2025-12-28T00:01:54.304259358Z","from":"gated","to":"done"}
 {"type":"issue_completed","id":"30331889-c86a-445d-9c62-bbf686ef16f2","issue_id":"a8f2f04b-f5e4-4cf7-9af4-7d714a2f7139","timestamp":"2025-12-28T00:01:54.304308228Z"}
 {"type":"issue_state_changed","id":"72a2ed21-9926-4ab5-8cf8-e2fa4c3b7aa8","issue_id":"71373e37-bb30-41d2-af0c-f08f381e027e","timestamp":"2025-12-28T00:07:42.436180506Z","from":"backlog","to":"ready"}
+{"type":"issue_created","id":"c4ff9aea-01a1-402a-87a1-918f3b654bb0","issue_id":"b323dfc0-7d69-4ed0-bf11-d0668a66ab39","timestamp":"2025-12-28T00:44:20.117638786Z","title":"Fix Markdown adapter to skip code blocks in link detection","priority":"high"}
+{"type":"issue_state_changed","id":"5e35e6fc-3951-405c-a707-9ae8995c3183","issue_id":"71373e37-bb30-41d2-af0c-f08f381e027e","timestamp":"2025-12-28T00:44:27.074816455Z","from":"ready","to":"backlog"}
+{"type":"issue_state_changed","id":"747f005a-10c2-4e9f-9b11-cf49d24bac5d","issue_id":"71373e37-bb30-41d2-af0c-f08f381e027e","timestamp":"2025-12-28T00:45:12.583521446Z","from":"backlog","to":"ready"}
+{"type":"issue_state_changed","id":"d2f2c142-d46f-4cb2-bbca-8b14791c68ee","issue_id":"b323dfc0-7d69-4ed0-bf11-d0668a66ab39","timestamp":"2025-12-28T00:45:12.608112910Z","from":"ready","to":"backlog"}
+{"type":"issue_state_changed","id":"58b29348-59a3-4655-ae8d-673e27bcc48d","issue_id":"b323dfc0-7d69-4ed0-bf11-d0668a66ab39","timestamp":"2025-12-28T00:48:15.882553151Z","from":"backlog","to":"ready"}
+{"type":"issue_state_changed","id":"103f437d-67d0-4cca-84d2-ecdcb345c350","issue_id":"71373e37-bb30-41d2-af0c-f08f381e027e","timestamp":"2025-12-28T00:49:47.794384349Z","from":"ready","to":"backlog"}
+{"type":"issue_state_changed","id":"283a636b-78df-4e4b-be28-fe5ec897d17b","issue_id":"b323dfc0-7d69-4ed0-bf11-d0668a66ab39","timestamp":"2025-12-28T00:55:32.156498533Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"d825cf7d-93fe-4346-8c10-0e170dfb90c9","issue_id":"b323dfc0-7d69-4ed0-bf11-d0668a66ab39","timestamp":"2025-12-28T00:55:32.156970052Z","assignee":"agent:copilot-cli"}
+{"type":"issue_state_changed","id":"5794223e-bdb0-4921-9317-8f34bba51b2e","issue_id":"b323dfc0-7d69-4ed0-bf11-d0668a66ab39","timestamp":"2025-12-28T01:11:37.490616886Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"aec0ef4d-47cd-4354-b237-68757f4e77b7","issue_id":"b323dfc0-7d69-4ed0-bf11-d0668a66ab39","timestamp":"2025-12-28T01:11:37.490971863Z"}
+{"type":"issue_state_changed","id":"89813991-d588-4669-9908-e995306ffa21","issue_id":"71373e37-bb30-41d2-af0c-f08f381e027e","timestamp":"2025-12-28T01:11:37.579927455Z","from":"backlog","to":"ready"}
+{"type":"issue_state_changed","id":"b1a77bab-0f84-47d9-8584-2d176080b77e","issue_id":"71373e37-bb30-41d2-af0c-f08f381e027e","timestamp":"2025-12-28T01:16:19.908093124Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"d0fd74ec-eeda-45a0-be5f-ae15951d35cc","issue_id":"71373e37-bb30-41d2-af0c-f08f381e027e","timestamp":"2025-12-28T01:16:19.942378785Z","assignee":"agent:copilot-cli"}
+{"type":"gate_passed","id":"054bb835-068b-4bb4-8163-e6a5912c9cf2","issue_id":"71373e37-bb30-41d2-af0c-f08f381e027e","timestamp":"2025-12-28T01:16:19.961532900Z","gate_key":"code-review","updated_by":null}
+{"type":"issue_state_changed","id":"94f83314-29ad-4a72-b6c0-7e058b47d48c","issue_id":"71373e37-bb30-41d2-af0c-f08f381e027e","timestamp":"2025-12-28T01:16:20.027436271Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"5fccff3a-bd6f-44cd-82fd-b576196e56ac","issue_id":"71373e37-bb30-41d2-af0c-f08f381e027e","timestamp":"2025-12-28T01:16:20.027527805Z"}
+{"type":"issue_state_changed","id":"b5e0da64-89e6-4d78-ac65-9077ab82c0cb","issue_id":"d6dc4dfa-6784-43a8-8b8a-761bd5a3f38a","timestamp":"2025-12-28T01:16:20.059155123Z","from":"backlog","to":"ready"}
+{"type":"issue_state_changed","id":"fc7a46d1-9757-4203-934c-bde9bb78ffef","issue_id":"baa723de-93bb-4ec7-8883-0a464bca9b30","timestamp":"2025-12-28T01:16:20.066317670Z","from":"backlog","to":"ready"}
+{"type":"issue_state_changed","id":"a248db37-ad73-4a8d-b007-cf115bb7a46a","issue_id":"b47c8918-8807-4eee-8474-39dab29fa4c2","timestamp":"2025-12-28T01:16:20.073540324Z","from":"backlog","to":"ready"}
+{"type":"issue_state_changed","id":"e2501cdd-b6bd-4c79-a569-13e5c04243fd","issue_id":"b336446d-e2fe-46d7-8652-e574bb114e3e","timestamp":"2025-12-28T01:16:20.121475075Z","from":"backlog","to":"ready"}
+{"type":"document_archived","id":"80b0a37e-2ed6-4b92-8ae8-50513d0a8e2c","timestamp":"2025-12-28T01:16:34.180967111Z","source":"dev/active/authoring-conventions-draft.md","destination":"dev/archive/studies/authoring-conventions-draft.md","category":"study","issues_updated":2}

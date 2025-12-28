@@ -705,7 +705,7 @@ mod tests {
 
     #[test]
     fn test_enumerate_issues_all() {
-        let mut storage = InMemoryStorage::new();
+        let storage = InMemoryStorage::new();
         storage.init().unwrap();
 
         // Create a couple of issues
@@ -722,7 +722,7 @@ mod tests {
 
     #[test]
     fn test_enumerate_issues_single() {
-        let mut storage = InMemoryStorage::new();
+        let storage = InMemoryStorage::new();
         storage.init().unwrap();
 
         let issue = Issue::new("Test Issue".to_string(), String::new());

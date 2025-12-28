@@ -2,7 +2,7 @@
   "id": "b47c8918-8807-4eee-8474-39dab29fa4c2",
   "title": "Update AGENT-QUICKSTART.md with gates",
   "description": "Add gate usage examples and workflows to agent quickstart guide",
-  "state": "backlog",
+  "state": "ready",
   "priority": "normal",
   "assignee": null,
   "dependencies": [

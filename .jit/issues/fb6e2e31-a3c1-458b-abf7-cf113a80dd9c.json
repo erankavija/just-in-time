@@ -16,6 +16,11 @@
     "code-review"
   ],
   "gates_status": {
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-24T19:01:06.247472215Z"
+    },
     "tdd-reminder": {
       "status": "passed",
       "updated_by": "copilot:session-1",
@@ -25,11 +30,6 @@
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2025-12-24T19:01:03.338077203Z"
-    },
-    "fmt": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-24T19:01:06.247472215Z"
     },
     "code-review": {
       "status": "passed",
@@ -51,7 +51,7 @@
       "doc_type": "notes"
     },
     {
-      "path": "dev/active/authoring-conventions-draft.md",
+      "path": "dev/archive/studies/authoring-conventions-draft.md",
       "commit": null,
       "label": "Authoring Conventions Draft",
       "doc_type": "notes"

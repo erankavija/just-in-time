@@ -110,7 +110,9 @@ ls dev/archive/features/
 
 ## Authoring Conventions
 
-### Asset Management Patterns
+**For development documentation authors:** See [authoring-conventions.md](authoring-conventions.md) for comprehensive guidelines on writing documentation that is safe to archive and move.
+
+### Asset Management Patterns (Summary)
 
 **Critical for documentation lifecycle:** Choose the right asset pattern so documents remain portable and links don't break during archival.
 

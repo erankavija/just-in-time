@@ -159,37 +159,39 @@ impl DocFormatAdapter for MarkdownAdapter {
     }
 
     fn scan_assets(&self, content: &str) -> HashSet<String> {
+        use pulldown_cmark::{Event, Parser, Tag};
+
         let mut assets = HashSet::new();
+        let parser = Parser::new(content);
 
-        // Regex patterns for Markdown links and images
-        // Pattern: ![alt](path) or [text](path)
-        let link_pattern = regex::Regex::new(r"!?\[(?:[^\]]+)\]\(([^)]+)\)").unwrap();
+        for event in parser {
+            match event {
+                Event::Start(Tag::Image(_, dest, _)) | Event::Start(Tag::Link(_, dest, _)) => {
+                    let path = dest.as_ref().trim();
 
-        for cap in link_pattern.captures_iter(content) {
-            if let Some(path_match) = cap.get(1) {
-                let path = path_match.as_str().trim();
+                    // Skip anchor-only links
+                    if path.starts_with('#') {
+                        continue;
+                    }
 
-                // Skip anchor-only links
-                if path.starts_with('#') {
-                    continue;
+                    // Skip mailto links
+                    if path.starts_with("mailto:") {
+                        continue;
+                    }
+
+                    // Remove anchor fragments
+                    let path_without_anchor = if let Some(pos) = path.find('#') {
+                        &path[..pos]
+                    } else {
+                        path
+                    };
+
+                    // Add non-empty paths (including external URLs)
+                    if !path_without_anchor.is_empty() {
+                        assets.insert(path_without_anchor.to_string());
+                    }
                 }
-
-                // Skip mailto links
-                if path.starts_with("mailto:") {
-                    continue;
-                }
-
-                // Remove anchor fragments
-                let path_without_anchor = if let Some(pos) = path.find('#') {
-                    &path[..pos]
-                } else {
-                    path
-                };
-
-                // Add non-empty paths (including external URLs)
-                if !path_without_anchor.is_empty() {
-                    assets.insert(path_without_anchor.to_string());
-                }
+                _ => {}
             }
         }
 
@@ -320,6 +322,56 @@ Regular relative: ![Other](./local.png)
         assert_eq!(assets.len(), 2);
         assert!(assets.contains("/assets/image.png"));
         assert!(assets.contains("./local.png"));
+    }
+
+    #[test]
+    fn test_markdown_scan_assets_skips_code_blocks() {
+        let adapter = MarkdownAdapter;
+        let content = r#"
+# Documentation
+
+Here's a real link: [Good Link](real.md)
+
+```markdown
+This is an example showing what NOT to do:
+[Bad Link](../../../other-repo/doc.md)
+![Bad Image](bad.png)
+```
+
+And inline code: `[Not a Link](fake.md)` should be ignored.
+
+Another real link: [Another Good](good.md)
+        "#;
+
+        let assets = adapter.scan_assets(content);
+        assert_eq!(assets.len(), 2);
+        assert!(assets.contains("real.md"));
+        assert!(assets.contains("good.md"));
+        // Should NOT contain code block examples
+        assert!(!assets.contains("../../../other-repo/doc.md"));
+        assert!(!assets.contains("bad.png"));
+        assert!(!assets.contains("fake.md"));
+    }
+
+    #[test]
+    fn test_markdown_scan_assets_skips_indented_code_blocks() {
+        let adapter = MarkdownAdapter;
+        let content = r#"
+Real link: [Good](real.md)
+
+    Indented code block example:
+    [Fake Link](fake.md)
+    ![Fake Image](fake.png)
+
+Another real: [Another](another.md)
+        "#;
+
+        let assets = adapter.scan_assets(content);
+        assert_eq!(assets.len(), 2);
+        assert!(assets.contains("real.md"));
+        assert!(assets.contains("another.md"));
+        assert!(!assets.contains("fake.md"));
+        assert!(!assets.contains("fake.png"));
     }
 
     #[test]
