@@ -1,40 +1,42 @@
 //! Output helper macros for reducing JSON boilerplate in main.rs
 
 /// Output a simple message: either JSON-wrapped or plain text
+/// Respects --quiet flag to suppress non-essential output
 ///
 /// # Examples
 ///
 /// ```ignore
-/// output_message!(json, "issue create", "Created issue: {}", id);
+/// output_message!(quiet, json, "issue create", "Created issue: {}", id);
 /// ```
 #[macro_export]
 macro_rules! output_message {
-    ($json:expr, $command:expr, $($arg:tt)*) => {
+    ($quiet:expr, $json:expr, $command:expr, $($arg:tt)*) => {
         if $json {
             use jit::output::JsonOutput;
             use serde_json::json;
             let msg = format!($($arg)*);
             let output = JsonOutput::success(json!({"message": msg}), $command);
             println!("{}", output.to_json_string()?);
-        } else {
+        } else if !$quiet {
             println!($($arg)*);
         }
     };
 }
 
 /// Output data as JSON or custom human-readable format
+/// Data output is preserved in quiet mode (essential output)
 ///
 /// # Examples
 ///
 /// ```ignore
-/// output_data!(json, "issue show", issue, {
+/// output_data!(quiet, json, "issue show", issue, {
 ///     println!("ID: {}", issue.id);
 ///     println!("Title: {}", issue.title);
 /// });
 /// ```
 #[macro_export]
 macro_rules! output_data {
-    ($json:expr, $command:expr, $data:expr, $human_block:block) => {
+    ($quiet:expr, $json:expr, $command:expr, $data:expr, $human_block:block) => {
         if $json {
             use jit::output::JsonOutput;
             let output = JsonOutput::success(&$data, $command);
@@ -46,11 +48,12 @@ macro_rules! output_data {
 }
 
 /// Output structured JSON data with custom human formatting
+/// Human output preserved in quiet mode (essential data)
 ///
 /// # Examples
 ///
 /// ```ignore
-/// output_json!(json, "query ready", json!({
+/// output_json!(quiet, json, "query ready", json!({
 ///     "issues": issues,
 ///     "count": issues.len()
 /// }), {
@@ -59,7 +62,7 @@ macro_rules! output_data {
 /// ```
 #[macro_export]
 macro_rules! output_json {
-    ($json:expr, $command:expr, $json_data:expr, $human_block:block) => {
+    ($quiet:expr, $json:expr, $command:expr, $json_data:expr, $human_block:block) => {
         if $json {
             use jit::output::JsonOutput;
             let output = JsonOutput::success($json_data, $command);

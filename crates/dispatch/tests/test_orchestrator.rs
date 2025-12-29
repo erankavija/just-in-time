@@ -34,13 +34,16 @@ fn setup_jit_repo() -> TempDir {
 fn create_ready_issue(repo_path: &Path, title: &str, priority: &str) -> String {
     // Create issue
     let output = Command::new(jit_binary())
-        .args(["issue", "create", "-t", title, "-p", priority, "--json"])
+        .args([
+            "issue", "create", "-t", title, "-p", priority, "--json", "--orphan",
+        ])
         .current_dir(repo_path)
         .output()
         .unwrap();
 
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    let id = json["id"].as_str().unwrap().to_string();
+    // JSON format: { "success": true, "data": { "id": "...", ... }, "metadata": {...} }
+    let id = json["data"]["id"].as_str().unwrap().to_string();
 
     // No need to set to ready - auto-transitions when no blockers
 

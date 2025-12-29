@@ -7,11 +7,109 @@
 use chrono::Utc;
 use serde::{Serialize, Serializer};
 use serde_json::Value;
+use std::fmt::Display;
+use std::io::{self, Write};
 
 use crate::domain::{Issue, Priority, State};
 
 /// Version of the JSON output format
 const OUTPUT_VERSION: &str = "0.2.0";
+
+// ============================================================================
+// Output Context for Quiet Mode
+// ============================================================================
+
+/// Context for controlling output verbosity
+pub struct OutputContext {
+    quiet: bool,
+    json: bool,
+}
+
+impl OutputContext {
+    /// Create a new output context
+    pub fn new(quiet: bool, json: bool) -> Self {
+        Self { quiet, json }
+    }
+
+    /// Print essential output (always shown unless --json)
+    pub fn print_data(&self, msg: impl Display) -> io::Result<()> {
+        if !self.json {
+            writeln_safe(&format!("{}", msg))
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Print informational message (suppressed by --quiet or --json)
+    pub fn print_info(&self, msg: impl Display) -> io::Result<()> {
+        if !self.quiet && !self.json {
+            writeln_safe(&format!("{}", msg))
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Print success message (suppressed by --quiet or --json)
+    pub fn print_success(&self, msg: impl Display) -> io::Result<()> {
+        if !self.quiet && !self.json {
+            writeln_safe(&format!("{}", msg))
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Print warning (suppressed by --quiet or --json)
+    pub fn print_warning(&self, msg: impl Display) -> io::Result<()> {
+        if !self.quiet && !self.json {
+            writeln_safe_stderr(&format!("Warning: {}", msg))
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Print error (always shown to stderr)
+    pub fn print_error(&self, msg: impl Display) -> io::Result<()> {
+        writeln_safe_stderr(&format!("Error: {}", msg))
+    }
+
+    /// Check if quiet mode is enabled
+    pub fn is_quiet(&self) -> bool {
+        self.quiet
+    }
+
+    /// Check if JSON mode is enabled
+    pub fn is_json(&self) -> bool {
+        self.json
+    }
+}
+
+/// Safe println that handles broken pipes gracefully
+fn writeln_safe(msg: &str) -> io::Result<()> {
+    match writeln!(io::stdout(), "{}", msg) {
+        Ok(_) => Ok(()),
+        Err(e) if e.kind() == io::ErrorKind::BrokenPipe => {
+            // Silently exit on broken pipe (expected when piping to head, etc.)
+            std::process::exit(0);
+        }
+        Err(e) => Err(e),
+    }
+}
+
+/// Safe eprintln that handles broken pipes gracefully
+fn writeln_safe_stderr(msg: &str) -> io::Result<()> {
+    match writeln!(io::stderr(), "{}", msg) {
+        Ok(_) => Ok(()),
+        Err(e) if e.kind() == io::ErrorKind::BrokenPipe => {
+            // Silently exit on broken pipe
+            std::process::exit(0);
+        }
+        Err(e) => Err(e),
+    }
+}
+
+// ============================================================================
+// JSON Output Types
+// ============================================================================
 
 /// Wrapper for successful command output with metadata
 #[derive(Debug, Serialize)]

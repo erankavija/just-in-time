@@ -20,6 +20,10 @@ use clap::{Parser, Subcommand};
 #[command(name = "jit")]
 #[command(about = "Just-In-Time issue tracker", long_about = None)]
 pub struct Cli {
+    /// Suppress non-essential output (for scripting)
+    #[arg(short, long, global = true)]
+    pub quiet: bool,
+
     /// Export command schema in JSON format for AI agent introspection
     #[arg(long)]
     pub schema: bool,

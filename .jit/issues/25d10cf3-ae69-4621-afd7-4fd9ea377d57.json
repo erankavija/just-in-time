@@ -1,0 +1,16 @@
+{
+  "id": "25d10cf3-ae69-4621-afd7-4fd9ea377d57",
+  "title": "Test",
+  "description": "",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task"
+  ]
+}

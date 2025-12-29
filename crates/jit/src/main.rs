@@ -21,7 +21,7 @@ use jit::cli::{
     IssueCommands, RegistryCommands,
 };
 use jit::commands::{parse_priority, parse_state, CommandExecutor};
-use jit::output::{ExitCode, JsonOutput};
+use jit::output::{ExitCode, JsonOutput, OutputContext};
 use jit::storage::{IssueStore, JsonFileStorage};
 use std::env;
 
@@ -76,6 +76,7 @@ fn main() {
 
 fn run() -> Result<()> {
     let cli = Cli::parse();
+    let quiet = cli.quiet;
 
     // Handle --schema flag first
     if cli.schema {
@@ -105,6 +106,7 @@ fn run() -> Result<()> {
 
     match &command {
         Commands::Init { hierarchy_template } => {
+            let output_ctx = OutputContext::new(quiet, false);
             executor.init()?;
 
             // If a template is specified, write it to config.toml
@@ -142,7 +144,10 @@ strategic_types = {}
 
                 std::fs::write(&config_path, config_content)?;
 
-                println!("Initialized with '{}' hierarchy template", template_name);
+                let _ = output_ctx.print_success(format!(
+                    "Initialized with '{}' hierarchy template",
+                    template_name
+                ));
             }
         }
         _ => {
@@ -169,16 +174,22 @@ strategic_types = {}
                 } => {
                     let prio = parse_priority(&priority)?;
                     let id = executor.create_issue(title, description, prio, gate, label)?;
+                    let output_ctx = OutputContext::new(quiet, json);
 
                     if json {
                         let issue = storage.load_issue(&id)?;
                         let output = JsonOutput::success(issue, "issue create");
                         println!("{}", output.to_json_string()?);
                     } else {
-                        println!("Created issue: {}", id);
+                        // In quiet mode, output just the ID for scripting
+                        if quiet {
+                            println!("{}", id);
+                        } else {
+                            println!("Created issue: {}", id);
+                        }
 
-                        // Check for warnings unless --force is set
-                        if !force {
+                        // Check for warnings unless --force or --quiet
+                        if !force && !quiet {
                             use jit::type_hierarchy::ValidationWarning;
 
                             let warnings = executor.check_warnings(&id)?;
@@ -203,20 +214,12 @@ strategic_types = {}
                                         expected_namespace,
                                         ..
                                     } => {
-                                        eprintln!("\n⚠ Warning: Strategic consistency issue");
-                                        eprintln!("  Issue {} (type:{}) should have a {}:* label for identification.", 
-                                             id, type_name, expected_namespace);
-                                        eprintln!(
-                                            "  Suggested: jit issue update {} --label \"{}:value\"",
-                                            id, expected_namespace
-                                        );
+                                        let _ = output_ctx.print_warning(format!("\n⚠ Strategic consistency issue\n  Issue {} (type:{}) should have a {}:* label for identification.\n  Suggested: jit issue update {} --label \"{}:value\"",
+                                            id, type_name, expected_namespace, id, expected_namespace));
                                     }
                                     ValidationWarning::OrphanedLeaf { type_name, .. } => {
-                                        eprintln!("\n⚠ Warning: Orphaned leaf issue");
-                                        eprintln!("  {} {} has no parent association (epic or milestone).", 
-                                             type_name.to_uppercase(), id);
-                                        eprintln!("  Consider adding: --label \"epic:value\" or --label \"milestone:value\"");
-                                        eprintln!("  Or use --orphan flag to acknowledge intentional orphan.");
+                                        let _ = output_ctx.print_warning(format!("\n⚠ Orphaned leaf issue\n  {} {} has no parent association (epic or milestone).\n  Consider adding: --label \"epic:value\" or --label \"milestone:value\"\n  Or use --orphan flag to acknowledge intentional orphan.",
+                                            type_name.to_uppercase(), id));
                                     }
                                 }
                             }
@@ -270,6 +273,7 @@ strategic_types = {}
                     priority,
                     json,
                 } => {
+                    let output_ctx = OutputContext::new(quiet, json);
                     let state_filter = state.map(|s| parse_state(&s)).transpose()?;
                     let priority_filter = priority.map(|p| parse_priority(&p)).transpose()?;
                     let issues = executor.search_issues_with_filters(
@@ -293,7 +297,7 @@ strategic_types = {}
                         );
                         println!("{}", output.to_json_string()?);
                     } else {
-                        println!("Found {} issue(s):", issues.len());
+                        let _ = output_ctx.print_info(format!("Found {} issue(s):", issues.len()));
                         for issue in issues {
                             println!(
                                 "{} | {} | {:?} | {:?}",
@@ -304,7 +308,7 @@ strategic_types = {}
                 }
                 IssueCommands::Show { id, json } => match executor.show_issue(&id) {
                     Ok(issue) => {
-                        output_data!(json, "issue show", issue, {
+                        output_data!(quiet, json, "issue show", issue, {
                             println!("ID: {}", issue.id);
                             println!("Title: {}", issue.title);
                             println!("Description: {}", issue.description);
@@ -349,6 +353,7 @@ strategic_types = {}
                     remove_label,
                     json,
                 } => {
+                    let output_ctx = OutputContext::new(quiet, json);
                     // Resolve short hash to full UUID first
                     let full_id = storage.resolve_issue_id(&id)?;
 
@@ -370,7 +375,8 @@ strategic_types = {}
                                 let output = JsonOutput::success(issue, "issue update");
                                 println!("{}", output.to_json_string()?);
                             } else {
-                                println!("Updated issue: {}", full_id);
+                                let _ =
+                                    output_ctx.print_success(format!("Updated issue: {}", full_id));
                             }
                         }
                         Err(e) => {
@@ -400,6 +406,7 @@ strategic_types = {}
                     }
                 }
                 IssueCommands::Delete { id, json } => {
+                    let output_ctx = OutputContext::new(quiet, json);
                     executor.delete_issue(&id)?;
 
                     if json {
@@ -410,7 +417,7 @@ strategic_types = {}
                         let output = JsonOutput::success(result, "issue delete");
                         println!("{}", output.to_json_string()?);
                     } else {
-                        println!("Deleted issue: {}", id);
+                        let _ = output_ctx.print_success(format!("Deleted issue: {}", id));
                     }
                 }
                 IssueCommands::Breakdown {
@@ -419,6 +426,7 @@ strategic_types = {}
                     subtask_descriptions,
                     json,
                 } => {
+                    let output_ctx = OutputContext::new(quiet, json);
                     // Pad descriptions with empty strings if not enough provided
                     let mut descs = subtask_descriptions.clone();
                     while descs.len() < subtask_titles.len() {
@@ -444,17 +452,18 @@ strategic_types = {}
                         let output = JsonOutput::success(response, "issue breakdown");
                         println!("{}", output.to_json_string()?);
                     } else {
-                        println!(
+                        let _ = output_ctx.print_info(format!(
                             "Broke down {} into {} subtasks:",
                             parent_id,
                             subtask_ids.len()
-                        );
+                        ));
                         for (i, id) in subtask_ids.iter().enumerate() {
                             println!("  {}. {}", i + 1, id);
                         }
                     }
                 }
                 IssueCommands::Assign { id, assignee, json } => {
+                    let output_ctx = OutputContext::new(quiet, json);
                     let full_id = storage.resolve_issue_id(&id)?;
                     executor.assign_issue(&full_id, assignee)?;
 
@@ -463,10 +472,11 @@ strategic_types = {}
                         let output = JsonOutput::success(issue, "issue assign");
                         println!("{}", output.to_json_string()?);
                     } else {
-                        println!("Assigned issue: {}", full_id);
+                        let _ = output_ctx.print_success(format!("Assigned issue: {}", full_id));
                     }
                 }
                 IssueCommands::Claim { id, assignee, json } => {
+                    let output_ctx = OutputContext::new(quiet, json);
                     let full_id = storage.resolve_issue_id(&id)?;
                     executor.claim_issue(&full_id, assignee)?;
 
@@ -475,10 +485,11 @@ strategic_types = {}
                         let output = JsonOutput::success(issue, "issue claim");
                         println!("{}", output.to_json_string()?);
                     } else {
-                        println!("Claimed issue: {}", full_id);
+                        let _ = output_ctx.print_success(format!("Claimed issue: {}", full_id));
                     }
                 }
                 IssueCommands::Unassign { id, json } => {
+                    let output_ctx = OutputContext::new(quiet, json);
                     let full_id = storage.resolve_issue_id(&id)?;
                     executor.unassign_issue(&full_id)?;
 
@@ -487,12 +498,13 @@ strategic_types = {}
                         let output = JsonOutput::success(issue, "issue unassign");
                         println!("{}", output.to_json_string()?);
                     } else {
-                        println!("Unassigned issue: {}", full_id);
+                        let _ = output_ctx.print_success(format!("Unassigned issue: {}", full_id));
                     }
                 }
                 IssueCommands::Reject { id, reason, json } => {
                     use jit::domain::State;
 
+                    let output_ctx = OutputContext::new(quiet, json);
                     let full_id = storage.resolve_issue_id(&id)?;
 
                     // Update state to rejected
@@ -509,12 +521,16 @@ strategic_types = {}
                         let output = JsonOutput::success(issue, "issue reject");
                         println!("{}", output.to_json_string()?);
                     } else if let Some(reason_value) = reason {
-                        println!("Rejected issue: {} (reason: {})", full_id, reason_value);
+                        let _ = output_ctx.print_success(format!(
+                            "Rejected issue: {} (reason: {})",
+                            full_id, reason_value
+                        ));
                     } else {
-                        println!("Rejected issue: {}", full_id);
+                        let _ = output_ctx.print_success(format!("Rejected issue: {}", full_id));
                     }
                 }
                 IssueCommands::Release { id, reason, json } => {
+                    let output_ctx = OutputContext::new(quiet, json);
                     let full_id = storage.resolve_issue_id(&id)?;
                     executor.release_issue(&full_id, &reason)?;
 
@@ -523,12 +539,16 @@ strategic_types = {}
                         let output = JsonOutput::success(issue, "issue release");
                         println!("{}", output.to_json_string()?);
                     } else {
-                        println!("Released issue: {} (reason: {})", full_id, reason);
+                        let _ = output_ctx.print_success(format!(
+                            "Released issue: {} (reason: {})",
+                            full_id, reason
+                        ));
                     }
                 }
                 IssueCommands::ClaimNext { assignee, filter } => {
+                    let output_ctx = OutputContext::new(quiet, false);
                     let id = executor.claim_next(assignee, filter)?;
-                    println!("Claimed issue: {}", id);
+                    let _ = output_ctx.print_success(format!("Claimed issue: {}", id));
                 }
             }
         }
@@ -537,112 +557,124 @@ strategic_types = {}
                 from_id,
                 to_id,
                 json,
-            } => match executor.add_dependency(&from_id, &to_id) {
-                Ok(result) => {
-                    use jit::commands::DependencyAddResult;
-                    if json {
-                        use jit::output::JsonOutput;
-                        let (status, message) = match result {
-                            DependencyAddResult::Added => {
-                                ("added", format!("{} now depends on {}", from_id, to_id))
-                            }
-                            DependencyAddResult::Skipped { reason } => {
-                                ("skipped", format!("Dependency skipped: {}", reason))
-                            }
-                            DependencyAddResult::AlreadyExists => (
-                                "exists",
-                                format!("{} already depends on {}", from_id, to_id),
-                            ),
-                        };
-                        let response = serde_json::json!({
-                            "from_id": from_id,
-                            "to_id": to_id,
-                            "status": status,
-                            "message": message
-                        });
-                        let output = JsonOutput::success(response, "dep add");
-                        println!("{}", output.to_json_string()?);
-                    } else {
-                        match result {
-                            DependencyAddResult::Added => {
-                                println!("Added dependency: {} depends on {}", from_id, to_id);
-                            }
-                            DependencyAddResult::Skipped { reason } => {
-                                println!("Skipped: dependency not added ({})", reason);
-                            }
-                            DependencyAddResult::AlreadyExists => {
-                                println!(
-                                    "Dependency already exists: {} depends on {}",
-                                    from_id, to_id
-                                );
+            } => {
+                let output_ctx = OutputContext::new(quiet, json);
+                match executor.add_dependency(&from_id, &to_id) {
+                    Ok(result) => {
+                        use jit::commands::DependencyAddResult;
+                        if json {
+                            use jit::output::JsonOutput;
+                            let (status, message) = match result {
+                                DependencyAddResult::Added => {
+                                    ("added", format!("{} now depends on {}", from_id, to_id))
+                                }
+                                DependencyAddResult::Skipped { reason } => {
+                                    ("skipped", format!("Dependency skipped: {}", reason))
+                                }
+                                DependencyAddResult::AlreadyExists => (
+                                    "exists",
+                                    format!("{} already depends on {}", from_id, to_id),
+                                ),
+                            };
+                            let response = serde_json::json!({
+                                "from_id": from_id,
+                                "to_id": to_id,
+                                "status": status,
+                                "message": message
+                            });
+                            let output = JsonOutput::success(response, "dep add");
+                            println!("{}", output.to_json_string()?);
+                        } else {
+                            match result {
+                                DependencyAddResult::Added => {
+                                    let _ = output_ctx.print_success(format!(
+                                        "Added dependency: {} depends on {}",
+                                        from_id, to_id
+                                    ));
+                                }
+                                DependencyAddResult::Skipped { reason } => {
+                                    let _ = output_ctx.print_info(format!(
+                                        "Skipped: dependency not added ({})",
+                                        reason
+                                    ));
+                                }
+                                DependencyAddResult::AlreadyExists => {
+                                    let _ = output_ctx.print_info(format!(
+                                        "Dependency already exists: {} depends on {}",
+                                        from_id, to_id
+                                    ));
+                                }
                             }
                         }
                     }
-                }
-                Err(e) => {
-                    if json {
-                        use jit::output::JsonError;
-                        let error_str = e.to_string();
-                        let json_error = if error_str.contains("cycle") {
-                            JsonError::cycle_detected(&from_id, &to_id, "dep add")
-                        } else if error_str.contains("not found") {
-                            if error_str.contains(&from_id) {
-                                JsonError::issue_not_found(&from_id, "dep add")
+                    Err(e) => {
+                        if json {
+                            use jit::output::JsonError;
+                            let error_str = e.to_string();
+                            let json_error = if error_str.contains("cycle") {
+                                JsonError::cycle_detected(&from_id, &to_id, "dep add")
+                            } else if error_str.contains("not found") {
+                                if error_str.contains(&from_id) {
+                                    JsonError::issue_not_found(&from_id, "dep add")
+                                } else {
+                                    JsonError::issue_not_found(&to_id, "dep add")
+                                }
                             } else {
-                                JsonError::issue_not_found(&to_id, "dep add")
-                            }
+                                JsonError::new("DEPENDENCY_ERROR", error_str, "dep add")
+                            };
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
                         } else {
-                            JsonError::new("DEPENDENCY_ERROR", error_str, "dep add")
-                        };
-                        println!("{}", json_error.to_json_string()?);
-                        std::process::exit(json_error.exit_code().code());
-                    } else {
-                        return Err(e);
+                            return Err(e);
+                        }
                     }
                 }
-            },
+            }
             DepCommands::Rm {
                 from_id,
                 to_id,
                 json,
-            } => match executor.remove_dependency(&from_id, &to_id) {
-                Ok(_) => {
-                    if json {
-                        use jit::output::JsonOutput;
-                        let response = serde_json::json!({
-                            "from_id": from_id,
-                            "to_id": to_id,
-                            "message": format!("{} no longer depends on {}", from_id, to_id)
-                        });
-                        let output = JsonOutput::success(response, "dep rm");
-                        println!("{}", output.to_json_string()?);
-                    } else {
-                        println!(
-                            "Removed dependency: {} no longer depends on {}",
-                            from_id, to_id
-                        );
-                    }
-                }
-                Err(e) => {
-                    if json {
-                        use jit::output::JsonError;
-                        let error_str = e.to_string();
-                        let json_error = if error_str.contains("not found") {
-                            if error_str.contains(&from_id) {
-                                JsonError::issue_not_found(&from_id, "dep add")
-                            } else {
-                                JsonError::issue_not_found(&to_id, "dep add")
-                            }
+            } => {
+                let output_ctx = OutputContext::new(quiet, json);
+                match executor.remove_dependency(&from_id, &to_id) {
+                    Ok(_) => {
+                        if json {
+                            use jit::output::JsonOutput;
+                            let response = serde_json::json!({
+                                "from_id": from_id,
+                                "to_id": to_id,
+                                "message": format!("{} no longer depends on {}", from_id, to_id)
+                            });
+                            let output = JsonOutput::success(response, "dep rm");
+                            println!("{}", output.to_json_string()?);
                         } else {
-                            JsonError::new("DEPENDENCY_ERROR", error_str, "dep add")
-                        };
-                        println!("{}", json_error.to_json_string()?);
-                        std::process::exit(json_error.exit_code().code());
-                    } else {
-                        return Err(e);
+                            let _ = output_ctx.print_success(format!(
+                                "Removed dependency: {} no longer depends on {}",
+                                from_id, to_id
+                            ));
+                        }
+                    }
+                    Err(e) => {
+                        if json {
+                            use jit::output::JsonError;
+                            let error_str = e.to_string();
+                            let json_error = if error_str.contains("not found") {
+                                if error_str.contains(&from_id) {
+                                    JsonError::issue_not_found(&from_id, "dep rm")
+                                } else {
+                                    JsonError::issue_not_found(&to_id, "dep rm")
+                                }
+                            } else {
+                                JsonError::new("DEPENDENCY_ERROR", error_str, "dep rm")
+                            };
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
+                        } else {
+                            return Err(e);
+                        }
                     }
                 }
-            },
+            }
         },
         Commands::Gate(gate_cmd) => match gate_cmd {
             GateCommands::Define {
@@ -657,6 +689,8 @@ strategic_types = {}
                 json,
             } => {
                 use jit::domain::{GateChecker, GateMode, GateStage};
+
+                let output_ctx = OutputContext::new(quiet, json);
 
                 // Parse stage
                 let gate_stage = match stage.to_lowercase().as_str() {
@@ -707,7 +741,7 @@ strategic_types = {}
                             let output = JsonOutput::success(response, "gate define");
                             println!("{}", output.to_json_string()?);
                         } else {
-                            println!("Defined gate '{}'", key);
+                            let _ = output_ctx.print_success(format!("Defined gate '{}'", key));
                         }
                     }
                     Err(e) => {
@@ -722,35 +756,38 @@ strategic_types = {}
                     }
                 }
             }
-            GateCommands::List { json } => match executor.list_gates() {
-                Ok(gates) => {
-                    if json {
-                        use jit::output::JsonOutput;
-                        let output = JsonOutput::success(gates, "gate list");
-                        println!("{}", output.to_json_string()?);
-                    } else if gates.is_empty() {
-                        println!("No gates defined");
-                    } else {
-                        println!("Gates:");
-                        for gate in gates {
-                            println!(
-                                "  {} - {} ({:?}, {:?})",
-                                gate.key, gate.title, gate.stage, gate.mode
-                            );
+            GateCommands::List { json } => {
+                let output_ctx = OutputContext::new(quiet, json);
+                match executor.list_gates() {
+                    Ok(gates) => {
+                        if json {
+                            use jit::output::JsonOutput;
+                            let output = JsonOutput::success(gates, "gate list");
+                            println!("{}", output.to_json_string()?);
+                        } else if gates.is_empty() {
+                            let _ = output_ctx.print_info("No gates defined");
+                        } else {
+                            let _ = output_ctx.print_info("Gates:");
+                            for gate in gates {
+                                println!(
+                                    "  {} - {} ({:?}, {:?})",
+                                    gate.key, gate.title, gate.stage, gate.mode
+                                );
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        if json {
+                            use jit::output::JsonError;
+                            let json_error = JsonError::new("GATE_ERROR", e.to_string(), "gate");
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
+                        } else {
+                            return Err(e);
                         }
                     }
                 }
-                Err(e) => {
-                    if json {
-                        use jit::output::JsonError;
-                        let json_error = JsonError::new("GATE_ERROR", e.to_string(), "gate");
-                        println!("{}", json_error.to_json_string()?);
-                        std::process::exit(json_error.exit_code().code());
-                    } else {
-                        return Err(e);
-                    }
-                }
-            },
+            }
             GateCommands::Show { key, json } => match executor.show_gate_definition(&key) {
                 Ok(gate) => {
                     if json {
@@ -793,32 +830,36 @@ strategic_types = {}
                     }
                 }
             },
-            GateCommands::Remove { key, json } => match executor.remove_gate_definition(&key) {
-                Ok(_) => {
-                    if json {
-                        use jit::output::JsonOutput;
-                        let response = serde_json::json!({
-                            "gate_key": key,
-                            "message": format!("Removed gate '{}'", key)
-                        });
-                        let output = JsonOutput::success(response, "gate remove");
-                        println!("{}", output.to_json_string()?);
-                    } else {
-                        println!("Removed gate '{}'", key);
+            GateCommands::Remove { key, json } => {
+                let output_ctx = OutputContext::new(quiet, json);
+                match executor.remove_gate_definition(&key) {
+                    Ok(_) => {
+                        if json {
+                            use jit::output::JsonOutput;
+                            let response = serde_json::json!({
+                                "gate_key": key,
+                                "message": format!("Removed gate '{}'", key)
+                            });
+                            let output = JsonOutput::success(response, "gate remove");
+                            println!("{}", output.to_json_string()?);
+                        } else {
+                            let _ = output_ctx.print_success(format!("Removed gate '{}'", key));
+                        }
+                    }
+                    Err(e) => {
+                        if json {
+                            use jit::output::JsonError;
+                            let json_error = JsonError::gate_not_found(&key, "gate show");
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
+                        } else {
+                            return Err(e);
+                        }
                     }
                 }
-                Err(e) => {
-                    if json {
-                        use jit::output::JsonError;
-                        let json_error = JsonError::gate_not_found(&key, "gate show");
-                        println!("{}", json_error.to_json_string()?);
-                        std::process::exit(json_error.exit_code().code());
-                    } else {
-                        return Err(e);
-                    }
-                }
-            },
+            }
             GateCommands::Check { id, gate_key, json } => {
+                let output_ctx = OutputContext::new(quiet, json);
                 match executor.check_gate(&id, &gate_key) {
                     Ok(result) => {
                         if json {
@@ -828,7 +869,10 @@ strategic_types = {}
                         } else {
                             match result.status {
                                 jit::domain::GateRunStatus::Passed => {
-                                    println!("✓ Gate '{}' passed for issue {}", gate_key, id);
+                                    let _ = output_ctx.print_success(format!(
+                                        "✓ Gate '{}' passed for issue {}",
+                                        gate_key, id
+                                    ));
                                 }
                                 jit::domain::GateRunStatus::Failed => {
                                     println!("✗ Gate '{}' failed for issue {}", gate_key, id);
@@ -862,44 +906,52 @@ strategic_types = {}
                     }
                 }
             }
-            GateCommands::CheckAll { id, json } => match executor.check_all_gates(&id) {
-                Ok(results) => {
-                    if json {
-                        use jit::output::JsonOutput;
-                        let output = JsonOutput::success(results, "gate check-all");
-                        println!("{}", output.to_json_string()?);
-                    } else if results.is_empty() {
-                        println!("No automated gates to check for issue {}", id);
-                    } else {
-                        println!("Checking gates for issue {}:", id);
-                        for result in results {
-                            match result.status {
-                                jit::domain::GateRunStatus::Passed => {
-                                    println!("  ✓ {} passed", result.gate_key);
-                                }
-                                jit::domain::GateRunStatus::Failed => {
-                                    println!("  ✗ {} failed", result.gate_key);
-                                }
-                                _ => {
-                                    println!("  {} - {:?}", result.gate_key, result.status);
+            GateCommands::CheckAll { id, json } => {
+                let output_ctx = OutputContext::new(quiet, json);
+                match executor.check_all_gates(&id) {
+                    Ok(results) => {
+                        if json {
+                            use jit::output::JsonOutput;
+                            let output = JsonOutput::success(results, "gate check-all");
+                            println!("{}", output.to_json_string()?);
+                        } else if results.is_empty() {
+                            let _ = output_ctx.print_info(format!(
+                                "No automated gates to check for issue {}",
+                                id
+                            ));
+                        } else {
+                            let _ =
+                                output_ctx.print_info(format!("Checking gates for issue {}:", id));
+                            for result in results {
+                                match result.status {
+                                    jit::domain::GateRunStatus::Passed => {
+                                        println!("  ✓ {} passed", result.gate_key);
+                                    }
+                                    jit::domain::GateRunStatus::Failed => {
+                                        println!("  ✗ {} failed", result.gate_key);
+                                    }
+                                    _ => {
+                                        println!("  {} - {:?}", result.gate_key, result.status);
+                                    }
                                 }
                             }
                         }
                     }
-                }
-                Err(e) => {
-                    if json {
-                        use jit::output::JsonError;
-                        let json_error =
-                            JsonError::new("GATE_CHECK_ERROR", e.to_string(), "gate check");
-                        println!("{}", json_error.to_json_string()?);
-                        std::process::exit(json_error.exit_code().code());
-                    } else {
-                        return Err(e);
+                    Err(e) => {
+                        if json {
+                            use jit::output::JsonError;
+                            let json_error =
+                                JsonError::new("GATE_CHECK_ERROR", e.to_string(), "gate check");
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
+                        } else {
+                            return Err(e);
+                        }
                     }
                 }
-            },
+            }
             GateCommands::Add { id, gate_key, json } => {
+                let output_ctx = OutputContext::new(quiet, json);
                 match executor.add_gate(&id, gate_key.clone()) {
                     Ok(_) => {
                         if json {
@@ -912,7 +964,10 @@ strategic_types = {}
                             let output = JsonOutput::success(response, "gate add");
                             println!("{}", output.to_json_string()?);
                         } else {
-                            println!("Added gate '{}' to issue {}", gate_key, id);
+                            let _ = output_ctx.print_success(format!(
+                                "Added gate '{}' to issue {}",
+                                gate_key, id
+                            ));
                         }
                     }
                     Err(e) => {
@@ -922,12 +977,12 @@ strategic_types = {}
                             let json_error = if error_str.contains("Issue")
                                 && error_str.contains("not found")
                             {
-                                JsonError::issue_not_found(&id, "gate pass")
+                                JsonError::issue_not_found(&id, "gate add")
                             } else if error_str.contains("Gate") && error_str.contains("not found")
                             {
-                                JsonError::gate_not_found(&gate_key, "gate pass")
+                                JsonError::gate_not_found(&gate_key, "gate add")
                             } else {
-                                JsonError::new("GATE_ERROR", error_str, "gate pass")
+                                JsonError::new("GATE_ERROR", error_str, "gate add")
                             };
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
@@ -942,68 +997,83 @@ strategic_types = {}
                 gate_key,
                 by,
                 json,
-            } => match executor.pass_gate(&id, gate_key.clone(), by) {
-                Ok(_) => {
-                    if json {
-                        use jit::output::JsonOutput;
-                        let response = serde_json::json!({
-                            "issue_id": id,
-                            "gate_key": gate_key,
-                            "status": "passed",
-                            "message": format!("Passed gate '{}' for issue {}", gate_key, id)
-                        });
-                        let output = JsonOutput::success(response, "gate pass");
-                        println!("{}", output.to_json_string()?);
-                    } else {
-                        println!("Passed gate '{}' for issue {}", gate_key, id);
+            } => {
+                let output_ctx = OutputContext::new(quiet, json);
+                match executor.pass_gate(&id, gate_key.clone(), by) {
+                    Ok(_) => {
+                        if json {
+                            use jit::output::JsonOutput;
+                            let response = serde_json::json!({
+                                "issue_id": id,
+                                "gate_key": gate_key,
+                                "status": "passed",
+                                "message": format!("Passed gate '{}' for issue {}", gate_key, id)
+                            });
+                            let output = JsonOutput::success(response, "gate pass");
+                            println!("{}", output.to_json_string()?);
+                        } else {
+                            let _ = output_ctx.print_success(format!(
+                                "Passed gate '{}' for issue {}",
+                                gate_key, id
+                            ));
+                        }
+                    }
+                    Err(e) => {
+                        if json {
+                            use jit::output::JsonError;
+                            let json_error =
+                                JsonError::new("GATE_ERROR", e.to_string(), "gate pass");
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
+                        } else {
+                            return Err(e);
+                        }
                     }
                 }
-                Err(e) => {
-                    if json {
-                        use jit::output::JsonError;
-                        let json_error = JsonError::new("GATE_ERROR", e.to_string(), "gate");
-                        println!("{}", json_error.to_json_string()?);
-                        std::process::exit(json_error.exit_code().code());
-                    } else {
-                        return Err(e);
-                    }
-                }
-            },
+            }
             GateCommands::Fail {
                 id,
                 gate_key,
                 by,
                 json,
-            } => match executor.fail_gate(&id, gate_key.clone(), by) {
-                Ok(_) => {
-                    if json {
-                        use jit::output::JsonOutput;
-                        let response = serde_json::json!({
-                            "issue_id": id,
-                            "gate_key": gate_key,
-                            "status": "failed",
-                            "message": format!("Failed gate '{}' for issue {}", gate_key, id)
-                        });
-                        let output = JsonOutput::success(response, "gate fail");
-                        println!("{}", output.to_json_string()?);
-                    } else {
-                        println!("Failed gate '{}' for issue {}", gate_key, id);
+            } => {
+                let output_ctx = OutputContext::new(quiet, json);
+                match executor.fail_gate(&id, gate_key.clone(), by) {
+                    Ok(_) => {
+                        if json {
+                            use jit::output::JsonOutput;
+                            let response = serde_json::json!({
+                                "issue_id": id,
+                                "gate_key": gate_key,
+                                "status": "failed",
+                                "message": format!("Failed gate '{}' for issue {}", gate_key, id)
+                            });
+                            let output = JsonOutput::success(response, "gate fail");
+                            println!("{}", output.to_json_string()?);
+                        } else {
+                            let _ = output_ctx.print_success(format!(
+                                "Failed gate '{}' for issue {}",
+                                gate_key, id
+                            ));
+                        }
+                    }
+                    Err(e) => {
+                        if json {
+                            use jit::output::JsonError;
+                            let json_error =
+                                JsonError::new("GATE_ERROR", e.to_string(), "gate fail");
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
+                        } else {
+                            return Err(e);
+                        }
                     }
                 }
-                Err(e) => {
-                    if json {
-                        use jit::output::JsonError;
-                        let json_error = JsonError::new("GATE_ERROR", e.to_string(), "gate");
-                        println!("{}", json_error.to_json_string()?);
-                        std::process::exit(json_error.exit_code().code());
-                    } else {
-                        return Err(e);
-                    }
-                }
-            },
+            }
         },
         Commands::Graph(graph_cmd) => match graph_cmd {
             GraphCommands::Show { id, json } => {
+                let output_ctx = OutputContext::new(quiet, json);
                 if let Some(issue_id) = id {
                     let issues = executor.show_graph(&issue_id)?;
                     if json {
@@ -1017,7 +1087,7 @@ strategic_types = {}
                         let output = JsonOutput::success(response, "graph show");
                         println!("{}", output.to_json_string()?);
                     } else {
-                        println!("Dependency tree for {}:", issue_id);
+                        let _ = output_ctx.print_info(format!("Dependency tree for {}:", issue_id));
                         for issue in issues {
                             println!("  {} | {}", issue.id, issue.title);
                         }
@@ -1052,7 +1122,7 @@ strategic_types = {}
                         let output = JsonOutput::success(response, "graph show");
                         println!("{}", output.to_json_string()?);
                     } else {
-                        println!("All dependencies:");
+                        let _ = output_ctx.print_info("All dependencies:");
                         for issue in all_issues {
                             if !issue.dependencies.is_empty() {
                                 println!("  {} depends on: {:?}", issue.id, issue.dependencies);
@@ -1062,6 +1132,7 @@ strategic_types = {}
                 }
             }
             GraphCommands::Downstream { id, json } => {
+                let output_ctx = OutputContext::new(quiet, json);
                 let issues = executor.show_downstream(&id)?;
                 if json {
                     use jit::output::{GraphDownstreamResponse, JsonOutput};
@@ -1074,13 +1145,14 @@ strategic_types = {}
                     let output = JsonOutput::success(response, "graph downstream");
                     println!("{}", output.to_json_string()?);
                 } else {
-                    println!("Downstream dependents of {}:", id);
+                    let _ = output_ctx.print_info(format!("Downstream dependents of {}:", id));
                     for issue in issues {
                         println!("  {} | {}", issue.id, issue.title);
                     }
                 }
             }
             GraphCommands::Roots { json } => {
+                let output_ctx = OutputContext::new(quiet, json);
                 let issues = executor.show_roots()?;
                 if json {
                     use jit::output::{GraphRootsResponse, JsonOutput};
@@ -1092,18 +1164,19 @@ strategic_types = {}
                     let output = JsonOutput::success(response, "graph roots");
                     println!("{}", output.to_json_string()?);
                 } else {
-                    println!("Root issues (no dependencies):");
+                    let _ = output_ctx.print_info("Root issues (no dependencies):");
                     for issue in issues {
                         println!("  {} | {}", issue.id, issue.title);
                     }
                 }
             }
             GraphCommands::Export { format, output } => {
+                let output_ctx = OutputContext::new(quiet, false);
                 let graph_output = executor.export_graph(&format)?;
 
                 if let Some(path) = output {
                     std::fs::write(&path, graph_output)?;
-                    println!("Graph exported to: {}", path);
+                    let _ = output_ctx.print_success(format!("Graph exported to: {}", path));
                 } else {
                     println!("{}", graph_output);
                 }
@@ -1154,6 +1227,7 @@ strategic_types = {}
                 example,
                 stage,
             } => {
+                let output_ctx = OutputContext::new(quiet, false);
                 executor.add_gate_definition(
                     key.clone(),
                     title,
@@ -1162,11 +1236,12 @@ strategic_types = {}
                     example,
                     stage,
                 )?;
-                println!("Added gate definition: {}", key);
+                let _ = output_ctx.print_success(format!("Added gate definition: {}", key));
             }
             RegistryCommands::Remove { key } => {
+                let output_ctx = OutputContext::new(quiet, false);
                 executor.remove_gate_definition(&key)?;
-                println!("Removed gate definition: {}", key);
+                let _ = output_ctx.print_success(format!("Removed gate definition: {}", key));
             }
             RegistryCommands::Show { key, json } => {
                 let gate = executor.show_gate_definition(&key)?;
@@ -1279,6 +1354,7 @@ strategic_types = {}
         },
         Commands::Query(query_cmd) => match query_cmd {
             jit::cli::QueryCommands::Ready { json } => {
+                let output_ctx = OutputContext::new(quiet, json);
                 let issues = executor.query_ready()?;
                 if json {
                     use jit::output::{JsonOutput, ReadyQueryResponse};
@@ -1290,14 +1366,15 @@ strategic_types = {}
                     let output = JsonOutput::success(response, "registry show");
                     println!("{}", output.to_json_string()?);
                 } else {
-                    println!("Ready issues (unassigned, unblocked):");
+                    let _ = output_ctx.print_info("Ready issues (unassigned, unblocked):");
                     for issue in &issues {
                         println!("  {} | {} | {:?}", issue.id, issue.title, issue.priority);
                     }
-                    println!("\nTotal: {}", issues.len());
+                    let _ = output_ctx.print_info(format!("\nTotal: {}", issues.len()));
                 }
             }
             jit::cli::QueryCommands::Blocked { json } => {
+                let output_ctx = OutputContext::new(quiet, json);
                 let blocked = executor.query_blocked()?;
                 if json {
                     use jit::output::{
@@ -1336,17 +1413,18 @@ strategic_types = {}
                     let output = JsonOutput::success(response, "registry show");
                     println!("{}", output.to_json_string()?);
                 } else {
-                    println!("Blocked issues:");
+                    let _ = output_ctx.print_info("Blocked issues:");
                     for (issue, reasons) in &blocked {
                         println!("  {} | {} | {:?}", issue.id, issue.title, issue.priority);
                         for reason in reasons {
                             println!("    - {}", reason);
                         }
                     }
-                    println!("\nTotal: {}", blocked.len());
+                    let _ = output_ctx.print_info(format!("\nTotal: {}", blocked.len()));
                 }
             }
             jit::cli::QueryCommands::Assignee { assignee, json } => {
+                let output_ctx = OutputContext::new(quiet, json);
                 let issues = executor.query_by_assignee(&assignee)?;
                 if json {
                     use jit::output::{AssigneeQueryResponse, JsonOutput};
@@ -1359,82 +1437,91 @@ strategic_types = {}
                     let output = JsonOutput::success(response, "registry show");
                     println!("{}", output.to_json_string()?);
                 } else {
-                    println!("Issues assigned to {}:", assignee);
+                    let _ = output_ctx.print_info(format!("Issues assigned to {}:", assignee));
                     for issue in &issues {
                         println!(
                             "  {} | {} | {:?} | {:?}",
                             issue.id, issue.title, issue.state, issue.priority
                         );
                     }
-                    println!("\nTotal: {}", issues.len());
+                    let _ = output_ctx.print_info(format!("\nTotal: {}", issues.len()));
                 }
             }
-            jit::cli::QueryCommands::State { state, json } => match parse_state(&state) {
-                Ok(parsed_state) => {
-                    let issues = executor.query_by_state(parsed_state)?;
-                    if json {
-                        use jit::output::{JsonOutput, StateQueryResponse};
+            jit::cli::QueryCommands::State { state, json } => {
+                let output_ctx = OutputContext::new(quiet, json);
+                match parse_state(&state) {
+                    Ok(parsed_state) => {
+                        let issues = executor.query_by_state(parsed_state)?;
+                        if json {
+                            use jit::output::{JsonOutput, StateQueryResponse};
 
-                        let response = StateQueryResponse {
-                            state: parsed_state,
-                            issues: issues.clone(),
-                            count: issues.len(),
-                        };
-                        let output = JsonOutput::success(response, "registry show");
-                        println!("{}", output.to_json_string()?);
-                    } else {
-                        println!("Issues with state '{}':", state);
-                        for issue in &issues {
-                            println!("  {} | {} | {:?}", issue.id, issue.title, issue.priority);
+                            let response = StateQueryResponse {
+                                state: parsed_state,
+                                issues: issues.clone(),
+                                count: issues.len(),
+                            };
+                            let output = JsonOutput::success(response, "registry show");
+                            println!("{}", output.to_json_string()?);
+                        } else {
+                            let _ =
+                                output_ctx.print_info(format!("Issues with state '{}':", state));
+                            for issue in &issues {
+                                println!("  {} | {} | {:?}", issue.id, issue.title, issue.priority);
+                            }
+                            let _ = output_ctx.print_info(format!("\nTotal: {}", issues.len()));
                         }
-                        println!("\nTotal: {}", issues.len());
+                    }
+                    Err(e) => {
+                        if json {
+                            use jit::output::JsonError;
+                            let json_error = JsonError::invalid_state(&state, "query state");
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
+                        } else {
+                            return Err(e);
+                        }
                     }
                 }
-                Err(e) => {
-                    if json {
-                        use jit::output::JsonError;
-                        let json_error = JsonError::invalid_state(&state, "query state");
-                        println!("{}", json_error.to_json_string()?);
-                        std::process::exit(json_error.exit_code().code());
-                    } else {
-                        return Err(e);
-                    }
-                }
-            },
-            jit::cli::QueryCommands::Priority { priority, json } => match parse_priority(&priority)
-            {
-                Ok(parsed_priority) => {
-                    let issues = executor.query_by_priority(parsed_priority)?;
-                    if json {
-                        use jit::output::{JsonOutput, PriorityQueryResponse};
+            }
+            jit::cli::QueryCommands::Priority { priority, json } => {
+                let output_ctx = OutputContext::new(quiet, json);
+                match parse_priority(&priority) {
+                    Ok(parsed_priority) => {
+                        let issues = executor.query_by_priority(parsed_priority)?;
+                        if json {
+                            use jit::output::{JsonOutput, PriorityQueryResponse};
 
-                        let response = PriorityQueryResponse {
-                            priority: parsed_priority,
-                            issues: issues.clone(),
-                            count: issues.len(),
-                        };
-                        let output = JsonOutput::success(response, "registry show");
-                        println!("{}", output.to_json_string()?);
-                    } else {
-                        println!("Issues with priority '{}':", priority);
-                        for issue in &issues {
-                            println!("  {} | {} | {:?}", issue.id, issue.title, issue.state);
+                            let response = PriorityQueryResponse {
+                                priority: parsed_priority,
+                                issues: issues.clone(),
+                                count: issues.len(),
+                            };
+                            let output = JsonOutput::success(response, "registry show");
+                            println!("{}", output.to_json_string()?);
+                        } else {
+                            let _ = output_ctx
+                                .print_info(format!("Issues with priority '{}':", priority));
+                            for issue in &issues {
+                                println!("  {} | {} | {:?}", issue.id, issue.title, issue.state);
+                            }
+                            let _ = output_ctx.print_info(format!("\nTotal: {}", issues.len()));
                         }
-                        println!("\nTotal: {}", issues.len());
+                    }
+                    Err(e) => {
+                        if json {
+                            use jit::output::JsonError;
+                            let json_error =
+                                JsonError::invalid_priority(&priority, "query priority");
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
+                        } else {
+                            return Err(e);
+                        }
                     }
                 }
-                Err(e) => {
-                    if json {
-                        use jit::output::JsonError;
-                        let json_error = JsonError::invalid_priority(&priority, "query priority");
-                        println!("{}", json_error.to_json_string()?);
-                        std::process::exit(json_error.exit_code().code());
-                    } else {
-                        return Err(e);
-                    }
-                }
-            },
+            }
             jit::cli::QueryCommands::Label { pattern, json } => {
+                let output_ctx = OutputContext::new(quiet, json);
                 match executor.query_by_label(&pattern) {
                     Ok(issues) => {
                         if json {
@@ -1447,11 +1534,12 @@ strategic_types = {}
                             let output = JsonOutput::success(response, "registry show");
                             println!("{}", output.to_json_string()?);
                         } else {
-                            println!("Issues matching label '{}':", pattern);
+                            let _ = output_ctx
+                                .print_info(format!("Issues matching label '{}':", pattern));
                             for issue in &issues {
                                 println!("  {} | {} | {:?}", issue.id, issue.title, issue.state);
                             }
-                            println!("\nTotal: {}", issues.len());
+                            let _ = output_ctx.print_info(format!("\nTotal: {}", issues.len()));
                         }
                     }
                     Err(e) => {
@@ -1467,36 +1555,40 @@ strategic_types = {}
                     }
                 }
             }
-            jit::cli::QueryCommands::Strategic { json } => match executor.query_strategic() {
-                Ok(issues) => {
-                    if json {
-                        use jit::output::{JsonOutput, StrategicQueryResponse};
-                        let response = StrategicQueryResponse {
-                            issues: issues.clone(),
-                            count: issues.len(),
-                        };
-                        let output = JsonOutput::success(response, "registry show");
-                        println!("{}", output.to_json_string()?);
-                    } else {
-                        println!("Strategic issues:");
-                        for issue in &issues {
-                            println!("  {} | {} | {:?}", issue.id, issue.title, issue.state);
+            jit::cli::QueryCommands::Strategic { json } => {
+                let output_ctx = OutputContext::new(quiet, json);
+                match executor.query_strategic() {
+                    Ok(issues) => {
+                        if json {
+                            use jit::output::{JsonOutput, StrategicQueryResponse};
+                            let response = StrategicQueryResponse {
+                                issues: issues.clone(),
+                                count: issues.len(),
+                            };
+                            let output = JsonOutput::success(response, "registry show");
+                            println!("{}", output.to_json_string()?);
+                        } else {
+                            let _ = output_ctx.print_info("Strategic issues:");
+                            for issue in &issues {
+                                println!("  {} | {} | {:?}", issue.id, issue.title, issue.state);
+                            }
+                            let _ = output_ctx.print_info(format!("\nTotal: {}", issues.len()));
                         }
-                        println!("\nTotal: {}", issues.len());
+                    }
+                    Err(e) => {
+                        if json {
+                            use jit::output::JsonError;
+                            let json_error = JsonError::new("QUERY_FAILED", e.to_string(), "query");
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
+                        } else {
+                            return Err(e);
+                        }
                     }
                 }
-                Err(e) => {
-                    if json {
-                        use jit::output::JsonError;
-                        let json_error = JsonError::new("QUERY_FAILED", e.to_string(), "query");
-                        println!("{}", json_error.to_json_string()?);
-                        std::process::exit(json_error.exit_code().code());
-                    } else {
-                        return Err(e);
-                    }
-                }
-            },
+            }
             jit::cli::QueryCommands::Closed { json } => {
+                let output_ctx = OutputContext::new(quiet, json);
                 let issues = executor.query_closed()?;
                 if json {
                     use jit::output::{ClosedQueryResponse, JsonOutput};
@@ -1507,16 +1599,17 @@ strategic_types = {}
                     let output = JsonOutput::success(response, "registry show");
                     println!("{}", output.to_json_string()?);
                 } else {
-                    println!("Closed issues (Done or Rejected):");
+                    let _ = output_ctx.print_info("Closed issues (Done or Rejected):");
                     for issue in &issues {
                         println!("  {} | {} | {:?}", issue.id, issue.title, issue.state);
                     }
-                    println!("\nTotal: {}", issues.len());
+                    let _ = output_ctx.print_info(format!("\nTotal: {}", issues.len()));
                 }
             }
         },
         Commands::Label(label_cmd) => match label_cmd {
             jit::cli::LabelCommands::Namespaces { json } => {
+                let output_ctx = OutputContext::new(quiet, json);
                 use jit::config_manager::ConfigManager;
                 let config_mgr = ConfigManager::new(&jit_dir);
                 let namespaces = config_mgr.get_namespaces()?;
@@ -1525,7 +1618,7 @@ strategic_types = {}
                     let output = JsonOutput::success(namespaces, "registry show");
                     println!("{}", output.to_json_string()?);
                 } else {
-                    println!("Label Namespaces:\n");
+                    let _ = output_ctx.print_info("Label Namespaces:\n");
                     for (name, ns) in &namespaces.namespaces {
                         println!("  {}", name);
                         println!("    Description: {}", ns.description);
@@ -1535,6 +1628,7 @@ strategic_types = {}
                 }
             }
             jit::cli::LabelCommands::Values { namespace, json } => {
+                let output_ctx = OutputContext::new(quiet, json);
                 let values = executor.list_label_values(&namespace)?;
                 if json {
                     use jit::output::JsonOutput;
@@ -1548,16 +1642,18 @@ strategic_types = {}
                     );
                     println!("{}", output.to_json_string()?);
                 } else {
-                    println!("Values in namespace '{}':\n", namespace);
+                    let _ =
+                        output_ctx.print_info(format!("Values in namespace '{}':\n", namespace));
                     for value in &values {
                         println!("  {}", value);
                     }
-                    println!("\nTotal: {}", values.len());
+                    let _ = output_ctx.print_info(format!("\nTotal: {}", values.len()));
                 }
             }
         },
         Commands::Config(config_cmd) => match config_cmd {
             jit::cli::ConfigCommands::ShowHierarchy { json } => {
+                let output_ctx = OutputContext::new(quiet, json);
                 use jit::config_manager::ConfigManager;
                 let config_mgr = ConfigManager::new(&jit_dir);
                 let namespaces = config_mgr.get_namespaces()?;
@@ -1570,7 +1666,7 @@ strategic_types = {}
                         JsonOutput::success(hierarchy, "config show-hierarchy").to_json_string()?
                     );
                 } else {
-                    println!("Type Hierarchy:\n");
+                    let _ = output_ctx.print_info("Type Hierarchy:\n");
                     let mut sorted: Vec<_> = hierarchy.iter().collect();
                     sorted.sort_by_key(|(_, level)| *level);
                     for (type_name, level) in sorted {
@@ -1579,6 +1675,7 @@ strategic_types = {}
                 }
             }
             jit::cli::ConfigCommands::ListTemplates { json } => {
+                let output_ctx = OutputContext::new(quiet, json);
                 let templates = jit::hierarchy_templates::HierarchyTemplate::all();
 
                 if json {
@@ -1600,7 +1697,7 @@ strategic_types = {}
                             .to_json_string()?
                     );
                 } else {
-                    println!("Available Hierarchy Templates:\n");
+                    let _ = output_ctx.print_info("Available Hierarchy Templates:\n");
                     for template in templates {
                         println!("  {}", template.name);
                         println!("    {}", template.description);
@@ -1618,6 +1715,7 @@ strategic_types = {}
             glob,
             json,
         } => {
+            let output_ctx = OutputContext::new(quiet, json);
             use jit::search::{search, SearchOptions};
 
             let options = SearchOptions {
@@ -1645,13 +1743,14 @@ strategic_types = {}
                         );
                         println!("{}", output.to_json_string()?);
                     } else if results.is_empty() {
-                        println!("No matches found for \"{}\"", query);
+                        let _ =
+                            output_ctx.print_info(format!("No matches found for \"{}\"", query));
                     } else {
-                        println!(
+                        let _ = output_ctx.print_info(format!(
                             "Search results for \"{}\" ({} matches):\n",
                             query,
                             results.len()
-                        );
+                        ));
 
                         let mut current_file = String::new();
                         for result in &results {

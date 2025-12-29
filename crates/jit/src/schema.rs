@@ -14,6 +14,8 @@ use std::collections::HashMap;
 pub struct CommandSchema {
     /// CLI version
     pub version: String,
+    /// Global options available on all commands
+    pub global_options: Vec<Flag>,
     /// Available commands mapped by name
     pub commands: HashMap<String, Command>,
     /// Type definitions (Issue, State, Priority, etc.)
@@ -96,6 +98,18 @@ impl CommandSchema {
     pub fn generate() -> Self {
         let cli = crate::cli::Cli::command();
 
+        // Extract global options (flags that apply to all commands)
+        let global_options: Vec<Flag> = cli
+            .get_arguments()
+            .filter(|arg| {
+                !arg.is_positional()
+                    && arg.is_global_set()
+                    && arg.get_id() != "help"
+                    && arg.get_id() != "version"
+            })
+            .map(Self::extract_flag)
+            .collect();
+
         let mut commands = HashMap::new();
 
         // Extract top-level commands
@@ -113,6 +127,7 @@ impl CommandSchema {
 
         CommandSchema {
             version: env!("CARGO_PKG_VERSION").to_string(),
+            global_options,
             commands,
             types: Self::generate_types(),
             exit_codes: Self::generate_exit_codes(),
