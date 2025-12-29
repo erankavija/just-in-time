@@ -523,3 +523,9 @@
 {"type":"issue_state_changed","id":"ea79eb13-96dd-4dd2-a850-5275dc23d592","issue_id":"44104a30-5cfb-4127-bd39-57688f7619bc","timestamp":"2025-12-28T21:47:17.978017659Z","from":"rejected","to":"ready"}
 {"type":"issue_state_changed","id":"fd215205-7783-4b17-a607-60a506fa64ed","issue_id":"dc2a9d91-499b-4c9b-8474-7cd1ea6ee4ba","timestamp":"2025-12-28T21:47:18.005649261Z","from":"ready","to":"rejected"}
 {"type":"issue_state_changed","id":"e1aaa5ca-9b9a-4124-88a3-2bb4661c14e8","issue_id":"408ed86a-12a5-45ec-8623-5739e14b1cb7","timestamp":"2025-12-28T21:52:33.101233745Z","from":"backlog","to":"ready"}
+{"type":"issue_created","id":"1cf150b3-78d9-46fd-ba4a-41793b9d503f","issue_id":"48e2e917-d129-433c-b3c5-2449f9c34cfd","timestamp":"2025-12-29T18:09:32.208269432Z","title":"Story: Gate System Documentation","priority":"high"}
+{"type":"issue_created","id":"68017a7c-7c7b-46b5-b58c-c0d8e017aa77","issue_id":"c8254dbf-19b6-4523-b8b5-bc22b8117a90","timestamp":"2025-12-29T18:09:42.644746392Z","title":"Story: Core Concepts Documentation","priority":"high"}
+{"type":"issue_created","id":"43c5d50b-5843-43e7-bdf1-ce45f78690e2","issue_id":"84c358ec-3925-4203-92d4-d9192a86f4ab","timestamp":"2025-12-29T18:09:50.333834592Z","title":"Story: Tutorial Documentation","priority":"high"}
+{"type":"issue_created","id":"9fe339d7-0c45-43e4-b844-b54601cf5cb8","issue_id":"5326b331-e14c-4157-b430-447e93f5f91b","timestamp":"2025-12-29T18:09:58.136301354Z","title":"Story: How-To Guides Documentation","priority":"normal"}
+{"type":"issue_created","id":"3a5b8c10-0593-42b5-be1c-68648d2d6e48","issue_id":"5bad7437-b121-4d2a-b2db-7aa8ee7f4d8b","timestamp":"2025-12-29T18:10:06.452449790Z","title":"Story: Reference Documentation","priority":"normal"}
+{"type":"issue_state_changed","id":"34aac997-f0dc-47ca-ab98-5c330f002401","issue_id":"48e2e917-d129-433c-b3c5-2449f9c34cfd","timestamp":"2025-12-29T18:10:29.058683751Z","from":"ready","to":"backlog"}

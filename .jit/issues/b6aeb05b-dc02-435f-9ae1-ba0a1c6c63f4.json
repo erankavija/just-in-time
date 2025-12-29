@@ -15,7 +15,6 @@
   "documents": [],
   "labels": [
     "type:bug",
-    "component:cli",
-    "area:json-output"
+    "component:cli"
   ]
 }

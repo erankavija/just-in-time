@@ -1,0 +1,16 @@
+{
+  "id": "84c358ec-3925-4203-92d4-d9192a86f4ab",
+  "title": "Story: Tutorial Documentation",
+  "description": "Create learning-oriented step-by-step tutorials for getting started with JIT (quickstart, first workflow, etc.). Part of Epic cfb3ba94 (User Documentation Phase 2). Follows Diátaxis: Tutorials.",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task"
+  ]
+}

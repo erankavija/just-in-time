@@ -23,7 +23,7 @@ study = "studies"
 
 [type_hierarchy]
 # Type name to hierarchy level mapping (lower = more strategic)
-types = { milestone = 1, epic = 2, story = 3, task = 4 }
+types = { milestone = 1, epic = 2, story = 3, task = 4, bug = 4, enhancement = 4 }
 
 # Strategic types - used by 'query strategic' command
 strategic_types = ["milestone", "epic"]

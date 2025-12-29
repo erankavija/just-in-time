@@ -12,7 +12,6 @@
   "documents": [],
   "labels": [
     "type:bug",
-    "component:cli",
-    "area:description"
+    "component:cli"
   ]
 }

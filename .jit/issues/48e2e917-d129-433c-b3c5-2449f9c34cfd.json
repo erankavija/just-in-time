@@ -1,0 +1,20 @@
+{
+  "id": "48e2e917-d129-433c-b3c5-2449f9c34cfd",
+  "title": "Story: Gate System Documentation",
+  "description": "Complete comprehensive gate system documentation across all user-facing materials (EXAMPLE.md, user guide, agent quickstart). Part of Epic cfb3ba94 (User Documentation Phase 2).",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "d6dc4dfa-6784-43a8-8b8a-761bd5a3f38a",
+    "b47c8918-8807-4eee-8474-39dab29fa4c2",
+    "baa723de-93bb-4ec7-8883-0a464bca9b30"
+  ],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task"
+  ]
+}
