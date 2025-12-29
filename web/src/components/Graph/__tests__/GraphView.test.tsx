@@ -66,6 +66,7 @@ vi.mock('../../../api/client', () => ({
         { from: '2', to: '3' },
       ],
     })),
+    getStrategicTypes: vi.fn(() => Promise.resolve(['milestone', 'epic'])),
   },
 }));
 
