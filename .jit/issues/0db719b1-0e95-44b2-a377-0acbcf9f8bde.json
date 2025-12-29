@@ -2,9 +2,9 @@
   "id": "0db719b1-0e95-44b2-a377-0acbcf9f8bde",
   "title": "Standardize JSON output format across all CLI commands",
   "description": "Create consistent JSON envelope format (success/data/error/meta) for all commands with --json flag. Currently some commands output raw JSON objects while others wrap in success/data. This makes scripting and MCP integration difficult. Implement JsonResponse<T> type and update all commands to use it.",
-  "state": "ready",
+  "state": "done",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:copilot",
   "dependencies": [],
   "gates_required": [
     "tdd-reminder",
@@ -13,7 +13,33 @@
     "fmt",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-29T21:17:11.539888704Z"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2025-12-29T20:03:12.692468370Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-29T21:17:33.736749814Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2025-12-29T21:17:27.007099979Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-29T21:17:11.538817033Z"
+    }
+  },
   "context": {},
   "documents": [
     {

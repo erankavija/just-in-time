@@ -529,3 +529,15 @@
 {"type":"issue_created","id":"9fe339d7-0c45-43e4-b844-b54601cf5cb8","issue_id":"5326b331-e14c-4157-b430-447e93f5f91b","timestamp":"2025-12-29T18:09:58.136301354Z","title":"Story: How-To Guides Documentation","priority":"normal"}
 {"type":"issue_created","id":"3a5b8c10-0593-42b5-be1c-68648d2d6e48","issue_id":"5bad7437-b121-4d2a-b2db-7aa8ee7f4d8b","timestamp":"2025-12-29T18:10:06.452449790Z","title":"Story: Reference Documentation","priority":"normal"}
 {"type":"issue_state_changed","id":"34aac997-f0dc-47ca-ab98-5c330f002401","issue_id":"48e2e917-d129-433c-b3c5-2449f9c34cfd","timestamp":"2025-12-29T18:10:29.058683751Z","from":"ready","to":"backlog"}
+{"type":"gate_passed","id":"bd571e12-87af-445d-ad90-4a18b4973e4c","issue_id":"0db719b1-0e95-44b2-a377-0acbcf9f8bde","timestamp":"2025-12-29T20:03:12.692626230Z","gate_key":"tdd-reminder","updated_by":null}
+{"type":"issue_state_changed","id":"66042943-4b06-49f2-81c3-a430cfaff91d","issue_id":"0db719b1-0e95-44b2-a377-0acbcf9f8bde","timestamp":"2025-12-29T20:03:12.695618901Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"c6ed2cd0-29b5-41d7-9f8f-ff4848968e79","issue_id":"0db719b1-0e95-44b2-a377-0acbcf9f8bde","timestamp":"2025-12-29T20:03:12.695776951Z","assignee":"agent:copilot"}
+{"type":"issue_state_changed","id":"bca9cac0-f4e5-4da6-993b-d2663cac3056","issue_id":"0db719b1-0e95-44b2-a377-0acbcf9f8bde","timestamp":"2025-12-29T21:17:11.543825095Z","from":"in_progress","to":"gated"}
+{"type":"gate_failed","id":"66c59947-3fdf-4f5e-838e-2b9809d4f1f1","issue_id":"0db719b1-0e95-44b2-a377-0acbcf9f8bde","timestamp":"2025-12-29T21:17:11.944230409Z","gate_key":"fmt","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"2e415124-ac96-46a5-99a4-894d73fde16b","issue_id":"0db719b1-0e95-44b2-a377-0acbcf9f8bde","timestamp":"2025-12-29T21:17:12.742189718Z","gate_key":"tests","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"2b040427-a9cf-4069-8f66-1b9c8173c898","issue_id":"0db719b1-0e95-44b2-a377-0acbcf9f8bde","timestamp":"2025-12-29T21:17:14.544343653Z","gate_key":"clippy","updated_by":"auto:executor"}
+{"type":"issue_state_changed","id":"d56b9239-c328-4d2d-98c8-960d33ee49f4","issue_id":"0db719b1-0e95-44b2-a377-0acbcf9f8bde","timestamp":"2025-12-29T21:17:20.545177710Z","from":"gated","to":"gated"}
+{"type":"gate_passed","id":"8f77a2b7-6e7f-4e68-97b2-e7e9d8981677","issue_id":"0db719b1-0e95-44b2-a377-0acbcf9f8bde","timestamp":"2025-12-29T21:17:27.007254879Z","gate_key":"code-review","updated_by":null}
+{"type":"gate_passed","id":"500389fb-9aca-4581-a45d-ec5be096b791","issue_id":"0db719b1-0e95-44b2-a377-0acbcf9f8bde","timestamp":"2025-12-29T21:17:34.039621301Z","gate_key":"fmt","updated_by":"auto:executor"}
+{"type":"issue_state_changed","id":"483af12e-0682-43e0-bb88-559cb039d24a","issue_id":"0db719b1-0e95-44b2-a377-0acbcf9f8bde","timestamp":"2025-12-29T21:17:34.043684682Z","from":"gated","to":"done"}
+{"type":"issue_completed","id":"d6cc26d6-56cf-429c-bcb2-a17471773cf9","issue_id":"0db719b1-0e95-44b2-a377-0acbcf9f8bde","timestamp":"2025-12-29T21:17:34.043704692Z"}

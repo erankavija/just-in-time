@@ -75,8 +75,7 @@ fn test_exit_code_validation_failed_cycle() {
         .unwrap();
     assert!(output1.status.success());
     let json1: serde_json::Value = serde_json::from_slice(&output1.stdout).unwrap();
-    // Issue creation returns the issue directly, not wrapped in JsonOutput
-    let id1 = json1["id"].as_str().expect("id1 should exist");
+    let id1 = json1["data"]["id"].as_str().expect("id1 should exist");
 
     let output2 = Command::new(jit_binary())
         .current_dir(&temp_dir)
@@ -85,7 +84,7 @@ fn test_exit_code_validation_failed_cycle() {
         .unwrap();
     assert!(output2.status.success());
     let json2: serde_json::Value = serde_json::from_slice(&output2.stdout).unwrap();
-    let id2 = json2["id"].as_str().expect("id2 should exist");
+    let id2 = json2["data"]["id"].as_str().expect("id2 should exist");
 
     // Add dependency A -> B
     let status = Command::new(jit_binary())
@@ -211,7 +210,7 @@ fn test_exit_code_validation_command() {
         .output()
         .unwrap();
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    let id = json["id"].as_str().expect("id should exist");
+    let id = json["data"]["id"].as_str().expect("id should exist");
 
     // Corrupt the issue file by adding invalid dependency reference
     let issue_path = temp_dir
@@ -284,7 +283,7 @@ fn test_exit_code_state_transition_blocked_by_gates() {
         .unwrap();
     assert!(output.status.success());
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    let id = json["id"].as_str().expect("id should exist");
+    let id = json["data"]["id"].as_str().expect("id should exist");
 
     // Mark as ready
     let status = Command::new(jit_binary())
@@ -367,7 +366,7 @@ fn test_exit_code_state_transition_blocked_by_gates_json() {
         .unwrap();
     assert!(output.status.success());
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    let id = json["id"].as_str().expect("id should exist");
+    let id = json["data"]["id"].as_str().expect("id should exist");
 
     // Try to transition to done with --json flag - should get JSON error
     let output = Command::new(jit_binary())

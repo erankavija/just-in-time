@@ -5,16 +5,16 @@
 /// # Examples
 ///
 /// ```ignore
-/// output_message!(json, "Created issue: {}", id);
+/// output_message!(json, "issue create", "Created issue: {}", id);
 /// ```
 #[macro_export]
 macro_rules! output_message {
-    ($json:expr, $($arg:tt)*) => {
+    ($json:expr, $command:expr, $($arg:tt)*) => {
         if $json {
             use jit::output::JsonOutput;
             use serde_json::json;
             let msg = format!($($arg)*);
-            let output = JsonOutput::success(json!({"message": msg}));
+            let output = JsonOutput::success(json!({"message": msg}), $command);
             println!("{}", output.to_json_string()?);
         } else {
             println!($($arg)*);
@@ -27,17 +27,17 @@ macro_rules! output_message {
 /// # Examples
 ///
 /// ```ignore
-/// output_data!(json, issue, {
+/// output_data!(json, "issue show", issue, {
 ///     println!("ID: {}", issue.id);
 ///     println!("Title: {}", issue.title);
 /// });
 /// ```
 #[macro_export]
 macro_rules! output_data {
-    ($json:expr, $data:expr, $human_block:block) => {
+    ($json:expr, $command:expr, $data:expr, $human_block:block) => {
         if $json {
             use jit::output::JsonOutput;
-            let output = JsonOutput::success(&$data);
+            let output = JsonOutput::success(&$data, $command);
             println!("{}", output.to_json_string()?);
         } else {
             $human_block
@@ -50,7 +50,7 @@ macro_rules! output_data {
 /// # Examples
 ///
 /// ```ignore
-/// output_json!(json, json!({
+/// output_json!(json, "query ready", json!({
 ///     "issues": issues,
 ///     "count": issues.len()
 /// }), {
@@ -59,10 +59,10 @@ macro_rules! output_data {
 /// ```
 #[macro_export]
 macro_rules! output_json {
-    ($json:expr, $json_data:expr, $human_block:block) => {
+    ($json:expr, $command:expr, $json_data:expr, $human_block:block) => {
         if $json {
             use jit::output::JsonOutput;
-            let output = JsonOutput::success($json_data);
+            let output = JsonOutput::success($json_data, $command);
             println!("{}", output.to_json_string()?);
         } else {
             $human_block

@@ -100,7 +100,10 @@ impl TestContext {
 
         let json: serde_json::Value =
             serde_json::from_slice(&output.stdout).expect("Failed to parse JSON from issue create");
-        json["id"].as_str().expect("No ID in response").to_string()
+        json["data"]["id"]
+            .as_str()
+            .expect("No ID in response")
+            .to_string()
     }
 }
 

@@ -589,9 +589,12 @@ fn test_label_operations_json_output() {
         serde_json::from_str(&stdout).expect("Output should be valid JSON");
 
     // Should contain labels field
-    assert!(json["labels"].is_array(), "JSON should have labels array");
     assert!(
-        !json["labels"].as_array().unwrap().is_empty(),
+        json["data"]["labels"].is_array(),
+        "JSON should have labels array"
+    );
+    assert!(
+        !json["data"]["labels"].as_array().unwrap().is_empty(),
         "Labels array should not be empty"
     );
 

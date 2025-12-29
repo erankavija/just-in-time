@@ -24,7 +24,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let full_id = self.storage.resolve_issue_id(issue_id)?;
         let mut issue = self.storage.load_issue(&full_id).inspect_err(|_| {
             if json {
-                let err = JsonError::issue_not_found(issue_id);
+                let err = JsonError::issue_not_found(issue_id, "doc add");
                 println!("{}", err.to_json_string().unwrap());
             }
         })?;
@@ -84,10 +84,13 @@ impl<S: IssueStore> CommandExecutor<S> {
         self.storage.save_issue(&issue)?;
 
         if json {
-            let output = JsonOutput::success(serde_json::json!({
-                "issue_id": full_id,
-                "document": doc_ref,
-            }));
+            let output = JsonOutput::success(
+                serde_json::json!({
+                    "issue_id": full_id,
+                    "document": doc_ref,
+                }),
+                "doc add",
+            );
             println!("{}", output.to_json_string()?);
         } else {
             println!("Added document reference to issue {}", full_id);
@@ -118,17 +121,20 @@ impl<S: IssueStore> CommandExecutor<S> {
         let full_id = self.storage.resolve_issue_id(issue_id)?;
         let issue = self.storage.load_issue(&full_id).inspect_err(|_| {
             if json {
-                let err = JsonError::issue_not_found(issue_id);
+                let err = JsonError::issue_not_found(issue_id, "doc list");
                 println!("{}", err.to_json_string().unwrap());
             }
         })?;
 
         if json {
-            let output = JsonOutput::success(serde_json::json!({
-                "issue_id": full_id,
-                "documents": issue.documents,
-                "count": issue.documents.len(),
-            }));
+            let output = JsonOutput::success(
+                serde_json::json!({
+                    "issue_id": full_id,
+                    "documents": issue.documents,
+                    "count": issue.documents.len(),
+                }),
+                "doc list",
+            );
             println!("{}", output.to_json_string()?);
         } else if issue.documents.is_empty() {
             println!("No document references for issue {}", full_id);
@@ -161,7 +167,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let full_id = self.storage.resolve_issue_id(issue_id)?;
         let mut issue = self.storage.load_issue(&full_id).inspect_err(|_| {
             if json {
-                let err = JsonError::issue_not_found(issue_id);
+                let err = JsonError::issue_not_found(issue_id, "doc remove");
                 println!("{}", err.to_json_string().unwrap());
             }
         })?;
@@ -172,7 +178,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         if issue.documents.len() == original_len {
             let err_msg = format!("Document reference {} not found in issue {}", path, full_id);
             if json {
-                let err = JsonError::new("DOCUMENT_NOT_FOUND", &err_msg)
+                let err = JsonError::new("DOCUMENT_NOT_FOUND", &err_msg, "doc remove")
                     .with_suggestion("Run 'jit doc list <issue-id>' to see available documents");
                 println!("{}", err.to_json_string()?);
             }
@@ -182,10 +188,13 @@ impl<S: IssueStore> CommandExecutor<S> {
         self.storage.save_issue(&issue)?;
 
         if json {
-            let output = JsonOutput::success(serde_json::json!({
-                "issue_id": full_id,
-                "removed_path": path,
-            }));
+            let output = JsonOutput::success(
+                serde_json::json!({
+                    "issue_id": full_id,
+                    "removed_path": path,
+                }),
+                "doc remove",
+            );
             println!("{}", output.to_json_string()?);
         } else {
             println!("Removed document reference {} from issue {}", path, full_id);
@@ -613,7 +622,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let full_id = self.storage.resolve_issue_id(issue_id)?;
         let mut issue = self.storage.load_issue(&full_id).inspect_err(|_| {
             if json {
-                let err = JsonError::issue_not_found(issue_id);
+                let err = JsonError::issue_not_found(issue_id, "doc history");
                 println!("{}", err.to_json_string().unwrap());
             }
         })?;
@@ -690,18 +699,21 @@ impl<S: IssueStore> CommandExecutor<S> {
             .collect();
 
         if json {
-            let output = JsonOutput::success(serde_json::json!({
-                "issue_id": full_id,
-                "document_path": path,
-                "assets": assets,
-                "summary": {
-                    "total": assets.len(),
-                    "per_doc": per_doc.len(),
-                    "shared": shared.len(),
-                    "external": external.len(),
-                    "missing": missing.len(),
-                },
-            }));
+            let output = JsonOutput::success(
+                serde_json::json!({
+                    "issue_id": full_id,
+                    "document_path": path,
+                    "assets": assets,
+                    "summary": {
+                        "total": assets.len(),
+                        "per_doc": per_doc.len(),
+                        "shared": shared.len(),
+                        "external": external.len(),
+                        "missing": missing.len(),
+                    },
+                }),
+                "doc assets",
+            );
             println!("{}", output.to_json_string()?);
         } else {
             println!("Assets for document {} (issue {}):", path, &full_id[..8]);
@@ -789,7 +801,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             let full_id = self.storage.resolve_issue_id(issue_id)?;
             let issue = self.storage.load_issue(&full_id).inspect_err(|_| {
                 if json {
-                    let err = JsonError::issue_not_found(issue_id);
+                    let err = JsonError::issue_not_found(issue_id, "doc check-links");
                     println!("{}", err.to_json_string().unwrap());
                 }
             })?;
@@ -813,17 +825,20 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         if all_documents.is_empty() {
             if json {
-                let output = JsonOutput::success(serde_json::json!({
-                    "valid": true,
-                    "errors": [],
-                    "warnings": [],
-                    "summary": {
-                        "total_documents": 0,
-                        "valid": 0,
-                        "errors": 0,
-                        "warnings": 0,
-                    }
-                }));
+                let output = JsonOutput::success(
+                    serde_json::json!({
+                        "valid": true,
+                        "errors": [],
+                        "warnings": [],
+                        "summary": {
+                            "total_documents": 0,
+                            "valid": 0,
+                            "errors": 0,
+                            "warnings": 0,
+                        }
+                    }),
+                    "doc check-links",
+                );
                 println!("{}", output.to_json_string()?);
             } else {
                 println!("No documents found to check");
@@ -970,17 +985,20 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Output results
         if json {
-            let output = JsonOutput::success(serde_json::json!({
-                "valid": errors.is_empty(),
-                "errors": errors,
-                "warnings": warnings,
-                "summary": {
-                    "total_documents": all_documents.len(),
-                    "valid": all_documents.len() - errors.len(),
-                    "errors": errors.len(),
-                    "warnings": warnings.len(),
-                }
-            }));
+            let output = JsonOutput::success(
+                serde_json::json!({
+                    "valid": errors.is_empty(),
+                    "errors": errors,
+                    "warnings": warnings,
+                    "summary": {
+                        "total_documents": all_documents.len(),
+                        "valid": all_documents.len() - errors.len(),
+                        "errors": errors.len(),
+                        "warnings": warnings.len(),
+                    }
+                }),
+                "doc check-links",
+            );
             println!("{}", output.to_json_string()?);
         } else {
             println!(

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "4a7ac94d-42ae-40a0-a3ad-b8e05ed930e9",
+  "gate_key": "fmt",
+  "stage": "postcheck",
+  "issue_id": "0db719b1-0e95-44b2-a377-0acbcf9f8bde",
+  "commit": "29a5ab8cc9f9f1534a363f2ffd8ffe0ec5c6533f",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2025-12-29T21:17:11.541448574Z",
+  "completed_at": "2025-12-29T21:17:11.943969989Z",
+  "duration_ms": 402,
+  "exit_code": 1,
+  "stdout": "Diff in /home/vkaskivuo/Projects/just-in-time/crates/jit/tests/check_links_tests.rs:100:\n \n         let json: serde_json::Value =\n             serde_json::from_slice(&output.stdout).expect(\"Failed to parse JSON from issue create\");\n\u001b[31m-        json[\"data\"][\"id\"].as_str().expect(\"No ID in response\").to_string()\n\u001b[m\u000f\u001b[32m+        json[\"data\"][\"id\"]\n\u001b[m\u000f\u001b[32m+            .as_str()\n\u001b[m\u000f\u001b[32m+            .expect(\"No ID in response\")\n\u001b[m\u000f\u001b[32m+            .to_string()\n\u001b[m\u000f     }\n }\n \nDiff in /home/vkaskivuo/Projects/just-in-time/crates/jit/tests/label_hierarchy_e2e_test.rs:589:\n         serde_json::from_str(&stdout).expect(\"Output should be valid JSON\");\n \n     // Should contain labels field\n\u001b[31m-    assert!(json[\"data\"][\"labels\"].is_array(), \"JSON should have labels array\");\n\u001b[m\u000f\u001b[32m+    assert!(\n\u001b[m\u000f\u001b[32m+        json[\"data\"][\"labels\"].is_array(),\n\u001b[m\u000f\u001b[32m+        \"JSON should have labels array\"\n\u001b[m\u000f\u001b[32m+    );\n\u001b[m\u000f     assert!(\n         !json[\"data\"][\"labels\"].as_array().unwrap().is_empty(),\n         \"Labels array should not be empty\"\nDiff in /home/vkaskivuo/Projects/just-in-time/crates/jit/tests/test_cli_consistency.rs:50:\n \n     // Should contain id field\n     assert!(json[\"data\"][\"id\"].is_string(), \"Should have 'id' field\");\n\u001b[31m-    assert!(json[\"data\"][\"title\"].is_string(), \"Should have 'title' field\");\n\u001b[m\u000f\u001b[32m+    assert!(\n\u001b[m\u000f\u001b[32m+        json[\"data\"][\"title\"].is_string(),\n\u001b[m\u000f\u001b[32m+        \"Should have 'title' field\"\n\u001b[m\u000f\u001b[32m+    );\n\u001b[m\u000f     assert_eq!(json[\"data\"][\"title\"].as_str().unwrap(), \"Test task\");\n }\n \nDiff in /home/vkaskivuo/Projects/just-in-time/crates/jit/tests/test_cli_consistency.rs:209:\n     let json: Value = serde_json::from_slice(&output.stdout).expect(\"Should return JSON\");\n \n     assert_eq!(json[\"data\"][\"id\"].as_str().unwrap(), id);\n\u001b[31m-    assert!(json[\"data\"][\"deleted\"].as_bool().unwrap(), \"deleted should be true\");\n\u001b[m\u000f\u001b[32m+    assert!(\n\u001b[m\u000f\u001b[32m+        json[\"data\"][\"deleted\"].as_bool().unwrap(),\n\u001b[m\u000f\u001b[32m+        \"deleted should be true\"\n\u001b[m\u000f\u001b[32m+    );\n\u001b[m\u000f }\n \n // ============================================================================\nDiff in /home/vkaskivuo/Projects/just-in-time/crates/jit/tests/test_cli_consistency.rs:254:\n     let json: Value = serde_json::from_slice(&output.stdout).expect(\"Should return JSON\");\n \n     assert_eq!(json[\"data\"][\"id\"].as_str().unwrap(), id);\n\u001b[31m-    assert!(json[\"data\"][\"assignee\"].is_null(), \"Assignee should be cleared\");\n\u001b[m\u000f\u001b[32m+    assert!(\n\u001b[m\u000f\u001b[32m+        json[\"data\"][\"assignee\"].is_null(),\n\u001b[m\u000f\u001b[32m+        \"Assignee should be cleared\"\n\u001b[m\u000f\u001b[32m+    );\n\u001b[m\u000f }\n \n // ============================================================================\n",
+  "stderr": "",
+  "command": "cargo fmt -- --check",
+  "by": "auto:executor",
+  "message": null
+}

@@ -23,11 +23,11 @@ pub struct JsonOutput<T: Serialize> {
 
 impl<T: Serialize> JsonOutput<T> {
     /// Create a new successful output with the given data
-    pub fn success(data: T) -> Self {
+    pub fn success(data: T, command: impl Into<String>) -> Self {
         Self {
             success: true,
             data,
-            metadata: Metadata::new(),
+            metadata: Metadata::new(command),
         }
     }
 
@@ -49,7 +49,11 @@ pub struct JsonError {
 #[allow(dead_code)]
 impl JsonError {
     /// Create a new error output
-    pub fn new(code: impl Into<String>, message: impl Into<String>) -> Self {
+    pub fn new(
+        code: impl Into<String>,
+        message: impl Into<String>,
+        command: impl Into<String>,
+    ) -> Self {
         Self {
             success: false,
             error: ErrorDetail {
@@ -58,7 +62,7 @@ impl JsonError {
                 details: None,
                 suggestions: Vec::new(),
             },
-            metadata: Metadata::new(),
+            metadata: Metadata::new(command),
         }
     }
 
@@ -249,55 +253,64 @@ impl ErrorCode {
 /// Helper to create common error responses
 #[allow(dead_code)]
 impl JsonError {
-    pub fn issue_not_found(issue_id: &str) -> Self {
+    pub fn issue_not_found(issue_id: &str, command: impl Into<String>) -> Self {
         Self::new(
             ErrorCode::ISSUE_NOT_FOUND,
             format!("Issue not found: {}", issue_id),
+            command,
         )
         .with_details(serde_json::json!({"issue_id": issue_id}))
         .with_suggestion("Run 'jit issue list' to see available issues")
         .with_suggestion("Check if the issue ID is correct")
     }
 
-    pub fn gate_not_found(gate_key: &str) -> Self {
+    pub fn gate_not_found(gate_key: &str, command: impl Into<String>) -> Self {
         Self::new(
             ErrorCode::GATE_NOT_FOUND,
             format!("Gate not found: {}", gate_key),
+            command,
         )
         .with_details(serde_json::json!({"gate_key": gate_key}))
         .with_suggestion("Run 'jit registry list' to see available gates")
         .with_suggestion("Add the gate to the registry first with 'jit registry add'")
     }
 
-    pub fn cycle_detected(from: &str, to: &str) -> Self {
+    pub fn cycle_detected(from: &str, to: &str, command: impl Into<String>) -> Self {
         Self::new(
             ErrorCode::CYCLE_DETECTED,
             format!("Adding dependency would create a cycle: {} -> {}", from, to),
+            command,
         )
         .with_details(serde_json::json!({"from": from, "to": to}))
         .with_suggestion("Remove existing dependencies that create the cycle")
         .with_suggestion("Use 'jit graph show' to visualize the dependency graph")
     }
 
-    pub fn invalid_state(state: &str) -> Self {
+    pub fn invalid_state(state: &str, command: impl Into<String>) -> Self {
         Self::new(
             ErrorCode::INVALID_STATE,
             format!("Invalid state: {}", state),
+            command,
         )
         .with_details(serde_json::json!({"invalid_state": state}))
         .with_suggestion("Valid states are: open, ready, in_progress, done")
     }
 
-    pub fn invalid_priority(priority: &str) -> Self {
+    pub fn invalid_priority(priority: &str, command: impl Into<String>) -> Self {
         Self::new(
             ErrorCode::INVALID_ARGUMENT,
             format!("Invalid priority: {}", priority),
+            command,
         )
         .with_details(serde_json::json!({"invalid_priority": priority}))
         .with_suggestion("Valid priorities are: low, normal, high, critical")
     }
 
-    pub fn gate_validation_failed(unpassed_gates: &[String], issue_id: &str) -> Self {
+    pub fn gate_validation_failed(
+        unpassed_gates: &[String],
+        issue_id: &str,
+        command: impl Into<String>,
+    ) -> Self {
         Self::new(
             ErrorCode::VALIDATION_FAILED,
             format!(
@@ -305,6 +318,7 @@ impl JsonError {
                 unpassed_gates.len(),
                 unpassed_gates.join(", ")
             ),
+            command,
         )
         .with_details(serde_json::json!({
             "issue_id": issue_id,
@@ -329,13 +343,16 @@ pub struct Metadata {
     pub timestamp: chrono::DateTime<Utc>,
     /// Version of the output format
     pub version: String,
+    /// Command that generated this response
+    pub command: String,
 }
 
 impl Metadata {
-    fn new() -> Self {
+    fn new(command: impl Into<String>) -> Self {
         Self {
             timestamp: Utc::now(),
             version: OUTPUT_VERSION.to_string(),
+            command: command.into(),
         }
     }
 }
@@ -510,57 +527,62 @@ mod tests {
     #[test]
     fn test_json_output_success() {
         let data = json!({"id": "123", "title": "Test"});
-        let output = JsonOutput::success(data);
+        let output = JsonOutput::success(data, "issue show");
 
         assert!(output.success);
         assert_eq!(output.data["id"], "123");
         assert_eq!(output.metadata.version, "0.2.0");
+        assert_eq!(output.metadata.command, "issue show");
     }
 
     #[test]
     fn test_json_output_serialization() {
         let data = json!({"id": "123"});
-        let output = JsonOutput::success(data);
+        let output = JsonOutput::success(data, "issue list");
 
         let json_str = output.to_json_string().unwrap();
         assert!(json_str.contains("\"success\": true"));
         assert!(json_str.contains("\"id\": \"123\""));
         assert!(json_str.contains("\"version\": \"0.2.0\""));
         assert!(json_str.contains("\"timestamp\":"));
+        assert!(json_str.contains("\"command\": \"issue list\""));
     }
 
     #[test]
     fn test_json_error_basic() {
-        let error = JsonError::new("TEST_ERROR", "This is a test error");
+        let error = JsonError::new("TEST_ERROR", "This is a test error", "test command");
 
         assert!(!error.success);
         assert_eq!(error.error.code, "TEST_ERROR");
         assert_eq!(error.error.message, "This is a test error");
+        assert_eq!(error.metadata.command, "test command");
         assert!(error.error.details.is_none());
         assert!(error.error.suggestions.is_empty());
     }
 
     #[test]
     fn test_json_error_with_details() {
-        let error = JsonError::new("NOT_FOUND", "Resource not found")
+        let error = JsonError::new("NOT_FOUND", "Resource not found", "show resource")
             .with_details(json!({"requested_id": "abc123"}));
 
         assert_eq!(error.error.details, Some(json!({"requested_id": "abc123"})));
+        assert_eq!(error.metadata.command, "show resource");
     }
 
     #[test]
     fn test_json_error_with_suggestions() {
-        let error = JsonError::new("NOT_FOUND", "Issue not found")
+        let error = JsonError::new("NOT_FOUND", "Issue not found", "issue show")
             .with_suggestion("Run 'jit issue list' to see available issues")
             .with_suggestion("Check if the issue ID is correct");
 
         assert_eq!(error.error.suggestions.len(), 2);
         assert!(error.error.suggestions[0].contains("jit issue list"));
+        assert_eq!(error.metadata.command, "issue show");
     }
 
     #[test]
     fn test_json_error_serialization() {
-        let error = JsonError::new("TEST_ERROR", "Test")
+        let error = JsonError::new("TEST_ERROR", "Test", "test")
             .with_details(json!({"key": "value"}))
             .with_suggestion("Try something");
 
@@ -570,12 +592,14 @@ mod tests {
         assert!(json_str.contains("\"message\": \"Test\""));
         assert!(json_str.contains("\"details\""));
         assert!(json_str.contains("\"suggestions\""));
+        assert!(json_str.contains("\"command\": \"test\""));
     }
 
     #[test]
     fn test_metadata_includes_timestamp() {
-        let metadata = Metadata::new();
+        let metadata = Metadata::new("test command");
         assert_eq!(metadata.version, "0.2.0");
+        assert_eq!(metadata.command, "test command");
         // Timestamp should be recent (within last 5 seconds)
         let now = Utc::now();
         let diff = now.signed_duration_since(metadata.timestamp);
@@ -594,12 +618,13 @@ mod tests {
             count: 1,
         };
 
-        let json_output = JsonOutput::success(response);
+        let json_output = JsonOutput::success(response, "query ready");
         let serialized = json_output.to_json_string().unwrap();
 
         assert!(serialized.contains("\"success\": true"));
         assert!(serialized.contains("\"count\": 1"));
         assert!(serialized.contains("\"metadata\""));
+        assert!(serialized.contains("\"command\": \"query ready\""));
     }
 
     #[test]
@@ -620,12 +645,13 @@ mod tests {
             count: 1,
         };
 
-        let json_output = JsonOutput::success(response);
+        let json_output = JsonOutput::success(response, "query blocked");
         let serialized = json_output.to_json_string().unwrap();
 
         assert!(serialized.contains("\"success\": true"));
         assert!(serialized.contains("\"blocked_reasons\""));
         assert!(serialized.contains("\"dependency\""));
+        assert!(serialized.contains("\"command\": \"query blocked\""));
     }
 
     #[test]
@@ -638,11 +664,12 @@ mod tests {
             count: 1,
         };
 
-        let json_output = JsonOutput::success(response);
+        let json_output = JsonOutput::success(response, "query assignee");
         let serialized = json_output.to_json_string().unwrap();
 
         assert!(serialized.contains("\"assignee\""));
         assert!(serialized.contains("copilot:session-1"));
+        assert!(serialized.contains("\"command\": \"query assignee\""));
     }
 
     #[test]
@@ -655,11 +682,12 @@ mod tests {
             count: 1,
         };
 
-        let json_output = JsonOutput::success(response);
+        let json_output = JsonOutput::success(response, "query state");
         let serialized = json_output.to_json_string().unwrap();
 
         assert!(serialized.contains("\"state\""));
         assert!(serialized.contains("\"ready\""));
+        assert!(serialized.contains("\"command\": \"query state\""));
     }
 
     #[test]
@@ -672,11 +700,12 @@ mod tests {
             count: 1,
         };
 
-        let json_output = JsonOutput::success(response);
+        let json_output = JsonOutput::success(response, "query priority");
         let serialized = json_output.to_json_string().unwrap();
 
         assert!(serialized.contains("\"priority\""));
         assert!(serialized.contains("\"high\""));
+        assert!(serialized.contains("\"command\": \"query priority\""));
     }
 
     #[test]
