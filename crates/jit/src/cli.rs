@@ -352,26 +352,33 @@ pub enum DepCommands {
     /// Dependencies are orthogonal to labels - issues don't need matching labels to depend on each other.
     ///
     /// Examples:
-    ///   jit dep add epic-123 task-456     # Epic blocked until task done
-    ///   jit dep add planning-v2 release-v1 # v2.0 planning waits for v1.0 release
+    ///   jit dep add epic-123 task-456           # Single dependency
+    ///   jit dep add epic-123 task-1 task-2 task-3  # Multiple dependencies
     Add {
         /// Issue that depends on another (FROM)
         from_id: String,
 
-        /// Dependency required (TO)
-        to_id: String,
+        /// Dependency/dependencies required (TO)
+        /// Can specify multiple: jit dep add <from> to1 to2 to3
+        #[arg(required = true)]
+        to_ids: Vec<String>,
 
         #[arg(long)]
         json: bool,
     },
 
     /// Remove a dependency
+    ///
+    /// Examples:
+    ///   jit dep rm epic-123 task-456            # Single dependency
+    ///   jit dep rm epic-123 task-1 task-2       # Multiple dependencies
     Rm {
         /// Issue to modify (FROM)
         from_id: String,
 
-        /// Dependency to remove (TO)
-        to_id: String,
+        /// Dependency/dependencies to remove (TO)
+        #[arg(required = true)]
+        to_ids: Vec<String>,
 
         #[arg(long)]
         json: bool,
@@ -448,13 +455,17 @@ pub enum GateCommands {
     /// registry - use 'jit gate list' to see available gates or 'jit gate define'
     /// to create new ones.
     ///
-    /// Example: jit gate add abc123 code-review
+    /// Examples:
+    ///   jit gate add abc123 code-review
+    ///   jit gate add abc123 tests clippy fmt
     Add {
         /// Issue ID
         id: String,
 
-        /// Gate key from registry (e.g., 'tests', 'code-review', 'clippy')
-        gate_key: String,
+        /// Gate key(s) from registry (e.g., 'tests', 'code-review', 'clippy')
+        /// Can specify multiple: jit gate add <issue> gate1 gate2 gate3
+        #[arg(required = true)]
+        gate_keys: Vec<String>,
 
         #[arg(long)]
         json: bool,

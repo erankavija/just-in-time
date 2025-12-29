@@ -555,54 +555,71 @@ strategic_types = {}
         Commands::Dep(dep_cmd) => match dep_cmd {
             DepCommands::Add {
                 from_id,
-                to_id,
+                to_ids,
                 json,
             } => {
                 let output_ctx = OutputContext::new(quiet, json);
-                match executor.add_dependency(&from_id, &to_id) {
+                match executor.add_dependencies(&from_id, &to_ids) {
                     Ok(result) => {
-                        use jit::commands::DependencyAddResult;
+                        // If all dependencies failed, return error
+                        if result.added.is_empty() && !result.errors.is_empty() {
+                            if json {
+                                use jit::output::JsonError;
+                                // Get first error for backward compatibility
+                                let (dep_id, error_msg) = &result.errors[0];
+                                let json_error = if error_msg.contains("cycle") {
+                                    JsonError::cycle_detected(&from_id, dep_id, "dep add")
+                                } else if error_msg.contains("not found") {
+                                    JsonError::issue_not_found(dep_id, "dep add")
+                                } else {
+                                    JsonError::new("DEPENDENCY_ERROR", error_msg.clone(), "dep add")
+                                };
+                                println!("{}", json_error.to_json_string()?);
+                                std::process::exit(json_error.exit_code().code());
+                            } else {
+                                return Err(anyhow!("{}", result.errors[0].1));
+                            }
+                        }
+
                         if json {
                             use jit::output::JsonOutput;
-                            let (status, message) = match result {
-                                DependencyAddResult::Added => {
-                                    ("added", format!("{} now depends on {}", from_id, to_id))
-                                }
-                                DependencyAddResult::Skipped { reason } => {
-                                    ("skipped", format!("Dependency skipped: {}", reason))
-                                }
-                                DependencyAddResult::AlreadyExists => (
-                                    "exists",
-                                    format!("{} already depends on {}", from_id, to_id),
-                                ),
-                            };
                             let response = serde_json::json!({
                                 "from_id": from_id,
-                                "to_id": to_id,
-                                "status": status,
-                                "message": message
+                                "added": result.added,
+                                "already_exist": result.already_exist,
+                                "skipped": result.skipped,
+                                "errors": result.errors,
+                                "message": format!("Added {} dependencies to issue {}", result.added.len(), from_id)
                             });
                             let output = JsonOutput::success(response, "dep add");
                             println!("{}", output.to_json_string()?);
                         } else {
-                            match result {
-                                DependencyAddResult::Added => {
-                                    let _ = output_ctx.print_success(format!(
-                                        "Added dependency: {} depends on {}",
-                                        from_id, to_id
-                                    ));
+                            if !result.added.is_empty() {
+                                let _ = output_ctx.print_success(format!(
+                                    "Added {} dependenc{}:",
+                                    result.added.len(),
+                                    if result.added.len() == 1 { "y" } else { "ies" }
+                                ));
+                                for dep in &result.added {
+                                    println!("  • {} → {}", from_id, dep);
                                 }
-                                DependencyAddResult::Skipped { reason } => {
-                                    let _ = output_ctx.print_info(format!(
-                                        "Skipped: dependency not added ({})",
-                                        reason
-                                    ));
+                            }
+                            if !result.already_exist.is_empty() {
+                                println!("ℹ Already exist ({}):", result.already_exist.len());
+                                for dep in &result.already_exist {
+                                    println!("  • {}", dep);
                                 }
-                                DependencyAddResult::AlreadyExists => {
-                                    let _ = output_ctx.print_info(format!(
-                                        "Dependency already exists: {} depends on {}",
-                                        from_id, to_id
-                                    ));
+                            }
+                            if !result.skipped.is_empty() {
+                                println!("ℹ Skipped ({}):", result.skipped.len());
+                                for (dep, reason) in &result.skipped {
+                                    println!("  • {}: {}", dep, reason);
+                                }
+                            }
+                            if !result.errors.is_empty() {
+                                println!("✗ Errors ({}):", result.errors.len());
+                                for (dep, error) in &result.errors {
+                                    println!("  • {}: {}", dep, error);
                                 }
                             }
                         }
@@ -611,17 +628,8 @@ strategic_types = {}
                         if json {
                             use jit::output::JsonError;
                             let error_str = e.to_string();
-                            let json_error = if error_str.contains("cycle") {
-                                JsonError::cycle_detected(&from_id, &to_id, "dep add")
-                            } else if error_str.contains("not found") {
-                                if error_str.contains(&from_id) {
-                                    JsonError::issue_not_found(&from_id, "dep add")
-                                } else {
-                                    JsonError::issue_not_found(&to_id, "dep add")
-                                }
-                            } else {
-                                JsonError::new("DEPENDENCY_ERROR", error_str, "dep add")
-                            };
+                            let json_error =
+                                JsonError::new("DEPENDENCY_ERROR", error_str, "dep add");
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
                         } else {
@@ -632,41 +640,51 @@ strategic_types = {}
             }
             DepCommands::Rm {
                 from_id,
-                to_id,
+                to_ids,
                 json,
             } => {
                 let output_ctx = OutputContext::new(quiet, json);
-                match executor.remove_dependency(&from_id, &to_id) {
-                    Ok(_) => {
+                match executor.remove_dependencies(&from_id, &to_ids) {
+                    Ok(result) => {
                         if json {
                             use jit::output::JsonOutput;
                             let response = serde_json::json!({
                                 "from_id": from_id,
-                                "to_id": to_id,
-                                "message": format!("{} no longer depends on {}", from_id, to_id)
+                                "removed": result.removed,
+                                "not_found": result.not_found,
+                                "message": format!("Removed {} dependencies from issue {}", result.removed.len(), from_id)
                             });
                             let output = JsonOutput::success(response, "dep rm");
                             println!("{}", output.to_json_string()?);
                         } else {
-                            let _ = output_ctx.print_success(format!(
-                                "Removed dependency: {} no longer depends on {}",
-                                from_id, to_id
-                            ));
+                            if !result.removed.is_empty() {
+                                let _ = output_ctx.print_success(format!(
+                                    "Removed {} dependenc{}:",
+                                    result.removed.len(),
+                                    if result.removed.len() == 1 {
+                                        "y"
+                                    } else {
+                                        "ies"
+                                    }
+                                ));
+                                for dep in &result.removed {
+                                    println!("  • {}", dep);
+                                }
+                            }
+                            if !result.not_found.is_empty() {
+                                println!("ℹ Not found ({}):", result.not_found.len());
+                                for dep in &result.not_found {
+                                    println!("  • {}", dep);
+                                }
+                            }
                         }
                     }
                     Err(e) => {
                         if json {
                             use jit::output::JsonError;
                             let error_str = e.to_string();
-                            let json_error = if error_str.contains("not found") {
-                                if error_str.contains(&from_id) {
-                                    JsonError::issue_not_found(&from_id, "dep rm")
-                                } else {
-                                    JsonError::issue_not_found(&to_id, "dep rm")
-                                }
-                            } else {
-                                JsonError::new("DEPENDENCY_ERROR", error_str, "dep rm")
-                            };
+                            let json_error =
+                                JsonError::new("DEPENDENCY_ERROR", error_str, "dep rm");
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
                         } else {
@@ -950,40 +968,58 @@ strategic_types = {}
                     }
                 }
             }
-            GateCommands::Add { id, gate_key, json } => {
+            GateCommands::Add {
+                id,
+                gate_keys,
+                json,
+            } => {
                 let output_ctx = OutputContext::new(quiet, json);
-                match executor.add_gate(&id, gate_key.clone()) {
-                    Ok(_) => {
+                match executor.add_gates(&id, &gate_keys) {
+                    Ok(result) => {
                         if json {
                             use jit::output::JsonOutput;
                             let response = serde_json::json!({
                                 "issue_id": id,
-                                "gate_key": gate_key,
-                                "message": format!("Added gate '{}' to issue {}", gate_key, id)
+                                "added": result.added,
+                                "already_exist": result.already_exist,
+                                "message": format!("Added {} gate(s) to issue {}", result.added.len(), id)
                             });
                             let output = JsonOutput::success(response, "gate add");
                             println!("{}", output.to_json_string()?);
                         } else {
-                            let _ = output_ctx.print_success(format!(
-                                "Added gate '{}' to issue {}",
-                                gate_key, id
-                            ));
+                            if !result.added.is_empty() {
+                                let _ = output_ctx.print_success(format!(
+                                    "Added {} gate(s) to issue {}:",
+                                    result.added.len(),
+                                    id
+                                ));
+                                for gate in &result.added {
+                                    println!("  • {}", gate);
+                                }
+                            }
+                            if !result.already_exist.is_empty() {
+                                println!(
+                                    "ℹ Already required ({} gate(s)):",
+                                    result.already_exist.len()
+                                );
+                                for gate in &result.already_exist {
+                                    println!("  • {}", gate);
+                                }
+                            }
                         }
                     }
                     Err(e) => {
                         if json {
                             use jit::output::JsonError;
                             let error_str = e.to_string();
-                            let json_error = if error_str.contains("Issue")
-                                && error_str.contains("not found")
-                            {
-                                JsonError::issue_not_found(&id, "gate add")
-                            } else if error_str.contains("Gate") && error_str.contains("not found")
-                            {
-                                JsonError::gate_not_found(&gate_key, "gate add")
-                            } else {
-                                JsonError::new("GATE_ERROR", error_str, "gate add")
-                            };
+                            let json_error =
+                                if error_str.contains("Issue") && error_str.contains("not found") {
+                                    JsonError::issue_not_found(&id, "gate add")
+                                } else if error_str.contains("not found in registry") {
+                                    JsonError::new("GATE_NOT_FOUND", error_str, "gate add")
+                                } else {
+                                    JsonError::new("GATE_ERROR", error_str, "gate add")
+                                };
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
                         } else {

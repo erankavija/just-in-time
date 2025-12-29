@@ -3,6 +3,20 @@
 use super::*;
 use crate::domain::GateMode;
 
+/// Result of adding multiple gates
+#[derive(Debug, Serialize)]
+pub struct GateAddResult {
+    pub added: Vec<String>,
+    pub already_exist: Vec<String>,
+}
+
+/// Result of removing multiple gates
+#[derive(Debug, Serialize)]
+pub struct GateRemoveResult {
+    pub removed: Vec<String>,
+    pub not_found: Vec<String>,
+}
+
 impl<S: IssueStore> CommandExecutor<S> {
     pub fn add_gate(&self, issue_id: &str, gate_key: String) -> Result<()> {
         let full_id = self.storage.resolve_issue_id(issue_id)?;
@@ -13,6 +27,97 @@ impl<S: IssueStore> CommandExecutor<S> {
             self.storage.save_issue(&issue)?;
         }
         Ok(())
+    }
+
+    /// Add multiple gates to an issue atomically
+    pub fn add_gates(&self, issue_id: &str, gate_keys: &[String]) -> Result<GateAddResult> {
+        // Validate input
+        if gate_keys.is_empty() {
+            return Err(anyhow!("Must provide at least one gate key"));
+        }
+
+        let full_id = self.storage.resolve_issue_id(issue_id)?;
+        let registry = self.storage.load_gate_registry()?;
+        let mut issue = self.storage.load_issue(&full_id)?;
+
+        let mut added = Vec::new();
+        let mut already_exist = Vec::new();
+        let mut not_found = Vec::new();
+
+        // First pass: validate all gates exist in registry
+        for gate_key in gate_keys {
+            if !registry.gates.contains_key(gate_key) {
+                not_found.push(gate_key.clone());
+            }
+        }
+
+        // Atomic: fail entirely if any gate doesn't exist
+        if !not_found.is_empty() {
+            return Err(anyhow!(
+                "Gates not found in registry: {}",
+                not_found.join(", ")
+            ));
+        }
+
+        // Second pass: add gates (now safe since all are validated)
+        for gate_key in gate_keys {
+            if issue.gates_required.contains(gate_key) {
+                already_exist.push(gate_key.clone());
+            } else {
+                issue.gates_required.push(gate_key.clone());
+
+                // Initialize status if not present
+                if !issue.gates_status.contains_key(gate_key) {
+                    issue.gates_status.insert(
+                        gate_key.clone(),
+                        GateState {
+                            status: GateStatus::Pending,
+                            updated_by: None,
+                            updated_at: Utc::now(),
+                        },
+                    );
+                }
+
+                added.push(gate_key.clone());
+            }
+        }
+
+        // Save issue
+        self.storage.save_issue(&issue)?;
+
+        Ok(GateAddResult {
+            added,
+            already_exist,
+        })
+    }
+
+    /// Remove multiple gates from an issue
+    pub fn remove_gates(&self, issue_id: &str, gate_keys: &[String]) -> Result<GateRemoveResult> {
+        // Validate input
+        if gate_keys.is_empty() {
+            return Err(anyhow!("Must provide at least one gate key"));
+        }
+
+        let full_id = self.storage.resolve_issue_id(issue_id)?;
+        let mut issue = self.storage.load_issue(&full_id)?;
+
+        let mut removed = Vec::new();
+        let mut not_found = Vec::new();
+
+        for gate_key in gate_keys {
+            if issue.gates_required.contains(gate_key) {
+                issue.gates_required.retain(|g| g != gate_key);
+                issue.gates_status.remove(gate_key);
+                removed.push(gate_key.clone());
+            } else {
+                not_found.push(gate_key.clone());
+            }
+        }
+
+        // Save issue
+        self.storage.save_issue(&issue)?;
+
+        Ok(GateRemoveResult { removed, not_found })
     }
 
     pub fn pass_gate(&self, issue_id: &str, gate_key: String, by: Option<String>) -> Result<()> {

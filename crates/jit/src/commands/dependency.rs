@@ -2,6 +2,22 @@
 
 use super::*;
 
+/// Result of adding multiple dependencies
+#[derive(Debug, Serialize)]
+pub struct DependenciesAddResult {
+    pub added: Vec<String>,
+    pub already_exist: Vec<String>,
+    pub skipped: Vec<(String, String)>, // (id, reason)
+    pub errors: Vec<(String, String)>,  // (id, error message)
+}
+
+/// Result of removing multiple dependencies
+#[derive(Debug, Serialize)]
+pub struct DependenciesRemoveResult {
+    pub removed: Vec<String>,
+    pub not_found: Vec<String>,
+}
+
 impl<S: IssueStore> CommandExecutor<S> {
     pub fn add_dependency(&self, issue_id: &str, dep_id: &str) -> Result<DependencyAddResult> {
         // Resolve both IDs first
@@ -72,5 +88,87 @@ impl<S: IssueStore> CommandExecutor<S> {
         self.auto_transition_to_ready(&full_issue_id)?;
 
         Ok(())
+    }
+
+    /// Add multiple dependencies to an issue
+    pub fn add_dependencies(
+        &self,
+        issue_id: &str,
+        dep_ids: &[String],
+    ) -> Result<DependenciesAddResult> {
+        // Validate input
+        if dep_ids.is_empty() {
+            return Err(anyhow!("Must provide at least one dependency"));
+        }
+
+        let mut result = DependenciesAddResult {
+            added: Vec::new(),
+            already_exist: Vec::new(),
+            skipped: Vec::new(),
+            errors: Vec::new(),
+        };
+
+        // Try to add each dependency individually
+        for dep_id in dep_ids {
+            match self.add_dependency(issue_id, dep_id) {
+                Ok(DependencyAddResult::Added) => {
+                    result.added.push(dep_id.clone());
+                }
+                Ok(DependencyAddResult::AlreadyExists) => {
+                    result.already_exist.push(dep_id.clone());
+                }
+                Ok(DependencyAddResult::Skipped { reason }) => {
+                    result.skipped.push((dep_id.clone(), reason));
+                }
+                Err(e) => {
+                    result.errors.push((dep_id.clone(), e.to_string()));
+                }
+            }
+        }
+
+        Ok(result)
+    }
+
+    /// Remove multiple dependencies from an issue
+    pub fn remove_dependencies(
+        &self,
+        issue_id: &str,
+        dep_ids: &[String],
+    ) -> Result<DependenciesRemoveResult> {
+        // Validate input
+        if dep_ids.is_empty() {
+            return Err(anyhow!("Must provide at least one dependency"));
+        }
+
+        let full_issue_id = self.storage.resolve_issue_id(issue_id)?;
+        let mut issue = self.storage.load_issue(&full_issue_id)?;
+
+        let mut removed = Vec::new();
+        let mut not_found = Vec::new();
+
+        for dep_id in dep_ids {
+            // Resolve the dependency ID
+            match self.storage.resolve_issue_id(dep_id) {
+                Ok(full_dep_id) => {
+                    if issue.dependencies.contains(&full_dep_id) {
+                        issue.dependencies.retain(|d| d != &full_dep_id);
+                        removed.push(dep_id.clone());
+                    } else {
+                        not_found.push(dep_id.clone());
+                    }
+                }
+                Err(_) => {
+                    not_found.push(dep_id.clone());
+                }
+            }
+        }
+
+        // Save issue once with all removals
+        self.storage.save_issue(&issue)?;
+
+        // Check if this issue can now transition to ready
+        self.auto_transition_to_ready(&full_issue_id)?;
+
+        Ok(DependenciesRemoveResult { removed, not_found })
     }
 }
