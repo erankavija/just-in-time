@@ -17,6 +17,7 @@
 //! - `search`: Issue search operations
 
 mod breakdown;
+mod bulk_update;
 mod dependency;
 mod document;
 mod events;
@@ -30,6 +31,8 @@ mod query;
 mod search;
 pub mod snapshot;
 mod validate;
+
+pub use bulk_update::{BulkUpdatePreview, BulkUpdateResult, UpdateOperations};
 
 // Common imports used across modules
 use crate::config_manager::ConfigManager;
