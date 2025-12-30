@@ -2,7 +2,7 @@
   "id": "8507f8e7-300a-45b6-95a4-44b66c7d9663",
   "title": "Story: CLI Ergonomics & Output Standardization",
   "description": "Improve CLI ergonomics for agents and scripting with standardized JSON output, quiet mode, and bulk operations.\n\n## Goal\nMake jit CLI more agent-friendly and scriptable by standardizing output formats and adding bulk operation support.\n\n## Tasks\n- Standardize JSON output format across all commands\n- Add --quiet flag for scripting workflows\n- Support bulk operations for gates, labels, and dependencies\n\n## Success Criteria\n- All commands with --json flag use consistent JsonResponse envelope\n- --quiet flag suppresses decorative output while preserving essential data\n- Broken pipe errors handled gracefully\n- Bulk operations work atomically\n\n## Benefits\n- Easier to script and automate\n- Better MCP integration\n- Reduced command count for common workflows\n- Improved agent experience",
-  "state": "ready",
+  "state": "done",
   "priority": "high",
   "assignee": null,
   "dependencies": [

@@ -1,4 +1,4 @@
-# Implementation Plan: Multi-Issue Bulk Operations
+# Implementation Plan: Unified Issue Update Command
 
 **Issue:** f5ce80bc - Implement bulk operations support  
 **Epic:** production-stability  
@@ -6,20 +6,33 @@
 
 ## Overview
 
-Add support for batch operations across **multiple issues** matching filter criteria. This complements the single-issue bulk operations (44104a30) by enabling efficient workspace-wide changes.
+Unify single-issue and multi-issue update operations under one command: `jit issue update`. The command accepts either an explicit issue ID (single issue mode) or a filter query (batch mode), making batch operations a natural extension of the familiar update command.
 
-**Key Distinction:**
-- **Single-issue bulk (44104a30)**: Multiple items → ONE issue (`jit gate add <issue> g1 g2 g3`) ✅ DONE
-- **Multi-issue bulk (f5ce80bc)**: ONE operation → MULTIPLE issues (`jit bulk-update --state done --filter "epic:auth"`)
+**Key Design Principle:**
+> An issue ID is just a shorthand for a filter: `update <id>` ≡ `update --filter "id:<id>"`
+
+**Examples:**
+```bash
+# Single issue (explicit ID)
+jit issue update 44104a30 --state done
+
+# Multiple issues (filter query)
+jit issue update --filter "label:milestone:v0.9" --state done
+```
+
+This design eliminates the asymmetry between single and batch operations while maintaining clarity and safety.
 
 ## Goals
 
-Enable efficient batch modifications for:
-- State transitions across multiple issues
-- Label management (add/remove to many issues)
-- Bulk assignments to agents
-- Priority adjustments
+Enable efficient updates for both individual and multiple issues:
+- Single issue updates (existing behavior, enhanced)
+- Batch state transitions across filtered issues
+- Batch label management (add/remove to many issues)
+- Batch assignments to agents
+- Batch priority adjustments
 - Workspace cleanup and reorganization
+
+All through one unified command interface.
 
 ## Design Philosophy
 
@@ -42,22 +55,46 @@ Enable efficient batch modifications for:
 
 ## Command Design
 
-### Primary Command
+### Unified Update Command
 
 ```bash
-jit bulk-update [OPTIONS] --filter QUERY
+# Single issue mode (ID provided)
+jit issue update <ID> [OPTIONS]
+
+# Batch mode (filter provided)
+jit issue update --filter <QUERY> [OPTIONS]
 
 Options:
-  --filter QUERY         Boolean query for issue selection (REQUIRED)
+  --filter QUERY         Boolean query for issue selection (batch mode)
   --state STATE          Change state to STATE
   --label LABEL          Add label (repeatable)
   --remove-label LABEL   Remove label (repeatable)
   --assignee ASSIGNEE    Set assignee
   --unassign             Clear assignee
   --priority PRIORITY    Set priority
-  --dry-run              Preview without applying (default for >10 issues)
+  --dry-run              Preview without applying (default for >10 matches)
   --yes                  Skip confirmation prompt
   --json                 JSON output
+```
+
+**Mutual Exclusivity:**
+- ID and `--filter` are mutually exclusive
+- Must provide either ID or `--filter`, not both
+- Clear error message if neither or both provided
+
+**Mental Model:**
+> Issue ID is shorthand for a precise filter: `update <id>` ≡ `update --filter "id:<id>"`
+
+**Examples:**
+```bash
+# Single issue (current behavior, unchanged)
+jit issue update 44104a30 --state done --label milestone:v1.0
+
+# Multiple issues (new capability)
+jit issue update --filter "state:ready label:epic:auth" --state in_progress
+
+# All high-priority unassigned
+jit issue update --filter "priority:high unassigned" --assignee agent:worker-1
 ```
 
 ### Query Language (Simple Boolean)
@@ -79,16 +116,16 @@ Options:
 **Examples:**
 ```bash
 # All ready tasks in auth epic
---filter "state:ready label:epic:auth label:type:task"
+jit issue update --filter "state:ready label:epic:auth label:type:task" --state in_progress
 
 # High or critical priority issues
---filter "priority:high OR priority:critical"
+jit issue update --filter "priority:high OR priority:critical" --label urgent
 
 # Ready issues not blocked
---filter "state:ready NOT blocked"
+jit issue update --filter "state:ready NOT blocked" --assignee agent:worker-1
 
 # Complex query
---filter "(state:ready OR state:in_progress) AND label:milestone:v1.0 NOT assignee:*"
+jit issue update --filter "(state:ready OR state:in_progress) AND label:milestone:v1.0 NOT assignee:*" --priority high
 ```
 
 ## Safety Features
@@ -135,8 +172,52 @@ About to modify 47 issues. Continue? [y/N]
 
 **Skip with `--yes` flag for automation:**
 ```bash
-jit bulk-update --state done --filter "epic:auth" --yes
+jit issue update --filter "epic:auth" --state done --yes
 ```
+
+## Single vs Batch Mode Behavior
+
+### Mode Detection
+
+```rust
+pub enum UpdateMode {
+    Single(String),           // ID provided
+    Batch(QueryFilter),       // --filter provided
+}
+
+// Validation
+if id.is_some() && filter.is_some() {
+    return Err("Cannot specify both ID and --filter");
+}
+if id.is_none() && filter.is_none() {
+    return Err("Must specify either ID or --filter");
+}
+
+let mode = if let Some(id) = id {
+    UpdateMode::Single(id)
+} else if let Some(filter) = filter {
+    UpdateMode::Batch(QueryFilter::parse(&filter)?)
+} else {
+    unreachable!() // Validated above
+};
+```
+
+### Behavioral Differences
+
+| Behavior | Single Mode | Batch Mode |
+|----------|-------------|------------|
+| **Dry-run** | Never automatic | Auto if >10 matches |
+| **Confirmation** | Never required | Required if >10 matches (unless --yes) |
+| **Error handling** | Fail immediately | Best effort, report all |
+| **Output** | "Updated issue X" | Summary with counts |
+| **Return code** | 0=success, 1=error | 0=any success, 1=all failed |
+
+### Safety Guardrails (Batch Mode Only)
+
+- Auto dry-run for >10 matches
+- Confirmation prompt required (unless `--yes`)
+- Clear preview showing impact
+- Per-issue validation before applying
 
 ## Result Reporting
 
@@ -210,11 +291,14 @@ Summary: 95/100 succeeded (95%)
 ### 1. State Changes
 
 ```bash
-# Mark all ready tasks in epic as in-progress
-jit bulk-update --state in_progress --filter "state:ready label:epic:auth label:type:task"
+# Single issue
+jit issue update 44104a30 --state in_progress
 
-# Complete entire milestone
-jit bulk-update --state done --filter "label:milestone:v0.9" --yes
+# Batch: Mark all ready tasks in epic as in-progress
+jit issue update --filter "state:ready label:epic:auth label:type:task" --state in_progress
+
+# Batch: Complete entire milestone
+jit issue update --filter "label:milestone:v0.9" --state done --yes
 ```
 
 **Validation:**
@@ -225,17 +309,19 @@ jit bulk-update --state done --filter "label:milestone:v0.9" --yes
 ### 2. Label Management
 
 ```bash
-# Add label to all issues
-jit bulk-update --label milestone:v1.1 --filter "state:ready OR state:in_progress"
+# Single issue
+jit issue update 44104a30 --label milestone:v1.1
 
-# Remove deprecated label
-jit bulk-update --remove-label old-epic:deprecated --filter "label:old-epic:deprecated"
+# Batch: Add label to all issues
+jit issue update --filter "state:ready OR state:in_progress" --label milestone:v1.1
 
-# Multiple label operations
-jit bulk-update \
+# Batch: Remove deprecated label
+jit issue update --filter "label:old-epic:deprecated" --remove-label old-epic:deprecated
+
+# Batch: Multiple label operations
+jit issue update --filter "state:done label:milestone:v0.9" \
   --label milestone:v1.0 \
-  --remove-label milestone:v0.9 \
-  --filter "state:done label:milestone:v0.9"
+  --remove-label milestone:v0.9
 ```
 
 **Validation:**
@@ -246,14 +332,17 @@ jit bulk-update \
 ### 3. Assignment Operations
 
 ```bash
-# Assign all ready high-priority tasks to agent
-jit bulk-update --assignee agent:worker-1 --filter "state:ready priority:high unassigned"
+# Single issue
+jit issue update 44104a30 --assignee agent:worker-1
 
-# Unassign stalled issues
-jit bulk-update --unassign --filter "state:in_progress assignee:agent:stalled-worker"
+# Batch: Assign all ready high-priority tasks to agent
+jit issue update --filter "state:ready priority:high unassigned" --assignee agent:worker-1
 
-# Reassign from one agent to another
-jit bulk-update --assignee agent:new-worker --filter "assignee:agent:old-worker"
+# Batch: Unassign stalled issues
+jit issue update --filter "state:in_progress assignee:agent:stalled-worker" --unassign
+
+# Batch: Reassign from one agent to another
+jit issue update --filter "assignee:agent:old-worker" --assignee agent:new-worker
 ```
 
 **Validation:**
@@ -263,11 +352,14 @@ jit bulk-update --assignee agent:new-worker --filter "assignee:agent:old-worker"
 ### 4. Priority Changes
 
 ```bash
-# Bump priority for milestone issues
-jit bulk-update --priority high --filter "label:milestone:v1.0 priority:normal"
+# Single issue
+jit issue update 44104a30 --priority high
 
-# Downgrade old issues
-jit bulk-update --priority low --filter "state:done label:milestone:v0.8"
+# Batch: Bump priority for milestone issues
+jit issue update --filter "label:milestone:v1.0 priority:normal" --priority high
+
+# Batch: Downgrade old issues
+jit issue update --filter "state:done label:milestone:v0.8" --priority low
 ```
 
 **Validation:**
@@ -457,57 +549,58 @@ fn apply_operations(
 **File:** `crates/jit/src/cli.rs`
 
 ```rust
-/// Bulk update operations
-#[derive(Subcommand)]
-pub enum BulkCommands {
-    /// Update multiple issues matching filter criteria
-    Update {
-        /// Boolean query filter (e.g., "state:ready label:epic:auth")
-        #[arg(long, required = true)]
-        filter: String,
-        
-        /// Change state
-        #[arg(long)]
-        state: Option<String>,
-        
-        /// Add label (repeatable)
-        #[arg(long)]
-        label: Vec<String>,
-        
-        /// Remove label (repeatable)
-        #[arg(long)]
-        remove_label: Vec<String>,
-        
-        /// Set assignee
-        #[arg(long)]
-        assignee: Option<String>,
-        
-        /// Clear assignee
-        #[arg(long)]
-        unassign: bool,
-        
-        /// Set priority
-        #[arg(long)]
-        priority: Option<String>,
-        
-        /// Preview without applying
-        #[arg(long)]
-        dry_run: bool,
-        
-        /// Skip confirmation prompt
-        #[arg(long)]
-        yes: bool,
-        
-        #[arg(long)]
-        json: bool,
-    },
-}
+/// Update an issue or multiple issues
+Update {
+    /// Issue ID (for single issue mode)
+    id: Option<String>,
+    
+    /// Boolean query filter (for batch mode)
+    /// Mutually exclusive with ID
+    #[arg(long, conflicts_with = "id")]
+    filter: Option<String>,
+    
+    /// Change state
+    #[arg(long)]
+    state: Option<String>,
+    
+    /// Add label (repeatable)
+    #[arg(long)]
+    label: Vec<String>,
+    
+    /// Remove label (repeatable)
+    #[arg(long)]
+    remove_label: Vec<String>,
+    
+    /// Set assignee
+    #[arg(long)]
+    assignee: Option<String>,
+    
+    /// Clear assignee
+    #[arg(long)]
+    unassign: bool,
+    
+    /// Set priority
+    #[arg(long)]
+    priority: Option<String>,
+    
+    /// Preview without applying (batch mode)
+    #[arg(long)]
+    dry_run: bool,
+    
+    /// Skip confirmation prompt (batch mode)
+    #[arg(long)]
+    yes: bool,
+    
+    #[arg(long)]
+    json: bool,
+},
 ```
 
 **File:** `crates/jit/src/main.rs`
 
 ```rust
-Commands::Bulk(BulkCommands::Update {
+IssueCommands::Update {
+    id,
     filter,
     state,
     label,
@@ -518,8 +611,14 @@ Commands::Bulk(BulkCommands::Update {
     dry_run,
     yes,
     json,
-}) => {
-    let filter = QueryFilter::parse(&filter)?;
+} => {
+    // Validate: exactly one of ID or filter
+    if id.is_none() && filter.is_none() {
+        return Err(anyhow!("Must specify either ID or --filter"));
+    }
+    if id.is_some() && filter.is_some() {
+        return Err(anyhow!("Cannot specify both ID and --filter"));
+    }
     
     let operations = UpdateOperations {
         state: state.map(|s| parse_state(&s)).transpose()?,
@@ -530,13 +629,22 @@ Commands::Bulk(BulkCommands::Update {
         priority: priority.map(|p| parse_priority(&p)).transpose()?,
     };
     
-    let result = executor.bulk_update(&filter, &operations, dry_run, yes)?;
+    let result = if let Some(id) = id {
+        // Single issue mode
+        executor.update_issue_single(&id, &operations)?
+    } else if let Some(filter_str) = filter {
+        // Batch mode
+        let filter = QueryFilter::parse(&filter_str)?;
+        executor.update_issue_batch(&filter, &operations, dry_run, yes)?
+    } else {
+        unreachable!() // Validated above
+    };
     
     if json {
-        let response = JsonOutput::success(result, "bulk-update");
+        let response = JsonOutput::success(result, "issue update");
         println!("{}", response.to_json_string()?);
     } else {
-        print_bulk_update_result(&result);
+        print_update_result(&result);
     }
     
     ExitCode::SUCCESS
@@ -738,49 +846,47 @@ Hint: Use boolean operators: AND, OR, NOT
 ### 1. Complete Milestone
 
 ```bash
-# Preview
-jit bulk-update --state done --filter "label:milestone:v0.9" --dry-run
+# Preview (single issue)
+jit issue update 44104a30 --state done --dry-run
 
-# Apply
-jit bulk-update --state done --filter "label:milestone:v0.9" --yes
+# Preview (batch)
+jit issue update --filter "label:milestone:v0.9" --state done --dry-run
+
+# Apply (batch)
+jit issue update --filter "label:milestone:v0.9" --state done --yes
 ```
 
 ### 2. Reassign Stalled Work
 
 ```bash
-# Find stalled issues
+# Find stalled issues (separate query)
 jit query stalled --json | jq -r '.data.issues[].id'
 
-# Unassign
-jit bulk-update --unassign --filter "state:in_progress assignee:agent:stalled"
+# Unassign (batch)
+jit issue update --filter "state:in_progress assignee:agent:stalled" --unassign
 
-# Reassign high-priority to new agent
-jit bulk-update --assignee agent:new-worker \
-  --filter "state:ready priority:high unassigned"
+# Reassign high-priority to new agent (batch)
+jit issue update --filter "state:ready priority:high unassigned" --assignee agent:new-worker
 ```
 
 ### 3. Workspace Cleanup
 
 ```bash
-# Archive old completed work
-jit bulk-update --state archived \
-  --filter "state:done label:milestone:v0.8"
+# Archive old completed work (batch)
+jit issue update --filter "state:done label:milestone:v0.8" --state archived
 
-# Remove deprecated labels
-jit bulk-update --remove-label old-component:deprecated \
-  --filter "label:old-component:*"
+# Remove deprecated labels (batch)
+jit issue update --filter "label:old-component:*" --remove-label old-component:deprecated
 ```
 
 ### 4. Milestone Preparation
 
 ```bash
-# Tag all ready issues for next milestone
-jit bulk-update --label milestone:v1.1 \
-  --filter "state:ready OR state:in_progress"
+# Tag all ready issues for next milestone (batch)
+jit issue update --filter "state:ready OR state:in_progress" --label milestone:v1.1
 
-# Bump priority for milestone blockers
-jit bulk-update --priority critical \
-  --filter "label:milestone:v1.1 label:blocker"
+# Bump priority for milestone blockers (batch)
+jit issue update --filter "label:milestone:v1.1 label:blocker" --priority critical
 ```
 
 ## Dependencies
