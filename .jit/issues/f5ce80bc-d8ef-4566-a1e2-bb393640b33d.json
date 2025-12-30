@@ -15,7 +15,15 @@
   ],
   "gates_status": {},
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "dev/active/multi-issue-bulk-operations-plan.md",
+      "commit": null,
+      "label": "Implementation Plan",
+      "doc_type": "design",
+      "format": "markdown"
+    }
+  ],
   "labels": [
     "type:task",
     "epic:production-stability",
