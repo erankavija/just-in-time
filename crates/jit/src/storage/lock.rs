@@ -47,8 +47,8 @@ impl Drop for LockGuard {
 ///
 /// ```no_run
 /// use jit::storage::lock::FileLocker;
-/// use std::time::Duration;
 /// use std::path::Path;
+/// use std::time::Duration;
 ///
 /// let locker = FileLocker::new(Duration::from_secs(5));
 ///

@@ -47,16 +47,15 @@ pub enum AssetType {
 /// # Example
 ///
 /// ```
-/// use jit::document::{AssetScanner, AdapterRegistry};
+/// use jit::document::{AdapterRegistry, AssetScanner};
 /// use std::path::Path;
 ///
 /// let registry = AdapterRegistry::with_builtins();
 /// let scanner = AssetScanner::new(registry, Path::new("/repo"));
 ///
-/// let assets = scanner.scan_document(
-///     Path::new("docs/guide.md"),
-///     "# Guide\n\n![Logo](./logo.png)"
-/// ).unwrap();
+/// let assets = scanner
+///     .scan_document(Path::new("docs/guide.md"), "# Guide\n\n![Logo](./logo.png)")
+///     .unwrap();
 ///
 /// assert_eq!(assets.len(), 1);
 /// assert_eq!(assets[0].original_path, "./logo.png");

@@ -145,6 +145,136 @@ impl Default for BulkUpdatePreview {
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
+    /// Apply bulk update to filtered issues
+    ///
+    /// Applies operations to all matched issues with per-issue atomicity.
+    /// Best-effort: continues on errors, tracks successes and failures.
+    pub fn apply_bulk_update(
+        &mut self,
+        filter: &QueryFilter,
+        operations: &UpdateOperations,
+    ) -> Result<BulkUpdateResult> {
+        let all_issues = self.storage.list_issues()?;
+        let matched = filter.filter_issues(&all_issues)?;
+
+        let mut result = BulkUpdateResult::new();
+        result.matched = matched.iter().map(|i| i.id.clone()).collect();
+
+        for issue in matched {
+            match self.apply_operations_to_issue(issue, operations) {
+                Ok(modified) => {
+                    if modified {
+                        result.modified.push(issue.id.clone());
+                    } else {
+                        result
+                            .skipped
+                            .push((issue.id.clone(), "No changes needed".to_string()));
+                    }
+                }
+                Err(e) => {
+                    result.errors.push((issue.id.clone(), e.to_string()));
+                }
+            }
+        }
+
+        result.compute_summary();
+        Ok(result)
+    }
+
+    /// Apply operations to a single issue
+    ///
+    /// Best-effort operation: applies all changes that pass validation,
+    /// tracks which fields were modified, and logs appropriate events.
+    ///
+    /// Returns Ok(true) if modifications were made, Ok(false) if no changes, Err on failure.
+    ///
+    /// Note: State transitions bypass update_issue_state() to avoid duplicate validation,
+    /// but we still log IssueStateChanged events for consistency.
+    fn apply_operations_to_issue(
+        &mut self,
+        issue: &Issue,
+        operations: &UpdateOperations,
+    ) -> Result<bool> {
+        // Validate first
+        self.validate_update(issue, operations)?;
+
+        // Check if any changes needed
+        let changes = self.compute_changes(issue, operations)?;
+        if changes.is_empty() {
+            return Ok(false);
+        }
+
+        // Load fresh copy of issue
+        let mut updated = self.storage.load_issue(&issue.id)?;
+
+        let mut modified_fields = Vec::new();
+
+        // Apply state change
+        if let Some(new_state) = operations.state {
+            if updated.state != new_state {
+                let old_state = updated.state;
+                updated.state = new_state;
+                modified_fields.push("state".to_string());
+
+                // Log state change event (in addition to update event)
+                // This maintains consistency with single-issue state transitions
+                self.storage.append_event(&Event::new_issue_state_changed(
+                    issue.id.clone(),
+                    old_state,
+                    new_state,
+                ))?;
+            }
+        }
+
+        // Apply label changes
+        for label in &operations.add_labels {
+            if !updated.labels.contains(label) {
+                updated.labels.push(label.clone());
+                modified_fields.push(format!("label:+{}", label));
+            }
+        }
+
+        for label in &operations.remove_labels {
+            if let Some(pos) = updated.labels.iter().position(|l| l == label) {
+                updated.labels.remove(pos);
+                modified_fields.push(format!("label:-{}", label));
+            }
+        }
+
+        // Apply assignee change
+        if let Some(ref assignee) = operations.assignee {
+            if updated.assignee.as_ref() != Some(assignee) {
+                updated.assignee = Some(assignee.clone());
+                modified_fields.push("assignee".to_string());
+            }
+        } else if operations.unassign && updated.assignee.is_some() {
+            updated.assignee = None;
+            modified_fields.push("assignee".to_string());
+        }
+
+        // Apply priority change
+        if let Some(new_priority) = operations.priority {
+            if updated.priority != new_priority {
+                updated.priority = new_priority;
+                modified_fields.push("priority".to_string());
+            }
+        }
+
+        // Save if modified
+        if !modified_fields.is_empty() {
+            self.storage.save_issue(&updated)?;
+
+            // Log update event
+            self.storage.append_event(&Event::new_issue_updated(
+                issue.id.clone(),
+                "bulk-update".to_string(),
+                modified_fields.clone(),
+            ))?;
+        }
+
+        Ok(!modified_fields.is_empty())
+    }
+
     /// Preview bulk update without applying changes (dry-run)
     pub fn preview_bulk_update(
         &self,
@@ -388,5 +518,173 @@ mod tests {
 
         let changes = executor.compute_changes(&issue, &ops).unwrap();
         assert!(changes.is_empty());
+    }
+
+    #[test]
+    fn test_apply_bulk_update_single_issue() {
+        use crate::query::QueryFilter;
+        use crate::storage::InMemoryStorage;
+
+        let storage = InMemoryStorage::new();
+
+        // Create test issue
+        let issue = create_test_issue("test-1", State::Ready, vec!["type:task"]);
+        storage.save_issue(&issue).unwrap();
+
+        let mut executor = crate::commands::CommandExecutor::new(storage);
+
+        // Apply bulk update
+        let filter = QueryFilter::parse("state:ready").unwrap();
+        let ops = UpdateOperations {
+            state: Some(State::Done),
+            ..Default::default()
+        };
+
+        let result = executor.apply_bulk_update(&filter, &ops).unwrap();
+
+        assert_eq!(result.summary.total_matched, 1);
+        assert_eq!(result.summary.total_modified, 1);
+        assert_eq!(result.summary.total_errors, 0);
+
+        // Verify issue was updated
+        let updated = executor.get_issue("test-1").unwrap();
+        assert_eq!(updated.state, State::Done);
+    }
+
+    #[test]
+    fn test_apply_bulk_update_multiple_issues() {
+        use crate::query::QueryFilter;
+        use crate::storage::InMemoryStorage;
+
+        let storage = InMemoryStorage::new();
+
+        // Create test issues
+        storage
+            .save_issue(&create_test_issue("1", State::Ready, vec![]))
+            .unwrap();
+        storage
+            .save_issue(&create_test_issue("2", State::Ready, vec![]))
+            .unwrap();
+        storage
+            .save_issue(&create_test_issue("3", State::InProgress, vec![]))
+            .unwrap();
+
+        let mut executor = crate::commands::CommandExecutor::new(storage);
+
+        // Update all ready issues
+        let filter = QueryFilter::parse("state:ready").unwrap();
+        let ops = UpdateOperations {
+            add_labels: vec!["milestone:v1.0".to_string()],
+            ..Default::default()
+        };
+
+        let result = executor.apply_bulk_update(&filter, &ops).unwrap();
+
+        assert_eq!(result.summary.total_matched, 2);
+        assert_eq!(result.summary.total_modified, 2);
+
+        // Verify labels added
+        let issue1 = executor.get_issue("1").unwrap();
+        assert!(issue1.labels.contains(&"milestone:v1.0".to_string()));
+
+        let issue3 = executor.get_issue("3").unwrap();
+        assert!(!issue3.labels.contains(&"milestone:v1.0".to_string()));
+    }
+
+    #[test]
+    fn test_apply_bulk_update_no_changes() {
+        use crate::query::QueryFilter;
+        use crate::storage::InMemoryStorage;
+
+        let storage = InMemoryStorage::new();
+        storage
+            .save_issue(&create_test_issue("1", State::Done, vec![]))
+            .unwrap();
+
+        let mut executor = crate::commands::CommandExecutor::new(storage);
+
+        // Try to set same state
+        let filter = QueryFilter::parse("state:done").unwrap();
+        let ops = UpdateOperations {
+            state: Some(State::Done),
+            ..Default::default()
+        };
+
+        let result = executor.apply_bulk_update(&filter, &ops).unwrap();
+
+        assert_eq!(result.summary.total_matched, 1);
+        assert_eq!(result.summary.total_modified, 0);
+        assert_eq!(result.summary.total_skipped, 1);
+    }
+
+    #[test]
+    fn test_apply_bulk_update_with_errors() {
+        use crate::query::QueryFilter;
+        use crate::storage::InMemoryStorage;
+
+        let storage = InMemoryStorage::new();
+
+        // Create issue with unpassed gates
+        let mut issue = create_test_issue("1", State::Gated, vec![]);
+        issue.gates_required = vec!["tests".to_string()];
+        storage.save_issue(&issue).unwrap();
+
+        let mut executor = crate::commands::CommandExecutor::new(storage);
+
+        // Try to transition to Done without passing gates
+        let filter = QueryFilter::parse("state:gated").unwrap();
+        let ops = UpdateOperations {
+            state: Some(State::Done),
+            ..Default::default()
+        };
+
+        let result = executor.apply_bulk_update(&filter, &ops).unwrap();
+
+        assert_eq!(result.summary.total_matched, 1);
+        assert_eq!(result.summary.total_modified, 0);
+        assert_eq!(result.summary.total_errors, 1);
+        assert!(result.errors[0].1.contains("gates pending"));
+    }
+
+    #[test]
+    fn test_apply_bulk_update_best_effort() {
+        use crate::query::QueryFilter;
+        use crate::storage::InMemoryStorage;
+
+        let storage = InMemoryStorage::new();
+
+        // Create mix of valid and invalid issues
+        storage
+            .save_issue(&create_test_issue("1", State::Ready, vec![]))
+            .unwrap();
+
+        let mut blocked = create_test_issue("2", State::Ready, vec![]);
+        blocked.gates_required = vec!["tests".to_string()];
+        storage.save_issue(&blocked).unwrap();
+
+        storage
+            .save_issue(&create_test_issue("3", State::Ready, vec![]))
+            .unwrap();
+
+        let mut executor = crate::commands::CommandExecutor::new(storage);
+
+        // Try to transition all to Done
+        let filter = QueryFilter::parse("state:ready").unwrap();
+        let ops = UpdateOperations {
+            state: Some(State::Done),
+            ..Default::default()
+        };
+
+        let result = executor.apply_bulk_update(&filter, &ops).unwrap();
+
+        // Should succeed for 2, fail for 1
+        assert_eq!(result.summary.total_matched, 3);
+        assert_eq!(result.summary.total_modified, 2);
+        assert_eq!(result.summary.total_errors, 1);
+
+        // Verify partial success
+        assert!(result.modified.contains(&"1".to_string()));
+        assert!(result.modified.contains(&"3".to_string()));
+        assert_eq!(result.errors[0].0, "2");
     }
 }

@@ -37,8 +37,8 @@ pub struct GateRegistry {
 /// # Examples
 ///
 /// ```no_run
-/// use jit::storage::{IssueStore, JsonFileStorage};
 /// use jit::domain::Issue;
+/// use jit::storage::{IssueStore, JsonFileStorage};
 ///
 /// let storage = JsonFileStorage::new(".");
 /// storage.init().unwrap();
@@ -77,8 +77,8 @@ pub trait IssueStore: Clone {
     /// # Examples
     ///
     /// ```no_run
-    /// use jit::storage::{IssueStore, InMemoryStorage};
     /// use jit::domain::Issue;
+    /// use jit::storage::{InMemoryStorage, IssueStore};
     ///
     /// let storage = InMemoryStorage::new();
     /// storage.init().unwrap();

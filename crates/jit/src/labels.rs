@@ -36,7 +36,7 @@ fn label_regex() -> &'static Regex {
 /// assert!(validate_label("epic:auth").is_ok());
 /// assert!(validate_label("type:task").is_ok());
 ///
-/// assert!(validate_label("auth").is_err());           // Missing namespace
+/// assert!(validate_label("auth").is_err()); // Missing namespace
 /// assert!(validate_label("Milestone:v1.0").is_err()); // Uppercase namespace
 /// assert!(validate_label("milestone-v1.0").is_err()); // Wrong separator
 /// ```

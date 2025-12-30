@@ -2,9 +2,9 @@
   "id": "f5ce80bc-d8ef-4566-a1e2-bb393640b33d",
   "title": "Implement bulk operations support",
   "description": "Unify single-issue and batch update operations under one command: `jit issue update`.\n\n## Design Philosophy\n\nIssue ID is just shorthand for a precise filter:\n> `jit issue update <id>` ≡ `jit issue update --filter \"id:<id>\"`\n\n## Command Interface\n\n```bash\n# Single issue mode (ID provided)\njit issue update <ID> [OPTIONS]\n\n# Batch mode (filter provided)  \njit issue update --filter <QUERY> [OPTIONS]\n```\n\n**Mutual exclusivity:** ID and `--filter` cannot both be specified.\n\n## Capabilities\n\n### Single Issue Mode\n- Update state, labels, assignee, priority\n- Existing behavior, enhanced interface\n\n### Batch Mode (New)\n- Boolean query language (AND/OR/NOT operations)\n- Filter by state, label, priority, assignee, blocked status\n- Batch state transitions\n- Batch label management (add/remove)\n- Batch assignments\n- Batch priority changes\n\n## Safety Features\n\n- Per-issue atomic file operations\n- Auto dry-run for >10 matches\n- Confirmation prompts for large operations\n- Comprehensive error reporting (modified/skipped/errors)\n- State transitions respect dependencies and gates\n- Label operations respect hierarchy\n\n## Example Usage\n\n```bash\n# Single issue\njit issue update 44104a30 --state done\n\n# Batch: Complete milestone\njit issue update --filter \"label:milestone:v0.9\" --state done --yes\n\n# Batch: Reassign work\njit issue update --filter \"assignee:agent:old\" --assignee agent:new\n\n# Batch: Tag issues\njit issue update --filter \"state:ready OR state:in_progress\" --label milestone:v1.1\n```\n\n## Implementation Approach\n\nBest-effort with per-issue atomicity:\n- Each issue update is atomic (temp file + rename)\n- Operations continue even if some issues fail\n- Clear reporting of successes and failures\n- Users can retry just the failures\n\nThis is essential for managing large workspaces efficiently, reducing overhead for both human users and AI agents when operating at scale.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:copilot",
   "dependencies": [],
   "gates_required": [
     "tdd-reminder",
@@ -13,7 +13,13 @@
     "fmt",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": "agent:copilot",
+      "updated_at": "2025-12-30T21:59:56.713109175Z"
+    }
+  },
   "context": {},
   "documents": [
     {

@@ -209,7 +209,10 @@ fn parse_ripgrep_json(json: &[u8], max: Option<usize>) -> Result<Vec<SearchResul
 ///
 /// ```
 /// # use jit::search::extract_issue_id;
-/// assert_eq!(extract_issue_id("issues/abc123.json"), Some("abc123".to_string()));
+/// assert_eq!(
+///     extract_issue_id("issues/abc123.json"),
+///     Some("abc123".to_string())
+/// );
 /// assert_eq!(extract_issue_id("docs/design.md"), None);
 /// ```
 pub fn extract_issue_id(path: &str) -> Option<String> {

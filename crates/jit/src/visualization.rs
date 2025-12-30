@@ -16,8 +16,8 @@ use crate::graph::DependencyGraph;
 ///
 /// # Example
 /// ```
-/// use jit::{Issue, graph::DependencyGraph};
 /// use jit::visualization;
+/// use jit::{graph::DependencyGraph, Issue};
 ///
 /// let issue1 = Issue::new("Setup".to_string(), "Initial setup".to_string());
 /// let mut issue2 = Issue::new("Deploy".to_string(), "Deploy app".to_string());
@@ -80,8 +80,8 @@ pub fn export_dot(graph: &DependencyGraph<Issue>) -> String {
 ///
 /// # Example
 /// ```
-/// use jit::{Issue, graph::DependencyGraph};
 /// use jit::visualization;
+/// use jit::{graph::DependencyGraph, Issue};
 ///
 /// let issue1 = Issue::new("Design".to_string(), "Design API".to_string());
 /// let mut issue2 = Issue::new("Implement".to_string(), "Build API".to_string());

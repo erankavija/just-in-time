@@ -32,7 +32,7 @@
 //! # Examples
 //!
 //! ```
-//! use jit::type_hierarchy::{HierarchyConfig, extract_type};
+//! use jit::type_hierarchy::{extract_type, HierarchyConfig};
 //!
 //! let config = HierarchyConfig::default();
 //!
@@ -308,7 +308,7 @@ fn levenshtein_distance(s1: &str, s2: &str) -> usize {
 /// # Examples
 ///
 /// ```
-/// use jit::type_hierarchy::{HierarchyConfig, suggest_type_fix};
+/// use jit::type_hierarchy::{suggest_type_fix, HierarchyConfig};
 ///
 /// let config = HierarchyConfig::default();
 ///
@@ -408,8 +408,8 @@ pub fn detect_validation_issues(
 /// # Examples
 ///
 /// ```
-/// use jit::type_hierarchy::{validate_strategic_labels, HierarchyConfig};
 /// use jit::domain::Issue;
+/// use jit::type_hierarchy::{validate_strategic_labels, HierarchyConfig};
 ///
 /// let config = HierarchyConfig::default();
 /// let mut epic = Issue::new("Auth".to_string(), "Epic description".to_string());
@@ -471,8 +471,8 @@ pub fn validate_strategic_labels(
 /// # Examples
 ///
 /// ```
-/// use jit::type_hierarchy::{validate_orphans, HierarchyConfig};
 /// use jit::domain::Issue;
+/// use jit::type_hierarchy::{validate_orphans, HierarchyConfig};
 ///
 /// let config = HierarchyConfig::default();
 /// let mut task = Issue::new("Login".to_string(), "Task description".to_string());
@@ -545,8 +545,8 @@ pub fn validate_orphans(
 /// # Examples
 ///
 /// ```
-/// use jit::type_hierarchy::{detect_membership_issues, HierarchyConfig};
 /// use jit::domain::Issue;
+/// use jit::type_hierarchy::{detect_membership_issues, HierarchyConfig};
 ///
 /// let config = HierarchyConfig::default();
 /// let mut task = Issue::new("Login".to_string(), "Task description".to_string());

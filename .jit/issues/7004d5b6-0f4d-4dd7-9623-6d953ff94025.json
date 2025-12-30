@@ -1,0 +1,18 @@
+{
+  "id": "7004d5b6-0f4d-4dd7-9623-6d953ff94025",
+  "title": "Reorganize commands module to separate CLI from domain logic",
+  "description": "## Problem\n\nThe `commands/` module currently contains both:\n- **CLI orchestration code** (command execution, output formatting)\n- **Core domain query operations** (`query_by_state()`, `query_by_label()`, `query_ready()`)\n\nThis mixing makes it hard to:\n- Identify reusable library code vs CLI-specific code\n- Use jit as a library (domain logic buried in commands)\n- Understand module boundaries\n- Test domain logic independently\n\n## Current Structure\n\n```\ncrates/jit/src/\n├── commands/\n│   ├── mod.rs              # CLI + domain mixed\n│   ├── query.rs            # Domain query logic\n│   ├── issue.rs            # CLI + domain mixed\n│   ├── document.rs         # CLI + domain mixed\n│   └── ...\n├── domain.rs               # Just data structures\n└── lib.rs\n```\n\n## Proposed Structure\n\n**Option 1: Separate queries module**\n```\ncrates/jit/src/\n├── commands/               # Pure CLI orchestration\n│   ├── mod.rs\n│   ├── issue.rs\n│   └── ...\n├── domain/                 # Domain types + operations\n│   ├── mod.rs\n│   ├── types.rs           # Issue, State, Priority, etc.\n│   └── queries.rs         # query_by_state, query_ready, etc.\n├── query/                  # Query filter engine (already exists)\n└── lib.rs\n```\n\n**Option 2: Keep flat but clearer naming**\n```\ncrates/jit/src/\n├── commands/               # Pure CLI orchestration\n├── domain.rs               # Domain types\n├── issue_queries.rs        # Domain query operations\n├── query/                  # Query filter engine\n└── lib.rs\n```\n\n## Migration Strategy\n\n1. Create new module structure (pick option)\n2. Move query functions from `commands/query.rs` to new location\n3. Update imports throughout codebase\n4. Ensure `CommandExecutor` still has access to domain functions\n5. Update lib.rs exports to expose domain operations\n6. Update documentation to clarify separation\n\n## Benefits\n\n- Clear separation of concerns (CLI vs domain)\n- Easier to use jit as a library\n- Better discoverability of domain operations\n- Cleaner module boundaries\n- Easier to test domain logic independently\n\n## Questions to Decide\n\n1. Which structure option? (Option 1 more scalable, Option 2 simpler)\n2. Should `CommandExecutor` stay in commands/ or move to separate orchestration layer?\n3. What about `parse_state()` and `parse_priority()`? (Domain or commands?)\n\n## Acceptance Criteria\n\n- [ ] Clear separation between CLI and domain logic\n- [ ] Domain query operations easy to find and import\n- [ ] All existing tests pass\n- [ ] lib.rs exports domain operations clearly\n- [ ] Documentation updated\n- [ ] No regression in CLI functionality",
+  "state": "ready",
+  "priority": "low",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:production-polish",
+    "component:core"
+  ]
+}

@@ -516,6 +516,19 @@ pub enum Event {
         /// Number of issues updated
         issues_updated: usize,
     },
+    /// Issue was updated (labels, priority, assignee, etc.)
+    IssueUpdated {
+        /// Event ID
+        id: String,
+        /// Issue that was updated
+        issue_id: String,
+        /// When this occurred
+        timestamp: DateTime<Utc>,
+        /// Who updated it (e.g., "bulk-update", "human:alice", "agent:copilot")
+        updated_by: String,
+        /// Fields that changed
+        fields: Vec<String>,
+    },
 }
 
 impl Event {
@@ -610,6 +623,17 @@ impl Event {
         }
     }
 
+    /// Create an issue updated event
+    pub fn new_issue_updated(issue_id: String, updated_by: String, fields: Vec<String>) -> Self {
+        Event::IssueUpdated {
+            id: Uuid::new_v4().to_string(),
+            issue_id,
+            timestamp: Utc::now(),
+            updated_by,
+            fields,
+        }
+    }
+
     /// Get the issue ID associated with this event
     pub fn get_issue_id(&self) -> &str {
         match self {
@@ -620,6 +644,7 @@ impl Event {
             Event::GateFailed { issue_id, .. } => issue_id,
             Event::IssueCompleted { issue_id, .. } => issue_id,
             Event::IssueReleased { issue_id, .. } => issue_id,
+            Event::IssueUpdated { issue_id, .. } => issue_id,
             Event::DocumentArchived { .. } => "", // No associated issue
         }
     }
@@ -634,6 +659,7 @@ impl Event {
             Event::GateFailed { .. } => "gate_failed",
             Event::IssueCompleted { .. } => "issue_completed",
             Event::IssueReleased { .. } => "issue_released",
+            Event::IssueUpdated { .. } => "issue_updated",
             Event::DocumentArchived { .. } => "document_archived",
         }
     }

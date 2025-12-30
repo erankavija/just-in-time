@@ -196,8 +196,8 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
     /// # Examples
     ///
     /// ```
-    /// use jit::graph::DependencyGraph;
     /// use jit::domain::Issue;
+    /// use jit::graph::DependencyGraph;
     ///
     /// let a = Issue::new("A".into(), "".into());
     /// let mut b = Issue::new("B".into(), "".into());
@@ -251,8 +251,8 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
     /// # Examples
     ///
     /// ```
-    /// use jit::graph::DependencyGraph;
     /// use jit::domain::Issue;
+    /// use jit::graph::DependencyGraph;
     ///
     /// let a = Issue::new("A".into(), "".into());
     /// let mut b = Issue::new("B".into(), "".into());

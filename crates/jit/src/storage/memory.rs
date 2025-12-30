@@ -17,8 +17,8 @@ use std::sync::{Arc, Mutex};
 /// # Examples
 ///
 /// ```
-/// use jit::storage::{InMemoryStorage, IssueStore};
 /// use jit::domain::Issue;
+/// use jit::storage::{InMemoryStorage, IssueStore};
 ///
 /// let storage = InMemoryStorage::new();
 /// storage.init().unwrap();
