@@ -210,6 +210,25 @@ impl<S: IssueStore> CommandExecutor<S> {
         let mut modified_fields = Vec::new();
 
         // Apply state change
+        //
+        // DESIGN DECISION: Bulk operations use literal state transitions.
+        //
+        // Unlike single-issue updates (`update_issue_state()`), bulk updates do NOT:
+        // - Run prechecks automatically (Ready → InProgress)
+        // - Run postchecks automatically (Gated state)
+        // - Auto-transition to Gated when attempting Done with unpassed gates
+        //
+        // Rationale:
+        // 1. Predictability: Users get exactly the state they specify (no surprises)
+        // 2. Performance: Avoiding gate execution for many issues
+        // 3. Safety: Explicit control for large-scale changes
+        // 4. Composability: Users can layer operations (bulk update → bulk gate check)
+        // 5. Precedent: Bulk tools (SQL UPDATE, jq, sed) use literal semantics
+        //
+        // Validation still occurs (dependencies, gate requirements) but no
+        // automatic gate execution or state orchestration.
+        //
+        // See issue 40f594a7 for full decision rationale.
         if let Some(new_state) = operations.state {
             if updated.state != new_state {
                 let old_state = updated.state;
@@ -361,6 +380,22 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     /// Validate that update can be applied to issue
     fn validate_update(&self, issue: &Issue, operations: &UpdateOperations) -> Result<()> {
+        // Validate label operations
+        if !operations.add_labels.is_empty() || !operations.remove_labels.is_empty() {
+            let label_namespaces = self.config_manager.get_namespaces()?;
+            crate::labels::validate_label_operations(
+                &issue.labels,
+                &operations.add_labels,
+                &operations.remove_labels,
+                &label_namespaces.namespaces,
+            )?;
+        }
+
+        // Validate assignee format
+        if let Some(ref assignee) = operations.assignee {
+            crate::labels::validate_assignee_format(assignee)?;
+        }
+
         // Validate state transition
         if let Some(new_state) = operations.state {
             // Check if blocked by dependencies
@@ -384,9 +419,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                 ));
             }
         }
-
-        // Label validation would go here
-        // (hierarchy checks, etc.)
 
         Ok(())
     }
@@ -686,5 +718,154 @@ mod tests {
         assert!(result.modified.contains(&"1".to_string()));
         assert!(result.modified.contains(&"3".to_string()));
         assert_eq!(result.errors[0].0, "2");
+    }
+
+    #[test]
+    fn test_bulk_update_rejects_invalid_label_format() {
+        use crate::query::QueryFilter;
+        use crate::storage::InMemoryStorage;
+
+        let storage = InMemoryStorage::new();
+        storage
+            .save_issue(&create_test_issue("1", State::Ready, vec!["type:task"]))
+            .unwrap();
+
+        let mut executor = crate::commands::CommandExecutor::new(storage);
+
+        // Try to add label without colon (invalid format)
+        let filter = QueryFilter::parse("state:ready").unwrap();
+        let ops = UpdateOperations {
+            add_labels: vec!["bad_label_no_colon".to_string()],
+            ..Default::default()
+        };
+
+        let result = executor.apply_bulk_update(&filter, &ops).unwrap();
+
+        // Should reject with error
+        assert_eq!(result.summary.total_matched, 1);
+        assert_eq!(result.summary.total_modified, 0);
+        assert_eq!(result.summary.total_errors, 1);
+        assert!(result.errors[0].1.contains("format"));
+    }
+
+    #[test]
+    fn test_bulk_update_rejects_duplicate_unique_namespace() {
+        use crate::query::QueryFilter;
+        use crate::storage::InMemoryStorage;
+
+        let storage = InMemoryStorage::new();
+
+        // Issue already has type:task label
+        storage
+            .save_issue(&create_test_issue("1", State::Ready, vec!["type:task"]))
+            .unwrap();
+
+        let mut executor = crate::commands::CommandExecutor::new(storage);
+
+        // Try to add another type:* label (violates uniqueness)
+        let filter = QueryFilter::parse("state:ready").unwrap();
+        let ops = UpdateOperations {
+            add_labels: vec!["type:epic".to_string()],
+            ..Default::default()
+        };
+
+        let result = executor.apply_bulk_update(&filter, &ops).unwrap();
+
+        // Should reject with error
+        assert_eq!(result.summary.total_matched, 1);
+        assert_eq!(result.summary.total_modified, 0);
+        assert_eq!(result.summary.total_errors, 1);
+        assert!(result.errors[0].1.contains("unique namespace"));
+    }
+
+    #[test]
+    fn test_bulk_update_rejects_invalid_assignee_format() {
+        use crate::query::QueryFilter;
+        use crate::storage::InMemoryStorage;
+
+        let storage = InMemoryStorage::new();
+        storage
+            .save_issue(&create_test_issue("1", State::Ready, vec![]))
+            .unwrap();
+
+        let mut executor = crate::commands::CommandExecutor::new(storage);
+
+        // Try to set assignee without colon (invalid format)
+        let filter = QueryFilter::parse("state:ready").unwrap();
+        let ops = UpdateOperations {
+            assignee: Some("invalid_no_colon".to_string()),
+            ..Default::default()
+        };
+
+        let result = executor.apply_bulk_update(&filter, &ops).unwrap();
+
+        // Should reject with error
+        assert_eq!(result.summary.total_matched, 1);
+        assert_eq!(result.summary.total_modified, 0);
+        assert_eq!(result.summary.total_errors, 1);
+        assert!(result.errors[0].1.contains("format"));
+    }
+
+    #[test]
+    fn test_bulk_update_accepts_valid_assignee_format() {
+        use crate::query::QueryFilter;
+        use crate::storage::InMemoryStorage;
+
+        let storage = InMemoryStorage::new();
+        storage
+            .save_issue(&create_test_issue("1", State::Ready, vec![]))
+            .unwrap();
+
+        let mut executor = crate::commands::CommandExecutor::new(storage);
+
+        // Valid assignee format should work
+        let filter = QueryFilter::parse("state:ready").unwrap();
+        let ops = UpdateOperations {
+            assignee: Some("agent:copilot".to_string()),
+            ..Default::default()
+        };
+
+        let result = executor.apply_bulk_update(&filter, &ops).unwrap();
+
+        // Should succeed
+        assert_eq!(result.summary.total_matched, 1);
+        assert_eq!(result.summary.total_modified, 1);
+        assert_eq!(result.summary.total_errors, 0);
+
+        // Verify assignee set correctly
+        let updated = executor.get_issue("1").unwrap();
+        assert_eq!(updated.assignee, Some("agent:copilot".to_string()));
+    }
+
+    #[test]
+    fn test_bulk_update_accepts_valid_labels() {
+        use crate::query::QueryFilter;
+        use crate::storage::InMemoryStorage;
+
+        let storage = InMemoryStorage::new();
+        storage
+            .save_issue(&create_test_issue("1", State::Ready, vec!["type:task"]))
+            .unwrap();
+
+        let mut executor = crate::commands::CommandExecutor::new(storage);
+
+        // Valid labels should work
+        let filter = QueryFilter::parse("state:ready").unwrap();
+        let ops = UpdateOperations {
+            add_labels: vec!["milestone:v1.0".to_string(), "epic:auth".to_string()],
+            ..Default::default()
+        };
+
+        let result = executor.apply_bulk_update(&filter, &ops).unwrap();
+
+        // Should succeed
+        assert_eq!(result.summary.total_matched, 1);
+        assert_eq!(result.summary.total_modified, 1);
+        assert_eq!(result.summary.total_errors, 0);
+
+        // Verify labels added
+        let updated = executor.get_issue("1").unwrap();
+        assert!(updated.labels.contains(&"milestone:v1.0".to_string()));
+        assert!(updated.labels.contains(&"epic:auth".to_string()));
     }
 }

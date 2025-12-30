@@ -116,6 +116,118 @@ fn suggest_label_fix(label: &str) -> Option<String> {
     None
 }
 
+/// Validate label operations (add/remove) against namespace constraints
+///
+/// Checks format of all labels being added and validates uniqueness constraints
+/// for the final set of labels after applying operations.
+///
+/// # Arguments
+///
+/// * `existing_labels` - Current labels on the issue
+/// * `add_labels` - Labels to be added
+/// * `remove_labels` - Labels to be removed
+/// * `namespaces` - Namespace configuration (HashMap from config)
+///
+/// # Examples
+///
+/// ```
+/// use jit::labels::validate_label_operations;
+/// use std::collections::HashMap;
+/// use jit::domain::LabelNamespace;
+///
+/// let existing = vec!["type:task".to_string()];
+/// let add = vec!["milestone:v1.0".to_string()];
+/// let remove = vec![];
+/// let mut namespaces = HashMap::new();
+/// namespaces.insert("type".to_string(), LabelNamespace::new("Issue type", true));
+///
+/// // Should pass - no conflicts
+/// assert!(validate_label_operations(&existing, &add, &remove, &namespaces).is_ok());
+/// ```
+pub fn validate_label_operations(
+    existing_labels: &[String],
+    add_labels: &[String],
+    remove_labels: &[String],
+    namespaces: &std::collections::HashMap<String, crate::domain::LabelNamespace>,
+) -> Result<()> {
+    // First, validate format of all labels being added
+    for label in add_labels {
+        validate_label(label)?;
+    }
+
+    // Compute final labels after operations
+    let mut final_labels = existing_labels.to_vec();
+
+    // Remove labels
+    for label in remove_labels {
+        if let Some(pos) = final_labels.iter().position(|l| l == label) {
+            final_labels.remove(pos);
+        }
+    }
+
+    // Add new labels (avoid duplicates)
+    for label in add_labels {
+        if !final_labels.contains(label) {
+            final_labels.push(label.clone());
+        }
+    }
+
+    // Check uniqueness constraints on final set
+    let mut unique_namespaces_seen = std::collections::HashSet::new();
+
+    for label in &final_labels {
+        if let Ok((namespace, _)) = parse_label(label) {
+            if let Some(ns_config) = namespaces.get(&namespace) {
+                if ns_config.unique && !unique_namespaces_seen.insert(namespace.clone()) {
+                    return Err(anyhow!(
+                        "Cannot add multiple labels from unique namespace '{}' to the same issue",
+                        namespace
+                    ));
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Validate assignee format
+///
+/// Assignees must follow the format `type:identifier` (e.g., `agent:copilot`, `user:alice`)
+///
+/// # Examples
+///
+/// ```
+/// use jit::labels::validate_assignee_format;
+///
+/// assert!(validate_assignee_format("agent:copilot").is_ok());
+/// assert!(validate_assignee_format("user:alice").is_ok());
+/// assert!(validate_assignee_format("invalid").is_err());
+/// assert!(validate_assignee_format("").is_err());
+/// ```
+pub fn validate_assignee_format(assignee: &str) -> Result<()> {
+    if assignee.is_empty() {
+        return Err(anyhow!("Assignee cannot be empty"));
+    }
+
+    if !assignee.contains(':') {
+        return Err(anyhow!(
+            "Assignee must be in format 'type:identifier' (e.g., 'agent:copilot', 'user:alice'). Got: '{}'",
+            assignee
+        ));
+    }
+
+    let parts: Vec<&str> = assignee.splitn(2, ':').collect();
+    if parts.len() != 2 || parts[0].is_empty() || parts[1].is_empty() {
+        return Err(anyhow!(
+            "Assignee must be in format 'type:identifier' with non-empty type and identifier. Got: '{}'",
+            assignee
+        ));
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -217,5 +329,94 @@ mod tests {
         let suggestion = suggest_label_fix("ns:val:extra");
         assert!(suggestion.is_some());
         assert!(suggestion.unwrap().contains("one colon"));
+    }
+
+    #[test]
+    fn test_validate_assignee_format_valid() {
+        assert!(validate_assignee_format("agent:copilot").is_ok());
+        assert!(validate_assignee_format("user:alice").is_ok());
+        assert!(validate_assignee_format("team:platform").is_ok());
+    }
+
+    #[test]
+    fn test_validate_assignee_format_invalid_no_colon() {
+        let result = validate_assignee_format("invalid");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("type:identifier"));
+    }
+
+    #[test]
+    fn test_validate_assignee_format_invalid_empty() {
+        let result = validate_assignee_format("");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("empty"));
+    }
+
+    #[test]
+    fn test_validate_assignee_format_invalid_empty_parts() {
+        assert!(validate_assignee_format(":identifier").is_err());
+        assert!(validate_assignee_format("type:").is_err());
+    }
+
+    #[test]
+    fn test_validate_label_operations_valid() {
+        use std::collections::HashMap;
+
+        let existing = vec!["type:task".to_string()];
+        let add = vec!["milestone:v1.0".to_string(), "epic:auth".to_string()];
+        let remove = vec![];
+        let namespaces = HashMap::new();
+
+        assert!(validate_label_operations(&existing, &add, &remove, &namespaces).is_ok());
+    }
+
+    #[test]
+    fn test_validate_label_operations_rejects_invalid_format() {
+        use std::collections::HashMap;
+
+        let existing = vec!["type:task".to_string()];
+        let add = vec!["bad_label_no_colon".to_string()];
+        let remove = vec![];
+        let namespaces = HashMap::new();
+
+        let result = validate_label_operations(&existing, &add, &remove, &namespaces);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid label format"));
+    }
+
+    #[test]
+    fn test_validate_label_operations_rejects_duplicate_unique_namespace() {
+        use crate::domain::LabelNamespace;
+        use std::collections::HashMap;
+
+        let existing = vec!["type:task".to_string()];
+        let add = vec!["type:epic".to_string()];
+        let remove = vec![];
+
+        let mut namespaces = HashMap::new();
+        namespaces.insert("type".to_string(), LabelNamespace::new("Issue type", true));
+
+        let result = validate_label_operations(&existing, &add, &remove, &namespaces);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("unique namespace"));
+    }
+
+    #[test]
+    fn test_validate_label_operations_allows_replacing_unique_namespace() {
+        use crate::domain::LabelNamespace;
+        use std::collections::HashMap;
+
+        let existing = vec!["type:task".to_string()];
+        let add = vec!["type:epic".to_string()];
+        let remove = vec!["type:task".to_string()];
+
+        let mut namespaces = HashMap::new();
+        namespaces.insert("type".to_string(), LabelNamespace::new("Issue type", true));
+
+        // Should succeed - removing old type before adding new one
+        assert!(validate_label_operations(&existing, &add, &remove, &namespaces).is_ok());
     }
 }

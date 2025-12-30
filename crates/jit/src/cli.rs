@@ -222,9 +222,14 @@ pub enum IssueCommands {
         json: bool,
     },
 
-    /// Update an issue
+    /// Update an issue or multiple issues
     Update {
-        id: String,
+        /// Issue ID (for single issue mode, mutually exclusive with --filter)
+        id: Option<String>,
+
+        /// Boolean query filter (for batch mode, mutually exclusive with ID)
+        #[arg(long, conflicts_with = "id")]
+        filter: Option<String>,
 
         #[arg(short, long)]
         title: Option<String>,
@@ -245,6 +250,14 @@ pub enum IssueCommands {
         /// Remove label(s) (repeatable)
         #[arg(long)]
         remove_label: Vec<String>,
+
+        /// Set assignee (format: type:identifier)
+        #[arg(long)]
+        assignee: Option<String>,
+
+        /// Clear assignee
+        #[arg(long)]
+        unassign: bool,
 
         #[arg(long)]
         json: bool,

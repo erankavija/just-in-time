@@ -345,63 +345,146 @@ strategic_types = {}
                 },
                 IssueCommands::Update {
                     id,
+                    filter,
                     title,
                     description,
                     priority,
                     state,
                     label,
                     remove_label,
+                    assignee,
+                    unassign,
                     json,
                 } => {
                     let output_ctx = OutputContext::new(quiet, json);
-                    // Resolve short hash to full UUID first
-                    let full_id = storage.resolve_issue_id(&id)?;
 
-                    let prio = priority.map(|p| parse_priority(&p)).transpose()?;
-                    let st = state.map(|s| parse_state(&s)).transpose()?;
+                    // Validate: exactly one of ID or filter must be provided
+                    if id.is_none() && filter.is_none() {
+                        return Err(anyhow!(
+                            "Must specify either issue ID or --filter for batch mode"
+                        ));
+                    }
+                    if id.is_some() && filter.is_some() {
+                        return Err(anyhow!(
+                            "Cannot specify both ID and --filter (mutually exclusive)"
+                        ));
+                    }
 
-                    match executor.update_issue(
-                        &full_id,
-                        title,
-                        description,
-                        prio,
-                        st,
-                        label,
-                        remove_label,
-                    ) {
-                        Ok(()) => {
-                            if json {
-                                let issue = storage.load_issue(&full_id)?;
-                                let output = JsonOutput::success(issue, "issue update");
-                                println!("{}", output.to_json_string()?);
-                            } else {
-                                let _ =
-                                    output_ctx.print_success(format!("Updated issue: {}", full_id));
+                    // Single issue mode
+                    if let Some(id_str) = id {
+                        // Resolve short hash to full UUID first
+                        let full_id = storage.resolve_issue_id(&id_str)?;
+
+                        let prio = priority.map(|p| parse_priority(&p)).transpose()?;
+                        let st = state.map(|s| parse_state(&s)).transpose()?;
+
+                        match executor.update_issue(
+                            &full_id,
+                            title,
+                            description,
+                            prio,
+                            st,
+                            label,
+                            remove_label,
+                        ) {
+                            Ok(()) => {
+                                if json {
+                                    let issue = storage.load_issue(&full_id)?;
+                                    let output = JsonOutput::success(issue, "issue update");
+                                    println!("{}", output.to_json_string()?);
+                                } else {
+                                    let _ = output_ctx
+                                        .print_success(format!("Updated issue: {}", full_id));
+                                }
+                            }
+                            Err(e) => {
+                                // Check if this is a gate validation error
+                                let error_msg = e.to_string();
+                                let json_error = if error_msg.contains("Gate validation failed") {
+                                    // Reload issue to get unpassed gates
+                                    let issue = storage.load_issue(&full_id)?;
+                                    let unpassed = issue.get_unpassed_gates();
+                                    jit::output::JsonError::gate_validation_failed(
+                                        &unpassed,
+                                        &full_id,
+                                        "issue update",
+                                    )
+                                } else if error_msg.contains("not found") {
+                                    jit::output::JsonError::issue_not_found(
+                                        &full_id,
+                                        "issue update",
+                                    )
+                                } else {
+                                    // Generic error - use the JsonError::new directly
+                                    jit::output::JsonError::new(
+                                        "GENERIC_ERROR",
+                                        &error_msg,
+                                        "issue update",
+                                    )
+                                };
+                                handle_json_error!(json, e, json_error);
                             }
                         }
-                        Err(e) => {
-                            // Check if this is a gate validation error
-                            let error_msg = e.to_string();
-                            let json_error = if error_msg.contains("Gate validation failed") {
-                                // Reload issue to get unpassed gates
-                                let issue = storage.load_issue(&full_id)?;
-                                let unpassed = issue.get_unpassed_gates();
-                                jit::output::JsonError::gate_validation_failed(
-                                    &unpassed,
-                                    &full_id,
-                                    "issue update",
-                                )
-                            } else if error_msg.contains("not found") {
-                                jit::output::JsonError::issue_not_found(&full_id, "issue update")
+                    }
+                    // Batch mode
+                    else if let Some(filter_str) = filter {
+                        use jit::commands::bulk_update::UpdateOperations;
+                        use jit::query::QueryFilter;
+
+                        // Parse query filter
+                        let query_filter = QueryFilter::parse(&filter_str)?;
+
+                        // Build update operations
+                        let operations = UpdateOperations {
+                            state: state.map(|s| parse_state(&s)).transpose()?,
+                            add_labels: label,
+                            remove_labels: remove_label,
+                            assignee,
+                            unassign,
+                            priority: priority.map(|p| parse_priority(&p)).transpose()?,
+                        };
+
+                        // Execute bulk update
+                        let result = executor.apply_bulk_update(&query_filter, &operations)?;
+
+                        if json {
+                            let output = JsonOutput::success(result, "bulk update");
+                            println!("{}", output.to_json_string()?);
+                        } else {
+                            // Human-readable output
+                            if result.summary.total_modified > 0 {
+                                let _ = output_ctx.print_success(format!(
+                                    "✓ Modified {} issue(s)",
+                                    result.summary.total_modified
+                                ));
+                            }
+
+                            if !result.skipped.is_empty() {
+                                println!("\nℹ Skipped {} issue(s):", result.summary.total_skipped);
+                                for (id, reason) in &result.skipped {
+                                    println!("  • {}: {}", &id[..8.min(id.len())], reason);
+                                }
+                            }
+
+                            if !result.errors.is_empty() {
+                                println!("\n✗ Failed {} issue(s):", result.summary.total_errors);
+                                for (id, error) in &result.errors {
+                                    println!("  • {}: {}", &id[..8.min(id.len())], error);
+                                }
+                            }
+
+                            if result.summary.total_matched > 0 {
+                                println!(
+                                    "\nSummary: {}/{} succeeded ({:.0}%)",
+                                    result.summary.total_modified,
+                                    result.summary.total_matched,
+                                    (result.summary.total_modified as f64
+                                        / result.summary.total_matched as f64)
+                                        * 100.0
+                                );
                             } else {
-                                // Generic error - use the JsonError::new directly
-                                jit::output::JsonError::new(
-                                    "GENERIC_ERROR",
-                                    &error_msg,
-                                    "issue update",
-                                )
-                            };
-                            handle_json_error!(json, e, json_error);
+                                println!("No issues matched filter");
+                            }
                         }
                     }
                 }

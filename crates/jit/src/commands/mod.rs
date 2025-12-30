@@ -17,7 +17,7 @@
 //! - `search`: Issue search operations
 
 mod breakdown;
-mod bulk_update;
+pub mod bulk_update;
 mod dependency;
 mod document;
 mod events;
