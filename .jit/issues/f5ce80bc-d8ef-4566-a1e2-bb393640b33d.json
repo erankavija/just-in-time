@@ -5,7 +5,9 @@
   "state": "in_progress",
   "priority": "high",
   "assignee": "agent:copilot",
-  "dependencies": [],
+  "dependencies": [
+    "d1c51bbd-baca-4d51-9013-d91c0801ebd4"
+  ],
   "gates_required": [
     "tdd-reminder",
     "tests",
