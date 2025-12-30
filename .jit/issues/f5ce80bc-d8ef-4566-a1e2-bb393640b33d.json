@@ -28,6 +28,13 @@
       "label": "Implementation Plan",
       "doc_type": "design",
       "format": "markdown"
+    },
+    {
+      "path": "dev/sessions/session-2025-12-30-bulk-operations-progress.md",
+      "commit": null,
+      "label": "Session Notes - Phase 1-3 Complete",
+      "doc_type": "notes",
+      "format": "markdown"
     }
   ],
   "labels": [
