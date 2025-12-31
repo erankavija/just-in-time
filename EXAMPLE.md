@@ -243,6 +243,40 @@ jit coordinator start
 jit coordinator stop
 ```
 
+## Bulk Operations
+
+For managing multiple issues efficiently:
+
+```bash
+# Batch state transitions - complete entire milestone
+jit issue update --filter "label:milestone:v1.0 AND state:ready" --state done
+
+# Batch label management - tag all backend tasks
+jit issue update --filter "label:component:backend" --label "needs-review:true"
+
+# Batch reassignment - hand off work to another agent
+jit issue update --filter "assignee:agent:worker-1" --assignee "agent:worker-2"
+
+# Batch priority adjustment - escalate critical path
+jit issue update --filter "label:epic:auth" --priority critical
+
+# Complex queries with AND/OR/NOT
+jit issue update --filter "state:ready AND NOT assignee:* AND priority:high" --assignee "agent:worker-1"
+
+# Remove labels from multiple issues
+jit issue update --filter "label:milestone:v0.9" --remove-label "milestone:v0.9"
+```
+
+**Bulk operations are literal:**
+- Set exactly what you specify (no auto-transitions)
+- Safer and more predictable for large-scale changes
+- Per-issue atomic file operations
+- Clear error reporting (modified/skipped/errors)
+
+**When to use bulk vs single-issue update:**
+- **Single-issue:** For smart orchestration (prechecks, postchecks, auto-transitions)
+- **Bulk:** For explicit, predictable batch changes across many issues
+
 ## Key Concepts
 
 - **Dynamic Issue Creation**: Agents create issues as they discover work
@@ -252,6 +286,7 @@ jit coordinator stop
 - **Event Sourcing**: Full audit trail
 - **Atomic Claiming**: No race conditions with `claim`
 - **Graph Queries**: Understand relationships and impact
+- **Bulk Operations**: Efficient batch updates with query filters
 
 ## Advanced Patterns
 
