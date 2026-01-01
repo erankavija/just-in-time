@@ -1,7 +1,7 @@
 {
   "id": "d6dc4dfa-6784-43a8-8b8a-761bd5a3f38a",
-  "title": "Update EXAMPLE.md with gate commands",
-  "description": "Add comprehensive gate command examples to EXAMPLE.md including TDD workflow and all gate commands",
+  "title": "Migrate EXAMPLE.md content to Diátaxis structure",
+  "description": "Migrate content from EXAMPLE.md into the appropriate Diátaxis documentation structure and remove the legacy file.\n\n## Content Mapping\n\n**From EXAMPLE.md (723 lines) to:**\n\n- `docs/tutorials/quickstart.md` - Basic CLI usage examples (Quick Note section, Setup)\n- `docs/tutorials/first-workflow.md` - Complete agent orchestration example\n- `docs/how-to/custom-gates.md` - Gate command examples and TDD workflow\n- `docs/how-to/software-development.md` - Software development patterns\n- `docs/reference/cli-commands.md` - CLI command reference examples\n\n## Key Content to Preserve\n\n- Short hash usage examples\n- Labels are optional (simple usage patterns)\n- Gate system examples (all gate commands)\n- Agent orchestration workflow\n- CLI command patterns with --json output\n\n## Acceptance Criteria\n\n- [ ] All valuable content from EXAMPLE.md migrated to appropriate docs\n- [ ] Gate command examples comprehensive (issue focus)\n- [ ] TDD workflow documented\n- [ ] EXAMPLE.md deleted (no redirects, clean removal)\n- [ ] No broken references to EXAMPLE.md in codebase\n\n## Related\n\nPart of Epic cfb3ba94 (User Documentation Phase 2) - Story 48e2e917 (Gate System Documentation)",
   "state": "ready",
   "priority": "high",
   "assignee": null,

@@ -1,7 +1,7 @@
 {
   "id": "b47c8918-8807-4eee-8474-39dab29fa4c2",
-  "title": "Update AGENT-QUICKSTART.md with gates",
-  "description": "Add gate usage examples and workflows to agent quickstart guide",
+  "title": "Migrate AGENT-QUICKSTART.md content to Diátaxis structure",
+  "description": "Migrate content from AGENT-QUICKSTART.md into the appropriate Diátaxis documentation structure and remove the legacy file.\n\n## Content Mapping\n\n**From AGENT-QUICKSTART.md (416 lines) to:**\n\n- `docs/concepts/overview.md` - Core concepts (what is JIT, why agents)\n- `docs/concepts/core-model.md` - Issue states, label format, required labels\n- `docs/tutorials/quickstart.md` - Agent onboarding (get productive in 5 minutes)\n- `docs/how-to/custom-gates.md` - Gate usage for agents\n- `docs/reference/cli-commands.md` - MCP tools and JSON output\n\n## Key Content to Preserve\n\n- Agent-first mental model\n- Label format requirements (namespace:value, validation)\n- Issue state machine\n- MCP tools reference\n- Common agent workflows\n- Gate usage patterns for agents\n\n## Acceptance Criteria\n\n- [ ] All agent-specific content migrated to appropriate docs\n- [ ] Agent perspective maintained in concepts/tutorials\n- [ ] Gate workflows documented for agents\n- [ ] AGENT-QUICKSTART.md deleted (no redirects, clean removal)\n- [ ] No broken references to AGENT-QUICKSTART.md in codebase\n\n## Related\n\nPart of Epic cfb3ba94 (User Documentation Phase 2) - Story 48e2e917 (Gate System Documentation)",
   "state": "ready",
   "priority": "normal",
   "assignee": null,
