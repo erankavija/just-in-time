@@ -100,7 +100,7 @@ Separate jit-dispatch orchestrator, storage abstraction, generic DAG, CLI consis
 - `INSTALL.md` - Installation methods
 - `DEPLOYMENT.md` - Production deployment
 - `TESTING.md` - Test strategy
-- `EXAMPLE.md` - Workflows and examples
+- `docs/tutorials/` - Quickstart and workflow examples
 
 ### Phase 5: Quality Gate System
 

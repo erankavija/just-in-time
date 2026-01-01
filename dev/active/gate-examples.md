@@ -467,5 +467,4 @@ jit gate define security-audit --stage postcheck --mode auto \
 ## See Also
 
 - [CI Gate Integration Design](ci-gate-integration-design.md) - Complete design specification
-- [Label Conventions](label-conventions.md) - Issue organization patterns
-- [Example Workflows](../EXAMPLE.md) - End-to-end agent coordination examples
+- [Example Workflows](../../docs/tutorials/first-workflow.md) - End-to-end agent coordination examples

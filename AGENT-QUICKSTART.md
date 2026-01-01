@@ -352,7 +352,7 @@ jit events query --event-type state_changed --limit 20
 - **ROADMAP.md** - Where we are, where we're going
 - **TESTING.md** - TDD approach, test strategy
 - **.copilot-instructions.md** - Coding standards, patterns to follow
-- **EXAMPLE.md** - Usage examples
+- **Tutorials** - Quickstart and complete workflow examples
 - **docs/reference/labels.md** - Complete label reference
 - **dev/index.md** - Development documentation guide
 

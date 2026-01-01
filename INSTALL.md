@@ -317,7 +317,7 @@ rg --version
 
 - Initialize a repository: `jit init`
 - Read the [Quick Start](README.md#quick-start)
-- See [EXAMPLE.md](EXAMPLE.md) for complete workflows
+- See [Quickstart Tutorial](docs/tutorials/quickstart.md) for complete workflows
 - Check [DEPLOYMENT.md](DEPLOYMENT.md) for production setup
 
 ---

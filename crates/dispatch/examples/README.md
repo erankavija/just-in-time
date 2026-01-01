@@ -241,4 +241,4 @@ Have a cool orchestrator pattern? Submit a PR!
 - **Built-in orchestrator**: `../README.md` - The production-ready jit-dispatch
 - **Integration patterns**: `integration-patterns.md` - Advanced patterns and best practices
 - **Core design**: `../../docs/design.md` - Architecture and API design
-- **Examples**: `../../EXAMPLE.md` - End-to-end workflow examples
+- **Examples**: `../../docs/tutorials/` - Complete workflow examples

@@ -19,9 +19,9 @@
     }
   ],
   "labels": [
-    "type:decision",
     "epic:production-stability",
     "milestone:v1.0",
-    "component:core"
+    "component:core",
+    "type:task"
   ]
 }

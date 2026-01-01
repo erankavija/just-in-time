@@ -22,7 +22,6 @@
     "type:task",
     "epic:production-stability",
     "milestone:v1.0",
-    "component:core",
-    "priority:critical"
+    "component:core"
   ]
 }

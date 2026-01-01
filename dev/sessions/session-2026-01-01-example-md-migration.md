@@ -168,12 +168,54 @@
 
 ## Next Actions
 
-1. **Review current tutorials** - Identify what's already covered
-2. **Extract unique content** - Only migrate what adds new value
-3. **Bulk operations** - High priority, clear reference material
-4. **Troubleshooting** - High priority, practical how-to content
-5. **Scripting** - Medium priority, useful for automation
-6. **Delete EXAMPLE.md** - After migration complete
+1. ✅ **Review current tutorials** - Identified coverage
+2. ✅ **Bulk operations** - Migrated to docs/reference/cli-commands.md
+3. ✅ **Scripting and automation** - Migrated to docs/reference/cli-commands.md  
+4. ✅ **Troubleshooting** - Migrated to docs/how-to/custom-gates.md
+5. ✅ **Update references** - Fixed all EXAMPLE.md references in main docs
+6. ✅ **Delete EXAMPLE.md** - Deleted successfully
+
+## Migration Complete ✅
+
+All valuable content from EXAMPLE.md has been migrated to the appropriate Diátaxis documentation structure. The file has been deleted and all references updated.
+
+**References updated:**
+- README.md (3 references → tutorials)
+- INSTALL.md (1 reference → quickstart)
+- CONTRIBUTOR-QUICKSTART.md (1 reference → tutorials/how-to)
+- AGENT-QUICKSTART.md (1 reference → tutorials)
+- ROADMAP.md (1 reference → tutorials)
+- scripts/agent-init-demo-project.sh (1 reference → tutorials)
+- crates/dispatch/examples/*.md (2 references → tutorials)
+- dev/active/gate-examples.md (1 reference → tutorials)
+
+**Next: Mark issue as done and pass code-review gate**
+
+## Content Migration Complete ✅
+
+**docs/reference/cli-commands.md additions:**
+- Global options (--json, --quiet)
+- Bulk operations section with filter syntax
+- Scripting and automation section
+  - Quiet mode examples
+  - JSON parsing with jq
+  - Graceful pipe handling
+  - Example scripts (bulk creation, CI/CD, status reports)
+  - Exit codes
+
+**docs/how-to/custom-gates.md additions:**
+- Troubleshooting gate failures section
+  - Common issues (repo not init, cycles, label format, orphaned tasks)
+  - Validation and recovery
+  - Getting help
+
+**Content skipped (as planned):**
+- Coordinator daemon examples (lines 227-245) - Future dispatch crate docs
+- Key concepts list (lines 280-290) - Already in tutorials
+- Advanced patterns (lines 291-330) - Covered in tutorials
+- Label hierarchy practices (lines 398-468) - Already in core-model.md
+- Label warnings (lines 664-723) - Already in core-model.md
+- Monitoring/events (lines 211-226) - Basic reference, can add to CLI reference later if needed
 
 ## Notes
 

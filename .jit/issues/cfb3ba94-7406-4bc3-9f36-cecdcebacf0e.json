@@ -19,12 +19,6 @@
   "context": {},
   "documents": [
     {
-      "path": "EXAMPLE.md",
-      "commit": null,
-      "label": "Reference",
-      "doc_type": null
-    },
-    {
       "path": "AGENT-QUICKSTART.md",
       "commit": null,
       "label": "Reference",

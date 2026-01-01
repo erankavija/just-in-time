@@ -419,4 +419,4 @@ assert_equals "$ASSIGNED" "1"
 
 - `crates/dispatch/README.md` - Built-in orchestrator documentation
 - `docs/design.md` - Architecture and design decisions
-- `EXAMPLE.md` - End-to-end workflow examples
+- `../../docs/tutorials/` - Complete workflow examples

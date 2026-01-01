@@ -75,7 +75,7 @@ jit issue list
 - **Use short hashes** - reference issues with short prefixes (min 4 chars) like git: `jit issue show 003f9f83`
 - Override storage location with `JIT_DATA_DIR` environment variable
 
-See [EXAMPLE.md](EXAMPLE.md) for complete workflows.
+See the [Quickstart Tutorial](docs/tutorials/quickstart.md) and [First Workflow](docs/tutorials/first-workflow.md) for complete examples.
 
 ## How It Works
 
@@ -330,7 +330,7 @@ jit issue update $EPIC_ID --state done
 jit coordinator stop
 ```
 
-**See the full step-by-step workflow in [EXAMPLE.md](EXAMPLE.md)** showing:
+**See the [tutorials](docs/tutorials/)** showing:
 - Lead agent orchestrating multiple workers
 - Dynamic issue creation during execution  
 - Dependency management and gate passing
@@ -525,7 +525,10 @@ File locking ensures data consistency. See [dev/archive/features/file-locking-us
 
 ### Getting Started
 - [INSTALL.md](INSTALL.md) - Installation guide (binaries, Docker, from source)
-- [EXAMPLE.md](EXAMPLE.md) - Complete agent orchestration walkthrough
+- [Tutorials](docs/tutorials/) - Quickstart and complete workflow examples
+- [How-To Guides](docs/how-to/) - Custom gates and software development patterns
+- [Concepts](docs/concepts/) - Core model and architecture
+- [Reference](docs/reference/) - CLI commands and configuration
 - [CONTRIBUTOR-QUICKSTART.md](CONTRIBUTOR-QUICKSTART.md) - Get productive in 5 minutes
 - [DEPLOYMENT.md](DEPLOYMENT.md) - Production deployment guide
 

@@ -71,7 +71,8 @@ jit query ready --json | head -5
 - **dev/architecture/core-system-design.md** - Core architecture
 - **dev/index.md** - Development documentation guide
 - **docs/index.md** - Product documentation (user-facing)
-- **EXAMPLE.md** - Usage examples
+- **Tutorials** - Quickstart and complete workflow examples
+- **How-To Guides** - Custom gates and software development patterns
 
 ## Common Patterns
 
