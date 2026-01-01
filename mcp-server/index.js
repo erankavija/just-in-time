@@ -94,12 +94,15 @@ function generateToolFromCommand(name, cmd, parentPath = "") {
   // Add arguments as properties
   if (cmd.args) {
     for (const arg of cmd.args) {
+      // Handle array types: convert array<string> or array[string] to proper JSON Schema
+      const isArray = arg.type === "array<string>" || arg.type === "array[string]" || arg.type === "array";
+      
       properties[arg.name] = {
-        type: arg.type === "array[string]" ? "array" : arg.type,
+        type: isArray ? "array" : arg.type,
         description: arg.description || `${arg.name} parameter`,
       };
       
-      if (arg.type === "array[string]") {
+      if (isArray) {
         properties[arg.name].items = { type: "string" };
       }
       
