@@ -79,6 +79,10 @@ impl<S: IssueStore> CommandExecutor<S> {
                 }
 
                 added.push(gate_key.clone());
+
+                // Log gate added event
+                self.storage
+                    .append_event(&Event::new_gate_added(full_id.clone(), gate_key.clone()))?;
             }
         }
 
@@ -109,6 +113,10 @@ impl<S: IssueStore> CommandExecutor<S> {
                 issue.gates_required.retain(|g| g != gate_key);
                 issue.gates_status.remove(gate_key);
                 removed.push(gate_key.clone());
+
+                // Log gate removed event
+                self.storage
+                    .append_event(&Event::new_gate_removed(full_id.clone(), gate_key.clone()))?;
             } else {
                 not_found.push(gate_key.clone());
             }

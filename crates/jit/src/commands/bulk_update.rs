@@ -23,6 +23,10 @@ pub struct UpdateOperations {
     pub unassign: bool,
     /// New priority to set
     pub priority: Option<Priority>,
+    /// Gates to add
+    pub add_gates: Vec<String>,
+    /// Gates to remove
+    pub remove_gates: Vec<String>,
 }
 
 /// Result of bulk update operation
@@ -260,6 +264,22 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
+        // Apply gate changes
+        for gate_key in &operations.add_gates {
+            if !updated.gates_required.contains(gate_key) {
+                updated.gates_required.push(gate_key.clone());
+                modified_fields.push(format!("gate:+{}", gate_key));
+            }
+        }
+
+        for gate_key in &operations.remove_gates {
+            if let Some(pos) = updated.gates_required.iter().position(|g| g == gate_key) {
+                updated.gates_required.remove(pos);
+                updated.gates_status.remove(gate_key);
+                modified_fields.push(format!("gate:-{}", gate_key));
+            }
+        }
+
         // Apply assignee change
         if let Some(ref assignee) = operations.assignee {
             if updated.assignee.as_ref() != Some(assignee) {
@@ -349,6 +369,20 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
+        // Gate additions
+        for gate_key in &operations.add_gates {
+            if !issue.gates_required.contains(gate_key) {
+                changes.push(format!("add gate: {}", gate_key));
+            }
+        }
+
+        // Gate removals
+        for gate_key in &operations.remove_gates {
+            if issue.gates_required.contains(gate_key) {
+                changes.push(format!("remove gate: {}", gate_key));
+            }
+        }
+
         // Assignee change
         if let Some(ref assignee) = operations.assignee {
             if issue.assignee.as_ref() != Some(assignee) {
@@ -389,6 +423,16 @@ impl<S: IssueStore> CommandExecutor<S> {
                 &operations.remove_labels,
                 &label_namespaces.namespaces,
             )?;
+        }
+
+        // Validate gate operations - check that gates exist in registry
+        if !operations.add_gates.is_empty() {
+            let registry = self.storage.load_gate_registry()?;
+            for gate_key in &operations.add_gates {
+                if !registry.gates.contains_key(gate_key) {
+                    return Err(anyhow::anyhow!("Gate '{}' not found in registry", gate_key));
+                }
+            }
         }
 
         // Validate assignee format

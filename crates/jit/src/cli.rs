@@ -251,6 +251,14 @@ pub enum IssueCommands {
         #[arg(long)]
         remove_label: Vec<String>,
 
+        /// Add gate(s) to issue (gate keys from registry, repeatable)
+        #[arg(long, value_delimiter = ',')]
+        add_gate: Vec<String>,
+
+        /// Remove gate(s) from issue (repeatable)
+        #[arg(long, value_delimiter = ',')]
+        remove_gate: Vec<String>,
+
         /// Set assignee (format: type:identifier)
         #[arg(long)]
         assignee: Option<String>,

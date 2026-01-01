@@ -2,9 +2,9 @@
   "id": "93d1caf7-1f6e-4d6c-a64d-42546401ebe4",
   "title": "Add gate modification flags to issue update command",
   "description": "Add --add-gate and --remove-gate flags to 'jit issue update' command, matching the existing pattern for labels (--label/--remove-label).\n\n## Problem\n\nCurrent: Must use separate 'jit gate add/remove' commands to modify gates on existing issues.\nDesired: Modify gates directly via 'jit issue update' for API consistency and efficiency.\n\n## Solution\n\nAdd two new flags to 'jit issue update':\n- `--add-gate <KEY>` - Add gate(s) to issue (comma-separated or multiple flags)\n- `--remove-gate <KEY>` - Remove gate(s) from issue\n\nWorks in both single-issue and batch mode (with --filter).\n\n## Examples\n\n```bash\n# Single issue\njit issue update abc123 --add-gate tests --add-gate clippy\n\n# Batch mode\njit issue update --filter \"label:epic:auth\" --add-gate code-review\n\n# Combined with other updates\njit issue update abc123 --state ready --add-gate tests\n```\n\n## Acceptance Criteria\n\n- Flags work in single-issue and batch modes\n- Multiple gates supported (comma-separated and multiple flags)\n- Invalid gate keys return clear errors\n- Idempotent (adding duplicate is no-op)\n- JSON output includes updated gates_required\n- Events logged for additions/removals\n- MCP schema updated\n- 14+ new tests passing\n\nSee linked implementation plan for detailed design and phases.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:copilot",
   "dependencies": [],
   "gates_required": [
     "tdd-reminder",
@@ -13,7 +13,13 @@
     "fmt",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": "agent:copilot",
+      "updated_at": "2026-01-01T21:55:34.454675319Z"
+    }
+  },
   "context": {},
   "documents": [
     {

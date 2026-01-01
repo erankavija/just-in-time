@@ -479,6 +479,28 @@ pub enum Event {
         /// Who marked it as failed
         updated_by: Option<String>,
     },
+    /// A quality gate was added to an issue
+    GateAdded {
+        /// Event ID
+        id: String,
+        /// Issue to which gate was added
+        issue_id: String,
+        /// When this occurred
+        timestamp: DateTime<Utc>,
+        /// Gate that was added
+        gate_key: String,
+    },
+    /// A quality gate was removed from an issue
+    GateRemoved {
+        /// Event ID
+        id: String,
+        /// Issue from which gate was removed
+        issue_id: String,
+        /// When this occurred
+        timestamp: DateTime<Utc>,
+        /// Gate that was removed
+        gate_key: String,
+    },
     /// Issue was completed
     IssueCompleted {
         /// Event ID
@@ -586,6 +608,26 @@ impl Event {
         }
     }
 
+    /// Create a gate added event
+    pub fn new_gate_added(issue_id: String, gate_key: String) -> Self {
+        Event::GateAdded {
+            id: Uuid::new_v4().to_string(),
+            issue_id,
+            timestamp: Utc::now(),
+            gate_key,
+        }
+    }
+
+    /// Create a gate removed event
+    pub fn new_gate_removed(issue_id: String, gate_key: String) -> Self {
+        Event::GateRemoved {
+            id: Uuid::new_v4().to_string(),
+            issue_id,
+            timestamp: Utc::now(),
+            gate_key,
+        }
+    }
+
     /// Create an issue completed event
     pub fn new_issue_completed(issue_id: String) -> Self {
         Event::IssueCompleted {
@@ -642,6 +684,8 @@ impl Event {
             Event::IssueStateChanged { issue_id, .. } => issue_id,
             Event::GatePassed { issue_id, .. } => issue_id,
             Event::GateFailed { issue_id, .. } => issue_id,
+            Event::GateAdded { issue_id, .. } => issue_id,
+            Event::GateRemoved { issue_id, .. } => issue_id,
             Event::IssueCompleted { issue_id, .. } => issue_id,
             Event::IssueReleased { issue_id, .. } => issue_id,
             Event::IssueUpdated { issue_id, .. } => issue_id,
@@ -657,6 +701,8 @@ impl Event {
             Event::IssueStateChanged { .. } => "issue_state_changed",
             Event::GatePassed { .. } => "gate_passed",
             Event::GateFailed { .. } => "gate_failed",
+            Event::GateAdded { .. } => "gate_added",
+            Event::GateRemoved { .. } => "gate_removed",
             Event::IssueCompleted { .. } => "issue_completed",
             Event::IssueReleased { .. } => "issue_released",
             Event::IssueUpdated { .. } => "issue_updated",

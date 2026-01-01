@@ -352,6 +352,8 @@ strategic_types = {}
                     state,
                     label,
                     remove_label,
+                    add_gate,
+                    remove_gate,
                     assignee,
                     unassign,
                     json,
@@ -377,6 +379,15 @@ strategic_types = {}
 
                         let prio = priority.map(|p| parse_priority(&p)).transpose()?;
                         let st = state.map(|s| parse_state(&s)).transpose()?;
+
+                        // Handle gate modifications first (before other updates)
+                        if !add_gate.is_empty() {
+                            executor.add_gates(&full_id, &add_gate)?;
+                        }
+
+                        if !remove_gate.is_empty() {
+                            executor.remove_gates(&full_id, &remove_gate)?;
+                        }
 
                         match executor.update_issue(
                             &full_id,
@@ -442,6 +453,8 @@ strategic_types = {}
                             assignee,
                             unassign,
                             priority: priority.map(|p| parse_priority(&p)).transpose()?,
+                            add_gates: add_gate,
+                            remove_gates: remove_gate,
                         };
 
                         // Execute bulk update
