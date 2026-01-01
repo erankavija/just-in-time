@@ -9,33 +9,35 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 ### 📚 [Concepts](concepts/) - Understanding JIT
 *Explanation-oriented: Learn about core concepts and design principles*
 
-- What is JIT and why it exists
-- Core model: issues, dependencies, gates, states
-- System guarantees and invariants
-- Domain-agnostic design principles
+- [Overview](concepts/overview.md) - What is JIT and why it exists (draft)
+- [Core Model](concepts/core-model.md) - Issues, dependencies, gates, states (draft)
+- [System Guarantees](concepts/guarantees.md) - Invariants and consistency (draft)
+- [Design Philosophy](concepts/design-philosophy.md) - Domain-agnostic principles (draft)
 
 ### 🎓 [Tutorials](tutorials/) - Learning-Oriented
 *Step-by-step lessons to get started*
 
-- Quickstart guide (coming soon)
-- Your first workflow (coming soon)
+- [Quickstart](tutorials/quickstart.md) - Get started in 10 minutes (draft)
+- [First Workflow](tutorials/first-workflow.md) - Complete walkthrough (draft)
 
 ### 🔧 [How-To Guides](how-to/) - Goal-Oriented
 *Practical recipes for specific use cases*
 
-- Software development workflows (coming soon)
-- Research project tracking (coming soon)
-- Knowledge work management (coming soon)
-- Custom gates and validation (coming soon)
-- Dependency management strategies (coming soon)
+- [Software Development](how-to/software-development.md) - Feature dev, TDD, CI/CD (draft)
+- [Research Projects](how-to/research-projects.md) - Research questions, experiments (draft)
+- [Knowledge Work](how-to/knowledge-work.md) - Personal projects, learning goals (draft)
+- [Custom Gates](how-to/custom-gates.md) - Define and use quality gates (draft)
+- [Dependency Management](how-to/dependency-management.md) - Graph strategies (draft)
 
 ### 📖 [Reference](reference/) - Information-Oriented
 *Technical specifications and API documentation*
 
-- CLI command reference (coming soon)
-- Storage format specification (coming soon)
-- Configuration options ([example-config.toml](reference/example-config.toml))
-- Programmatic API (coming soon)
+- [CLI Commands](reference/cli-commands.md) - Complete command reference (draft)
+- [Storage Format](reference/storage-format.md) - On-disk format specification (draft)
+- [Configuration](reference/configuration.md) - config.toml and settings (draft)
+- [Glossary](reference/glossary.md) - Term definitions (draft)
+- [Example Config](reference/example-config.toml) - Sample configuration
+- [Labels](reference/labels.md) - Label system reference
 
 ### 📄 Additional Resources
 

@@ -18,6 +18,7 @@
     "type:task",
     "epic:rejection-state",
     "milestone:v1.0",
-    "component:docs"
+    "component:docs",
+    "epic:docs"
   ]
 }
