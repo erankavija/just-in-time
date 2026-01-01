@@ -24,57 +24,73 @@ impl LinkValidator {
     }
 
     /// Scan document for internal links to other documents
+    ///
+    /// Uses pulldown_cmark parser to properly handle Markdown structure.
+    /// Skips links inside code blocks (fenced and indented).
+    /// Note: Inline code cannot contain links in Markdown, so we don't need to track it.
     pub fn scan_document_links(&self, doc_path: &Path) -> Result<Vec<InternalLink>> {
+        use pulldown_cmark::{Event, Parser, Tag};
+
         let content = std::fs::read_to_string(self.repo_root.join(doc_path))?;
         let mut links = Vec::new();
 
-        for (line_num, line) in content.lines().enumerate() {
-            // Match Markdown links: [text](url) but NOT images: ![alt](url)
-            let mut chars = line.char_indices().peekable();
-            while let Some((idx, ch)) = chars.next() {
-                if ch == '[' {
-                    // Check if this is an image link by looking back for !
-                    let is_image = idx > 0 && line.chars().nth(idx - 1) == Some('!');
+        let parser = Parser::new(&content);
 
-                    if is_image {
-                        continue; // Skip image links
-                    }
+        // Track whether we're inside a code block
+        let mut in_code_block = false;
 
-                    // Find closing ]
-                    let remaining: String = chars.clone().map(|(_, c)| c).collect();
-                    if let Some(close_bracket) = remaining.find(']') {
-                        // Skip ahead
-                        for _ in 0..close_bracket {
-                            chars.next();
-                        }
-                        chars.next(); // Skip ]
-
-                        // Check for (url)
-                        if let Some((_, '(')) = chars.peek() {
-                            chars.next(); // Skip (
-                            let url_start: String = chars.clone().map(|(_, c)| c).collect();
-                            if let Some(close_paren) = url_start.find(')') {
-                                let url = &url_start[..close_paren];
-
-                                // Skip external URLs and anchors
-                                if !url.starts_with("http://")
-                                    && !url.starts_with("https://")
-                                    && !url.starts_with('#')
-                                {
-                                    links.push(InternalLink {
-                                        target: url.to_string(),
-                                        line_number: line_num + 1,
-                                        link_type: if url.starts_with('/') {
-                                            LinkType::RootRelative
-                                        } else {
-                                            LinkType::Relative
-                                        },
-                                    });
-                                }
-                            }
-                        }
-                    }
+        for event in parser {
+            match event {
+                // Track code block boundaries
+                Event::Start(Tag::CodeBlock(_)) => {
+                    in_code_block = true;
                 }
+                Event::End(Tag::CodeBlock(_)) => {
+                    in_code_block = false;
+                }
+                // Process links only if not in code block
+                // Note: Inline code (`...`) cannot contain Markdown links, so no need to track it
+                Event::Start(Tag::Link(_, dest, _)) if !in_code_block => {
+                    let url = dest.as_ref().trim();
+
+                    // Skip external URLs
+                    if url.starts_with("http://") || url.starts_with("https://") {
+                        continue;
+                    }
+
+                    // Skip mailto links
+                    if url.starts_with("mailto:") {
+                        continue;
+                    }
+
+                    // Skip anchor-only links
+                    if url.starts_with('#') {
+                        continue;
+                    }
+
+                    // Remove anchor fragments from URLs
+                    let url_without_anchor = if let Some(pos) = url.find('#') {
+                        &url[..pos]
+                    } else {
+                        url
+                    };
+
+                    // Skip empty paths
+                    if url_without_anchor.is_empty() {
+                        continue;
+                    }
+
+                    links.push(InternalLink {
+                        target: url_without_anchor.to_string(),
+                        line_number: 0, // Line number tracking requires more complex parsing
+                        link_type: if url_without_anchor.starts_with('/') {
+                            LinkType::RootRelative
+                        } else {
+                            LinkType::Relative
+                        },
+                    });
+                }
+                _ => {}
             }
         }
 
@@ -274,5 +290,57 @@ mod tests {
         assert!(validator.is_risky_path("../../other/doc.md"));
         assert!(!validator.is_risky_path("../doc.md"));
         assert!(!validator.is_risky_path("doc.md"));
+    }
+
+    #[test]
+    fn test_scan_skips_code_blocks() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let doc_path = temp_dir.path().join("test.md");
+        std::fs::write(
+            &doc_path,
+            r#"# Document
+
+This is a real link: [real](real.md)
+
+```markdown
+This is a fake link in a code block: [fake](fake.md)
+```
+
+Another real link: [another](another.md)
+"#,
+        )
+        .unwrap();
+
+        let validator = LinkValidator::new(temp_dir.path().to_path_buf(), vec![]);
+        let links = validator.scan_document_links(Path::new("test.md")).unwrap();
+
+        // Should only find the two real links, not the one in the code block
+        assert_eq!(links.len(), 2);
+        let targets: Vec<_> = links.iter().map(|l| l.target.as_str()).collect();
+        assert!(targets.contains(&"real.md"));
+        assert!(targets.contains(&"another.md"));
+        assert!(!targets.contains(&"fake.md"));
+    }
+
+    #[test]
+    fn test_scan_handles_inline_code_correctly() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let doc_path = temp_dir.path().join("test.md");
+        // Note: In Markdown, inline code cannot contain actual links
+        // The backticks prevent link parsing, so `[text](url)` is literal text
+        std::fs::write(
+            &doc_path,
+            "Real link: [doc](doc.md). Inline code with literal brackets: `[not parsed as link](fake.md)`. Another: [other](other.md)",
+        )
+        .unwrap();
+
+        let validator = LinkValidator::new(temp_dir.path().to_path_buf(), vec![]);
+        let links = validator.scan_document_links(Path::new("test.md")).unwrap();
+
+        // Should find both real links; inline code content is not parsed as Markdown
+        assert_eq!(links.len(), 2);
+        let targets: Vec<_> = links.iter().map(|l| l.target.as_str()).collect();
+        assert!(targets.contains(&"doc.md"));
+        assert!(targets.contains(&"other.md"));
     }
 }
