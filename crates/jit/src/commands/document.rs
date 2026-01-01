@@ -778,6 +778,32 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(())
     }
 
+    /// Validate that an external URL is reachable
+    ///
+    /// Returns Ok(true) if URL is reachable, Ok(false) if not reachable,
+    /// or Err if validation failed (network error, timeout, etc.)
+    fn validate_external_url(url: &str) -> Result<bool> {
+        use std::time::Duration;
+
+        // Quick HEAD request with short timeout
+        let response = ureq::head(url).timeout(Duration::from_secs(5)).call();
+
+        match response {
+            Ok(resp) => {
+                // Any 2xx or 3xx status is considered valid
+                Ok(resp.status() < 400)
+            }
+            Err(ureq::Error::Status(code, _)) => {
+                // Got a response but with error status (4xx, 5xx)
+                Ok(code < 500) // 4xx means URL exists but access denied/not found
+            }
+            Err(ureq::Error::Transport(_)) => {
+                // Network error, DNS failure, timeout, etc.
+                Ok(false)
+            }
+        }
+    }
+
     /// Check document links and assets for validity
     ///
     /// Returns exit code: 0 (all valid), 1 (errors), 2 (warnings only)
@@ -921,14 +947,35 @@ impl<S: IssueStore> CommandExecutor<S> {
                         }));
                     }
                     AssetType::External => {
-                        // External URLs are just warnings
-                        warnings.push(serde_json::json!({
-                            "issue_id": issue_id,
-                            "document": doc.path,
-                            "type": "external_asset",
-                            "asset": asset.original_path,
-                            "message": format!("External URL (not validated): {}", asset.original_path),
-                        }));
+                        // Validate external URLs
+                        match Self::validate_external_url(&asset.original_path) {
+                            Ok(true) => {
+                                // URL is reachable - all good
+                            }
+                            Ok(false) => {
+                                // URL exists but returned error or is unreachable
+                                errors.push(serde_json::json!({
+                                    "issue_id": issue_id,
+                                    "document": doc.path,
+                                    "type": "unreachable_url",
+                                    "asset": asset.original_path,
+                                    "message": format!("External URL is unreachable: {}", asset.original_path),
+                                }));
+                            }
+                            Err(e) => {
+                                // Validation failed (network error, timeout, etc.)
+                                warnings.push(serde_json::json!({
+                                    "issue_id": issue_id,
+                                    "document": doc.path,
+                                    "type": "url_validation_failed",
+                                    "asset": asset.original_path,
+                                    "message": format!(
+                                        "Could not validate external URL ({}): {}",
+                                        e, asset.original_path
+                                    ),
+                                }));
+                            }
+                        }
                     }
                 }
             }

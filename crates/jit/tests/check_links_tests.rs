@@ -325,13 +325,13 @@ fn test_empty_repository_no_documents() {
 }
 
 #[test]
-fn test_external_urls_generate_warnings() {
+fn test_external_urls_are_validated() {
     let ctx = TestContext::new();
     ctx.init_repo();
 
     let issue_id = ctx.create_issue("Test issue", "Description");
 
-    // Document with external URL
+    // Document with reachable external URL
     fs::create_dir_all(ctx.repo_path().join("docs")).unwrap();
     fs::write(
         ctx.repo_path().join("docs/external.md"),
@@ -349,11 +349,43 @@ fn test_external_urls_generate_warnings() {
     ])
     .success();
 
-    // External URLs should warn but not error
+    // Reachable external URLs should validate successfully (no warnings/errors)
+    // Note: This assumes example.com is reachable during tests
     ctx.run_jit(&["doc", "check-links", "--scope", "all"])
-        .code(2)
-        .stdout(predicate::str::contains("Warnings"))
-        .stdout(predicate::str::contains("external").or(predicate::str::contains("URL")));
+        .code(0)
+        .stdout(predicate::str::contains("valid"));
+}
+
+#[test]
+fn test_unreachable_external_urls_error() {
+    let ctx = TestContext::new();
+    ctx.init_repo();
+
+    let issue_id = ctx.create_issue("Test issue", "Description");
+
+    // Document with unreachable external URL
+    fs::create_dir_all(ctx.repo_path().join("docs")).unwrap();
+    fs::write(
+        ctx.repo_path().join("docs/bad_url.md"),
+        "# Bad URL\n\n![Remote](https://this-domain-definitely-does-not-exist-12345.com/image.png)\n",
+    )
+    .unwrap();
+
+    ctx.run_jit(&[
+        "doc",
+        "add",
+        &issue_id,
+        "docs/bad_url.md",
+        "--label",
+        "Test",
+    ])
+    .success();
+
+    // Unreachable external URLs should error
+    ctx.run_jit(&["doc", "check-links", "--scope", "all"])
+        .code(1)
+        .stdout(predicate::str::contains("Errors found"))
+        .stdout(predicate::str::contains("unreachable"));
 }
 
 #[test]

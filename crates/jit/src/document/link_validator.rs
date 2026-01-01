@@ -137,6 +137,11 @@ impl LinkValidator {
             // Check if it exists in the filesystem
             let full_path = self.repo_root.join(&normalized);
             if full_path.exists() && full_path.is_file() {
+                // Root-relative links to permanent paths (docs/, README.md) are safe
+                if link.link_type == LinkType::RootRelative && self.is_permanent_path(&normalized) {
+                    return LinkValidationResult::Valid;
+                }
+
                 // File exists but not tracked as a document
                 LinkValidationResult::Risky {
                     warning: format!(
@@ -170,6 +175,20 @@ impl LinkValidator {
             }
         }
         components.iter().collect()
+    }
+
+    /// Check if a path is to permanent documentation
+    ///
+    /// Permanent paths are expected to be stable and not move during archival.
+    fn is_permanent_path(&self, path: &Path) -> bool {
+        let path_str = path.to_string_lossy();
+
+        // Permanent documentation paths
+        path_str.starts_with("docs/")
+            || path_str.starts_with("README.md")
+            || path_str.starts_with("CONTRIBUTING.md")
+            || path_str.starts_with("LICENSE")
+            || path_str.starts_with("dev/architecture/") // Architecture docs are permanent
     }
 
     /// Check if a path is risky (deep relative traversal)
