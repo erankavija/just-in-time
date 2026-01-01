@@ -13,7 +13,14 @@
   ],
   "gates_status": {},
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "dev/sessions/session-2026-01-01-example-md-migration.md",
+      "commit": null,
+      "label": "Session Notes - Migration Decisions",
+      "doc_type": "notes"
+    }
+  ],
   "labels": [
     "type:task",
     "epic:docs",
