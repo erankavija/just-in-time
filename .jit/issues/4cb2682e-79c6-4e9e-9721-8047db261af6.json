@@ -7,7 +7,8 @@
   "assignee": null,
   "dependencies": [
     "cfb3ba94-7406-4bc3-9f36-cecdcebacf0e",
-    "14303b30-75b2-4b21-8963-bc6563b95b91"
+    "14303b30-75b2-4b21-8963-bc6563b95b91",
+    "e748afbb-63bf-41f3-8823-e0e643bff374"
   ],
   "gates_required": [
     "code-review"
