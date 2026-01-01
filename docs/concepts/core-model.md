@@ -123,7 +123,121 @@ Query ready: → Shows Login Task (epic blocked by dependency)
 
 ## States
 
-<!-- State machine, transitions, terminal states -->
+Issues progress through a lifecycle with the following states:
+
+### State Machine
+
+```
+       ┌─────────┐
+       │ Backlog │ (default initial state)
+       └────┬────┘
+            │
+            v
+       ┌─────────┐
+       │  Ready  │ (dependencies satisfied, no assignee)
+       └────┬────┘
+            │
+            v
+    ┌──────────────┐
+    │ In Progress  │ (assignee claimed)
+    └──────┬───────┘
+           │
+           v
+    ┌──────────┐
+    │  Gated   │ (waiting for gates to pass)
+    └────┬─────┘
+         │
+         v
+    ┌────────┐
+    │  Done  │ (terminal - successfully completed)
+    └────────┘
+    
+    From any state:
+         │
+         v
+    ┌──────────┐
+    │ Rejected │ (terminal - won't implement)
+    └──────────┘
+```
+
+### State Descriptions
+
+**Backlog**: Issue is not yet ready to work on. Dependencies are incomplete or issue is explicitly marked as future work.
+
+**Ready**: Issue is unblocked (all dependencies satisfied), has no assignee, and is available to claim. This is the state agents query to find work.
+
+**In Progress**: Issue is actively being worked on by an assignee.
+
+**Gated**: Issue has attempted to transition to Done, but quality gates have not all passed. Issue auto-transitions to Done when all required gates pass.
+
+**Done**: Terminal state indicating successful completion. Issue cannot transition out of this state.
+
+**Rejected**: Terminal state indicating the issue was closed without implementation. Common reasons: duplicate, won't-fix, invalid, out-of-scope.
+
+### Terminal States
+
+JIT has two terminal states that represent different outcomes:
+
+**Done** - Work was successfully completed
+- All gates passed
+- Implementation delivered
+- Issue fulfilled its purpose
+
+**Rejected** - Work was not completed
+- Closed without implementation
+- Common reasons: duplicate, won't-fix, invalid, out-of-scope
+- Optional `resolution:*` label provides closure reason
+
+Once an issue reaches a terminal state (Done or Rejected), it cannot transition to any other state.
+
+### State Transitions
+
+**Auto-transitions:**
+- `Backlog → Ready`: When all dependencies complete
+- `Gated → Done`: When all required gates pass
+
+**Manual transitions:**
+- `Ready → In Progress`: Via `jit issue claim` or `jit issue assign`
+- `In Progress → Done`: Via `jit issue update --state done` (if gates allow)
+- `In Progress → Gated`: Automatic when transitioning to Done with unmet gates
+- `Any State → Rejected`: Via `jit issue reject` (bypasses gates)
+
+### Gate Bypass for Rejected
+
+**Critical design property:** Transitioning to `Rejected` bypasses all gate enforcement.
+
+**Rationale:**
+- Issues can be rejected at any time (duplicate discovered, requirements changed, etc.)
+- Requiring gates to pass before rejecting doesn't make sense
+- `Rejected` is an escape hatch for "this work won't happen"
+
+**Example:**
+```bash
+# Issue has failing gates, cannot transition to Done
+jit issue update $ISSUE --state done
+# Error: Gate validation failed
+
+# But can always reject
+jit issue reject $ISSUE --reason "duplicate"
+# Success - bypasses gates
+```
+
+### Resolution Labels
+
+When rejecting issues, optionally add `resolution:*` labels to document why:
+
+**Common resolution labels:**
+- `resolution:duplicate` - Duplicate of another issue
+- `resolution:wont-fix` - Valid request, but won't implement
+- `resolution:invalid` - Not a valid issue
+- `resolution:out-of-scope` - Outside project scope
+- `resolution:obsolete` - No longer relevant
+
+**Usage:**
+```bash
+jit issue reject $ISSUE --reason "duplicate"
+# Adds label: resolution:duplicate
+```
 
 ## Labels
 

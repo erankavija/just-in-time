@@ -31,6 +31,12 @@
 
 **Rejected**: Closed without implementation
 
+Terminal state for issues that won't be completed. Common reasons include duplicates, won't-fix decisions, invalid requests, or out-of-scope work. Bypasses all gate enforcement when transitioning.
+
+**Resolution Label**: Documents why an issue was rejected
+
+Format: `resolution:reason` (e.g., `resolution:duplicate`, `resolution:wont-fix`). Added automatically via `jit issue reject --reason <REASON>` command.
+
 **Archived**: Long-term storage
 
 ## Gate Types

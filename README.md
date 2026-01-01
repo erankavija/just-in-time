@@ -361,6 +361,8 @@ backlog → ready → in_progress → gated → done
            ↑         ↓            ↓
            └──── prechecks    postchecks
               (validate)    (verify quality)
+
+From any state: → rejected (terminal, bypasses gates)
 ```
 
 **States:**
@@ -368,7 +370,8 @@ backlog → ready → in_progress → gated → done
 - **ready**: Dependencies done, available to start
 - **in_progress**: Work actively happening
 - **gated**: Work complete, awaiting quality gate approval
-- **done**: All gates passed, complete
+- **done**: All gates passed, complete (terminal)
+- **rejected**: Closed without implementation (terminal, bypasses gates)
 
 **Quality Gates:**
 - **Prechecks** run before work starts (e.g., TDD: verify tests exist)

@@ -61,6 +61,65 @@ jit issue update --filter "label:milestone:v0.9" --remove-label "milestone:v0.9"
 
 <!-- Additional jit issue commands -->
 
+### Rejecting Issues
+
+Use `jit issue reject` to close an issue without implementation:
+
+```bash
+# Reject with reason
+jit issue reject $ISSUE --reason "duplicate"
+
+# Reject without reason
+jit issue reject $ISSUE
+
+# Quiet mode for scripting
+jit issue reject $ISSUE --reason "wont-fix" --quiet
+```
+
+**Key behaviors:**
+- **Bypasses gates:** Can reject from any state, even with failing gates
+- **Terminal state:** Cannot transition out of Rejected
+- **Optional reason:** `--reason` flag adds `resolution:*` label
+- **Immediate:** No validation or gate checks
+
+**Common rejection reasons:**
+- `duplicate` - Duplicate of another issue
+- `wont-fix` - Valid request, but won't implement
+- `invalid` - Not a valid issue
+- `out-of-scope` - Outside project scope
+- `obsolete` - No longer relevant
+
+**Example workflow:**
+```bash
+# Discover duplicate during work
+jit issue show $ISSUE
+# Found duplicate: #ABC123
+
+# Reject with reason
+jit issue reject $ISSUE --reason "duplicate"
+
+# Query rejected issues
+jit query state rejected --json | jq -r '.issues[] | {id, title, labels}'
+```
+
+**State transition examples:**
+
+```bash
+# From Ready → Rejected (skip work entirely)
+jit issue reject $READY_ISSUE --reason "out-of-scope"
+
+# From In Progress → Rejected (abandon in-progress work)
+jit issue reject $WIP_ISSUE --reason "duplicate"
+
+# From Gated → Rejected (bypass failing gates)
+jit issue reject $GATED_ISSUE --reason "wont-fix"
+# Note: This bypasses gates, unlike transitioning to Done
+
+# Cannot transition from Done → Rejected (terminal states are final)
+jit issue reject $DONE_ISSUE
+# Error: Cannot transition from terminal state
+```
+
 ## Gate Commands
 
 <!-- Complete jit gate reference -->
