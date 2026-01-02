@@ -14,19 +14,21 @@ Working with AI agents on complex projects gives rise to a coordination problem:
 
 JIT is built from the ground up to support AI agent workflows with features that address their unique needs:
 
-- 🔗 **Dependency DAG**: Express "Task B needs Task A" with automatic blocking and cycle detection  
 - ✅ **Quality Gates**: Enforce tests, linting, reviews, scans before work can proceed
-- 🔒 **Multi-Agent Safe**: File locking prevents race conditions with concurrent agents
+- 📝 **Document Lifecycle**: Link design docs, session notes, and context to issues with safe archival
+- 🔗 **Dependency DAG**: Express "Task B needs Task A" with automatic blocking and cycle detection  
 - 📁 **Git-Friendly**: All state in plain JSON—version, diff, merge and version like code
 - 🤖 **Agent-First Design** - JSON output, short hashes, atomic claims, event logs for observability
+- 🔒 **Multi-Agent Safe**: File locking prevents race conditions with concurrent agents
 - ⚙️ **Configurable**: Customize issue hierarchies and validation rules per repository
+
+All issue data lives in `.jit/` directory within your project, versioned with git like code. No external database, no cloud service, no API dependencies.
 
 ## Use Cases
 
-- **Multi-agent software development** - Lead agent architects, workers implement and test 
-- **Research projects** - Break down analysis into parallel tasks with dependency management
-- **CI/CD orchestration** - Gate progression through build → test → deploy pipeline
-- **Content generation** - Manage writing, editing, review tasks with quality checks
+- **Multi-agent software development** - Lead agent plans work and breaks it to smaller tasks, workers claim ready tasks, quality gates enforce tests before merge. 
+- **Research projects** - Break down analysis into parallel tasks, gate on peer review before publishing, preserve research context in linked documents.
+- **Content generation** - Writing tasks depend on outline approval, editing tasks depend on writing completion, publication gate requires editor review.
 - **Any workflow** where you want agents to discover and create work dynamically
 
 ## Quick Start
@@ -37,13 +39,17 @@ JIT is built from the ground up to support AI agent workflows with features that
 ```bash
 wget https://github.com/erankavija/just-in-time/releases/latest/download/jit-linux-x64.tar.gz
 tar -xzf jit-linux-x64.tar.gz
-sudo mv jit jit-server jit-dispatch /usr/local/bin/
+sudo mv jit /usr/local/bin/    # Core CLI tool
 ```
 
 **From source:**
 ```bash
 cargo install --path crates/jit
 ```
+
+**Optional components:**
+- `jit-server` - Web UI server (provides visualization at http://localhost:8080)
+- `jit-dispatch` - Agent dispatcher for autonomous coordination
 
 See [INSTALL.md](INSTALL.md) for all installation options.
 
@@ -62,6 +68,9 @@ TASK2=$(jit issue create --title "Implement login endpoint" --priority high)
 jit dep add $EPIC $TASK1
 jit dep add $EPIC $TASK2
 
+# Link design document for context
+jit doc add $EPIC auth-design.md --label "Design Document"
+
 # Agent claims and executes
 jit issue claim $TASK1 agent:worker-1
 # ... do work ...
@@ -76,7 +85,30 @@ jit query ready
 
 ## Core Concepts
 
-JIT's core model revolves around issues, dependencies, quality gates, and flexible organization. JIT itself is a sofware project, but it can be used to manage any type of work. Domain-specific logic and terminology is configurable.
+JIT's workflow revolves around **issues** (units of work) that progress through **states** (lifecycle stages) with **dependencies** (execution order) and **quality gates** (checkpoints). Labels provide optional organization.
+
+### Issue Lifecycle
+
+Issues progress through states with automated quality checks:
+
+```
+backlog → ready → in_progress → gated → done
+           ↑         ↓            ↓
+           └──── prechecks    postchecks
+              (validate)    (verify quality)
+
+From any state: → rejected (terminal, bypasses gates)
+```
+
+**States:**
+- **backlog**: Has incomplete dependencies
+- **ready**: Dependencies done, available to claim
+- **in_progress**: Work actively happening
+- **gated**: Work complete, awaiting quality gate approval
+- **done**: All gates passed, complete (terminal)
+- **rejected**: Closed without implementation (terminal, bypasses gates)
+
+See [Core Model - States](docs/concepts/core-model.md#states) for detailed transition rules.
 
 ### Dependencies Form a DAG
 
@@ -122,6 +154,9 @@ jit doc add <issue> design.md --label "Design Document"
 # Link session notes for work-in-progress
 jit doc add <issue> notes/session-2024-01-02.md --label "Session Notes"
 
+# Discover documents linked to an issue
+jit doc list <issue>
+
 # Validate links before archiving
 jit doc check-links --scope issue:<issue>
 
@@ -131,11 +166,14 @@ jit doc archive design.md --type features
 
 **Key features:**
 - **Document tracking** - Link markdown files, images, and assets to issues
+- **Discovery** - Query documents by issue to find relevant context
 - **Link validation** - Ensure references stay valid when documents move
 - **Safe archival** - Move completed docs with assets intact
 - **Git integration** - Documents version alongside code
 
-Documents can capture design rationale, session notes, research findings, or any context that helps agents understand the work. See the CLI reference for full `jit doc` commands.
+**Why this matters:** Agents can discover context from previous work, understand design decisions, and maintain institutional knowledge without relying on external systems.
+
+See [Document Commands Reference](docs/reference/cli-commands.md#document-commands) for full `jit doc` usage.
 
 ### Organization with Labels
 
