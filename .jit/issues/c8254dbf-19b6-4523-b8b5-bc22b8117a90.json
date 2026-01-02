@@ -2,10 +2,15 @@
   "id": "c8254dbf-19b6-4523-b8b5-bc22b8117a90",
   "title": "Story: Core Concepts Documentation",
   "description": "Create explanation-oriented documentation covering what JIT is, core model (issues, dependencies, gates, states), system guarantees, and domain-agnostic design. Part of Epic cfb3ba94 (User Documentation Phase 2). Follows Diátaxis: Explanation.",
-  "state": "ready",
+  "state": "backlog",
   "priority": "high",
   "assignee": null,
-  "dependencies": [],
+  "dependencies": [
+    "c8355d70-4c21-4c96-b8d9-1f8036910368",
+    "d820155f-53e9-414e-9f6b-cb08b68acab9",
+    "b66d2338-19cc-46eb-bbf4-0db1aaaddeb8",
+    "865051b2-50ea-4c52-84cb-5fcb6366ee70"
+  ],
   "gates_required": [],
   "gates_status": {},
   "context": {},

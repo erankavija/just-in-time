@@ -643,3 +643,23 @@
 {"type":"issue_state_changed","id":"00135299-660a-4637-8c7b-f03d7690ebc3","issue_id":"b47c8918-8807-4eee-8474-39dab29fa4c2","timestamp":"2026-01-02T21:46:14.049465403Z","from":"gated","to":"done"}
 {"type":"issue_completed","id":"d1880fde-d497-495c-a7d6-33e8a9eb6328","issue_id":"b47c8918-8807-4eee-8474-39dab29fa4c2","timestamp":"2026-01-02T21:46:14.049488503Z"}
 {"type":"issue_state_changed","id":"b257e472-3627-45b1-b0d7-9aac2ca59f9c","issue_id":"48e2e917-d129-433c-b3c5-2449f9c34cfd","timestamp":"2026-01-02T21:46:14.064357467Z","from":"backlog","to":"ready"}
+{"type":"issue_state_changed","id":"6cb6517f-0e8b-4007-8076-3ab0c724f768","issue_id":"48e2e917-d129-433c-b3c5-2449f9c34cfd","timestamp":"2026-01-02T21:48:22.104953179Z","from":"ready","to":"done"}
+{"type":"issue_completed","id":"1903a520-ffe6-4e2b-a264-26368eab2ee2","issue_id":"48e2e917-d129-433c-b3c5-2449f9c34cfd","timestamp":"2026-01-02T21:48:22.104978929Z"}
+{"type":"issue_created","id":"f3e8befb-019f-41e2-8a57-0e8fa05f479a","issue_id":"b66d2338-19cc-46eb-bbf4-0db1aaaddeb8","timestamp":"2026-01-02T22:02:20.907981543Z","title":"Complete Issues section in core-model.md","priority":"high"}
+{"type":"issue_created","id":"347a2be9-69a2-4547-acd4-3da478fb5575","issue_id":"c8355d70-4c21-4c96-b8d9-1f8036910368","timestamp":"2026-01-02T22:02:20.910949734Z","title":"Write design-philosophy.md","priority":"high"}
+{"type":"issue_created","id":"c9fd8461-1113-4e6e-a29f-e1561e692f64","issue_id":"d820155f-53e9-414e-9f6b-cb08b68acab9","timestamp":"2026-01-02T22:02:20.911363454Z","title":"Write guarantees.md (System Guarantees)","priority":"high"}
+{"type":"issue_created","id":"56fb586f-eede-48b7-ba53-e6d493d3fa50","issue_id":"865051b2-50ea-4c52-84cb-5fcb6366ee70","timestamp":"2026-01-02T22:02:20.911751624Z","title":"Create scope.md (Domain Coverage)","priority":"high"}
+{"type":"issue_state_changed","id":"3a42b7c1-728d-4e27-9fa5-67a5af9efa8d","issue_id":"c8254dbf-19b6-4523-b8b5-bc22b8117a90","timestamp":"2026-01-02T22:02:20.913602014Z","from":"ready","to":"backlog"}
+{"type":"gate_added","id":"1edbad77-9950-495d-b204-4cc60075154d","issue_id":"b66d2338-19cc-46eb-bbf4-0db1aaaddeb8","timestamp":"2026-01-02T22:02:40.825177241Z","gate_key":"code-review"}
+{"type":"gate_added","id":"f45093a0-5eb6-4dfa-9763-b9ec09ce310d","issue_id":"c8355d70-4c21-4c96-b8d9-1f8036910368","timestamp":"2026-01-02T22:02:40.830611853Z","gate_key":"code-review"}
+{"type":"gate_added","id":"2cec381b-6438-4018-a4de-b2f7823bee55","issue_id":"d820155f-53e9-414e-9f6b-cb08b68acab9","timestamp":"2026-01-02T22:02:40.833708724Z","gate_key":"code-review"}
+{"type":"gate_added","id":"ca4d314a-19a9-4199-921c-c235dd16db30","issue_id":"865051b2-50ea-4c52-84cb-5fcb6366ee70","timestamp":"2026-01-02T22:02:40.837189245Z","gate_key":"code-review"}
+{"type":"issue_created","id":"2d930003-7194-4b5e-9e35-d6a68534afba","issue_id":"8847805b-9320-4f1f-b9cf-cb7fe9944f7a","timestamp":"2026-01-02T22:11:41.647936302Z","title":"Complete software-development.md","priority":"normal"}
+{"type":"issue_created","id":"36c50336-6074-4af5-b156-d2196088e64b","issue_id":"ab451fdb-2bd3-42e2-a866-9d644779eb53","timestamp":"2026-01-02T22:11:41.650908943Z","title":"Complete dependency-management.md","priority":"normal"}
+{"type":"issue_created","id":"08852edd-504a-4254-9df8-aae25853c30a","issue_id":"d037eece-a1ec-448d-a5e2-2ec1345acf91","timestamp":"2026-01-02T22:11:41.651321113Z","title":"Complete research-projects.md","priority":"normal"}
+{"type":"issue_created","id":"cdbf3850-11a6-4da1-9c9a-987b6ad5f7dd","issue_id":"2a48ca4d-8ad3-46b7-9cf4-5207fa95b143","timestamp":"2026-01-02T22:11:41.651718813Z","title":"Complete knowledge-work.md","priority":"normal"}
+{"type":"issue_state_changed","id":"f93eb66a-a78d-4ba1-aa42-b39b7a62f21b","issue_id":"5326b331-e14c-4157-b430-447e93f5f91b","timestamp":"2026-01-02T22:11:41.653402573Z","from":"ready","to":"backlog"}
+{"type":"gate_added","id":"69556e9a-9389-4bad-b82e-729671e93092","issue_id":"8847805b-9320-4f1f-b9cf-cb7fe9944f7a","timestamp":"2026-01-02T22:11:47.860424989Z","gate_key":"code-review"}
+{"type":"gate_added","id":"d77259bf-1f0b-4a92-b635-2623169069fe","issue_id":"ab451fdb-2bd3-42e2-a866-9d644779eb53","timestamp":"2026-01-02T22:11:47.864206060Z","gate_key":"code-review"}
+{"type":"gate_added","id":"54ce0a92-2d95-402a-9d2a-c531d3b30d22","issue_id":"d037eece-a1ec-448d-a5e2-2ec1345acf91","timestamp":"2026-01-02T22:11:47.867846451Z","gate_key":"code-review"}
+{"type":"gate_added","id":"5d5b828a-3aef-40e7-9c39-21868b1ce6e0","issue_id":"2a48ca4d-8ad3-46b7-9cf4-5207fa95b143","timestamp":"2026-01-02T22:11:47.871851062Z","gate_key":"code-review"}

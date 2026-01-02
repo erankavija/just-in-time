@@ -2,10 +2,15 @@
   "id": "5326b331-e14c-4157-b430-447e93f5f91b",
   "title": "Story: How-To Guides Documentation",
   "description": "Create goal-oriented practical recipes for specific use cases across different domains (software development, research, knowledge work, custom gates, dependency management). Part of Epic cfb3ba94 (User Documentation Phase 2). Follows Diátaxis: How-To Guides.",
-  "state": "ready",
+  "state": "backlog",
   "priority": "normal",
   "assignee": null,
-  "dependencies": [],
+  "dependencies": [
+    "8847805b-9320-4f1f-b9cf-cb7fe9944f7a",
+    "ab451fdb-2bd3-42e2-a866-9d644779eb53",
+    "d037eece-a1ec-448d-a5e2-2ec1345acf91",
+    "2a48ca4d-8ad3-46b7-9cf4-5207fa95b143"
+  ],
   "gates_required": [],
   "gates_status": {},
   "context": {},
