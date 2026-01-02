@@ -2,9 +2,9 @@
   "id": "93f3e4df-990c-4993-b8dc-66a8827acba7",
   "title": "Issue Lifecycle - Rejection State",
   "description": "Add 'Rejected' terminal state to properly handle issues that won't be implemented, eliminating the need to pass gates for rejected work. Current workaround requires passing all gates even for won't-fix issues, which is semantically incorrect (done implies success). The Rejected state will bypass gate enforcement and provide clear distinction between successful completion (Done) and non-implementation (Rejected). Optional resolution:* labels provide detailed closure reasons.",
-  "state": "ready",
+  "state": "done",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:copilot",
   "dependencies": [
     "b336446d-e2fe-46d7-8652-e574bb114e3e",
     "90575086-fcfe-4b0d-82b5-fc00c4daace7",
@@ -15,7 +15,13 @@
   "gates_required": [
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_by": "human:reviewer",
+      "updated_at": "2026-01-02T18:20:50.374816502Z"
+    }
+  },
   "context": {},
   "documents": [
     {

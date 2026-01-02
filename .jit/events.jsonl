@@ -619,3 +619,11 @@
 {"type":"issue_completed","id":"7e511152-1596-4c64-a44c-e6f75ad1136e","issue_id":"b336446d-e2fe-46d7-8652-e574bb114e3e","timestamp":"2026-01-02T18:06:16.120822396Z"}
 {"type":"issue_state_changed","id":"cbd027dd-4149-4f6f-ae9a-d9e6d8b9a821","issue_id":"93f3e4df-990c-4993-b8dc-66a8827acba7","timestamp":"2026-01-02T18:06:16.144228513Z","from":"backlog","to":"ready"}
 {"type":"issue_state_changed","id":"41656269-1c56-4886-9f6d-6988f457215b","issue_id":"5bad7437-b121-4d2a-b2db-7aa8ee7f4d8b","timestamp":"2026-01-02T18:06:16.150428684Z","from":"backlog","to":"ready"}
+{"type":"issue_state_changed","id":"09125152-bded-4aa9-86bf-f6fb49cf2387","issue_id":"93f3e4df-990c-4993-b8dc-66a8827acba7","timestamp":"2026-01-02T18:19:32.027292657Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"a8fb5ad0-ce65-4e19-92ac-ca1616d02aff","issue_id":"93f3e4df-990c-4993-b8dc-66a8827acba7","timestamp":"2026-01-02T18:19:32.030157997Z","assignee":"agent:copilot"}
+{"type":"issue_created","id":"05a76e1d-059c-4e91-9608-d6ecc9f71014","issue_id":"abc84902-b690-4862-b73b-7e07e01c3161","timestamp":"2026-01-02T18:20:02.612705807Z","title":"Test rejection workflow","priority":"normal"}
+{"type":"issue_state_changed","id":"ff3d81fb-7646-4c74-828e-5e30935805bd","issue_id":"abc84902-b690-4862-b73b-7e07e01c3161","timestamp":"2026-01-02T18:20:07.546113179Z","from":"ready","to":"rejected"}
+{"type":"issue_state_changed","id":"0f278e77-b135-4052-b969-a593335722d6","issue_id":"93f3e4df-990c-4993-b8dc-66a8827acba7","timestamp":"2026-01-02T18:20:28.130524008Z","from":"in_progress","to":"gated"}
+{"type":"gate_passed","id":"73488d78-86ad-451d-83c8-5259e9c56b84","issue_id":"93f3e4df-990c-4993-b8dc-66a8827acba7","timestamp":"2026-01-02T18:20:50.378065293Z","gate_key":"code-review","updated_by":"human:reviewer"}
+{"type":"issue_state_changed","id":"3075cb29-dc84-496c-b7f5-60d037200eed","issue_id":"93f3e4df-990c-4993-b8dc-66a8827acba7","timestamp":"2026-01-02T18:20:50.378306173Z","from":"gated","to":"done"}
+{"type":"issue_completed","id":"4fcbc697-c510-4e0d-9973-0ee1da7df46e","issue_id":"93f3e4df-990c-4993-b8dc-66a8827acba7","timestamp":"2026-01-02T18:20:50.378323973Z"}
