@@ -2,7 +2,7 @@
   "id": "93f3e4df-990c-4993-b8dc-66a8827acba7",
   "title": "Issue Lifecycle - Rejection State",
   "description": "Add 'Rejected' terminal state to properly handle issues that won't be implemented, eliminating the need to pass gates for rejected work. Current workaround requires passing all gates even for won't-fix issues, which is semantically incorrect (done implies success). The Rejected state will bypass gate enforcement and provide clear distinction between successful completion (Done) and non-implementation (Rejected). Optional resolution:* labels provide detailed closure reasons.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "high",
   "assignee": null,
   "dependencies": [
