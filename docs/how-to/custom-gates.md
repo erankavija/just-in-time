@@ -401,6 +401,80 @@ jit gate define audit \
   --timeout 60
 ```
 
+### Beyond Software Development
+
+Gates are domain-agnostic. Examples for other workflows:
+
+**Research Projects:**
+```bash
+# Literature review gate
+jit gate define lit-review \
+  --title "Literature Review Complete" \
+  --description "Relevant papers reviewed and cited" \
+  --stage precheck \
+  --mode manual
+
+# Peer review
+jit gate define peer-review \
+  --title "Peer Review" \
+  --description "Research findings reviewed by colleague" \
+  --stage postcheck \
+  --mode manual
+
+# Data validation
+jit gate define data-check \
+  --title "Data Validated" \
+  --description "Check data quality and completeness" \
+  --stage postcheck \
+  --mode auto \
+  --checker-command "python scripts/validate_data.py"
+```
+
+**Writing Projects:**
+```bash
+# Outline approval
+jit gate define outline-approved \
+  --title "Outline Approved" \
+  --description "Editor approved chapter outline" \
+  --stage precheck \
+  --mode manual
+
+# Spell check
+jit gate define spellcheck \
+  --title "Spell Check" \
+  --description "No spelling errors found" \
+  --stage postcheck \
+  --mode auto \
+  --checker-command "aspell check manuscript.md"
+
+# Word count target
+jit gate define wordcount \
+  --title "Word Count Met" \
+  --description "Chapter meets minimum word count" \
+  --stage postcheck \
+  --mode auto \
+  --checker-command "test $(wc -w < chapter.md) -ge 2000"
+```
+
+**General Knowledge Work:**
+```bash
+# Fact-checking
+jit gate define factcheck \
+  --title "Facts Verified" \
+  --description "All claims verified against sources" \
+  --stage postcheck \
+  --mode manual
+
+# Feedback incorporated
+jit gate define feedback \
+  --title "Feedback Incorporated" \
+  --description "Stakeholder feedback addressed" \
+  --stage postcheck \
+  --mode manual
+```
+
+The gate system adapts to any workflow requiring quality checkpoints.
+
 ## Common Workflows
 
 ### Workflow 1: TDD Enforcement
@@ -534,3 +608,36 @@ jit label namespaces
 jit label values milestone
 jit label values epic
 ```
+
+## Advanced Topics
+
+### Gate System Extensibility
+
+The current gate system is intentionally simple and flexible. Future enhancements being considered:
+
+**Potential extensions** (not yet implemented):
+- **Conditional gates**: Apply different gates based on issue labels or properties
+- **Gate dependencies**: Enforce gate ordering (e.g., tests before code-review)
+- **Parallel execution**: Run multiple automated gates concurrently
+- **Rich output**: Structured results with metrics, warnings, and artifacts
+- **Gate templates**: Pre-configured gate bundles for common workflows
+- **Custom gate stages**: Beyond precheck/postcheck for complex pipelines
+
+These would be added based on real-world usage patterns while maintaining backward compatibility.
+
+### Adapting Gates to Your Domain
+
+Gates are domain-agnostic quality checkpoints. The examples in this guide focus on software development, but the patterns apply broadly:
+
+**Research**: Literature review, peer review, data validation, statistical significance
+**Writing**: Outline approval, editor review, spell check, word count targets, fact-checking
+**Design**: Stakeholder approval, user testing, accessibility checks, brand compliance
+**Operations**: Change approval, rollback plan, monitoring setup, incident review
+
+The key insight: **any workflow with quality requirements can use gates**.
+
+## See Also
+
+- [Core Model - Gates](../concepts/core-model.md#gates) - Conceptual understanding
+- [CLI Reference - Gate Commands](../reference/cli-commands.md#gate-commands) - Complete command syntax
+- [First Workflow Tutorial](../tutorials/first-workflow.md) - Gate usage in practice

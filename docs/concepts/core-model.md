@@ -323,6 +323,25 @@ Gates influence state transitions:
 - Audit trail of who approved what (gate status history)
 - Programmatic queryability (find issues awaiting specific gates)
 
+### Current Limitations and Future Directions
+
+**Current capabilities:**
+- Gates apply uniformly at state transitions
+- Checker commands run in shell with simple pass/fail
+- Gate status is binary: required/passed/failed
+
+**Potential future enhancements** (not yet implemented):
+- **Conditional gates**: Apply gates based on issue properties (e.g., only require security-scan for epic:auth issues)
+- **Gate dependencies**: Gates that must pass in specific order
+- **Parallel gate execution**: Run multiple automated gates concurrently for speed
+- **Rich gate output**: Structured results beyond exit codes (metrics, warnings, artifacts)
+- **Gate templates**: Pre-configured gate sets for common workflows
+- **Per-label gate policies**: Different gate requirements based on issue labels
+
+**Note:** Current design intentionally keeps gates simple and flexible. These extensions would be added based on real-world usage patterns, maintaining backward compatibility.
+
+For domain-specific gate examples beyond software development, see [Custom Gates - Beyond Software Development](../how-to/custom-gates.md#beyond-software-development).
+
 ## States
 
 Issues progress through a lifecycle with the following states:
