@@ -97,7 +97,8 @@ archive/        → After 1-2 releases
 - [web-ui-architecture.md](architecture/web-ui-architecture.md) - Web UI design
 
 ### Development Guides
-- See [AGENT-QUICKSTART.md](../AGENT-QUICKSTART.md) - Comprehensive agent guide
+- See [docs/tutorials/quickstart.md](../docs/tutorials/quickstart.md) - Getting started (10 min)
+- See [docs/reference/cli-commands.md](../docs/reference/cli-commands.md#mcp-tools-reference) - MCP tools for agents
 - See [CONTRIBUTOR-QUICKSTART.md](../CONTRIBUTOR-QUICKSTART.md) - Contributor guide
 
 ### Reference

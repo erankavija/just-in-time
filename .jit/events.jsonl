@@ -635,3 +635,11 @@
 {"type":"issue_completed","id":"8147172e-29e5-4ed5-a3a9-55fc1d643e9a","issue_id":"baa723de-93bb-4ec7-8883-0a464bca9b30","timestamp":"2026-01-02T18:43:25.796050931Z"}
 {"type":"issue_created","id":"5a8086e7-092f-48f6-a8ac-e85515658fa8","issue_id":"6535ba30-1236-4c10-a718-81ceeb11acb4","timestamp":"2026-01-02T21:10:38.776532386Z","title":"Consolidate and move deployment documentation to docs/","priority":"normal"}
 {"type":"issue_created","id":"486d0ec1-92e1-4f29-8f61-137be33edae2","issue_id":"a4e3cfb0-626e-4a73-8be4-364dd0597833","timestamp":"2026-01-02T21:26:44.765052408Z","title":"Evaluate and implement documentation tooling for v1.0","priority":"high"}
+{"type":"issue_state_changed","id":"16003525-d54b-495c-a891-934cec43a73a","issue_id":"b47c8918-8807-4eee-8474-39dab29fa4c2","timestamp":"2026-01-02T21:40:59.052529911Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"6cb1c728-e741-4b7b-8ef8-6e91e31a753b","issue_id":"b47c8918-8807-4eee-8474-39dab29fa4c2","timestamp":"2026-01-02T21:40:59.055522992Z","assignee":"agent:copilot"}
+{"type":"issue_state_changed","id":"412585a2-fb84-4268-8856-e48267239dbf","issue_id":"b47c8918-8807-4eee-8474-39dab29fa4c2","timestamp":"2026-01-02T21:46:06.439381205Z","from":"in_progress","to":"gated"}
+{"type":"issue_state_changed","id":"d33c7916-5569-4146-911c-dab1189a8278","issue_id":"b47c8918-8807-4eee-8474-39dab29fa4c2","timestamp":"2026-01-02T21:46:10.277111273Z","from":"gated","to":"gated"}
+{"type":"gate_passed","id":"3de0f072-1575-4c72-80b1-c1762467d4d9","issue_id":"b47c8918-8807-4eee-8474-39dab29fa4c2","timestamp":"2026-01-02T21:46:14.046461632Z","gate_key":"code-review","updated_by":"agent:copilot"}
+{"type":"issue_state_changed","id":"00135299-660a-4637-8c7b-f03d7690ebc3","issue_id":"b47c8918-8807-4eee-8474-39dab29fa4c2","timestamp":"2026-01-02T21:46:14.049465403Z","from":"gated","to":"done"}
+{"type":"issue_completed","id":"d1880fde-d497-495c-a7d6-33e8a9eb6328","issue_id":"b47c8918-8807-4eee-8474-39dab29fa4c2","timestamp":"2026-01-02T21:46:14.049488503Z"}
+{"type":"issue_state_changed","id":"b257e472-3627-45b1-b0d7-9aac2ca59f9c","issue_id":"48e2e917-d129-433c-b3c5-2449f9c34cfd","timestamp":"2026-01-02T21:46:14.064357467Z","from":"backlog","to":"ready"}

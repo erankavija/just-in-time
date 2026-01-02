@@ -462,8 +462,401 @@ jit issue reject $ISSUE --reason "duplicate"
 
 ## Labels
 
-<!-- Namespace:value format, hierarchy, strategic vs tactical -->
+Labels provide organizational membership using `namespace:value` format for filtering and grouping.
+
+### Label Format (CRITICAL)
+
+**ALL labels MUST use**: `namespace:value`
+
+```
+✅ CORRECT:
+  type:task, epic:auth, milestone:v1.0, component:backend
+
+❌ WRONG:
+  auth (missing namespace)
+  milestone-v1.0 (wrong separator)
+  Type:task (uppercase namespace)
+  type: task (space after colon)
+```
+
+**Validation rules:**
+- Namespace: lowercase, no spaces, alphanumeric + hyphens
+- Value: any characters (allows spaces, uppercase)
+- Separator: exactly one colon (`:`)
+- No leading/trailing whitespace
+
+### Required Labels
+
+**Every issue must have exactly ONE**:
+```
+type:*
+├─ type:milestone    Release/time-bound goal
+├─ type:epic         Large feature  
+├─ type:task         Concrete work item
+├─ type:research     Time-boxed investigation
+└─ type:bug          Defect to fix
+```
+
+**Exception:** Use `--orphan` flag to explicitly allow issues without type label.
+
+### Common Label Namespaces
+
+**Organization labels** (optional but recommended):
+```
+milestone:*    Groups work under releases (e.g., milestone:v1.0)
+epic:*         Groups tasks under features (e.g., epic:auth)
+component:*    Technical area (e.g., component:backend, component:web)
+priority:*     (Built-in, not a label) - critical, high, normal, low
+```
+
+**Workflow labels:**
+```
+needs-review:true      Requires review
+blocked-by:external    External dependency
+resolution:duplicate   Why rejected
+```
+
+**Strategic labels** (high-level organization):
+
+JIT defines certain namespaces as "strategic" in configuration:
+- `milestone:*` - Release grouping
+- `epic:*` - Feature grouping
+- `goal:*` - Objective grouping
+- `theme:*` - Initiative grouping
+
+Strategic issues (those with strategic labels) appear in special queries:
+```bash
+# Find all strategic issues
+jit query strategic
+```
+
+### Label Usage
+
+**Creating issues with labels:**
+```bash
+# Single label
+jit issue create --title "Fix bug" --label "type:bug"
+
+# Multiple labels
+jit issue create \
+  --title "Implement login" \
+  --label "type:task" \
+  --label "epic:auth" \
+  --label "milestone:v1.0" \
+  --label "component:backend"
+```
+
+**Adding labels to existing issues:**
+```bash
+# Add single label
+jit issue update abc123 --label "needs-review:true"
+
+# Add multiple labels
+jit issue update abc123 \
+  --label "component:frontend" \
+  --label "priority:high"
+```
+
+**Removing labels:**
+```bash
+# Remove single label
+jit issue update abc123 --remove-label "needs-review:true"
+
+# Remove multiple labels
+jit issue update abc123 \
+  --remove-label "milestone:v0.9" \
+  --remove-label "component:legacy"
+```
+
+### Label Queries
+
+**Exact match:**
+```bash
+# Find all auth epic issues
+jit query label "epic:auth"
+
+# Find all v1.0 milestone issues
+jit query label "milestone:v1.0"
+```
+
+**Wildcard (namespace match):**
+```bash
+# Find all issues with ANY milestone
+jit query label "milestone:*"
+
+# Find all issues with ANY epic
+jit query label "epic:*"
+
+# Find all component-tagged issues
+jit query label "component:*"
+```
+
+**Boolean queries:**
+```bash
+# Complex filters
+jit issue list --filter "label:epic:auth AND label:component:backend"
+jit issue list --filter "label:milestone:v1.0 OR label:milestone:v1.1"
+jit issue list --filter "label:type:task AND NOT label:epic:*"
+```
+
+### Label vs Dependency Semantics
+
+See [Dependencies vs Labels](#dependencies-vs-labels-understanding-the-difference) section above for detailed comparison.
+
+**Summary:**
+- **Labels** = Organizational membership (grouping)
+- **Dependencies** = Execution order (workflow)
+- Both often flow same direction, but different purposes
+- Use both for maximum clarity
+
+**Example:**
+```bash
+# Task belongs to auth epic (label)
+jit issue create --title "JWT utils" --label "epic:auth"
+
+# Epic requires task to complete (dependency)
+jit dep add <epic-id> <task-id>
+
+# Query by label: "epic:auth" → Shows all auth work
+# Query ready: → Shows task if unblocked, epic if task done
+```
+
+### Label Namespaces Discovery
+
+**List all namespaces in use:**
+```bash
+jit label namespaces
+# Output:
+# type
+# epic
+# milestone
+# component
+# needs-review
+```
+
+**List all values for a namespace:**
+```bash
+jit label values milestone
+# Output:
+# v0.9
+# v1.0
+# v1.1
+
+jit label values epic
+# Output:
+# auth
+# api
+# web-ui
+```
+
+These commands help discover existing labels without manual inspection.
 
 ## Assignees
 
-<!-- Format, types, claim/release semantics -->
+Assignees indicate who (human or agent) is actively working on an issue. JIT supports atomic claiming to prevent race conditions in multi-agent scenarios.
+
+### Assignee Format
+
+**All assignees use**: `{type}:{identifier}`
+
+**Supported types:**
+- `human:{name}` - Human developer (e.g., `human:alice`, `human:bob`)
+- `agent:{id}` - AI agent (e.g., `agent:copilot-session-1`, `agent:worker-2`)
+- `bot:{name}` - Automated bot (e.g., `bot:dependabot`, `bot:automation`)
+
+**Examples:**
+```bash
+# Human assignee
+jit issue assign abc123 human:alice
+
+# Agent assignee
+jit issue claim abc123 agent:worker-1
+
+# Bot assignee
+jit issue assign abc123 bot:ci-automation
+```
+
+### Claim Semantics (Atomic Operations)
+
+**Why atomic claiming matters:**
+
+In multi-agent scenarios, multiple agents may query for ready work simultaneously. Without atomic operations, race conditions occur:
+
+```
+Time   Agent 1                Agent 2
+-----------------------------------------
+T1     query ready → [abc123]
+T2                           query ready → [abc123]
+T3     claim abc123 ✓
+T4                           claim abc123 ✓  ← Duplicate work!
+```
+
+**JIT's solution: File-based atomic claiming**
+
+Claiming uses atomic file operations (rename is atomic in POSIX):
+1. Read issue file
+2. Verify no assignee exists
+3. Write temp file with new assignee
+4. **Atomic rename** (succeeds for one agent, fails for others)
+
+```bash
+# Both agents try simultaneously
+Agent 1: jit issue claim abc123 agent:worker-1  # ✓ Succeeds
+Agent 2: jit issue claim abc123 agent:worker-2  # ✗ Fails: already claimed
+```
+
+### Claim vs Assign
+
+**`jit issue claim`** - Atomic operation (race-safe)
+- Verifies issue is unassigned
+- Claims for specified assignee
+- Returns error if already assigned
+- Use for multi-agent coordination
+
+**`jit issue assign`** - Force assignment (overwrites)
+- Assigns regardless of current state
+- Can reassign from one agent to another
+- Use for manual intervention
+
+**Examples:**
+```bash
+# Agent claims (atomic, safe)
+jit issue claim abc123 agent:worker-1
+# Error if already claimed
+
+# Human reassigns (force, override)
+jit issue assign abc123 human:alice
+# Succeeds even if claimed by agent
+```
+
+### Claim Next Ready Issue
+
+For agents that just want "next available work":
+
+```bash
+# Claim next ready issue by priority
+jit issue claim-next agent:worker-1
+
+# With filter
+jit issue claim-next agent:worker-1 --filter "label:epic:auth"
+```
+
+**Behavior:**
+1. Queries ready issues (unassigned, state=ready, unblocked)
+2. Sorts by priority (critical → high → normal → low)
+3. Atomically claims first available issue
+4. Returns claimed issue ID
+
+**Race handling:**
+- If multiple agents claim-next simultaneously, each gets different issue
+- Atomic file operations ensure no duplicates
+- If no ready issues, returns error
+
+### Release Semantics
+
+Agents can release issues they cannot complete:
+
+```bash
+# Release an issue
+jit issue release abc123 --reason "timeout"
+```
+
+**Behavior:**
+- Clears assignee
+- Adds event to audit log
+- Issue becomes available for other agents
+- Reason recorded for observability
+
+**Common reasons:**
+- `timeout` - Exceeded time budget
+- `error` - Encountered blocking error
+- `reassign` - Redirecting to different agent
+- `manual` - Human intervention required
+
+### Unassign
+
+Simpler alternative when no reason needed:
+
+```bash
+# Clear assignee
+jit issue unassign abc123
+```
+
+Equivalent to `assign` with no assignee value.
+
+### Multi-Agent Coordination Patterns
+
+**Pattern 1: Decentralized Polling**
+```bash
+# Each agent independently polls and claims
+while true; do
+  # Claim next ready work atomically
+  ISSUE=$(jit issue claim-next agent:worker-$ID --json | jq -r '.data.id')
+  
+  if [ -n "$ISSUE" ]; then
+    # Do work...
+    work_on_issue "$ISSUE"
+    
+    # Complete when done
+    jit issue update "$ISSUE" --state done
+  else
+    # No work available, wait
+    sleep 10
+  fi
+done
+```
+
+**Pattern 2: Filtered Work Distribution**
+```bash
+# Agent 1: Backend specialist
+jit issue claim-next agent:backend-specialist --filter "label:component:backend"
+
+# Agent 2: Frontend specialist
+jit issue claim-next agent:frontend-specialist --filter "label:component:frontend"
+
+# Agent 3: Generalist
+jit issue claim-next agent:generalist
+```
+
+**Pattern 3: Priority-Based Assignment**
+```bash
+# High-priority agent gets critical work
+jit issue claim-next agent:priority-worker --filter "priority:critical OR priority:high"
+
+# Low-priority agent gets normal work
+jit issue claim-next agent:background-worker --filter "priority:normal OR priority:low"
+```
+
+**Pattern 4: Timeout and Recovery**
+```bash
+# Work on issue with timeout
+ISSUE=$(jit issue claim-next agent:worker-1)
+timeout 300 work_on_issue "$ISSUE" || {
+  # Timeout exceeded, release for others
+  jit issue release "$ISSUE" --reason "timeout"
+}
+```
+
+### Current Limitations and Future Directions
+
+**Current capabilities:**
+- Atomic claiming via file operations
+- Decentralized polling (no coordinator daemon)
+- Simple assignee format with type prefix
+- Manual release on timeout/error
+
+**Potential future enhancements** (not yet implemented):
+- **Coordinator daemon** (`jit-dispatch`) - Central work distributor with:
+  - Active push to agents (no polling)
+  - Health monitoring and automatic reassignment
+  - Load balancing across agents
+  - Stalled work detection
+  - Agent capability matching
+- **Assignee priorities** - Preferred agent for issue types
+- **Work-in-progress limits** - Max concurrent issues per agent
+- **Agent heartbeats** - Detect crashed agents
+- **Automatic timeout** - Release after inactivity threshold
+
+**Note:** Current design works well for 1-10 agents polling every 10-30 seconds. Coordinator daemon would optimize for larger agent pools (10-100 agents) with lower latency requirements.
+
+For practical coordination examples, see [How-To: Software Development](../how-to/software-development.md#multi-agent-workflows).

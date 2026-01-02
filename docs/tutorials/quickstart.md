@@ -4,6 +4,50 @@
 > **Time:** 10 minutes  
 > **Goal:** Get started with JIT in 10 minutes
 
+# Quickstart
+
+> **Diátaxis Type:** Tutorial  
+> **Time:** 10 minutes  
+> **Goal:** Get started with JIT in 10 minutes
+
+## For AI Agents: Quick Orientation
+
+**If you're an AI agent**, you want to get productive fast. Here's the 2-minute version:
+
+**Core Concepts:**
+- **Issues** = Units of work (states: backlog → ready → in_progress → done)
+- **Dependencies** = DAG controlling work order (FROM depends on TO)
+- **Gates** = Quality checkpoints that must pass
+- **Labels** = `namespace:value` format for organization (REQUIRED: `type:*`)
+- **Assignees** = `{type}:{identifier}` (e.g., `agent:copilot-session-1`)
+
+**Essential Commands:**
+```bash
+# Find ready work
+jit query ready --json
+
+# Claim atomically (race-safe)
+jit issue claim <short-hash> agent:your-id
+
+# Check status
+jit issue show <short-hash> --json
+
+# Pass gates
+jit gate check <short-hash> tests
+jit gate pass <short-hash> code-review
+
+# Complete
+jit issue update <short-hash> --state done
+```
+
+**Use MCP Tools** - Don't fall back to CLI for efficiency. MCP provides structured responses.
+
+See [MCP Tools Reference](../reference/cli-commands.md#mcp-tools-reference) for complete tool catalog.
+
+**Continue with human tutorial below for detailed examples...**
+
+---
+
 ## Quick Note: Labels are Optional
 
 **JIT works perfectly fine without labels!** You can use it as a simple issue tracker:

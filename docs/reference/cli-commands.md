@@ -3,6 +3,647 @@
 > **Status:** Draft - Story 5bad7437  
 > **Diátaxis Type:** Reference
 
+## MCP Tools Reference
+
+JIT provides Model Context Protocol (MCP) tools for AI agent integration. These tools wrap CLI commands with standardized interfaces.
+
+### What is MCP?
+
+MCP (Model Context Protocol) is a standard interface for AI agents to interact with tools. JIT's MCP server provides all CLI functionality through structured tool calls.
+
+**Key benefits:**
+- Standardized parameter names and formats
+- Structured JSON responses
+- Type-safe tool definitions
+- Framework-agnostic (works with any MCP client)
+
+### Installation and Setup
+
+```bash
+# MCP server is in mcp-server/ directory
+cd mcp-server
+
+# Install dependencies
+npm install
+
+# Start server (for MCP clients)
+node index.js
+
+# Configure in your MCP client (e.g., Claude Desktop, VSCode)
+# See mcp-server/README.md for client configuration
+```
+
+### Parameter Naming Convention
+
+**MCP tool parameters match CLI exactly:**
+
+```javascript
+// CLI: jit issue create --title "..." --description "..."
+jit_issue_create({
+  title: "string",
+  description: "string",  // Full word (consistent with CLI)
+  label: ["type:task"],   // Array, singular form
+  gate: ["tests"],        // Array, singular form
+  priority: "high"
+})
+```
+
+**Key conventions:**
+- Parameters use full words (description, not desc)
+- Arrays use singular form (label not labels, gate not gates)
+- Flags become boolean properties (json: true, quiet: true)
+- Hyphens become underscores (add_gate not add-gate)
+
+### Core MCP Tools
+
+#### Issue Management
+
+**`jit_issue_create`** - Create new issue
+```javascript
+{
+  title: string,              // Required
+  description?: string,
+  label?: string[],           // ["type:task", "epic:auth"]
+  gate?: string[],            // ["tests", "code-review"]
+  priority?: string,          // "critical" | "high" | "normal" | "low"
+  orphan?: boolean,           // Allow without type label
+  json?: boolean              // Return JSON response
+}
+```
+
+**`jit_issue_show`** - Get issue details
+```javascript
+{
+  id: string,                 // Issue ID or short hash
+  json?: boolean
+}
+```
+
+**`jit_issue_list`** - List issues with filters
+```javascript
+{
+  state?: string,             // "ready" | "in_progress" | "done" etc.
+  assignee?: string,          // "agent:worker-1"
+  priority?: string,
+  json?: boolean
+}
+```
+
+**`jit_issue_update`** - Modify issue
+```javascript
+{
+  id?: string,                // Single issue mode
+  filter?: string,            // Batch mode (mutually exclusive with id)
+  state?: string,
+  priority?: string,
+  assignee?: string,
+  unassign?: boolean,
+  label?: string[],           // Add labels
+  remove_label?: string[],
+  add_gate?: string[],
+  remove_gate?: string[],
+  json?: boolean
+}
+```
+
+**`jit_issue_claim`** - Atomically claim unassigned issue
+```javascript
+{
+  id: string,
+  assignee: string,           // "agent:copilot-session-1"
+  json?: boolean
+}
+```
+
+**`jit_issue_claim_next`** - Claim next ready issue by priority
+```javascript
+{
+  assignee: string,
+  filter?: string,            // Optional filter
+  json?: boolean
+}
+```
+
+**`jit_issue_release`** - Release issue from assignee
+```javascript
+{
+  id: string,
+  reason: string,             // "timeout" | "error" | "reassign"
+  json?: boolean
+}
+```
+
+**`jit_issue_reject`** - Reject issue (bypasses gates)
+```javascript
+{
+  id: string,
+  reason?: string,            // Adds resolution:* label
+  json?: boolean
+}
+```
+
+**`jit_issue_search`** - Full-text search
+```javascript
+{
+  query: string,              // Search title, description, ID
+  state?: string,
+  assignee?: string,
+  priority?: string,
+  json?: boolean
+}
+```
+
+**`jit_issue_breakdown`** - Break issue into subtasks
+```javascript
+{
+  parent_id: string,
+  subtask: string[],          // Subtask titles
+  description?: string[],     // Optional descriptions
+  json?: boolean
+}
+```
+
+#### Dependencies
+
+**`jit_dep_add`** - Add dependency (FROM depends on TO)
+```javascript
+{
+  from_id: string,            // Issue that is blocked
+  to_ids: string[],           // Dependencies required
+  json?: boolean
+}
+```
+
+**`jit_dep_rm`** - Remove dependency
+```javascript
+{
+  from_id: string,
+  to_ids: string[],
+  json?: boolean
+}
+```
+
+#### Gates
+
+**`jit_gate_define`** - Define new gate in registry
+```javascript
+{
+  key: string,                // Unique identifier
+  title: string,
+  description: string,
+  stage?: string,             // "precheck" | "postcheck"
+  mode?: string,              // "manual" | "auto"
+  checker_command?: string,   // For automated gates
+  timeout?: number,           // Seconds
+  working_dir?: string,
+  json?: boolean
+}
+```
+
+**`jit_gate_list`** - List all gate definitions
+```javascript
+{
+  json?: boolean
+}
+```
+
+**`jit_gate_show`** - Show gate definition
+```javascript
+{
+  key: string,
+  json?: boolean
+}
+```
+
+**`jit_gate_add`** - Add gates to issue
+```javascript
+{
+  id: string,
+  gate_keys: string[],        // ["tests", "clippy", "code-review"]
+  json?: boolean
+}
+```
+
+**`jit_gate_remove`** - Remove gate from issue
+```javascript
+{
+  id: string,
+  gate_key: string,
+  json?: boolean
+}
+```
+
+**`jit_gate_check`** - Run automated gate checker
+```javascript
+{
+  id: string,
+  gate_key: string,
+  json?: boolean
+}
+```
+
+**`jit_gate_check_all`** - Run all automated gates
+```javascript
+{
+  id: string,
+  json?: boolean
+}
+```
+
+**`jit_gate_pass`** - Mark gate as passed
+```javascript
+{
+  id: string,
+  gate_key: string,
+  by?: string,                // "human:alice" | "ci:github"
+  json?: boolean
+}
+```
+
+**`jit_gate_fail`** - Mark gate as failed
+```javascript
+{
+  id: string,
+  gate_key: string,
+  by?: string,
+  json?: boolean
+}
+```
+
+#### Queries
+
+**`jit_query_ready`** - Issues ready to work on
+```javascript
+{
+  json?: boolean
+}
+```
+
+**`jit_query_blocked`** - Blocked issues with reasons
+```javascript
+{
+  json?: boolean
+}
+```
+
+**`jit_query_state`** - Filter by state
+```javascript
+{
+  state: string,              // "backlog" | "ready" | "in_progress" | etc.
+  json?: boolean
+}
+```
+
+**`jit_query_priority`** - Filter by priority
+```javascript
+{
+  priority: string,           // "critical" | "high" | "normal" | "low"
+  json?: boolean
+}
+```
+
+**`jit_query_label`** - Filter by label pattern
+```javascript
+{
+  pattern: string,            // "epic:auth" | "milestone:*"
+  json?: boolean
+}
+```
+
+**`jit_query_assignee`** - Filter by assignee
+```javascript
+{
+  assignee: string,           // "agent:worker-1"
+  json?: boolean
+}
+```
+
+**`jit_query_strategic`** - Strategic issues (milestone/epic/goal)
+```javascript
+{
+  json?: boolean
+}
+```
+
+**`jit_query_closed`** - Done or rejected issues
+```javascript
+{
+  json?: boolean
+}
+```
+
+#### Graph
+
+**`jit_graph_show`** - Show dependency tree
+```javascript
+{
+  id?: string,                // Optional - shows all if omitted
+  json?: boolean
+}
+```
+
+**`jit_graph_roots`** - Find root issues (no dependencies)
+```javascript
+{
+  json?: boolean
+}
+```
+
+**`jit_graph_downstream`** - Show what's blocked by this issue
+```javascript
+{
+  id: string,
+  json?: boolean
+}
+```
+
+**`jit_graph_export`** - Export graph in various formats
+```javascript
+{
+  format: string,             // "dot" | "mermaid"
+  output?: string             // File path (optional)
+}
+```
+
+#### Documents
+
+**`jit_doc_add`** - Add document reference to issue
+```javascript
+{
+  id: string,
+  path: string,
+  label?: string,
+  doc_type?: string,          // "design" | "implementation" | "notes"
+  commit?: string,            // Git commit
+  skip_scan?: boolean,
+  json?: boolean
+}
+```
+
+**`jit_doc_list`** - List documents for issue
+```javascript
+{
+  id: string,
+  json?: boolean
+}
+```
+
+**`jit_doc_show`** - Show document content
+```javascript
+{
+  id: string,
+  path: string,
+  at?: string,                // Git commit
+  json?: boolean
+}
+```
+
+**`jit_doc_remove`** - Remove document reference
+```javascript
+{
+  id: string,
+  path: string,
+  json?: boolean
+}
+```
+
+#### Status and Validation
+
+**`jit_status`** - Overall status
+```javascript
+{
+  json?: boolean
+}
+```
+
+**`jit_validate`** - Validate repository integrity
+```javascript
+{
+  fix?: boolean,              // Auto-fix issues
+  dry_run?: boolean,          // Preview fixes
+  json?: boolean
+}
+```
+
+#### Search
+
+**`jit_search`** - Full-text search across issues and documents
+```javascript
+{
+  query: string,
+  glob?: string,              // File pattern
+  regex?: boolean,
+  case_sensitive?: boolean,
+  context?: number,           // Lines of context
+  limit?: number,
+  json?: boolean
+}
+```
+
+### MCP Response Format
+
+All MCP tools return structured responses:
+
+**Success response:**
+```javascript
+{
+  success: true,
+  data: {
+    id: "abc123...",
+    title: "Issue title",
+    state: "ready",
+    // ... other fields
+  }
+}
+```
+
+**Error response:**
+```javascript
+{
+  success: false,
+  error: {
+    message: "Issue not found",
+    code: "NOT_FOUND"
+  }
+}
+```
+
+**List response:**
+```javascript
+{
+  success: true,
+  data: {
+    issues: [...],
+    count: 42
+  }
+}
+```
+
+### Usage Examples (JavaScript/TypeScript)
+
+**Basic workflow:**
+```typescript
+// Create issue
+const created = await jit_issue_create({
+  title: "Implement user authentication",
+  label: ["type:task", "epic:auth", "component:backend"],
+  gate: ["tests", "code-review"],
+  priority: "high",
+  json: true
+});
+const issueId = created.data.id;
+
+// Add dependencies
+await jit_dep_add({
+  from_id: epicId,
+  to_ids: [issueId]
+});
+
+// Query ready work
+const ready = await jit_query_ready({ json: true });
+console.log(`${ready.data.count} issues ready`);
+
+// Claim atomically
+await jit_issue_claim({
+  id: issueId,
+  assignee: "agent:copilot-session-1"
+});
+
+// Do work...
+
+// Pass gates
+await jit_gate_check({ id: issueId, gate_key: "tests" });
+await jit_gate_pass({ 
+  id: issueId, 
+  gate_key: "code-review",
+  by: "human:reviewer"
+});
+
+// Complete
+await jit_issue_update({ 
+  id: issueId, 
+  state: "done" 
+});
+```
+
+**Multi-agent coordination:**
+```typescript
+// Agent polling loop
+async function agentLoop(agentId: string) {
+  while (true) {
+    // Claim next ready issue atomically
+    const claimed = await jit_issue_claim_next({
+      assignee: `agent:${agentId}`,
+      json: true
+    });
+    
+    if (claimed.success) {
+      const issueId = claimed.data.id;
+      console.log(`Agent ${agentId} claimed ${issueId}`);
+      
+      // Do work
+      await performWork(issueId);
+      
+      // Complete
+      await jit_issue_update({ id: issueId, state: "done" });
+    } else {
+      // No work available
+      await sleep(10000);
+    }
+  }
+}
+```
+
+**Parallel operations:**
+```typescript
+// Create multiple issues in parallel
+const tasks = [
+  "Implement JWT utilities",
+  "Add password hashing",
+  "Create session management"
+];
+
+const created = await Promise.all(
+  tasks.map(title => 
+    jit_issue_create({
+      title,
+      label: ["type:task", "epic:auth"],
+      gate: ["tests", "code-review"],
+      json: true
+    })
+  )
+);
+
+const issueIds = created.map(r => r.data.id);
+console.log(`Created ${issueIds.length} issues`);
+```
+
+### Efficiency Tips for Agents
+
+**✅ Use MCP tools exclusively**
+- Don't fall back to CLI/bash for efficiency
+- MCP tools are optimized for structured responses
+- Avoid shell parsing overhead
+
+**✅ Parallel operations with Promise.all()**
+```typescript
+// Good: Parallel
+await Promise.all([
+  jit_gate_check({ id, gate_key: "tests" }),
+  jit_gate_check({ id, gate_key: "clippy" }),
+  jit_gate_check({ id, gate_key: "fmt" })
+]);
+
+// Avoid: Sequential
+await jit_gate_check({ id, gate_key: "tests" });
+await jit_gate_check({ id, gate_key: "clippy" });
+await jit_gate_check({ id, gate_key: "fmt" });
+```
+
+**✅ Chain MCP calls**
+```typescript
+// Structured JSON responses are easy to chain
+const ready = await jit_query_ready({ json: true });
+const firstIssue = ready.data.issues[0];
+await jit_issue_claim({ id: firstIssue.id, assignee: agentId });
+```
+
+**✅ Use short hashes**
+```typescript
+// Works with short prefixes (4+ chars)
+await jit_issue_show({ id: "01abc" });  // Instead of full UUID
+await jit_gate_pass({ id: "003f", gate_key: "tests" });
+```
+
+**✅ Check JSON output structure**
+```typescript
+// Inspect response for available fields
+const issue = await jit_issue_show({ id, json: true });
+console.log(issue.data);
+// { id, title, state, priority, assignee, dependencies, gates_status, ... }
+```
+
+### Testing MCP Tools
+
+```bash
+# Test MCP server
+cd mcp-server
+npm test
+
+# Test specific tool
+node test-tool.js jit_issue_create
+
+# Test with MCP inspector (if available)
+npx @modelcontextprotocol/inspector
+```
+
+### See Also
+
+- [MCP Server README](../../mcp-server/README.md) - Setup and configuration
+- [Core Model](../concepts/core-model.md) - Understanding issues, gates, dependencies
+- [How-To: Custom Gates](../how-to/custom-gates.md) - Gate usage patterns
+- [Quickstart Tutorial](../tutorials/quickstart.md) - Getting started
+
 ## Global Options
 
 ### `--json`

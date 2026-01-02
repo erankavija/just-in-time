@@ -20,12 +20,6 @@
   "context": {},
   "documents": [
     {
-      "path": "AGENT-QUICKSTART.md",
-      "commit": null,
-      "label": "Reference",
-      "doc_type": null
-    },
-    {
       "path": "dev/studies/documentation-organization-strategy.md",
       "commit": null,
       "label": null,
