@@ -6,12 +6,13 @@
   "priority": "critical",
   "assignee": null,
   "dependencies": [
+    "a4e3cfb0-626e-4a73-8be4-364dd0597833",
+    "5fe00921-6548-4263-b428-f1e839f68c74",
+    "9d427a6b-a8f7-4478-a0e1-1637781e00f6",
+    "4a00b2b0-a527-4f04-9475-62f1d838f903",
     "df0b551f-c60e-4c6f-951c-5a796a1c5635",
     "d7bfd4a4-b2ad-477a-977e-e3242b77b7a2",
-    "4a00b2b0-a527-4f04-9475-62f1d838f903",
-    "93f3e4df-990c-4993-b8dc-66a8827acba7",
-    "5fe00921-6548-4263-b428-f1e839f68c74",
-    "9d427a6b-a8f7-4478-a0e1-1637781e00f6"
+    "93f3e4df-990c-4993-b8dc-66a8827acba7"
   ],
   "gates_required": [
     "code-review"

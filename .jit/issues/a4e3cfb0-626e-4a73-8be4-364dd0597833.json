@@ -1,0 +1,26 @@
+{
+  "id": "a4e3cfb0-626e-4a73-8be4-364dd0597833",
+  "title": "Evaluate and implement documentation tooling for v1.0",
+  "description": "Evaluate documentation rendering options (Docsify, MDBook, Jekyll, etc.) and implement chosen solution before v1.0 release.\n\n## Goal\n\nProvide professional, searchable documentation site for v1.0 users while maintaining markdown source for agent accessibility.\n\n## Key Requirements\n\n- Full-text search across all documentation\n- Professional appearance and navigation\n- Preserve markdown source files (agent-readable)\n- Minimal maintenance overhead\n- GitLab Pages compatible\n\n## Deliverables\n\n- Evaluation of all viable options (see attached document)\n- Decision made and documented\n- Chosen solution implemented\n- Documentation hosted and accessible\n- Maintenance process documented\n\nSee attached document for detailed option analysis and recommendation (Docsify).",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [
+    {
+      "path": "dev/studies/documentation-tooling-evaluation.md",
+      "commit": null,
+      "label": "Evaluation Document",
+      "doc_type": null,
+      "format": "markdown"
+    }
+  ],
+  "labels": [
+    "type:task",
+    "milestone:v1.0",
+    "component:docs"
+  ]
+}
