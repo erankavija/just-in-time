@@ -119,7 +119,209 @@ Query ready: → Shows Login Task (epic blocked by dependency)
 
 ## Gates
 
-<!-- Quality checkpoints, prechecks/postchecks, automated vs manual -->
+Quality gates are checkpoints that enforce process requirements before issues can progress through the workflow.
+
+### What Are Gates?
+
+**Gates** are quality control mechanisms that:
+- Define quality standards for work completion
+- Automate or remind about process steps
+- Prevent premature completion of incomplete work
+- Integrate quality checks directly into workflow
+
+**Mental model:** Gates are like guardrails on a road - they keep work on track and prevent accidents (bugs, technical debt, incomplete features).
+
+### Gate Lifecycle
+
+Gates exist in three states:
+
+1. **Required** - Gate is attached to an issue but not yet checked
+2. **Passed** - Gate check succeeded (automated) or approved (manual)
+3. **Failed** - Gate check failed (automated only)
+
+**State transitions:**
+```
+Required → Passed    (check succeeds or manual approval)
+Required → Failed    (automated check fails)
+Failed → Passed      (fix issue, re-run check)
+```
+
+### Gate Types: Prechecks vs Postchecks
+
+Gates run at two stages in the issue lifecycle:
+
+**Prechecks** - Run before work begins (`backlog/ready → in_progress`)
+- Verify prerequisites met
+- Remind about process (e.g., TDD: write tests first)
+- Validate approach before implementation
+
+**Postchecks** - Run before completion (`in_progress → done`)
+- Verify quality standards (tests pass, linting clean)
+- Require reviews or approvals
+- Validate deliverables complete
+
+**Example workflow:**
+```
+backlog → [PRECHECK: tdd-reminder] → in_progress
+          ↓
+          work happens
+          ↓
+in_progress → [POSTCHECK: tests, clippy, code-review] → gated → done
+```
+
+### Gate Modes: Manual vs Automated
+
+**Manual Gates** - Require human judgment
+- Examples: code review, design approval, security audit
+- Passed explicitly: `jit gate pass $ISSUE code-review --by human:alice`
+- Used for subjective quality checks
+
+**Automated Gates** - Run programmatic checks
+- Examples: tests, linters, builds, security scans
+- Run automatically: `jit gate check $ISSUE tests`
+- Used for objective, repeatable verification
+- Require checker command and timeout configuration
+
+### Gate Status Tracking
+
+Each gate on an issue tracks:
+- **Status**: required, passed, or failed
+- **Updated by**: Who/what passed the gate (e.g., `human:alice`, `ci:github-actions`)
+- **Updated at**: Timestamp of last status change
+
+**Query gate status:**
+```bash
+jit issue show $ISSUE --json | jq '.data.gates_status'
+```
+
+### Gate Enforcement and Auto-Transitions
+
+Gates integrate with the state machine to enforce quality:
+
+**Attempting to complete work:**
+```bash
+jit issue update $ISSUE --state done
+```
+
+**If all gates passed:**
+- Issue transitions directly to `done`
+
+**If any gates not passed:**
+- Issue transitions to `gated` (waiting for gate approval)
+- Clear error message shows which gates are blocking
+- Auto-transitions to `done` when last gate passes
+
+**Example:**
+```bash
+$ jit issue update abc123 --state done
+Error: Gate validation failed: Cannot transition to 'done' - 2 gate(s) not passed: tests, code-review
+→ Issue automatically transitioned to 'gated' (awaiting gate approval)
+
+# Fix and pass gates
+$ jit gate check abc123 tests
+✓ tests passed
+
+$ jit gate pass abc123 code-review --by human:alice
+✓ code-review passed
+→ Issue automatically transitioned to 'done' (all gates passed)
+```
+
+### Gate Bypass for Terminal States
+
+**Critical design property:** Transitioning to `rejected` bypasses all gate enforcement.
+
+**Rationale:**
+- Issues can be rejected at any time (duplicate found, requirements changed)
+- Requiring gates to pass before rejecting doesn't make semantic sense
+- `rejected` is an escape hatch for "this work won't happen"
+
+**Example:**
+```bash
+# Issue has failing gates
+jit issue update $ISSUE --state done
+# Error: Gate validation failed
+
+# But can always reject
+jit issue reject $ISSUE --reason "duplicate"
+# Success - bypasses gates
+```
+
+Terminal state `done` requires gates, but `rejected` does not.
+
+### Gate Registry
+
+Gates are defined globally in the **gate registry** (`.jit/gates.json`):
+- Each gate has a unique key (e.g., `tests`, `code-review`)
+- Gate definitions are reusable across issues
+- Changes to gate definitions don't affect existing gate status
+
+**Define once, use many times:**
+```bash
+# Define in registry
+jit gate define tests --title "Tests Pass" --mode auto --checker-command "cargo test"
+
+# Apply to multiple issues
+jit issue update --filter "epic:auth" --add-gate tests
+```
+
+### Relationship to State Machine
+
+Gates influence state transitions:
+
+```
+                    ┌──────────┐
+                    │ Backlog  │
+                    └────┬─────┘
+                         │
+                    [prechecks]
+                         │
+                         v
+                    ┌──────────┐
+                    │  Ready   │
+                    └────┬─────┘
+                         │
+                         v
+                  ┌─────────────┐
+                  │ In Progress │
+                  └──────┬──────┘
+                         │
+                    [postchecks]
+                         │
+                         v
+                    ┌─────────┐
+                    │  Gated  │ ← Waiting for gates
+                    └────┬────┘
+                         │
+                  [all gates pass]
+                         │
+                         v
+                    ┌────────┐
+                    │  Done  │
+                    └────────┘
+```
+
+**Key behaviors:**
+- **Prechecks** gate entry to `in_progress`
+- **Postchecks** gate entry to `done`
+- **Gated state** exists specifically for gate waiting
+- **Auto-transition** from `gated → done` when gates pass
+
+### Design Philosophy
+
+**Gates encode process, not just validation:**
+- Manual gates remind about important steps (write tests first)
+- Automated gates enforce quality standards (tests pass)
+- Together, they create a workflow that's hard to shortcut
+
+**Gates are optional and flexible:**
+- Issues can have zero gates (simple tracking)
+- Issues can have many gates (strict quality control)
+- Gates are defined per-issue (different standards for different work)
+
+**Gates provide transparency:**
+- Clear why work is blocked (which gates need to pass)
+- Audit trail of who approved what (gate status history)
+- Programmatic queryability (find issues awaiting specific gates)
 
 ## States
 

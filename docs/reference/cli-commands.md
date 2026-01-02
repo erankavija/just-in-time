@@ -122,7 +122,279 @@ jit issue reject $DONE_ISSUE
 
 ## Gate Commands
 
-<!-- Complete jit gate reference -->
+Gates are quality checkpoints that enforce process requirements. See [How-To: Custom Gates](../how-to/custom-gates.md) for practical examples and [Core Model - Gates](../concepts/core-model.md#gates) for conceptual understanding.
+
+### `jit gate define`
+
+Define a new gate in the registry for reuse across issues.
+
+**Usage:**
+```bash
+jit gate define <KEY> --title <TITLE> --description <DESCRIPTION> [OPTIONS]
+```
+
+**Arguments:**
+- `KEY` - Unique identifier (e.g., `tests`, `code-review`, `security-scan`)
+
+**Required Options:**
+- `--title <TITLE>` - Human-readable name
+- `--description <DESCRIPTION>` - What this gate checks
+
+**Optional:**
+- `--stage <STAGE>` - When gate runs: `precheck` or `postcheck` (default: `postcheck`)
+- `--mode <MODE>` - How gate is checked: `manual` or `auto` (default: `manual`)
+- `--checker-command <COMMAND>` - Command to run for automated gates
+- `--timeout <SECONDS>` - Checker timeout in seconds (default: 300)
+- `--working-dir <PATH>` - Working directory for checker (relative to repo root)
+
+**Examples:**
+```bash
+# Manual code review gate
+jit gate define code-review \
+  --title "Code Review" \
+  --description "Another developer must review code" \
+  --stage postcheck \
+  --mode manual
+
+# Automated test gate
+jit gate define tests \
+  --title "All Tests Pass" \
+  --description "Full test suite must succeed" \
+  --stage postcheck \
+  --mode auto \
+  --checker-command "cargo test --lib" \
+  --timeout 300
+
+# TDD precheck reminder
+jit gate define tdd-reminder \
+  --title "Write Tests First" \
+  --description "Reminder to follow TDD practice" \
+  --stage precheck \
+  --mode manual
+```
+
+### `jit gate add`
+
+Add gate requirements to an issue. Gates must be defined in registry first.
+
+**Usage:**
+```bash
+jit gate add <ISSUE_ID> <GATE_KEY>...
+```
+
+**Arguments:**
+- `ISSUE_ID` - Issue to add gates to
+- `GATE_KEY...` - One or more gate keys from registry
+
+**Examples:**
+```bash
+# Add single gate
+jit gate add abc123 code-review
+
+# Add multiple gates at once
+jit gate add abc123 tests clippy fmt
+
+# Add gate to multiple issues with filter
+jit issue update --filter "label:epic:auth" --add-gate tests
+```
+
+### `jit gate list`
+
+List all gates defined in the registry.
+
+**Usage:**
+```bash
+jit gate list [--json] [--quiet]
+```
+
+**Output:**
+```
+Gates:
+  tests - All Tests Pass (Postcheck, Auto)
+  clippy - Clippy Lints Pass (Postcheck, Auto)
+  fmt - Code Formatted (Postcheck, Auto)
+  code-review - Code Review (Postcheck, Manual)
+  tdd-reminder - TDD Reminder (Precheck, Manual)
+```
+
+### `jit gate show`
+
+Show detailed information about a specific gate definition.
+
+**Usage:**
+```bash
+jit gate show <GATE_KEY> [--json] [--quiet]
+```
+
+**Example:**
+```bash
+$ jit gate show tests
+
+Gate: tests
+  Title: All Tests Pass
+  Description: Full test suite must pass
+  Stage: Postcheck
+  Mode: Auto
+  Checker:
+    Command: cargo test --lib
+    Timeout: 300s
+```
+
+### `jit gate check`
+
+Run an automated gate checker for a specific issue.
+
+**Usage:**
+```bash
+jit gate check <ISSUE_ID> <GATE_KEY> [--json] [--quiet]
+```
+
+**Behavior:**
+- Runs the gate's checker command
+- Updates gate status based on exit code (0 = passed, non-zero = failed)
+- Only works for automated gates (manual gates cannot be checked)
+
+**Examples:**
+```bash
+# Check single gate
+jit gate check abc123 tests
+# ✓ tests passed (exit code 0)
+
+# Check fails
+jit gate check abc123 clippy
+# ✗ clippy failed (exit code 1)
+# Output: found 3 warnings...
+```
+
+### `jit gate check-all`
+
+Run all automated gates for an issue.
+
+**Usage:**
+```bash
+jit gate check-all <ISSUE_ID> [--json]
+```
+
+**Behavior:**
+- Runs checker commands for all automated gates on the issue
+- Manual gates are skipped
+- Reports summary of results
+
+**Example:**
+```bash
+$ jit gate check-all abc123
+
+Running 3 automated gate(s)...
+✓ tests passed
+✓ fmt passed
+✗ clippy failed
+
+Summary: 2 passed, 1 failed
+```
+
+### `jit gate pass`
+
+Manually mark a gate as passed.
+
+**Usage:**
+```bash
+jit gate pass <ISSUE_ID> <GATE_KEY> [--by <WHO>]
+```
+
+**Options:**
+- `--by <WHO>` - Record who passed the gate (e.g., `human:alice`, `ci:github-actions`)
+
+**Examples:**
+```bash
+# Pass manual gate
+jit gate pass abc123 code-review --by "human:alice"
+
+# Pass without attribution
+jit gate pass abc123 tdd-reminder
+
+# Pass automated gate manually (override checker)
+jit gate pass abc123 tests --by "human:admin"
+```
+
+**Behavior:**
+- Updates gate status to `passed`
+- Records who passed it and timestamp
+- If this was the last blocking gate, issue auto-transitions from `gated → done`
+
+### `jit gate fail`
+
+Manually mark a gate as failed.
+
+**Usage:**
+```bash
+jit gate fail <ISSUE_ID> <GATE_KEY> [--by <WHO>]
+```
+
+**Example:**
+```bash
+# Fail automated gate manually
+jit gate fail abc123 tests --by "ci:github-actions"
+```
+
+**Note:** Typically only used for automated gates run in CI/CD. Manual gates are usually only passed, not failed.
+
+### `jit gate remove`
+
+Remove a gate requirement from an issue.
+
+**Usage:**
+```bash
+jit issue update <ISSUE_ID> --remove-gate <GATE_KEY>
+```
+
+**Example:**
+```bash
+# Remove single gate
+jit issue update abc123 --remove-gate code-review
+
+# Remove multiple gates
+jit issue update abc123 --remove-gate tests --remove-gate clippy
+```
+
+### Gate Status in Issue Queries
+
+**View gate status:**
+```bash
+# Show all gate information for issue
+jit issue show abc123 --json | jq '.data.gates_status'
+
+# Example output:
+{
+  "tests": {
+    "status": "passed",
+    "updated_by": "ci:github-actions",
+    "updated_at": "2026-01-02T10:30:00Z"
+  },
+  "code-review": {
+    "status": "passed",
+    "updated_by": "human:alice",
+    "updated_at": "2026-01-02T11:00:00Z"
+  }
+}
+```
+
+**Find issues with specific gate status:**
+```bash
+# Find all gated issues (waiting for gates)
+jit query state gated
+
+# Use jq to filter by specific gate
+jit issue list --json | jq '.issues[] | select(.gates_status.tests.status == "failed")'
+```
+
+### Exit Codes
+
+All gate commands use standard exit codes:
+
+- `0` - Success
+- `1` - Error (gate not found, issue not found, invalid input)
+- `2` - Validation error (cannot add duplicate gate, etc.)
+- `4` - Gate check failed (for `jit gate check` when checker returns non-zero)
 
 ## Dependency Commands
 
