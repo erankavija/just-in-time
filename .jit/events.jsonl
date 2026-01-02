@@ -633,3 +633,4 @@
 {"type":"gate_passed","id":"b2524f4f-b0bd-4ebf-959c-16d461600a39","issue_id":"baa723de-93bb-4ec7-8883-0a464bca9b30","timestamp":"2026-01-02T18:43:25.793079050Z","gate_key":"code-review","updated_by":"human:reviewer"}
 {"type":"issue_state_changed","id":"f1424fcd-6c88-4bfe-ac1c-dea9c614e79d","issue_id":"baa723de-93bb-4ec7-8883-0a464bca9b30","timestamp":"2026-01-02T18:43:25.796025431Z","from":"gated","to":"done"}
 {"type":"issue_completed","id":"8147172e-29e5-4ed5-a3a9-55fc1d643e9a","issue_id":"baa723de-93bb-4ec7-8883-0a464bca9b30","timestamp":"2026-01-02T18:43:25.796050931Z"}
+{"type":"issue_created","id":"5a8086e7-092f-48f6-a8ac-e85515658fa8","issue_id":"6535ba30-1236-4c10-a718-81ceeb11acb4","timestamp":"2026-01-02T21:10:38.776532386Z","title":"Consolidate and move deployment documentation to docs/","priority":"normal"}

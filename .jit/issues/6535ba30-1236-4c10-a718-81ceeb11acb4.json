@@ -1,0 +1,19 @@
+{
+  "id": "6535ba30-1236-4c10-a718-81ceeb11acb4",
+  "title": "Consolidate and move deployment documentation to docs/",
+  "description": "Merge DEPLOYMENT.md and PODMAN.md into streamlined deployment guide in docs/how-to/.\n\n## Current State\n\n**DEPLOYMENT.md (570 lines)**\n- Production deployment guide (systemd, nginx, monitoring, backups)\n- Likely contains obsolete or overly detailed content\n\n**PODMAN.md (527 lines)**  \n- Podman-specific deployment alternative\n- Overlaps with DEPLOYMENT.md\n- Contains 'lots of useless stuff'\n\n## Goal\n\nCreate concise, focused deployment documentation in docs/how-to/deployment.md\n\n## Tasks\n\n1. **Audit both files** - Identify essential vs obsolete content\n2. **Extract core content:**\n   - Basic deployment (systemd service)\n   - Docker/Podman options (consolidated)\n   - Production considerations (concise)\n3. **Create docs/how-to/deployment.md**\n   - Follow Diátaxis how-to guide style\n   - Focus on practical deployment recipes\n   - Docker AND Podman in one guide\n4. **Delete root-level files:**\n   - Remove DEPLOYMENT.md\n   - Remove PODMAN.md\n5. **Update references** - Fix any links to these files\n\n## Acceptance Criteria\n\n- [ ] docs/how-to/deployment.md created with streamlined content\n- [ ] Both Docker and Podman covered concisely\n- [ ] DEPLOYMENT.md deleted from root\n- [ ] PODMAN.md deleted from root\n- [ ] No broken references to old files\n- [ ] Follows Diátaxis how-to guide style\n\n## Related\n\nPart of User Documentation Phase 2 (Epic cfb3ba94)",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:docs",
+    "milestone:v1.0",
+    "component:docs"
+  ]
+}
