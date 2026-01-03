@@ -663,3 +663,4 @@
 {"type":"gate_added","id":"d77259bf-1f0b-4a92-b635-2623169069fe","issue_id":"ab451fdb-2bd3-42e2-a866-9d644779eb53","timestamp":"2026-01-02T22:11:47.864206060Z","gate_key":"code-review"}
 {"type":"gate_added","id":"54ce0a92-2d95-402a-9d2a-c531d3b30d22","issue_id":"d037eece-a1ec-448d-a5e2-2ec1345acf91","timestamp":"2026-01-02T22:11:47.867846451Z","gate_key":"code-review"}
 {"type":"gate_added","id":"5d5b828a-3aef-40e7-9c39-21868b1ce6e0","issue_id":"2a48ca4d-8ad3-46b7-9cf4-5207fa95b143","timestamp":"2026-01-02T22:11:47.871851062Z","gate_key":"code-review"}
+{"type":"issue_created","id":"372add0e-3bb9-4ee0-8b26-0158d91321ab","issue_id":"ad601a15-5217-439f-9b3c-94a52c06c18b","timestamp":"2026-01-03T19:25:16.858034362Z","title":"Enable parallel multi-agent work with git worktrees","priority":"high"}
