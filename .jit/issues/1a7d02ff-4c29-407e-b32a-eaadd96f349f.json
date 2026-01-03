@@ -1,0 +1,29 @@
+{
+  "id": "1a7d02ff-4c29-407e-b32a-eaadd96f349f",
+  "title": "Write multi-agent coordination how-to guide",
+  "description": "Write how-to guide with recipes for common coordination patterns: multiple agents on same machine, long-running work with heartbeat, handoff between agents, recovering from crashes. Place in docs/how-to/.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "730d25b5-f16c-4327-99fd-fb337e65edb9"
+  ],
+  "gates_required": [
+    "code-review"
+  ],
+  "gates_status": {
+    "code-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-01-03T20:37:20.945500733Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "epic:parallel-work",
+    "milestone:v1.0",
+    "component:docs",
+    "type:task"
+  ]
+}

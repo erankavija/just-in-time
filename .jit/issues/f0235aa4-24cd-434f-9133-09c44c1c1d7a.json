@@ -1,0 +1,77 @@
+{
+  "id": "f0235aa4-24cd-434f-9133-09c44c1c1d7a",
+  "title": "Story: CLI Commands for Claims and Worktrees",
+  "description": "Implement the CLI commands for claim management and worktree information, providing the user-facing interface for the parallel work system.\n\n## Goal\n\nExpose claim coordination and worktree features through intuitive CLI commands with full JSON output support for agent consumption.\n\n## Tasks\n\n1. **`jit claim acquire`** - Acquire lease on issue with configurable TTL\n2. **`jit claim renew`** - Extend lease TTL for long-running work\n3. **`jit claim release`** - Explicitly release lease before expiry\n4. **`jit claim force-evict`** - Admin operation to evict stale leases\n5. **`jit claim status`** - Show current claim status (single issue or all)\n6. **`jit claim list`** - List all active claims across worktrees\n7. **`jit worktree info`** - Display current worktree context\n8. **`jit worktree list`** - List all worktrees with claim info\n9. **`jit validate --divergence`** - Explicit divergence validation\n10. **`jit validate --leases`** - Validate lease consistency\n\n## Success Criteria\n\n- All commands support `--json` output for agent consumption\n- Clear error messages with actionable remediation\n- `jit claim acquire` fails gracefully if already claimed\n- `jit claim status` shows remaining TTL and expiry time\n- Commands work in both main worktree and secondary worktrees\n\n## References\n\nSee design document `dev/design/worktree-parallel-work.md`:\n- Section \"New Commands\" for command specifications\n- Section \"Example Usage\" for typical workflows\n- Section \"Configuration\" for default values\n\n## Dependencies\n\nRequires Story: Claim Coordination System (backend implementation)",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "2ba4d4c7-5ad9-4d01-90c2-92cbf5819580",
+    "d91b72ab-33b0-48e8-b52a-a30145c67695",
+    "6e020dc9-144c-400f-82b2-703c93e5b111",
+    "9262f487-89b9-4271-a412-3daff40d258d",
+    "ee20327b-2f2a-48f8-80d6-06cb1cb31a6e",
+    "f8e58e7d-6d05-4bbe-a077-be3fb792a27f",
+    "77206cf6-f935-49d0-b132-054e6a1edfae",
+    "8be14c59-bb0a-4b2d-91cf-03ee589ccfc3",
+    "3f2cf966-1265-4953-81ee-61ea02974d35"
+  ],
+  "gates_required": [
+    "tdd-reminder",
+    "tests",
+    "clippy",
+    "fmt",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [
+    {
+      "path": "dev/design/worktree-parallel-work.md",
+      "commit": null,
+      "label": "Design Document",
+      "doc_type": "design",
+      "format": "markdown",
+      "assets": [
+        {
+          "original_path": "https://github.com/ulid/spec",
+          "resolved_path": null,
+          "asset_type": "external",
+          "mime_type": null,
+          "content_hash": null,
+          "is_shared": false
+        },
+        {
+          "original_path": "https://automerge.org/",
+          "resolved_path": null,
+          "asset_type": "external",
+          "mime_type": null,
+          "content_hash": null,
+          "is_shared": false
+        },
+        {
+          "original_path": "https://git-scm.com/docs/git-worktree",
+          "resolved_path": null,
+          "asset_type": "external",
+          "mime_type": null,
+          "content_hash": null,
+          "is_shared": false
+        },
+        {
+          "original_path": "https://docs.rs/fs4/",
+          "resolved_path": null,
+          "asset_type": "external",
+          "mime_type": null,
+          "content_hash": null,
+          "is_shared": false
+        }
+      ]
+    }
+  ],
+  "labels": [
+    "type:story",
+    "epic:parallel-work",
+    "milestone:v1.0",
+    "component:cli"
+  ]
+}
