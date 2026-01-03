@@ -3,7 +3,16 @@
 **Issue:** ad601a15-5217-439f-9b3c-94a52c06c18b  
 **Status:** Design  
 **Author:** System  
-**Date:** 2026-01-03
+**Date:** 2026-01-03  
+**Last Updated:** 2026-01-03
+
+**Recent refinements:**
+- Reorganized for clarity: goals → architecture → identities → lease semantics → atomicity/durability → enforcement → recovery → configuration → testing → future work
+- Emphasized deterministic, race-free behavior with monotonic time semantics and sequence numbers
+- Enhanced atomicity with parent directory fsync after atomic renames
+- Strengthened enforcement with CLI-level lease checks, divergence gating, and comprehensive hook examples
+- Added configuration toggles for enforcement modes and worktree behavior
+- Expanded guidance on long-running tasks, lease transfers, and integration points
 
 ## Problem Statement
 
@@ -14,6 +23,7 @@ Current `.jit/` storage is repository-local but not worktree-aware. Multiple age
 - No coordination mechanism for issue ownership
 - No visibility into which agent is working on what
 - Manual deconfliction required (inefficient)
+- Risk of race conditions and non-deterministic behavior
 
 ## Goals
 
@@ -22,10 +32,14 @@ Current `.jit/` storage is repository-local but not worktree-aware. Multiple age
 3. **Preserve simplicity**: Keep storage plaintext JSON, git-versionable
 4. **Support recovery**: Handle crashes and stale claims gracefully
 5. **Audit trail**: All coordination actions logged for observability
+6. **Deterministic behavior**: Race-free, monotonic, and predictable operations
+7. **Correctness-first**: Strong invariants with defense-in-depth enforcement
 
-## Solution Architecture
+## Architecture
 
 ### Two-Tier Storage Model
+
+This design separates data-plane (versioned issue data) from control-plane (ephemeral coordination state).
 
 **Per-Worktree Data Plane** (`<worktree>/.jit/`):
 - Issue data: `issues/<ID>/issue.json`
@@ -79,6 +93,20 @@ project-root/
             └── events/
 ```
 
+**Design rationale:**
+- Per-worktree issue data enables git-based merging and versioning
+- Shared control plane provides global coordination without network dependency
+- Append-only logs ensure audit trail and enable index rebuild
+- Atomic operations via file locks guarantee consistency
+
+### Key Principles
+
+1. **Correctness**: Strong invariants enforced at multiple layers (CLI, hooks, locks)
+2. **Determinism**: Monotonic clocks, sequence numbers, predictable ordering
+3. **Durability**: fsync after critical writes, atomic rename pattern
+4. **Recovery**: Self-healing from corrupted indices, expired leases, stale locks
+5. **Defense-in-depth**: CLI-level checks before hooks before commit
+
 ## Identity System
 
 ### Agent Identity
@@ -92,11 +120,23 @@ project-root/
 - `ci:github-actions` - CI/CD pipeline
 
 **Persistence:**
-- Environment variable: `JIT_AGENT_ID`
-- Config file: `~/.config/jit/agent.toml`
-- Per-session override: `--agent-id` flag
+- Environment variable: `JIT_AGENT_ID` (highest priority, session-specific)
+- Config file: `~/.config/jit/agent.toml` (persistent identity)
+- Per-session override: `--agent-id` flag (explicit override)
 
-**Stability:** Agent ID should persist across process restarts for the same logical agent/session.
+**Provenance (agent.toml):**
+```toml
+[agent]
+id = "agent:copilot-1"
+created_at = "2026-01-03T12:00:00Z"
+description = "GitHub Copilot Workspace Session 1"
+
+# Session override via env or CLI flag
+# JIT_AGENT_ID=agent:session-xyz jit claim acquire ...
+# jit claim acquire <issue> --agent-id agent:override
+```
+
+**Stability:** Agent ID should persist across process restarts for the same logical agent/session to maintain lease continuity.
 
 ### Worktree Identity
 
@@ -123,6 +163,37 @@ project-root/
 }
 ```
 
+**Relocation detection:**
+```rust
+pub fn load_worktree_identity(paths: &WorktreePaths) -> Result<WorktreeIdentity> {
+    let wt_file = paths.local_jit.join("worktree.json");
+    let mut wt: WorktreeIdentity = serde_json::from_str(&fs::read_to_string(&wt_file)?)?;
+    
+    // Check if worktree was moved
+    let current_root = paths.worktree_root.to_string_lossy().to_string();
+    if wt.root != current_root {
+        warn!("Worktree relocated: {} -> {}", wt.root, current_root);
+        
+        // Update location (worktree_id remains stable)
+        wt.root = current_root;
+        wt.relocated_at = Some(Utc::now());
+        
+        // Write updated identity atomically
+        let temp_path = wt_file.with_extension("tmp");
+        fs::write(&temp_path, serde_json::to_string_pretty(&wt)?)?;
+        fs::rename(temp_path, &wt_file)?;
+    }
+    
+    Ok(wt)
+}
+```
+
+**Procedure on relocation:**
+1. Detect path change on any `jit` command
+2. Update `worktree.json` with new path and `relocated_at` timestamp
+3. Preserve `worktree_id` to maintain lease identity
+4. Log warning for audit trail
+
 ### Lease Identity
 
 **Format:** ULID (Universally Unique Lexicographically Sortable Identifier)
@@ -134,7 +205,11 @@ project-root/
 - Globally unique
 - 26 characters (URL-safe Base32)
 
-## Claim/Lease Semantics
+## Lease Semantics
+
+### Overview
+
+Leases are **time-bounded, exclusive claims** on issues for structural editing. This section defines the lease model, invariants, and operations.
 
 ### Lease Model
 
@@ -156,15 +231,116 @@ struct Lease {
 
 **Default TTL:** 600 seconds (10 minutes)
 
+**Monotonic expiry check:** Use `Instant` internally for TTL expiry checks to avoid wall-clock jumps affecting lease validity. Store RFC3339 timestamps for audit trail.
+
+```rust
+use std::time::Instant;
+
+pub struct Lease {
+    // Monotonic clock for expiry checks (not serialized)
+    #[serde(skip)]
+    acquired_instant: Instant,
+    
+    // UTC timestamps for audit trail
+    pub acquired_at: DateTime<Utc>,
+    pub expires_at: DateTime<Utc>,
+    pub ttl_secs: u64,
+    
+    // ... other fields
+}
+
+impl Lease {
+    pub fn is_expired(&self) -> bool {
+        // Use monotonic clock (immune to NTP adjustments, system time changes)
+        self.acquired_instant.elapsed().as_secs() > self.ttl_secs
+    }
+    
+    pub fn remaining_secs(&self) -> u64 {
+        self.ttl_secs.saturating_sub(self.acquired_instant.elapsed().as_secs())
+    }
+}
+```
+
+### Invariants
+
+**Critical invariants enforced throughout the system:**
+
+1. **One active lease per issue**: At most one lease can be active for any issue at any time
+   - Enforced in: `acquire_claim()` under global lock
+   - Verified in: `verify_index_consistency()` on startup
+
+2. **Lease ownership**: Only the exact (agent_id, worktree_id) pair can renew or release a lease
+   - Prevents agent impersonation
+   - Ensures work stays within intended worktree
+
+3. **Expiry determinism**: Expired leases are automatically evicted lazily during any claim operation
+   - No background daemon required for expiry
+   - Predictable, reproducible behavior
+
+4. **Atomic transitions**: All lease state changes (acquire, renew, release, evict) are atomic
+   - Append to log + update index under global lock
+   - No partial states observable
+
+5. **Audit completeness**: Every lease operation is logged in append-only `claims.jsonl`
+   - Immutable audit trail
+   - Enables index rebuild and forensics
+
 ### Single-Writer Policy
 
 **Per-issue structural edits require an active lease:**
 - Creating/updating/deleting issue
 - Adding/removing dependencies
-- Adding/removing gates
+- Adding/removing gates  
 - Changing issue state
+- Editing labels, assignees, metadata
 
-**Multi-writer allowed (CRDT-based, future):**
+**CLI-level enforcement (defense-in-depth layer 1):**
+```rust
+impl CommandExecutor {
+    pub fn update_issue(&self, id: &str, params: UpdateParams) -> Result<()> {
+        // MUST check lease before operation
+        self.require_active_lease(id, "update issue")?;
+        
+        // Proceed with update
+        self.storage.update_issue(id, params)
+    }
+    
+    fn require_active_lease(&self, issue_id: &str, operation: &str) -> Result<()> {
+        let config = self.load_config()?;
+        
+        // Check enforcement mode
+        match config.coordination.enforce_leases {
+            EnforceMode::Off => return Ok(()), // Bypass
+            EnforceMode::Warn => {
+                // Check but only warn
+                if !self.has_active_lease(issue_id)? {
+                    eprintln!("⚠️  Warning: {} on {} without active lease", operation, issue_id);
+                }
+                return Ok(());
+            }
+            EnforceMode::Strict => {
+                // Strict enforcement (default)
+            }
+        }
+        
+        let agent_id = self.get_agent_id()?;
+        let worktree_id = self.get_worktree_id()?;
+        
+        if !self.claim_coordinator.has_active_lease(issue_id, &agent_id, &worktree_id)? {
+            bail!(
+                "Operation '{}' on issue {} requires active lease.\n\
+                 Agent: {}, Worktree: {}\n\
+                 Acquire: jit claim acquire {} --ttl 600",
+                operation, issue_id, agent_id, worktree_id, issue_id
+            );
+        }
+        
+        Ok(())
+    }
+}
+```
+
+**Multi-writer allowed (future):**
 - Free-text description edits (Automerge CRDT)
 - Comment additions (append-only)
 
@@ -203,6 +379,360 @@ struct Lease {
 4. Write updated index
 
 **Eviction is lazy:** Only happens during claim operations, not background process (for simplicity).
+
+## Atomicity and Durability
+
+### Write-Temp-Rename Pattern
+
+All critical file updates use atomic write-temp-rename to prevent partial writes and ensure crash safety.
+
+**Enhanced atomic write with directory fsync:**
+```rust
+fn write_index_atomic(&self, index: &ClaimsIndex) -> Result<()> {
+    let index_path = self.paths.shared_jit.join("claims.index.json");
+    let temp_path = index_path.with_extension("tmp");
+    
+    // Write to temp file
+    let json = serde_json::to_string_pretty(index)?;
+    fs::write(&temp_path, json)?;
+    
+    // Fsync temp file content to disk
+    let file = File::open(&temp_path)?;
+    file.sync_all()?;
+    drop(file);
+    
+    // Atomic rename (replaces target atomically)
+    fs::rename(&temp_path, &index_path)?;
+    
+    // CRITICAL: Fsync parent directory to ensure rename is durable
+    // Without this, a crash could lose the directory entry update
+    let parent_dir = File::open(index_path.parent().unwrap())?;
+    parent_dir.sync_all()?;
+    
+    Ok(())
+}
+```
+
+**Apply everywhere:**
+- Claims index updates: `claims.index.json`
+- Worktree identity: `worktree.json`
+- Issue updates: `issues/<id>/issue.json`
+- Gate results: `gates/results/<issue-id>.json`
+
+### Append-Only Log Durability
+
+**Claims log append with fsync:**
+```rust
+fn append_claim_op(&self, op: &ClaimOp) -> Result<()> {
+    let log_path = self.paths.shared_jit.join("claims.jsonl");
+    
+    // Ensure directory exists
+    fs::create_dir_all(log_path.parent().unwrap())?;
+    
+    // Append operation
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log_path)?;
+    
+    let json = serde_json::to_string(op)?;
+    writeln!(file, "{}", json)?;
+    
+    // Fsync to ensure append is durable before index update
+    file.sync_all()?;
+    
+    Ok(())
+}
+```
+
+**Ordering guarantee:** Log append MUST complete (and fsync) before index update. This ensures the index can always be rebuilt from the log.
+
+### Sequence Numbers for Total Ordering
+
+**Optional monotonic sequence in claims log:**
+```json
+{"schema_version":1,"sequence":1,"op":"acquire","lease_id":"01HX...","issue_id":"ad601a15",...}
+{"schema_version":1,"sequence":2,"op":"renew","lease_id":"01HX...",...}
+{"schema_version":1,"sequence":3,"op":"release","lease_id":"01HX...",...}
+```
+
+**Benefits:**
+- Detects missing log entries (gap in sequence)
+- Provides total ordering under global lock
+- Enables log compaction and archival
+
+**Implementation:**
+```rust
+struct ClaimCoordinator {
+    next_sequence: AtomicU64, // In-memory counter
+}
+
+impl ClaimCoordinator {
+    fn append_claim_op(&self, op: &ClaimOp) -> Result<()> {
+        let seq = self.next_sequence.fetch_add(1, Ordering::SeqCst);
+        
+        // Wrap operation with sequence
+        let envelope = ClaimOpEnvelope {
+            schema_version: 1,
+            sequence: seq,
+            op: op.clone(),
+        };
+        
+        // Append to log
+        // ...
+    }
+    
+    fn rebuild_index_from_log(&self) -> Result<ClaimsIndex> {
+        // Read log, verify sequence continuity
+        let mut expected_seq = 1;
+        for line in BufReader::new(File::open(&log_path)?).lines() {
+            let envelope: ClaimOpEnvelope = serde_json::from_str(&line?)?;
+            
+            if envelope.sequence != expected_seq {
+                warn!("Sequence gap: expected {}, got {}", expected_seq, envelope.sequence);
+            }
+            
+            expected_seq = envelope.sequence + 1;
+            // Apply operation...
+        }
+        
+        // Update next_sequence
+        self.next_sequence.store(expected_seq, Ordering::SeqCst);
+        
+        Ok(index)
+    }
+}
+```
+
+### Monotonic Time Semantics
+
+**Avoid wall-clock dependencies for expiry:**
+
+**Problem:** System time changes (NTP, manual adjustments) can cause:
+- Leases expiring prematurely
+- Leases living longer than intended
+- Non-deterministic behavior in tests
+
+**Solution:** Dual-clock approach:
+- **Store**: RFC3339 timestamps (`acquired_at`, `expires_at`) for human-readable audit trail
+- **Check**: `Instant` (monotonic clock) for TTL expiry logic
+
+**Serialization handling:**
+```rust
+#[derive(Serialize, Deserialize)]
+pub struct Lease {
+    pub lease_id: String,
+    pub issue_id: String,
+    pub agent_id: String,
+    pub worktree_id: String,
+    pub branch: String,
+    pub ttl_secs: u64,
+    
+    // Serialized for audit trail
+    pub acquired_at: DateTime<Utc>,
+    pub expires_at: DateTime<Utc>,
+    
+    // NOT serialized, reconstructed on load
+    #[serde(skip)]
+    acquired_instant: Option<Instant>,
+}
+
+impl Lease {
+    pub fn new(...) -> Self {
+        let now_utc = Utc::now();
+        let now_instant = Instant::now();
+        
+        Self {
+            // ...
+            acquired_at: now_utc,
+            expires_at: now_utc + Duration::seconds(ttl_secs as i64),
+            acquired_instant: Some(now_instant),
+        }
+    }
+    
+    pub fn from_index(lease_data: LeaseSerde) -> Self {
+        // Reconstruct Instant from UTC timestamp
+        // Use conservative approach: assume lease started at load time minus elapsed
+        let elapsed_secs = Utc::now()
+            .signed_duration_since(lease_data.acquired_at)
+            .num_seconds()
+            .max(0) as u64;
+        
+        let acquired_instant = Instant::now()
+            .checked_sub(Duration::from_secs(elapsed_secs))
+            .unwrap_or_else(Instant::now);
+        
+        Self {
+            acquired_instant: Some(acquired_instant),
+            // ... copy other fields
+        }
+    }
+    
+    pub fn is_expired(&self) -> bool {
+        match self.acquired_instant {
+            Some(instant) => instant.elapsed().as_secs() > self.ttl_secs,
+            None => {
+                // Fallback to wall-clock (less reliable)
+                Utc::now() > self.expires_at
+            }
+        }
+    }
+}
+```
+
+### Lock Hygiene and Metadata
+
+**Lock file metadata for better diagnostics:**
+
+```rust
+#[derive(Serialize, Deserialize)]
+pub struct LockMetadata {
+    pub pid: u32,
+    pub agent_id: String,
+    pub created_at: DateTime<Utc>,
+    pub last_updated: DateTime<Utc>,
+}
+
+impl FileLocker {
+    pub fn lock_exclusive_with_metadata(
+        &self,
+        path: &Path,
+        agent_id: &str,
+    ) -> Result<LockGuard> {
+        let file = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .open(path)?;
+        file.lock_exclusive()?;
+        
+        // Write metadata for diagnostics
+        let metadata = LockMetadata {
+            pid: std::process::id(),
+            agent_id: agent_id.to_string(),
+            created_at: Utc::now(),
+            last_updated: Utc::now(),
+        };
+        
+        let meta_path = path.with_extension("meta");
+        fs::write(&meta_path, serde_json::to_string_pretty(&metadata)?)?;
+        
+        Ok(LockGuard {
+            file,
+            meta_path: Some(meta_path),
+        })
+    }
+}
+
+pub struct LockGuard {
+    file: File,
+    meta_path: Option<PathBuf>,
+}
+
+impl Drop for LockGuard {
+    fn drop(&mut self) {
+        let _ = self.file.unlock();
+        if let Some(ref path) = self.meta_path {
+            let _ = fs::remove_file(path);
+        }
+    }
+}
+```
+
+**Stale lock cleanup with enhanced checks:**
+```rust
+pub fn cleanup_stale_locks(&self) -> Result<()> {
+    let lock_dir = self.paths.shared_jit.join("locks");
+    if !lock_dir.exists() {
+        return Ok(());
+    }
+    
+    for entry in fs::read_dir(&lock_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        
+        // Skip metadata files
+        if path.extension().map_or(false, |e| e == "meta") {
+            continue;
+        }
+        
+        let metadata_path = path.with_extension("meta");
+        
+        // Try to acquire lock non-blocking
+        if let Ok(file) = OpenOptions::new().write(true).open(&path) {
+            match file.try_lock_exclusive() {
+                Ok(_guard) => {
+                    // Lock acquired => it was stale
+                    warn!("Removed stale lock: {}", path.display());
+                    drop(_guard);
+                    let _ = fs::remove_file(&path);
+                    let _ = fs::remove_file(&metadata_path);
+                }
+                Err(_) => {
+                    // Lock held, check metadata
+                    if let Ok(meta_json) = fs::read_to_string(&metadata_path) {
+                        let meta: LockMetadata = serde_json::from_str(&meta_json)?;
+                        
+                        // Check if process still exists
+                        if !process_exists(meta.pid) {
+                            warn!("Removing lock from dead process {}: {}", meta.pid, path.display());
+                            // Force remove (process dead, lock should be stale)
+                            let _ = fs::remove_file(&path);
+                            let _ = fs::remove_file(&metadata_path);
+                            continue;
+                        }
+                        
+                        // Check age (1 hour TTL for locks)
+                        let age = Utc::now().signed_duration_since(meta.created_at);
+                        if age.num_seconds() > 3600 {
+                            error!(
+                                "Lock very old: {} ({}s, pid={}, agent={})",
+                                path.display(),
+                                age.num_seconds(),
+                                meta.pid,
+                                meta.agent_id
+                            );
+                            // Don't auto-remove if process exists, require manual intervention
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    Ok(())
+}
+
+#[cfg(unix)]
+fn process_exists(pid: u32) -> bool {
+    use nix::sys::signal::{kill, Signal};
+    use nix::unistd::Pid;
+    
+    // Signal 0 doesn't send a signal but checks if process exists
+    kill(Pid::from_raw(pid as i32), Signal::from_c_int(0).ok()).is_ok()
+}
+
+#[cfg(windows)]
+fn process_exists(pid: u32) -> bool {
+    use winapi::um::processthreadsapi::OpenProcess;
+    use winapi::um::winnt::PROCESS_QUERY_INFORMATION;
+    
+    unsafe {
+        let handle = OpenProcess(PROCESS_QUERY_INFORMATION, 0, pid);
+        if handle.is_null() {
+            false
+        } else {
+            winapi::um::handleapi::CloseHandle(handle);
+            true
+        }
+    }
+}
+```
+
+**Lock TTL policy:**
+- Maximum lock hold time: 1 hour (detect stuck processes)
+- Metadata updated periodically for long operations (optional)
+- Auto-cleanup only if process dead
+- Manual intervention required for old locks with live process
 
 ## Atomic Operations and Locking
 
@@ -546,6 +1076,90 @@ pub fn start_heartbeat_thread(
 
 ## Enforcement Mechanisms
 
+### Defense-in-Depth Strategy
+
+Enforcement happens at multiple layers to ensure correctness:
+
+1. **CLI-level** (layer 1): `require_active_lease()` before any structural operation
+2. **Pre-commit hook** (layer 2): Validates leases and divergence before commit
+3. **Pre-push hook** (layer 3, optional): Validates leases still active before push
+4. **Pre-receive hook** (layer 4, optional): Server-side validation for shared bare origins
+
+### CLI-Level Divergence Gate
+
+**Global operations require common history with main:**
+
+```rust
+pub fn validate_divergence(&self) -> Result<()> {
+    let merge_base = Command::new("git")
+        .args(["merge-base", "HEAD", "origin/main"])
+        .output()
+        .context("Failed to get merge-base")?
+        .stdout;
+    
+    let main_commit = Command::new("git")
+        .args(["rev-parse", "origin/main"])
+        .output()
+        .context("Failed to get main commit")?
+        .stdout;
+    
+    if merge_base != main_commit {
+        bail!(
+            "Branch diverged from origin/main.\n\
+             Global operations require common history.\n\
+             Run: git rebase origin/main"
+        );
+    }
+    Ok(())
+}
+
+// Apply before global operations
+impl CommandExecutor {
+    pub fn update_config(&self, params: ConfigUpdate) -> Result<()> {
+        // Check config setting
+        if self.config.global_operations.require_main_history {
+            self.validate_divergence()?;
+        }
+        
+        // Proceed with update
+        self.storage.update_config(params)
+    }
+    
+    pub fn update_type_hierarchy(&self, params: TypeUpdate) -> Result<()> {
+        if self.config.global_operations.require_main_history {
+            self.validate_divergence()?;
+        }
+        
+        self.storage.update_type_hierarchy(params)
+    }
+    
+    pub fn update_gates_registry(&self, params: GateUpdate) -> Result<()> {
+        if self.config.global_operations.require_main_history {
+            self.validate_divergence()?;
+        }
+        
+        self.storage.update_gates_registry(params)
+    }
+}
+
+// Expose as CLI command for explicit validation
+pub fn cmd_validate(args: ValidateArgs) -> Result<()> {
+    let executor = CommandExecutor::new()?;
+    
+    if args.divergence {
+        executor.validate_divergence()?;
+        println!("✓ Branch is up-to-date with origin/main");
+    }
+    
+    if args.leases {
+        executor.validate_all_leases()?;
+        println!("✓ All active leases are valid");
+    }
+    
+    Ok(())
+}
+```
+
 ### Pre-Commit Hook
 
 **Location:** `.git/hooks/pre-commit`
@@ -624,6 +1238,166 @@ chmod +x .git/hooks/pre-commit
 git config core.hooksPath .git/hooks
 ```
 
+### Pre-Push Hook (Strict Teams)
+
+**Validates that leases mentioned in commits are still active before push.**
+
+**Location:** `.git/hooks/pre-push`
+
+**Template:**
+```bash
+#!/usr/bin/env bash
+# Pre-push hook: Verify active leases before push
+set -euo pipefail
+
+remote="$1"
+url="$2"
+
+# Only check for non-local pushes
+if [[ "$url" =~ ^(file://|/) ]]; then
+  exit 0
+fi
+
+# Read push details from stdin
+while read local_ref local_sha remote_ref remote_sha; do
+  # Skip deletes
+  if [ "$local_sha" = "0000000000000000000000000000000000000000" ]; then
+    continue
+  fi
+  
+  # Get commits being pushed
+  if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
+    # New branch, check all commits
+    commits=$(git rev-list "$local_sha")
+  else
+    # Existing branch, check new commits
+    commits=$(git rev-list "$remote_sha..$local_sha")
+  fi
+  
+  # Verify leases in commit messages
+  for commit in $commits; do
+    # Extract JIT-Lease trailer
+    lease_id=$(git log --format='%(trailers:key=JIT-Lease,valueonly)' -1 "$commit" | tr -d '[:space:]')
+    
+    if [ -n "$lease_id" ]; then
+      # Check if lease still active
+      claims_index=".git/jit/claims.index.json"
+      if [ -f "$claims_index" ]; then
+        exists=$(jq -r \
+          --arg lid "$lease_id" \
+          '.active[] | select(.lease_id==$lid) | .lease_id' \
+          "$claims_index" 2>/dev/null | tr -d '[:space:]')
+        
+        if [ -z "$exists" ]; then
+          issue_id=$(git log --format='%(trailers:key=JIT-Issue,valueonly)' -1 "$commit" | tr -d '[:space:]')
+          echo "❌ Error: Lease $lease_id in commit $commit is no longer active"
+          echo "   Issue: $issue_id"
+          echo "   Re-acquire lease: jit claim acquire $issue_id --ttl 600"
+          exit 1
+        fi
+      fi
+    fi
+    
+    # Check for global operations divergence
+    changed_files=$(git diff-tree --no-commit-id --name-only -r "$commit")
+    if echo "$changed_files" | grep -E '^\..?jit/(config|type-hierarchy|gates/registry)\b' >/dev/null; then
+      # Verify common history with main
+      merge_base=$(git merge-base "$commit" origin/main 2>/dev/null || echo "")
+      main_commit=$(git rev-parse origin/main 2>/dev/null || echo "")
+      
+      if [ -n "$merge_base" ] && [ -n "$main_commit" ] && [ "$merge_base" != "$main_commit" ]; then
+        echo "❌ Error: Commit $commit modifies global config but diverged from origin/main"
+        echo "   Rebase required: git rebase origin/main"
+        exit 1
+      fi
+    fi
+  done
+done
+
+echo "✓ All leases valid and branch up-to-date"
+exit 0
+```
+
+**Installation:**
+```bash
+chmod +x .git/hooks/pre-push
+
+# Enable for repository
+git config core.hooksPath .git/hooks
+
+# Optional: Skip on force push (not recommended)
+# git push --no-verify
+```
+
+### Pre-Receive Hook (Server-Side, Optional)
+
+**For local bare origin merge queue setup.**
+
+**Location:** `.git/hooks/pre-receive` (on bare repository)
+
+**Template:**
+```bash
+#!/usr/bin/env bash
+# Pre-receive hook: Server-side lease and divergence validation
+set -euo pipefail
+
+# Path to shared claims data (if accessible on server)
+CLAIMS_LOG="${GIT_DIR}/jit/claims.jsonl"
+
+while read old_sha new_sha ref_name; do
+  # Skip deletes
+  if [ "$new_sha" = "0000000000000000000000000000000000000000" ]; then
+    continue
+  fi
+  
+  # Get commits being pushed
+  if [ "$old_sha" = "0000000000000000000000000000000000000000" ]; then
+    commits=$(git rev-list "$new_sha")
+  else
+    commits=$(git rev-list "$old_sha..$new_sha")
+  fi
+  
+  # Verify each commit
+  for commit in $commits; do
+    # Extract lease info
+    lease_id=$(git log --format='%(trailers:key=JIT-Lease,valueonly)' -1 "$commit" | tr -d '[:space:]')
+    
+    if [ -n "$lease_id" ]; then
+      # Verify lease existed at commit time (check claims.jsonl)
+      if [ -f "$CLAIMS_LOG" ]; then
+        commit_time=$(git log --format='%aI' -1 "$commit")
+        
+        # Check if lease was acquired before commit and not released before commit
+        # (requires parsing claims.jsonl - complex, example simplified)
+        lease_valid=$(grep -c "\"lease_id\":\"$lease_id\"" "$CLAIMS_LOG" || echo "0")
+        
+        if [ "$lease_valid" -eq "0" ]; then
+          echo "❌ Rejected: Commit $commit references unknown lease $lease_id" >&2
+          exit 1
+        fi
+      fi
+    fi
+    
+    # Verify global operations on main branch only
+    changed_files=$(git diff-tree --no-commit-id --name-only -r "$commit")
+    if echo "$changed_files" | grep -E '^\..?jit/(config|type-hierarchy|gates/registry)\b' >/dev/null; then
+      # Only allow on main branch
+      if [ "$ref_name" != "refs/heads/main" ]; then
+        echo "❌ Rejected: Global operations only allowed on main branch" >&2
+        echo "   Commit: $commit" >&2
+        echo "   Branch: $ref_name" >&2
+        exit 1
+      fi
+    fi
+  done
+done
+
+echo "✓ Server-side validation passed" >&2
+exit 0
+```
+
+**Note:** Pre-receive hooks require access to `.git/jit/claims.jsonl` on the server, which may not be available for remote origins. This is primarily useful for local bare repository merge queue setups.
+
 ### Branch Divergence Detection
 
 ```rust
@@ -650,6 +1424,136 @@ pub fn enforce_main_only_operations(&self) -> Result<()> {
     Ok(())
 }
 ```
+
+## File Formats and Merge Strategies
+
+### Gitattributes for Safe Merges
+
+**Create `.gitattributes` in repository root:**
+
+```gitattributes
+# Union merge for append-only logs
+# Multiple agents can append independently, git merges all lines
+*.jsonl merge=union
+**/*-set.jsonl merge=union
+**/*-or-set.jsonl merge=union
+
+# CRDT merge driver for descriptions (future)
+# Requires custom merge driver configured in .git/config
+**/description.automerge merge=automerge
+
+# Never merge binary indices - always take one side
+**/*.sqlite binary
+**/cache/*.db binary
+
+# Plaintext files use default merge
+*.json merge=text
+*.md merge=text
+```
+
+**Configure CRDT merge driver (future):**
+```bash
+# In .git/config or ~/.gitconfig
+[merge "automerge"]
+    name = Automerge CRDT merge driver
+    driver = jit-automerge-merge %O %A %B %P
+    
+# jit-automerge-merge script:
+# - Loads Automerge documents from %A (ours) and %B (theirs)
+# - Merges using Automerge CRDT semantics
+# - Writes result to %A
+```
+
+### Standardized Event Envelopes
+
+**Unified schema for both control-plane and data-plane events:**
+
+**Control-plane events (claims.jsonl):**
+```json
+{
+  "schema_version": 1,
+  "sequence": 42,
+  "event_type": "claim.acquired",
+  "timestamp": "2026-01-03T12:00:00Z",
+  "actor": {
+    "agent_id": "agent:copilot-1",
+    "worktree_id": "wt:abc123ef"
+  },
+  "payload": {
+    "lease_id": "01HXJK2M3N4P5Q",
+    "issue_id": "ad601a15",
+    "ttl_secs": 600,
+    "expires_at": "2026-01-03T12:10:00Z"
+  }
+}
+```
+
+**Data-plane events (events/local.jsonl):**
+```json
+{
+  "schema_version": 1,
+  "sequence": 17,
+  "event_type": "issue.updated",
+  "timestamp": "2026-01-03T12:05:00Z",
+  "actor": {
+    "agent_id": "agent:copilot-1",
+    "worktree_id": "wt:abc123ef",
+    "lease_id": "01HXJK2M3N4P5Q"
+  },
+  "payload": {
+    "issue_id": "ad601a15",
+    "changes": {
+      "state": {"from": "ready", "to": "in_progress"}
+    }
+  }
+}
+```
+
+**Unified event types:**
+- Control-plane: `claim.acquired`, `claim.renewed`, `claim.released`, `claim.evicted`
+- Data-plane: `issue.created`, `issue.updated`, `issue.deleted`, `dep.added`, `dep.removed`, `gate.added`, `gate.completed`
+
+**Benefits:**
+- Consistent tooling for event parsing and analysis
+- Easier correlation between control and data plane actions
+- Standardized schema evolution path
+
+### Storage Format References
+
+**Worktree-aware layout summary:**
+
+```
+.git/jit/                   # Control plane (local only, not versioned)
+├── claims.jsonl            # Append-only audit log
+├── claims.index.json       # Derived view (can be rebuilt)
+├── locks/
+│   ├── claims.lock         # Global coordination lock
+│   ├── claims.lock.meta    # Lock metadata
+│   └── scope.lock          # Global operations lock
+└── heartbeat/
+    └── <agent-id>.json     # Optional heartbeat files
+
+<worktree>/.jit/            # Data plane (versioned)
+├── worktree.json           # Worktree identity
+├── config.toml             # Repository configuration
+├── issues/
+│   └── <issue-id>/
+│       ├── issue.json      # Issue data
+│       ├── deps.or-set.jsonl    # Dependencies (OR-set CRDT)
+│       └── labels.or-set.jsonl  # Labels (OR-set CRDT)
+├── gates/
+│   ├── registry.json       # Global gate definitions
+│   └── results/
+│       └── <issue-id>.json # Gate execution results
+└── events/
+    └── local.jsonl         # Data-plane events
+```
+
+**Key properties:**
+- Control plane is machine-local, never committed to git
+- Data plane is git-versioned, uses union merge for append-only logs
+- All structural edits protected by leases
+- Global config (registry, type-hierarchy) requires main-branch history
 
 ## Recovery and Robustness
 
@@ -746,7 +1650,134 @@ pub fn verify_index_consistency(&self) -> Result<bool> {
 }
 ```
 
-## CLI Surface
+## Configuration
+
+### Repository Configuration
+
+**Location:** `<worktree>/.jit/config.toml`
+
+**Schema:**
+```toml
+[worktree]
+# auto: detect git worktree and enable automatically
+# on: force worktree mode (fail if not in worktree)
+# off: disable worktree features (use legacy .jit/ only)
+mode = "auto"
+
+# strict: block operations without lease
+# warn: warn but allow operations without lease
+# off: no lease enforcement
+enforce_leases = "strict"
+
+[coordination]
+# Default TTL for new leases (seconds)
+default_ttl_secs = 600
+
+# Heartbeat interval for automatic lease renewal (seconds)
+heartbeat_interval_secs = 30
+
+# Warn when lease has less than this % of TTL remaining
+lease_renewal_threshold_pct = 10
+
+# Automatic lease renewal by heartbeat daemon
+auto_renew_leases = false
+
+[global_operations]
+# Require common history with main for global operations
+require_main_history = true
+
+# Branches allowed to modify global config
+allowed_branches = ["main", "develop"]
+
+[locks]
+# Maximum age for lock files before considered stale (seconds)
+max_age_secs = 3600
+
+# Enable lock metadata for diagnostics
+enable_metadata = true
+
+[events]
+# Enable sequence numbers in event logs
+enable_sequences = true
+
+# Standardize event envelopes across control and data plane
+use_unified_envelope = true
+```
+
+**Loading order:**
+1. Repository config: `<worktree>/.jit/config.toml`
+2. User config: `~/.config/jit/config.toml`
+3. System config: `/etc/jit/config.toml`
+4. Defaults (hardcoded)
+
+**CLI overrides:**
+```bash
+# Override config for single command
+jit claim acquire <issue> --ttl 1200
+jit issue update <issue> --strict  # Force lease check even if mode=warn
+jit claim acquire <issue> --agent-id agent:override
+```
+
+### Agent Configuration
+
+**Location:** `~/.config/jit/agent.toml`
+
+**Schema:**
+```toml
+[agent]
+# Persistent agent identity
+id = "agent:copilot-1"
+
+# When this identity was created
+created_at = "2026-01-03T12:00:00Z"
+
+# Human-readable description
+description = "GitHub Copilot Workspace Session 1"
+
+# Optional: Default TTL preference
+default_ttl_secs = 900
+
+[behavior]
+# Auto-start heartbeat daemon for lease renewal
+auto_heartbeat = false
+
+# Heartbeat interval (seconds)
+heartbeat_interval = 30
+```
+
+**Environment variable overrides:**
+```bash
+# Session-specific override (highest priority)
+export JIT_AGENT_ID="agent:session-xyz"
+
+# Run with override
+JIT_AGENT_ID=agent:override jit claim acquire <issue>
+```
+
+### Configuration Commands
+
+```bash
+# Show effective configuration
+jit config show [--json]
+
+# Get specific config value
+jit config get worktree.mode
+jit config get coordination.default_ttl_secs
+
+# Set config value (repository-level)
+jit config set worktree.enforce_leases strict
+jit config set coordination.default_ttl_secs 1200
+
+# Set config value (user-level)
+jit config set --global agent.id agent:alice
+jit config set --global agent.default_ttl_secs 900
+
+# Validate configuration
+jit config validate
+
+# Reset to defaults
+jit config reset coordination.default_ttl_secs
+```
 
 ### New Commands
 
@@ -784,6 +1815,181 @@ jit worktree list [--json]
 
 # Initialize worktree (manual)
 jit worktree init
+```
+
+**`jit validate` subcommand group:**
+
+```bash
+# Validate branch divergence
+jit validate divergence
+
+# Validate all active leases
+jit validate leases
+
+# Validate configuration
+jit validate config
+
+# Run all validations
+jit validate all [--json]
+```
+
+### Long-Running Tasks
+
+**Lease renewal warnings:**
+
+```rust
+pub fn check_lease_expiry_warning(&self, lease: &Lease) -> Option<String> {
+    let remaining_secs = lease.remaining_secs();
+    let threshold = self.config.coordination.lease_renewal_threshold_pct;
+    let threshold_secs = (lease.ttl_secs * threshold as u64) / 100;
+    
+    if remaining_secs < threshold_secs {
+        let minutes = remaining_secs / 60;
+        let seconds = remaining_secs % 60;
+        
+        return Some(format!(
+            "⚠️  Lease {} expires in {}m{}s ({}% remaining)\n\
+             Renew: jit claim renew {} --ttl {}",
+            lease.lease_id,
+            minutes,
+            seconds,
+            (remaining_secs * 100) / lease.ttl_secs,
+            lease.lease_id,
+            lease.ttl_secs
+        ));
+    }
+    
+    None
+}
+
+// Check before each CLI operation
+impl CommandExecutor {
+    pub fn execute(&self) -> Result<()> {
+        // Check all active leases for this agent
+        let leases = self.claim_coordinator.get_agent_leases(&self.agent_id)?;
+        
+        for lease in leases {
+            if let Some(warning) = self.check_lease_expiry_warning(&lease) {
+                eprintln!("{}", warning);
+            }
+        }
+        
+        // Continue with operation...
+    }
+}
+```
+
+**Heartbeat daemon (optional):**
+
+```rust
+pub fn start_heartbeat_daemon(
+    agent_id: String,
+    paths: WorktreePaths,
+    config: HeartbeatConfig,
+) -> Result<JoinHandle<()>> {
+    let handle = thread::spawn(move || {
+        let coordinator = ClaimCoordinator::new(paths.clone(), FileLocker);
+        
+        loop {
+            thread::sleep(Duration::from_secs(config.interval_secs));
+            
+            // Update heartbeat file
+            if let Err(e) = update_heartbeat(&agent_id, &paths) {
+                error!("Heartbeat update failed: {}", e);
+            }
+            
+            // Auto-renew active leases if enabled
+            if config.auto_renew_leases {
+                if let Err(e) = auto_renew_agent_leases(&coordinator, &agent_id) {
+                    error!("Lease auto-renewal failed: {}", e);
+                }
+            }
+        }
+    });
+    
+    Ok(handle)
+}
+
+fn auto_renew_agent_leases(
+    coordinator: &ClaimCoordinator,
+    agent_id: &str,
+) -> Result<()> {
+    let leases = coordinator.get_agent_leases(agent_id)?;
+    
+    for lease in leases {
+        let remaining_secs = lease.remaining_secs();
+        let threshold_secs = (lease.ttl_secs * 20) / 100; // Renew at 20% remaining
+        
+        if remaining_secs < threshold_secs {
+            info!("Auto-renewing lease {} ({}s remaining)", lease.lease_id, remaining_secs);
+            coordinator.renew_claim(&lease.lease_id, lease.ttl_secs)?;
+        }
+    }
+    
+    Ok(())
+}
+```
+
+**Lease transfer for handoff:**
+
+```rust
+pub fn transfer_lease(
+    &self,
+    lease_id: &str,
+    to_agent_id: &str,
+    to_worktree_id: &str,
+    reason: &str,
+) -> Result<Lease> {
+    let lock_path = self.paths.shared_jit.join("locks/claims.lock");
+    let _guard = self.locker.lock_exclusive(&lock_path)?;
+    
+    let mut index = self.load_claims_index()?;
+    
+    // Find existing lease
+    let old_lease = index.find_lease(lease_id)
+        .ok_or_else(|| anyhow!("Lease {} not found", lease_id))?
+        .clone();
+    
+    // Verify ownership (only owner can transfer)
+    let current_agent = self.get_agent_id()?;
+    if old_lease.agent_id != current_agent {
+        bail!("Cannot transfer lease owned by {}", old_lease.agent_id);
+    }
+    
+    // Create new lease with same issue, different owner
+    let new_lease = Lease::new(
+        old_lease.issue_id.clone(),
+        to_agent_id.to_string(),
+        to_worktree_id.to_string(),
+        self.get_branch_for_worktree(to_worktree_id)?,
+        old_lease.ttl_secs,
+    );
+    
+    // Log transfer
+    self.append_claim_op(&ClaimOp::Transfer {
+        from_lease_id: lease_id.to_string(),
+        to_lease: new_lease.clone(),
+        transferred_at: Utc::now(),
+        transferred_by: current_agent,
+        reason: reason.to_string(),
+    })?;
+    
+    // Update index
+    index.remove_lease(lease_id);
+    index.add_lease(new_lease.clone());
+    self.write_index_atomic(&index)?;
+    
+    Ok(new_lease)
+}
+```
+
+**CLI command:**
+```bash
+# Transfer lease to another agent (e.g., for debugging, handoff)
+jit claim transfer <lease-id> \
+  --to-agent agent:alice \
+  --to-worktree wt:abc123ef \
+  --reason "Handing off for review"
 ```
 
 ### Example Usage
@@ -972,438 +2178,16 @@ chmod 0644 .jit/issues/*/issue.json
 
 **Security consideration:** `.git/jit/` is local-only and should not be committed to git.
 
-## Refinements and Additional Considerations
+## Integration and Future Work
 
-### Policy and Invariants
+### Web UI Integration
 
-**CLI-Level Enforcement (Primary):**
+**Claim status visualization:**
 ```rust
-// CommandExecutor enforces lease requirement BEFORE operation
-impl CommandExecutor {
-    pub fn update_issue(&self, id: &str, params: UpdateParams) -> Result<()> {
-        // Require active lease for structural edits
-        self.require_active_lease(id, "update issue")?;
-        
-        // Proceed with update
-        self.storage.update_issue(id, params)
-    }
-    
-    fn require_active_lease(&self, issue_id: &str, operation: &str) -> Result<()> {
-        let agent_id = self.get_agent_id()?;
-        let worktree_id = self.get_worktree_id()?;
-        
-        if !self.claim_coordinator.has_active_lease(issue_id, &agent_id, &worktree_id)? {
-            bail!(
-                "Operation '{}' on issue {} requires active lease.\n\
-                 Acquire: jit claim acquire {} --ttl 600",
-                operation, issue_id, issue_id
-            );
-        }
-        
-        Ok(())
-    }
-}
-```
-
-**Invariants to codify:**
-- **One active lease per issue:** Enforced in `acquire_claim()` and verified in `verify_index_consistency()`
-- **Lease ownership:** Only the lease holder (agent + worktree) can renew or release
-- **Structural edits require lease:** CLI checks before hooks (defense in depth)
-
-**Global Operations Divergence Gate:**
-```rust
-pub fn validate_divergence(&self) -> Result<()> {
-    let merge_base = self.git_merge_base("HEAD", "origin/main")?;
-    let main_commit = self.git_rev_parse("origin/main")?;
-    
-    if merge_base != main_commit {
-        bail!(
-            "Branch diverged from origin/main.\n\
-             Global operations require common history.\n\
-             Run: git rebase origin/main"
-        );
-    }
-    Ok(())
-}
-
-// Expose as CLI command
-pub fn cmd_validate(args: ValidateArgs) -> Result<()> {
-    if args.divergence {
-        coordinator.validate_divergence()?;
-        println!("✓ Branch is up-to-date with origin/main");
-    }
-    Ok(())
-}
-```
-
-### Atomicity and Durability Enhancements
-
-**Directory fsync after rename:**
-```rust
-fn write_index_atomic(&self, index: &ClaimsIndex) -> Result<()> {
-    let index_path = self.paths.shared_jit.join("claims.index.json");
-    let temp_path = index_path.with_extension("tmp");
-    
-    // Write temp file
-    let json = serde_json::to_string_pretty(index)?;
-    fs::write(&temp_path, json)?;
-    
-    // Fsync temp file
-    let file = File::open(&temp_path)?;
-    file.sync_all()?;
-    drop(file);
-    
-    // Atomic rename
-    fs::rename(&temp_path, &index_path)?;
-    
-    // IMPORTANT: Fsync parent directory to ensure rename is durable
-    let parent_dir = File::open(index_path.parent().unwrap())?;
-    parent_dir.sync_all()?;
-    
-    Ok(())
-}
-```
-
-**Monotonic time for TTL checks:**
-```rust
-use std::time::Instant;
-
-pub struct Lease {
-    // Store creation instant for monotonic expiry checks
-    acquired_instant: Instant,
-    
-    // Store UTC for audit trail and display
-    pub acquired_at: DateTime<Utc>,
-    pub expires_at: DateTime<Utc>,
-    pub ttl_secs: u64,
-}
-
-impl Lease {
-    pub fn is_expired(&self) -> bool {
-        // Use monotonic clock for expiry check (immune to wall-clock jumps)
-        self.acquired_instant.elapsed().as_secs() > self.ttl_secs
-    }
-}
-
-// Serialize without Instant (not serializable)
-// On load, reconstruct from expires_at and current time
-```
-
-**Sequence numbers for strict ordering:**
-```json
-{"schema_version":1,"sequence":1,"op":"acquire","lease_id":"01HX...","issue_id":"ad601a15",...}
-{"schema_version":1,"sequence":2,"op":"renew","lease_id":"01HX...",...}
-{"schema_version":1,"sequence":3,"op":"release","lease_id":"01HX...",...}
-```
-
-### Identity Refinements
-
-**Agent identity provenance:**
-```toml
-# ~/.config/jit/agent.toml
-[agent]
-id = "agent:copilot-1"
-created_at = "2026-01-03T12:00:00Z"
-
-# Session override via env
-# JIT_AGENT_ID=agent:session-xyz jit claim acquire ...
-```
-
-**Worktree relocation detection:**
-```rust
-pub fn load_worktree_identity(paths: &WorktreePaths) -> Result<WorktreeIdentity> {
-    let wt_file = paths.local_jit.join("worktree.json");
-    let mut wt: WorktreeIdentity = serde_json::from_str(&fs::read_to_string(&wt_file)?)?;
-    
-    // Check if worktree was moved
-    let current_root = paths.worktree_root.to_string_lossy().to_string();
-    if wt.root != current_root {
-        warn!("Worktree relocated: {} -> {}", wt.root, current_root);
-        
-        // Update location
-        wt.root = current_root;
-        wt.relocated_at = Some(Utc::now());
-        
-        // Write updated identity
-        fs::write(&wt_file, serde_json::to_string_pretty(&wt)?)?;
-    }
-    
-    Ok(wt)
-}
-```
-
-### Lease Context Stamping
-
-**Commit message trailers (audit trail):**
-```rust
-pub fn commit_with_lease_context(
-    &self,
-    message: &str,
-    lease: &Lease,
-) -> Result<()> {
-    let full_message = format!(
-        "{}\n\n\
-         JIT-Lease: {}\n\
-         JIT-Agent: {}\n\
-         JIT-Worktree: {}",
-        message,
-        lease.lease_id,
-        lease.agent_id,
-        lease.worktree_id
-    );
-    
-    // Git commit with trailers
-    Command::new("git")
-        .args(["commit", "-m", &full_message])
-        .status()?;
-    
-    Ok(())
-}
-```
-
-**Server-side verification (optional):**
-```bash
-# .git/hooks/pre-receive (for local bare origin)
-while read old_sha new_sha ref_name; do
-  # Extract lease info from commit trailers
-  lease_id=$(git log --format='%(trailers:key=JIT-Lease,valueonly)' -1 $new_sha)
-  
-  if [ -n "$lease_id" ]; then
-    # Verify lease was valid at commit time
-    # (requires claims.jsonl access on server)
-  fi
-done
-```
-
-### File Formats and Merge Strategies
-
-**`.gitattributes` for safe merges:**
-```gitattributes
-# Union merge for append-only logs
-*.jsonl merge=union
-**/*-set.jsonl merge=union
-
-# CRDT merge driver for descriptions (future)
-**/description.automerge merge=automerge
-
-# Never merge binary indices
-**/*.sqlite binary
-```
-
-**Unified event schema:**
-```json
-{
-  "schema_version": 1,
-  "sequence": 42,
-  "type": "claim.acquired",
-  "timestamp": "2026-01-03T12:00:00Z",
-  "actor": {
-    "agent_id": "agent:copilot-1",
-    "worktree_id": "wt:abc123ef"
-  },
-  "payload": {
-    "lease_id": "01HXJK2M3N4P5Q",
-    "issue_id": "ad601a15",
-    "ttl_secs": 600,
-    "expires_at": "2026-01-03T12:10:00Z"
-  }
-}
-```
-
-### Configuration and Toggles
-
-**Repository config (`.jit/config.toml`):**
-```toml
-[worktree]
-mode = "auto"  # auto | on | off
-enforce_leases = "strict"  # strict | warn | off
-
-[coordination]
-default_ttl_secs = 600
-heartbeat_interval_secs = 30
-lease_renewal_threshold_pct = 10  # Warn when <10% TTL left
-
-[global_operations]
-require_main_history = true  # Enforce divergence gate
-allowed_branches = ["main", "develop"]  # Can edit global config
-```
-
-**CLI flags for overrides:**
-```bash
-jit claim acquire <issue> --ttl 1200
-jit claim acquire <issue> --agent-id agent:override-session
-jit issue update <issue> --strict  # Force lease check even if mode=warn
-```
-
-### Recovery and Housekeeping
-
-**Enhanced stale lock cleanup:**
-```rust
-pub struct LockMetadata {
-    pub pid: u32,
-    pub created_at: DateTime<Utc>,
-    pub agent_id: String,
-}
-
-pub fn cleanup_stale_locks(&self) -> Result<()> {
-    let lock_dir = self.paths.shared_jit.join("locks");
-    
-    for entry in fs::read_dir(&lock_dir)? {
-        let path = entry.path();
-        let metadata_path = path.with_extension("meta");
-        
-        if let Ok(meta_json) = fs::read_to_string(&metadata_path) {
-            let meta: LockMetadata = serde_json::from_str(&meta_json)?;
-            
-            // Check if process still exists
-            if !process_exists(meta.pid) {
-                warn!("Removing lock from dead process {}: {}", meta.pid, path.display());
-                let _ = fs::remove_file(&path);
-                let _ = fs::remove_file(&metadata_path);
-                continue;
-            }
-            
-            // Check TTL (1 hour max)
-            let age = Utc::now().signed_duration_since(meta.created_at);
-            if age.num_seconds() > 3600 {
-                warn!("Removing stale lock ({}s old): {}", age.num_seconds(), path.display());
-                let _ = fs::remove_file(&path);
-                let _ = fs::remove_file(&metadata_path);
-            }
-        }
-    }
-    
-    Ok(())
-}
-```
-
-**Automatic index rebuild triggers:**
-```rust
-pub fn load_claims_index(&self) -> Result<ClaimsIndex> {
-    let index_path = self.paths.shared_jit.join("claims.index.json");
-    
-    if !index_path.exists() {
-        info!("Claims index not found, rebuilding from log");
-        return self.rebuild_index_from_log();
-    }
-    
-    match fs::read_to_string(&index_path)
-        .and_then(|s| Ok(serde_json::from_str::<ClaimsIndex>(&s)?))
-    {
-        Ok(index) => {
-            // Verify schema version
-            if index.schema_version != CURRENT_SCHEMA_VERSION {
-                warn!("Schema version mismatch, rebuilding index");
-                return self.rebuild_index_from_log();
-            }
-            
-            // Verify consistency
-            if !self.verify_index_consistency_quick(&index)? {
-                warn!("Index consistency check failed, rebuilding");
-                return self.rebuild_index_from_log();
-            }
-            
-            Ok(index)
-        }
-        Err(e) => {
-            error!("Failed to load index: {}, rebuilding", e);
-            self.rebuild_index_from_log()
-        }
-    }
-}
-```
-
-### Additional Hooks and Server-Side Checks
-
-**Pre-push hook (strict teams):**
-```bash
-#!/usr/bin/env bash
-# .git/hooks/pre-push
-set -euo pipefail
-
-# Verify all committed leases are still valid
-for commit in $(git rev-list @{u}..HEAD); do
-  issue_files=$(git diff-tree --no-commit-id --name-only -r $commit | grep 'issues/.*/issue.json' || true)
-  
-  for file in $issue_files; do
-    issue_id=$(echo "$file" | sed -E 's#.*/issues/([^/]+)/.*#\1#')
-    
-    # Extract lease from commit message
-    lease_id=$(git log --format='%(trailers:key=JIT-Lease,valueonly)' -1 $commit)
-    
-    if [ -n "$lease_id" ]; then
-      # Verify lease exists in current index
-      exists=$(jq -r --arg lid "$lease_id" '.active[] | select(.lease_id==$lid) | .lease_id' .git/jit/claims.index.json 2>/dev/null || echo "")
-      
-      if [ -z "$exists" ]; then
-        echo "❌ Warning: Lease $lease_id in commit $commit is no longer active"
-        echo "   Consider re-acquiring lease before pushing"
-      fi
-    fi
-  done
-done
-```
-
-### Edge Cases and Long-Running Work
-
-**Lease renewal warnings:**
-```rust
-pub fn check_lease_expiry_warning(&self, lease: &Lease) -> Option<String> {
-    let remaining_secs = lease.ttl_secs.saturating_sub(
-        lease.acquired_instant.elapsed().as_secs()
-    );
-    
-    let threshold_secs = (lease.ttl_secs * 10) / 100;  // 10% of TTL
-    
-    if remaining_secs < threshold_secs {
-        return Some(format!(
-            "⚠️  Lease {} expires in {}s. Renew: jit claim renew {} --ttl {}",
-            lease.lease_id,
-            remaining_secs,
-            lease.lease_id,
-            lease.ttl_secs
-        ));
-    }
-    
-    None
-}
-```
-
-**Automatic heartbeat thread (opt-in):**
-```rust
-pub fn start_heartbeat_daemon(
-    agent_id: String,
-    paths: WorktreePaths,
-    interval_secs: u64,
-) -> Result<JoinHandle<()>> {
-    let handle = thread::spawn(move || {
-        loop {
-            thread::sleep(Duration::from_secs(interval_secs));
-            
-            // Update heartbeat file
-            if let Err(e) = update_heartbeat(&agent_id, &paths) {
-                error!("Heartbeat update failed: {}", e);
-            }
-            
-            // Auto-renew active leases
-            if let Err(e) = auto_renew_leases(&agent_id, &paths) {
-                error!("Lease renewal failed: {}", e);
-            }
-        }
-    });
-    
-    Ok(handle)
-}
-```
-
-### Integration Points
-
-**Web UI endpoints:**
-```rust
-// jit-server routes
+// jit-server API endpoints
 #[get("/api/claims/status")]
 async fn get_claim_status() -> Json<ClaimStatus> {
-    let coordinator = ClaimCoordinator::new(...);
+    let coordinator = ClaimCoordinator::new(...)?;
     let index = coordinator.load_claims_index()?;
     
     Json(ClaimStatus {
@@ -1419,82 +2203,133 @@ async fn list_worktrees() -> Json<Vec<WorktreeInfo>> {
     let worktrees = parse_git_worktrees()?;
     Json(worktrees)
 }
+
+#[get("/api/claims/history")]
+async fn get_claim_history(issue_id: Query<String>) -> Json<Vec<ClaimOp>> {
+    let history = parse_claims_log_for_issue(&issue_id)?;
+    Json(history)
+}
 ```
 
-**Dispatcher integration:**
+**UI features:**
+- Active leases dashboard with agent, worktree, expiry time
+- Lease history timeline for each issue
+- Worktree status overview (which issues claimed in each worktree)
+- Force-evict capability for administrators
+- Lease renewal/extension interface
+
+### Dispatcher Integration
+
+**Automatic lease management for agents:**
 ```rust
 // jit-dispatch agent wrapper
 impl AgentExecutor {
     pub async fn execute_with_lease(&self, issue_id: &str) -> Result<()> {
-        // Acquire lease
+        // Acquire lease with appropriate TTL
         let lease = self.coordinator.acquire_claim(
             issue_id,
             &self.agent_id,
             self.config.default_ttl,
         )?;
         
-        // Start heartbeat daemon
-        let _heartbeat = start_heartbeat_daemon(
-            self.agent_id.clone(),
-            self.paths.clone(),
-            30,
-        )?;
+        // Start heartbeat daemon for auto-renewal
+        let heartbeat = if self.config.auto_heartbeat {
+            Some(start_heartbeat_daemon(
+                self.agent_id.clone(),
+                self.paths.clone(),
+                HeartbeatConfig {
+                    interval_secs: self.config.heartbeat_interval,
+                    auto_renew_leases: true,
+                },
+            )?)
+        } else {
+            None
+        };
         
-        // Execute work
-        let result = self.execute_issue(issue_id).await;
+        // Execute work with lease context
+        let result = self.execute_issue_work(issue_id, &lease).await;
+        
+        // Stop heartbeat daemon
+        drop(heartbeat);
         
         // Release lease
         self.coordinator.release_claim(&lease.lease_id)?;
         
         result
     }
+    
+    async fn execute_issue_work(&self, issue_id: &str, lease: &Lease) -> Result<()> {
+        // Work implementation...
+        // Can periodically check lease.remaining_secs() and warn if low
+        
+        Ok(())
+    }
 }
 ```
 
-**Lease transfer for handoff:**
+### Commit Message Trailers
+
+**Automatic lease context in commits:**
 ```rust
-pub fn transfer_lease(
+pub fn commit_with_lease_context(
     &self,
-    lease_id: &str,
-    to_agent_id: &str,
-    to_worktree_id: &str,
-) -> Result<Lease> {
-    let lock_path = self.paths.shared_jit.join("locks/claims.lock");
-    let _guard = self.locker.lock_exclusive(&lock_path)?;
+    message: &str,
+    lease: &Lease,
+    issue_id: &str,
+) -> Result<()> {
+    let full_message = format!(
+        "{}\n\n\
+         JIT-Lease: {}\n\
+         JIT-Issue: {}\n\
+         JIT-Agent: {}\n\
+         JIT-Worktree: {}",
+        message,
+        lease.lease_id,
+        issue_id,
+        lease.agent_id,
+        lease.worktree_id
+    );
     
-    let mut index = self.load_claims_index()?;
+    Command::new("git")
+        .args(["commit", "-m", &full_message])
+        .status()?;
     
-    // Find existing lease
-    let old_lease = index.find_lease(lease_id)
-        .ok_or_else(|| anyhow!("Lease {} not found", lease_id))?;
-    
-    // Create new lease with same issue, different owner
-    let new_lease = Lease {
-        lease_id: Ulid::new().to_string(),
-        issue_id: old_lease.issue_id.clone(),
-        agent_id: to_agent_id.to_string(),
-        worktree_id: to_worktree_id.to_string(),
-        branch: self.get_current_branch()?,
-        ttl_secs: old_lease.ttl_secs,
-        acquired_at: Utc::now(),
-        expires_at: Utc::now() + Duration::seconds(old_lease.ttl_secs as i64),
-    };
-    
-    // Log transfer
-    self.append_claim_op(&ClaimOp::Transfer {
-        from_lease_id: lease_id.to_string(),
-        to_lease: new_lease.clone(),
-        transferred_at: Utc::now(),
-    })?;
-    
-    // Update index
-    index.remove_lease(lease_id);
-    index.add_lease(new_lease.clone());
-    self.write_index_atomic(&index)?;
-    
-    Ok(new_lease)
+    Ok(())
 }
 ```
+
+**Benefits:**
+- Audit trail of which lease authorized each commit
+- Server-side verification possible (pre-receive hooks)
+- Post-hoc analysis of work attribution
+- Forensics for debugging coordination issues
+
+### Future Enhancements
+
+**Cross-machine coordination (future):**
+- Use custom refs `refs/jit/claims/*` for replication
+- Push/fetch claims to enable distributed coordination
+- Conflict resolution when claims diverge
+
+**CRDT for multi-writer descriptions:**
+- Integrate Automerge CRDT for concurrent free-text edits
+- Custom merge driver: `jit-automerge-merge`
+- Allow multiple agents to edit descriptions simultaneously
+
+**Advanced lease operations:**
+- Lease splitting: divide issue work across multiple agents
+- Lease sub-claims: hierarchical ownership for sub-tasks
+- Conditional leases: acquire only if dependencies ready
+
+**Enhanced monitoring:**
+- Prometheus metrics for lease acquisition rate, duration, evictions
+- Alerting for frequent lease conflicts or expirations
+- Dashboard for team-wide coordination visibility
+
+**Policy enforcement:**
+- Required approvers for force-evict operations
+- Maximum TTL limits per agent type
+- Automatic escalation for long-held leases
 
 ## Next Implementation Steps
 
@@ -1533,32 +2368,36 @@ pub fn transfer_lease(
 ### Phase 6: Advanced Features (Week 4+)
 1. **Web UI integration** (claim status, worktree list endpoints)
 2. **Dispatcher integration** (automatic lease management)
-3. **CRDT merge driver** for descriptions (future)
-4. **Cross-machine coordination** via custom refs (future)
+3. **Commit message trailers** for audit trail
+4. **CRDT merge driver** for descriptions (future)
+5. **Cross-machine coordination** via custom refs (future)
 
-## Open Questions and Future Work
-
-### Questions
+## Open Questions
 
 1. **Claim visibility across machines?**
    - Current design: Local-only (`.git/jit/` not versioned)
    - Future: Use custom refs `refs/jit/claims/*` for replication?
+   - Trade-off: Simplicity vs. distributed coordination
 
 2. **CRDT for multi-writer descriptions?**
-   - Current: Single-writer via leases
+   - Current: Single-writer via leases for all fields
    - Future: Automerge CRDT for concurrent free-text edits?
+   - Complexity: Custom merge driver, CRDT library dependency
 
-3. **Heartbeat daemon vs. manual renewal?**
-   - Current: Both supported (manual + opt-in daemon)
-   - Future: Auto-start daemon based on config?
+3. **Heartbeat daemon lifecycle?**
+   - Current: Both manual renewal and opt-in daemon supported
+   - Future: Auto-start daemon based on config? Systemd integration?
+   - Consider: Battery impact on laptops, resource usage
 
-### Future Enhancements
+4. **Lock timeout policy?**
+   - Current: 1-hour max age for locks
+   - Should this be configurable per-repository?
+   - How to handle truly long-running operations (multi-hour builds)?
 
-- **Web UI integration:** Show active claims and worktree status
-- **CI/CD coordination:** Prevent claim acquisition during CI runs
-- **Claim history query:** `jit claim history --issue <id>`
-- **Lease transfer:** `jit claim transfer <lease-id> --to <agent-id>` ✓ (designed above)
-- **Global event aggregation:** Merge control-plane and data-plane events
+5. **Lease transfer authorization?**
+   - Current: Only lease owner can transfer
+   - Future: Admin override? Automated handoff policies?
+   - Security implications of privilege escalation
 
 ## References
 
