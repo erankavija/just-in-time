@@ -1,7 +1,7 @@
 {
   "id": "ee20327b-2f2a-48f8-80d6-06cb1cb31a6e",
   "title": "Implement jit claim acquire command",
-  "description": "Implement `jit claim acquire <issue-id>` with `--ttl <seconds>` and `--agent-id <id>` options. Return lease ID on success, clear error if already claimed. Support `--json` output. See design doc section \"New Commands\".",
+  "description": "Implement `jit claim acquire <issue-id>` with `--ttl <seconds>` and `--agent-id <id>` options. Return lease ID on success, clear error if already claimed. Support `--json` output.\n\n## TTL=0 Support\nWhen `--ttl 0`, require `--reason <text>` flag and enforce:\n- Repository policy permits indefinite leases\n- Per-agent limit: max_indefinite_leases_per_agent\n- Per-repository limit: max_indefinite_leases_per_repo\n\nSee design doc sections \"New Commands\" and \"TTL=0 constraints\".",
   "state": "backlog",
   "priority": "high",
   "assignee": null,
@@ -16,6 +16,11 @@
     "code-review"
   ],
   "gates_status": {
+    "clippy": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-01-03T20:37:07.594972443Z"
+    },
     "fmt": {
       "status": "pending",
       "updated_by": null,
@@ -25,11 +30,6 @@
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:07.594963053Z"
-    },
-    "clippy": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.594972443Z"
     },
     "tdd-reminder": {
       "status": "pending",

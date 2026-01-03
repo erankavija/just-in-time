@@ -1,7 +1,7 @@
 {
   "id": "3f2cf966-1265-4953-81ee-61ea02974d35",
   "title": "Implement jit claim status command",
-  "description": "Implement `jit claim status` showing all active leases for current agent, and `jit claim status --issue <id>` for specific issue. Show remaining TTL, expiry time, agent, worktree. Support `--json` output.",
+  "description": "Implement `jit claim status` showing all active leases for current agent, and `jit claim status --issue <id>` for specific issue. Show remaining TTL (finite) or time since last beat (indefinite), expiry time, agent, worktree. Highlight stale indefinite leases. Support `--json` output.\n\nSee design doc section \"New Commands\".",
   "state": "backlog",
   "priority": "high",
   "assignee": null,
@@ -26,6 +26,11 @@
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:07.603131786Z"
     },
+    "code-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-01-03T20:37:07.603140646Z"
+    },
     "tdd-reminder": {
       "status": "pending",
       "updated_by": null,
@@ -35,11 +40,6 @@
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:07.603123286Z"
-    },
-    "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.603140646Z"
     }
   },
   "context": {},

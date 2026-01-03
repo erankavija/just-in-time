@@ -18,6 +18,13 @@
       "commit": null,
       "label": "Design Document",
       "doc_type": null
+    },
+    {
+      "path": "dev/sessions/session-20260103-parallel-work-design-review.md",
+      "commit": null,
+      "label": "Session Notes: TTL=0 & Design Review",
+      "doc_type": "notes",
+      "format": "markdown"
     }
   ],
   "labels": [

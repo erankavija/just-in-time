@@ -348,16 +348,19 @@ impl CommandExecutor {
 
 **Acquire:**
 1. Check if issue is unleased or lease expired
-2. Create new lease with TTL
+2. Create new lease with TTL:
+   - `ttl_secs > 0`: finite lease, `expires_at = acquired_at + ttl_secs`
+   - `ttl_secs = 0`: indefinite lease, no time-based expiry (see below)
 3. Append to `claims.jsonl`
 4. Update `claims.index.json`
 5. Return lease to caller
 
 **Renew (Heartbeat):**
 1. Find active lease by ID
-2. Extend `expires_at` by TTL
-3. Append renew operation to `claims.jsonl`
-4. Update `claims.index.json`
+2. For finite leases: extend `expires_at` by TTL
+3. For indefinite leases: update `last_beat` timestamp
+4. Append renew or heartbeat operation to `claims.jsonl`
+5. Update `claims.index.json`
 
 **Release:**
 1. Find active lease by ID
@@ -370,15 +373,35 @@ impl CommandExecutor {
 3. Remove from `claims.index.json`
 4. Log warning event
 
-### Automatic Expiration
+### Automatic Expiration and Staleness
 
 **On every claim operation:**
 1. Load `claims.index.json`
-2. Filter out expired leases (now > expires_at)
-3. For each expired lease, append auto-evict to `claims.jsonl`
+2. For finite leases (`ttl_secs > 0`): filter out expired leases (`now > expires_at`) and, for each, append `auto-evict` to `claims.jsonl`
+3. For indefinite leases (`ttl_secs = 0`): mark leases as `stale: true` if `now - last_beat > stale_threshold_secs`
 4. Write updated index
 
 **Eviction is lazy:** Only happens during claim operations, not background process (for simplicity).
+
+### Indefinite (TTL=0) Leases
+
+**Semantics:**
+- `ttl_secs = 0` means no automatic time-based expiry; `expires_at` is `null` or omitted in the index.
+- Indefinite leases still require heartbeats and staleness checks; a stale indefinite lease blocks structural edits until renewed or force-evicted.
+
+**Use cases:**
+- Manual oversight of high-risk changes (complex refactors, schema migrations)
+- Global operations requiring uninterrupted exclusive control (registry/config/type-hierarchy edits)
+- Long-running tasks with human supervision
+
+**Policy and guardrails:**
+- TTL=0 requires `--reason` flag when acquiring (mandatory audit trail)
+- Repository config must explicitly permit indefinite leases for the requested scope
+- Per-agent limit: `max_indefinite_leases_per_agent` (default: 2)
+- Per-repository limit: `max_indefinite_leases_per_repo` (default: 10)
+- Staleness threshold: configurable via `stale_threshold_secs` (default: 3600s / 1 hour)
+- Pre-commit/pre-push hooks reject structural edits when `stale: true`
+- Not recommended for routine automated agents; use finite TTL with auto-renew instead
 
 ## Atomicity and Durability
 
@@ -975,6 +998,12 @@ pub fn load_or_create_worktree_id(paths: &WorktreePaths) -> Result<String> {
 {"schema_version":1,"op":"auto-evict","lease_id":"01HXJK2M3N4P5Q","evicted_at":"2026-01-03T12:10:00Z","reason":"expired"}
 
 {"schema_version":1,"op":"force-evict","lease_id":"01HXJK2M3N4P5Q","evicted_at":"2026-01-03T12:11:00Z","by":"human:alice","reason":"stale after crash"}
+
+{"schema_version":1,"op":"acquire","lease_id":"01HX...","issue_id":"ISSUE-42","agent_id":"agent:human-1","worktree_id":"wt:abc123","branch":"staging/refactor-42","ttl_secs":0,"reason":"Manual oversight of complex refactor","acquired_at":"2026-01-03T12:00:00Z"}
+
+{"schema_version":1,"op":"heartbeat","lease_id":"01HX...","at":"2026-01-03T12:15:00Z"}
+
+{"schema_version":1,"op":"force-evict","lease_id":"01HX...","by":"admin:erankavija","reason":"holder unresponsive > 2h","at":"2026-01-03T14:30:00Z"}
 ```
 
 **Immutability:** Never modify or delete entries. Append-only for audit trail.
@@ -987,16 +1016,20 @@ pub fn load_or_create_worktree_id(paths: &WorktreePaths) -> Result<String> {
 ```json
 {
   "schema_version": 1,
-  "generated_at": "2026-01-03T12:05:00Z",
+  "generated_at": "2026-01-03T12:16:00Z",
   "sequence": 42,
+  "stale_threshold_secs": 3600,
   "active": [
     {
-      "lease_id": "01HXJK2M3N4P5Q",
-      "issue_id": "ad601a15",
-      "agent_id": "agent:copilot-1",
-      "worktree_id": "wt:abc123ef",
-      "branch": "agents/copilot-1",
-      "expires_at": "2026-01-03T12:15:00Z"
+      "lease_id": "01HX...",
+      "issue_id": "ISSUE-42",
+      "agent_id": "agent:human-1",
+      "worktree_id": "wt:abc123",
+      "branch": "staging/refactor-42",
+      "ttl_secs": 0,
+      "expires_at": null,
+      "last_beat": "2026-01-03T12:15:00Z",
+      "stale": false
     }
   ]
 }
@@ -1211,7 +1244,7 @@ for f in $changed; do
         --arg issue "$issue_id" \
         --arg agent "$agent_id" \
         --arg wt "$worktree_id" \
-        '.active[] | select(.issue_id==$issue and .agent_id==$agent and .worktree_id==$wt) | .lease_id' \
+        '.active[] | select(.issue_id==$issue and .agent_id==$agent and .worktree_id==$wt and (.stale != true)) | .lease_id' \
         "$claims_index" 2>/dev/null || echo "")
       
       if [ -z "$has_claim" ]; then
@@ -1285,7 +1318,7 @@ while read local_ref local_sha remote_ref remote_sha; do
       if [ -f "$claims_index" ]; then
         exists=$(jq -r \
           --arg lid "$lease_id" \
-          '.active[] | select(.lease_id==$lid) | .lease_id' \
+          '.active[] | select(.lease_id==$lid and (.stale != true)) | .lease_id' \
           "$claims_index" 2>/dev/null | tr -d '[:space:]')
         
         if [ -z "$exists" ]; then
@@ -1679,6 +1712,13 @@ heartbeat_interval_secs = 30
 # Warn when lease has less than this % of TTL remaining
 lease_renewal_threshold_pct = 10
 
+# Staleness threshold for TTL=0 leases (seconds)
+stale_threshold_secs = 3600
+
+# Maximum concurrent TTL=0 leases
+max_indefinite_leases_per_agent = 2
+max_indefinite_leases_per_repo = 10
+
 # Automatic lease renewal by heartbeat daemon
 auto_renew_leases = false
 
@@ -1803,6 +1843,12 @@ jit claim status --issue <issue-id> [--json]
 # List all active claims
 jit claim list [--json]
 ```
+
+**TTL=0 constraints:**
+- `jit claim acquire <issue-id> --ttl 0 --reason "..."` is only allowed when repository policy permits indefinite leases
+- Requires `--reason` flag with non-empty explanation for audit trail
+- CLI enforces per-agent and per-repository limits (`max_indefinite_leases_per_agent`, `max_indefinite_leases_per_repo`)
+- Routine automated agents should use finite TTL with auto-renew instead
 
 **`jit worktree` subcommand group:**
 
@@ -2411,7 +2457,7 @@ pub fn commit_with_lease_context(
 - [ ] Multiple agents can work on different issues in parallel worktrees
 - [ ] No file conflicts between concurrent agents
 - [ ] Lease acquisition is atomic and race-free
-- [ ] Expired leases are automatically evicted
+- [ ] Expired finite leases are automatically evicted and stale TTL=0 leases can be detected and force-evicted
 - [ ] Pre-commit hook prevents unauthorized structural edits
 - [ ] Crash recovery rebuilds index from audit log
 - [ ] All operations logged for observability
