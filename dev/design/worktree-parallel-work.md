@@ -4,10 +4,14 @@
 **Status:** Design  
 **Author:** System  
 **Date:** 2026-01-03  
-**Last Updated:** 2026-01-03
+**Last Updated:** 2026-01-04
 
 **Recent refinements:**
-- Reorganized for clarity: goals → architecture → identities → lease semantics → atomicity/durability → enforcement → recovery → configuration → testing → future work
+- **2026-01-04:** Added critical design sections from session review:
+  - "Read vs Write Operations" - explicit lease requirements and data access patterns
+  - "Issue Creation Workflow" - resolves chicken-and-egg problem (create doesn't require lease)
+  - "Query Behavior in Worktrees" - local vs global queries, coordination-awareness
+- **2026-01-03:** Reorganized for clarity: goals → architecture → identities → lease semantics → atomicity/durability → enforcement → recovery → configuration → testing → future work
 - Emphasized deterministic, race-free behavior with monotonic time semantics and sequence numbers
 - Enhanced atomicity with parent directory fsync after atomic renames
 - Strengthened enforcement with CLI-level lease checks, divergence gating, and comprehensive hook examples
@@ -343,6 +347,234 @@ impl CommandExecutor {
 **Multi-writer allowed (future):**
 - Free-text description edits (Automerge CRDT)
 - Comment additions (append-only)
+
+### Read vs Write Operations
+
+**CRITICAL DISTINCTION:** Leases control write access, not read access. All issue data remains readable from any worktree regardless of claims.
+
+#### Operations That Require Active Lease (Writes)
+
+These operations modify issue state and require an active, non-stale lease:
+
+**Issue modifications:**
+- `jit issue update <id> --state <state>` - Change issue state
+- `jit issue update <id> --priority <priority>` - Change priority
+- `jit issue update <id> --label <label>` - Add/remove labels
+- `jit issue update <id> --assignee <assignee>` - Change assignee
+- `jit issue delete <id>` - Delete issue
+
+**Dependency modifications:**
+- `jit dep add <from> <to>` - Add dependency
+- `jit dep rm <from> <to>` - Remove dependency
+
+**Gate modifications:**
+- `jit gate add <id> <gate-key>` - Add gate requirement
+- `jit gate pass <id> <gate-key>` - Mark gate as passed
+- `jit gate fail <id> <gate-key>` - Mark gate as failed
+
+**Document modifications (when linked to issue):**
+- Editing documents attached to claimed issue
+
+#### Operations That DO NOT Require Lease (Reads)
+
+These operations access data without modifying issue state and work from any worktree:
+
+**Issue inspection:**
+- `jit issue show <id>` - View any issue details
+- `jit issue list` - List issues (see "Query Behavior" below)
+- `jit query ready` - Query ready issues (coordination-aware)
+- `jit query blocked` - Query blocked issues
+- `jit query state <state>` - Query by state
+- `jit query assignee <assignee>` - Query by assignee
+- `jit search <query>` - Search across all issues
+
+**Graph operations:**
+- `jit graph show <id>` - View dependency tree for any issue
+- `jit graph downstream <id>` - View dependents
+- `jit graph roots` - View root issues
+- `jit graph export` - Export full graph
+
+**Configuration and registry:**
+- `jit gate list` - List gate definitions
+- `jit gate show <key>` - View gate details
+- `jit config show-hierarchy` - View type hierarchy
+- `jit status` - Repository status
+
+**Coordination state:**
+- `jit claim status` - View all active leases
+- `jit claim status --issue <id>` - Check who has an issue
+- `jit claim status --agent <agent-id>` - Check agent's leases
+
+**Document operations (read-only):**
+- `jit doc show <issue-id> <path>` - View document content
+- `jit doc list <issue-id>` - List documents for issue
+- `jit doc history <issue-id> <path>` - View document history
+
+#### Issue Creation Workflow
+
+**Issue creation is exempted from lease requirement** because it allocates a new ID that cannot conflict:
+
+```bash
+# Create new issue (no lease required, allocates fresh ID)
+jit issue create --title "New feature" --priority high
+# => Issue 01ABC created with state: ready
+
+# Optionally claim to work on it
+jit claim acquire 01ABC --ttl 600
+# => Lease acquired: lease-xyz
+
+# Work on issue
+jit issue update 01ABC --state in-progress
+```
+
+**Rationale:** 
+- New issue creation allocates a unique ID (ULID)
+- No conflict possible with concurrent creates (different ULIDs)
+- Issue becomes claimable immediately after creation
+- Works from any worktree (main or secondary)
+
+**Alternative workflow (create-and-claim):**
+```bash
+# Create and immediately claim in single operation (future)
+jit claim create --title "Fix bug" --ttl 600
+# => Issue 01DEF created, lease acquired
+```
+
+#### Data Access Patterns
+
+Reads access issue data through a layered resolution strategy:
+
+**Resolution order:**
+1. **Git HEAD** - Committed issue state (canonical for merged work)
+2. **Main `.jit/`** - Uncommitted issues in main worktree (fallback)
+3. **Local `.jit/`** - Write copies of claimed issues in secondary worktree
+4. **Claims index** - Real-time coordination state (`.git/jit/claims.index.json`)
+
+**Example - Cross-worktree dependency checking:**
+```bash
+# Agent-1 in worktree-1 (working on issue-A)
+# issue-A depends on issue-B (claimed by agent-2 in worktree-2)
+
+jit graph show issue-A           # ✅ Shows full tree including issue-B
+jit issue show issue-B           # ✅ Read issue-B details (via git)
+jit claim status --issue issue-B # ✅ See agent-2 has lease on issue-B
+jit query blocked                # ✅ Check if issue-A blocked by issue-B
+```
+
+**Key insight:** Worktrees contain **write copies** of claimed issues, but all issues remain **readable** from any worktree via git.
+
+### Query Behavior in Worktrees
+
+Different query commands behave differently based on context and coordination-awareness.
+
+#### Local Queries (Worktree-Scoped)
+
+`jit issue list` shows issues in the local `.jit/issues/` directory:
+
+**Main worktree:**
+```bash
+jit issue list
+# Shows: All issues in .jit/issues/ (both claimed and unclaimed)
+```
+
+**Secondary worktree:**
+```bash
+jit issue list
+# Shows: Only issues claimed by this worktree (write copies)
+```
+
+**Rationale:** Reflects the actual file structure in each worktree's data plane.
+
+#### Global Queries (Coordination-Aware)
+
+These queries aggregate across all worktrees and respect coordination state:
+
+**Ready issues (unclaimed and unblocked):**
+```bash
+jit query ready
+# Filters out:
+# - Issues with active leases (from claims index)
+# - Issues blocked by dependencies
+# - Issues in non-ready states
+# Works from any worktree
+```
+
+**Blocked issues:**
+```bash
+jit query blocked
+# Shows: All blocked issues with blocking reasons
+# Reads: Dependencies from git (committed state)
+# Works from any worktree
+```
+
+**State/priority/assignee queries:**
+```bash
+jit query state in-progress
+jit query priority high
+jit query assignee agent:copilot-1
+# Aggregates across: git + main .jit/ + claims index
+# Works from any worktree
+```
+
+**Search (full-text):**
+```bash
+jit search "authentication"
+# Searches: Issue titles, descriptions, metadata
+# Scope: git + main .jit/ (uncommitted)
+# Works from any worktree
+```
+
+#### Direct Issue Access
+
+`jit issue show <id>` works for ANY issue from ANY worktree:
+
+**Access pattern:**
+1. Check local `.jit/issues/<id>/` (if claimed by this worktree)
+2. Fallback to git HEAD (committed state)
+3. Fallback to main `.jit/issues/<id>/` (uncommitted in main)
+4. Error if not found anywhere
+
+**Example:**
+```bash
+# From secondary worktree working on issue-A
+jit issue show issue-A  # ✅ Local write copy
+jit issue show issue-B  # ✅ Via git (committed)
+jit issue show issue-C  # ✅ Via main .jit/ (uncommitted, unclaimed)
+jit issue show issue-D  # ❌ Not found (doesn't exist)
+```
+
+#### Graph Operations
+
+Dependency graphs aggregate across all sources:
+
+```bash
+jit graph show <id>
+# Traverses: Full dependency tree
+# Reads: Dependencies from git + main .jit/
+# Ignores: Worktree boundaries
+# Shows: Complete graph regardless of claims
+```
+
+**Coordination-aware labels:**
+```bash
+jit graph show issue-A --show-claims
+# Output:
+# issue-A (claimed by agent:copilot-1)
+# ├─ issue-B (claimed by agent:copilot-2)
+# └─ issue-C (unclaimed)
+```
+
+#### Summary Table
+
+| Command | Scope | Coordination-Aware | Works From |
+|---------|-------|-------------------|------------|
+| `jit issue list` | Local `.jit/` only | ❌ No | Any worktree |
+| `jit query ready` | Global (git + main .jit/) | ✅ Yes (filters claimed) | Any worktree |
+| `jit query blocked` | Global | ✅ Yes (checks deps) | Any worktree |
+| `jit issue show <id>` | Global (layered resolution) | ❌ No | Any worktree |
+| `jit graph show <id>` | Global (full graph) | ✅ Optional (--show-claims) | Any worktree |
+| `jit search <query>` | Global (git + main .jit/) | ❌ No | Any worktree |
+| `jit claim status` | Control plane (.git/jit/) | ✅ Yes | Any worktree |
 
 ### Lease Operations
 
