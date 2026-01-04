@@ -25,6 +25,13 @@
       "label": "Session Notes: TTL=0 & Design Review",
       "doc_type": "notes",
       "format": "markdown"
+    },
+    {
+      "path": "dev/experiments/worktree-manual-coordination-experiment.md",
+      "commit": null,
+      "label": "Worktree Manual Coordination Experiment",
+      "doc_type": "experiment",
+      "format": "markdown"
     }
   ],
   "labels": [
