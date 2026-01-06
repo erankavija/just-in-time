@@ -2,7 +2,7 @@
   "id": "65e7dccd-a7f0-4274-90c3-2d0a9384005b",
   "title": "Story: Worktree Foundation Infrastructure",
   "description": "Implement core infrastructure for worktree-aware storage, enabling the two-tier storage model that separates per-worktree data plane from shared control plane.\n\n## Goal\n\nEstablish the foundation for parallel multi-agent work by implementing worktree detection, identity management, and the directory layout that enables isolated per-worktree state.\n\n## Tasks\n\n1. **Worktree path detection** - Detect git worktree context using `git rev-parse --git-common-dir` and `--show-toplevel`\n2. **Worktree identity generation** - Create deterministic worktree IDs (hash of path + timestamp)\n3. **Agent identity configuration** - Support `JIT_AGENT_ID` env var, `~/.config/jit/agent.toml`, and `--agent-id` flag\n4. **Directory layout migration** - Create `.git/jit/` control plane structure\n\n## Success Criteria\n\n- `WorktreePaths::detect()` correctly identifies main worktree vs secondary worktrees\n- Worktree identity persists in `<worktree>/.jit/worktree.json` and survives relocations\n- Agent identity resolution follows documented priority order\n- Control plane directories created with proper 0700 permissions\n- All operations work without git (graceful fallback)\n\n## References\n\nSee design document `dev/design/worktree-parallel-work.md`:\n- Section \"Path Resolution\" for detection algorithm\n- Section \"Identity System\" for ID formats and persistence\n- Section \"Directory Layout\" for structure\n\n## Dependencies\n\nNone - this is the foundation story.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "high",
   "assignee": null,
   "dependencies": [
