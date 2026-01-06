@@ -282,11 +282,93 @@ During the experiment, note:
 - Did separate directories help or hinder?
 - Any issues with git operations?
 
-## Next Steps After Experiment
+## Experiment Results (2026-01-06)
 
-1. **Document findings** in session notes
-2. **Update design** based on pain points discovered
-3. **Prioritize automation** features by impact
+### ✅ Success Criteria - ALL MET
+
+**Parallel work completed:**
+- ✅ All 3 agents completed tasks in parallel
+- ✅ Merges completed with minor conflicts (< 10 lines)
+- ✅ `cargo test --workspace` passes after merge (0 failures)
+- ✅ `cargo clippy` and `cargo fmt` pass (0 warnings)
+- ✅ No data loss or corruption in `.jit/`
+
+**Tasks delivered:**
+- Agent 1 (main worktree): b69fa9a9 - WorktreePaths detection (commit 01267cb)
+- Agent 2 (task-foundation): 5186a98d - Worktree identity (commits 4918854, 3611e2b)
+- Agent 3 (task-identity): 61783d2f - Agent identity config (commits dc6212e, 62a2845)
+
+### 📊 Observations Recorded
+
+#### Coordination Pain Points
+- **Manual communication required**: Agents had to verbally coordinate "I'm working on X"
+- **No visibility**: Couldn't see which issues were claimed by other agents in real-time
+- **No conflict prevention**: Nothing stopped two agents from accidentally claiming same issue
+- **Completion notifications**: Had to manually check git branches to see when others finished
+
+#### .jit/ Conflicts
+- **events.jsonl conflicts (2x)**: Both merge operations had conflicts in append-only event log
+  - Resolution: Union merge (combined all events with `sort -u`)
+  - Works but requires manual intervention every merge
+- **Issue file edits**: Each agent only modified their own issue file (no conflicts here)
+- **Gate runs**: No conflicts (isolated per-issue directories)
+
+#### Workflow Friction
+- **Most manual/tedious**: Checking who's working on what (had to look at git branches)
+- **Merge coordination**: Having to manually resolve events.jsonl every time
+- **No lease enforcement**: Could have accidentally edited same issue (lucky we didn't)
+- **Surprises**: How well git worktrees isolated source code changes (no merge conflicts in .rs files!)
+
+#### Git Worktree Experience
+- **Setup**: Easy with `git worktree add -b <branch> <path>`
+- **Cleanup**: Need to remove worktrees and branches (see cleanup section)
+- **Separate directories**: ✅ Helped! Isolated builds, tests, and edits
+- **Git operations**: Smooth, no issues with branching or merging
+
+#### Merge Conflicts Details
+
+**crates/jit/src/storage/mod.rs:**
+```
+Both added module declarations
+<<<<<<< HEAD
+pub mod worktree_paths;
+=======
+pub mod worktree_identity;
+>>>>>>> agents/foundation-work
+```
+Resolution: Include both (trivial fix)
+
+**.jit/events.jsonl:**
+Both agents appended events → merge conflict
+Resolution: `git show :2 > ours && git show :3 > theirs && cat ours theirs | sort -u`
+
+### 💡 Key Learnings
+
+**What automation MUST provide:**
+1. **Claim/lease system**: Atomic acquisition, TTL-based expiry, prevents concurrent edits
+2. **Per-worktree isolation**: Move `.jit/` data plane per-worktree to eliminate conflicts
+3. **Shared control plane**: `.git/jit/` for coordination state (claims, locks, heartbeats)
+4. **Visibility commands**: `jit claim status` to see who has what, `jit query ready` to filter claimed issues
+
+**What worked without automation:**
+- Git worktree isolation for source code (no .rs file conflicts!)
+- Independent builds/tests in each worktree
+- Union merge strategy for append-only logs (manual but predictable)
+
+**Design validation:**
+- ✅ Two-tier storage model is essential (data plane + control plane)
+- ✅ Lease-based coordination solves the coordination pain
+- ✅ Union merge works for events (but should be automatic via .gitattributes)
+- ✅ Git worktrees enable true parallelism without complex infrastructure
+
+### 🎯 Next Steps After Experiment
+
+1. ✅ **Document findings** in experiment document (DONE)
+2. **Update design** based on pain points discovered (design already addresses these!)
+3. **Prioritize automation** features by impact:
+   - Phase 1: Claims coordination (highest impact - prevents conflicts)
+   - Phase 2: CLI integration and enforcement (usability)
+   - Phase 3: Hooks and recovery (robustness)
 4. **Implement coordination** starting with most painful manual steps
 
 ## References
