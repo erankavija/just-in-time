@@ -2,7 +2,7 @@
   "id": "5186a98d-ff33-467f-9bad-f048b6a547d3",
   "title": "Implement worktree identity generation and persistence",
   "description": "Implement deterministic worktree ID generation (hash of absolute path + creation timestamp, truncated to 8 hex chars). Persist in `<worktree>/.jit/worktree.json` with schema version, branch, root path, and created_at. Handle worktree relocation detection. See design doc section \"Worktree Identity\".",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "high",
   "assignee": null,
   "dependencies": [],
@@ -14,30 +14,30 @@
     "code-review"
   ],
   "gates_status": {
-    "tests": {
+    "tdd-reminder": {
       "status": "pending",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.561412294Z"
+      "updated_at": "2026-01-03T20:37:07.561373704Z"
     },
     "clippy": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:07.561422164Z"
     },
-    "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.561441544Z"
-    },
     "fmt": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:07.561431774Z"
     },
-    "tdd-reminder": {
+    "code-review": {
       "status": "pending",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.561373704Z"
+      "updated_at": "2026-01-03T20:37:07.561441544Z"
+    },
+    "tests": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-01-03T20:37:07.561412294Z"
     }
   },
   "context": {},

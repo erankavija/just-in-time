@@ -13,6 +13,7 @@ pub mod gate_runs;
 pub mod json;
 pub mod lock;
 pub mod memory;
+pub mod worktree_identity;
 
 // Re-export for convenience
 pub use json::JsonFileStorage;
