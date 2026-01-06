@@ -956,3 +956,11 @@
 {"type":"gate_added","id":"eecf7665-6144-46ce-a7a6-47dadcce0a9b","issue_id":"d42f761a-c0e4-4fce-b338-5cf886769963","timestamp":"2026-01-03T20:37:20.954714086Z","gate_key":"code-review"}
 {"type":"issue_created","id":"bcfb745d-5535-4e47-ab01-391effb50295","issue_id":"608ae1e8-1523-482a-9a17-428b64c95f61","timestamp":"2026-01-03T22:50:25.297418310Z","title":"Implement TTL=0 indefinite lease support with staleness detection","priority":"high"}
 {"type":"issue_state_changed","id":"3e6bd4c4-745f-4c82-b8ac-40b185387a66","issue_id":"608ae1e8-1523-482a-9a17-428b64c95f61","timestamp":"2026-01-03T22:51:34.064305145Z","from":"ready","to":"backlog"}
+{"type":"issue_state_changed","id":"3a08d9c2-07fd-47db-b524-99a30eb96ec3","issue_id":"b69fa9a9-5645-4f17-9941-f053a4b68b14","timestamp":"2026-01-06T20:25:44.161193427Z","from":"ready","to":"gated"}
+{"type":"gate_passed","id":"7a82b242-ef40-4209-a977-65a41f4ce72c","issue_id":"b69fa9a9-5645-4f17-9941-f053a4b68b14","timestamp":"2026-01-06T20:25:56.433273065Z","gate_key":"tdd-reminder","updated_by":null}
+{"type":"gate_passed","id":"9a6537a2-08f4-410f-b423-3e858b408631","issue_id":"b69fa9a9-5645-4f17-9941-f053a4b68b14","timestamp":"2026-01-06T20:25:59.942009601Z","gate_key":"tests","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"9fe031e5-395f-4a5d-8c6b-7c6c1e9d890f","issue_id":"b69fa9a9-5645-4f17-9941-f053a4b68b14","timestamp":"2026-01-06T20:28:03.938487785Z","gate_key":"clippy","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"1973f800-f423-4af5-b761-35a052ff644d","issue_id":"b69fa9a9-5645-4f17-9941-f053a4b68b14","timestamp":"2026-01-06T20:28:08.029399011Z","gate_key":"fmt","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"dac5c267-b4c3-4d8a-92dd-2bf5060ebb7c","issue_id":"b69fa9a9-5645-4f17-9941-f053a4b68b14","timestamp":"2026-01-06T20:28:17.739106856Z","gate_key":"code-review","updated_by":null}
+{"type":"issue_state_changed","id":"fd89ab20-f5dd-483b-b049-392d4a7b6a4f","issue_id":"b69fa9a9-5645-4f17-9941-f053a4b68b14","timestamp":"2026-01-06T20:28:17.739300026Z","from":"gated","to":"done"}
+{"type":"issue_completed","id":"daf2c49b-2fd1-438f-9903-46f16db7977b","issue_id":"b69fa9a9-5645-4f17-9941-f053a4b68b14","timestamp":"2026-01-06T20:28:17.739318306Z"}
