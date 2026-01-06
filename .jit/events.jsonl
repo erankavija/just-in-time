@@ -956,3 +956,4 @@
 {"type":"gate_added","id":"eecf7665-6144-46ce-a7a6-47dadcce0a9b","issue_id":"d42f761a-c0e4-4fce-b338-5cf886769963","timestamp":"2026-01-03T20:37:20.954714086Z","gate_key":"code-review"}
 {"type":"issue_created","id":"bcfb745d-5535-4e47-ab01-391effb50295","issue_id":"608ae1e8-1523-482a-9a17-428b64c95f61","timestamp":"2026-01-03T22:50:25.297418310Z","title":"Implement TTL=0 indefinite lease support with staleness detection","priority":"high"}
 {"type":"issue_state_changed","id":"3e6bd4c4-745f-4c82-b8ac-40b185387a66","issue_id":"608ae1e8-1523-482a-9a17-428b64c95f61","timestamp":"2026-01-03T22:51:34.064305145Z","from":"ready","to":"backlog"}
+{"type":"issue_state_changed","id":"89ae467d-305a-438f-832d-964cd0188921","issue_id":"61783d2f-afd5-4f69-bb41-54081d8a6158","timestamp":"2026-01-06T20:17:31.772222203Z","from":"ready","to":"in_progress"}
