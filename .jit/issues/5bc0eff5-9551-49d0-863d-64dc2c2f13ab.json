@@ -2,7 +2,7 @@
   "id": "5bc0eff5-9551-49d0-863d-64dc2c2f13ab",
   "title": "Implement claims JSONL append-only log",
   "description": "Implement `claims.jsonl` append-only log with schema version, sequence numbers, and operation types (acquire, renew, release, auto-evict, force-evict). Use fsync after append for durability. See design doc section \"Claims JSONL\".",
-  "state": "backlog",
+  "state": "ready",
   "priority": "high",
   "assignee": null,
   "dependencies": [
@@ -16,6 +16,16 @@
     "code-review"
   ],
   "gates_status": {
+    "clippy": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-01-03T20:37:07.569320966Z"
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-01-03T20:37:07.569344326Z"
+    },
     "tests": {
       "status": "pending",
       "updated_by": null,
@@ -30,16 +40,6 @@
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:07.569334316Z"
-    },
-    "clippy": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.569320966Z"
-    },
-    "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.569344326Z"
     }
   },
   "context": {},

@@ -2,7 +2,7 @@
   "id": "b31a81be-94c6-4887-84b5-bc8f8864870d",
   "title": "Implement atomic claim acquisition with file locking",
   "description": "Implement atomic claim acquisition using `fs4` file locking. Acquire exclusive lock, load index, check availability, create lease with ULID, append to log, update index atomically. See design doc section \"Claim Acquisition Algorithm\".",
-  "state": "backlog",
+  "state": "ready",
   "priority": "high",
   "assignee": null,
   "dependencies": [
@@ -16,15 +16,20 @@
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
+    "tdd-reminder": {
       "status": "pending",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.574044977Z"
+      "updated_at": "2026-01-03T20:37:07.573989277Z"
     },
     "fmt": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:07.574035107Z"
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-01-03T20:37:07.574044977Z"
     },
     "tests": {
       "status": "pending",
@@ -35,11 +40,6 @@
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:07.574025587Z"
-    },
-    "tdd-reminder": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.573989277Z"
     }
   },
   "context": {},

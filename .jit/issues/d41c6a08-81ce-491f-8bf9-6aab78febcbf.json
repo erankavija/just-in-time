@@ -2,7 +2,7 @@
   "id": "d41c6a08-81ce-491f-8bf9-6aab78febcbf",
   "title": "Implement config loading with priority and merging",
   "description": "Implement config loading with priority: repo config > user config > system config > defaults. Support merging across levels. Validate schema on load.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -21,25 +21,25 @@
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:15.079639355Z"
     },
-    "tdd-reminder": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.079591705Z"
-    },
     "tests": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:15.079619795Z"
     },
-    "clippy": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.079629685Z"
-    },
     "code-review": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:15.079649125Z"
+    },
+    "tdd-reminder": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-01-03T20:37:15.079591705Z"
+    },
+    "clippy": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-01-03T20:37:15.079629685Z"
     }
   },
   "context": {},

@@ -2,7 +2,7 @@
   "id": "e66da7c0-150a-4eb5-8f60-faec3449a32f",
   "title": "Implement automatic lease expiration with monotonic time",
   "description": "Implement lazy expiration during claim operations with support for both finite and indefinite leases.\n\n## Finite Leases (ttl_secs > 0)\nUse monotonic clock (`Instant`) for TTL checks to avoid wall-clock issues. Reconstruct `Instant` from UTC timestamps on index load. Filter out expired leases (`now > expires_at`) and append `auto-evict` to log.\n\n## Indefinite Leases (ttl_secs = 0)\nNo time-based expiry. Mark as `stale: true` if `now - last_beat > stale_threshold_secs`. Stale leases block structural edits but aren't auto-evicted (require explicit force-evict).\n\nSee design doc sections \"Automatic Expiration and Staleness\" and \"Monotonic Time Semantics\".",
-  "state": "backlog",
+  "state": "ready",
   "priority": "high",
   "assignee": null,
   "dependencies": [
@@ -16,6 +16,16 @@
     "code-review"
   ],
   "gates_status": {
+    "code-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-01-03T20:37:07.578491939Z"
+    },
+    "tests": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-01-03T20:37:07.578465269Z"
+    },
     "fmt": {
       "status": "pending",
       "updated_by": null,
@@ -26,20 +36,10 @@
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:07.578474299Z"
     },
-    "tests": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.578465269Z"
-    },
     "tdd-reminder": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:07.578442159Z"
-    },
-    "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.578491939Z"
     }
   },
   "context": {},

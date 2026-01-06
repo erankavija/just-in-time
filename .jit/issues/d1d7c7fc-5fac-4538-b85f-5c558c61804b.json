@@ -2,7 +2,7 @@
   "id": "d1d7c7fc-5fac-4538-b85f-5c558c61804b",
   "title": "Implement environment variable overrides",
   "description": "Implement environment variable overrides: `JIT_AGENT_ID`, `JIT_WORKTREE_MODE`, `JIT_ENFORCE_LEASES`. Document precedence over config files.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -16,21 +16,6 @@
     "code-review"
   ],
   "gates_status": {
-    "tests": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.086555707Z"
-    },
-    "clippy": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.086565697Z"
-    },
-    "fmt": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.086575197Z"
-    },
     "code-review": {
       "status": "pending",
       "updated_by": null,
@@ -40,6 +25,21 @@
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:15.086528407Z"
+    },
+    "tests": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-01-03T20:37:15.086555707Z"
+    },
+    "fmt": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-01-03T20:37:15.086575197Z"
+    },
+    "clippy": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-01-03T20:37:15.086565697Z"
     }
   },
   "context": {},

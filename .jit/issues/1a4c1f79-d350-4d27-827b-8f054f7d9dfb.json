@@ -2,7 +2,7 @@
   "id": "1a4c1f79-d350-4d27-827b-8f054f7d9dfb",
   "title": "Implement lease renewal, release, and force-evict operations",
   "description": "Implement lease renewal (extend TTL or update heartbeat), release (explicit), and force-evict (admin) operations. All operations append to log and update index under lock. Verify ownership for renew/release.\n\n## Renewal Behavior\n- Finite leases (ttl_secs > 0): extend `expires_at` by TTL\n- Indefinite leases (ttl_secs = 0): update `last_beat` timestamp via heartbeat operation\n\nSee design doc section \"Lease Operations\".",
-  "state": "backlog",
+  "state": "ready",
   "priority": "high",
   "assignee": null,
   "dependencies": [

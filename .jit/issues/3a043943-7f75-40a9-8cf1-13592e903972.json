@@ -2,7 +2,7 @@
   "id": "3a043943-7f75-40a9-8cf1-13592e903972",
   "title": "Define repository config.toml schema",
   "description": "Define `.jit/config.toml` schema with sections: `[worktree]` (mode), `[coordination]` (ttl, heartbeat, enforcement), `[global_operations]` (require_main_history), `[locks]` (max_age, metadata), `[events]` (sequences, envelope). See design doc section \"Repository Configuration\".",
-  "state": "backlog",
+  "state": "ready",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -21,11 +21,6 @@
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:15.075302954Z"
     },
-    "fmt": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.075311124Z"
-    },
     "code-review": {
       "status": "pending",
       "updated_by": null,
@@ -40,6 +35,11 @@
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:15.075294374Z"
+    },
+    "fmt": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-01-03T20:37:15.075311124Z"
     }
   },
   "context": {},

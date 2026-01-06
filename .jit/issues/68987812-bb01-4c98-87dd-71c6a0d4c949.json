@@ -2,7 +2,7 @@
   "id": "68987812-bb01-4c98-87dd-71c6a0d4c949",
   "title": "Implement jit config validate command",
   "description": "Implement `jit config validate` to check configuration for errors, warnings, and deprecated options. Report issues with suggestions. Exit non-zero on errors.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -16,20 +16,20 @@
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
+    "tests": {
       "status": "pending",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.084220366Z"
+      "updated_at": "2026-01-03T20:37:15.084193286Z"
     },
     "tdd-reminder": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:15.084169426Z"
     },
-    "tests": {
+    "code-review": {
       "status": "pending",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.084193286Z"
+      "updated_at": "2026-01-03T20:37:15.084220366Z"
     },
     "clippy": {
       "status": "pending",
