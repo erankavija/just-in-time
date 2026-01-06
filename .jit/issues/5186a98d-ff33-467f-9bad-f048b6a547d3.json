@@ -2,7 +2,7 @@
   "id": "5186a98d-ff33-467f-9bad-f048b6a547d3",
   "title": "Implement worktree identity generation and persistence",
   "description": "Implement deterministic worktree ID generation (hash of absolute path + creation timestamp, truncated to 8 hex chars). Persist in `<worktree>/.jit/worktree.json` with schema version, branch, root path, and created_at. Handle worktree relocation detection. See design doc section \"Worktree Identity\".",
-  "state": "ready",
+  "state": "done",
   "priority": "high",
   "assignee": null,
   "dependencies": [],
@@ -15,29 +15,29 @@
   ],
   "gates_status": {
     "tests": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.561412294Z"
-    },
-    "clippy": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.561422164Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-06T20:24:19.825017846Z"
     },
     "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.561441544Z"
+      "status": "passed",
+      "updated_by": "agent:copilot-worktree-foundation",
+      "updated_at": "2026-01-06T20:24:17.462388833Z"
+    },
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-06T20:24:19.054916706Z"
     },
     "fmt": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.561431774Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-06T20:24:18.441096631Z"
     },
     "tdd-reminder": {
-      "status": "pending",
+      "status": "passed",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.561373704Z"
+      "updated_at": "2026-01-06T20:24:21.499749577Z"
     }
   },
   "context": {},
