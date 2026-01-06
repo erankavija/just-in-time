@@ -957,3 +957,15 @@
 {"type":"issue_created","id":"bcfb745d-5535-4e47-ab01-391effb50295","issue_id":"608ae1e8-1523-482a-9a17-428b64c95f61","timestamp":"2026-01-03T22:50:25.297418310Z","title":"Implement TTL=0 indefinite lease support with staleness detection","priority":"high"}
 {"type":"issue_state_changed","id":"3e6bd4c4-745f-4c82-b8ac-40b185387a66","issue_id":"608ae1e8-1523-482a-9a17-428b64c95f61","timestamp":"2026-01-03T22:51:34.064305145Z","from":"ready","to":"backlog"}
 {"type":"issue_state_changed","id":"89ae467d-305a-438f-832d-964cd0188921","issue_id":"61783d2f-afd5-4f69-bb41-54081d8a6158","timestamp":"2026-01-06T20:17:31.772222203Z","from":"ready","to":"in_progress"}
+{"type":"gate_passed","id":"ea6de9ae-f330-4b4b-99b0-37475582874c","issue_id":"61783d2f-afd5-4f69-bb41-54081d8a6158","timestamp":"2026-01-06T20:24:07.051717826Z","gate_key":"tdd-reminder","updated_by":"agent:copilot-1"}
+{"type":"gate_passed","id":"0009b7e3-5e08-487c-89ee-0b0c9d299895","issue_id":"61783d2f-afd5-4f69-bb41-54081d8a6158","timestamp":"2026-01-06T20:24:07.454734883Z","gate_key":"fmt","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"1cc86ba6-75f6-4892-8632-c3a5d6b0ef3c","issue_id":"61783d2f-afd5-4f69-bb41-54081d8a6158","timestamp":"2026-01-06T20:24:10.556650603Z","gate_key":"tests","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"f9fb0aa8-cb71-4074-8fe9-e2dd6dc7c11f","issue_id":"61783d2f-afd5-4f69-bb41-54081d8a6158","timestamp":"2026-01-06T20:24:15.159638569Z","gate_key":"clippy","updated_by":"auto:executor"}
+{"type":"issue_state_changed","id":"ee11c29c-26e7-43dd-9ccf-37d56cc0d478","issue_id":"61783d2f-afd5-4f69-bb41-54081d8a6158","timestamp":"2026-01-06T20:24:23.673870110Z","from":"in_progress","to":"gated"}
+{"type":"gate_passed","id":"adf5c380-6625-4a39-bfd7-eee7aa77214a","issue_id":"61783d2f-afd5-4f69-bb41-54081d8a6158","timestamp":"2026-01-06T20:26:29.673194884Z","gate_key":"code-review","updated_by":"human:reviewer"}
+{"type":"issue_state_changed","id":"61007c06-d365-42b1-921a-0bf268cbf10e","issue_id":"61783d2f-afd5-4f69-bb41-54081d8a6158","timestamp":"2026-01-06T20:26:29.673375744Z","from":"gated","to":"done"}
+{"type":"issue_completed","id":"ab5ccddd-ec80-4c27-b86c-84a4917e6a58","issue_id":"61783d2f-afd5-4f69-bb41-54081d8a6158","timestamp":"2026-01-06T20:26:29.673398284Z"}
+{"type":"issue_state_changed","id":"4cacc58c-1359-469e-8fe7-b3aa9db12dbe","issue_id":"61783d2f-afd5-4f69-bb41-54081d8a6158","timestamp":"2026-01-06T20:26:29.797172704Z","from":"gated","to":"gated"}
+{"type":"gate_passed","id":"9179c492-3aed-41ac-8b7d-fb672dbf01e0","issue_id":"61783d2f-afd5-4f69-bb41-54081d8a6158","timestamp":"2026-01-06T20:26:44.186079664Z","gate_key":"code-review","updated_by":"human:reviewer"}
+{"type":"issue_state_changed","id":"ecb3fbc0-b21a-4e49-90c3-bcc04eb7a6b2","issue_id":"61783d2f-afd5-4f69-bb41-54081d8a6158","timestamp":"2026-01-06T20:26:44.189054934Z","from":"gated","to":"done"}
+{"type":"issue_completed","id":"5cefe4e0-9c2b-41e5-babf-7cce83d54927","issue_id":"61783d2f-afd5-4f69-bb41-54081d8a6158","timestamp":"2026-01-06T20:26:44.189084204Z"}

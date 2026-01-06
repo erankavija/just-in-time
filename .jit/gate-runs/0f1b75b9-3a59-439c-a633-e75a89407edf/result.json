@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "0f1b75b9-3a59-439c-a633-e75a89407edf",
+  "gate_key": "fmt",
+  "stage": "postcheck",
+  "issue_id": "61783d2f-afd5-4f69-bb41-54081d8a6158",
+  "commit": "dc6212e0f54163cded2c30cd35a6420e1b12d6b0",
+  "branch": "agents/identity-work",
+  "status": "passed",
+  "started_at": "2026-01-06T20:24:07.051570126Z",
+  "completed_at": "2026-01-06T20:24:07.454421014Z",
+  "duration_ms": 402,
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "",
+  "command": "cargo fmt -- --check",
+  "by": "auto:executor",
+  "message": null
+}

@@ -2,7 +2,7 @@
   "id": "61783d2f-afd5-4f69-bb41-54081d8a6158",
   "title": "Implement agent identity configuration",
   "description": "Implement agent identity resolution with priority: `--agent-id` flag > `JIT_AGENT_ID` env var > `~/.config/jit/agent.toml` > error. Support format `{type}:{identifier}` (e.g., `agent:copilot-1`). See design doc section \"Agent Identity\".",
-  "state": "in_progress",
+  "state": "done",
   "priority": "high",
   "assignee": null,
   "dependencies": [],
@@ -14,30 +14,30 @@
     "code-review"
   ],
   "gates_status": {
-    "clippy": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.563861885Z"
-    },
-    "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.563880865Z"
-    },
     "fmt": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.563871205Z"
-    },
-    "tdd-reminder": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.563826055Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-06T20:24:07.051570126Z"
     },
     "tests": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.563851955Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-06T20:24:07.051541496Z"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": "agent:copilot-1",
+      "updated_at": "2026-01-06T20:24:07.051506056Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "human:reviewer",
+      "updated_at": "2026-01-06T20:26:44.185852375Z"
+    },
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-06T20:24:07.051541306Z"
     }
   },
   "context": {},
