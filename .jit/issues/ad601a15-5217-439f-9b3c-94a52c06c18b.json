@@ -6,8 +6,10 @@
   "priority": "high",
   "assignee": null,
   "dependencies": [
-    "7051d24e-c804-4231-9a60-d1046ef45dde",
-    "909c78cc-d5da-4d4c-bfb8-7e9510795bfe"
+    "909c78cc-d5da-4d4c-bfb8-7e9510795bfe",
+    "f0235aa4-24cd-434f-9133-09c44c1c1d7a",
+    "92bf3a9b-914a-4015-8d26-b52535afe479",
+    "7051d24e-c804-4231-9a60-d1046ef45dde"
   ],
   "gates_required": [],
   "gates_status": {},
