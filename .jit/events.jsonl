@@ -957,3 +957,10 @@
 {"type":"issue_created","id":"bcfb745d-5535-4e47-ab01-391effb50295","issue_id":"608ae1e8-1523-482a-9a17-428b64c95f61","timestamp":"2026-01-03T22:50:25.297418310Z","title":"Implement TTL=0 indefinite lease support with staleness detection","priority":"high"}
 {"type":"issue_state_changed","id":"3e6bd4c4-745f-4c82-b8ac-40b185387a66","issue_id":"608ae1e8-1523-482a-9a17-428b64c95f61","timestamp":"2026-01-03T22:51:34.064305145Z","from":"ready","to":"backlog"}
 {"type":"issue_state_changed","id":"33f26019-22b3-4fb6-99bb-255e24a8934a","issue_id":"5186a98d-ff33-467f-9bad-f048b6a547d3","timestamp":"2026-01-06T20:16:43.251152353Z","from":"ready","to":"in_progress"}
+{"type":"gate_passed","id":"320c62d6-d449-4c54-b28b-8bbd4472616a","issue_id":"5186a98d-ff33-467f-9bad-f048b6a547d3","timestamp":"2026-01-06T20:24:17.462554573Z","gate_key":"code-review","updated_by":"agent:copilot-worktree-foundation"}
+{"type":"gate_passed","id":"d0aa0434-353e-447d-af6d-c6d51e9590b6","issue_id":"5186a98d-ff33-467f-9bad-f048b6a547d3","timestamp":"2026-01-06T20:24:18.847776498Z","gate_key":"fmt","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"b5c00d76-a7d9-4412-8df2-c84415d49189","issue_id":"5186a98d-ff33-467f-9bad-f048b6a547d3","timestamp":"2026-01-06T20:24:21.499916077Z","gate_key":"tdd-reminder","updated_by":null}
+{"type":"gate_passed","id":"307768e1-f23a-44b2-a831-1ebebf070671","issue_id":"5186a98d-ff33-467f-9bad-f048b6a547d3","timestamp":"2026-01-06T20:24:25.061476265Z","gate_key":"clippy","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"3ca236c6-26d6-4422-b05a-c065f84b53e0","issue_id":"5186a98d-ff33-467f-9bad-f048b6a547d3","timestamp":"2026-01-06T20:24:27.833400275Z","gate_key":"tests","updated_by":"auto:executor"}
+{"type":"issue_state_changed","id":"3fff38d0-87cf-4066-82e4-3a454d49b79f","issue_id":"5186a98d-ff33-467f-9bad-f048b6a547d3","timestamp":"2026-01-06T20:24:38.225262845Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"d117e98f-7698-4acf-882f-fac1af5011f7","issue_id":"5186a98d-ff33-467f-9bad-f048b6a547d3","timestamp":"2026-01-06T20:24:38.225294795Z"}

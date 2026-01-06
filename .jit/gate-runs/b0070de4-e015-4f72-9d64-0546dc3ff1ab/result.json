@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "b0070de4-e015-4f72-9d64-0546dc3ff1ab",
+  "gate_key": "fmt",
+  "stage": "postcheck",
+  "issue_id": "5186a98d-ff33-467f-9bad-f048b6a547d3",
+  "commit": "4918854b02798580bb737970bedab33151a0ff29",
+  "branch": "agents/foundation-work",
+  "status": "passed",
+  "started_at": "2026-01-06T20:24:18.441096631Z",
+  "completed_at": "2026-01-06T20:24:18.844045958Z",
+  "duration_ms": 402,
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "",
+  "command": "cargo fmt -- --check",
+  "by": "auto:executor",
+  "message": null
+}
