@@ -63,6 +63,13 @@
           "is_shared": false
         }
       ]
+    },
+    {
+      "path": "dev/sessions/session-claim-coordination-parallel.md",
+      "commit": null,
+      "label": "Parallel Work Session Notes",
+      "doc_type": "notes",
+      "format": "markdown"
     }
   ],
   "labels": [
