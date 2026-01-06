@@ -14,16 +14,6 @@
     "code-review"
   ],
   "gates_status": {
-    "tests": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.566617935Z"
-    },
-    "fmt": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.566637485Z"
-    },
     "clippy": {
       "status": "pending",
       "updated_by": null,
@@ -38,6 +28,16 @@
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:07.566647375Z"
+    },
+    "fmt": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-01-03T20:37:07.566637485Z"
+    },
+    "tests": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-01-03T20:37:07.566617935Z"
     }
   },
   "context": {},
