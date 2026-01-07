@@ -2,7 +2,7 @@
   "id": "5bc0eff5-9551-49d0-863d-64dc2c2f13ab",
   "title": "Implement claims JSONL append-only log",
   "description": "Implement `claims.jsonl` append-only log with schema version, sequence numbers, and operation types (acquire, renew, release, auto-evict, force-evict). Use fsync after append for durability. See design doc section \"Claims JSONL\".",
-  "state": "ready",
+  "state": "done",
   "priority": "high",
   "assignee": null,
   "dependencies": [
@@ -16,30 +16,30 @@
     "code-review"
   ],
   "gates_status": {
-    "tdd-reminder": {
-      "status": "pending",
+    "code-review": {
+      "status": "passed",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.569288886Z"
+      "updated_at": "2026-01-07T18:52:14.939535937Z"
     },
     "tests": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.569311096Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-07T18:52:14.948464880Z"
     },
     "fmt": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.569334316Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-07T18:52:14.948467380Z"
     },
-    "code-review": {
-      "status": "pending",
+    "tdd-reminder": {
+      "status": "passed",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.569344326Z"
+      "updated_at": "2026-01-07T18:52:14.938302377Z"
     },
     "clippy": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.569320966Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-07T18:52:14.948464900Z"
     }
   },
   "context": {},
