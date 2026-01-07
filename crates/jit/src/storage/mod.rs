@@ -9,6 +9,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+pub mod claim_coordinator;
 pub mod claims_log;
 pub mod control_plane;
 pub mod gate_runs;

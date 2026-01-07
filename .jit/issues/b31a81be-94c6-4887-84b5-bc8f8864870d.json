@@ -2,7 +2,7 @@
   "id": "b31a81be-94c6-4887-84b5-bc8f8864870d",
   "title": "Implement atomic claim acquisition with file locking",
   "description": "Implement atomic claim acquisition using `fs4` file locking. Acquire exclusive lock, load index, check availability, create lease with ULID, append to log, update index atomically. See design doc section \"Claim Acquisition Algorithm\".",
-  "state": "ready",
+  "state": "done",
   "priority": "high",
   "assignee": null,
   "dependencies": [
@@ -16,30 +16,30 @@
     "code-review"
   ],
   "gates_status": {
-    "tdd-reminder": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.573989277Z"
-    },
-    "fmt": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.574035107Z"
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-07T18:55:51.303523039Z"
     },
     "code-review": {
-      "status": "pending",
+      "status": "passed",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.574044977Z"
+      "updated_at": "2026-01-07T18:55:59.430917275Z"
     },
-    "tests": {
-      "status": "pending",
+    "tdd-reminder": {
+      "status": "passed",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.574015577Z"
+      "updated_at": "2026-01-07T18:55:51.300914939Z"
     },
     "clippy": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.574025587Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-07T18:55:53.913298666Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-07T18:55:59.024599548Z"
     }
   },
   "context": {},
