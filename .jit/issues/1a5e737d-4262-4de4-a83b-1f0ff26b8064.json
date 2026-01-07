@@ -2,7 +2,7 @@
   "id": "1a5e737d-4262-4de4-a83b-1f0ff26b8064",
   "title": "Implement claims index with rebuild capability",
   "description": "Implement `claims.index.json` derived view with active leases. Support rebuild from JSONL log. Include schema version, generated_at timestamp, sequence number, and stale_threshold_secs.\n\n## Lease Entry Schema\n- `lease_id`, `issue_id`, `agent_id`, `worktree_id`, `branch`\n- `ttl_secs`: 0 for indefinite, >0 for finite\n- `expires_at`: RFC3339 timestamp or null (for TTL=0)\n- `last_beat`: RFC3339 timestamp (for staleness checks)\n- `stale`: boolean (derived: true if TTL=0 and now - last_beat > threshold)\n\nSee design doc section \"Claims Index JSON\".",
-  "state": "ready",
+  "state": "gated",
   "priority": "high",
   "assignee": null,
   "dependencies": [
@@ -17,29 +17,29 @@
   ],
   "gates_status": {
     "tests": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.571475537Z"
-    },
-    "clippy": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.571484417Z"
-    },
-    "fmt": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.571492887Z"
-    },
-    "tdd-reminder": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.571451617Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-07T19:27:47.689314992Z"
     },
     "code-review": {
-      "status": "pending",
+      "status": "passed",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.571501687Z"
+      "updated_at": "2026-01-07T19:27:55.814608246Z"
+    },
+    "clippy": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-07T19:27:50.597315744Z"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-01-07T19:27:47.686240941Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-07T19:27:55.408991980Z"
     }
   },
   "context": {},
