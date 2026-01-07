@@ -16,30 +16,30 @@
     "code-review"
   ],
   "gates_status": {
-    "clippy": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.576317638Z"
-    },
     "fmt": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:07.576326908Z"
     },
-    "code-review": {
+    "tdd-reminder": {
       "status": "pending",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.576336458Z"
+      "updated_at": "2026-01-03T20:37:07.576283658Z"
     },
     "tests": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:07.576308018Z"
     },
-    "tdd-reminder": {
+    "code-review": {
       "status": "pending",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.576283658Z"
+      "updated_at": "2026-01-03T20:37:07.576336458Z"
+    },
+    "clippy": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-01-03T20:37:07.576317638Z"
     }
   },
   "context": {},

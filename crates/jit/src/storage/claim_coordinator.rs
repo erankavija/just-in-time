@@ -389,6 +389,164 @@ impl ClaimCoordinator {
 
         Ok(String::from_utf8(output.stdout)?.trim().to_string())
     }
+
+    /// Renew an existing lease
+    ///
+    /// # Arguments
+    ///
+    /// * `lease_id` - Lease to renew
+    /// * `ttl_secs` - New TTL in seconds (must match original for finite leases)
+    ///
+    /// # Returns
+    ///
+    /// Updated lease on success
+    ///
+    /// # Errors
+    ///
+    /// - Lease not found
+    /// - Lease not owned by current agent
+    /// - Lease already expired
+    pub fn renew_lease(&self, lease_id: &str, ttl_secs: u64) -> Result<Lease> {
+        // 1. Acquire exclusive lock
+        let lock_path = self.paths.shared_jit.join("locks/claims.lock");
+        let _guard = self.locker.lock_exclusive(&lock_path)?;
+
+        // 2. Load index and evict expired
+        let mut index = self.load_claims_index()?;
+        self.evict_expired(&mut index)?;
+
+        // 3. Find the lease
+        let lease = index
+            .leases
+            .iter()
+            .find(|l| l.lease_id == lease_id)
+            .ok_or_else(|| anyhow::anyhow!("Lease {} not found", lease_id))?;
+
+        // 4. Verify ownership
+        if lease.agent_id != self.agent_id {
+            bail!(
+                "Cannot renew lease {}: owned by {}, not {}",
+                lease_id,
+                lease.agent_id,
+                self.agent_id
+            );
+        }
+
+        // 5. Calculate new expiry/heartbeat
+        let now = Utc::now();
+        let (new_expires_at, new_last_beat) = if lease.ttl_secs > 0 {
+            // Finite lease: extend expiry by TTL
+            let new_expiry = now + Duration::seconds(ttl_secs as i64);
+            (Some(new_expiry), lease.last_beat)
+        } else {
+            // Indefinite lease: update heartbeat
+            (None, now)
+        };
+
+        // 6. Log renewal
+        let op = ClaimOp::Renew {
+            lease_id: lease_id.to_string(),
+            new_expires_at,
+            new_last_beat,
+        };
+        self.append_claim_op(&op)?;
+
+        // 7. Update index
+        let mut updated_lease = lease.clone();
+        updated_lease.expires_at = new_expires_at;
+        updated_lease.last_beat = new_last_beat;
+        index.add_lease(updated_lease.clone());
+        self.write_index_atomic(&index)?;
+
+        Ok(updated_lease)
+    }
+
+    /// Release a lease explicitly
+    ///
+    /// # Arguments
+    ///
+    /// * `lease_id` - Lease to release
+    ///
+    /// # Errors
+    ///
+    /// - Lease not found
+    /// - Lease not owned by current agent
+    pub fn release_lease(&self, lease_id: &str) -> Result<()> {
+        // 1. Acquire exclusive lock
+        let lock_path = self.paths.shared_jit.join("locks/claims.lock");
+        let _guard = self.locker.lock_exclusive(&lock_path)?;
+
+        // 2. Load index
+        let mut index = self.load_claims_index()?;
+
+        // 3. Find the lease
+        let lease = index
+            .leases
+            .iter()
+            .find(|l| l.lease_id == lease_id)
+            .ok_or_else(|| anyhow::anyhow!("Lease {} not found", lease_id))?;
+
+        // 4. Verify ownership
+        if lease.agent_id != self.agent_id {
+            bail!(
+                "Cannot release lease {}: owned by {}, not {}",
+                lease_id,
+                lease.agent_id,
+                self.agent_id
+            );
+        }
+
+        // 5. Log release
+        let op = ClaimOp::Release {
+            lease_id: lease_id.to_string(),
+            released_at: Utc::now(),
+        };
+        self.append_claim_op(&op)?;
+
+        // 6. Remove from index
+        index.remove_lease(lease_id);
+        self.write_index_atomic(&index)?;
+
+        Ok(())
+    }
+
+    /// Force evict a lease (admin operation)
+    ///
+    /// # Arguments
+    ///
+    /// * `lease_id` - Lease to evict
+    /// * `reason` - Reason for eviction
+    ///
+    /// # Errors
+    ///
+    /// - Lease not found
+    pub fn force_evict_lease(&self, lease_id: &str, reason: &str) -> Result<()> {
+        // 1. Acquire exclusive lock
+        let lock_path = self.paths.shared_jit.join("locks/claims.lock");
+        let _guard = self.locker.lock_exclusive(&lock_path)?;
+
+        // 2. Load index
+        let mut index = self.load_claims_index()?;
+
+        // 3. Verify lease exists
+        if !index.leases.iter().any(|l| l.lease_id == lease_id) {
+            bail!("Lease {} not found", lease_id);
+        }
+
+        // 4. Log eviction
+        let op = ClaimOp::ForceEvict {
+            lease_id: lease_id.to_string(),
+            evicted_at: Utc::now(),
+            reason: reason.to_string(),
+        };
+        self.append_claim_op(&op)?;
+
+        // 5. Remove from index
+        index.remove_lease(lease_id);
+        self.write_index_atomic(&index)?;
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -569,5 +727,209 @@ mod tests {
         // Now try to claim - should evict expired and succeed
         let lease = coordinator.acquire_claim("issue-006", 600).unwrap();
         assert_eq!(lease.agent_id, "agent:test");
+    }
+
+    #[test]
+    fn test_renew_finite_lease() {
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp_dir);
+
+        // Acquire a finite lease
+        let lease = coordinator.acquire_claim("issue-007", 600).unwrap();
+        let original_expiry = lease.expires_at.unwrap();
+
+        // Wait a bit
+        thread::sleep(StdDuration::from_millis(100));
+
+        // Renew the lease
+        let renewed = coordinator.renew_lease(&lease.lease_id, 600).unwrap();
+
+        // Expiry should be extended
+        assert!(renewed.expires_at.unwrap() > original_expiry);
+        assert_eq!(renewed.issue_id, lease.issue_id);
+        assert_eq!(renewed.agent_id, lease.agent_id);
+    }
+
+    #[test]
+    fn test_renew_indefinite_lease() {
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp_dir);
+
+        // Acquire an indefinite lease
+        let lease = coordinator.acquire_claim("issue-008", 0).unwrap();
+        let original_heartbeat = lease.last_beat;
+
+        // Wait a bit
+        thread::sleep(StdDuration::from_millis(100));
+
+        // Renew (heartbeat) the lease
+        let renewed = coordinator.renew_lease(&lease.lease_id, 0).unwrap();
+
+        // Heartbeat should be updated
+        assert!(renewed.last_beat > original_heartbeat);
+        assert_eq!(renewed.ttl_secs, 0);
+        assert!(renewed.expires_at.is_none());
+    }
+
+    #[test]
+    fn test_renew_nonexistent_lease() {
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp_dir);
+
+        let result = coordinator.renew_lease("fake-lease-id", 600);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("not found"));
+    }
+
+    #[test]
+    fn test_renew_lease_not_owned() {
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator1 = setup_coordinator(&temp_dir);
+
+        // Agent 1 acquires lease
+        let lease = coordinator1.acquire_claim("issue-009", 600).unwrap();
+
+        // Create coordinator for different agent
+        let paths = WorktreePaths {
+            common_dir: temp_dir.path().join(".git"),
+            worktree_root: temp_dir.path().to_path_buf(),
+            local_jit: temp_dir.path().join(".jit"),
+            shared_jit: temp_dir.path().join(".git/jit"),
+        };
+        let coordinator2 = ClaimCoordinator::new(
+            paths,
+            FileLocker::new(StdDuration::from_secs(5)),
+            "wt:other".to_string(),
+            "agent:other".to_string(),
+        );
+
+        // Agent 2 tries to renew - should fail
+        let result = coordinator2.renew_lease(&lease.lease_id, 600);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("owned by"));
+    }
+
+    #[test]
+    fn test_release_lease() {
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp_dir);
+
+        // Acquire and release
+        let lease = coordinator.acquire_claim("issue-010", 600).unwrap();
+        coordinator.release_lease(&lease.lease_id).unwrap();
+
+        // Verify lease is gone from index
+        let index = coordinator.load_claims_index().unwrap();
+        assert!(index.find_lease("issue-010").is_none());
+
+        // Should be able to claim again
+        let new_lease = coordinator.acquire_claim("issue-010", 600).unwrap();
+        assert_ne!(new_lease.lease_id, lease.lease_id); // Different lease
+    }
+
+    #[test]
+    fn test_release_nonexistent_lease() {
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp_dir);
+
+        let result = coordinator.release_lease("fake-lease-id");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("not found"));
+    }
+
+    #[test]
+    fn test_release_lease_not_owned() {
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator1 = setup_coordinator(&temp_dir);
+
+        // Agent 1 acquires lease
+        let lease = coordinator1.acquire_claim("issue-011", 600).unwrap();
+
+        // Create coordinator for different agent
+        let paths = WorktreePaths {
+            common_dir: temp_dir.path().join(".git"),
+            worktree_root: temp_dir.path().to_path_buf(),
+            local_jit: temp_dir.path().join(".jit"),
+            shared_jit: temp_dir.path().join(".git/jit"),
+        };
+        let coordinator2 = ClaimCoordinator::new(
+            paths,
+            FileLocker::new(StdDuration::from_secs(5)),
+            "wt:other".to_string(),
+            "agent:other".to_string(),
+        );
+
+        // Agent 2 tries to release - should fail
+        let result = coordinator2.release_lease(&lease.lease_id);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("owned by"));
+    }
+
+    #[test]
+    fn test_force_evict_lease() {
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator1 = setup_coordinator(&temp_dir);
+
+        // Agent 1 acquires lease
+        let lease = coordinator1.acquire_claim("issue-012", 600).unwrap();
+
+        // Create admin coordinator
+        let paths = WorktreePaths {
+            common_dir: temp_dir.path().join(".git"),
+            worktree_root: temp_dir.path().to_path_buf(),
+            local_jit: temp_dir.path().join(".jit"),
+            shared_jit: temp_dir.path().join(".git/jit"),
+        };
+        let admin_coordinator = ClaimCoordinator::new(
+            paths,
+            FileLocker::new(StdDuration::from_secs(5)),
+            "wt:admin".to_string(),
+            "admin:alice".to_string(),
+        );
+
+        // Admin force evicts (no ownership check)
+        admin_coordinator
+            .force_evict_lease(&lease.lease_id, "stale after crash")
+            .unwrap();
+
+        // Verify lease is gone
+        let index = coordinator1.load_claims_index().unwrap();
+        assert!(index.find_lease("issue-012").is_none());
+
+        // Should be able to claim again
+        coordinator1.acquire_claim("issue-012", 600).unwrap();
+    }
+
+    #[test]
+    fn test_force_evict_nonexistent_lease() {
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp_dir);
+
+        let result = coordinator.force_evict_lease("fake-lease-id", "test");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("not found"));
+    }
+
+    #[test]
+    fn test_operations_logged_to_audit_trail() {
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp_dir);
+
+        // Perform various operations
+        let lease = coordinator.acquire_claim("issue-013", 600).unwrap();
+        coordinator.renew_lease(&lease.lease_id, 600).unwrap();
+        coordinator.release_lease(&lease.lease_id).unwrap();
+
+        // Check audit log
+        let log_path = temp_dir.path().join(".git/jit/claims.jsonl");
+        let content = fs::read_to_string(log_path).unwrap();
+
+        assert!(content.contains("acquire"));
+        assert!(content.contains("renew"));
+        assert!(content.contains("release"));
+
+        // Verify sequence ordering
+        let lines: Vec<_> = content.lines().collect();
+        assert!(lines.len() >= 3);
     }
 }
