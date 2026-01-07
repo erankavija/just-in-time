@@ -547,6 +547,87 @@ impl ClaimCoordinator {
 
         Ok(())
     }
+
+    /// Rebuild claims index from JSONL log
+    ///
+    /// Replays all operations from the append-only log to reconstruct the current
+    /// state of active leases. Filters out expired finite leases.
+    ///
+    /// # Use Cases
+    ///
+    /// - Recovery from corrupted index file
+    /// - Consistency validation
+    /// - Debugging and diagnostics
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the log file cannot be read or parsed
+    pub fn rebuild_index_from_log(&self) -> Result<ClaimsIndex> {
+        use std::collections::HashMap;
+        use std::io::{BufRead, BufReader};
+
+        let log_path = self.paths.shared_jit.join("claims.jsonl");
+        let mut active: HashMap<String, Lease> = HashMap::new();
+        let mut max_seq = 0u64;
+
+        if log_path.exists() {
+            let file = fs::File::open(&log_path).context("Failed to open claims log")?;
+            let reader = BufReader::new(file);
+
+            for line in reader.lines() {
+                let line = line.context("Failed to read line from claims log")?;
+                if line.trim().is_empty() {
+                    continue;
+                }
+
+                let entry: ClaimLogEntry =
+                    serde_json::from_str(&line).context("Failed to parse claim log entry")?;
+
+                max_seq = max_seq.max(entry.seq);
+
+                match entry.operation {
+                    ClaimOp::Acquire { lease } => {
+                        active.insert(lease.lease_id.clone(), lease);
+                    }
+                    ClaimOp::Renew {
+                        lease_id,
+                        new_expires_at,
+                        new_last_beat,
+                    } => {
+                        if let Some(lease) = active.get_mut(&lease_id) {
+                            lease.expires_at = new_expires_at;
+                            lease.last_beat = new_last_beat;
+                        }
+                    }
+                    ClaimOp::Release { lease_id, .. }
+                    | ClaimOp::AutoEvict { lease_id, .. }
+                    | ClaimOp::ForceEvict { lease_id, .. } => {
+                        active.remove(&lease_id);
+                    }
+                }
+            }
+        }
+
+        // Filter out expired finite leases
+        let now = Utc::now();
+        active.retain(|_, lease| {
+            if lease.ttl_secs > 0 {
+                // Finite lease - check expiration
+                lease.expires_at.is_some_and(|exp| exp > now)
+            } else {
+                // Indefinite lease - keep it (staleness doesn't remove, just warns)
+                true
+            }
+        });
+
+        Ok(ClaimsIndex {
+            schema_version: 1,
+            generated_at: Utc::now(),
+            last_seq: max_seq,
+            stale_threshold_secs: 3600, // 1 hour default
+            leases: active.into_values().collect(),
+        })
+    }
 }
 
 #[cfg(test)]
