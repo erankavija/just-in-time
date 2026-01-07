@@ -70,6 +70,13 @@
       "label": "Parallel Work Session Notes",
       "doc_type": "notes",
       "format": "markdown"
+    },
+    {
+      "path": "dev/sessions/session-claim-coordination-review.md",
+      "commit": null,
+      "label": "Implementation Review & Testing Gap Analysis",
+      "doc_type": "notes",
+      "format": "markdown"
     }
   ],
   "labels": [
