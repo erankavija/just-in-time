@@ -16,15 +16,15 @@
     "code-review"
   ],
   "gates_status": {
-    "tdd-reminder": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.573989277Z"
-    },
     "fmt": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:07.574035107Z"
+    },
+    "tdd-reminder": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-01-03T20:37:07.573989277Z"
     },
     "code-review": {
       "status": "pending",
