@@ -2,7 +2,7 @@
   "id": "1a4c1f79-d350-4d27-827b-8f054f7d9dfb",
   "title": "Implement lease renewal, release, and force-evict operations",
   "description": "Implement lease renewal (extend TTL or update heartbeat), release (explicit), and force-evict (admin) operations. All operations append to log and update index under lock. Verify ownership for renew/release.\n\n## Renewal Behavior\n- Finite leases (ttl_secs > 0): extend `expires_at` by TTL\n- Indefinite leases (ttl_secs = 0): update `last_beat` timestamp via heartbeat operation\n\nSee design doc section \"Lease Operations\".",
-  "state": "ready",
+  "state": "done",
   "priority": "high",
   "assignee": null,
   "dependencies": [
@@ -16,30 +16,30 @@
     "code-review"
   ],
   "gates_status": {
-    "fmt": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.576326908Z"
-    },
     "tdd-reminder": {
-      "status": "pending",
+      "status": "passed",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.576283658Z"
-    },
-    "tests": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.576308018Z"
+      "updated_at": "2026-01-07T19:28:27.459860950Z"
     },
     "code-review": {
-      "status": "pending",
+      "status": "passed",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.576336458Z"
+      "updated_at": "2026-01-07T19:28:27.464419291Z"
     },
     "clippy": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.576317638Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-07T19:28:27.462340461Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-07T19:28:27.463276031Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-07T19:28:27.461052460Z"
     }
   },
   "context": {},
