@@ -2,7 +2,7 @@
   "id": "77206cf6-f935-49d0-b132-054e6a1edfae",
   "title": "Implement jit claim renew command",
   "description": "Implement `jit claim renew <lease-id>` with `--ttl <seconds>` option. Extend lease expiry time for finite leases, or update last_beat for indefinite leases. Verify ownership before renewal. Support `--json` output.\n\nSee design doc section \"Lease Operations\" (renew/heartbeat).",
-  "state": "backlog",
+  "state": "ready",
   "priority": "high",
   "assignee": null,
   "dependencies": [
@@ -16,30 +16,30 @@
     "code-review"
   ],
   "gates_status": {
-    "tdd-reminder": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.596984454Z"
-    },
-    "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.597037684Z"
-    },
     "tests": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:07.597011414Z"
+    },
+    "fmt": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-01-03T20:37:07.597029014Z"
+    },
+    "tdd-reminder": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-01-03T20:37:07.596984454Z"
     },
     "clippy": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:07.597020434Z"
     },
-    "fmt": {
+    "code-review": {
       "status": "pending",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.597029014Z"
+      "updated_at": "2026-01-03T20:37:07.597037684Z"
     }
   },
   "context": {},

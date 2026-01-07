@@ -2,7 +2,7 @@
   "id": "5f567491-ff8d-4f85-8788-7c4d60ea7a87",
   "title": "Implement startup recovery routine",
   "description": "Implement startup recovery routine that runs on every `jit` command: cleanup stale locks, verify index consistency, evict expired leases, remove orphaned temp files. See design doc section \"Crash Recovery\".",
-  "state": "backlog",
+  "state": "ready",
   "priority": "high",
   "assignee": null,
   "dependencies": [
@@ -16,15 +16,20 @@
     "code-review"
   ],
   "gates_status": {
-    "clippy": {
+    "tdd-reminder": {
       "status": "pending",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.063446090Z"
+      "updated_at": "2026-01-03T20:37:15.063417060Z"
     },
     "tests": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:15.063437500Z"
+    },
+    "clippy": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-01-03T20:37:15.063446090Z"
     },
     "fmt": {
       "status": "pending",
@@ -35,11 +40,6 @@
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:15.063462860Z"
-    },
-    "tdd-reminder": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.063417060Z"
     }
   },
   "context": {},

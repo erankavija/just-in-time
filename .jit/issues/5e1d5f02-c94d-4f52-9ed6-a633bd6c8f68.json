@@ -2,7 +2,7 @@
   "id": "5e1d5f02-c94d-4f52-9ed6-a633bd6c8f68",
   "title": "Add configurable enforcement modes",
   "description": "Add `enforce_leases` config option with modes: `strict` (block), `warn` (warn but allow), `off` (bypass). Load from `.jit/config.toml` and respect in `require_active_lease()`. See design doc section \"Configuration\".",
-  "state": "backlog",
+  "state": "ready",
   "priority": "high",
   "assignee": null,
   "dependencies": [
@@ -16,25 +16,25 @@
     "code-review"
   ],
   "gates_status": {
-    "tests": {
+    "clippy": {
       "status": "pending",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.592758453Z"
+      "updated_at": "2026-01-03T20:37:07.592768373Z"
     },
     "fmt": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:07.592777833Z"
     },
+    "tests": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-01-03T20:37:07.592758453Z"
+    },
     "code-review": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:07.592787543Z"
-    },
-    "clippy": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.592768373Z"
     },
     "tdd-reminder": {
       "status": "pending",

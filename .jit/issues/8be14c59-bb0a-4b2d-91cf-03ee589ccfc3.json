@@ -2,7 +2,7 @@
   "id": "8be14c59-bb0a-4b2d-91cf-03ee589ccfc3",
   "title": "Implement jit worktree info command",
   "description": "Implement `jit worktree info` showing current worktree context: worktree ID, branch, root path, is_main_worktree. Support `--json` output.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "high",
   "assignee": null,
   "dependencies": [
@@ -21,6 +21,11 @@
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:15.056778418Z"
     },
+    "fmt": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-01-03T20:37:15.056839378Z"
+    },
     "clippy": {
       "status": "pending",
       "updated_by": null,
@@ -30,11 +35,6 @@
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:15.056849338Z"
-    },
-    "fmt": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.056839378Z"
     },
     "tests": {
       "status": "pending",

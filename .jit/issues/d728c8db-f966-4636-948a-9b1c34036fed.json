@@ -2,7 +2,7 @@
   "id": "d728c8db-f966-4636-948a-9b1c34036fed",
   "title": "Implement orphaned temp file cleanup",
   "description": "Implement orphaned temp file cleanup. Find `*.tmp` files older than threshold (e.g., 1 hour), verify no active operation, remove. Run during startup recovery.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "high",
   "assignee": null,
   "dependencies": [
@@ -16,16 +16,6 @@
     "code-review"
   ],
   "gates_status": {
-    "tests": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.073351023Z"
-    },
-    "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.073376123Z"
-    },
     "tdd-reminder": {
       "status": "pending",
       "updated_by": null,
@@ -36,10 +26,20 @@
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:15.073359613Z"
     },
+    "tests": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-01-03T20:37:15.073351023Z"
+    },
     "fmt": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:15.073367793Z"
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-01-03T20:37:15.073376123Z"
     }
   },
   "context": {},

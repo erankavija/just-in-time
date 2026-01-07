@@ -2,7 +2,7 @@
   "id": "9262f487-89b9-4271-a412-3daff40d258d",
   "title": "Implement jit worktree list command",
   "description": "Implement `jit worktree list` showing all git worktrees with their JIT status: worktree ID, branch, active claims count. Support `--json` output.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "high",
   "assignee": null,
   "dependencies": [
@@ -16,6 +16,11 @@
     "code-review"
   ],
   "gates_status": {
+    "fmt": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-01-03T20:37:15.059230969Z"
+    },
     "code-review": {
       "status": "pending",
       "updated_by": null,
@@ -26,20 +31,15 @@
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:15.059217389Z"
     },
-    "tdd-reminder": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.059180029Z"
-    },
-    "fmt": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.059230969Z"
-    },
     "tests": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:15.059207519Z"
+    },
+    "tdd-reminder": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-01-03T20:37:15.059180029Z"
     }
   },
   "context": {},

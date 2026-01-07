@@ -2,7 +2,7 @@
   "id": "f8e58e7d-6d05-4bbe-a077-be3fb792a27f",
   "title": "Add divergence and lease validation to jit validate",
   "description": "Add `--divergence` and `--leases` flags to `jit validate` command. Validate branch divergence from main and lease consistency respectively. Report issues with fix suggestions.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "high",
   "assignee": null,
   "dependencies": [
@@ -16,6 +16,16 @@
     "code-review"
   ],
   "gates_status": {
+    "clippy": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-01-03T20:37:15.061397810Z"
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-01-03T20:37:15.061414930Z"
+    },
     "fmt": {
       "status": "pending",
       "updated_by": null,
@@ -30,16 +40,6 @@
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:15.061368420Z"
-    },
-    "clippy": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.061397810Z"
-    },
-    "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.061414930Z"
     }
   },
   "context": {},

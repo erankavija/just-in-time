@@ -2,7 +2,7 @@
   "id": "d91b72ab-33b0-48e8-b52a-a30145c67695",
   "title": "Implement jit claim release command",
   "description": "Implement `jit claim release <lease-id>` to explicitly release lease before expiry. Verify ownership. Support `--json` output.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "high",
   "assignee": null,
   "dependencies": [
@@ -16,20 +16,20 @@
     "code-review"
   ],
   "gates_status": {
-    "fmt": {
+    "clippy": {
       "status": "pending",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.599073375Z"
+      "updated_at": "2026-01-03T20:37:07.599064855Z"
     },
     "tdd-reminder": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:07.599034815Z"
     },
-    "clippy": {
+    "fmt": {
       "status": "pending",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.599064855Z"
+      "updated_at": "2026-01-03T20:37:07.599073375Z"
     },
     "code-review": {
       "status": "pending",

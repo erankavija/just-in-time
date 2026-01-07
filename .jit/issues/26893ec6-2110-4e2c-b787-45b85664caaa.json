@@ -2,7 +2,7 @@
   "id": "26893ec6-2110-4e2c-b787-45b85664caaa",
   "title": "Implement claims index rebuild from JSONL log",
   "description": "Implement `rebuild_index_from_log()` to reconstruct claims index from append-only JSONL. Verify sequence continuity, apply operations in order, filter expired leases. See design doc section \"Rebuilding\".",
-  "state": "backlog",
+  "state": "ready",
   "priority": "high",
   "assignee": null,
   "dependencies": [
@@ -16,10 +16,15 @@
     "code-review"
   ],
   "gates_status": {
-    "tdd-reminder": {
+    "fmt": {
       "status": "pending",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.067430871Z"
+      "updated_at": "2026-01-03T20:37:15.067465521Z"
+    },
+    "tests": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-01-03T20:37:15.067448991Z"
     },
     "code-review": {
       "status": "pending",
@@ -31,15 +36,10 @@
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:15.067457331Z"
     },
-    "fmt": {
+    "tdd-reminder": {
       "status": "pending",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.067465521Z"
-    },
-    "tests": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.067448991Z"
+      "updated_at": "2026-01-03T20:37:15.067430871Z"
     }
   },
   "context": {},

@@ -2,7 +2,7 @@
   "id": "dacbda85-fe92-46c5-977d-940121c189ed",
   "title": "Implement lock metadata for diagnostics",
   "description": "Implement lock metadata files (`*.lock.meta`) with PID, agent_id, created_at, and last_updated. Enable diagnosis of stuck processes. Clean up metadata on lock release. See design doc section \"Lock Hygiene and Metadata\".",
-  "state": "backlog",
+  "state": "ready",
   "priority": "high",
   "assignee": null,
   "dependencies": [
@@ -16,15 +16,20 @@
     "code-review"
   ],
   "gates_status": {
-    "clippy": {
+    "tests": {
       "status": "pending",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.071395422Z"
+      "updated_at": "2026-01-03T20:37:15.071386722Z"
     },
     "tdd-reminder": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:15.071364362Z"
+    },
+    "clippy": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-01-03T20:37:15.071395422Z"
     },
     "fmt": {
       "status": "pending",
@@ -35,11 +40,6 @@
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:15.071412002Z"
-    },
-    "tests": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.071386722Z"
     }
   },
   "context": {},

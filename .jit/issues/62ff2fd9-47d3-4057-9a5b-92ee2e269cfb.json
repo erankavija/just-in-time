@@ -2,7 +2,7 @@
   "id": "62ff2fd9-47d3-4057-9a5b-92ee2e269cfb",
   "title": "Create pre-push hook for lease validation",
   "description": "Create pre-push hook template for strict teams that validates leases referenced in commit trailers are still active and non-stale. Parse JIT-Lease trailer from commits being pushed. Check `.stale != true` in claims index.\n\nSee design doc section \"Pre-Push Hook\".",
-  "state": "backlog",
+  "state": "ready",
   "priority": "high",
   "assignee": null,
   "dependencies": [
@@ -16,6 +16,16 @@
     "code-review"
   ],
   "gates_status": {
+    "code-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-01-03T20:37:07.587827341Z"
+    },
+    "tdd-reminder": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-01-03T20:37:07.587770931Z"
+    },
     "tests": {
       "status": "pending",
       "updated_by": null,
@@ -30,16 +40,6 @@
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:07.587817501Z"
-    },
-    "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.587827341Z"
-    },
-    "tdd-reminder": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.587770931Z"
     }
   },
   "context": {},

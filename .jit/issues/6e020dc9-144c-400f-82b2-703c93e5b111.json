@@ -2,7 +2,7 @@
   "id": "6e020dc9-144c-400f-82b2-703c93e5b111",
   "title": "Implement jit claim list command",
   "description": "Implement `jit claim list` showing all active claims across all agents/worktrees. Include lease ID, issue ID, agent, worktree, expiry. Support `--json` output.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "high",
   "assignee": null,
   "dependencies": [
@@ -26,20 +26,20 @@
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:07.605163676Z"
     },
-    "code-review": {
+    "clippy": {
       "status": "pending",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.605190266Z"
+      "updated_at": "2026-01-03T20:37:07.605172736Z"
     },
     "fmt": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:07.605181406Z"
     },
-    "clippy": {
+    "code-review": {
       "status": "pending",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.605172736Z"
+      "updated_at": "2026-01-03T20:37:07.605190266Z"
     }
   },
   "context": {},
