@@ -4,7 +4,7 @@
   "description": "Add property-based tests using `proptest` to verify claim coordination system invariants that example-based tests may miss.\n\n## Problem\n\nStory b74af86f explicitly requires \"Property-based tests for index consistency\" in its testing strategy, but current implementation only has example-based tests (63 tests). While functionality is verified, edge cases in complex operation sequences may be missed.\n\n## Scope\n\nAdd comprehensive property-based tests to verify system invariants across randomly generated operation sequences.\n\n## Tasks\n\n1. **Add proptest dependency** - Update Cargo.toml\n2. **Create generators** - ClaimOperation variants, valid sequences, concurrent scenarios\n3. **Index rebuild properties** (5 tests):\n   - Idempotency: rebuilding twice produces identical results\n   - Lease count invariant: acquires - releases = active leases\n   - No data loss during rebuild\n   - Expired leases filtered correctly\n   - Sequence number continuity\n\n4. **Concurrent claim properties** (3 tests):\n   - Exclusivity: exactly one winner per issue across variable thread counts\n   - No race conditions in concurrent acquisitions\n   - Lock timeout behavior under contention\n\n5. **Sequence number properties** (2 tests):\n   - Strictly increasing with no gaps\n   - Total ordering maintained across operations\n\n6. **Increase concurrent test scale** - Change from 5 to 20 threads\n\n## Success Criteria\n\n- All properties hold across 1000+ generated test cases\n- Property tests integrated into CI (run with `cargo test`)\n- Concurrent test uses 20 threads (meets \"10+\" requirement)\n- Zero test failures\n- Documentation updated with property descriptions\n\n## Testing Strategy\n\n- Use `proptest` shrinking to find minimal failing cases\n- Test with different random seeds for reproducibility\n- Verify properties across edge cases (empty sequences, single ops, complex interleaving)\n\n## References\n\n- Story b74af86f testing strategy requirement\n- Review document: dev/sessions/session-claim-coordination-review.md (lines 201-290)\n- Existing tests in: crates/jit/src/storage/{claims_log,claim_coordinator,lease}.rs",
   "state": "ready",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:copilot-claim-coordination",
   "dependencies": [],
   "gates_required": [
     "tdd-reminder",
@@ -13,7 +13,13 @@
     "fmt",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-01-07T23:19:04.285435946Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [

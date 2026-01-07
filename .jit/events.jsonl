@@ -1065,3 +1065,4 @@
 {"type":"issue_created","id":"6ddd73d4-2234-4e92-9e06-16a19b1cdb7c","issue_id":"3450ad64-caf5-4057-a40e-f0af45e6996b","timestamp":"2026-01-07T23:18:26.255837790Z","title":"Add property-based tests for claim coordination invariants","priority":"high"}
 {"type":"gate_passed","id":"86f1d6d3-633d-4c09-97a3-660460ded6e8","issue_id":"b74af86f-388d-49a2-a172-bc9fdaa7bb9c","timestamp":"2026-01-07T23:18:32.136765798Z","gate_key":"tdd-reminder","updated_by":null}
 {"type":"issue_state_changed","id":"e60e4900-341f-48b5-830c-ad366d26e4f3","issue_id":"b74af86f-388d-49a2-a172-bc9fdaa7bb9c","timestamp":"2026-01-07T23:18:32.140588718Z","from":"ready","to":"backlog"}
+{"type":"gate_passed","id":"ae68ac42-cca0-477d-bc2b-bd9095d697dc","issue_id":"3450ad64-caf5-4057-a40e-f0af45e6996b","timestamp":"2026-01-07T23:19:04.289084846Z","gate_key":"tdd-reminder","updated_by":null}

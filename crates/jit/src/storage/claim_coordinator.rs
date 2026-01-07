@@ -716,10 +716,10 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let temp_path = Arc::new(temp_dir.path().to_path_buf());
 
-        let barrier = Arc::new(Barrier::new(5));
+        let barrier = Arc::new(Barrier::new(20)); // Increased from 5 to 20
         let successes = Arc::new(std::sync::Mutex::new(Vec::new()));
 
-        let handles: Vec<_> = (0..5)
+        let handles: Vec<_> = (0..20) // Increased from 5 to 20
             .map(|i| {
                 let temp_path = Arc::clone(&temp_path);
                 let barrier = Arc::clone(&barrier);
@@ -1213,3 +1213,8 @@ mod tests {
         assert!(!index.is_stale(&finite_lease));
     }
 }
+
+// Include property-based tests
+#[cfg(test)]
+#[path = "claim_coordinator_proptests.rs"]
+mod proptests;
