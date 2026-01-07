@@ -13,6 +13,7 @@ pub mod claims_log;
 pub mod control_plane;
 pub mod gate_runs;
 pub mod json;
+pub mod lease;
 pub mod lock;
 pub mod memory;
 pub mod worktree_identity;
