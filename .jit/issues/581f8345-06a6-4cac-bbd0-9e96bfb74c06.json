@@ -21,25 +21,25 @@
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:07.580559999Z"
     },
-    "clippy": {
+    "fmt": {
       "status": "pending",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.580569319Z"
-    },
-    "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.580587109Z"
+      "updated_at": "2026-01-03T20:37:07.580578139Z"
     },
     "tdd-reminder": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:07.580533459Z"
     },
-    "fmt": {
+    "code-review": {
       "status": "pending",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.580578139Z"
+      "updated_at": "2026-01-03T20:37:07.580587109Z"
+    },
+    "clippy": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-01-03T20:37:07.580569319Z"
     }
   },
   "context": {},

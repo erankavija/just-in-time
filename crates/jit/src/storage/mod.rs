@@ -13,6 +13,7 @@ pub mod claim_coordinator;
 pub mod claims_log;
 pub mod control_plane;
 pub mod gate_runs;
+pub mod heartbeat;
 pub mod json;
 pub mod lease;
 pub mod lock;
