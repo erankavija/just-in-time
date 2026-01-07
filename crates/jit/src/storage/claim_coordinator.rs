@@ -932,4 +932,190 @@ mod tests {
         let lines: Vec<_> = content.lines().collect();
         assert!(lines.len() >= 3);
     }
+
+    #[test]
+    fn test_rebuild_index_from_empty_log() {
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp_dir);
+
+        let index = coordinator.rebuild_index_from_log().unwrap();
+
+        assert_eq!(index.schema_version, 1);
+        assert_eq!(index.last_seq, 0);
+        assert_eq!(index.leases.len(), 0);
+    }
+
+    #[test]
+    fn test_rebuild_index_with_acquire_operations() {
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp_dir);
+
+        // Create some leases
+        coordinator.acquire_claim("issue-rebuild-1", 600).unwrap();
+        coordinator.acquire_claim("issue-rebuild-2", 600).unwrap();
+
+        // Rebuild from log
+        let rebuilt = coordinator.rebuild_index_from_log().unwrap();
+
+        assert_eq!(rebuilt.leases.len(), 2);
+        assert!(rebuilt
+            .leases
+            .iter()
+            .any(|l| l.issue_id == "issue-rebuild-1"));
+        assert!(rebuilt
+            .leases
+            .iter()
+            .any(|l| l.issue_id == "issue-rebuild-2"));
+        assert_eq!(rebuilt.last_seq, 2);
+    }
+
+    #[test]
+    fn test_rebuild_index_with_release_operation() {
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp_dir);
+
+        // Acquire and release
+        let lease = coordinator.acquire_claim("issue-rebuild-3", 600).unwrap();
+        coordinator.release_lease(&lease.lease_id).unwrap();
+
+        // Rebuild should show no active leases
+        let rebuilt = coordinator.rebuild_index_from_log().unwrap();
+        assert_eq!(rebuilt.leases.len(), 0);
+    }
+
+    #[test]
+    fn test_rebuild_index_filters_expired_leases() {
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp_dir);
+
+        // Create lease that expires immediately
+        coordinator.acquire_claim("issue-rebuild-4", 1).unwrap();
+
+        // Wait for expiry
+        thread::sleep(StdDuration::from_millis(1100));
+
+        // Rebuild should filter out expired
+        let rebuilt = coordinator.rebuild_index_from_log().unwrap();
+        assert_eq!(rebuilt.leases.len(), 0);
+    }
+
+    #[test]
+    fn test_rebuild_index_with_renew_operation() {
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp_dir);
+
+        let lease = coordinator.acquire_claim("issue-rebuild-5", 600).unwrap();
+        let original_expiry = lease.expires_at.unwrap();
+
+        // Renew
+        thread::sleep(StdDuration::from_millis(100));
+        coordinator.renew_lease(&lease.lease_id, 600).unwrap();
+
+        // Rebuild and verify updated expiry
+        let rebuilt = coordinator.rebuild_index_from_log().unwrap();
+        assert_eq!(rebuilt.leases.len(), 1);
+        let renewed = &rebuilt.leases[0];
+        assert!(renewed.expires_at.unwrap() > original_expiry);
+    }
+
+    #[test]
+    fn test_rebuild_index_with_evict_operations() {
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp_dir);
+
+        let lease = coordinator.acquire_claim("issue-rebuild-6", 600).unwrap();
+
+        // Force evict
+        coordinator
+            .force_evict_lease(&lease.lease_id, "test eviction")
+            .unwrap();
+
+        // Rebuild should show no active leases
+        let rebuilt = coordinator.rebuild_index_from_log().unwrap();
+        assert_eq!(rebuilt.leases.len(), 0);
+    }
+
+    #[test]
+    fn test_rebuild_index_preserves_indefinite_leases() {
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp_dir);
+
+        // Create indefinite lease
+        let lease = coordinator.acquire_claim("issue-rebuild-7", 0).unwrap();
+
+        // Rebuild
+        let rebuilt = coordinator.rebuild_index_from_log().unwrap();
+
+        assert_eq!(rebuilt.leases.len(), 1);
+        let preserved = &rebuilt.leases[0];
+        assert_eq!(preserved.ttl_secs, 0);
+        assert!(preserved.expires_at.is_none());
+        assert_eq!(preserved.lease_id, lease.lease_id);
+    }
+
+    #[test]
+    fn test_rebuild_index_sequence_tracking() {
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp_dir);
+
+        // Multiple operations
+        coordinator.acquire_claim("issue-rebuild-8", 600).unwrap();
+        coordinator.acquire_claim("issue-rebuild-9", 600).unwrap();
+        coordinator.acquire_claim("issue-rebuild-10", 600).unwrap();
+
+        let rebuilt = coordinator.rebuild_index_from_log().unwrap();
+
+        // Should track last sequence number
+        assert_eq!(rebuilt.last_seq, 3);
+    }
+
+    #[test]
+    fn test_staleness_check() {
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp_dir);
+
+        let index = coordinator.load_claims_index().unwrap();
+
+        // Stale indefinite lease (old heartbeat)
+        let stale_lease = Lease {
+            lease_id: Uuid::new_v4().to_string(),
+            issue_id: "test".to_string(),
+            agent_id: "agent:test".to_string(),
+            worktree_id: "wt:test".to_string(),
+            branch: None,
+            ttl_secs: 0,
+            acquired_at: Utc::now() - Duration::seconds(7200),
+            expires_at: None,
+            last_beat: Utc::now() - Duration::seconds(7200),
+        };
+        assert!(index.is_stale(&stale_lease));
+
+        // Fresh indefinite lease (recent heartbeat)
+        let fresh_lease = Lease {
+            lease_id: Uuid::new_v4().to_string(),
+            issue_id: "test".to_string(),
+            agent_id: "agent:test".to_string(),
+            worktree_id: "wt:test".to_string(),
+            branch: None,
+            ttl_secs: 0,
+            acquired_at: Utc::now() - Duration::seconds(60),
+            expires_at: None,
+            last_beat: Utc::now() - Duration::seconds(60),
+        };
+        assert!(!index.is_stale(&fresh_lease));
+
+        // Finite lease - never stale (uses expiration instead)
+        let finite_lease = Lease {
+            lease_id: Uuid::new_v4().to_string(),
+            issue_id: "test".to_string(),
+            agent_id: "agent:test".to_string(),
+            worktree_id: "wt:test".to_string(),
+            branch: None,
+            ttl_secs: 600,
+            acquired_at: Utc::now() - Duration::seconds(7200),
+            expires_at: Some(Utc::now() + Duration::seconds(600)),
+            last_beat: Utc::now() - Duration::seconds(7200),
+        };
+        assert!(!index.is_stale(&finite_lease));
+    }
 }

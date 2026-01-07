@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "4cc03417-7f13-4f04-b295-fab34d53c344",
+  "gate_key": "fmt",
+  "stage": "postcheck",
+  "issue_id": "1a5e737d-4262-4de4-a83b-1f0ff26b8064",
+  "commit": "01635f977b591084a03e4143abc30207ca6899e9",
+  "branch": "agents/claim-index",
+  "status": "passed",
+  "started_at": "2026-01-07T19:27:55.408991980Z",
+  "completed_at": "2026-01-07T19:27:55.811785985Z",
+  "duration_ms": 402,
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "",
+  "command": "cargo fmt -- --check",
+  "by": "auto:executor",
+  "message": null
+}
