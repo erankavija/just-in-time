@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "9bd5d520-0986-4651-87fe-7ff30c3ee150",
+  "gate_key": "fmt",
+  "stage": "postcheck",
+  "issue_id": "e66da7c0-150a-4eb5-8f60-faec3449a32f",
+  "commit": "0d5003b5b8ebd1df11ca255b749dcfa19db5b645",
+  "branch": "agents/lease-expiry",
+  "status": "passed",
+  "started_at": "2026-01-07T18:58:31.776970641Z",
+  "completed_at": "2026-01-07T18:58:32.179769796Z",
+  "duration_ms": 402,
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "",
+  "command": "cargo fmt -- --check",
+  "by": "auto:executor",
+  "message": null
+}

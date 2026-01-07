@@ -1014,3 +1014,10 @@
 {"type":"issue_state_changed","id":"61adf8a7-c07f-4bbd-8c7b-59c466520823","issue_id":"765f06b2-f0cc-4805-9692-0a80efd77aed","timestamp":"2026-01-06T21:01:34.502899704Z","from":"backlog","to":"ready"}
 {"type":"issue_state_changed","id":"138205b7-2bdc-48ae-a097-57a4002e591c","issue_id":"68987812-bb01-4c98-87dd-71c6a0d4c949","timestamp":"2026-01-06T21:01:34.504837433Z","from":"backlog","to":"ready"}
 {"type":"issue_state_changed","id":"b5fdb5ae-f7df-4ab3-a560-a5183f8ac331","issue_id":"d1d7c7fc-5fac-4538-b85f-5c558c61804b","timestamp":"2026-01-06T21:01:34.506781523Z","from":"backlog","to":"ready"}
+{"type":"gate_passed","id":"4c693805-6a9d-4372-b5d4-f189dda40ea9","issue_id":"e66da7c0-150a-4eb5-8f60-faec3449a32f","timestamp":"2026-01-07T18:58:25.355195974Z","gate_key":"tdd-reminder","updated_by":"agent:agent-3"}
+{"type":"gate_passed","id":"05e9201f-7fa8-4ca8-a3d3-caad918442ee","issue_id":"e66da7c0-150a-4eb5-8f60-faec3449a32f","timestamp":"2026-01-07T18:58:26.762762897Z","gate_key":"tests","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"cdf7e1bb-2e1e-4ca2-9a74-2aae61e51ed8","issue_id":"e66da7c0-150a-4eb5-8f60-faec3449a32f","timestamp":"2026-01-07T18:58:31.774432410Z","gate_key":"clippy","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"a36049a0-5d38-4684-8eac-a12450b87185","issue_id":"e66da7c0-150a-4eb5-8f60-faec3449a32f","timestamp":"2026-01-07T18:58:32.180022167Z","gate_key":"fmt","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"a532c030-b0a5-4f8f-b3e0-f6bf56c57964","issue_id":"e66da7c0-150a-4eb5-8f60-faec3449a32f","timestamp":"2026-01-07T18:58:32.182993997Z","gate_key":"code-review","updated_by":"agent:agent-3"}
+{"type":"issue_state_changed","id":"979ab82e-5e7f-4be1-9cfc-e17f2c5a4854","issue_id":"e66da7c0-150a-4eb5-8f60-faec3449a32f","timestamp":"2026-01-07T18:58:38.960587216Z","from":"ready","to":"done"}
+{"type":"issue_completed","id":"2050a972-d402-4b39-804b-d3ebb301ce40","issue_id":"e66da7c0-150a-4eb5-8f60-faec3449a32f","timestamp":"2026-01-07T18:58:38.960608596Z"}
