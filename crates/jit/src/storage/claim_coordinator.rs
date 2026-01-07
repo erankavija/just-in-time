@@ -135,6 +135,11 @@ impl ClaimsIndex {
         let elapsed = Utc::now().signed_duration_since(lease.last_beat);
         elapsed.num_seconds() as u64 > self.stale_threshold_secs
     }
+
+    /// Find a lease by lease_id
+    pub fn find_lease_by_id(&self, lease_id: &str) -> Option<&Lease> {
+        self.leases.iter().find(|l| l.lease_id == lease_id)
+    }
 }
 
 /// Claim coordinator for atomic lease operations
@@ -550,14 +555,22 @@ impl ClaimCoordinator {
 
     /// Rebuild claims index from JSONL log
     ///
-    /// Replays all operations from the append-only log to reconstruct the current
-    /// state of active leases. Filters out expired finite leases.
+    /// Reconstructs the index by replaying all operations from the append-only log.
+    /// This is used for recovery from corruption or to ensure consistency.
     ///
-    /// # Use Cases
+    /// # Algorithm
     ///
-    /// - Recovery from corrupted index file
-    /// - Consistency validation
-    /// - Debugging and diagnostics
+    /// 1. Read all entries from claims.jsonl in sequence order
+    /// 2. Apply operations to build active leases map:
+    ///    - Acquire: add lease
+    ///    - Renew: update expires_at and last_beat
+    ///    - Release/AutoEvict/ForceEvict: remove lease
+    /// 3. Filter out expired finite leases
+    /// 4. Track highest sequence number
+    ///
+    /// # Returns
+    ///
+    /// A new ClaimsIndex with all active, non-expired leases
     ///
     /// # Errors
     ///
