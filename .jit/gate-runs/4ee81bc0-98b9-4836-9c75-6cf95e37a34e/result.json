@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "4ee81bc0-98b9-4836-9c75-6cf95e37a34e",
+  "gate_key": "clippy",
+  "stage": "postcheck",
+  "issue_id": "581f8345-06a6-4cac-bbd0-9e96bfb74c06",
+  "commit": "18e5ec80f9f280b42de12a458b66404fc5083a45",
+  "branch": "agents/heartbeat",
+  "status": "passed",
+  "started_at": "2026-01-07T19:28:29.542763296Z",
+  "completed_at": "2026-01-07T19:28:35.048796941Z",
+  "duration_ms": 5506,
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "    Checking getrandom v0.2.16\n   Compiling getrandom v0.3.4\n   Compiling num-traits v0.2.19\n    Checking futures-task v0.3.31\n    Checking hyper v1.8.1\n    Checking tower v0.4.13\n    Checking futures-util v0.3.31\n    Checking ring v0.17.14\n    Checking uuid v1.18.1\n    Checking tempfile v3.23.0\n    Checking hyper-util v0.1.19\n    Checking chrono v0.4.42\n    Checking rustls-webpki v0.103.8\n    Checking tower v0.5.2\n    Checking axum-core v0.4.5\n    Checking rustls v0.23.35\n    Checking axum v0.7.9\n    Checking ureq v2.12.1\n    Checking jit v0.2.0 (/home/vkaskivuo/Projects/just-in-time-worktrees/task-heartbeat/crates/jit)\n    Checking jit-server v0.1.0 (/home/vkaskivuo/Projects/just-in-time-worktrees/task-heartbeat/crates/server)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.32s\n",
+  "command": "cargo clippy --lib -- -D warnings",
+  "by": "auto:executor",
+  "message": null
+}

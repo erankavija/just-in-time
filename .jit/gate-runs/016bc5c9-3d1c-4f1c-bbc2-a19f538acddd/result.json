@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "016bc5c9-3d1c-4f1c-bbc2-a19f538acddd",
+  "gate_key": "fmt",
+  "stage": "postcheck",
+  "issue_id": "581f8345-06a6-4cac-bbd0-9e96bfb74c06",
+  "commit": "18e5ec80f9f280b42de12a458b66404fc5083a45",
+  "branch": "agents/heartbeat",
+  "status": "passed",
+  "started_at": "2026-01-07T19:28:35.052006352Z",
+  "completed_at": "2026-01-07T19:28:35.455450098Z",
+  "duration_ms": 403,
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "",
+  "command": "cargo fmt -- --check",
+  "by": "auto:executor",
+  "message": null
+}
