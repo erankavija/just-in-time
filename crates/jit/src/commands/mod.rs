@@ -18,6 +18,7 @@
 
 mod breakdown;
 pub mod bulk_update;
+pub mod claim;
 mod dependency;
 mod document;
 mod events;

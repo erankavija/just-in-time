@@ -17,8 +17,8 @@ mod output_macros;
 use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 use jit::cli::{
-    Cli, Commands, DepCommands, DocCommands, EventCommands, GateCommands, GraphCommands,
-    IssueCommands, RegistryCommands,
+    Cli, ClaimCommands, Commands, DepCommands, DocCommands, EventCommands, GateCommands,
+    GraphCommands, IssueCommands, RegistryCommands,
 };
 use jit::commands::{parse_priority, parse_state, CommandExecutor};
 use jit::output::{ExitCode, JsonOutput, OutputContext};
@@ -2073,6 +2073,56 @@ strategic_types = {}
                 }
             }
         }
+        Commands::Claim(claim_cmd) => match claim_cmd {
+            ClaimCommands::Acquire {
+                issue_id,
+                ttl,
+                agent_id,
+                reason,
+                json,
+            } => {
+                use jit::commands::claim::execute_claim_acquire;
+                use jit::output::{JsonError, JsonOutput};
+
+                match execute_claim_acquire(
+                    &storage,
+                    &issue_id,
+                    ttl,
+                    agent_id.as_deref(),
+                    reason.as_deref(),
+                ) {
+                    Ok(lease_id) => {
+                        if json {
+                            let response = serde_json::json!({
+                                "lease_id": lease_id,
+                                "issue_id": issue_id,
+                                "ttl_secs": ttl,
+                                "message": format!("Acquired lease {} on issue {}", lease_id, issue_id),
+                            });
+                            let output = JsonOutput::success(response, "claim acquire");
+                            println!("{}", output.to_json_string()?);
+                        } else {
+                            println!("✓ Acquired lease: {}", lease_id);
+                            println!("  Issue: {}", issue_id);
+                            println!("  TTL: {} seconds", ttl);
+                        }
+                    }
+                    Err(e) => {
+                        if json {
+                            let json_error = JsonError::new(
+                                "CLAIM_ACQUIRE_ERROR",
+                                e.to_string(),
+                                "claim acquire",
+                            );
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
+                        } else {
+                            return Err(e);
+                        }
+                    }
+                }
+            }
+        },
         Commands::Snapshot(snapshot_cmd) => match snapshot_cmd {
             jit::cli::SnapshotCommands::Export {
                 out,

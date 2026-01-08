@@ -94,6 +94,13 @@ pub enum Commands {
     #[command(subcommand)]
     Snapshot(SnapshotCommands),
 
+    /// Claim coordination commands
+    ///
+    /// Manage lease-based claims on issues for parallel work coordination.
+    /// Leases prevent conflicting edits across multiple agents and worktrees.
+    #[command(subcommand)]
+    Claim(ClaimCommands),
+
     /// Search issues and documents
     Search {
         /// Search query string
@@ -959,6 +966,39 @@ pub enum SnapshotCommands {
         force: bool,
 
         /// Output metadata as JSON instead of human-readable format
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum ClaimCommands {
+    /// Acquire a lease on an issue
+    ///
+    /// Acquires an exclusive lease to work on an issue. Only one agent can hold
+    /// a lease on an issue at a time, preventing conflicting edits.
+    ///
+    /// Examples:
+    ///   jit claim acquire abc123 --ttl 600        # 10-minute lease
+    ///   jit claim acquire abc123 --ttl 3600       # 1-hour lease
+    ///   jit claim acquire abc123 --ttl 0 --reason "Manual oversight"  # Indefinite (requires reason)
+    Acquire {
+        /// Issue ID to claim
+        issue_id: String,
+
+        /// Time-to-live in seconds (0 for indefinite, requires --reason)
+        #[arg(long, default_value = "600")]
+        ttl: u64,
+
+        /// Agent identifier (defaults to current agent from config)
+        #[arg(long)]
+        agent_id: Option<String>,
+
+        /// Reason for claim (required for TTL=0)
+        #[arg(long)]
+        reason: Option<String>,
+
+        /// Output as JSON
         #[arg(long)]
         json: bool,
     },
