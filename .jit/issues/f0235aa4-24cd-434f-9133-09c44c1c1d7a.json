@@ -6,15 +6,16 @@
   "priority": "high",
   "assignee": null,
   "dependencies": [
-    "2ba4d4c7-5ad9-4d01-90c2-92cbf5819580",
-    "d91b72ab-33b0-48e8-b52a-a30145c67695",
+    "f8e58e7d-6d05-4bbe-a077-be3fb792a27f",
+    "8be14c59-bb0a-4b2d-91cf-03ee589ccfc3",
     "6e020dc9-144c-400f-82b2-703c93e5b111",
     "9262f487-89b9-4271-a412-3daff40d258d",
     "ee20327b-2f2a-48f8-80d6-06cb1cb31a6e",
-    "f8e58e7d-6d05-4bbe-a077-be3fb792a27f",
+    "2ba4d4c7-5ad9-4d01-90c2-92cbf5819580",
+    "d91b72ab-33b0-48e8-b52a-a30145c67695",
+    "3f2cf966-1265-4953-81ee-61ea02974d35",
     "77206cf6-f935-49d0-b132-054e6a1edfae",
-    "8be14c59-bb0a-4b2d-91cf-03ee589ccfc3",
-    "3f2cf966-1265-4953-81ee-61ea02974d35"
+    "4b2cb4cd-0351-48d1-bb90-7c0d14909623"
   ],
   "gates_required": [
     "tdd-reminder",
