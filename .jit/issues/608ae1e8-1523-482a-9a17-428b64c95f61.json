@@ -2,13 +2,11 @@
   "id": "608ae1e8-1523-482a-9a17-428b64c95f61",
   "title": "Implement TTL=0 indefinite lease support with staleness detection",
   "description": "Implement indefinite (TTL=0) lease semantics with mandatory reason, heartbeats, staleness detection, and policy enforcement.\n\n## Scope\nAdd TTL=0 lease support to the claim coordination system with operational guardrails to prevent deadlocks while enabling manual oversight scenarios.\n\n## Requirements\n\n### Lease Acquisition\n- Accept `ttl_secs = 0` in `claim acquire` operation\n- Require non-empty `--reason` flag for TTL=0 leases\n- Enforce per-agent limit: `max_indefinite_leases_per_agent` (default: 2)\n- Enforce per-repository limit: `max_indefinite_leases_per_repo` (default: 10)\n- Check repository policy allows indefinite leases for requested scope\n\n### Heartbeat and Staleness\n- For TTL=0 leases: set `expires_at = null` in index\n- Track `last_beat` timestamp (updated on renew/heartbeat operations)\n- Mark lease as `stale: true` if `now - last_beat > stale_threshold_secs`\n- Add `heartbeat` operation to claims JSONL (updates `last_beat`, no expiry change)\n\n### Index Schema Updates\n- Add `stale_threshold_secs` to index root (from config)\n- Add `ttl_secs` field to lease entries\n- Add `last_beat` field to lease entries\n- Add `stale` boolean field to lease entries (derived during index rebuild)\n\n### Hook Enforcement\n- Pre-commit: reject structural edits when lease has `stale: true`\n- Pre-push: reject commits with stale lease trailers\n\n### CLI Updates\n- `jit claim acquire <issue> --ttl 0 --reason \"...\"` validates policy and limits\n- `jit claim renew <lease-id>` updates `last_beat` for TTL=0 leases\n- `jit claim status` highlights indefinite leases with time since last beat\n\n### Configuration Schema\n- Add `coordination.stale_threshold_secs = 3600`\n- Add `coordination.max_indefinite_leases_per_agent = 2`\n- Add `coordination.max_indefinite_leases_per_repo = 10`\n\n## Acceptance Criteria\n- [ ] TTL=0 leases can be acquired with mandatory `--reason`\n- [ ] Per-agent and per-repo limits enforced\n- [ ] Staleness detection marks inactive TTL=0 leases as stale\n- [ ] Heartbeat operation updates `last_beat` without changing expiry\n- [ ] Pre-commit/pre-push hooks reject stale leases\n- [ ] Claims index rebuild correctly computes staleness\n- [ ] Config schema includes staleness threshold and limits\n- [ ] Property-based tests validate staleness transitions\n\n## Design Reference\nSee `dev/design/worktree-parallel-work.md` sections:\n- \"Indefinite (TTL=0) Leases\"\n- \"Automatic Expiration and Staleness\"\n- \"Lease Operations\" (heartbeat logic)\n- Claims JSONL and Index schemas",
-  "state": "ready",
+  "state": "backlog",
   "priority": "high",
   "assignee": null,
   "dependencies": [
-    "5bc0eff5-9551-49d0-863d-64dc2c2f13ab",
-    "1a5e737d-4262-4de4-a83b-1f0ff26b8064",
-    "b31a81be-94c6-4887-84b5-bc8f8864870d"
+    "f0235aa4-24cd-434f-9133-09c44c1c1d7a"
   ],
   "gates_required": [
     "tdd-reminder",
@@ -21,7 +19,6 @@
   "context": {},
   "documents": [],
   "labels": [
-    "story:b74af86f-388d-49a2-a172-bc9fdaa7bb9c",
     "epic:worktree-parallel-work",
     "milestone:v1.0",
     "type:task"

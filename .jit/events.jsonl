@@ -1099,3 +1099,4 @@
 {"type":"issue_state_changed","id":"07818090-f426-4152-b786-c3fedb7a4006","issue_id":"e8f9a2ff-e921-439d-9a9e-0710218368ff","timestamp":"2026-01-07T23:32:21.574283529Z","from":"backlog","to":"ready"}
 {"type":"issue_state_changed","id":"ee84afa4-8cc2-4769-8066-4ce4d72a24a4","issue_id":"dacbda85-fe92-46c5-977d-940121c189ed","timestamp":"2026-01-07T23:32:21.580893728Z","from":"backlog","to":"ready"}
 {"type":"issue_state_changed","id":"f24f89a3-082a-40e4-b73a-e676bcd0e3b7","issue_id":"d728c8db-f966-4636-948a-9b1c34036fed","timestamp":"2026-01-07T23:32:21.587504667Z","from":"backlog","to":"ready"}
+{"type":"issue_state_changed","id":"5e5dca95-825e-48a0-b035-ea81a5805a45","issue_id":"608ae1e8-1523-482a-9a17-428b64c95f61","timestamp":"2026-01-08T20:53:37.383038291Z","from":"ready","to":"backlog"}
