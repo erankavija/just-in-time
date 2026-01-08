@@ -2,9 +2,9 @@
   "id": "d91b72ab-33b0-48e8-b52a-a30145c67695",
   "title": "Implement jit claim release command",
   "description": "Implement `jit claim release <lease-id>` to explicitly release lease before expiry. Verify ownership. Support `--json` output.",
-  "state": "ready",
+  "state": "done",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:copilot-cli-commands",
   "dependencies": [
     "b74af86f-388d-49a2-a172-bc9fdaa7bb9c"
   ],
@@ -16,30 +16,30 @@
     "code-review"
   ],
   "gates_status": {
-    "clippy": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.599064855Z"
-    },
     "tdd-reminder": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.599034815Z"
+      "status": "passed",
+      "updated_by": "agent:copilot-cli-commands",
+      "updated_at": "2026-01-08T21:30:34.895928214Z"
     },
     "fmt": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.599073375Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-08T21:30:10.895559681Z"
     },
     "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.599082215Z"
+      "status": "passed",
+      "updated_by": "human:reviewer",
+      "updated_at": "2026-01-08T21:34:50.978007401Z"
+    },
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-08T21:30:06.790122496Z"
     },
     "tests": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.599055795Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-08T21:29:48.870969806Z"
     }
   },
   "context": {},

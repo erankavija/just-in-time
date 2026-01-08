@@ -553,6 +553,58 @@ impl ClaimCoordinator {
         Ok(())
     }
 
+    /// Get active leases with optional filtering
+    ///
+    /// # Arguments
+    ///
+    /// * `issue_id` - Optional filter by issue ID
+    /// * `agent_id` - Optional filter by agent ID
+    ///
+    /// # Returns
+    ///
+    /// Vector of active leases matching the filters
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the index cannot be loaded
+    pub fn get_active_leases(
+        &self,
+        issue_id: Option<&str>,
+        agent_id: Option<&str>,
+    ) -> Result<Vec<Lease>> {
+        // 1. Acquire exclusive lock (needed for evict_expired which writes)
+        let lock_path = self.paths.shared_jit.join("locks/claims.lock");
+        let _guard = self.locker.lock_exclusive(&lock_path)?;
+
+        // 2. Load index and evict expired leases
+        let mut index = self.load_claims_index()?;
+        self.evict_expired(&mut index)?;
+
+        // 3. Filter leases
+        let mut leases: Vec<Lease> = index
+            .leases
+            .into_iter()
+            .filter(|lease| {
+                if let Some(iid) = issue_id {
+                    if lease.issue_id != iid {
+                        return false;
+                    }
+                }
+                if let Some(aid) = agent_id {
+                    if lease.agent_id != aid {
+                        return false;
+                    }
+                }
+                true
+            })
+            .collect();
+
+        // 4. Sort by acquired_at (most recent first)
+        leases.sort_by(|a, b| b.acquired_at.cmp(&a.acquired_at));
+
+        Ok(leases)
+    }
+
     /// Rebuild claims index from JSONL log
     ///
     /// Reconstructs the index by replaying all operations from the append-only log.

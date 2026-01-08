@@ -22,7 +22,7 @@ pub mod worktree_identity;
 pub mod worktree_paths;
 
 // Re-export for convenience
-pub use claim_coordinator::ClaimCoordinator;
+pub use claim_coordinator::{ClaimCoordinator, Lease};
 pub use json::JsonFileStorage;
 pub use lock::FileLocker;
 

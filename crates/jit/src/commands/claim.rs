@@ -4,7 +4,7 @@
 
 use crate::storage::worktree_identity::load_or_create_worktree_identity;
 use crate::storage::worktree_paths::WorktreePaths;
-use crate::storage::{ClaimCoordinator, FileLocker, IssueStore};
+use crate::storage::{ClaimCoordinator, FileLocker, IssueStore, Lease};
 use anyhow::{Context, Result};
 use std::process::Command;
 use std::time::Duration;
@@ -33,6 +33,8 @@ pub fn execute_claim_acquire<S: IssueStore>(
     agent_id: Option<&str>,
     _reason: Option<&str>,
 ) -> Result<String> {
+    use crate::agent_config::resolve_agent_id;
+
     // Validate issue exists
     let _issue = storage
         .load_issue(issue_id)
@@ -49,14 +51,8 @@ pub fn execute_claim_acquire<S: IssueStore>(
     let identity =
         load_or_create_worktree_identity(&paths.local_jit, &paths.worktree_root, &branch)?;
 
-    // Determine agent ID (use provided or generate from username)
-    let agent = agent_id.map(|s| s.to_string()).unwrap_or_else(|| {
-        // Use system username as default agent ID
-        std::env::var("USER")
-            .or_else(|_| std::env::var("USERNAME"))
-            .map(|u| format!("agent:{}", u))
-            .unwrap_or_else(|_| "agent:default".to_string())
-    });
+    // Resolve agent ID using proper priority: CLI flag > JIT_AGENT_ID > ~/.config/jit/agent.toml > error
+    let agent = resolve_agent_id(agent_id.map(|s| s.to_string()))?;
 
     // Create file locker with 5-second timeout
     let locker = FileLocker::new(Duration::from_secs(5));
@@ -78,10 +74,100 @@ pub fn execute_claim_acquire<S: IssueStore>(
     Ok(lease.lease_id)
 }
 
+/// Execute `jit claim release` command.
+///
+/// Releases a previously acquired lease.
+pub fn execute_claim_release<S: IssueStore>(_storage: &S, lease_id: &str) -> Result<()> {
+    use crate::agent_config::resolve_agent_id;
+
+    // Detect worktree context
+    let paths = WorktreePaths::detect()
+        .context("Failed to detect worktree paths - are you in a git repository?")?;
+
+    // Get current branch for identity
+    let branch = get_current_branch()?;
+
+    // Load worktree identity
+    let identity =
+        load_or_create_worktree_identity(&paths.local_jit, &paths.worktree_root, &branch)?;
+
+    // Resolve agent ID using proper priority: JIT_AGENT_ID > ~/.config/jit/agent.toml > error
+    let agent = resolve_agent_id(None)?;
+
+    // Create file locker
+    let locker = FileLocker::new(Duration::from_secs(5));
+
+    // Create claim coordinator
+    let coordinator = ClaimCoordinator::new(
+        paths.clone(),
+        locker,
+        identity.worktree_id.clone(),
+        agent.clone(),
+    );
+
+    // Release the lease
+    coordinator.release_lease(lease_id)?;
+
+    Ok(())
+}
+
+/// Shows status of active leases.
+///
+/// # Arguments
+///
+/// * `_storage` - Issue storage (unused but kept for consistency)
+/// * `issue_id` - Optional filter by issue ID
+/// * `agent_id` - Optional filter by agent ID
+///
+/// # Returns
+///
+/// Vector of active leases matching the filters
+pub fn execute_claim_status<S: IssueStore>(
+    _storage: &S,
+    issue_id: Option<&str>,
+    agent_id: Option<&str>,
+) -> Result<Vec<Lease>> {
+    use crate::agent_config::resolve_agent_id;
+
+    // Detect worktree context
+    let paths = WorktreePaths::detect()
+        .context("Failed to detect worktree paths - are you in a git repository?")?;
+
+    // Get current branch for identity
+    let branch = get_current_branch()?;
+
+    // Load worktree identity
+    let identity =
+        load_or_create_worktree_identity(&paths.local_jit, &paths.worktree_root, &branch)?;
+
+    // Resolve current agent ID using proper priority: JIT_AGENT_ID > ~/.config/jit/agent.toml > error
+    let current_agent_id = resolve_agent_id(None)?;
+
+    // Create claim coordinator
+    let locker = FileLocker::new(Duration::from_secs(5));
+    let coordinator = ClaimCoordinator::new(
+        paths,
+        locker,
+        identity.worktree_id,
+        current_agent_id.clone(),
+    );
+    coordinator.init()?;
+
+    // Get active leases (default to current agent if no filters specified)
+    let filter_agent = if agent_id.is_none() && issue_id.is_none() {
+        Some(current_agent_id.as_str())
+    } else {
+        agent_id
+    };
+
+    coordinator.get_active_leases(issue_id, filter_agent)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::domain::Issue;
+    use crate::storage::claim_coordinator::Lease;
     use crate::storage::worktree_paths::WorktreePaths;
     use crate::storage::{ClaimCoordinator, FileLocker, JsonFileStorage};
     use std::fs;
@@ -146,6 +232,57 @@ mod tests {
         Ok(lease.lease_id)
     }
 
+    /// Execute claim release with manually constructed paths (for testing)
+    fn execute_claim_release_test(temp: &TempDir, lease_id: &str, agent_id: &str) -> Result<()> {
+        // Manually construct WorktreePaths for testing
+        let paths = WorktreePaths {
+            common_dir: temp.path().join(".git"),
+            worktree_root: temp.path().to_path_buf(),
+            local_jit: temp.path().join(".jit"),
+            shared_jit: temp.path().join(".git/jit"),
+        };
+
+        // Create coordinator
+        let locker = FileLocker::new(Duration::from_secs(5));
+        let coordinator =
+            ClaimCoordinator::new(paths, locker, "wt:test".to_string(), agent_id.to_string());
+
+        // Release lease
+        coordinator.release_lease(lease_id)?;
+        Ok(())
+    }
+
+    /// Execute claim status with manually constructed paths (for testing)
+    fn execute_claim_status_test(
+        temp: &TempDir,
+        issue_id: Option<&str>,
+        agent_id: Option<&str>,
+    ) -> Result<Vec<Lease>> {
+        // Manually construct WorktreePaths for testing
+        let paths = WorktreePaths {
+            common_dir: temp.path().join(".git"),
+            worktree_root: temp.path().to_path_buf(),
+            local_jit: temp.path().join(".jit"),
+            shared_jit: temp.path().join(".git/jit"),
+        };
+
+        // Create coordinator
+        let locker = FileLocker::new(Duration::from_secs(5));
+        let coordinator = ClaimCoordinator::new(
+            paths,
+            locker,
+            "wt:test".to_string(),
+            agent_id.unwrap_or("agent:test").to_string(),
+        );
+
+        // Initialize coordinator (creates directories)
+        coordinator.init()?;
+
+        // Get active leases
+        let leases = coordinator.get_active_leases(issue_id, agent_id)?;
+        Ok(leases)
+    }
+
     /// Helper to create a test issue
     fn create_test_issue(storage: &JsonFileStorage, title: &str) -> Result<String> {
         let issue = Issue::new(title.to_string(), "Test description".to_string());
@@ -184,7 +321,7 @@ mod tests {
     fn test_claim_acquire_accepts_different_ttl_values() -> Result<()> {
         let (temp, storage) = setup_test_repo()?;
 
-        let ttls = vec![60, 600, 3600, 0];
+        let ttls = [60, 600, 3600, 0];
         for (i, ttl) in ttls.iter().enumerate() {
             let issue_id = create_test_issue(&storage, &format!("Issue {}", i))?;
             let result = execute_claim_acquire_test(
@@ -258,6 +395,128 @@ mod tests {
         let content = fs::read_to_string(&worktree_json)?;
         assert!(content.contains("worktree_id"));
         assert!(content.contains("wt:"));
+        Ok(())
+    }
+
+    // Tests for claim release command
+    #[test]
+    fn test_claim_release_fails_with_invalid_lease_id() -> Result<()> {
+        let (temp, storage) = setup_test_repo()?;
+
+        let result = execute_claim_release_test(&temp, "invalid-lease-id", "agent:test");
+
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn test_claim_release_succeeds_for_valid_lease() -> Result<()> {
+        let (temp, storage) = setup_test_repo()?;
+        let issue_id = create_test_issue(&storage, "Test Issue")?;
+
+        // Acquire a claim first
+        let lease_id = execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:test")?;
+
+        // Release it
+        let result = execute_claim_release_test(&temp, &lease_id, "agent:test");
+
+        assert!(result.is_ok(), "Should successfully release valid lease");
+        Ok(())
+    }
+
+    #[test]
+    fn test_claim_release_allows_re_acquisition_after_release() -> Result<()> {
+        let (temp, storage) = setup_test_repo()?;
+        let issue_id = create_test_issue(&storage, "Test Issue")?;
+
+        // Acquire claim
+        let lease_id = execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:first")?;
+
+        // Release it
+        execute_claim_release_test(&temp, &lease_id, "agent:first")?;
+
+        // Should be able to acquire again
+        let second_lease =
+            execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:second");
+        assert!(
+            second_lease.is_ok(),
+            "Should be able to re-acquire after release"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_status_empty() -> Result<()> {
+        let (temp, _storage) = setup_test_repo()?;
+
+        let result = execute_claim_status_test(&temp, None, None);
+        if let Err(e) = &result {
+            eprintln!("Error: {:?}", e);
+        }
+        assert!(result.is_ok());
+        let leases = result.unwrap();
+        assert!(leases.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn test_status_with_active_leases() -> Result<()> {
+        let (temp, storage) = setup_test_repo()?;
+        let issue_id = create_test_issue(&storage, "Test Issue")?;
+
+        // Acquire a lease
+        let lease_id = execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:test")?;
+
+        // Query status
+        let result = execute_claim_status_test(&temp, None, None);
+        assert!(result.is_ok());
+        let leases = result.unwrap();
+        assert_eq!(leases.len(), 1);
+        assert_eq!(leases[0].lease_id, lease_id);
+        assert_eq!(leases[0].issue_id, issue_id);
+        Ok(())
+    }
+
+    #[test]
+    fn test_status_filter_by_issue() -> Result<()> {
+        let (temp, storage) = setup_test_repo()?;
+        let issue1 = create_test_issue(&storage, "Issue 1")?;
+        let issue2 = create_test_issue(&storage, "Issue 2")?;
+
+        // Acquire leases on both issues
+        execute_claim_acquire_test(&temp, &storage, &issue1, 600, "agent:test")?;
+        execute_claim_acquire_test(&temp, &storage, &issue2, 600, "agent:test")?;
+
+        // Query status for issue1 only
+        let result = execute_claim_status_test(&temp, Some(&issue1), None);
+        assert!(result.is_ok());
+        let leases = result.unwrap();
+        assert_eq!(leases.len(), 1);
+        assert_eq!(leases[0].issue_id, issue1);
+        Ok(())
+    }
+
+    #[test]
+    fn test_status_filter_by_agent() -> Result<()> {
+        let (temp, storage) = setup_test_repo()?;
+        let issue_id = create_test_issue(&storage, "Test Issue")?;
+
+        // Acquire lease with specific agent
+        execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:other-agent")?;
+
+        // Query status for test agent (should be empty)
+        let result = execute_claim_status_test(&temp, None, Some("agent:test"));
+        assert!(result.is_ok());
+        let leases = result.unwrap();
+        assert!(leases.is_empty());
+
+        // Query status for other agent (should find it)
+        let result = execute_claim_status_test(&temp, None, Some("agent:other-agent"));
+        assert!(result.is_ok());
+        let leases = result.unwrap();
+        assert_eq!(leases.len(), 1);
+        assert_eq!(leases[0].agent_id, "agent:other-agent");
         Ok(())
     }
 }

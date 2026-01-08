@@ -2,9 +2,9 @@
   "id": "3f2cf966-1265-4953-81ee-61ea02974d35",
   "title": "Implement jit claim status command",
   "description": "Implement `jit claim status` showing all active leases for current agent, and `jit claim status --issue <id>` for specific issue. Show remaining TTL (finite) or time since last beat (indefinite), expiry time, agent, worktree. Highlight stale indefinite leases. Support `--json` output.\n\nSee design doc section \"New Commands\".",
-  "state": "ready",
+  "state": "gated",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:copilot-cli-commands",
   "dependencies": [
     "b74af86f-388d-49a2-a172-bc9fdaa7bb9c"
   ],
@@ -16,30 +16,30 @@
     "code-review"
   ],
   "gates_status": {
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-08T21:53:27.402782368Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-08T21:53:06.783315724Z"
+    },
     "code-review": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:07.603140646Z"
     },
-    "tests": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.603114446Z"
-    },
     "tdd-reminder": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.603091106Z"
-    },
-    "fmt": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.603131786Z"
+      "status": "passed",
+      "updated_by": "agent:copilot-cli-commands",
+      "updated_at": "2026-01-08T21:36:33.357817929Z"
     },
     "clippy": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.603123286Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-08T21:53:24.998035529Z"
     }
   },
   "context": {},

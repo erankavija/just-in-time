@@ -279,27 +279,44 @@ description = "Alice's development machine"
 
     #[test]
     fn test_resolve_agent_id_cli_flag_priority() {
+        // Save current env state
+        let original = env::var("JIT_AGENT_ID").ok();
+
         // CLI flag should take highest priority
         env::set_var("JIT_AGENT_ID", "env:should-not-use");
 
         let result = resolve_agent_id(Some("agent:cli-override".to_string())).unwrap();
         assert_eq!(result, "agent:cli-override");
 
-        env::remove_var("JIT_AGENT_ID");
+        // Restore original env state
+        match original {
+            Some(val) => env::set_var("JIT_AGENT_ID", val),
+            None => env::remove_var("JIT_AGENT_ID"),
+        }
     }
 
     #[test]
     fn test_resolve_agent_id_env_var() {
+        // Save current env state
+        let original = env::var("JIT_AGENT_ID").ok();
+
         env::set_var("JIT_AGENT_ID", "agent:from-env");
 
         let result = resolve_agent_id(None).unwrap();
         assert_eq!(result, "agent:from-env");
 
-        env::remove_var("JIT_AGENT_ID");
+        // Restore original env state
+        match original {
+            Some(val) => env::set_var("JIT_AGENT_ID", val),
+            None => env::remove_var("JIT_AGENT_ID"),
+        }
     }
 
     #[test]
     fn test_resolve_agent_id_invalid_format() {
+        // Save current env state
+        let original = env::var("JIT_AGENT_ID").ok();
+
         env::set_var("JIT_AGENT_ID", "invalid-no-colon");
 
         let result = resolve_agent_id(None);
@@ -309,11 +326,18 @@ description = "Alice's development machine"
             .to_string()
             .contains("Invalid agent ID format"));
 
-        env::remove_var("JIT_AGENT_ID");
+        // Restore original env state
+        match original {
+            Some(val) => env::set_var("JIT_AGENT_ID", val),
+            None => env::remove_var("JIT_AGENT_ID"),
+        }
     }
 
     #[test]
     fn test_resolve_agent_id_no_config_error() {
+        // Save current env state
+        let original = env::var("JIT_AGENT_ID").ok();
+
         // Ensure no env var set
         env::remove_var("JIT_AGENT_ID");
 
@@ -324,6 +348,12 @@ description = "Alice's development machine"
         assert!(err.contains("--agent-id"));
         assert!(err.contains("JIT_AGENT_ID"));
         assert!(err.contains("agent.toml"));
+
+        // Restore original env state
+        match original {
+            Some(val) => env::set_var("JIT_AGENT_ID", val),
+            None => env::remove_var("JIT_AGENT_ID"),
+        }
     }
 
     #[test]

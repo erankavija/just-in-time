@@ -1002,4 +1002,45 @@ pub enum ClaimCommands {
         #[arg(long)]
         json: bool,
     },
+
+    /// Release a lease
+    ///
+    /// Explicitly releases a lease before it expires, making the issue available
+    /// for other agents to claim.
+    ///
+    /// Examples:
+    ///   jit claim release abc12345-6789-...
+    ///   jit claim release abc12345-6789-... --json
+    Release {
+        /// Lease ID to release
+        lease_id: String,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Show active lease status
+    ///
+    /// By default, shows leases for the current agent.
+    /// Use --issue or --agent to filter by specific issue or agent.
+    ///
+    /// Examples:
+    ///   jit claim status                        # Show my leases
+    ///   jit claim status --issue 01ABC          # Check who has issue
+    ///   jit claim status --agent agent:copilot  # Show copilot's leases
+    ///   jit claim status --json
+    Status {
+        /// Filter by issue ID
+        #[arg(long)]
+        issue: Option<String>,
+
+        /// Filter by agent ID (format: type:identifier)
+        #[arg(long)]
+        agent: Option<String>,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
 }

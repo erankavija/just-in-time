@@ -2122,6 +2122,110 @@ strategic_types = {}
                     }
                 }
             }
+            ClaimCommands::Release { lease_id, json } => {
+                use jit::commands::claim::execute_claim_release;
+                use jit::output::{JsonError, JsonOutput};
+
+                match execute_claim_release(&storage, &lease_id) {
+                    Ok(()) => {
+                        if json {
+                            let response = serde_json::json!({
+                                "lease_id": lease_id,
+                                "message": format!("Released lease {}", lease_id),
+                            });
+                            let output = JsonOutput::success(response, "claim release");
+                            println!("{}", output.to_json_string()?);
+                        } else {
+                            println!("✓ Released lease: {}", lease_id);
+                        }
+                    }
+                    Err(e) => {
+                        if json {
+                            let json_error = JsonError::new(
+                                "CLAIM_RELEASE_ERROR",
+                                e.to_string(),
+                                "claim release",
+                            );
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
+                        } else {
+                            return Err(e);
+                        }
+                    }
+                }
+            }
+            ClaimCommands::Status { issue, agent, json } => {
+                use jit::commands::claim::execute_claim_status;
+                use jit::output::{JsonError, JsonOutput};
+
+                match execute_claim_status(&storage, issue.as_deref(), agent.as_deref()) {
+                    Ok(leases) => {
+                        if json {
+                            let response = serde_json::json!({
+                                "leases": leases,
+                                "count": leases.len(),
+                            });
+                            let output = JsonOutput::success(response, "claim status");
+                            println!("{}", output.to_json_string()?);
+                        } else if leases.is_empty() {
+                            println!("No active leases found.");
+                        } else {
+                            use chrono::Utc;
+                            println!("Active leases ({}):\n", leases.len());
+                            for lease in &leases {
+                                println!("Lease: {}", lease.lease_id);
+                                println!("  Issue:    {}", lease.issue_id);
+                                println!("  Agent:    {}", lease.agent_id);
+                                println!("  Worktree: {}", lease.worktree_id);
+                                if let Some(branch) = &lease.branch {
+                                    println!("  Branch:   {}", branch);
+                                }
+                                println!("  Acquired: {}", lease.acquired_at);
+
+                                if lease.ttl_secs > 0 {
+                                    // Finite lease - show expiry and remaining time
+                                    if let Some(expires_at) = lease.expires_at {
+                                        let now = Utc::now();
+                                        let remaining = expires_at.signed_duration_since(now);
+                                        println!(
+                                            "  Expires:  {} ({} seconds remaining)",
+                                            expires_at,
+                                            remaining.num_seconds().max(0)
+                                        );
+                                    }
+                                } else {
+                                    // Indefinite lease - show last beat and time since
+                                    let now = Utc::now();
+                                    let since_beat = now.signed_duration_since(lease.last_beat);
+                                    println!("  TTL:      indefinite");
+                                    println!(
+                                        "  Last beat: {} ({} seconds ago)",
+                                        lease.last_beat,
+                                        since_beat.num_seconds()
+                                    );
+
+                                    // Warn if stale (>1 hour since last beat)
+                                    if since_beat.num_seconds() > 3600 {
+                                        println!("  ⚠️  WARNING: Lease may be stale (no heartbeat for {} minutes)", 
+                                            since_beat.num_minutes());
+                                    }
+                                }
+                                println!();
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        if json {
+                            let json_error =
+                                JsonError::new("CLAIM_STATUS_ERROR", e.to_string(), "claim status");
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
+                        } else {
+                            return Err(e);
+                        }
+                    }
+                }
+            }
         },
         Commands::Snapshot(snapshot_cmd) => match snapshot_cmd {
             jit::cli::SnapshotCommands::Export {
