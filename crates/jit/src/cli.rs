@@ -1020,6 +1020,28 @@ pub enum ClaimCommands {
         json: bool,
     },
 
+    /// Renew a lease
+    ///
+    /// Extends the expiry time of an existing lease. Allows agents to continue
+    /// working on an issue beyond the original TTL.
+    ///
+    /// Examples:
+    ///   jit claim renew abc12345-6789-... --ttl 600   # Extend by 10 minutes
+    ///   jit claim renew abc12345-6789-... --ttl 3600  # Extend by 1 hour
+    ///   jit claim renew abc12345-6789-...             # Use default TTL
+    Renew {
+        /// Lease ID to renew
+        lease_id: String,
+
+        /// Time-to-live extension in seconds
+        #[arg(long, default_value = "600")]
+        ttl: u64,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Show active lease status
     ///
     /// By default, shows leases for the current agent.

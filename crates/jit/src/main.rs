@@ -2154,6 +2154,44 @@ strategic_types = {}
                     }
                 }
             }
+            ClaimCommands::Renew {
+                lease_id,
+                ttl,
+                json,
+            } => {
+                use jit::commands::claim::execute_claim_renew;
+                use jit::output::{JsonError, JsonOutput};
+
+                match execute_claim_renew(&storage, &lease_id, ttl) {
+                    Ok(renewed_lease) => {
+                        if json {
+                            let response = serde_json::json!({
+                                "lease": renewed_lease,
+                                "message": format!("Renewed lease {} with TTL {} seconds", lease_id, ttl),
+                            });
+                            let output = JsonOutput::success(response, "claim renew");
+                            println!("{}", output.to_json_string()?);
+                        } else {
+                            println!("✓ Renewed lease: {}", lease_id);
+                            println!("  Issue: {}", renewed_lease.issue_id);
+                            println!("  Extended by: {} seconds", ttl);
+                            if let Some(expires_at) = renewed_lease.expires_at {
+                                println!("  New expiry: {}", expires_at.to_rfc3339());
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        if json {
+                            let json_error =
+                                JsonError::new("CLAIM_RENEW_ERROR", e.to_string(), "claim renew");
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
+                        } else {
+                            return Err(e);
+                        }
+                    }
+                }
+            }
             ClaimCommands::Status { issue, agent, json } => {
                 use jit::commands::claim::execute_claim_status;
                 use jit::output::{JsonError, JsonOutput};

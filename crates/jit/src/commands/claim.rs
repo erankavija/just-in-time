@@ -111,6 +111,51 @@ pub fn execute_claim_release<S: IssueStore>(_storage: &S, lease_id: &str) -> Res
     Ok(())
 }
 
+/// Renews an existing lease, extending its TTL.
+///
+/// # Arguments
+///
+/// * `_storage` - Issue storage (unused but kept for consistency)
+/// * `lease_id` - ID of the lease to renew
+/// * `ttl_secs` - New TTL in seconds
+///
+/// # Returns
+///
+/// The renewed lease with updated expiry time
+pub fn execute_claim_renew<S: IssueStore>(
+    _storage: &S,
+    lease_id: &str,
+    ttl_secs: u64,
+) -> Result<Lease> {
+    use crate::agent_config::resolve_agent_id;
+
+    // Detect worktree context
+    let paths = WorktreePaths::detect()
+        .context("Failed to detect worktree paths - are you in a git repository?")?;
+
+    // Get current branch
+    let branch = get_current_branch()?;
+
+    // Load worktree identity
+    let identity =
+        load_or_create_worktree_identity(&paths.local_jit, &paths.worktree_root, &branch)?;
+
+    // Resolve agent ID
+    let agent = resolve_agent_id(None)?;
+
+    // Create locker and coordinator
+    let locker = FileLocker::new(Duration::from_secs(5));
+    let coordinator = ClaimCoordinator::new(
+        paths.clone(),
+        locker,
+        identity.worktree_id.clone(),
+        agent.clone(),
+    );
+
+    // Renew the lease
+    coordinator.renew_lease(lease_id, ttl_secs)
+}
+
 /// Shows status of active leases.
 ///
 /// # Arguments
@@ -398,10 +443,137 @@ mod tests {
         Ok(())
     }
 
+    /// Helper to execute claim renew in tests
+    fn execute_claim_renew_test(
+        temp: &TempDir,
+        lease_id: &str,
+        ttl_secs: u64,
+        agent_id: &str,
+    ) -> Result<Lease> {
+        let paths = WorktreePaths {
+            common_dir: temp.path().join(".git"),
+            worktree_root: temp.path().to_path_buf(),
+            local_jit: temp.path().join(".jit"),
+            shared_jit: temp.path().join(".git/jit"),
+        };
+
+        let branch = "test-branch".to_string();
+        let identity =
+            load_or_create_worktree_identity(&paths.local_jit, &paths.worktree_root, &branch)?;
+
+        let locker = FileLocker::new(Duration::from_secs(5));
+        let coordinator =
+            ClaimCoordinator::new(paths, locker, identity.worktree_id, agent_id.to_string());
+
+        coordinator.renew_lease(lease_id, ttl_secs)
+    }
+
+    // Tests for claim renew command
+    #[test]
+    fn test_claim_renew_extends_ttl() -> Result<()> {
+        let (temp, storage) = setup_test_repo()?;
+        let issue_id = create_test_issue(&storage, "Test Issue")?;
+
+        // Acquire a claim
+        let lease_id = execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:test")?;
+
+        // Get original lease
+        let paths = WorktreePaths {
+            common_dir: temp.path().join(".git"),
+            worktree_root: temp.path().to_path_buf(),
+            local_jit: temp.path().join(".jit"),
+            shared_jit: temp.path().join(".git/jit"),
+        };
+        let locker = FileLocker::new(Duration::from_secs(5));
+        let coordinator = ClaimCoordinator::new(
+            paths,
+            locker,
+            "wt:test".to_string(),
+            "agent:test".to_string(),
+        );
+        let original = coordinator
+            .get_active_leases(None, None)?
+            .into_iter()
+            .find(|l| l.lease_id == lease_id)
+            .unwrap();
+
+        // Sleep briefly to ensure time passes
+        std::thread::sleep(Duration::from_millis(10));
+
+        // Renew with longer TTL
+        let renewed = execute_claim_renew_test(&temp, &lease_id, 1200, "agent:test")?;
+
+        assert_eq!(renewed.lease_id, lease_id);
+        // Note: ttl_secs stays the same (600), but expires_at is extended by new TTL
+        assert_eq!(renewed.ttl_secs, 600);
+        assert!(renewed.expires_at.unwrap() > original.expires_at.unwrap());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_claim_renew_fails_for_nonexistent_lease() -> Result<()> {
+        let (temp, _storage) = setup_test_repo()?;
+
+        // Initialize control plane
+        let control_plane = temp.path().join(".git/jit");
+        fs::create_dir_all(control_plane.join("locks"))?;
+
+        let result = execute_claim_renew_test(&temp, "fake-lease-id", 600, "agent:test");
+
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("not found") || err_msg.contains("Lease"),
+            "Error message should mention lease not found, got: {}",
+            err_msg
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_claim_renew_fails_for_wrong_agent() -> Result<()> {
+        let (temp, storage) = setup_test_repo()?;
+        let issue_id = create_test_issue(&storage, "Test Issue")?;
+
+        // Acquire with agent1
+        let lease_id = execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:first")?;
+
+        // Try to renew with agent2
+        let result = execute_claim_renew_test(&temp, &lease_id, 600, "agent:second");
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("not agent:second"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_claim_renew_indefinite_lease() -> Result<()> {
+        let (temp, storage) = setup_test_repo()?;
+        let issue_id = create_test_issue(&storage, "Test Issue")?;
+
+        // Acquire indefinite lease (TTL=0)
+        let lease_id = execute_claim_acquire_test(&temp, &storage, &issue_id, 0, "agent:test")?;
+
+        // Sleep to ensure heartbeat changes
+        std::thread::sleep(Duration::from_millis(10));
+
+        // Renew indefinite lease
+        let renewed = execute_claim_renew_test(&temp, &lease_id, 0, "agent:test")?;
+
+        assert_eq!(renewed.ttl_secs, 0);
+        assert!(renewed.expires_at.is_none());
+        // Verify heartbeat was updated (last_beat is DateTime, not 0)
+
+        Ok(())
+    }
+
     // Tests for claim release command
     #[test]
     fn test_claim_release_fails_with_invalid_lease_id() -> Result<()> {
-        let (temp, storage) = setup_test_repo()?;
+        let (temp, _storage) = setup_test_repo()?;
 
         let result = execute_claim_release_test(&temp, "invalid-lease-id", "agent:test");
 

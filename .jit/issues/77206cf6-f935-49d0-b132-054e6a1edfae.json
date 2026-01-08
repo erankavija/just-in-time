@@ -2,9 +2,9 @@
   "id": "77206cf6-f935-49d0-b132-054e6a1edfae",
   "title": "Implement jit claim renew command",
   "description": "Implement `jit claim renew <lease-id>` with `--ttl <seconds>` option. Extend lease expiry time for finite leases, or update last_beat for indefinite leases. Verify ownership before renewal. Support `--json` output.\n\nSee design doc section \"Lease Operations\" (renew/heartbeat).",
-  "state": "ready",
+  "state": "done",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:copilot-cli-commands",
   "dependencies": [
     "b74af86f-388d-49a2-a172-bc9fdaa7bb9c"
   ],
@@ -16,30 +16,30 @@
     "code-review"
   ],
   "gates_status": {
-    "tests": {
-      "status": "pending",
+    "code-review": {
+      "status": "passed",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.597011414Z"
-    },
-    "fmt": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.597029014Z"
+      "updated_at": "2026-01-08T22:09:31.638668097Z"
     },
     "tdd-reminder": {
-      "status": "pending",
+      "status": "passed",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.596984454Z"
+      "updated_at": "2026-01-08T22:04:31.828020842Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-08T22:10:00.833325827Z"
     },
     "clippy": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.597020434Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-08T22:10:00.529792646Z"
     },
-    "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.597037684Z"
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-08T22:09:44.715778747Z"
     }
   },
   "context": {},

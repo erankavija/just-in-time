@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "4220789c-5de8-4368-bc96-1ac1fc7a96e2",
+  "gate_key": "clippy",
+  "stage": "postcheck",
+  "issue_id": "77206cf6-f935-49d0-b132-054e6a1edfae",
+  "commit": "d90bebf72a6e6a622206d186f6f4ea416252a7f9",
+  "branch": "feature/worktree-parallel-work",
+  "status": "passed",
+  "started_at": "2026-01-08T22:10:00.529792646Z",
+  "completed_at": "2026-01-08T22:10:00.832603257Z",
+  "duration_ms": 302,
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.12s\n",
+  "command": "cargo clippy --lib -- -D warnings",
+  "by": "auto:executor",
+  "message": null
+}
