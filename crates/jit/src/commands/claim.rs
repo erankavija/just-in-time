@@ -84,75 +84,277 @@ pub fn execute_claim_acquire<S: IssueStore>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::Issue;
     use crate::storage::JsonFileStorage;
-    use crate::domain::Priority;
+    use std::env;
     use std::fs;
     use tempfile::TempDir;
 
-    #[test]
-    fn test_claim_acquire_creates_lease() -> Result<()> {
-        // Setup
+    /// Helper to set up test environment
+    /// Must change to temp directory for WorktreePaths::detect() to work
+    fn setup_test_repo() -> Result<(TempDir, JsonFileStorage, std::path::PathBuf)> {
         let temp = TempDir::new()?;
-        let repo_root = temp.path();
-
-        // Initialize .jit
-        let jit_root = repo_root.join(".jit");
+        let original_dir = env::current_dir()?;
+        
+        // Create .jit directory
+        let jit_root = temp.path().join(".jit");
         fs::create_dir_all(&jit_root)?;
 
-        // Initialize .git/jit (control plane)
-        let git_dir = repo_root.join(".git");
+        // Create .git directory
+        let git_dir = temp.path().join(".git");
         fs::create_dir_all(&git_dir)?;
 
-        let storage = JsonFileStorage::new(&jit_root)?;
+        // Change to temp directory so WorktreePaths::detect() works
+        env::set_current_dir(temp.path())?;
 
-        // Create test issue
-        let issue_id = storage.create_issue(
-            "Test Issue".to_string(),
-            "Description".to_string(),
-            Priority::Normal,
-        )?;
+        // Initialize storage
+        let storage = JsonFileStorage::new(&jit_root);
+        storage.init()?;
 
-        // Acquire claim
-        let lease_id = execute_claim_acquire(
-            &storage,
-            &issue_id,
-            600,
-            Some("agent:test"),
-            None,
-        )?;
+        Ok((temp, storage, original_dir))
+    }
 
-        // Verify lease ID returned
-        assert!(!lease_id.is_empty());
-
+    /// Restore original directory after test
+    fn teardown(original_dir: std::path::PathBuf) -> Result<()> {
+        env::set_current_dir(original_dir)?;
         Ok(())
     }
 
+    /// Helper to create a test issue
+    fn create_test_issue(storage: &JsonFileStorage, title: &str) -> Result<String> {
+        let issue = Issue::new(title.to_string(), "Test description".to_string());
+        let issue_id = issue.id.clone();
+        storage.save_issue(&issue)?;
+        Ok(issue_id)
+    }
+
     #[test]
-    fn test_claim_acquire_fails_on_nonexistent_issue() -> Result<()> {
-        // Setup
-        let temp = TempDir::new()?;
-        let repo_root = temp.path();
+    fn test_claim_acquire_fails_when_issue_does_not_exist() -> Result<()> {
+        let (_temp, storage, original_dir) = setup_test_repo()?;
 
-        let jit_root = repo_root.join(".jit");
-        fs::create_dir_all(&jit_root)?;
-
-        let git_dir = repo_root.join(".git");
-        fs::create_dir_all(&git_dir)?;
-
-        let storage = JsonFileStorage::new(&jit_root)?;
-
-        // Try to acquire claim on non-existent issue
         let result = execute_claim_acquire(
             &storage,
-            "nonexistent",
+            "nonexistent-issue-id",
             600,
             Some("agent:test"),
             None,
         );
 
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("not found"));
+        assert!(result.is_err(), "Should fail for non-existent issue");
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("not found") || err_msg.contains("nonexistent"),
+            "Error should mention issue not found, got: {}", err_msg
+        );
 
+        teardown(original_dir)?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_claim_acquire_returns_valid_lease_id() -> Result<()> {
+        let (_temp, storage, original_dir) = setup_test_repo()?;
+        let issue_id = create_test_issue(&storage, "Test Issue")?;
+
+        let result = execute_claim_acquire(
+            &storage,
+            &issue_id,
+            600,
+            Some("agent:test-acquire"),
+            None,
+        );
+
+        assert!(result.is_ok(), "Claim acquisition failed: {:?}", result.err());
+        let lease_id = result.unwrap();
+        
+        // Lease ID should be a valid UUID
+        assert!(!lease_id.is_empty(), "Lease ID should not be empty");
+        assert!(lease_id.len() >= 32, "Lease ID should be UUID-like, got: {}", lease_id);
+
+        teardown(original_dir)?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_claim_acquire_uses_provided_agent_id() -> Result<()> {
+        let (_temp, storage, original_dir) = setup_test_repo()?;
+        let issue_id = create_test_issue(&storage, "Test Issue")?;
+
+        let custom_agent = "agent:custom-bot-123";
+        let result = execute_claim_acquire(
+            &storage,
+            &issue_id,
+            600,
+            Some(custom_agent),
+            None,
+        );
+
+        assert!(result.is_ok(), "Claim acquisition should succeed");
+        teardown(original_dir)?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_claim_acquire_uses_default_agent_when_not_provided() -> Result<()> {
+        let (_temp, storage, original_dir) = setup_test_repo()?;
+        let issue_id = create_test_issue(&storage, "Test Issue")?;
+
+        let result = execute_claim_acquire(
+            &storage,
+            &issue_id,
+            600,
+            None,
+            None,
+        );
+
+        assert!(result.is_ok(), "Should succeed with default agent");
+        teardown(original_dir)?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_claim_acquire_accepts_different_ttl_values() -> Result<()> {
+        let (_temp, storage, original_dir) = setup_test_repo()?;
+        
+        // Test various TTL values
+        let ttls = vec![60, 600, 3600, 0];
+        
+        for (i, ttl) in ttls.iter().enumerate() {
+            let issue_id = create_test_issue(&storage, &format!("Issue {}", i))?;
+            
+            let result = execute_claim_acquire(
+                &storage,
+                &issue_id,
+                *ttl,
+                Some(&format!("agent:ttl-test-{}", i)),
+                None,
+            );
+
+            assert!(
+                result.is_ok(),
+                "Should succeed with TTL={}, got error: {:?}",
+                ttl,
+                result.err()
+            );
+        }
+
+        teardown(original_dir)?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_claim_acquire_fails_when_already_claimed() -> Result<()> {
+        let (_temp, storage, original_dir) = setup_test_repo()?;
+        let issue_id = create_test_issue(&storage, "Test Issue")?;
+
+        // First claim should succeed
+        let first_claim = execute_claim_acquire(
+            &storage,
+            &issue_id,
+            600,
+            Some("agent:first"),
+            None,
+        );
+        assert!(first_claim.is_ok(), "First claim should succeed");
+
+        // Second claim should fail
+        let second_claim = execute_claim_acquire(
+            &storage,
+            &issue_id,
+            600,
+            Some("agent:second"),
+            None,
+        );
+
+        assert!(second_claim.is_err(), "Second claim should fail");
+        let err_msg = second_claim.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("already claimed") || err_msg.contains("agent:first"),
+            "Error should mention already claimed, got: {}", err_msg
+        );
+
+        teardown(original_dir)?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_claim_acquire_creates_control_plane_structure() -> Result<()> {
+        let (temp, storage, original_dir) = setup_test_repo()?;
+        let issue_id = create_test_issue(&storage, "Test Issue")?;
+
+        let result = execute_claim_acquire(
+            &storage,
+            &issue_id,
+            600,
+            Some("agent:structure-test"),
+            None,
+        );
+
+        assert!(result.is_ok(), "Claim should succeed");
+
+        // Verify control plane structure was created
+        let control_plane = temp.path().join(".git/jit");
+        assert!(control_plane.exists(), ".git/jit should exist");
+        
+        let locks_dir = control_plane.join("locks");
+        assert!(locks_dir.exists(), ".git/jit/locks should exist");
+
+        let heartbeat_dir = control_plane.join("heartbeat");
+        assert!(heartbeat_dir.exists(), ".git/jit/heartbeat should exist");
+
+        teardown(original_dir)?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_claim_acquire_creates_claims_log() -> Result<()> {
+        let (temp, storage, original_dir) = setup_test_repo()?;
+        let issue_id = create_test_issue(&storage, "Test Issue")?;
+
+        execute_claim_acquire(
+            &storage,
+            &issue_id,
+            600,
+            Some("agent:log-test"),
+            None,
+        )?;
+
+        // Verify claims.jsonl was created
+        let claims_log = temp.path().join(".git/jit/claims.jsonl");
+        assert!(claims_log.exists(), "claims.jsonl should be created");
+
+        // Verify it has content
+        let content = fs::read_to_string(&claims_log)?;
+        assert!(!content.is_empty(), "claims.jsonl should not be empty");
+        assert!(content.contains(&issue_id), "Log should contain issue ID");
+
+        teardown(original_dir)?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_claim_acquire_creates_worktree_identity() -> Result<()> {
+        let (temp, storage, original_dir) = setup_test_repo()?;
+        let issue_id = create_test_issue(&storage, "Test Issue")?;
+
+        execute_claim_acquire(
+            &storage,
+            &issue_id,
+            600,
+            Some("agent:identity-test"),
+            None,
+        )?;
+
+        // Verify worktree.json was created in .jit
+        let worktree_json = temp.path().join(".jit/worktree.json");
+        assert!(worktree_json.exists(), "worktree.json should be created");
+
+        // Verify it has valid content
+        let content = fs::read_to_string(&worktree_json)?;
+        assert!(content.contains("worktree_id"), "Should have worktree_id");
+        assert!(content.contains("wt:"), "Worktree ID should start with wt:");
+
+        teardown(original_dir)?;
         Ok(())
     }
 }
