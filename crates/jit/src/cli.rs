@@ -1026,16 +1026,16 @@ pub enum ClaimCommands {
     /// working on an issue beyond the original TTL.
     ///
     /// Examples:
-    ///   jit claim renew abc12345-6789-... --ttl 600   # Extend by 10 minutes
-    ///   jit claim renew abc12345-6789-... --ttl 3600  # Extend by 1 hour
-    ///   jit claim renew abc12345-6789-...             # Use default TTL
+    ///   jit claim renew abc12345-6789-... --extension 600   # Extend by 10 minutes
+    ///   jit claim renew abc12345-6789-... --extension 3600  # Extend by 1 hour
+    ///   jit claim renew abc12345-6789-...                   # Use default (10 minutes)
     Renew {
         /// Lease ID to renew
         lease_id: String,
 
-        /// Time-to-live extension in seconds
+        /// How many seconds to extend the lease by
         #[arg(long, default_value = "600")]
-        ttl: u64,
+        extension: u64,
 
         /// Output as JSON
         #[arg(long)]

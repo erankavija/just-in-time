@@ -400,7 +400,7 @@ impl ClaimCoordinator {
     /// # Arguments
     ///
     /// * `lease_id` - Lease to renew
-    /// * `ttl_secs` - New TTL in seconds (must match original for finite leases)
+    /// * `extension_secs` - How many seconds to extend the lease by
     ///
     /// # Returns
     ///
@@ -411,7 +411,7 @@ impl ClaimCoordinator {
     /// - Lease not found
     /// - Lease not owned by current agent
     /// - Lease already expired
-    pub fn renew_lease(&self, lease_id: &str, ttl_secs: u64) -> Result<Lease> {
+    pub fn renew_lease(&self, lease_id: &str, extension_secs: u64) -> Result<Lease> {
         // 1. Acquire exclusive lock
         let lock_path = self.paths.shared_jit.join("locks/claims.lock");
         let _guard = self.locker.lock_exclusive(&lock_path)?;
@@ -440,8 +440,8 @@ impl ClaimCoordinator {
         // 5. Calculate new expiry/heartbeat
         let now = Utc::now();
         let (new_expires_at, new_last_beat) = if lease.ttl_secs > 0 {
-            // Finite lease: extend expiry by TTL
-            let new_expiry = now + Duration::seconds(ttl_secs as i64);
+            // Finite lease: extend expiry by extension_secs
+            let new_expiry = now + Duration::seconds(extension_secs as i64);
             (Some(new_expiry), lease.last_beat)
         } else {
             // Indefinite lease: update heartbeat

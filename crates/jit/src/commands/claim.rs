@@ -111,13 +111,13 @@ pub fn execute_claim_release<S: IssueStore>(_storage: &S, lease_id: &str) -> Res
     Ok(())
 }
 
-/// Renews an existing lease, extending its TTL.
+/// Renews an existing lease, extending its expiry time.
 ///
 /// # Arguments
 ///
 /// * `_storage` - Issue storage (unused but kept for consistency)
 /// * `lease_id` - ID of the lease to renew
-/// * `ttl_secs` - New TTL in seconds
+/// * `extension_secs` - How many seconds to extend the lease by
 ///
 /// # Returns
 ///
@@ -125,7 +125,7 @@ pub fn execute_claim_release<S: IssueStore>(_storage: &S, lease_id: &str) -> Res
 pub fn execute_claim_renew<S: IssueStore>(
     _storage: &S,
     lease_id: &str,
-    ttl_secs: u64,
+    extension_secs: u64,
 ) -> Result<Lease> {
     use crate::agent_config::resolve_agent_id;
 
@@ -153,7 +153,7 @@ pub fn execute_claim_renew<S: IssueStore>(
     );
 
     // Renew the lease
-    coordinator.renew_lease(lease_id, ttl_secs)
+    coordinator.renew_lease(lease_id, extension_secs)
 }
 
 /// Shows status of active leases.
@@ -440,7 +440,7 @@ mod tests {
     fn execute_claim_renew_test(
         temp: &TempDir,
         lease_id: &str,
-        ttl_secs: u64,
+        extension_secs: u64,
         agent_id: &str,
     ) -> Result<Lease> {
         let paths = create_test_paths(temp);
@@ -453,7 +453,7 @@ mod tests {
         let coordinator =
             ClaimCoordinator::new(paths, locker, identity.worktree_id, agent_id.to_string());
 
-        coordinator.renew_lease(lease_id, ttl_secs)
+        coordinator.renew_lease(lease_id, extension_secs)
     }
 
     // Tests for claim renew command
@@ -483,11 +483,11 @@ mod tests {
         // Sleep briefly to ensure time passes
         std::thread::sleep(Duration::from_millis(10));
 
-        // Renew with longer TTL
+        // Renew with 1200 second extension
         let renewed = execute_claim_renew_test(&temp, &lease_id, 1200, "agent:test")?;
 
         assert_eq!(renewed.lease_id, lease_id);
-        // Note: ttl_secs stays the same (600), but expires_at is extended by new TTL
+        // Note: ttl_secs stays the same (original 600), but expires_at is extended by extension_secs
         assert_eq!(renewed.ttl_secs, 600);
         assert!(renewed.expires_at.unwrap() > original.expires_at.unwrap());
 

@@ -2156,25 +2156,25 @@ strategic_types = {}
             }
             ClaimCommands::Renew {
                 lease_id,
-                ttl,
+                extension,
                 json,
             } => {
                 use jit::commands::claim::execute_claim_renew;
                 use jit::output::{JsonError, JsonOutput};
 
-                match execute_claim_renew(&storage, &lease_id, ttl) {
+                match execute_claim_renew(&storage, &lease_id, extension) {
                     Ok(renewed_lease) => {
                         if json {
                             let response = serde_json::json!({
                                 "lease": renewed_lease,
-                                "message": format!("Renewed lease {} with TTL {} seconds", lease_id, ttl),
+                                "message": format!("Renewed lease {} by {} seconds", lease_id, extension),
                             });
                             let output = JsonOutput::success(response, "claim renew");
                             println!("{}", output.to_json_string()?);
                         } else {
                             println!("✓ Renewed lease: {}", lease_id);
                             println!("  Issue: {}", renewed_lease.issue_id);
-                            println!("  Extended by: {} seconds", ttl);
+                            println!("  Extended by: {} seconds", extension);
                             if let Some(expires_at) = renewed_lease.expires_at {
                                 println!("  New expiry: {}", expires_at.to_rfc3339());
                             }
