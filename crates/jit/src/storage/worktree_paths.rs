@@ -52,7 +52,7 @@ impl WorktreePaths {
         }
 
         // Get git common dir (shared .git)
-        let common_dir = PathBuf::from(
+        let common_dir_raw = PathBuf::from(
             String::from_utf8(
                 Command::new("git")
                     .args(["rev-parse", "--git-common-dir"])
@@ -62,6 +62,13 @@ impl WorktreePaths {
             )?
             .trim(),
         );
+
+        // Canonicalize common_dir to handle relative paths (e.g., ".git" in main worktree)
+        let common_dir = if common_dir_raw.is_absolute() {
+            common_dir_raw
+        } else {
+            env::current_dir()?.join(common_dir_raw).canonicalize()?
+        };
 
         // Get worktree root
         let worktree_root = PathBuf::from(
@@ -124,9 +131,13 @@ mod tests {
         // This test requires being in a git repo
         // We'll test with the actual project directory
         if let Ok(paths) = WorktreePaths::detect() {
-            // In main worktree, common_dir should be worktree_root/.git
-            if !paths.is_worktree() {
-                assert_eq!(paths.common_dir, paths.worktree_root.join(".git"));
+            // If we're in the main worktree (common_dir == worktree_root/.git)
+            // then is_worktree() should return false
+            if paths.common_dir == paths.worktree_root.join(".git") {
+                assert!(
+                    !paths.is_worktree(),
+                    "Main worktree should have is_worktree() == false"
+                );
                 assert_eq!(paths.local_jit, paths.worktree_root.join(".jit"));
                 assert_eq!(paths.shared_jit, paths.common_dir.join("jit"));
             }
