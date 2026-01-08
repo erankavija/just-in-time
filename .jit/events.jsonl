@@ -1102,3 +1102,8 @@
 {"type":"issue_state_changed","id":"5e5dca95-825e-48a0-b035-ea81a5805a45","issue_id":"608ae1e8-1523-482a-9a17-428b64c95f61","timestamp":"2026-01-08T20:53:37.383038291Z","from":"ready","to":"backlog"}
 {"type":"gate_passed","id":"0f2f57f7-58d8-4936-9a0f-3e16b3b6db52","issue_id":"ee20327b-2f2a-48f8-80d6-06cb1cb31a6e","timestamp":"2026-01-08T20:57:54.184758461Z","gate_key":"tdd-reminder","updated_by":null}
 {"type":"issue_state_changed","id":"0e71416b-b263-413b-ab61-903d2c40ed53","issue_id":"ee20327b-2f2a-48f8-80d6-06cb1cb31a6e","timestamp":"2026-01-08T21:06:25.731019256Z","from":"ready","to":"in_progress"}
+{"type":"gate_passed","id":"fae3cf12-03db-494d-8c3a-bf83020d8f94","issue_id":"ee20327b-2f2a-48f8-80d6-06cb1cb31a6e","timestamp":"2026-01-08T21:13:41.532276600Z","gate_key":"code-review","updated_by":"agent:copilot-cli-commands"}
+{"type":"gate_passed","id":"a0b22bcd-49b9-45d7-86c1-3afe8105035d","issue_id":"ee20327b-2f2a-48f8-80d6-06cb1cb31a6e","timestamp":"2026-01-08T21:13:42.097792081Z","gate_key":"fmt","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"da496326-2ce7-4b1f-a42e-43d93d37a4d6","issue_id":"ee20327b-2f2a-48f8-80d6-06cb1cb31a6e","timestamp":"2026-01-08T21:13:53.650089652Z","gate_key":"clippy","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"bd6aeb37-250a-4dc3-8fc6-d463ce95f4bb","issue_id":"ee20327b-2f2a-48f8-80d6-06cb1cb31a6e","timestamp":"2026-01-08T21:14:02.565962315Z","gate_key":"tests","updated_by":"auto:executor"}
+{"type":"issue_state_changed","id":"3d3d9032-97a7-4bc4-95bc-fc9202a2bb88","issue_id":"ee20327b-2f2a-48f8-80d6-06cb1cb31a6e","timestamp":"2026-01-08T21:14:17.813989563Z","from":"in_progress","to":"gated"}

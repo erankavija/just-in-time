@@ -17,7 +17,7 @@ mod output_macros;
 use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 use jit::cli::{
-    Cli, ClaimCommands, Commands, DepCommands, DocCommands, EventCommands, GateCommands,
+    ClaimCommands, Cli, Commands, DepCommands, DocCommands, EventCommands, GateCommands,
     GraphCommands, IssueCommands, RegistryCommands,
 };
 use jit::commands::{parse_priority, parse_state, CommandExecutor};

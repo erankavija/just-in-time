@@ -2,7 +2,7 @@
   "id": "ee20327b-2f2a-48f8-80d6-06cb1cb31a6e",
   "title": "Implement jit claim acquire command",
   "description": "Implement `jit claim acquire <issue-id>` with `--ttl <seconds>` and `--agent-id <id>` options. Return lease ID on success, clear error if already claimed. Support `--json` output.\n\n## TTL=0 Support\nWhen `--ttl 0`, require `--reason <text>` flag and enforce:\n- Repository policy permits indefinite leases\n- Per-agent limit: max_indefinite_leases_per_agent\n- Per-repository limit: max_indefinite_leases_per_repo\n\nSee design doc sections \"New Commands\" and \"TTL=0 constraints\".",
-  "state": "in_progress",
+  "state": "gated",
   "priority": "high",
   "assignee": "agent:copilot-cli-commands",
   "dependencies": [
@@ -16,30 +16,30 @@
     "code-review"
   ],
   "gates_status": {
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-08T21:13:41.538823315Z"
+    },
     "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.594990673Z"
+      "status": "passed",
+      "updated_by": "agent:copilot-cli-commands",
+      "updated_at": "2026-01-08T21:13:41.531995350Z"
     },
     "fmt": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.594981293Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-08T21:13:41.562260242Z"
     },
     "tdd-reminder": {
       "status": "passed",
       "updated_by": null,
       "updated_at": "2026-01-08T20:57:54.184390791Z"
     },
-    "clippy": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.594972443Z"
-    },
     "tests": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.594963053Z"
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-08T21:13:41.547560881Z"
     }
   },
   "context": {},
