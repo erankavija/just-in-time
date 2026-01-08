@@ -1065,4 +1065,18 @@ pub enum ClaimCommands {
         #[arg(long)]
         json: bool,
     },
+
+    /// List all active leases
+    ///
+    /// Shows all active leases across all agents and worktrees. Useful for
+    /// seeing the global state of who is working on what.
+    ///
+    /// Examples:
+    ///   jit claim list             # Show all leases
+    ///   jit claim list --json      # JSON output
+    List {
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
 }

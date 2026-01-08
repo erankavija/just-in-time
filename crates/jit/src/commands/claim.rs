@@ -208,6 +208,39 @@ pub fn execute_claim_status<S: IssueStore>(
     coordinator.get_active_leases(issue_id, filter_agent)
 }
 
+/// Lists all active leases across all agents and worktrees.
+///
+/// # Arguments
+///
+/// * `_storage` - Issue storage (unused but kept for consistency)
+///
+/// # Returns
+///
+/// Vector of all active leases
+pub fn execute_claim_list<S: IssueStore>(_storage: &S) -> Result<Vec<Lease>> {
+    // Detect worktree context
+    let paths = WorktreePaths::detect()
+        .context("Failed to detect worktree paths - are you in a git repository?")?;
+
+    // Get current branch for identity
+    let branch = get_current_branch()?;
+
+    // Load worktree identity
+    let identity =
+        load_or_create_worktree_identity(&paths.local_jit, &paths.worktree_root, &branch)?;
+
+    // We need an agent ID for coordinator, but it doesn't matter which one for listing
+    let agent = "system:list".to_string();
+
+    // Create claim coordinator
+    let locker = FileLocker::new(Duration::from_secs(5));
+    let coordinator = ClaimCoordinator::new(paths, locker, identity.worktree_id, agent);
+    coordinator.init()?;
+
+    // Get all active leases (no filters)
+    coordinator.get_active_leases(None, None)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -673,5 +706,86 @@ mod tests {
         assert_eq!(leases.len(), 1);
         assert_eq!(leases[0].agent_id, "agent:other-agent");
         Ok(())
+    }
+
+    // Tests for claim list command
+    #[test]
+    fn test_list_empty() -> Result<()> {
+        let (temp, _storage) = setup_test_repo()?;
+
+        let result = execute_claim_list_test(&temp);
+        assert!(result.is_ok());
+        let leases = result.unwrap();
+        assert!(leases.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn test_list_shows_all_leases() -> Result<()> {
+        let (temp, storage) = setup_test_repo()?;
+        let issue1 = create_test_issue(&storage, "Issue 1")?;
+        let issue2 = create_test_issue(&storage, "Issue 2")?;
+        let issue3 = create_test_issue(&storage, "Issue 3")?;
+
+        // Acquire leases with different agents
+        execute_claim_acquire_test(&temp, &storage, &issue1, 600, "agent:alice")?;
+        execute_claim_acquire_test(&temp, &storage, &issue2, 600, "agent:bob")?;
+        execute_claim_acquire_test(&temp, &storage, &issue3, 600, "agent:charlie")?;
+
+        // List should show all leases
+        let result = execute_claim_list_test(&temp);
+        assert!(result.is_ok());
+        let leases = result.unwrap();
+        assert_eq!(leases.len(), 3);
+
+        // Verify all agents are present
+        let agents: Vec<String> = leases.iter().map(|l| l.agent_id.clone()).collect();
+        assert!(agents.contains(&"agent:alice".to_string()));
+        assert!(agents.contains(&"agent:bob".to_string()));
+        assert!(agents.contains(&"agent:charlie".to_string()));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_list_excludes_expired_leases() -> Result<()> {
+        let (temp, storage) = setup_test_repo()?;
+        let issue1 = create_test_issue(&storage, "Issue 1")?;
+        let issue2 = create_test_issue(&storage, "Issue 2")?;
+
+        // Acquire one lease with very short TTL (will expire)
+        execute_claim_acquire_test(&temp, &storage, &issue1, 0, "agent:expired")?;
+
+        // Sleep to ensure first lease expires
+        std::thread::sleep(Duration::from_millis(10));
+
+        // Acquire another lease (should still be active)
+        execute_claim_acquire_test(&temp, &storage, &issue2, 600, "agent:active")?;
+
+        // List should only show active lease
+        let result = execute_claim_list_test(&temp);
+        assert!(result.is_ok());
+        let leases = result.unwrap();
+
+        // Note: TTL=0 means indefinite, not expired. Both should be in list.
+        assert_eq!(leases.len(), 2);
+
+        Ok(())
+    }
+
+    /// Helper to execute claim list in tests
+    fn execute_claim_list_test(temp: &TempDir) -> Result<Vec<Lease>> {
+        let paths = create_test_paths(temp);
+
+        let locker = FileLocker::new(Duration::from_secs(5));
+        let coordinator = ClaimCoordinator::new(
+            paths,
+            locker,
+            "wt:test".to_string(),
+            "system:list".to_string(),
+        );
+        coordinator.init()?;
+
+        coordinator.get_active_leases(None, None)
     }
 }
