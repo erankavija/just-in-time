@@ -238,6 +238,16 @@ mod tests {
         Ok((temp, storage))
     }
 
+    /// Create test WorktreePaths from TempDir
+    fn create_test_paths(temp: &TempDir) -> WorktreePaths {
+        WorktreePaths {
+            common_dir: temp.path().join(".git"),
+            worktree_root: temp.path().to_path_buf(),
+            local_jit: temp.path().join(".jit"),
+            shared_jit: temp.path().join(".git/jit"),
+        }
+    }
+
     /// Execute claim acquire with manually constructed paths (bypassing WorktreePaths::detect)
     fn execute_claim_acquire_test(
         temp: &TempDir,
@@ -249,13 +259,8 @@ mod tests {
         // Validate issue exists
         let _issue = storage.load_issue(issue_id)?;
 
-        // Manually construct WorktreePaths for testing
-        let paths = WorktreePaths {
-            common_dir: temp.path().join(".git"),
-            worktree_root: temp.path().to_path_buf(),
-            local_jit: temp.path().join(".jit"),
-            shared_jit: temp.path().join(".git/jit"),
-        };
+        // Get test paths
+        let paths = create_test_paths(temp);
 
         // Get or create worktree identity
         let branch = "test-branch".to_string();
@@ -279,13 +284,7 @@ mod tests {
 
     /// Execute claim release with manually constructed paths (for testing)
     fn execute_claim_release_test(temp: &TempDir, lease_id: &str, agent_id: &str) -> Result<()> {
-        // Manually construct WorktreePaths for testing
-        let paths = WorktreePaths {
-            common_dir: temp.path().join(".git"),
-            worktree_root: temp.path().to_path_buf(),
-            local_jit: temp.path().join(".jit"),
-            shared_jit: temp.path().join(".git/jit"),
-        };
+        let paths = create_test_paths(temp);
 
         // Create coordinator
         let locker = FileLocker::new(Duration::from_secs(5));
@@ -303,13 +302,7 @@ mod tests {
         issue_id: Option<&str>,
         agent_id: Option<&str>,
     ) -> Result<Vec<Lease>> {
-        // Manually construct WorktreePaths for testing
-        let paths = WorktreePaths {
-            common_dir: temp.path().join(".git"),
-            worktree_root: temp.path().to_path_buf(),
-            local_jit: temp.path().join(".jit"),
-            shared_jit: temp.path().join(".git/jit"),
-        };
+        let paths = create_test_paths(temp);
 
         // Create coordinator
         let locker = FileLocker::new(Duration::from_secs(5));
@@ -450,12 +443,7 @@ mod tests {
         ttl_secs: u64,
         agent_id: &str,
     ) -> Result<Lease> {
-        let paths = WorktreePaths {
-            common_dir: temp.path().join(".git"),
-            worktree_root: temp.path().to_path_buf(),
-            local_jit: temp.path().join(".jit"),
-            shared_jit: temp.path().join(".git/jit"),
-        };
+        let paths = create_test_paths(temp);
 
         let branch = "test-branch".to_string();
         let identity =
@@ -478,12 +466,7 @@ mod tests {
         let lease_id = execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:test")?;
 
         // Get original lease
-        let paths = WorktreePaths {
-            common_dir: temp.path().join(".git"),
-            worktree_root: temp.path().to_path_buf(),
-            local_jit: temp.path().join(".jit"),
-            shared_jit: temp.path().join(".git/jit"),
-        };
+        let paths = create_test_paths(&temp);
         let locker = FileLocker::new(Duration::from_secs(5));
         let coordinator = ClaimCoordinator::new(
             paths,
