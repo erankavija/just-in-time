@@ -241,6 +241,45 @@ pub fn execute_claim_list<S: IssueStore>(_storage: &S) -> Result<Vec<Lease>> {
     coordinator.get_active_leases(None, None)
 }
 
+/// Force-evicts a lease (admin operation).
+///
+/// # Arguments
+///
+/// * `_storage` - Issue storage (unused but kept for consistency)
+/// * `lease_id` - ID of the lease to evict
+/// * `reason` - Reason for eviction (for audit trail)
+///
+/// # Returns
+///
+/// Ok(()) on success
+pub fn execute_claim_force_evict<S: IssueStore>(
+    _storage: &S,
+    lease_id: &str,
+    reason: &str,
+) -> Result<()> {
+    // Detect worktree context
+    let paths = WorktreePaths::detect()
+        .context("Failed to detect worktree paths - are you in a git repository?")?;
+
+    // Get current branch for identity
+    let branch = get_current_branch()?;
+
+    // Load worktree identity
+    let identity =
+        load_or_create_worktree_identity(&paths.local_jit, &paths.worktree_root, &branch)?;
+
+    // For force-evict, we use a system agent (admin operation)
+    let agent = "system:admin".to_string();
+
+    // Create claim coordinator
+    let locker = FileLocker::new(Duration::from_secs(5));
+    let coordinator = ClaimCoordinator::new(paths, locker, identity.worktree_id, agent);
+    coordinator.init()?;
+
+    // Force evict the lease
+    coordinator.force_evict_lease(lease_id, reason)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -787,5 +826,87 @@ mod tests {
         coordinator.init()?;
 
         coordinator.get_active_leases(None, None)
+    }
+
+    // Tests for claim force-evict command
+    #[test]
+    fn test_force_evict_removes_lease() -> Result<()> {
+        let (temp, storage) = setup_test_repo()?;
+        let issue_id = create_test_issue(&storage, "Test Issue")?;
+
+        // Acquire a lease
+        let lease_id = execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:test")?;
+
+        // Verify lease exists
+        let leases_before = execute_claim_list_test(&temp)?;
+        assert_eq!(leases_before.len(), 1);
+
+        // Force evict it
+        let result = execute_claim_force_evict_test(&temp, &lease_id, "Test eviction");
+        assert!(result.is_ok(), "Force evict should succeed");
+
+        // Verify lease is gone
+        let leases_after = execute_claim_list_test(&temp)?;
+        assert_eq!(leases_after.len(), 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_force_evict_fails_for_nonexistent_lease() -> Result<()> {
+        let (temp, _storage) = setup_test_repo()?;
+
+        // Initialize control plane
+        let control_plane = temp.path().join(".git/jit");
+        fs::create_dir_all(control_plane.join("locks"))?;
+
+        let result = execute_claim_force_evict_test(&temp, "fake-lease-id", "Test reason");
+
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("not found") || err_msg.contains("Lease"),
+            "Error should mention lease not found, got: {}",
+            err_msg
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_force_evict_allows_re_acquisition() -> Result<()> {
+        let (temp, storage) = setup_test_repo()?;
+        let issue_id = create_test_issue(&storage, "Test Issue")?;
+
+        // Agent 1 acquires
+        let lease_id = execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:first")?;
+
+        // Admin evicts
+        execute_claim_force_evict_test(&temp, &lease_id, "Admin intervention")?;
+
+        // Agent 2 should be able to acquire
+        let result = execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:second");
+        assert!(
+            result.is_ok(),
+            "Should be able to acquire after force eviction"
+        );
+
+        Ok(())
+    }
+
+    /// Helper to execute force evict in tests
+    fn execute_claim_force_evict_test(temp: &TempDir, lease_id: &str, reason: &str) -> Result<()> {
+        let paths = create_test_paths(temp);
+
+        let locker = FileLocker::new(Duration::from_secs(5));
+        let coordinator = ClaimCoordinator::new(
+            paths,
+            locker,
+            "wt:test".to_string(),
+            "system:admin".to_string(),
+        );
+        coordinator.init()?;
+
+        coordinator.force_evict_lease(lease_id, reason)
     }
 }

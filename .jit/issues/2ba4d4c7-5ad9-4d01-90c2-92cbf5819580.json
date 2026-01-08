@@ -2,9 +2,9 @@
   "id": "2ba4d4c7-5ad9-4d01-90c2-92cbf5819580",
   "title": "Implement jit claim force-evict command",
   "description": "Implement `jit claim force-evict <lease-id>` with `--reason <text>` for admin eviction of stale leases. Log eviction with reason. Require explicit confirmation or `--force` flag.",
-  "state": "ready",
+  "state": "done",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:copilot-cli-commands",
   "dependencies": [
     "b74af86f-388d-49a2-a172-bc9fdaa7bb9c"
   ],
@@ -17,29 +17,29 @@
   ],
   "gates_status": {
     "code-review": {
-      "status": "pending",
+      "status": "passed",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.601111385Z"
-    },
-    "tdd-reminder": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.601058395Z"
+      "updated_at": "2026-01-08T22:27:18.165674230Z"
     },
     "tests": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.601084445Z"
-    },
-    "fmt": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.601102395Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-08T22:26:57.335323473Z"
     },
     "clippy": {
-      "status": "pending",
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-08T22:27:15.352071164Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-08T22:27:17.759698745Z"
+    },
+    "tdd-reminder": {
+      "status": "passed",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.601093715Z"
+      "updated_at": "2026-01-08T22:24:58.305504847Z"
     }
   },
   "context": {},

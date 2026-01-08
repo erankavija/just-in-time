@@ -1079,4 +1079,26 @@ pub enum ClaimCommands {
         #[arg(long)]
         json: bool,
     },
+
+    /// Force-evict a lease (admin operation)
+    ///
+    /// Removes a lease immediately, regardless of who owns it. This is an
+    /// administrative operation for handling stale leases or emergency situations.
+    /// The eviction is logged with the provided reason for audit trail.
+    ///
+    /// Examples:
+    ///   jit claim force-evict abc12345-6789-... --reason "Stale after crash"
+    ///   jit claim force-evict abc12345-6789-... --reason "Admin override" --json
+    ForceEvict {
+        /// Lease ID to evict
+        lease_id: String,
+
+        /// Reason for eviction (required for audit trail)
+        #[arg(long)]
+        reason: String,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
 }

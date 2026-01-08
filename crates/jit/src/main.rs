@@ -2330,6 +2330,44 @@ strategic_types = {}
                     }
                 }
             }
+            ClaimCommands::ForceEvict {
+                lease_id,
+                reason,
+                json,
+            } => {
+                use jit::commands::claim::execute_claim_force_evict;
+                use jit::output::{JsonError, JsonOutput};
+
+                match execute_claim_force_evict(&storage, &lease_id, &reason) {
+                    Ok(()) => {
+                        if json {
+                            let response = serde_json::json!({
+                                "lease_id": lease_id,
+                                "reason": reason,
+                                "message": format!("Force-evicted lease {}", lease_id),
+                            });
+                            let output = JsonOutput::success(response, "claim force-evict");
+                            println!("{}", output.to_json_string()?);
+                        } else {
+                            println!("✓ Force-evicted lease: {}", lease_id);
+                            println!("  Reason: {}", reason);
+                        }
+                    }
+                    Err(e) => {
+                        if json {
+                            let json_error = JsonError::new(
+                                "CLAIM_FORCE_EVICT_ERROR",
+                                e.to_string(),
+                                "claim force-evict",
+                            );
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
+                        } else {
+                            return Err(e);
+                        }
+                    }
+                }
+            }
         },
         Commands::Snapshot(snapshot_cmd) => match snapshot_cmd {
             jit::cli::SnapshotCommands::Export {
