@@ -2369,6 +2369,55 @@ strategic_types = {}
                 }
             }
         },
+        Commands::Worktree(worktree_cmd) => match worktree_cmd {
+            jit::cli::WorktreeCommands::Info { json } => {
+                use jit::commands::worktree::execute_worktree_info;
+                use jit::output::{JsonError, JsonOutput};
+
+                match execute_worktree_info(&storage) {
+                    Ok(info) => {
+                        if json {
+                            let response = serde_json::json!({
+                                "worktree_id": info.worktree_id,
+                                "branch": info.branch,
+                                "root_path": info.root_path,
+                                "is_main_worktree": info.is_main_worktree,
+                                "common_dir": info.common_dir,
+                            });
+                            let output = JsonOutput::success(response, "worktree info");
+                            println!("{}", output.to_json_string()?);
+                        } else {
+                            println!("Worktree Information:");
+                            println!("  ID:         {}", info.worktree_id);
+                            println!("  Branch:     {}", info.branch);
+                            println!("  Root:       {}", info.root_path);
+                            println!(
+                                "  Type:       {}",
+                                if info.is_main_worktree {
+                                    "main worktree"
+                                } else {
+                                    "secondary worktree"
+                                }
+                            );
+                            println!("  Common dir: {}", info.common_dir);
+                        }
+                    }
+                    Err(e) => {
+                        if json {
+                            let json_error = JsonError::new(
+                                "WORKTREE_INFO_ERROR",
+                                e.to_string(),
+                                "worktree info",
+                            );
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
+                        } else {
+                            return Err(e);
+                        }
+                    }
+                }
+            }
+        },
         Commands::Snapshot(snapshot_cmd) => match snapshot_cmd {
             jit::cli::SnapshotCommands::Export {
                 out,

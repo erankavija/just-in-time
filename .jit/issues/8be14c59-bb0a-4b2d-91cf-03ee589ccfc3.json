@@ -2,9 +2,9 @@
   "id": "8be14c59-bb0a-4b2d-91cf-03ee589ccfc3",
   "title": "Implement jit worktree info command",
   "description": "Implement `jit worktree info` showing current worktree context: worktree ID, branch, root path, is_main_worktree. Support `--json` output.",
-  "state": "ready",
+  "state": "done",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:copilot-cli-commands",
   "dependencies": [
     "b74af86f-388d-49a2-a172-bc9fdaa7bb9c"
   ],
@@ -16,30 +16,30 @@
     "code-review"
   ],
   "gates_status": {
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-08T22:31:16.547194316Z"
+    },
     "tdd-reminder": {
-      "status": "pending",
+      "status": "passed",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.056778418Z"
-    },
-    "fmt": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.056839378Z"
-    },
-    "clippy": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.056829788Z"
+      "updated_at": "2026-01-08T22:28:03.820331549Z"
     },
     "code-review": {
-      "status": "pending",
+      "status": "passed",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.056849338Z"
+      "updated_at": "2026-01-08T22:31:36.377322316Z"
     },
-    "tests": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.056819628Z"
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-08T22:31:33.363413434Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-08T22:31:35.971472841Z"
     }
   },
   "context": {},

@@ -32,6 +32,7 @@ mod query;
 mod search;
 pub mod snapshot;
 mod validate;
+pub mod worktree;
 
 pub use bulk_update::{BulkUpdatePreview, BulkUpdateResult, UpdateOperations};
 

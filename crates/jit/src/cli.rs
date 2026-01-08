@@ -101,6 +101,12 @@ pub enum Commands {
     #[command(subcommand)]
     Claim(ClaimCommands),
 
+    /// Worktree information commands
+    ///
+    /// Display and manage git worktree context for parallel work.
+    #[command(subcommand)]
+    Worktree(WorktreeCommands),
+
     /// Search issues and documents
     Search {
         /// Search query string
@@ -1097,6 +1103,24 @@ pub enum ClaimCommands {
         #[arg(long)]
         reason: String,
 
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+/// Worktree commands
+#[derive(Debug, Subcommand)]
+pub enum WorktreeCommands {
+    /// Show current worktree information
+    ///
+    /// Displays worktree ID, branch, root path, and whether this is the
+    /// main worktree or a secondary one.
+    ///
+    /// Examples:
+    ///   jit worktree info          # Show current worktree info
+    ///   jit worktree info --json   # JSON output
+    Info {
         /// Output as JSON
         #[arg(long)]
         json: bool,
