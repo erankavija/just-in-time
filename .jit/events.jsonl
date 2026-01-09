@@ -1175,3 +1175,6 @@
 {"type":"issue_completed","id":"be946584-8eec-4834-8559-f3cc6cda8d71","issue_id":"8be14c59-bb0a-4b2d-91cf-03ee589ccfc3","timestamp":"2026-01-08T22:31:42.426501495Z"}
 {"type":"issue_created","id":"9e560717-1307-4966-9a48-4624a00e3798","issue_id":"1bdc5395-b94c-4ca1-8e1d-7f0f19487ead","timestamp":"2026-01-08T22:40:44.819998160Z","title":"Refactor: Address code quality improvements from CLI command implementation","priority":"high"}
 {"type":"issue_created","id":"c8937418-3da4-4850-ba97-2f965d0384cd","issue_id":"4b2cb4cd-0351-48d1-bb90-7c0d14909623","timestamp":"2026-01-08T22:40:50.398801347Z","title":"Refactor: Address code quality improvements from CLI command implementation","priority":"high"}
+{"type":"issue_created","id":"e91501a0-1c95-4596-b967-b8c3365526cd","issue_id":"11682766-316e-4fd7-9bbf-eaddf7c01b04","timestamp":"2026-01-09T19:45:43.086843747Z","title":"Consolidate and simplify jit query commands","priority":"high"}
+{"type":"issue_state_changed","id":"b5f22df0-5a27-4c07-9150-b954a696c643","issue_id":"11682766-316e-4fd7-9bbf-eaddf7c01b04","timestamp":"2026-01-09T19:51:16.976213134Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"cf6cf66d-6dbf-4efb-b9d5-aae7e32a7ecf","issue_id":"11682766-316e-4fd7-9bbf-eaddf7c01b04","timestamp":"2026-01-09T19:51:16.976373454Z","assignee":"agent:copilot-cli"}

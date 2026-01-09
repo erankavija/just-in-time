@@ -196,4 +196,122 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         Ok(filtered)
     }
+
+    /// Query all issues with optional filters
+    pub fn query_all(
+        &self,
+        state_filter: Option<State>,
+        assignee_filter: Option<&str>,
+        priority_filter: Option<Priority>,
+        label_filter: Option<&str>,
+    ) -> Result<Vec<Issue>> {
+        let mut issues = self.storage.list_issues()?;
+
+        // Apply filters
+        if let Some(state) = state_filter {
+            issues.retain(|i| i.state == state);
+        }
+        if let Some(assignee) = assignee_filter {
+            issues.retain(|i| i.assignee.as_deref() == Some(assignee));
+        }
+        if let Some(priority) = priority_filter {
+            issues.retain(|i| i.priority == priority);
+        }
+        if let Some(label_pattern) = label_filter {
+            let label_matches = self.query_by_label(label_pattern)?;
+            let label_ids: std::collections::HashSet<_> =
+                label_matches.iter().map(|i| i.id.as_str()).collect();
+            issues.retain(|i| label_ids.contains(i.id.as_str()));
+        }
+
+        Ok(issues)
+    }
+
+    /// Query available issues with optional filters (unassigned + state=ready + unblocked)
+    pub fn query_available(
+        &self,
+        priority_filter: Option<Priority>,
+        label_filter: Option<&str>,
+    ) -> Result<Vec<Issue>> {
+        let mut issues = self.query_ready()?;
+
+        // Apply additional filters
+        if let Some(priority) = priority_filter {
+            issues.retain(|i| i.priority == priority);
+        }
+        if let Some(label_pattern) = label_filter {
+            let label_matches = self.query_by_label(label_pattern)?;
+            let label_ids: std::collections::HashSet<_> =
+                label_matches.iter().map(|i| i.id.as_str()).collect();
+            issues.retain(|i| label_ids.contains(i.id.as_str()));
+        }
+
+        Ok(issues)
+    }
+
+    /// Query blocked issues with optional filters
+    pub fn query_blocked_filtered(
+        &self,
+        priority_filter: Option<Priority>,
+        label_filter: Option<&str>,
+    ) -> Result<Vec<(Issue, Vec<String>)>> {
+        let mut blocked = self.query_blocked()?;
+
+        // Apply additional filters
+        if let Some(priority) = priority_filter {
+            blocked.retain(|(i, _)| i.priority == priority);
+        }
+        if let Some(label_pattern) = label_filter {
+            let label_matches = self.query_by_label(label_pattern)?;
+            let label_ids: std::collections::HashSet<_> =
+                label_matches.iter().map(|i| i.id.as_str()).collect();
+            blocked.retain(|(i, _)| label_ids.contains(i.id.as_str()));
+        }
+
+        Ok(blocked)
+    }
+
+    /// Query strategic issues with optional filters
+    pub fn query_strategic_filtered(
+        &self,
+        priority_filter: Option<Priority>,
+        label_filter: Option<&str>,
+    ) -> Result<Vec<Issue>> {
+        let mut issues = self.query_strategic()?;
+
+        // Apply additional filters
+        if let Some(priority) = priority_filter {
+            issues.retain(|i| i.priority == priority);
+        }
+        if let Some(label_pattern) = label_filter {
+            let label_matches = self.query_by_label(label_pattern)?;
+            let label_ids: std::collections::HashSet<_> =
+                label_matches.iter().map(|i| i.id.as_str()).collect();
+            issues.retain(|i| label_ids.contains(i.id.as_str()));
+        }
+
+        Ok(issues)
+    }
+
+    /// Query closed issues with optional filters
+    pub fn query_closed_filtered(
+        &self,
+        priority_filter: Option<Priority>,
+        label_filter: Option<&str>,
+    ) -> Result<Vec<Issue>> {
+        let mut issues = self.query_closed()?;
+
+        // Apply additional filters
+        if let Some(priority) = priority_filter {
+            issues.retain(|i| i.priority == priority);
+        }
+        if let Some(label_pattern) = label_filter {
+            let label_matches = self.query_by_label(label_pattern)?;
+            let label_ids: std::collections::HashSet<_> =
+                label_matches.iter().map(|i| i.id.as_str()).collect();
+            issues.retain(|i| label_ids.contains(i.id.as_str()));
+        }
+
+        Ok(issues)
+    }
 }

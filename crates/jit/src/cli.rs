@@ -194,21 +194,6 @@ pub enum IssueCommands {
         json: bool,
     },
 
-    /// List issues
-    List {
-        #[arg(short, long)]
-        state: Option<String>,
-
-        #[arg(short, long)]
-        assignee: Option<String>,
-
-        #[arg(short, long)]
-        priority: Option<String>,
-
-        #[arg(long)]
-        json: bool,
-    },
-
     /// Search issues by text query
     Search {
         /// Search query (searches title, description, and ID)
@@ -819,46 +804,63 @@ pub enum EventCommands {
 
 #[derive(Subcommand)]
 pub enum QueryCommands {
-    /// Query ready issues (unassigned, state=ready, unblocked)
-    Ready {
+    /// Query all issues with optional filters
+    All {
+        /// Filter by state
+        #[arg(short = 's', long)]
+        state: Option<String>,
+
+        /// Filter by assignee (format: type:identifier)
+        #[arg(short = 'a', long)]
+        assignee: Option<String>,
+
+        /// Filter by priority
+        #[arg(short = 'p', long)]
+        priority: Option<String>,
+
+        /// Filter by label pattern (exact match or wildcard)
+        #[arg(short = 'l', long)]
+        label: Option<String>,
+
+        /// Return full issue objects instead of minimal summaries
+        #[arg(long)]
+        full: bool,
+
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Query available issues (unassigned, state=ready, unblocked)
+    Available {
+        /// Filter by priority
+        #[arg(short = 'p', long)]
+        priority: Option<String>,
+
+        /// Filter by label pattern (exact match or wildcard)
+        #[arg(short = 'l', long)]
+        label: Option<String>,
+
+        /// Return full issue objects instead of minimal summaries
+        #[arg(long)]
+        full: bool,
+
         #[arg(long)]
         json: bool,
     },
 
     /// Query blocked issues with reasons
     Blocked {
+        /// Filter by priority
+        #[arg(short = 'p', long)]
+        priority: Option<String>,
+
+        /// Filter by label pattern (exact match or wildcard)
+        #[arg(short = 'l', long)]
+        label: Option<String>,
+
+        /// Return full issue objects instead of minimal summaries
         #[arg(long)]
-        json: bool,
-    },
-
-    /// Query issues by assignee
-    Assignee {
-        assignee: String,
-
-        #[arg(long)]
-        json: bool,
-    },
-
-    /// Query issues by state
-    State {
-        state: String,
-
-        #[arg(long)]
-        json: bool,
-    },
-
-    /// Query issues by priority
-    Priority {
-        priority: String,
-
-        #[arg(long)]
-        json: bool,
-    },
-
-    /// Query issues by label (exact match or wildcard)
-    Label {
-        /// Label pattern: 'namespace:value' for exact match, 'namespace:*' for wildcard
-        pattern: String,
+        full: bool,
 
         #[arg(long)]
         json: bool,
@@ -866,12 +868,36 @@ pub enum QueryCommands {
 
     /// Query strategic issues (those with labels from strategic namespaces)
     Strategic {
+        /// Filter by priority
+        #[arg(short = 'p', long)]
+        priority: Option<String>,
+
+        /// Filter by label pattern (exact match or wildcard)
+        #[arg(short = 'l', long)]
+        label: Option<String>,
+
+        /// Return full issue objects instead of minimal summaries
+        #[arg(long)]
+        full: bool,
+
         #[arg(long)]
         json: bool,
     },
 
     /// Query closed issues (Done or Rejected states)
     Closed {
+        /// Filter by priority
+        #[arg(short = 'p', long)]
+        priority: Option<String>,
+
+        /// Filter by label pattern (exact match or wildcard)
+        #[arg(short = 'l', long)]
+        label: Option<String>,
+
+        /// Return full issue objects instead of minimal summaries
+        #[arg(long)]
+        full: bool,
+
         #[arg(long)]
         json: bool,
     },

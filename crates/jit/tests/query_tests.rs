@@ -107,7 +107,7 @@ fn test_query_ready_returns_unblocked_issues() {
 
     // Query ready issues
     let output = Command::new(&jit)
-        .args(["query", "ready", "--json"])
+        .args(["query", "available", "--json"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -169,7 +169,7 @@ fn test_query_ready_excludes_assigned_issues() {
 
     // Query ready issues
     let output = Command::new(&jit)
-        .args(["query", "ready", "--json"])
+        .args(["query", "available", "--json"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -288,7 +288,7 @@ fn test_query_by_assignee() {
 
     // Query by assignee
     let output = Command::new(&jit)
-        .args(["query", "assignee", "agent:worker-1", "--json"])
+        .args(["query", "all", "--assignee", "agent:worker-1", "--json"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -382,7 +382,7 @@ fn test_query_by_state() {
 
     // Query by state
     let output = Command::new(&jit)
-        .args(["query", "state", "done", "--json"])
+        .args(["query", "all", "--state", "done", "--json"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -434,7 +434,7 @@ fn test_query_by_priority() {
 
     // Query by priority
     let output = Command::new(&jit)
-        .args(["query", "priority", "critical", "--json"])
+        .args(["query", "all", "--priority", "critical", "--json"])
         .current_dir(temp.path())
         .output()
         .unwrap();

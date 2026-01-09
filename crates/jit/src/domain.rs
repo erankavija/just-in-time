@@ -197,6 +197,39 @@ impl Issue {
     }
 }
 
+/// Minimal issue representation for efficient list queries
+///
+/// Returns only essential fields to reduce token usage. Use `jit issue show`
+/// for full details.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MinimalIssue {
+    pub id: String,
+    pub title: String,
+    pub state: State,
+    pub priority: Priority,
+}
+
+impl From<&Issue> for MinimalIssue {
+    fn from(issue: &Issue) -> Self {
+        Self {
+            id: issue.id.clone(),
+            title: issue.title.clone(),
+            state: issue.state,
+            priority: issue.priority,
+        }
+    }
+}
+
+/// Minimal blocked issue for queries - includes blocking reasons
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MinimalBlockedIssue {
+    pub id: String,
+    pub title: String,
+    pub state: State,
+    pub priority: Priority,
+    pub blocked_reasons: Vec<String>,
+}
+
 /// Implement GraphNode for Issue to enable dependency graph operations
 impl crate::graph::GraphNode for Issue {
     fn id(&self) -> &str {

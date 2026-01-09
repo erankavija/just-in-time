@@ -226,46 +226,6 @@ strategic_types = {}
                         }
                     }
                 }
-                IssueCommands::List {
-                    state,
-                    assignee,
-                    priority,
-                    json,
-                } => {
-                    let state_filter = state.map(|s| parse_state(&s)).transpose()?;
-                    let priority_filter = priority.map(|p| parse_priority(&p)).transpose()?;
-                    let issues = executor.list_issues(state_filter, assignee, priority_filter)?;
-
-                    if json {
-                        use jit::output::JsonOutput;
-                        use serde_json::json;
-
-                        // Count issues by state
-                        let mut state_counts = std::collections::HashMap::new();
-                        for issue in &issues {
-                            *state_counts.entry(issue.state).or_insert(0) += 1;
-                        }
-
-                        let output = JsonOutput::success(
-                            json!({
-                                "issues": issues,
-                                "summary": {
-                                    "total": issues.len(),
-                                    "by_state": state_counts,
-                                }
-                            }),
-                            "issue list",
-                        );
-                        println!("{}", output.to_json_string()?);
-                    } else {
-                        for issue in issues {
-                            println!(
-                                "{} | {} | {:?} | {:?}",
-                                issue.id, issue.title, issue.state, issue.priority
-                            );
-                        }
-                    }
-                }
                 IssueCommands::Search {
                     query,
                     state,
@@ -1485,64 +1445,183 @@ strategic_types = {}
             }
         },
         Commands::Query(query_cmd) => match query_cmd {
-            jit::cli::QueryCommands::Ready { json } => {
+            jit::cli::QueryCommands::All {
+                state,
+                assignee,
+                priority,
+                label,
+                full,
+                json,
+            } => {
                 let output_ctx = OutputContext::new(quiet, json);
-                let issues = executor.query_ready()?;
-                if json {
-                    use jit::output::{JsonOutput, ReadyQueryResponse};
+                let state_filter = state.as_ref().map(|s| parse_state(s)).transpose()?;
+                let priority_filter = priority.as_ref().map(|p| parse_priority(p)).transpose()?;
+                let issues = executor.query_all(
+                    state_filter,
+                    assignee.as_deref(),
+                    priority_filter,
+                    label.as_deref(),
+                )?;
 
-                    let response = ReadyQueryResponse {
-                        issues: issues.clone(),
-                        count: issues.len(),
+                if json {
+                    use jit::domain::MinimalIssue;
+                    use jit::output::JsonOutput;
+                    use serde_json::json;
+
+                    let output = if full {
+                        JsonOutput::success(
+                            json!({
+                                "count": issues.len(),
+                                "issues": issues,
+                                "filters": {
+                                    "state": state,
+                                    "assignee": assignee,
+                                    "priority": priority,
+                                    "label": label,
+                                }
+                            }),
+                            "query all",
+                        )
+                    } else {
+                        let minimal: Vec<MinimalIssue> =
+                            issues.iter().map(MinimalIssue::from).collect();
+                        JsonOutput::success(
+                            json!({
+                                "count": minimal.len(),
+                                "issues": minimal,
+                                "filters": {
+                                    "state": state,
+                                    "assignee": assignee,
+                                    "priority": priority,
+                                    "label": label,
+                                }
+                            }),
+                            "query all",
+                        )
                     };
-                    let output = JsonOutput::success(response, "registry show");
                     println!("{}", output.to_json_string()?);
                 } else {
-                    let _ = output_ctx.print_info("Ready issues (unassigned, unblocked):");
+                    let _ = output_ctx.print_info("All issues (filtered):");
+                    for issue in &issues {
+                        println!(
+                            "  {} | {} | {:?} | {:?}",
+                            issue.id, issue.title, issue.state, issue.priority
+                        );
+                    }
+                    let _ = output_ctx.print_info(format!("\nTotal: {}", issues.len()));
+                }
+            }
+            jit::cli::QueryCommands::Available {
+                priority,
+                label,
+                full,
+                json,
+            } => {
+                let output_ctx = OutputContext::new(quiet, json);
+                let priority_filter = priority.as_ref().map(|p| parse_priority(p)).transpose()?;
+                let issues = executor.query_available(priority_filter, label.as_deref())?;
+
+                if json {
+                    use jit::domain::MinimalIssue;
+                    use jit::output::JsonOutput;
+                    use serde_json::json;
+
+                    let output = if full {
+                        JsonOutput::success(
+                            json!({
+                                "count": issues.len(),
+                                "issues": issues,
+                            }),
+                            "query available",
+                        )
+                    } else {
+                        let minimal: Vec<MinimalIssue> =
+                            issues.iter().map(MinimalIssue::from).collect();
+                        JsonOutput::success(
+                            json!({
+                                "count": minimal.len(),
+                                "issues": minimal,
+                            }),
+                            "query available",
+                        )
+                    };
+                    println!("{}", output.to_json_string()?);
+                } else {
+                    let _ = output_ctx.print_info("Available issues (unassigned, unblocked):");
                     for issue in &issues {
                         println!("  {} | {} | {:?}", issue.id, issue.title, issue.priority);
                     }
                     let _ = output_ctx.print_info(format!("\nTotal: {}", issues.len()));
                 }
             }
-            jit::cli::QueryCommands::Blocked { json } => {
+            jit::cli::QueryCommands::Blocked {
+                priority,
+                label,
+                full,
+                json,
+            } => {
                 let output_ctx = OutputContext::new(quiet, json);
-                let blocked = executor.query_blocked()?;
+                let priority_filter = priority.as_ref().map(|p| parse_priority(p)).transpose()?;
+                let blocked = executor.query_blocked_filtered(priority_filter, label.as_deref())?;
+
                 if json {
-                    use jit::output::{
-                        BlockedIssue, BlockedQueryResponse, BlockedReason, BlockedReasonType,
-                        JsonOutput,
-                    };
+                    use jit::output::JsonOutput;
+                    use serde_json::json;
 
-                    let blocked_issues: Vec<BlockedIssue> = blocked
-                        .iter()
-                        .map(|(issue, reasons)| {
-                            let blocked_reasons = reasons
-                                .iter()
-                                .map(|r| {
-                                    let parts: Vec<&str> = r.splitn(2, ':').collect();
-                                    let reason_type = match parts[0] {
-                                        "gate" => BlockedReasonType::Gate,
-                                        _ => BlockedReasonType::Dependency,
-                                    };
-                                    BlockedReason {
-                                        reason_type,
-                                        detail: parts.get(1).unwrap_or(&"").to_string(),
-                                    }
-                                })
-                                .collect();
-                            BlockedIssue {
-                                issue: (*issue).clone(),
-                                blocked_reasons,
-                            }
-                        })
-                        .collect();
+                    let output = if full {
+                        use jit::output::{BlockedIssue, BlockedReason, BlockedReasonType};
+                        let blocked_issues: Vec<BlockedIssue> = blocked
+                            .iter()
+                            .map(|(issue, reasons)| {
+                                let blocked_reasons = reasons
+                                    .iter()
+                                    .map(|r| {
+                                        let parts: Vec<&str> = r.splitn(2, ':').collect();
+                                        let reason_type = match parts[0] {
+                                            "gate" => BlockedReasonType::Gate,
+                                            _ => BlockedReasonType::Dependency,
+                                        };
+                                        BlockedReason {
+                                            reason_type,
+                                            detail: parts.get(1).unwrap_or(&"").to_string(),
+                                        }
+                                    })
+                                    .collect();
+                                BlockedIssue {
+                                    issue: (*issue).clone(),
+                                    blocked_reasons,
+                                }
+                            })
+                            .collect();
 
-                    let response = BlockedQueryResponse {
-                        issues: blocked_issues,
-                        count: blocked.len(),
+                        JsonOutput::success(
+                            json!({
+                                "count": blocked_issues.len(),
+                                "issues": blocked_issues,
+                            }),
+                            "query blocked",
+                        )
+                    } else {
+                        use jit::domain::MinimalBlockedIssue;
+                        let minimal: Vec<MinimalBlockedIssue> = blocked
+                            .iter()
+                            .map(|(issue, reasons)| MinimalBlockedIssue {
+                                id: issue.id.clone(),
+                                title: issue.title.clone(),
+                                state: issue.state,
+                                priority: issue.priority,
+                                blocked_reasons: reasons.clone(),
+                            })
+                            .collect();
+
+                        JsonOutput::success(
+                            json!({
+                                "count": minimal.len(),
+                                "issues": minimal,
+                            }),
+                            "query blocked",
+                        )
                     };
-                    let output = JsonOutput::success(response, "registry show");
                     println!("{}", output.to_json_string()?);
                 } else {
                     let _ = output_ctx.print_info("Blocked issues:");
@@ -1555,180 +1634,84 @@ strategic_types = {}
                     let _ = output_ctx.print_info(format!("\nTotal: {}", blocked.len()));
                 }
             }
-            jit::cli::QueryCommands::Assignee { assignee, json } => {
+            jit::cli::QueryCommands::Strategic {
+                priority,
+                label,
+                full,
+                json,
+            } => {
                 let output_ctx = OutputContext::new(quiet, json);
-                let issues = executor.query_by_assignee(&assignee)?;
-                if json {
-                    use jit::output::{AssigneeQueryResponse, JsonOutput};
+                let priority_filter = priority.as_ref().map(|p| parse_priority(p)).transpose()?;
+                let issues =
+                    executor.query_strategic_filtered(priority_filter, label.as_deref())?;
 
-                    let response = AssigneeQueryResponse {
-                        assignee: assignee.clone(),
-                        issues: issues.clone(),
-                        count: issues.len(),
+                if json {
+                    use jit::domain::MinimalIssue;
+                    use jit::output::JsonOutput;
+                    use serde_json::json;
+
+                    let output = if full {
+                        JsonOutput::success(
+                            json!({
+                                "count": issues.len(),
+                                "issues": issues,
+                            }),
+                            "query strategic",
+                        )
+                    } else {
+                        let minimal: Vec<MinimalIssue> =
+                            issues.iter().map(MinimalIssue::from).collect();
+                        JsonOutput::success(
+                            json!({
+                                "count": minimal.len(),
+                                "issues": minimal,
+                            }),
+                            "query strategic",
+                        )
                     };
-                    let output = JsonOutput::success(response, "registry show");
                     println!("{}", output.to_json_string()?);
                 } else {
-                    let _ = output_ctx.print_info(format!("Issues assigned to {}:", assignee));
+                    let _ = output_ctx.print_info("Strategic issues:");
                     for issue in &issues {
-                        println!(
-                            "  {} | {} | {:?} | {:?}",
-                            issue.id, issue.title, issue.state, issue.priority
-                        );
+                        println!("  {} | {} | {:?}", issue.id, issue.title, issue.priority);
                     }
                     let _ = output_ctx.print_info(format!("\nTotal: {}", issues.len()));
                 }
             }
-            jit::cli::QueryCommands::State { state, json } => {
+            jit::cli::QueryCommands::Closed {
+                priority,
+                label,
+                full,
+                json,
+            } => {
                 let output_ctx = OutputContext::new(quiet, json);
-                match parse_state(&state) {
-                    Ok(parsed_state) => {
-                        let issues = executor.query_by_state(parsed_state)?;
-                        if json {
-                            use jit::output::{JsonOutput, StateQueryResponse};
+                let priority_filter = priority.as_ref().map(|p| parse_priority(p)).transpose()?;
+                let issues = executor.query_closed_filtered(priority_filter, label.as_deref())?;
 
-                            let response = StateQueryResponse {
-                                state: parsed_state,
-                                issues: issues.clone(),
-                                count: issues.len(),
-                            };
-                            let output = JsonOutput::success(response, "registry show");
-                            println!("{}", output.to_json_string()?);
-                        } else {
-                            let _ =
-                                output_ctx.print_info(format!("Issues with state '{}':", state));
-                            for issue in &issues {
-                                println!("  {} | {} | {:?}", issue.id, issue.title, issue.priority);
-                            }
-                            let _ = output_ctx.print_info(format!("\nTotal: {}", issues.len()));
-                        }
-                    }
-                    Err(e) => {
-                        if json {
-                            use jit::output::JsonError;
-                            let json_error = JsonError::invalid_state(&state, "query state");
-                            println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error.exit_code().code());
-                        } else {
-                            return Err(e);
-                        }
-                    }
-                }
-            }
-            jit::cli::QueryCommands::Priority { priority, json } => {
-                let output_ctx = OutputContext::new(quiet, json);
-                match parse_priority(&priority) {
-                    Ok(parsed_priority) => {
-                        let issues = executor.query_by_priority(parsed_priority)?;
-                        if json {
-                            use jit::output::{JsonOutput, PriorityQueryResponse};
-
-                            let response = PriorityQueryResponse {
-                                priority: parsed_priority,
-                                issues: issues.clone(),
-                                count: issues.len(),
-                            };
-                            let output = JsonOutput::success(response, "registry show");
-                            println!("{}", output.to_json_string()?);
-                        } else {
-                            let _ = output_ctx
-                                .print_info(format!("Issues with priority '{}':", priority));
-                            for issue in &issues {
-                                println!("  {} | {} | {:?}", issue.id, issue.title, issue.state);
-                            }
-                            let _ = output_ctx.print_info(format!("\nTotal: {}", issues.len()));
-                        }
-                    }
-                    Err(e) => {
-                        if json {
-                            use jit::output::JsonError;
-                            let json_error =
-                                JsonError::invalid_priority(&priority, "query priority");
-                            println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error.exit_code().code());
-                        } else {
-                            return Err(e);
-                        }
-                    }
-                }
-            }
-            jit::cli::QueryCommands::Label { pattern, json } => {
-                let output_ctx = OutputContext::new(quiet, json);
-                match executor.query_by_label(&pattern) {
-                    Ok(issues) => {
-                        if json {
-                            use jit::output::{JsonOutput, LabelQueryResponse};
-                            let response = LabelQueryResponse {
-                                pattern: pattern.clone(),
-                                issues: issues.clone(),
-                                count: issues.len(),
-                            };
-                            let output = JsonOutput::success(response, "registry show");
-                            println!("{}", output.to_json_string()?);
-                        } else {
-                            let _ = output_ctx
-                                .print_info(format!("Issues matching label '{}':", pattern));
-                            for issue in &issues {
-                                println!("  {} | {} | {:?}", issue.id, issue.title, issue.state);
-                            }
-                            let _ = output_ctx.print_info(format!("\nTotal: {}", issues.len()));
-                        }
-                    }
-                    Err(e) => {
-                        if json {
-                            use jit::output::JsonError;
-                            let json_error = JsonError::new("INVALID_LABEL_PATTERN", e.to_string(), "query label")
-                                .with_suggestion("Use 'namespace:value' for exact match or 'namespace:*' for wildcard");
-                            println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error.exit_code().code());
-                        } else {
-                            return Err(e);
-                        }
-                    }
-                }
-            }
-            jit::cli::QueryCommands::Strategic { json } => {
-                let output_ctx = OutputContext::new(quiet, json);
-                match executor.query_strategic() {
-                    Ok(issues) => {
-                        if json {
-                            use jit::output::{JsonOutput, StrategicQueryResponse};
-                            let response = StrategicQueryResponse {
-                                issues: issues.clone(),
-                                count: issues.len(),
-                            };
-                            let output = JsonOutput::success(response, "registry show");
-                            println!("{}", output.to_json_string()?);
-                        } else {
-                            let _ = output_ctx.print_info("Strategic issues:");
-                            for issue in &issues {
-                                println!("  {} | {} | {:?}", issue.id, issue.title, issue.state);
-                            }
-                            let _ = output_ctx.print_info(format!("\nTotal: {}", issues.len()));
-                        }
-                    }
-                    Err(e) => {
-                        if json {
-                            use jit::output::JsonError;
-                            let json_error = JsonError::new("QUERY_FAILED", e.to_string(), "query");
-                            println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error.exit_code().code());
-                        } else {
-                            return Err(e);
-                        }
-                    }
-                }
-            }
-            jit::cli::QueryCommands::Closed { json } => {
-                let output_ctx = OutputContext::new(quiet, json);
-                let issues = executor.query_closed()?;
                 if json {
-                    use jit::output::{ClosedQueryResponse, JsonOutput};
-                    let response = ClosedQueryResponse {
-                        issues: issues.clone(),
-                        count: issues.len(),
+                    use jit::domain::MinimalIssue;
+                    use jit::output::JsonOutput;
+                    use serde_json::json;
+
+                    let output = if full {
+                        JsonOutput::success(
+                            json!({
+                                "count": issues.len(),
+                                "issues": issues,
+                            }),
+                            "query closed",
+                        )
+                    } else {
+                        let minimal: Vec<MinimalIssue> =
+                            issues.iter().map(MinimalIssue::from).collect();
+                        JsonOutput::success(
+                            json!({
+                                "count": minimal.len(),
+                                "issues": minimal,
+                            }),
+                            "query closed",
+                        )
                     };
-                    let output = JsonOutput::success(response, "registry show");
                     println!("{}", output.to_json_string()?);
                 } else {
                     let _ = output_ctx.print_info("Closed issues (Done or Rejected):");

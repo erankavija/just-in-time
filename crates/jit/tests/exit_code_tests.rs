@@ -136,7 +136,7 @@ fn test_exit_code_io_error() {
 
     let output = Command::new(jit_binary())
         .current_dir(&temp_dir)
-        .args(["issue", "list"])
+        .args(["query", "all"])
         .output()
         .unwrap();
 

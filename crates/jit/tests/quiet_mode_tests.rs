@@ -88,7 +88,7 @@ fn test_quiet_mode_preserves_essential_output() {
     // Quiet mode should still output the issue list
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp_dir.path())
-        .args(["issue", "list", "--quiet"])
+        .args(["query", "all", "--quiet"])
         .assert()
         .success()
         .stdout(predicate::str::contains("Test Issue 1"))

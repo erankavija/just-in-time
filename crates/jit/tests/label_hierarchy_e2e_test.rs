@@ -186,7 +186,7 @@ fn test_label_hierarchy_complete_workflow() {
     // ========================================================================
 
     // Query exact match: milestone:v1.0
-    let output = run_jit(&temp, &["query", "label", "milestone:v1.0"]);
+    let output = run_jit(&temp, &["query", "all", "--label", "milestone:v1.0"]);
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains(&milestone_id), "Should find milestone");
@@ -200,7 +200,7 @@ fn test_label_hierarchy_complete_workflow() {
     );
 
     // Query wildcard: epic:*
-    let output = run_jit(&temp, &["query", "label", "epic:*"]);
+    let output = run_jit(&temp, &["query", "all", "--label", "epic:*"]);
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains(&epic_id), "Should find epic with epic:auth");
@@ -222,7 +222,7 @@ fn test_label_hierarchy_complete_workflow() {
     );
 
     // Query by component
-    let output = run_jit(&temp, &["query", "label", "component:backend"]);
+    let output = run_jit(&temp, &["query", "all", "--label", "component:backend"]);
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains(&task1_id));
@@ -321,7 +321,7 @@ fn test_label_hierarchy_complete_workflow() {
     assert!(stdout.contains(&epic_id), "Epic should be blocked");
 
     // Tasks should be ready (no dependencies)
-    let output = run_jit(&temp, &["query", "ready"]);
+    let output = run_jit(&temp, &["query", "available"]);
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains(&task1_id), "Task 1 should be ready");
     assert!(stdout.contains(&task2_id), "Task 2 should be ready");
@@ -333,7 +333,7 @@ fn test_label_hierarchy_complete_workflow() {
     run_jit(&temp, &["issue", "update", &task3_id, "--state", "done"]);
 
     // Epic should now be unblocked
-    let output = run_jit(&temp, &["query", "ready"]);
+    let output = run_jit(&temp, &["query", "available"]);
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains(&epic_id), "Epic should now be ready");
 
@@ -341,7 +341,7 @@ fn test_label_hierarchy_complete_workflow() {
     run_jit(&temp, &["issue", "update", &epic_id, "--state", "done"]);
 
     // Milestone should now be unblocked
-    let output = run_jit(&temp, &["query", "ready"]);
+    let output = run_jit(&temp, &["query", "available"]);
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
         stdout.contains(&milestone_id),
@@ -526,7 +526,7 @@ fn test_breakdown_label_inheritance() {
     );
 
     // Query by milestone to find all created issues
-    let output = run_jit(&temp, &["query", "label", "milestone:v2.0"]);
+    let output = run_jit(&temp, &["query", "all", "--label", "milestone:v2.0"]);
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
 
@@ -549,7 +549,7 @@ fn test_breakdown_label_inheritance() {
 
     // Verify subtasks inherited the labels
     // Query by epic:large to find all issues in the epic
-    let output = run_jit(&temp, &["query", "label", "epic:large"]);
+    let output = run_jit(&temp, &["query", "all", "--label", "epic:large"]);
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
 

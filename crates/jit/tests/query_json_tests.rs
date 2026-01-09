@@ -38,7 +38,7 @@ fn test_query_ready_json_output() {
 
     // Query ready with --json
     let output = Command::new(&jit)
-        .args(["query", "ready", "--json"])
+        .args(["query", "available", "--json"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -137,7 +137,7 @@ fn test_query_assignee_json_output() {
 
     // Query by assignee with --json
     let output = Command::new(&jit)
-        .args(["query", "assignee", "copilot:test", "--json"])
+        .args(["query", "all", "--assignee", "copilot:test", "--json"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -148,7 +148,7 @@ fn test_query_assignee_json_output() {
 
     // Verify structure
     assert_eq!(json["success"], true);
-    assert_eq!(json["data"]["assignee"], "copilot:test");
+    assert_eq!(json["data"]["filters"]["assignee"], "copilot:test");
     assert!(json["data"]["issues"].is_array());
     assert_eq!(json["data"]["count"], 1);
 }
@@ -167,7 +167,7 @@ fn test_query_state_json_output() {
 
     // Query by state with --json (issues default to ready when unblocked)
     let output = Command::new(&jit)
-        .args(["query", "state", "ready", "--json"])
+        .args(["query", "all", "--state", "ready", "--json"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -178,7 +178,7 @@ fn test_query_state_json_output() {
 
     // Verify structure
     assert_eq!(json["success"], true);
-    assert_eq!(json["data"]["state"], "ready");
+    assert_eq!(json["data"]["filters"]["state"], "ready");
     assert!(json["data"]["issues"].is_array());
     assert_eq!(json["data"]["count"], 1);
 }
@@ -199,7 +199,7 @@ fn test_query_priority_json_output() {
 
     // Query by priority with --json
     let output = Command::new(&jit)
-        .args(["query", "priority", "high", "--json"])
+        .args(["query", "all", "--priority", "high", "--json"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -210,7 +210,7 @@ fn test_query_priority_json_output() {
 
     // Verify structure
     assert_eq!(json["success"], true);
-    assert_eq!(json["data"]["priority"], "high");
+    assert_eq!(json["data"]["filters"]["priority"], "high");
     assert!(json["data"]["issues"].is_array());
     assert_eq!(json["data"]["count"], 1);
 }
