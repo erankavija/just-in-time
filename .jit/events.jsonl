@@ -1178,3 +1178,13 @@
 {"type":"issue_created","id":"e91501a0-1c95-4596-b967-b8c3365526cd","issue_id":"11682766-316e-4fd7-9bbf-eaddf7c01b04","timestamp":"2026-01-09T19:45:43.086843747Z","title":"Consolidate and simplify jit query commands","priority":"high"}
 {"type":"issue_state_changed","id":"b5f22df0-5a27-4c07-9150-b954a696c643","issue_id":"11682766-316e-4fd7-9bbf-eaddf7c01b04","timestamp":"2026-01-09T19:51:16.976213134Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"cf6cf66d-6dbf-4efb-b9d5-aae7e32a7ecf","issue_id":"11682766-316e-4fd7-9bbf-eaddf7c01b04","timestamp":"2026-01-09T19:51:16.976373454Z","assignee":"agent:copilot-cli"}
+{"type":"gate_passed","id":"ba3b5b3e-ccaf-407c-b986-38b7006557b9","issue_id":"11682766-316e-4fd7-9bbf-eaddf7c01b04","timestamp":"2026-01-10T22:17:51.098282033Z","gate_key":"fmt","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"cc7dec2f-e093-4b8b-a7ef-81efb6af7679","issue_id":"11682766-316e-4fd7-9bbf-eaddf7c01b04","timestamp":"2026-01-10T22:17:55.199771486Z","gate_key":"clippy","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"d67b2c51-c40d-4c01-b8e5-cd88e7495b6e","issue_id":"11682766-316e-4fd7-9bbf-eaddf7c01b04","timestamp":"2026-01-10T22:18:06.007110808Z","gate_key":"tests","updated_by":"auto:executor"}
+{"type":"issue_state_changed","id":"ddc556f1-287b-4c86-8503-9b357b9e5cf7","issue_id":"11682766-316e-4fd7-9bbf-eaddf7c01b04","timestamp":"2026-01-10T22:18:14.138430825Z","from":"in_progress","to":"gated"}
+{"type":"gate_passed","id":"2b7f2006-3f84-4b2e-accc-cf68baa19f0a","issue_id":"11682766-316e-4fd7-9bbf-eaddf7c01b04","timestamp":"2026-01-10T22:18:17.484528222Z","gate_key":"code-review","updated_by":null}
+{"type":"issue_state_changed","id":"db814a3b-3d52-4161-ba87-47a93c1bf7a4","issue_id":"11682766-316e-4fd7-9bbf-eaddf7c01b04","timestamp":"2026-01-10T22:18:17.487503093Z","from":"gated","to":"done"}
+{"type":"issue_completed","id":"d87e5972-b52a-4734-9c67-954bfa5a98f3","issue_id":"11682766-316e-4fd7-9bbf-eaddf7c01b04","timestamp":"2026-01-10T22:18:17.487525473Z"}
+{"type":"gate_passed","id":"a3cdbaf6-b3ca-413a-a3ac-e134e6b12f28","issue_id":"9262f487-89b9-4271-a412-3daff40d258d","timestamp":"2026-01-10T22:29:46.247933579Z","gate_key":"tdd-reminder","updated_by":null}
+{"type":"issue_state_changed","id":"9ed269a9-c9a2-4925-b693-2c5a5cc66dce","issue_id":"9262f487-89b9-4271-a412-3daff40d258d","timestamp":"2026-01-10T22:29:46.250905440Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"a2783011-14bd-43af-ad5d-734aaaadc11d","issue_id":"9262f487-89b9-4271-a412-3daff40d258d","timestamp":"2026-01-10T22:29:46.251066610Z","assignee":"agent:copilot-cli"}

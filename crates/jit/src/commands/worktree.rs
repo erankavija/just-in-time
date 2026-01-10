@@ -2,6 +2,7 @@
 //!
 //! Provides CLI interface for worktree information and operations.
 
+use crate::storage::claim_coordinator::ClaimsIndex;
 use crate::storage::worktree_identity::load_or_create_worktree_identity;
 use crate::storage::worktree_paths::WorktreePaths;
 use crate::storage::IssueStore;
@@ -24,6 +25,21 @@ pub struct WorktreeInfo {
     pub common_dir: String,
 }
 
+/// Entry in worktree list
+#[derive(Debug, Serialize, PartialEq)]
+pub struct WorktreeListEntry {
+    /// Stable worktree identifier
+    pub worktree_id: String,
+    /// Current git branch
+    pub branch: String,
+    /// Absolute path to worktree root
+    pub path: String,
+    /// Whether this is the main worktree
+    pub is_main: bool,
+    /// Number of active claims in this worktree
+    pub active_claims: usize,
+}
+
 /// Get current git branch name.
 fn get_current_branch() -> Result<String> {
     let output = Command::new("git")
@@ -36,6 +52,58 @@ fn get_current_branch() -> Result<String> {
     }
 
     Ok(String::from_utf8(output.stdout)?.trim().to_string())
+}
+
+/// Parsed git worktree entry
+#[derive(Debug)]
+struct GitWorktreeEntry {
+    path: String,
+    branch: String,
+}
+
+/// Parse git worktree list --porcelain output
+fn parse_git_worktree_porcelain(output: &str) -> Result<Vec<GitWorktreeEntry>> {
+    let mut entries = Vec::new();
+    let mut current_path: Option<String> = None;
+    let mut current_branch: Option<String> = None;
+
+    for line in output.lines() {
+        if line.is_empty() {
+            // Empty line signals end of entry
+            if let (Some(path), Some(branch)) = (current_path.take(), current_branch.take()) {
+                entries.push(GitWorktreeEntry { path, branch });
+            }
+            continue;
+        }
+
+        if let Some(path) = line.strip_prefix("worktree ") {
+            current_path = Some(path.to_string());
+        } else if let Some(branch_ref) = line.strip_prefix("branch ") {
+            // Extract branch name from refs/heads/...
+            let branch = branch_ref
+                .strip_prefix("refs/heads/")
+                .unwrap_or(branch_ref)
+                .to_string();
+            current_branch = Some(branch);
+        }
+        // Ignore HEAD and other fields
+    }
+
+    // Handle last entry if no trailing newline
+    if let (Some(path), Some(branch)) = (current_path, current_branch) {
+        entries.push(GitWorktreeEntry { path, branch });
+    }
+
+    Ok(entries)
+}
+
+/// Count active claims for a specific worktree
+fn count_claims_for_worktree(index: &ClaimsIndex, worktree_id: &str) -> usize {
+    index
+        .leases
+        .iter()
+        .filter(|lease| lease.worktree_id == worktree_id)
+        .count()
 }
 
 /// Execute `jit worktree info` command.
@@ -64,6 +132,84 @@ pub fn execute_worktree_info<S: IssueStore>(_storage: &S) -> Result<WorktreeInfo
         is_main_worktree: is_main,
         common_dir: paths.common_dir.to_string_lossy().to_string(),
     })
+}
+
+/// Execute `jit worktree list` command.
+///
+/// Lists all git worktrees with their JIT status including worktree ID, branch,
+/// path, and count of active claims.
+pub fn execute_worktree_list<S: IssueStore>(_storage: &S) -> Result<Vec<WorktreeListEntry>> {
+    use crate::storage::claim_coordinator::ClaimsIndex;
+    use std::path::PathBuf;
+
+    // Get worktree paths to access shared control plane
+    let paths = WorktreePaths::detect()
+        .context("Failed to detect worktree paths - are you in a git repository?")?;
+
+    // Execute git worktree list --porcelain
+    let output = Command::new("git")
+        .args(["worktree", "list", "--porcelain"])
+        .output()
+        .context("Failed to execute git worktree list")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        anyhow::bail!("git worktree list failed: {}", stderr);
+    }
+
+    let porcelain_output =
+        String::from_utf8(output.stdout).context("Invalid UTF-8 in git worktree output")?;
+
+    let git_entries = parse_git_worktree_porcelain(&porcelain_output)?;
+
+    // Load claims index to count active claims per worktree
+    let claims_index_path = paths.shared_jit.join("claims.index.json");
+    let claims_index = if claims_index_path.exists() {
+        let contents =
+            std::fs::read_to_string(&claims_index_path).context("Failed to read claims index")?;
+        serde_json::from_str::<ClaimsIndex>(&contents).context("Failed to parse claims index")?
+    } else {
+        // No claims index file means no active claims
+        ClaimsIndex {
+            schema_version: 1,
+            generated_at: chrono::Utc::now(),
+            last_seq: 0,
+            stale_threshold_secs: 3600,
+            leases: vec![],
+        }
+    };
+
+    // Enrich git entries with JIT data
+    let mut entries = Vec::new();
+    for git_entry in git_entries {
+        let worktree_path = PathBuf::from(&git_entry.path);
+        let local_jit = worktree_path.join(".jit");
+
+        // Try to load worktree identity, fallback to generated ID if not found
+        let worktree_id = if local_jit.exists() {
+            load_or_create_worktree_identity(&local_jit, &worktree_path, &git_entry.branch)
+                .map(|identity| identity.worktree_id)
+                .unwrap_or_else(|_| format!("wt:{}", &git_entry.branch))
+        } else {
+            format!("wt:{}", &git_entry.branch)
+        };
+
+        // Count active claims for this worktree
+        let active_claims = count_claims_for_worktree(&claims_index, &worktree_id);
+
+        // Determine if main worktree (compare with common_dir parent)
+        let is_main = worktree_path == paths.worktree_root && !paths.is_worktree();
+
+        entries.push(WorktreeListEntry {
+            worktree_id,
+            branch: git_entry.branch,
+            path: git_entry.path,
+            is_main,
+            active_claims,
+        });
+    }
+
+    Ok(entries)
 }
 
 #[cfg(test)]
@@ -115,5 +261,113 @@ mod tests {
         assert!(info.is_main_worktree);
 
         Ok(())
+    }
+
+    #[test]
+    fn test_parse_git_worktree_porcelain() {
+        // Test parsing git worktree list --porcelain output
+        let porcelain = "worktree /home/user/project\nHEAD abc123\nbranch refs/heads/main\n\nworktree /home/user/project/wt1\nHEAD def456\nbranch refs/heads/feature/task-1\n";
+
+        let entries = parse_git_worktree_porcelain(porcelain).unwrap();
+
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].path, "/home/user/project");
+        assert_eq!(entries[0].branch, "main");
+        assert_eq!(entries[1].path, "/home/user/project/wt1");
+        assert_eq!(entries[1].branch, "feature/task-1");
+    }
+
+    #[test]
+    fn test_worktree_list_returns_current_worktree() -> Result<()> {
+        let (_temp, storage) = setup_test_repo()?;
+
+        // In an actual git repository, should return at least the current worktree
+        let result = execute_worktree_list(&storage)?;
+
+        // Should have at least one worktree (current)
+        assert!(result.len() >= 1, "Should return at least current worktree");
+
+        // Each entry should have required fields
+        for entry in &result {
+            assert!(!entry.worktree_id.is_empty());
+            assert!(!entry.branch.is_empty());
+            assert!(!entry.path.is_empty());
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_worktree_list_entry_structure() {
+        // Verify the structure is correct
+        let entry = WorktreeListEntry {
+            worktree_id: "wt:12345678".to_string(),
+            branch: "main".to_string(),
+            path: "/home/user/project".to_string(),
+            is_main: true,
+            active_claims: 3,
+        };
+
+        assert_eq!(entry.worktree_id, "wt:12345678");
+        assert_eq!(entry.branch, "main");
+        assert_eq!(entry.active_claims, 3);
+        assert!(entry.is_main);
+    }
+
+    #[test]
+    fn test_count_claims_per_worktree() {
+        use crate::storage::claim_coordinator::{ClaimsIndex, Lease};
+        use chrono::Utc;
+
+        // Create mock claims index with leases for different worktrees
+        let index = ClaimsIndex {
+            schema_version: 1,
+            generated_at: Utc::now(),
+            last_seq: 3,
+            stale_threshold_secs: 3600,
+            leases: vec![
+                Lease {
+                    lease_id: "lease-1".to_string(),
+                    issue_id: "issue-1".to_string(),
+                    agent_id: "agent:1".to_string(),
+                    worktree_id: "wt:abc123".to_string(),
+                    branch: Some("main".to_string()),
+                    ttl_secs: 600,
+                    acquired_at: Utc::now(),
+                    expires_at: None,
+                    last_beat: Utc::now(),
+                },
+                Lease {
+                    lease_id: "lease-2".to_string(),
+                    issue_id: "issue-2".to_string(),
+                    agent_id: "agent:1".to_string(),
+                    worktree_id: "wt:abc123".to_string(),
+                    branch: Some("main".to_string()),
+                    ttl_secs: 600,
+                    acquired_at: Utc::now(),
+                    expires_at: None,
+                    last_beat: Utc::now(),
+                },
+                Lease {
+                    lease_id: "lease-3".to_string(),
+                    issue_id: "issue-3".to_string(),
+                    agent_id: "agent:2".to_string(),
+                    worktree_id: "wt:def456".to_string(),
+                    branch: Some("feature/test".to_string()),
+                    ttl_secs: 600,
+                    acquired_at: Utc::now(),
+                    expires_at: None,
+                    last_beat: Utc::now(),
+                },
+            ],
+        };
+
+        let count_abc = count_claims_for_worktree(&index, "wt:abc123");
+        let count_def = count_claims_for_worktree(&index, "wt:def456");
+        let count_xyz = count_claims_for_worktree(&index, "wt:xyz789");
+
+        assert_eq!(count_abc, 2);
+        assert_eq!(count_def, 1);
+        assert_eq!(count_xyz, 0);
     }
 }

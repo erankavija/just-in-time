@@ -2400,6 +2400,52 @@ strategic_types = {}
                     }
                 }
             }
+            jit::cli::WorktreeCommands::List { json } => {
+                use jit::commands::worktree::execute_worktree_list;
+                use jit::output::{JsonError, JsonOutput};
+
+                match execute_worktree_list(&storage) {
+                    Ok(worktrees) => {
+                        if json {
+                            let response = serde_json::json!({
+                                "worktrees": worktrees,
+                            });
+                            let output = JsonOutput::success(response, "worktree list");
+                            println!("{}", output.to_json_string()?);
+                        } else {
+                            // Human-readable table format
+                            println!(
+                                "{:<16} {:<25} {:<50} {:>6}",
+                                "WORKTREE ID", "BRANCH", "PATH", "CLAIMS"
+                            );
+                            println!("{}", "-".repeat(100));
+
+                            for entry in worktrees {
+                                println!(
+                                    "{:<16} {:<25} {:<50} {:>6}",
+                                    entry.worktree_id,
+                                    entry.branch,
+                                    entry.path,
+                                    entry.active_claims
+                                );
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        if json {
+                            let json_error = JsonError::new(
+                                "WORKTREE_LIST_ERROR",
+                                e.to_string(),
+                                "worktree list",
+                            );
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
+                        } else {
+                            return Err(e);
+                        }
+                    }
+                }
+            }
         },
         Commands::Snapshot(snapshot_cmd) => match snapshot_cmd {
             jit::cli::SnapshotCommands::Export {

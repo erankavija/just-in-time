@@ -2,7 +2,7 @@
   "id": "11682766-316e-4fd7-9bbf-eaddf7c01b04",
   "title": "Consolidate and simplify jit query commands",
   "description": "## Problem\n\nCurrent query/list system has confusing overlaps and naming issues:\n\n1. **Naming collision**: `jit query ready` (unassigned + unblocked) vs `--state ready` (just the state field)\n2. **Redundant commands**: `jit query state/assignee/priority/label` AND `jit issue list` both do basic filtering\n3. **Inconsistent filtering**: Some queries accept filters, others don't\n4. **Discoverability**: Hard to compose filters (e.g., \"ready issues in epic X\")\n\n## Proposed Solution\n\nConsolidate into clean subcommand pattern where all subcommands are filters:\n\n### New Design\n```bash\n# Filter all issues\njit query all [--state STATE] [--assignee X] [--priority P] [--label PATTERN]\n\n# Special filtered queries (with optional additional filters)\njit query available [--priority P] [--label PATTERN]   # unassigned + state=ready + unblocked\njit query blocked [--priority P] [--label PATTERN]     # has blocking deps/gates (with reasons)\njit query strategic [--priority P] [--label PATTERN]   # has strategic labels\njit query closed [--priority P] [--label PATTERN]      # state=done OR rejected\n```\n\n### Changes Required\n\n**Remove redundant commands:**\n- ❌ `jit issue list` → use `jit query all` (with same filters)\n- ❌ `jit query state` → use `jit query all --state`\n- ❌ `jit query assignee` → use `jit query all --assignee`\n- ❌ `jit query priority` → use `jit query all --priority`\n- ❌ `jit query label` → use `jit query all --label`\n\n**Rename for clarity:**\n- ✅ `jit query ready` → `jit query available` (avoid confusion with --state ready)\n\n**Add new:**\n- ✅ `jit query all` - base filter accepting all filter flags\n\n**Add filters to special queries:**\n- All special queries accept `--priority`, `--label`, etc. for further filtering\n\n**Keep as is:**\n- ✅ `jit issue search` - text search remains separate (different use case)\n- ✅ `jit issue show` - display single issue\n- ✅ `jit issue create/update/delete` - CRUD operations\n\n## Benefits\n\n- **No naming confusion**: `available` != `--state ready`\n- **Composable**: `jit query available --label epic:auth`\n- **Consistent**: All subcommands follow same pattern\n- **Agent-friendly**: Predictable, uniform interface\n- **Less code**: Remove 5 redundant commands\n- **Clear semantics**: `jit query` for finding issues, `jit issue` for CRUD operations\n\n## Implementation Tasks\n\n1. Add `jit query all` with filter flags\n2. Rename `ready` → `available`\n3. Add filter flags to `available/blocked/strategic/closed`\n4. Remove `state/assignee/priority/label` query subcommands\n5. Remove `jit issue list` command\n6. Update CLI help text and schema\n7. Update ~26 documentation files\n8. Update 3 scripts\n9. Regenerate MCP server from new schema\n10. Add tests for new filter combinations\n\n## Breaking Changes\n\nNot backward compatible (pre-1.0), but migration is straightforward:\n- `jit issue list` → `jit query all`\n- `jit issue list --state X` → `jit query all --state X`\n- `jit query ready` → `jit query available`\n- `jit query state X` → `jit query all --state X`\n- `jit query label X` → `jit query all --label X`\n\n## Implementation Notes\n\n### Output Format Consistency\n\nAll query commands now return consistent JSON structure:\n```json\n{\n  \"count\": N,\n  \"issues\": [...]\n}\n```\n\nFor `jit query all`, additional `filters` field shows applied filters:\n```json\n{\n  \"count\": N,\n  \"issues\": [...],\n  \"filters\": {\n    \"state\": \"ready\",\n    \"label\": \"epic:auth\",\n    ...\n  }\n}\n```\n\nThis ensures predictable, uniform output across all query commands while preserving filter transparency for the base `all` command.\n\n### Token Efficiency with --full Flag\n\nBy default, all query commands return minimal issue objects containing only:\n- `id` - Full UUID\n- `title` - Issue title\n- `state` - Current state\n- `priority` - Priority level\n\nFor blocked queries, also includes:\n- `blocked_reasons` - List of blocking reasons\n\nUse `--full` flag to return complete issue objects when needed:\n```bash\njit query all --full --json           # Full issue details\njit query available --label epic:auth  # Minimal (default)\n```\n\nThis dramatically reduces token usage for queries that return many issues.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "high",
   "assignee": "agent:copilot-cli",
   "dependencies": [],
@@ -12,7 +12,28 @@
     "fmt",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-10T22:17:50.594321139Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-10T22:17:50.594354379Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-01-10T22:18:17.484349582Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-10T22:17:50.594334749Z"
+    }
+  },
   "context": {},
   "documents": [
     {

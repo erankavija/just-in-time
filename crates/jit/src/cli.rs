@@ -1151,4 +1151,18 @@ pub enum WorktreeCommands {
         #[arg(long)]
         json: bool,
     },
+
+    /// List all git worktrees with JIT status
+    ///
+    /// Shows all worktrees with their worktree ID, branch, path,
+    /// and count of active claims.
+    ///
+    /// Examples:
+    ///   jit worktree list          # List all worktrees
+    ///   jit worktree list --json   # JSON output
+    List {
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
 }
