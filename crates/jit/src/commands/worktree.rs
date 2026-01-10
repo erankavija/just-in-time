@@ -61,7 +61,24 @@ struct GitWorktreeEntry {
     branch: String,
 }
 
-/// Parse git worktree list --porcelain output
+/// Parse git worktree list --porcelain output.
+///
+/// Porcelain format provides machine-readable output with lines like:
+/// ```text
+/// worktree /path/to/worktree
+/// HEAD abc123def456...
+/// branch refs/heads/main
+///
+/// worktree /path/to/secondary
+/// HEAD 789ghi...
+/// branch refs/heads/feature/x
+/// ```
+///
+/// # Returns
+/// Vector of parsed worktree entries with path and branch name
+///
+/// # Errors
+/// Returns error if output format is invalid
 fn parse_git_worktree_porcelain(output: &str) -> Result<Vec<GitWorktreeEntry>> {
     let mut entries = Vec::new();
     let mut current_path: Option<String> = None;
@@ -97,7 +114,17 @@ fn parse_git_worktree_porcelain(output: &str) -> Result<Vec<GitWorktreeEntry>> {
     Ok(entries)
 }
 
-/// Count active claims for a specific worktree
+/// Count active claims for a specific worktree.
+///
+/// Filters the claims index to count leases where the worktree_id matches
+/// the provided identifier.
+///
+/// # Arguments
+/// * `index` - Claims index containing all active leases
+/// * `worktree_id` - Worktree identifier to filter by (e.g., "wt:abc12345")
+///
+/// # Returns
+/// Number of active claims (leases) for the worktree
 fn count_claims_for_worktree(index: &ClaimsIndex, worktree_id: &str) -> usize {
     index
         .leases
@@ -180,34 +207,43 @@ pub fn execute_worktree_list<S: IssueStore>(_storage: &S) -> Result<Vec<Worktree
     };
 
     // Enrich git entries with JIT data
-    let mut entries = Vec::new();
-    for git_entry in git_entries {
-        let worktree_path = PathBuf::from(&git_entry.path);
-        let local_jit = worktree_path.join(".jit");
+    let entries = git_entries
+        .into_iter()
+        .map(|git_entry| -> Result<WorktreeListEntry> {
+            let worktree_path = PathBuf::from(&git_entry.path);
+            let local_jit = worktree_path.join(".jit");
 
-        // Try to load worktree identity, fallback to generated ID if not found
-        let worktree_id = if local_jit.exists() {
-            load_or_create_worktree_identity(&local_jit, &worktree_path, &git_entry.branch)
-                .map(|identity| identity.worktree_id)
-                .unwrap_or_else(|_| format!("wt:{}", &git_entry.branch))
-        } else {
-            format!("wt:{}", &git_entry.branch)
-        };
+            // Load worktree identity - error if .jit exists but can't be read
+            let worktree_id = if local_jit.exists() {
+                let identity =
+                    load_or_create_worktree_identity(&local_jit, &worktree_path, &git_entry.branch)
+                        .with_context(|| {
+                            format!(
+                                "Failed to load worktree identity from {}",
+                                local_jit.display()
+                            )
+                        })?;
+                identity.worktree_id
+            } else {
+                // No .jit directory yet - use branch-based temporary ID
+                format!("wt:{}", &git_entry.branch)
+            };
 
-        // Count active claims for this worktree
-        let active_claims = count_claims_for_worktree(&claims_index, &worktree_id);
+            // Count active claims for this worktree
+            let active_claims = count_claims_for_worktree(&claims_index, &worktree_id);
 
-        // Determine if main worktree (compare with common_dir parent)
-        let is_main = worktree_path == paths.worktree_root && !paths.is_worktree();
+            // Determine if main worktree (compare with common_dir parent)
+            let is_main = worktree_path == paths.worktree_root && !paths.is_worktree();
 
-        entries.push(WorktreeListEntry {
-            worktree_id,
-            branch: git_entry.branch,
-            path: git_entry.path,
-            is_main,
-            active_claims,
-        });
-    }
+            Ok(WorktreeListEntry {
+                worktree_id,
+                branch: git_entry.branch,
+                path: git_entry.path,
+                is_main,
+                active_claims,
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
 
     Ok(entries)
 }
@@ -369,5 +405,49 @@ mod tests {
         assert_eq!(count_abc, 2);
         assert_eq!(count_def, 1);
         assert_eq!(count_xyz, 0);
+    }
+
+    #[test]
+    fn test_parse_git_worktree_porcelain_invalid() {
+        // Test error handling for malformed output
+        let invalid = "worktree /path\nHEAD abc123\n";
+        // Missing branch line - should still work, just no branch entry created
+        let result = parse_git_worktree_porcelain(invalid);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().len(), 0);
+    }
+
+    #[test]
+    fn test_json_output_structure() -> Result<()> {
+        let (_temp, storage) = setup_test_repo()?;
+
+        let result = execute_worktree_list(&storage)?;
+
+        // Verify JSON serialization works
+        let json = serde_json::to_string(&result)?;
+        assert!(json.contains("worktree_id"));
+        assert!(json.contains("branch"));
+        assert!(json.contains("path"));
+        assert!(json.contains("is_main"));
+        assert!(json.contains("active_claims"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_worktree_list_with_no_claims_index() -> Result<()> {
+        let (_temp, storage) = setup_test_repo()?;
+
+        // Even without claims.index.json, should work and show 0 claims
+        let result = execute_worktree_list(&storage)?;
+
+        for entry in &result {
+            assert_eq!(
+                entry.active_claims, 0,
+                "Should have 0 claims when no index exists"
+            );
+        }
+
+        Ok(())
     }
 }
