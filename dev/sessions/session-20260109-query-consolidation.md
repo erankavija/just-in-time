@@ -368,3 +368,47 @@ Typical savings: query returning 50 issues
 ## Summary
 
 Core implementation complete and working. Main remaining work is fixing tests to work with minimal output and updating documentation. The design is solid and delivers significant improvements in consistency, clarity, and efficiency.
+
+## Update: 2026-01-10 - Implementation Complete
+
+### Completed Work
+
+✅ **All tasks from "Next Steps" completed:**
+
+1. **Test failures fixed** - 3 tests updated to use `--full` flag and correct blocked_reasons format
+2. **Documentation updated** - 31 files updated with new command syntax
+3. **Scripts updated** - 3 shell scripts migrated to new commands  
+4. **MCP server regenerated** - Schema updated with new query commands
+5. **Quality gates passed:**
+   - Tests: 464 passed (1 pre-existing flaky test)
+   - Clippy: Pass (1 pre-existing warning)
+   - Fmt: Pass
+
+### Final Commit Summary
+
+```
+2208edc test: Fix test assertions for minimal query output format
+fd21dc6 docs: Update all documentation for query command consolidation
+13a6402 mcp: Regenerate schema for query command consolidation
+```
+
+### Migration Summary
+
+**Commands changed:**
+- `jit query ready` → `jit query available`
+- `jit query state X` → `jit query all --state X`
+- `jit query priority X` → `jit query all --priority X`
+- `jit query assignee X` → `jit query all --assignee X`
+- `jit query label X` → `jit query all --label X`
+- `jit issue list` → `jit query all`
+
+**Files updated:**
+- 31 documentation/script files
+- 3 test files
+- 1 MCP schema file
+
+**Breaking changes:** Yes - not backward compatible (pre-1.0)
+
+### Issue Status
+
+Ready to mark issue 1168 as done after final gate checks.
