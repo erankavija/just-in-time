@@ -106,10 +106,14 @@ fn test_query_blocked_json_output() {
     assert!(json["data"]["issues"].is_array());
     assert_eq!(json["data"]["count"], 1);
     assert!(json["data"]["issues"][0]["blocked_reasons"].is_array());
-    assert_eq!(
-        json["data"]["issues"][0]["blocked_reasons"][0]["type"],
-        "dependency"
-    );
+
+    // blocked_reasons is now an array of strings, not objects
+    let blocked_reasons = json["data"]["issues"][0]["blocked_reasons"]
+        .as_array()
+        .unwrap();
+    assert_eq!(blocked_reasons.len(), 1);
+    let reason_str = blocked_reasons[0].as_str().unwrap();
+    assert!(reason_str.starts_with("dependency:"));
 }
 
 #[test]

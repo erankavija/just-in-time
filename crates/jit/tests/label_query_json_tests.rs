@@ -47,7 +47,14 @@ fn test_query_label_json_exact_match() {
 
     // Query with JSON
     let output = Command::new(&jit)
-        .args(["query", "all", "--label", "milestone:v1.0", "--json"])
+        .args([
+            "query",
+            "all",
+            "--label",
+            "milestone:v1.0",
+            "--full",
+            "--json",
+        ])
         .current_dir(temp.path())
         .output()
         .unwrap();
