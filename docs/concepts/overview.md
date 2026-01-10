@@ -113,7 +113,7 @@ JIT (Just-In-Time) is a **CLI-first issue tracker** designed for **AI agent orch
 **Example:**
 ```bash
 # Agent queries ready work
-jit query ready --json
+jit query available --json
 
 # Agent claims task atomically
 jit issue claim abc123 agent:worker-1

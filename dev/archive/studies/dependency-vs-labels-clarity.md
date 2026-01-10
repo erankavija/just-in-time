@@ -30,7 +30,7 @@ Flow: Task → Epic → Milestone (membership)
 ```
 
 **Purpose**: Organization, filtering, reporting  
-**Query**: `jit query label "epic:auth"` shows all members  
+**Query**: `jit query all --label "epic:auth"` shows all members  
 **Properties**:
 - Hierarchical (smaller belongs to larger)
 - Multiple issues can share same label
@@ -49,7 +49,7 @@ Flow: Task → Epic → Milestone (work order)
 ```
 
 **Purpose**: Workflow control, state transitions  
-**Query**: `jit query ready` shows unblocked work  
+**Query**: `jit query available` shows unblocked work  
 **Properties**:
 - DAG (can be any acyclic structure)
 - Controls issue state (backlog → ready → done)
@@ -130,8 +130,8 @@ jit dep add $EPIC $TASK2
 **Result**:
 - ✅ Labels: All grouped under `epic:auth`
 - ✅ Dependencies: Epic blocked until tasks done
-- ✅ `jit query label "epic:*"` shows all 3 issues
-- ✅ `jit query ready` shows only tasks (epic blocked)
+- ✅ `jit query all --label "epic:*"` shows all 3 issues
+- ✅ `jit query available` shows only tasks (epic blocked)
 
 **Use case**: Most common workflow pattern
 
@@ -254,23 +254,23 @@ jit graph downstream TASK
 
 ```bash
 # Find all work in an epic
-jit query label "epic:auth"
+jit query all --label "epic:auth"
 
 # Find all work in a milestone
-jit query label "milestone:v1.0"
+jit query all --label "milestone:v1.0"
 
 # Find strategic issues (epic/milestone labels)
 jit query strategic
 
 # Find by component
-jit query label "component:backend"
+jit query all --label "component:backend"
 ```
 
 ### Workflow View (Dependencies)
 
 ```bash
 # Find work that's ready to start
-jit query ready
+jit query available
 
 # Find blocked work
 jit query blocked

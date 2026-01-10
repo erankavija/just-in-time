@@ -118,7 +118,7 @@ archive/        → After 1-2 releases
 1. Read [CONTRIBUTOR-QUICKSTART.md](../CONTRIBUTOR-QUICKSTART.md)
 2. Review [architecture/core-system-design.md](architecture/core-system-design.md)
 3. Check `.copilot-instructions.md` for coding standards
-4. Use `jit query ready` to find tasks
+4. Use `jit query available` to find tasks
 
 **Adding Documentation:**
 - **Active work?** → Add design doc to `active/` and link to issue

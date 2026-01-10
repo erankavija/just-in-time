@@ -12,7 +12,7 @@ When using JIT in scripts or piping commands, unnecessary output causes issues:
 
 **Example**:
 ```bash
-$ jit issue list | head -1
+$ jit query all | head -1
 thread 'main' panicked at library/std/src/io/stdio.rs:1165:9:
 failed printing to stdout: Broken pipe (os error 32)
 ```
@@ -339,7 +339,7 @@ ISSUE_ID=$(jit issue create --title "Bug fix" --quiet)
 jit issue update $ISSUE_ID --state done --quiet
 
 # Pipe to other commands without noise
-jit issue list --quiet | grep "Bug"
+jit query all --quiet | grep "Bug"
 ```
 
 ### JSON Mode
@@ -347,7 +347,7 @@ jit issue list --quiet | grep "Bug"
 Combine `--quiet` with `--json` for pure JSON output:
 
 ```bash
-jit issue list --quiet --json | jq '.data[0].id'
+jit query all --quiet --json | jq '.data[0].id'
 ```
 ```
 

@@ -57,7 +57,7 @@ list_issues() {
     local num_reads=$2
     
     for i in $(seq 1 $num_reads); do
-        jit issue list > /dev/null 2>&1
+        jit query all > /dev/null 2>&1
         if [ $? -ne 0 ]; then
             echo -e "${RED}❌ Agent $agent_id failed to list issues (attempt $i)${NC}"
             return 1
@@ -93,10 +93,10 @@ fi
 
 # Verify issue count (use --json for reliable parsing)
 if command -v jq &> /dev/null; then
-    issue_count=$(jit issue list --json 2>/dev/null | jq '.data.issues | length')
+    issue_count=$(jit query all --json 2>/dev/null | jq '.data.issues | length')
 else
     # Fallback: count lines in normal output (each issue is one line)
-    issue_count=$(jit issue list 2>/dev/null | tail -n +1 | wc -l)
+    issue_count=$(jit query all 2>/dev/null | tail -n +1 | wc -l)
 fi
 
 expected=50

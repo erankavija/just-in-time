@@ -78,7 +78,7 @@ jit issue claim $TASK1 agent:worker-1
 jit issue update $TASK1 --state done
 
 # Check what's ready to work on
-jit query ready
+jit query available
 ```
 
 **See [Quickstart Tutorial](docs/tutorials/quickstart.md) and [Complete Workflow Example](docs/tutorials/first-workflow.md) for full walkthroughs.**
@@ -188,8 +188,8 @@ jit issue create --title "Login API" --label "type:task" --label "epic:auth"
 
 # Query by labels
 jit query strategic              # Only milestones and epics
-jit query label "epic:auth"      # All tasks in auth epic
-jit query label "milestone:*"    # All milestone-tagged work
+jit query all --label "epic:auth"      # All tasks in auth epic
+jit query all --label "milestone:*"    # All milestone-tagged work
 ```
 
 Labels are **optional** - use them when you need organizational structure. Dependencies are always required.

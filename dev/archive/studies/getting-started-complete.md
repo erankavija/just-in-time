@@ -170,7 +170,7 @@ Labels group related work for filtering and reporting:
 - `--label "epic:auth"` means "this work is part of the auth epic"
 - `--label "milestone:v1.0"` means "this work is part of the v1.0 release"
 
-**Query**: `jit query label "epic:auth"` shows all members
+**Query**: `jit query all --label "epic:auth"` shows all members
 
 ### Dependencies: Work Order
 
@@ -178,7 +178,7 @@ Dependencies control workflow and blocking:
 - `jit dep add EPIC TASK` means "epic depends on task"
 - Epic is blocked until task completes
 
-**Query**: `jit query ready` shows unblocked work
+**Query**: `jit query available` shows unblocked work
 
 ### They Work Together
 
@@ -255,7 +255,7 @@ jit issue create \
   --state backlog
 
 # Note the issue ID (e.g., 01ABC123XYZ)
-INFRA_ID=$(jit issue list --json | jq -r '.[0].id')
+INFRA_ID=$(jit query all --json | jq -r '.[0].id')
 
 jit issue create \
   --title "Implement markdown parser" \
@@ -263,7 +263,7 @@ jit issue create \
   --priority high \
   --state backlog
 
-PARSER_ID=$(jit issue list --json | jq -r '.[1].id')
+PARSER_ID=$(jit query all --json | jq -r '.[1].id')
 
 jit issue create \
   --title "Build template engine" \
@@ -271,7 +271,7 @@ jit issue create \
   --priority normal \
   --state backlog
 
-TEMPLATE_ID=$(jit issue list --json | jq -r '.[2].id')
+TEMPLATE_ID=$(jit query all --json | jq -r '.[2].id')
 
 jit issue create \
   --title "Generate static site" \
@@ -281,7 +281,7 @@ jit issue create \
   --depends-on "$PARSER_ID" \
   --depends-on "$TEMPLATE_ID"
 
-GENERATOR_ID=$(jit issue list --json | jq -r '.[3].id')
+GENERATOR_ID=$(jit query all --json | jq -r '.[3].id')
 
 jit issue create \
   --title "Add RSS feed support" \
@@ -290,7 +290,7 @@ jit issue create \
   --state backlog \
   --depends-on "$GENERATOR_ID"
 
-RSS_ID=$(jit issue list --json | jq -r '.[4].id')
+RSS_ID=$(jit query all --json | jq -r '.[4].id')
 
 # View dependency graph
 jit graph show
@@ -374,7 +374,7 @@ jit issue update "$INFRA_ID" --state in_progress
 jit issue update "$INFRA_ID" --state done
 
 # Infrastructure is done, parser is now ready
-jit query ready
+jit query available
 # Output: 02DEF456ABC: Implement markdown parser (ready, high)
 
 # Claim and work on parser
@@ -394,7 +394,7 @@ jit issue show "$PARSER_ID"
 # State: done
 
 # Check what's ready now
-jit query ready
+jit query available
 # Output: 03GHI789DEF: Build template engine (ready, normal)
 ```
 
@@ -411,11 +411,11 @@ jit search "markdown"
 jit search "template" --glob "docs/*.md"
 
 # Query by state
-jit query state in_progress
-jit query state done
+jit query all --state in_progress
+jit query all --state done
 
 # Query by priority
-jit query priority high
+jit query all --priority high
 
 # Check for blocked issues
 jit query blocked
@@ -431,7 +431,7 @@ jit query blocked
 ```bash
 # Issue Management
 jit issue create --title "..." --description "..." --priority high
-jit issue list
+jit query all
 jit issue show <id>
 jit issue update <id> --state in_progress
 jit issue delete <id>
@@ -463,11 +463,11 @@ jit graph downstream <id>
 jit graph export --format dot  # or mermaid
 
 # Queries
-jit query ready
+jit query available
 jit query blocked
-jit query state <state>
-jit query priority <priority>
-jit query assignee <assignee>
+jit query all --state <state>
+jit query all --priority <priority>
+jit query all --assignee <assignee>
 
 # Search
 jit search <query> [--regex] [--glob "pattern"]
@@ -479,7 +479,7 @@ jit validate  # Check DAG integrity, gates, references
 jit status  # Overview of repository
 
 # JSON Output (for automation)
-jit issue list --json | jq '.[] | select(.state == "ready")'
+jit query all --json | jq '.[] | select(.state == "ready")'
 ```
 
 ---

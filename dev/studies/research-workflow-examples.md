@@ -57,12 +57,12 @@ Research workflows use the same parallel structure as development workflows.
 **Labels (membership)** = Organizational grouping
 - "This literature review belongs to the vector-survey paper"
 - Purpose: Track related work, filter by project
-- Query: `jit query label "paper:vector-survey"`
+- Query: `jit query all --label "paper:vector-survey"`
 
 **Dependencies (work order)** = Blocking relationships
 - "The paper writing requires literature reviews to complete"
 - Purpose: Control workflow, determine what's ready
-- Query: `jit query ready` (unblocked work)
+- Query: `jit query available` (unblocked work)
 
 **Both flow the same direction**: Review → Paper → Publication
 
@@ -89,8 +89,8 @@ jit dep add $PAPER $LIT3
 # Result:
 # Labels: All part of vector-db-survey paper (grouped for queries)
 # Dependencies: Paper writing waits for reviews (workflow control)
-# Query: jit query label "paper:*" shows all paper-related work
-# Query: jit query ready shows reviews (paper is blocked)
+# Query: jit query all --label "paper:*" shows all paper-related work
+# Query: jit query available shows reviews (paper is blocked)
 ```
 
 ### Asymmetry: Follow-up Work Can Depend on Published Results
@@ -255,7 +255,7 @@ jit dep add $TASK3 $TASK2  # API needs vector store
 **Progress tracking:**
 ```bash
 # Show all work in this epic (membership via label)
-jit query label "epic:semantic-search"
+jit query all --label "epic:semantic-search"
 
 # Show blocking dependencies for epic (what gates completion)
 jit graph show $EPIC
@@ -294,7 +294,7 @@ OTHER_EPIC=$(jit issue create \
 jit dep add $MILESTONE $OTHER_EPIC
 
 # 4. Strategic view: what's in this milestone?
-jit query label "milestone:v1.1"
+jit query all --label "milestone:v1.1"
 
 # 5. Gated view: what must complete for milestone?
 jit graph show $MILESTONE
@@ -600,7 +600,7 @@ jit issue update $TASK_EMBED --state done
 jit issue update $TASK_DB --state done
 
 # TASK_API now fully unblocked → state:ready
-jit query ready
+jit query available
 # Output: TASK_API
 
 jit issue claim $TASK_API agent:dev-bob
@@ -679,7 +679,7 @@ jit dep add $MILESTONE $EPIC
 jit issue update $EPIC --label "milestone:v1.1"
 
 # Query all work in this milestone
-jit query label "milestone:v1.1"
+jit query all --label "milestone:v1.1"
 
 # Strategic view: show milestone progress
 jit graph show $MILESTONE --format mermaid
@@ -770,13 +770,13 @@ Epic: Semantic Search
 
 ```bash
 # All work in epic (membership)
-jit query label "epic:semantic-search"
+jit query all --label "epic:semantic-search"
 
 # Required work for epic (gating)
 jit graph show $EPIC
 
 # Optional work (label but no edge)
-# Future: jit query label "epic:semantic-search" --exclude-dependencies $EPIC
+# Future: jit query all --label "epic:semantic-search" --exclude-dependencies $EPIC
 ```
 
 ---
@@ -787,38 +787,38 @@ jit graph show $EPIC
 
 ```bash
 # All epics
-jit query label "type:epic"
+jit query all --label "type:epic"
 
 # All milestones
-jit query label "type:milestone"
+jit query all --label "type:milestone"
 
 # Strategic view (epics + milestones)
-jit query label "epic:*" --or label "milestone:*"
+jit query all --label "epic:*" --or label "milestone:*"
 
 # Specific milestone's work
-jit query label "milestone:v1.1"
+jit query all --label "milestone:v1.1"
 
 # Specific epic's work
-jit query label "epic:semantic-search"
+jit query all --label "epic:semantic-search"
 ```
 
 ### Operational Queries
 
 ```bash
 # Ready tasks (unblocked, unassigned)
-jit query ready
+jit query available
 
 # Ready tasks in specific epic
-jit query ready | jq '.[] | select(.labels | contains(["epic:semantic-search"]))'
+jit query available | jq '.[] | select(.labels | contains(["epic:semantic-search"]))'
 
 # Blocked issues with reasons
 jit query blocked
 
 # My assigned work
-jit query assignee "agent:dev-bob"
+jit query all --assignee "agent:dev-bob"
 
 # High-priority work
-jit query priority "high"
+jit query all --priority "high"
 ```
 
 ### Progress Tracking
@@ -842,10 +842,10 @@ jit graph downstream $TASK
 
 ```bash
 # Find ideas without research tasks
-jit query label "type:idea" | jq '.[] | select(.dependencies | length == 0)'
+jit query all --label "type:idea" | jq '.[] | select(.dependencies | length == 0)'
 
 # Find epics without tasks
-jit query label "type:epic" | jq '.[] | select(.dependencies | length == 0)'
+jit query all --label "type:epic" | jq '.[] | select(.dependencies | length == 0)'
 
 # Find orphaned research tasks (no idea/epic depends on them)
 # Future: jit query orphaned --type research

@@ -74,20 +74,20 @@ echo ""
 
 # Query by label - exact match
 echo "STEP 7: Query by label (exact match: milestone:v1.0)"
-echo "$ jit query label 'milestone:v1.0'"
-jit query label "milestone:v1.0"
+echo "$ jit query all --label 'milestone:v1.0'"
+jit query all --label "milestone:v1.0"
 echo ""
 
 # Query by label - wildcard
 echo "STEP 8: Query by label (wildcard: epic:*)"
-echo "$ jit query label 'epic:*'"
-jit query label "epic:*"
+echo "$ jit query all --label 'epic:*'"
+jit query all --label "epic:*"
 echo ""
 
 # Query by component
 echo "STEP 9: Query by component (component:backend)"
-echo "$ jit query label 'component:backend'"
-jit query label "component:backend"
+echo "$ jit query all --label 'component:backend'"
+jit query all --label "component:backend"
 echo ""
 
 # Strategic view
@@ -116,9 +116,9 @@ echo ""
 
 # Check ready/blocked status
 echo "STEP 14: Check ready and blocked issues"
-echo "$ jit query ready"
+echo "$ jit query available"
 echo "Ready issues (no blocking dependencies):"
-jit query ready
+jit query available
 echo ""
 echo "$ jit query blocked"
 echo "Blocked issues (have blocking dependencies):"
@@ -137,8 +137,8 @@ echo "✓ All tasks completed"
 echo ""
 
 echo "STEP 16: Check if epic is now unblocked"
-echo "$ jit query ready"
-jit query ready
+echo "$ jit query available"
+jit query available
 echo ""
 
 # Graph visualization

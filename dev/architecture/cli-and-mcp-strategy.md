@@ -56,7 +56,7 @@
 
 **Before** (human-readable):
 ```bash
-$ jit issue list
+$ jit query all
 Open: 5  Ready: 3  In Progress: 2  Done: 10
 
 abc123 | Feature: Add authentication | high | open
@@ -65,7 +65,7 @@ def456 | Bug: Fix login redirect     | critical | ready
 
 **After** (with --json):
 ```bash
-$ jit issue list --json
+$ jit query all --json
 {
   "success": true,
   "data": {
@@ -156,7 +156,7 @@ $ jit issue show nonexistent --json
       "requested_id": "nonexistent"
     },
     "suggestions": [
-      "Run 'jit issue list' to see available issues",
+      "Run 'jit query all' to see available issues",
       "Check if the issue ID is correct"
     ]
   },
@@ -477,7 +477,7 @@ await server.connect(transport);
 | MCP Tool | CLI Command | Description |
 |----------|-------------|-------------|
 | `jit_create_issue` | `jit issue create` | Create new issue |
-| `jit_list_issues` | `jit issue list` | List issues with filters |
+| `jit_list_issues` | `jit query all` | List issues with filters |
 | `jit_show_issue` | `jit issue show` | Get issue details |
 | `jit_update_issue` | `jit issue update` | Update issue fields |
 | `jit_claim_issue` | `jit issue claim` | Claim issue for agent |
@@ -486,7 +486,7 @@ await server.connect(transport);
 | `jit_add_gate` | `jit gate add` | Add gate to issue |
 | `jit_pass_gate` | `jit gate pass` | Mark gate as passed |
 | `jit_fail_gate` | `jit gate fail` | Mark gate as failed |
-| `jit_query_ready` | `jit query ready` | Get ready issues |
+| `jit_query_ready` | `jit query available` | Get ready issues |
 | `jit_query_blocked` | `jit query blocked` | Get blocked issues |
 | `jit_show_graph` | `jit graph show` | Get dependency graph |
 | `jit_validate` | `jit validate` | Validate repository |

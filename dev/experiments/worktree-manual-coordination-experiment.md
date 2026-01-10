@@ -191,7 +191,7 @@ jit issue update <id> --assignee agent:your-name --state in-progress
 
 ### 2. Communicate Claims
 - Verbally announce: "I'm working on task b69fa9a9"
-- Check assignments: `jit query assignee agent:agent-1`
+- Check assignments: `jit query all --assignee agent:agent-1`
 
 ### 3. Avoid Conflicts
 - **Never work on the same issue** as another agent
@@ -348,7 +348,7 @@ Resolution: `git show :2 > ours && git show :3 > theirs && cat ours theirs | sor
 1. **Claim/lease system**: Atomic acquisition, TTL-based expiry, prevents concurrent edits
 2. **Per-worktree isolation**: Move `.jit/` data plane per-worktree to eliminate conflicts
 3. **Shared control plane**: `.git/jit/` for coordination state (claims, locks, heartbeats)
-4. **Visibility commands**: `jit claim status` to see who has what, `jit query ready` to filter claimed issues
+4. **Visibility commands**: `jit claim status` to see who has what, `jit query available` to filter claimed issues
 
 **What worked without automation:**
 - Git worktree isolation for source code (no .rs file conflicts!)

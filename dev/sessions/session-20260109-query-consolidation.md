@@ -17,7 +17,7 @@ Implemented major consolidation of `jit query` commands to eliminate redundancy,
 - ❌ `jit query assignee` → use `jit query all --assignee`
 - ❌ `jit query priority` → use `jit query all --priority`
 - ❌ `jit query label` → use `jit query all --label`
-- ❌ `jit issue list` → use `jit query all`
+- ❌ `jit query all` → use `jit query all`
 
 **New unified commands:**
 ```bash
@@ -234,7 +234,7 @@ cargo test --workspace 2>&1 | grep "thread.*panicked" -B 2
 **To update docs:**
 ```bash
 rg "jit query (ready|state|priority|assignee|label)" docs/ dev/ -l
-rg "jit issue list" docs/ dev/ -l
+rg "jit query all" docs/ dev/ -l
 ```
 
 **Query command handler location:**
@@ -256,15 +256,15 @@ rg 'query", "(ready|state|label|priority|assignee)"' crates/jit/tests/
 
 ```bash
 # Query commands
-jit query ready              → jit query available
-jit query state ready        → jit query all --state ready
-jit query priority high      → jit query all --priority high
-jit query assignee X         → jit query all --assignee X
-jit query label epic:auth    → jit query all --label epic:auth
+jit query available              → jit query available
+jit query all --state ready        → jit query all --state ready
+jit query all --priority high      → jit query all --priority high
+jit query all --assignee X         → jit query all --assignee X
+jit query all --label epic:auth    → jit query all --label epic:auth
 
 # Issue list
-jit issue list               → jit query all
-jit issue list --state ready → jit query all --state ready
+jit query all               → jit query all
+jit query all --state ready → jit query all --state ready
 
 # Composable filters (NEW!)
 jit query all --state ready --label epic:auth --priority high
@@ -281,7 +281,7 @@ jit query available --full --json
 ## Design Decisions Made
 
 1. **Why rename `ready` to `available`?**
-   - Avoids confusion: `jit query ready` vs `jit query all --state ready`
+   - Avoids confusion: `jit query available` vs `jit query all --state ready`
    - Clear semantics: "available for claiming" vs "in ready state"
    - The query checks more than state (also unassigned + unblocked)
 

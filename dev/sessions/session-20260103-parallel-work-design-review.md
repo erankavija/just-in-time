@@ -134,7 +134,7 @@ enforce_leases = "off"     # No lease enforcement
 ```bash
 # From any worktree
 jit issue show <any-issue-id>   # ✅ Works via git/main .jit/
-jit query ready                 # ✅ Coordination-aware queries
+jit query available                 # ✅ Coordination-aware queries
 jit graph show <issue-id>       # ✅ Full dependency tree
 jit dep show <issue-id>         # ✅ Dependencies
 jit gate list                   # ✅ Global configuration
@@ -220,8 +220,8 @@ jit claim acquire issue-E --ttl 600
 **Issue:** Design shows worktrees with "only claimed issues" (line 84), but doesn't explain how queries work across worktrees.
 
 **Missing specification:**
-- `jit issue list` behavior in main vs secondary worktrees
-- `jit query ready` - how does it filter claimed issues?
+- `jit query all` behavior in main vs secondary worktrees
+- `jit query available` - how does it filter claimed issues?
 - `jit issue show <id>` - can it show unclaimed issues from secondary worktree?
 - `jit graph show <id>` - full graph or only local issues?
 
@@ -232,12 +232,12 @@ jit claim acquire issue-E --ttl 600
 ```markdown
 ### Query Behavior in Worktrees
 
-**Local queries** (`jit issue list`):
+**Local queries** (`jit query all`):
 - Main worktree: Shows all issues in `.jit/issues/`
 - Secondary worktree: Shows only claimed issues in local `.jit/issues/`
 
 **Global queries** (coordination-aware):
-- `jit query ready`: Filters out claimed issues (consults `.git/jit/claims.index.json`)
+- `jit query available`: Filters out claimed issues (consults `.git/jit/claims.index.json`)
 - `jit query blocked`: Shows all blocked issues (reads dependencies from git)
 - Access to full issue graph regardless of worktree
 
@@ -308,8 +308,8 @@ Shared Control Plane (.git/jit/)
    - Add configuration option if restricting to main worktree
 
 3. **Add "Query Behavior in Worktrees" section** (Priority: High)
-   - Specify `jit issue list` behavior (main vs secondary)
-   - Document coordination-aware queries (`jit query ready`)
+   - Specify `jit query all` behavior (main vs secondary)
+   - Document coordination-aware queries (`jit query available`)
    - Clarify global visibility (dependency graphs, issue show)
 
 4. **Add "Data Access Patterns" section** (Priority: Medium)

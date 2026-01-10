@@ -13,14 +13,14 @@ git log --oneline -10
 
 # What's the current work state?
 jit status
-jit query ready --json | jq -r '.issues[] | "\(.priority) | \(.id[0:8]) | \(.title)"' | head -10
+jit query available --json | jq -r '.issues[] | "\(.priority) | \(.id[0:8]) | \(.title)"' | head -10
 ```
 
 ## 2. Find Your Next Task (1 minute)
 
 ```bash
 # See what's ready to work on (prioritized)
-jit query ready | grep -E "critical|high"
+jit query available | grep -E "critical|high"
 
 # Claim a task
 jit issue claim <short-hash> agent:your-name
@@ -59,7 +59,7 @@ jit gate pass <short-hash> fmt
 jit issue update <short-hash> --state done
 
 # Find next task
-jit query ready --json | head -5
+jit query available --json | head -5
 ```
 
 ## Key Files to Know

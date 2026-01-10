@@ -80,9 +80,9 @@ jit issue update $MILESTONE --context "target_date:2026-03-01"
 
 ### ✅ Query Syntax: Exact + wildcard (Option A)
 ```bash
-jit query label "milestone:v1.0"      # Exact match
-jit query label "milestone:*"         # All milestones
-jit query label "epic:*" --or label "milestone:*"  # Strategic view
+jit query all --label "milestone:v1.0"      # Exact match
+jit query all --label "milestone:*"         # All milestones
+jit query all --label "epic:*" --or label "milestone:*"  # Strategic view
 ```
 - Clear semantics
 - Fast performance
@@ -129,7 +129,7 @@ jit query label "epic:*" --or label "milestone:*"  # Strategic view
 **Tests**: 10-15 CLI integration tests
 
 #### 1.4 Query by Label
-- [ ] `jit query label "pattern"`
+- [ ] `jit query all --label "pattern"`
 - [ ] Support exact match
 - [ ] Support wildcard: `milestone:*`
 

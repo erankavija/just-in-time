@@ -47,7 +47,7 @@ jit (single binary)
 │  └─────────────────┘        └──────────────────┘       │
 │         ▲                            │                  │
 │         │                            │                  │
-│         │  jit query ready           │                  │
+│         │  jit query available           │                  │
 │         │  jit issue claim <id>      │                  │
 │         └────────────────────────────┘                  │
 │                                                          │
@@ -82,7 +82,7 @@ jit (single binary)
 // dispatch/src/lib.rs
 impl Orchestrator {
     pub fn query_ready_issues(&self) -> Result<Vec<Issue>> {
-        // Spawn: jit query ready --json
+        // Spawn: jit query available --json
         // Parse JSON output
         // Return structured data
     }
@@ -172,7 +172,7 @@ jit issue create -t "Write tests" -p normal
 jit dep add <test-id> <parser-id>
 
 # Query available work
-jit query ready --json
+jit query available --json
 ```
 
 ### Running the Orchestrator (jit-dispatch)

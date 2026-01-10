@@ -120,7 +120,7 @@ Initialization and scaffolding
 - jit init
 Issue management
 - jit issue create --title "..." [--desc "..."] [--priority high] [--gate review --gate unit-tests]
-- jit issue list [--state open|ready|done] [--assignee agent-x] [--priority high]
+- jit query all [--state open|ready|done] [--assignee agent-x] [--priority high]
 - jit issue show <id>
 - jit issue update <id> [--title ...] [--desc ...] [--priority ...]
 - jit issue delete <id>
@@ -142,11 +142,11 @@ Graph commands
 - jit graph downstream <id>   (issues that depend on <id>)
 - jit graph roots             (issues with no dependencies)
 Query interface
-- jit query ready             (issues ready for work: state=ready, unassigned, no blocks)
+- jit query available             (issues ready for work: state=ready, unassigned, no blocks)
 - jit query blocked           (issues blocked by dependencies or gates)
-- jit query assignee <name>   (issues assigned to specific agent)
-- jit query state <state>     (filter by state)
-- jit query priority <level>  (filter by priority)
+- jit query all --assignee <name>   (issues assigned to specific agent)
+- jit query all --state <state>     (filter by state)
+- jit query all --priority <level>  (filter by priority)
 Events
 - jit events tail             (live event stream)
 - jit events query            (historical event search)
@@ -243,7 +243,7 @@ The core `jit` CLI focuses on issue tracking and querying, while `jit-dispatch` 
 Push-based orchestrator that monitors issue state and dispatches agents on-demand.
 
 **Orchestrator responsibilities:**
-- Poll `jit query ready` to identify available work
+- Poll `jit query available` to identify available work
 - Dispatch work to agents based on priority and capacity
 - Track agent assignments and capacity limits
 - Support multiple concurrent agents
@@ -279,7 +279,7 @@ jit-dispatch start --config dispatch.toml --jit-path ./jit [--daemon]
 
 **How jit-dispatch works:**
 1. Reads configuration (agent pool, capacity limits)
-2. Polls `jit query ready --json` to find available work
+2. Polls `jit query available --json` to find available work
 3. Sorts by priority (critical → high → normal → low)
 4. Dispatches to agents respecting max_concurrent limits
 5. Uses `jit issue claim <id> --to <agent-id>` to assign work
@@ -315,7 +315,7 @@ done
 ### Query Interface (Phase 2 - Implemented)
 ```bash
 # Find ready work
-jit query ready [--json]
+jit query available [--json]
 # Returns: unassigned issues with state=ready, no blocking deps/gates
 
 # Find blocked issues
@@ -323,13 +323,13 @@ jit query blocked [--json]
 # Returns: issues blocked by dependencies or failed gates
 
 # Filter by assignee
-jit query assignee copilot-1 [--json]
+jit query all --assignee copilot-1 [--json]
 
 # Filter by state
-jit query state in_progress [--json]
+jit query all --state in_progress [--json]
 
 # Filter by priority
-jit query priority critical [--json]
+jit query all --priority critical [--json]
 ```
 
 ### Event Log Queries (Phase 3 - Implemented)

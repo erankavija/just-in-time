@@ -381,11 +381,11 @@ These operations access data without modifying issue state and work from any wor
 
 **Issue inspection:**
 - `jit issue show <id>` - View any issue details
-- `jit issue list` - List issues (see "Query Behavior" below)
-- `jit query ready` - Query ready issues (coordination-aware)
+- `jit query all` - List issues (see "Query Behavior" below)
+- `jit query available` - Query ready issues (coordination-aware)
 - `jit query blocked` - Query blocked issues
-- `jit query state <state>` - Query by state
-- `jit query assignee <assignee>` - Query by assignee
+- `jit query all --state <state>` - Query by state
+- `jit query all --assignee <assignee>` - Query by assignee
 - `jit search <query>` - Search across all issues
 
 **Graph operations:**
@@ -469,17 +469,17 @@ Different query commands behave differently based on context and coordination-aw
 
 #### Local Queries (Worktree-Scoped)
 
-`jit issue list` shows issues in the local `.jit/issues/` directory:
+`jit query all` shows issues in the local `.jit/issues/` directory:
 
 **Main worktree:**
 ```bash
-jit issue list
+jit query all
 # Shows: All issues in .jit/issues/ (both claimed and unclaimed)
 ```
 
 **Secondary worktree:**
 ```bash
-jit issue list
+jit query all
 # Shows: Only issues claimed by this worktree (write copies)
 ```
 
@@ -491,7 +491,7 @@ These queries aggregate across all worktrees and respect coordination state:
 
 **Ready issues (unclaimed and unblocked):**
 ```bash
-jit query ready
+jit query available
 # Filters out:
 # - Issues with active leases (from claims index)
 # - Issues blocked by dependencies
@@ -509,9 +509,9 @@ jit query blocked
 
 **State/priority/assignee queries:**
 ```bash
-jit query state in-progress
-jit query priority high
-jit query assignee agent:copilot-1
+jit query all --state in-progress
+jit query all --priority high
+jit query all --assignee agent:copilot-1
 # Aggregates across: git + main .jit/ + claims index
 # Works from any worktree
 ```
@@ -568,8 +568,8 @@ jit graph show issue-A --show-claims
 
 | Command | Scope | Coordination-Aware | Works From |
 |---------|-------|-------------------|------------|
-| `jit issue list` | Local `.jit/` only | ❌ No | Any worktree |
-| `jit query ready` | Global (git + main .jit/) | ✅ Yes (filters claimed) | Any worktree |
+| `jit query all` | Local `.jit/` only | ❌ No | Any worktree |
+| `jit query available` | Global (git + main .jit/) | ✅ Yes (filters claimed) | Any worktree |
 | `jit query blocked` | Global | ✅ Yes (checks deps) | Any worktree |
 | `jit issue show <id>` | Global (layered resolution) | ❌ No | Any worktree |
 | `jit graph show <id>` | Global (full graph) | ✅ Optional (--show-claims) | Any worktree |
