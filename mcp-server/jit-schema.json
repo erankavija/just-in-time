@@ -9,216 +9,49 @@
     }
   ],
   "commands": {
-    "doc": {
-      "description": "Document reference commands",
+    "registry": {
+      "description": "Gate registry management commands",
       "subcommands": {
-        "diff": {
-          "description": "Show diff between document versions",
-          "args": [
-            {
-              "name": "id",
-              "type": "string",
-              "required": true,
-              "description": "Issue ID"
-            },
-            {
-              "name": "path",
-              "type": "string",
-              "required": true,
-              "description": "Path to document"
-            }
-          ],
-          "flags": [
-            {
-              "name": "from",
-              "type": "string",
-              "required": true,
-              "description": "Source commit (required)"
-            },
-            {
-              "name": "to",
-              "type": "string",
-              "required": false,
-              "description": "Target commit (defaults to HEAD)"
-            }
-          ],
-          "output": {
-            "success": "CommandResponse",
-            "error": "ErrorResponse"
-          }
-        },
-        "check-links": {
-          "description": "Check document links and assets for validity",
-          "args": [],
-          "flags": [
-            {
-              "name": "scope",
-              "type": "string",
-              "required": false,
-              "description": "Scope of validation (all or issue:ID)"
-            },
-            {
-              "name": "json",
-              "type": "boolean",
-              "required": false,
-              "description": "Output results in JSON format"
-            }
-          ],
-          "output": {
-            "success": "CommandResponse",
-            "error": "ErrorResponse"
-          }
-        },
         "add": {
-          "description": "Add a document reference to an issue",
+          "description": "Add a gate definition to the registry",
           "args": [
             {
-              "name": "id",
+              "name": "key",
               "type": "string",
               "required": true,
-              "description": "Issue ID"
-            },
-            {
-              "name": "path",
-              "type": "string",
-              "required": true,
-              "description": "Path to document relative to repository root"
+              "description": "Unique gate key"
             }
           ],
           "flags": [
             {
-              "name": "commit",
+              "name": "title",
               "type": "string",
-              "required": false,
-              "description": "Git commit hash (optional, defaults to HEAD)"
+              "required": true,
+              "description": ""
             },
             {
-              "name": "label",
+              "name": "description",
               "type": "string",
               "required": false,
-              "description": "Human-readable label"
+              "description": ""
             },
             {
-              "name": "doc-type",
-              "type": "string",
-              "required": false,
-              "description": "Document type (e.g., design, implementation, notes)"
-            },
-            {
-              "name": "skip-scan",
+              "name": "auto",
               "type": "boolean",
               "required": false,
-              "description": "Skip scanning document for assets (default: false)"
+              "description": ""
             },
             {
-              "name": "json",
-              "type": "boolean",
-              "required": false,
-              "description": "Output JSON format"
-            }
-          ],
-          "output": {
-            "success": "CommandResponse",
-            "error": "ErrorResponse"
-          }
-        },
-        "assets": {
-          "description": "Asset management commands",
-          "subcommands": {
-            "list": {
-              "description": "List assets for a document",
-              "args": [
-                {
-                  "name": "id",
-                  "type": "string",
-                  "required": true,
-                  "description": "Issue ID"
-                },
-                {
-                  "name": "path",
-                  "type": "string",
-                  "required": true,
-                  "description": "Path to document"
-                }
-              ],
-              "flags": [
-                {
-                  "name": "rescan",
-                  "type": "boolean",
-                  "required": false,
-                  "description": "Rescan document to refresh asset metadata"
-                },
-                {
-                  "name": "json",
-                  "type": "boolean",
-                  "required": false,
-                  "description": "Output JSON format"
-                }
-              ],
-              "output": {
-                "success": "CommandResponse",
-                "error": "ErrorResponse"
-              }
-            }
-          },
-          "args": [],
-          "flags": [],
-          "output": {
-            "success": "CommandResponse",
-            "error": "ErrorResponse"
-          }
-        },
-        "show": {
-          "description": "Show document content",
-          "args": [
-            {
-              "name": "id",
+              "name": "example",
               "type": "string",
-              "required": true,
-              "description": "Issue ID"
+              "required": false,
+              "description": ""
             },
             {
-              "name": "path",
-              "type": "string",
-              "required": true,
-              "description": "Path to document"
-            }
-          ],
-          "flags": [
-            {
-              "name": "at",
+              "name": "stage",
               "type": "string",
               "required": false,
-              "description": "View document at specific commit (defaults to HEAD)"
-            }
-          ],
-          "output": {
-            "success": "CommandResponse",
-            "error": "ErrorResponse"
-          }
-        },
-        "history": {
-          "description": "List commit history for a document",
-          "args": [
-            {
-              "name": "id",
-              "type": "string",
-              "required": true,
-              "description": "Issue ID"
-            },
-            {
-              "name": "path",
-              "type": "string",
-              "required": true,
-              "description": "Path to document"
-            }
-          ],
-          "flags": [
-            {
-              "name": "json",
-              "type": "boolean",
-              "required": false,
-              "description": "Output JSON format"
+              "description": "Gate execution stage (precheck or postcheck)"
             }
           ],
           "output": {
@@ -227,44 +60,23 @@
           }
         },
         "remove": {
-          "description": "Remove a document reference from an issue",
+          "description": "Remove a gate definition",
           "args": [
             {
-              "name": "id",
+              "name": "key",
               "type": "string",
-              "required": true,
-              "description": "Issue ID"
-            },
-            {
-              "name": "path",
-              "type": "string",
-              "required": true,
-              "description": "Path to document to remove"
+              "required": true
             }
           ],
-          "flags": [
-            {
-              "name": "json",
-              "type": "boolean",
-              "required": false,
-              "description": "Output JSON format"
-            }
-          ],
+          "flags": [],
           "output": {
             "success": "CommandResponse",
             "error": "ErrorResponse"
           }
         },
         "list": {
-          "description": "List document references for an issue",
-          "args": [
-            {
-              "name": "id",
-              "type": "string",
-              "required": true,
-              "description": "Issue ID"
-            }
-          ],
+          "description": "List all gate definitions",
+          "args": [],
           "flags": [
             {
               "name": "json",
@@ -278,34 +90,21 @@
             "error": "ErrorResponse"
           }
         },
-        "archive": {
-          "description": "Archive a document with its assets",
+        "show": {
+          "description": "Show gate definition details",
           "args": [
             {
-              "name": "path",
+              "name": "key",
               "type": "string",
-              "required": true,
-              "description": "Document path to archive (repo-relative)"
+              "required": true
             }
           ],
           "flags": [
             {
-              "name": "type",
-              "type": "string",
-              "required": true,
-              "description": "Archive category (must be configured in config.toml)"
-            },
-            {
-              "name": "dry-run",
+              "name": "json",
               "type": "boolean",
               "required": false,
-              "description": "Show plan without executing"
-            },
-            {
-              "name": "force",
-              "type": "boolean",
-              "required": false,
-              "description": "Override safety checks (allow archival of docs linked to active issues)"
+              "description": "Output JSON format"
             }
           ],
           "output": {
@@ -321,90 +120,135 @@
         "error": "ErrorResponse"
       }
     },
-    "validate": {
-      "description": "Validate repository integrity",
-      "args": [],
-      "flags": [
-        {
-          "name": "json",
-          "type": "boolean",
-          "required": false,
-          "description": "Output JSON format"
-        },
-        {
-          "name": "fix",
-          "type": "boolean",
-          "required": false,
-          "description": "Attempt to automatically fix validation issues"
-        },
-        {
-          "name": "dry-run",
-          "type": "boolean",
-          "required": false,
-          "description": "Show what would be fixed without applying changes (requires --fix)"
-        }
-      ],
-      "output": {
-        "success": "void",
-        "error": "ErrorResponse"
-      }
-    },
-    "search": {
-      "description": "Search issues and documents",
-      "args": [
-        {
-          "name": "query",
-          "type": "string",
-          "required": true,
-          "description": "Search query string"
-        }
-      ],
-      "flags": [
-        {
-          "name": "regex",
-          "type": "boolean",
-          "required": false,
-          "description": "Use regex pattern matching"
-        },
-        {
-          "name": "case-sensitive",
-          "type": "boolean",
-          "required": false,
-          "description": "Case sensitive search"
-        },
-        {
-          "name": "context",
-          "type": "number",
-          "required": false,
-          "description": "Show N lines of context"
-        },
-        {
-          "name": "limit",
-          "type": "number",
-          "required": false,
-          "description": "Maximum results to return"
-        },
-        {
-          "name": "glob",
-          "type": "string",
-          "required": false,
-          "description": "Search only in specific files (glob pattern, e.g., \"*.json\" or \"*.md\")"
-        },
-        {
-          "name": "json",
-          "type": "boolean",
-          "required": false,
-          "description": "Output as JSON"
-        }
-      ],
-      "output": {
-        "success": "CommandResponse",
-        "error": "ErrorResponse"
-      }
-    },
     "gate": {
       "description": "Gate management commands",
       "subcommands": {
+        "remove": {
+          "description": "Remove a gate definition from the registry",
+          "args": [
+            {
+              "name": "key",
+              "type": "string",
+              "required": true,
+              "description": "Gate key"
+            }
+          ],
+          "flags": [
+            {
+              "name": "json",
+              "type": "boolean",
+              "required": false,
+              "description": "Output JSON format"
+            }
+          ],
+          "output": {
+            "success": "CommandResponse",
+            "error": "ErrorResponse"
+          }
+        },
+        "check": {
+          "description": "Check a single gate for an issue (run automated checker)",
+          "args": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "description": "Issue ID"
+            },
+            {
+              "name": "gate_key",
+              "type": "string",
+              "required": true,
+              "description": "Gate key"
+            }
+          ],
+          "flags": [
+            {
+              "name": "json",
+              "type": "boolean",
+              "required": false,
+              "description": "Output JSON format"
+            }
+          ],
+          "output": {
+            "success": "CommandResponse",
+            "error": "ErrorResponse"
+          }
+        },
+        "show": {
+          "description": "Show gate definition details",
+          "args": [
+            {
+              "name": "key",
+              "type": "string",
+              "required": true,
+              "description": "Gate key"
+            }
+          ],
+          "flags": [
+            {
+              "name": "json",
+              "type": "boolean",
+              "required": false,
+              "description": "Output JSON format"
+            }
+          ],
+          "output": {
+            "success": "CommandResponse",
+            "error": "ErrorResponse"
+          }
+        },
+        "fail": {
+          "description": "Mark a gate as failed",
+          "args": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "description": "Issue ID"
+            },
+            {
+              "name": "gate_key",
+              "type": "string",
+              "required": true,
+              "description": "Gate key"
+            }
+          ],
+          "flags": [
+            {
+              "name": "by",
+              "type": "string",
+              "required": false,
+              "description": "Who failed the gate (optional)"
+            },
+            {
+              "name": "json",
+              "type": "boolean",
+              "required": false,
+              "description": "Output JSON format"
+            }
+          ],
+          "output": {
+            "success": "CommandResponse",
+            "error": "ErrorResponse"
+          }
+        },
+        "list": {
+          "description": "List all gate definitions",
+          "args": [],
+          "flags": [
+            {
+              "name": "json",
+              "type": "boolean",
+              "required": false,
+              "description": "Output JSON format"
+            }
+          ],
+          "output": {
+            "success": "CommandResponse",
+            "error": "ErrorResponse"
+          }
+        },
         "define": {
           "description": "Define a new gate in the registry",
           "args": [
@@ -470,75 +314,6 @@
             "error": "ErrorResponse"
           }
         },
-        "show": {
-          "description": "Show gate definition details",
-          "args": [
-            {
-              "name": "key",
-              "type": "string",
-              "required": true,
-              "description": "Gate key"
-            }
-          ],
-          "flags": [
-            {
-              "name": "json",
-              "type": "boolean",
-              "required": false,
-              "description": "Output JSON format"
-            }
-          ],
-          "output": {
-            "success": "CommandResponse",
-            "error": "ErrorResponse"
-          }
-        },
-        "remove": {
-          "description": "Remove a gate definition from the registry",
-          "args": [
-            {
-              "name": "key",
-              "type": "string",
-              "required": true,
-              "description": "Gate key"
-            }
-          ],
-          "flags": [
-            {
-              "name": "json",
-              "type": "boolean",
-              "required": false,
-              "description": "Output JSON format"
-            }
-          ],
-          "output": {
-            "success": "CommandResponse",
-            "error": "ErrorResponse"
-          }
-        },
-        "check-all": {
-          "description": "Check all automated gates for an issue",
-          "args": [
-            {
-              "name": "id",
-              "type": "string",
-              "required": true,
-              "description": "Issue ID"
-            }
-          ],
-          "flags": [
-            {
-              "name": "json",
-              "type": "boolean",
-              "required": false,
-              "description": "Output JSON format"
-            }
-          ],
-          "output": {
-            "success": "CommandResponse",
-            "error": "ErrorResponse"
-          }
-        },
         "add": {
           "description": "Add a gate requirement to an issue",
           "args": [
@@ -568,36 +343,14 @@
             "error": "ErrorResponse"
           }
         },
-        "list": {
-          "description": "List all gate definitions",
-          "args": [],
-          "flags": [
-            {
-              "name": "json",
-              "type": "boolean",
-              "required": false,
-              "description": "Output JSON format"
-            }
-          ],
-          "output": {
-            "success": "CommandResponse",
-            "error": "ErrorResponse"
-          }
-        },
-        "check": {
-          "description": "Check a single gate for an issue (run automated checker)",
+        "check-all": {
+          "description": "Check all automated gates for an issue",
           "args": [
             {
               "name": "id",
               "type": "string",
               "required": true,
               "description": "Issue ID"
-            },
-            {
-              "name": "gate_key",
-              "type": "string",
-              "required": true,
-              "description": "Gate key"
             }
           ],
           "flags": [
@@ -647,9 +400,535 @@
             "success": "CommandResponse",
             "error": "ErrorResponse"
           }
+        }
+      },
+      "args": [],
+      "flags": [],
+      "output": {
+        "success": "CommandResponse",
+        "error": "ErrorResponse"
+      }
+    },
+    "graph": {
+      "description": "Graph query commands",
+      "subcommands": {
+        "export": {
+          "description": "Export dependency graph in various formats",
+          "args": [],
+          "flags": [
+            {
+              "name": "format",
+              "type": "string",
+              "required": false,
+              "description": "Output format (dot, mermaid)"
+            },
+            {
+              "name": "output",
+              "type": "string",
+              "required": false,
+              "description": "Output file (optional - prints to stdout if omitted)"
+            }
+          ],
+          "output": {
+            "success": "CommandResponse",
+            "error": "ErrorResponse"
+          }
         },
-        "fail": {
-          "description": "Mark a gate as failed",
+        "roots": {
+          "description": "Show root issues (no dependencies)",
+          "args": [],
+          "flags": [
+            {
+              "name": "json",
+              "type": "boolean",
+              "required": false,
+              "description": "Output JSON format"
+            }
+          ],
+          "output": {
+            "success": "CommandResponse",
+            "error": "ErrorResponse"
+          }
+        },
+        "show": {
+          "description": "Show dependency tree for an issue",
+          "args": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": false,
+              "description": "Issue ID (optional - shows all if omitted)"
+            }
+          ],
+          "flags": [
+            {
+              "name": "json",
+              "type": "boolean",
+              "required": false,
+              "description": "Output JSON format"
+            }
+          ],
+          "output": {
+            "success": "CommandResponse",
+            "error": "ErrorResponse"
+          }
+        },
+        "downstream": {
+          "description": "Show downstream dependents (issues that are blocked by this one)",
+          "args": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "description": "Issue ID"
+            }
+          ],
+          "flags": [
+            {
+              "name": "json",
+              "type": "boolean",
+              "required": false,
+              "description": "Output JSON format"
+            }
+          ],
+          "output": {
+            "success": "CommandResponse",
+            "error": "ErrorResponse"
+          }
+        }
+      },
+      "args": [],
+      "flags": [],
+      "output": {
+        "success": "CommandResponse",
+        "error": "ErrorResponse"
+      }
+    },
+    "label": {
+      "description": "Label namespace management commands",
+      "subcommands": {
+        "values": {
+          "description": "List all values used in a namespace",
+          "args": [
+            {
+              "name": "namespace",
+              "type": "string",
+              "required": true,
+              "description": "Namespace to query (e.g., 'milestone', 'epic')"
+            }
+          ],
+          "flags": [
+            {
+              "name": "json",
+              "type": "boolean",
+              "required": false,
+              "description": "Output JSON format"
+            }
+          ],
+          "output": {
+            "success": "CommandResponse",
+            "error": "ErrorResponse"
+          }
+        },
+        "namespaces": {
+          "description": "List all label namespaces",
+          "args": [],
+          "flags": [
+            {
+              "name": "json",
+              "type": "boolean",
+              "required": false,
+              "description": "Output JSON format"
+            }
+          ],
+          "output": {
+            "success": "CommandResponse",
+            "error": "ErrorResponse"
+          }
+        }
+      },
+      "args": [],
+      "flags": [],
+      "output": {
+        "success": "CommandResponse",
+        "error": "ErrorResponse"
+      }
+    },
+    "snapshot": {
+      "description": "Snapshot export commands",
+      "subcommands": {
+        "export": {
+          "description": "Archive a complete snapshot of issues and documents",
+          "args": [],
+          "flags": [
+            {
+              "name": "out",
+              "type": "string",
+              "required": false,
+              "description": "Output path (default: snapshot-YYYYMMDD-HHMMSS)"
+            },
+            {
+              "name": "format",
+              "type": "string",
+              "required": false,
+              "description": "Output format: dir or tar"
+            },
+            {
+              "name": "scope",
+              "type": "string",
+              "required": false,
+              "description": "Scope: all (default), issue:ID, or label:namespace:value"
+            },
+            {
+              "name": "at",
+              "type": "string",
+              "required": false,
+              "description": "Git commit/tag to export (requires git repository)"
+            },
+            {
+              "name": "working-tree",
+              "type": "boolean",
+              "required": false,
+              "description": "Export from working tree instead of git"
+            },
+            {
+              "name": "committed-only",
+              "type": "boolean",
+              "required": false,
+              "description": "Reject if uncommitted docs/assets exist (requires git, implies --at HEAD)"
+            },
+            {
+              "name": "force",
+              "type": "boolean",
+              "required": false,
+              "description": "Skip repository validation before export"
+            },
+            {
+              "name": "json",
+              "type": "boolean",
+              "required": false,
+              "description": "Output metadata as JSON instead of human-readable format"
+            }
+          ],
+          "output": {
+            "success": "CommandResponse",
+            "error": "ErrorResponse"
+          }
+        }
+      },
+      "args": [],
+      "flags": [],
+      "output": {
+        "success": "CommandResponse",
+        "error": "ErrorResponse"
+      }
+    },
+    "worktree": {
+      "description": "Worktree information commands",
+      "subcommands": {
+        "info": {
+          "description": "Show current worktree information",
+          "args": [],
+          "flags": [
+            {
+              "name": "json",
+              "type": "boolean",
+              "required": false,
+              "description": "Output as JSON"
+            }
+          ],
+          "output": {
+            "success": "CommandResponse",
+            "error": "ErrorResponse"
+          }
+        }
+      },
+      "args": [],
+      "flags": [],
+      "output": {
+        "success": "CommandResponse",
+        "error": "ErrorResponse"
+      }
+    },
+    "search": {
+      "description": "Search issues and documents",
+      "args": [
+        {
+          "name": "query",
+          "type": "string",
+          "required": true,
+          "description": "Search query string"
+        }
+      ],
+      "flags": [
+        {
+          "name": "regex",
+          "type": "boolean",
+          "required": false,
+          "description": "Use regex pattern matching"
+        },
+        {
+          "name": "case-sensitive",
+          "type": "boolean",
+          "required": false,
+          "description": "Case sensitive search"
+        },
+        {
+          "name": "context",
+          "type": "number",
+          "required": false,
+          "description": "Show N lines of context"
+        },
+        {
+          "name": "limit",
+          "type": "number",
+          "required": false,
+          "description": "Maximum results to return"
+        },
+        {
+          "name": "glob",
+          "type": "string",
+          "required": false,
+          "description": "Search only in specific files (glob pattern, e.g., \"*.json\" or \"*.md\")"
+        },
+        {
+          "name": "json",
+          "type": "boolean",
+          "required": false,
+          "description": "Output as JSON"
+        }
+      ],
+      "output": {
+        "success": "CommandResponse",
+        "error": "ErrorResponse"
+      }
+    },
+    "status": {
+      "description": "Show overall status",
+      "args": [],
+      "flags": [
+        {
+          "name": "json",
+          "type": "boolean",
+          "required": false,
+          "description": "Output JSON format"
+        }
+      ],
+      "output": {
+        "success": "CommandResponse",
+        "error": "ErrorResponse"
+      }
+    },
+    "validate": {
+      "description": "Validate repository integrity",
+      "args": [],
+      "flags": [
+        {
+          "name": "json",
+          "type": "boolean",
+          "required": false,
+          "description": "Output JSON format"
+        },
+        {
+          "name": "fix",
+          "type": "boolean",
+          "required": false,
+          "description": "Attempt to automatically fix validation issues"
+        },
+        {
+          "name": "dry-run",
+          "type": "boolean",
+          "required": false,
+          "description": "Show what would be fixed without applying changes (requires --fix)"
+        }
+      ],
+      "output": {
+        "success": "void",
+        "error": "ErrorResponse"
+      }
+    },
+    "claim": {
+      "description": "Claim coordination commands",
+      "subcommands": {
+        "acquire": {
+          "description": "Acquire a lease on an issue",
+          "args": [
+            {
+              "name": "issue_id",
+              "type": "string",
+              "required": true,
+              "description": "Issue ID to claim"
+            }
+          ],
+          "flags": [
+            {
+              "name": "ttl",
+              "type": "number",
+              "required": false,
+              "description": "Time-to-live in seconds (0 for indefinite, requires --reason)"
+            },
+            {
+              "name": "agent-id",
+              "type": "string",
+              "required": false,
+              "description": "Agent identifier (defaults to current agent from config)"
+            },
+            {
+              "name": "reason",
+              "type": "string",
+              "required": false,
+              "description": "Reason for claim (required for TTL=0)"
+            },
+            {
+              "name": "json",
+              "type": "boolean",
+              "required": false,
+              "description": "Output as JSON"
+            }
+          ],
+          "output": {
+            "success": "CommandResponse",
+            "error": "ErrorResponse"
+          }
+        },
+        "renew": {
+          "description": "Renew a lease",
+          "args": [
+            {
+              "name": "lease_id",
+              "type": "string",
+              "required": true,
+              "description": "Lease ID to renew"
+            }
+          ],
+          "flags": [
+            {
+              "name": "extension",
+              "type": "number",
+              "required": false,
+              "description": "How many seconds to extend the lease by"
+            },
+            {
+              "name": "json",
+              "type": "boolean",
+              "required": false,
+              "description": "Output as JSON"
+            }
+          ],
+          "output": {
+            "success": "CommandResponse",
+            "error": "ErrorResponse"
+          }
+        },
+        "release": {
+          "description": "Release a lease",
+          "args": [
+            {
+              "name": "lease_id",
+              "type": "string",
+              "required": true,
+              "description": "Lease ID to release"
+            }
+          ],
+          "flags": [
+            {
+              "name": "json",
+              "type": "boolean",
+              "required": false,
+              "description": "Output as JSON"
+            }
+          ],
+          "output": {
+            "success": "CommandResponse",
+            "error": "ErrorResponse"
+          }
+        },
+        "list": {
+          "description": "List all active leases",
+          "args": [],
+          "flags": [
+            {
+              "name": "json",
+              "type": "boolean",
+              "required": false,
+              "description": "Output as JSON"
+            }
+          ],
+          "output": {
+            "success": "CommandResponse",
+            "error": "ErrorResponse"
+          }
+        },
+        "force-evict": {
+          "description": "Force-evict a lease (admin operation)",
+          "args": [
+            {
+              "name": "lease_id",
+              "type": "string",
+              "required": true,
+              "description": "Lease ID to evict"
+            }
+          ],
+          "flags": [
+            {
+              "name": "reason",
+              "type": "string",
+              "required": true,
+              "description": "Reason for eviction (required for audit trail)"
+            },
+            {
+              "name": "json",
+              "type": "boolean",
+              "required": false,
+              "description": "Output as JSON"
+            }
+          ],
+          "output": {
+            "success": "CommandResponse",
+            "error": "ErrorResponse"
+          }
+        },
+        "status": {
+          "description": "Show active lease status",
+          "args": [],
+          "flags": [
+            {
+              "name": "issue",
+              "type": "string",
+              "required": false,
+              "description": "Filter by issue ID"
+            },
+            {
+              "name": "agent",
+              "type": "string",
+              "required": false,
+              "description": "Filter by agent ID (format: type:identifier)"
+            },
+            {
+              "name": "json",
+              "type": "boolean",
+              "required": false,
+              "description": "Output as JSON"
+            }
+          ],
+          "output": {
+            "success": "CommandResponse",
+            "error": "ErrorResponse"
+          }
+        }
+      },
+      "args": [],
+      "flags": [],
+      "output": {
+        "success": "CommandResponse",
+        "error": "ErrorResponse"
+      }
+    },
+    "doc": {
+      "description": "Document reference commands",
+      "subcommands": {
+        "history": {
+          "description": "List commit history for a document",
           "args": [
             {
               "name": "id",
@@ -658,19 +937,285 @@
               "description": "Issue ID"
             },
             {
-              "name": "gate_key",
+              "name": "path",
               "type": "string",
               "required": true,
-              "description": "Gate key"
+              "description": "Path to document"
             }
           ],
           "flags": [
             {
-              "name": "by",
+              "name": "json",
+              "type": "boolean",
+              "required": false,
+              "description": "Output JSON format"
+            }
+          ],
+          "output": {
+            "success": "CommandResponse",
+            "error": "ErrorResponse"
+          }
+        },
+        "diff": {
+          "description": "Show diff between document versions",
+          "args": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "description": "Issue ID"
+            },
+            {
+              "name": "path",
+              "type": "string",
+              "required": true,
+              "description": "Path to document"
+            }
+          ],
+          "flags": [
+            {
+              "name": "from",
+              "type": "string",
+              "required": true,
+              "description": "Source commit (required)"
+            },
+            {
+              "name": "to",
               "type": "string",
               "required": false,
-              "description": "Who failed the gate (optional)"
+              "description": "Target commit (defaults to HEAD)"
+            }
+          ],
+          "output": {
+            "success": "CommandResponse",
+            "error": "ErrorResponse"
+          }
+        },
+        "show": {
+          "description": "Show document content",
+          "args": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "description": "Issue ID"
             },
+            {
+              "name": "path",
+              "type": "string",
+              "required": true,
+              "description": "Path to document"
+            }
+          ],
+          "flags": [
+            {
+              "name": "at",
+              "type": "string",
+              "required": false,
+              "description": "View document at specific commit (defaults to HEAD)"
+            }
+          ],
+          "output": {
+            "success": "CommandResponse",
+            "error": "ErrorResponse"
+          }
+        },
+        "assets": {
+          "description": "Asset management commands",
+          "subcommands": {
+            "list": {
+              "description": "List assets for a document",
+              "args": [
+                {
+                  "name": "id",
+                  "type": "string",
+                  "required": true,
+                  "description": "Issue ID"
+                },
+                {
+                  "name": "path",
+                  "type": "string",
+                  "required": true,
+                  "description": "Path to document"
+                }
+              ],
+              "flags": [
+                {
+                  "name": "rescan",
+                  "type": "boolean",
+                  "required": false,
+                  "description": "Rescan document to refresh asset metadata"
+                },
+                {
+                  "name": "json",
+                  "type": "boolean",
+                  "required": false,
+                  "description": "Output JSON format"
+                }
+              ],
+              "output": {
+                "success": "CommandResponse",
+                "error": "ErrorResponse"
+              }
+            }
+          },
+          "args": [],
+          "flags": [],
+          "output": {
+            "success": "CommandResponse",
+            "error": "ErrorResponse"
+          }
+        },
+        "check-links": {
+          "description": "Check document links and assets for validity",
+          "args": [],
+          "flags": [
+            {
+              "name": "scope",
+              "type": "string",
+              "required": false,
+              "description": "Scope of validation (all or issue:ID)"
+            },
+            {
+              "name": "json",
+              "type": "boolean",
+              "required": false,
+              "description": "Output results in JSON format"
+            }
+          ],
+          "output": {
+            "success": "CommandResponse",
+            "error": "ErrorResponse"
+          }
+        },
+        "list": {
+          "description": "List document references for an issue",
+          "args": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "description": "Issue ID"
+            }
+          ],
+          "flags": [
+            {
+              "name": "json",
+              "type": "boolean",
+              "required": false,
+              "description": "Output JSON format"
+            }
+          ],
+          "output": {
+            "success": "CommandResponse",
+            "error": "ErrorResponse"
+          }
+        },
+        "add": {
+          "description": "Add a document reference to an issue",
+          "args": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "description": "Issue ID"
+            },
+            {
+              "name": "path",
+              "type": "string",
+              "required": true,
+              "description": "Path to document relative to repository root"
+            }
+          ],
+          "flags": [
+            {
+              "name": "commit",
+              "type": "string",
+              "required": false,
+              "description": "Git commit hash (optional, defaults to HEAD)"
+            },
+            {
+              "name": "label",
+              "type": "string",
+              "required": false,
+              "description": "Human-readable label"
+            },
+            {
+              "name": "doc-type",
+              "type": "string",
+              "required": false,
+              "description": "Document type (e.g., design, implementation, notes)"
+            },
+            {
+              "name": "skip-scan",
+              "type": "boolean",
+              "required": false,
+              "description": "Skip scanning document for assets (default: false)"
+            },
+            {
+              "name": "json",
+              "type": "boolean",
+              "required": false,
+              "description": "Output JSON format"
+            }
+          ],
+          "output": {
+            "success": "CommandResponse",
+            "error": "ErrorResponse"
+          }
+        },
+        "archive": {
+          "description": "Archive a document with its assets",
+          "args": [
+            {
+              "name": "path",
+              "type": "string",
+              "required": true,
+              "description": "Document path to archive (repo-relative)"
+            }
+          ],
+          "flags": [
+            {
+              "name": "type",
+              "type": "string",
+              "required": true,
+              "description": "Archive category (must be configured in config.toml)"
+            },
+            {
+              "name": "dry-run",
+              "type": "boolean",
+              "required": false,
+              "description": "Show plan without executing"
+            },
+            {
+              "name": "force",
+              "type": "boolean",
+              "required": false,
+              "description": "Override safety checks (allow archival of docs linked to active issues)"
+            }
+          ],
+          "output": {
+            "success": "CommandResponse",
+            "error": "ErrorResponse"
+          }
+        },
+        "remove": {
+          "description": "Remove a document reference from an issue",
+          "args": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "description": "Issue ID"
+            },
+            {
+              "name": "path",
+              "type": "string",
+              "required": true,
+              "description": "Path to document to remove"
+            }
+          ],
+          "flags": [
             {
               "name": "json",
               "type": "boolean",
@@ -694,114 +1239,6 @@
     "issue": {
       "description": "Issue management commands",
       "subcommands": {
-        "unassign": {
-          "description": "Unassign an issue",
-          "args": [
-            {
-              "name": "id",
-              "type": "string",
-              "required": true,
-              "description": "Issue ID"
-            }
-          ],
-          "flags": [
-            {
-              "name": "json",
-              "type": "boolean",
-              "required": false,
-              "description": "Output JSON format"
-            }
-          ],
-          "output": {
-            "success": "CommandResponse",
-            "error": "ErrorResponse"
-          }
-        },
-        "list": {
-          "description": "List issues",
-          "args": [],
-          "flags": [
-            {
-              "name": "state",
-              "type": "string",
-              "required": false,
-              "description": ""
-            },
-            {
-              "name": "assignee",
-              "type": "string",
-              "required": false,
-              "description": ""
-            },
-            {
-              "name": "priority",
-              "type": "string",
-              "required": false,
-              "description": ""
-            },
-            {
-              "name": "json",
-              "type": "boolean",
-              "required": false,
-              "description": "Output JSON format"
-            }
-          ],
-          "output": {
-            "success": "CommandResponse",
-            "error": "ErrorResponse"
-          }
-        },
-        "delete": {
-          "description": "Delete an issue",
-          "args": [
-            {
-              "name": "id",
-              "type": "string",
-              "required": true
-            }
-          ],
-          "flags": [
-            {
-              "name": "json",
-              "type": "boolean",
-              "required": false,
-              "description": "Output JSON format"
-            }
-          ],
-          "output": {
-            "success": "CommandResponse",
-            "error": "ErrorResponse"
-          }
-        },
-        "claim": {
-          "description": "Claim an unassigned issue (atomic)",
-          "args": [
-            {
-              "name": "id",
-              "type": "string",
-              "required": true,
-              "description": "Issue ID"
-            },
-            {
-              "name": "assignee",
-              "type": "string",
-              "required": true,
-              "description": "Assignee (format: type:identifier, e.g., agent:worker-1)"
-            }
-          ],
-          "flags": [
-            {
-              "name": "json",
-              "type": "boolean",
-              "required": false,
-              "description": "Output JSON format"
-            }
-          ],
-          "output": {
-            "success": "CommandResponse",
-            "error": "ErrorResponse"
-          }
-        },
         "assign": {
           "description": "Assign issue to someone",
           "args": [
@@ -824,185 +1261,6 @@
               "type": "boolean",
               "required": false,
               "description": "Output JSON format"
-            }
-          ],
-          "output": {
-            "success": "CommandResponse",
-            "error": "ErrorResponse"
-          }
-        },
-        "reject": {
-          "description": "Reject an issue (convenience for --state rejected)",
-          "args": [
-            {
-              "name": "id",
-              "type": "string",
-              "required": true,
-              "description": "Issue ID"
-            }
-          ],
-          "flags": [
-            {
-              "name": "reason",
-              "type": "string",
-              "required": false,
-              "description": "Reason for rejection (adds resolution:REASON label)"
-            },
-            {
-              "name": "json",
-              "type": "boolean",
-              "required": false,
-              "description": "Output JSON format"
-            }
-          ],
-          "output": {
-            "success": "CommandResponse",
-            "error": "ErrorResponse"
-          }
-        },
-        "claim-next": {
-          "description": "Claim the next available ready issue",
-          "args": [
-            {
-              "name": "assignee",
-              "type": "string",
-              "required": true,
-              "description": "Assignee (format: type:identifier, e.g., agent:worker-1)"
-            }
-          ],
-          "flags": [
-            {
-              "name": "filter",
-              "type": "string",
-              "required": false,
-              "description": ""
-            }
-          ],
-          "output": {
-            "success": "CommandResponse",
-            "error": "ErrorResponse"
-          }
-        },
-        "show": {
-          "description": "Show issue details",
-          "args": [
-            {
-              "name": "id",
-              "type": "string",
-              "required": true
-            }
-          ],
-          "flags": [
-            {
-              "name": "json",
-              "type": "boolean",
-              "required": false,
-              "description": "Output JSON format"
-            }
-          ],
-          "output": {
-            "success": "CommandResponse",
-            "error": "ErrorResponse"
-          }
-        },
-        "search": {
-          "description": "Search issues by text query",
-          "args": [
-            {
-              "name": "query",
-              "type": "string",
-              "required": true,
-              "description": "Search query (searches title, description, and ID)"
-            }
-          ],
-          "flags": [
-            {
-              "name": "state",
-              "type": "string",
-              "required": false,
-              "description": ""
-            },
-            {
-              "name": "assignee",
-              "type": "string",
-              "required": false,
-              "description": ""
-            },
-            {
-              "name": "priority",
-              "type": "string",
-              "required": false,
-              "description": ""
-            },
-            {
-              "name": "json",
-              "type": "boolean",
-              "required": false,
-              "description": "Output JSON format"
-            }
-          ],
-          "output": {
-            "success": "CommandResponse",
-            "error": "ErrorResponse"
-          }
-        },
-        "release": {
-          "description": "Release an issue from its assignee (for timeout recovery)",
-          "args": [
-            {
-              "name": "id",
-              "type": "string",
-              "required": true,
-              "description": "Issue ID"
-            },
-            {
-              "name": "reason",
-              "type": "string",
-              "required": true,
-              "description": "Reason for release (e.g., timeout, error)"
-            }
-          ],
-          "flags": [
-            {
-              "name": "json",
-              "type": "boolean",
-              "required": false,
-              "description": "Output JSON format"
-            }
-          ],
-          "output": {
-            "success": "CommandResponse",
-            "error": "ErrorResponse"
-          }
-        },
-        "breakdown": {
-          "description": "Break down an issue into subtasks with automatic dependency inheritance",
-          "args": [
-            {
-              "name": "parent_id",
-              "type": "string",
-              "required": true,
-              "description": "Parent issue ID to break down"
-            }
-          ],
-          "flags": [
-            {
-              "name": "subtask",
-              "type": "array<string>",
-              "required": true,
-              "description": "Subtask titles (use multiple times)"
-            },
-            {
-              "name": "description",
-              "type": "array<string>",
-              "required": false,
-              "description": "Subtask descriptions (optional, must match number of subtasks)"
-            },
-            {
-              "name": "json",
-              "type": "boolean",
-              "required": false,
-              "description": "Output as JSON for machine consumption"
             }
           ],
           "output": {
@@ -1099,6 +1357,35 @@
             "error": "ErrorResponse"
           }
         },
+        "reject": {
+          "description": "Reject an issue (convenience for --state rejected)",
+          "args": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "description": "Issue ID"
+            }
+          ],
+          "flags": [
+            {
+              "name": "reason",
+              "type": "string",
+              "required": false,
+              "description": "Reason for rejection (adds resolution:REASON label)"
+            },
+            {
+              "name": "json",
+              "type": "boolean",
+              "required": false,
+              "description": "Output JSON format"
+            }
+          ],
+          "output": {
+            "success": "CommandResponse",
+            "error": "ErrorResponse"
+          }
+        },
         "create": {
           "description": "Create a new issue",
           "args": [],
@@ -1156,117 +1443,41 @@
             "success": "CommandResponse",
             "error": "ErrorResponse"
           }
-        }
-      },
-      "args": [],
-      "flags": [],
-      "output": {
-        "success": "CommandResponse",
-        "error": "ErrorResponse"
-      }
-    },
-    "config": {
-      "description": "Configuration commands",
-      "subcommands": {
-        "show-hierarchy": {
-          "description": "Show current type hierarchy",
-          "args": [],
-          "flags": [
-            {
-              "name": "json",
-              "type": "boolean",
-              "required": false,
-              "description": "Output JSON format"
-            }
-          ],
-          "output": {
-            "success": "CommandResponse",
-            "error": "ErrorResponse"
-          }
         },
-        "list-templates": {
-          "description": "List available hierarchy templates",
-          "args": [],
-          "flags": [
-            {
-              "name": "json",
-              "type": "boolean",
-              "required": false,
-              "description": "Output JSON format"
-            }
-          ],
-          "output": {
-            "success": "CommandResponse",
-            "error": "ErrorResponse"
-          }
-        }
-      },
-      "args": [],
-      "flags": [],
-      "output": {
-        "success": "CommandResponse",
-        "error": "ErrorResponse"
-      }
-    },
-    "registry": {
-      "description": "Gate registry management commands",
-      "subcommands": {
-        "list": {
-          "description": "List all gate definitions",
-          "args": [],
-          "flags": [
-            {
-              "name": "json",
-              "type": "boolean",
-              "required": false,
-              "description": "Output JSON format"
-            }
-          ],
-          "output": {
-            "success": "CommandResponse",
-            "error": "ErrorResponse"
-          }
-        },
-        "add": {
-          "description": "Add a gate definition to the registry",
+        "search": {
+          "description": "Search issues by text query",
           "args": [
             {
-              "name": "key",
+              "name": "query",
               "type": "string",
               "required": true,
-              "description": "Unique gate key"
+              "description": "Search query (searches title, description, and ID)"
             }
           ],
           "flags": [
             {
-              "name": "title",
-              "type": "string",
-              "required": true,
-              "description": ""
-            },
-            {
-              "name": "description",
+              "name": "state",
               "type": "string",
               "required": false,
               "description": ""
             },
             {
-              "name": "auto",
+              "name": "assignee",
+              "type": "string",
+              "required": false,
+              "description": ""
+            },
+            {
+              "name": "priority",
+              "type": "string",
+              "required": false,
+              "description": ""
+            },
+            {
+              "name": "json",
               "type": "boolean",
               "required": false,
-              "description": ""
-            },
-            {
-              "name": "example",
-              "type": "string",
-              "required": false,
-              "description": ""
-            },
-            {
-              "name": "stage",
-              "type": "string",
-              "required": false,
-              "description": "Gate execution stage (precheck or postcheck)"
+              "description": "Output JSON format"
             }
           ],
           "output": {
@@ -1274,26 +1485,137 @@
             "error": "ErrorResponse"
           }
         },
-        "remove": {
-          "description": "Remove a gate definition",
+        "delete": {
+          "description": "Delete an issue",
           "args": [
             {
-              "name": "key",
+              "name": "id",
               "type": "string",
               "required": true
             }
           ],
-          "flags": [],
+          "flags": [
+            {
+              "name": "json",
+              "type": "boolean",
+              "required": false,
+              "description": "Output JSON format"
+            }
+          ],
+          "output": {
+            "success": "CommandResponse",
+            "error": "ErrorResponse"
+          }
+        },
+        "claim": {
+          "description": "Claim an unassigned issue (atomic)",
+          "args": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "description": "Issue ID"
+            },
+            {
+              "name": "assignee",
+              "type": "string",
+              "required": true,
+              "description": "Assignee (format: type:identifier, e.g., agent:worker-1)"
+            }
+          ],
+          "flags": [
+            {
+              "name": "json",
+              "type": "boolean",
+              "required": false,
+              "description": "Output JSON format"
+            }
+          ],
+          "output": {
+            "success": "CommandResponse",
+            "error": "ErrorResponse"
+          }
+        },
+        "release": {
+          "description": "Release an issue from its assignee (for timeout recovery)",
+          "args": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "description": "Issue ID"
+            },
+            {
+              "name": "reason",
+              "type": "string",
+              "required": true,
+              "description": "Reason for release (e.g., timeout, error)"
+            }
+          ],
+          "flags": [
+            {
+              "name": "json",
+              "type": "boolean",
+              "required": false,
+              "description": "Output JSON format"
+            }
+          ],
+          "output": {
+            "success": "CommandResponse",
+            "error": "ErrorResponse"
+          }
+        },
+        "unassign": {
+          "description": "Unassign an issue",
+          "args": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "description": "Issue ID"
+            }
+          ],
+          "flags": [
+            {
+              "name": "json",
+              "type": "boolean",
+              "required": false,
+              "description": "Output JSON format"
+            }
+          ],
+          "output": {
+            "success": "CommandResponse",
+            "error": "ErrorResponse"
+          }
+        },
+        "claim-next": {
+          "description": "Claim the next available ready issue",
+          "args": [
+            {
+              "name": "assignee",
+              "type": "string",
+              "required": true,
+              "description": "Assignee (format: type:identifier, e.g., agent:worker-1)"
+            }
+          ],
+          "flags": [
+            {
+              "name": "filter",
+              "type": "string",
+              "required": false,
+              "description": ""
+            }
+          ],
           "output": {
             "success": "CommandResponse",
             "error": "ErrorResponse"
           }
         },
         "show": {
-          "description": "Show gate definition details",
+          "description": "Show issue details",
           "args": [
             {
-              "name": "key",
+              "name": "id",
               "type": "string",
               "required": true
             }
@@ -1310,119 +1632,35 @@
             "success": "CommandResponse",
             "error": "ErrorResponse"
           }
-        }
-      },
-      "args": [],
-      "flags": [],
-      "output": {
-        "success": "CommandResponse",
-        "error": "ErrorResponse"
-      }
-    },
-    "label": {
-      "description": "Label namespace management commands",
-      "subcommands": {
-        "namespaces": {
-          "description": "List all label namespaces",
-          "args": [],
-          "flags": [
-            {
-              "name": "json",
-              "type": "boolean",
-              "required": false,
-              "description": "Output JSON format"
-            }
-          ],
-          "output": {
-            "success": "CommandResponse",
-            "error": "ErrorResponse"
-          }
         },
-        "values": {
-          "description": "List all values used in a namespace",
+        "breakdown": {
+          "description": "Break down an issue into subtasks with automatic dependency inheritance",
           "args": [
             {
-              "name": "namespace",
+              "name": "parent_id",
               "type": "string",
               "required": true,
-              "description": "Namespace to query (e.g., 'milestone', 'epic')"
+              "description": "Parent issue ID to break down"
             }
           ],
           "flags": [
             {
-              "name": "json",
-              "type": "boolean",
-              "required": false,
-              "description": "Output JSON format"
-            }
-          ],
-          "output": {
-            "success": "CommandResponse",
-            "error": "ErrorResponse"
-          }
-        }
-      },
-      "args": [],
-      "flags": [],
-      "output": {
-        "success": "CommandResponse",
-        "error": "ErrorResponse"
-      }
-    },
-    "snapshot": {
-      "description": "Snapshot export commands",
-      "subcommands": {
-        "export": {
-          "description": "Archive a complete snapshot of issues and documents",
-          "args": [],
-          "flags": [
-            {
-              "name": "out",
-              "type": "string",
-              "required": false,
-              "description": "Output path (default: snapshot-YYYYMMDD-HHMMSS)"
+              "name": "subtask",
+              "type": "array<string>",
+              "required": true,
+              "description": "Subtask titles (use multiple times)"
             },
             {
-              "name": "format",
-              "type": "string",
+              "name": "description",
+              "type": "array<string>",
               "required": false,
-              "description": "Output format: dir or tar"
-            },
-            {
-              "name": "scope",
-              "type": "string",
-              "required": false,
-              "description": "Scope: all (default), issue:ID, or label:namespace:value"
-            },
-            {
-              "name": "at",
-              "type": "string",
-              "required": false,
-              "description": "Git commit/tag to export (requires git repository)"
-            },
-            {
-              "name": "working-tree",
-              "type": "boolean",
-              "required": false,
-              "description": "Export from working tree instead of git"
-            },
-            {
-              "name": "committed-only",
-              "type": "boolean",
-              "required": false,
-              "description": "Reject if uncommitted docs/assets exist (requires git, implies --at HEAD)"
-            },
-            {
-              "name": "force",
-              "type": "boolean",
-              "required": false,
-              "description": "Skip repository validation before export"
+              "description": "Subtask descriptions (optional, must match number of subtasks)"
             },
             {
               "name": "json",
               "type": "boolean",
               "required": false,
-              "description": "Output metadata as JSON instead of human-readable format"
+              "description": "Output as JSON for machine consumption"
             }
           ],
           "output": {
@@ -1454,199 +1692,11 @@
         "error": "ErrorResponse"
       }
     },
-    "status": {
-      "description": "Show overall status",
-      "args": [],
-      "flags": [
-        {
-          "name": "json",
-          "type": "boolean",
-          "required": false,
-          "description": "Output JSON format"
-        }
-      ],
-      "output": {
-        "success": "CommandResponse",
-        "error": "ErrorResponse"
-      }
-    },
-    "graph": {
-      "description": "Graph query commands",
+    "config": {
+      "description": "Configuration commands",
       "subcommands": {
-        "downstream": {
-          "description": "Show downstream dependents (issues that are blocked by this one)",
-          "args": [
-            {
-              "name": "id",
-              "type": "string",
-              "required": true,
-              "description": "Issue ID"
-            }
-          ],
-          "flags": [
-            {
-              "name": "json",
-              "type": "boolean",
-              "required": false,
-              "description": "Output JSON format"
-            }
-          ],
-          "output": {
-            "success": "CommandResponse",
-            "error": "ErrorResponse"
-          }
-        },
-        "export": {
-          "description": "Export dependency graph in various formats",
-          "args": [],
-          "flags": [
-            {
-              "name": "format",
-              "type": "string",
-              "required": false,
-              "description": "Output format (dot, mermaid)"
-            },
-            {
-              "name": "output",
-              "type": "string",
-              "required": false,
-              "description": "Output file (optional - prints to stdout if omitted)"
-            }
-          ],
-          "output": {
-            "success": "CommandResponse",
-            "error": "ErrorResponse"
-          }
-        },
-        "show": {
-          "description": "Show dependency tree for an issue",
-          "args": [
-            {
-              "name": "id",
-              "type": "string",
-              "required": false,
-              "description": "Issue ID (optional - shows all if omitted)"
-            }
-          ],
-          "flags": [
-            {
-              "name": "json",
-              "type": "boolean",
-              "required": false,
-              "description": "Output JSON format"
-            }
-          ],
-          "output": {
-            "success": "CommandResponse",
-            "error": "ErrorResponse"
-          }
-        },
-        "roots": {
-          "description": "Show root issues (no dependencies)",
-          "args": [],
-          "flags": [
-            {
-              "name": "json",
-              "type": "boolean",
-              "required": false,
-              "description": "Output JSON format"
-            }
-          ],
-          "output": {
-            "success": "CommandResponse",
-            "error": "ErrorResponse"
-          }
-        }
-      },
-      "args": [],
-      "flags": [],
-      "output": {
-        "success": "CommandResponse",
-        "error": "ErrorResponse"
-      }
-    },
-    "events": {
-      "description": "Event log commands",
-      "subcommands": {
-        "tail": {
-          "description": "Tail recent events",
-          "args": [],
-          "flags": [
-            {
-              "name": "n",
-              "type": "number",
-              "required": false,
-              "description": ""
-            }
-          ],
-          "output": {
-            "success": "CommandResponse",
-            "error": "ErrorResponse"
-          }
-        },
-        "query": {
-          "description": "Query events by type or issue",
-          "args": [],
-          "flags": [
-            {
-              "name": "event-type",
-              "type": "string",
-              "required": false,
-              "description": ""
-            },
-            {
-              "name": "issue-id",
-              "type": "string",
-              "required": false,
-              "description": ""
-            },
-            {
-              "name": "limit",
-              "type": "number",
-              "required": false,
-              "description": ""
-            }
-          ],
-          "output": {
-            "success": "CommandResponse",
-            "error": "ErrorResponse"
-          }
-        }
-      },
-      "args": [],
-      "flags": [],
-      "output": {
-        "success": "CommandResponse",
-        "error": "ErrorResponse"
-      }
-    },
-    "query": {
-      "description": "Query issues for orchestrators",
-      "subcommands": {
-        "priority": {
-          "description": "Query issues by priority",
-          "args": [
-            {
-              "name": "priority",
-              "type": "string",
-              "required": true
-            }
-          ],
-          "flags": [
-            {
-              "name": "json",
-              "type": "boolean",
-              "required": false,
-              "description": "Output JSON format"
-            }
-          ],
-          "output": {
-            "success": "CommandResponse",
-            "error": "ErrorResponse"
-          }
-        },
-        "strategic": {
-          "description": "Query strategic issues (those with labels from strategic namespaces)",
+        "show-hierarchy": {
+          "description": "Show current type hierarchy",
           "args": [],
           "flags": [
             {
@@ -1661,107 +1711,8 @@
             "error": "ErrorResponse"
           }
         },
-        "blocked": {
-          "description": "Query blocked issues with reasons",
-          "args": [],
-          "flags": [
-            {
-              "name": "json",
-              "type": "boolean",
-              "required": false,
-              "description": "Output JSON format"
-            }
-          ],
-          "output": {
-            "success": "CommandResponse",
-            "error": "ErrorResponse"
-          }
-        },
-        "label": {
-          "description": "Query issues by label (exact match or wildcard)",
-          "args": [
-            {
-              "name": "pattern",
-              "type": "string",
-              "required": true,
-              "description": "Label pattern: 'namespace:value' for exact match, 'namespace:*' for wildcard"
-            }
-          ],
-          "flags": [
-            {
-              "name": "json",
-              "type": "boolean",
-              "required": false,
-              "description": "Output JSON format"
-            }
-          ],
-          "output": {
-            "success": "CommandResponse",
-            "error": "ErrorResponse"
-          }
-        },
-        "ready": {
-          "description": "Query ready issues (unassigned, state=ready, unblocked)",
-          "args": [],
-          "flags": [
-            {
-              "name": "json",
-              "type": "boolean",
-              "required": false,
-              "description": "Output JSON format"
-            }
-          ],
-          "output": {
-            "success": "CommandResponse",
-            "error": "ErrorResponse"
-          }
-        },
-        "assignee": {
-          "description": "Query issues by assignee",
-          "args": [
-            {
-              "name": "assignee",
-              "type": "string",
-              "required": true
-            }
-          ],
-          "flags": [
-            {
-              "name": "json",
-              "type": "boolean",
-              "required": false,
-              "description": "Output JSON format"
-            }
-          ],
-          "output": {
-            "success": "CommandResponse",
-            "error": "ErrorResponse"
-          }
-        },
-        "state": {
-          "description": "Query issues by state",
-          "args": [
-            {
-              "name": "state",
-              "type": "string",
-              "required": true
-            }
-          ],
-          "flags": [
-            {
-              "name": "json",
-              "type": "boolean",
-              "required": false,
-              "description": "Output JSON format"
-            }
-          ],
-          "output": {
-            "success": "CommandResponse",
-            "error": "ErrorResponse"
-          }
-        },
-        "closed": {
-          "description": "Query closed issues (Done or Rejected states)",
+        "list-templates": {
+          "description": "List available hierarchy templates",
           "args": [],
           "flags": [
             {
@@ -1852,19 +1803,257 @@
         "success": "CommandResponse",
         "error": "ErrorResponse"
       }
+    },
+    "query": {
+      "description": "Query issues for orchestrators",
+      "subcommands": {
+        "strategic": {
+          "description": "Query strategic issues (those with labels from strategic namespaces)",
+          "args": [],
+          "flags": [
+            {
+              "name": "priority",
+              "type": "string",
+              "required": false,
+              "description": "Filter by priority"
+            },
+            {
+              "name": "label",
+              "type": "string",
+              "required": false,
+              "description": "Filter by label pattern (exact match or wildcard)"
+            },
+            {
+              "name": "full",
+              "type": "boolean",
+              "required": false,
+              "description": "Return full issue objects instead of minimal summaries"
+            },
+            {
+              "name": "json",
+              "type": "boolean",
+              "required": false,
+              "description": "Output JSON format"
+            }
+          ],
+          "output": {
+            "success": "CommandResponse",
+            "error": "ErrorResponse"
+          }
+        },
+        "blocked": {
+          "description": "Query blocked issues with reasons",
+          "args": [],
+          "flags": [
+            {
+              "name": "priority",
+              "type": "string",
+              "required": false,
+              "description": "Filter by priority"
+            },
+            {
+              "name": "label",
+              "type": "string",
+              "required": false,
+              "description": "Filter by label pattern (exact match or wildcard)"
+            },
+            {
+              "name": "full",
+              "type": "boolean",
+              "required": false,
+              "description": "Return full issue objects instead of minimal summaries"
+            },
+            {
+              "name": "json",
+              "type": "boolean",
+              "required": false,
+              "description": "Output JSON format"
+            }
+          ],
+          "output": {
+            "success": "CommandResponse",
+            "error": "ErrorResponse"
+          }
+        },
+        "available": {
+          "description": "Query available issues (unassigned, state=ready, unblocked)",
+          "args": [],
+          "flags": [
+            {
+              "name": "priority",
+              "type": "string",
+              "required": false,
+              "description": "Filter by priority"
+            },
+            {
+              "name": "label",
+              "type": "string",
+              "required": false,
+              "description": "Filter by label pattern (exact match or wildcard)"
+            },
+            {
+              "name": "full",
+              "type": "boolean",
+              "required": false,
+              "description": "Return full issue objects instead of minimal summaries"
+            },
+            {
+              "name": "json",
+              "type": "boolean",
+              "required": false,
+              "description": "Output JSON format"
+            }
+          ],
+          "output": {
+            "success": "CommandResponse",
+            "error": "ErrorResponse"
+          }
+        },
+        "all": {
+          "description": "Query all issues with optional filters",
+          "args": [],
+          "flags": [
+            {
+              "name": "state",
+              "type": "string",
+              "required": false,
+              "description": "Filter by state"
+            },
+            {
+              "name": "assignee",
+              "type": "string",
+              "required": false,
+              "description": "Filter by assignee (format: type:identifier)"
+            },
+            {
+              "name": "priority",
+              "type": "string",
+              "required": false,
+              "description": "Filter by priority"
+            },
+            {
+              "name": "label",
+              "type": "string",
+              "required": false,
+              "description": "Filter by label pattern (exact match or wildcard)"
+            },
+            {
+              "name": "full",
+              "type": "boolean",
+              "required": false,
+              "description": "Return full issue objects instead of minimal summaries"
+            },
+            {
+              "name": "json",
+              "type": "boolean",
+              "required": false,
+              "description": "Output JSON format"
+            }
+          ],
+          "output": {
+            "success": "CommandResponse",
+            "error": "ErrorResponse"
+          }
+        },
+        "closed": {
+          "description": "Query closed issues (Done or Rejected states)",
+          "args": [],
+          "flags": [
+            {
+              "name": "priority",
+              "type": "string",
+              "required": false,
+              "description": "Filter by priority"
+            },
+            {
+              "name": "label",
+              "type": "string",
+              "required": false,
+              "description": "Filter by label pattern (exact match or wildcard)"
+            },
+            {
+              "name": "full",
+              "type": "boolean",
+              "required": false,
+              "description": "Return full issue objects instead of minimal summaries"
+            },
+            {
+              "name": "json",
+              "type": "boolean",
+              "required": false,
+              "description": "Output JSON format"
+            }
+          ],
+          "output": {
+            "success": "CommandResponse",
+            "error": "ErrorResponse"
+          }
+        }
+      },
+      "args": [],
+      "flags": [],
+      "output": {
+        "success": "CommandResponse",
+        "error": "ErrorResponse"
+      }
+    },
+    "events": {
+      "description": "Event log commands",
+      "subcommands": {
+        "tail": {
+          "description": "Tail recent events",
+          "args": [],
+          "flags": [
+            {
+              "name": "n",
+              "type": "number",
+              "required": false,
+              "description": ""
+            }
+          ],
+          "output": {
+            "success": "CommandResponse",
+            "error": "ErrorResponse"
+          }
+        },
+        "query": {
+          "description": "Query events by type or issue",
+          "args": [],
+          "flags": [
+            {
+              "name": "event-type",
+              "type": "string",
+              "required": false,
+              "description": ""
+            },
+            {
+              "name": "issue-id",
+              "type": "string",
+              "required": false,
+              "description": ""
+            },
+            {
+              "name": "limit",
+              "type": "number",
+              "required": false,
+              "description": ""
+            }
+          ],
+          "output": {
+            "success": "CommandResponse",
+            "error": "ErrorResponse"
+          }
+        }
+      },
+      "args": [],
+      "flags": [],
+      "output": {
+        "success": "CommandResponse",
+        "error": "ErrorResponse"
+      }
     }
   },
   "types": {
-    "Priority": {
-      "description": "Issue priority level",
-      "enum": [
-        "low",
-        "normal",
-        "high",
-        "critical"
-      ],
-      "type": "enum"
-    },
     "State": {
       "description": "Issue lifecycle state",
       "enum": [
@@ -1874,6 +2063,42 @@
         "gated",
         "done",
         "archived"
+      ],
+      "type": "enum"
+    },
+    "ErrorResponse": {
+      "properties": {
+        "error": {
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            },
+            "suggestion": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
+        },
+        "success": {
+          "const": false,
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "Priority": {
+      "description": "Issue priority level",
+      "enum": [
+        "low",
+        "normal",
+        "high",
+        "critical"
       ],
       "type": "enum"
     },
@@ -1917,32 +2142,6 @@
         },
         "title": {
           "type": "string"
-        }
-      },
-      "type": "object"
-    },
-    "ErrorResponse": {
-      "properties": {
-        "error": {
-          "properties": {
-            "code": {
-              "type": "string"
-            },
-            "message": {
-              "type": "string"
-            },
-            "suggestion": {
-              "type": [
-                "string",
-                "null"
-              ]
-            }
-          },
-          "type": "object"
-        },
-        "success": {
-          "const": false,
-          "type": "boolean"
         }
       },
       "type": "object"
