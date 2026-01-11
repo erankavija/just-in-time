@@ -155,6 +155,14 @@ pub enum Commands {
         /// Show what would be fixed without applying changes (requires --fix)
         #[arg(long)]
         dry_run: bool,
+
+        /// Validate branch hasn't diverged from main
+        #[arg(long)]
+        divergence: bool,
+
+        /// Validate active leases are consistent and not stale
+        #[arg(long)]
+        leases: bool,
     },
 }
 

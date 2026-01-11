@@ -1931,12 +1931,108 @@ strategic_types = {}
                 executor.status()?;
             }
         }
-        Commands::Validate { json, fix, dry_run } => {
+        Commands::Validate {
+            json,
+            fix,
+            dry_run,
+            divergence,
+            leases,
+        } => {
             // Validate dry_run requires fix
             if dry_run && !fix {
                 return Err(anyhow!("--dry-run requires --fix to be specified"));
             }
 
+            // Handle specific validations if requested
+            if divergence || leases {
+                let mut validation_results = Vec::new();
+
+                if divergence {
+                    match executor.validate_divergence() {
+                        Ok(()) => {
+                            if !json {
+                                println!("✓ Branch is up-to-date with origin/main");
+                            }
+                            validation_results.push(("divergence", true, String::new()));
+                        }
+                        Err(e) => {
+                            if json {
+                                validation_results.push(("divergence", false, e.to_string()));
+                            } else {
+                                eprintln!("❌ Divergence validation failed:\n{}", e);
+                                std::process::exit(1);
+                            }
+                        }
+                    }
+                }
+
+                if leases {
+                    match executor.validate_leases() {
+                        Ok(invalid_leases) => {
+                            if invalid_leases.is_empty() {
+                                if !json {
+                                    println!("✓ All active leases are valid");
+                                }
+                                validation_results.push(("leases", true, String::new()));
+                            } else {
+                                let message = format!(
+                                    "Found {} invalid lease(s):\n{}",
+                                    invalid_leases.len(),
+                                    invalid_leases.join("\n\n")
+                                );
+                                if json {
+                                    validation_results.push(("leases", false, message.clone()));
+                                } else {
+                                    eprintln!("❌ Lease validation failed:\n{}", message);
+                                    std::process::exit(1);
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            if json {
+                                validation_results.push(("leases", false, format!("Error: {}", e)));
+                            } else {
+                                eprintln!("❌ Lease validation error: {}", e);
+                                std::process::exit(1);
+                            }
+                        }
+                    }
+                }
+
+                if json {
+                    use jit::output::JsonOutput;
+                    use serde_json::json;
+
+                    let all_valid = validation_results.iter().all(|(_, valid, _)| *valid);
+                    let results_json: Vec<_> = validation_results
+                        .iter()
+                        .map(|(name, valid, message)| {
+                            json!({
+                                "validation": name,
+                                "valid": valid,
+                                "message": message
+                            })
+                        })
+                        .collect();
+
+                    let output = JsonOutput::success(
+                        json!({
+                            "valid": all_valid,
+                            "validations": results_json
+                        }),
+                        "validate",
+                    );
+                    println!("{}", output.to_json_string()?);
+
+                    if !all_valid {
+                        std::process::exit(1);
+                    }
+                }
+
+                return Ok(());
+            }
+
+            // Standard repository validation (existing code)
             if fix {
                 // Use auto-fix mode (pass quiet=true if json mode)
                 let fixes_applied = executor.validate_with_fix(true, dry_run, json)?;
