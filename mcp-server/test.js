@@ -316,9 +316,10 @@ const tests = [
       // Parse the output
       const output = JSON.parse(content.text);
       
-      // Check if it's a ripgrep-not-installed error
-      const outputStr = JSON.stringify(output).toLowerCase();
-      if (outputStr.includes('ripgrep')) {
+      // Check if it's a ripgrep-not-installed error by checking error code
+      if (output && output.error && 
+          (output.error.code === 'RIPGREP_NOT_FOUND' || 
+           output.error.code === 'ripgrep_not_found')) {
         console.log(`  ⚠ Search skipped (ripgrep not installed)`);
         return;
       }

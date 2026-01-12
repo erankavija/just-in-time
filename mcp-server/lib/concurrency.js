@@ -40,7 +40,8 @@ export class ConcurrencyLimiter {
       // Start next queued operation
       if (this.queue.length > 0) {
         const resolve = this.queue.shift();
-        resolve();
+        // Resolve in next tick to avoid stack overflow
+        setImmediate(resolve);
       }
     }
   }

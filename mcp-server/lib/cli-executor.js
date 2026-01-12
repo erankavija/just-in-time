@@ -127,7 +127,7 @@ function buildCliArgs(cmdPath, args, cmdDef) {
   }
   
   // Add --json flag if supported and not already present
-  if (hasJsonFlag && !cliArgs.includes('--json') && args.json !== true) {
+  if (hasJsonFlag && !cliArgs.includes('--json') && !args.json) {
     cliArgs.push('--json');
   }
   
