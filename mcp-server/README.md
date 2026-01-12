@@ -8,8 +8,13 @@ This MCP server wraps the `jit` CLI to provide MCP tools for AI agents like Clau
 
 ## Features
 
-- **33 MCP tools** automatically generated from JIT schema
-- **Type-safe** input validation using JSON Schema
+- **60+ MCP tools** automatically generated from JIT schema
+- **Nested subcommand support** - handles multi-level commands like `doc.assets.list`
+- **Type-safe** input validation using Zod
+- **Runtime schema loading** - prefers live schema from `jit --schema` with fallback to bundled schema
+- **Structured error responses** - consistent JSON envelope with error codes
+- **Operational hardening** - timeouts (30s) and concurrency limits (10 concurrent commands)
+- **Modular architecture** - clean separation of concerns for maintainability
 - **Zero-maintenance** - tools update automatically when CLI changes
 - **Full coverage** - all CLI commands exposed as MCP tools
 
@@ -93,7 +98,7 @@ Add to your Claude Desktop configuration (`~/Library/Application Support/Claude/
 
 ## Available Tools
 
-The server exposes 33 tools organized by command:
+The server exposes 60+ tools organized by command, including nested subcommands:
 
 ### Issue Management
 - `jit_issue_create` - Create a new issue
@@ -163,21 +168,60 @@ Claude: [calls jit_dep_add with from="AUTH_ID", to="DB_ID"]
 
 ## Implementation Details
 
-### Dynamic Tool Generation
+### Architecture
 
-The server loads `jit-schema.json` at startup and generates MCP tools dynamically:
+The server is modularized into focused components:
+
+```
+mcp-server/
+├── index.js                    # MCP server entry point
+└── lib/
+    ├── schema-loader.js        # Runtime schema loading with fallback
+    ├── tool-generator.js       # Recursive tool generation
+    ├── validator.js            # Zod-based input validation
+    ├── cli-executor.js         # CLI execution with timeouts
+    └── concurrency.js          # Concurrency limiter
+```
+
+### Schema Loading
+
+The server prefers loading the schema from the runtime CLI to ensure synchronization:
 
 ```javascript
-function generateTools() {
+// Try loading from `jit --schema` first
+const cliSchema = await loadSchemaFromCli();
+const bundledSchema = loadSchemaFromFile(schemaPath);
+
+if (!cliSchema) {
+  warnings.push("Could not load schema from jit CLI. Using bundled schema.");
+  return { schema: bundledSchema, warnings };
+}
+
+// Check version mismatch
+if (cliSchema.version !== bundledSchema.version) {
+  warnings.push(`Schema version mismatch: CLI ${cliSchema.version}, bundled ${bundledSchema.version}`);
+}
+
+return { schema: cliSchema, warnings };
+```
+
+### Dynamic Tool Generation with Nested Subcommands
+
+The server recursively generates tools from the schema, supporting multi-level nesting:
+
+```javascript
+function generateToolsRecursive(commands, parentPath = []) {
   const tools = [];
   
-  for (const [cmdName, cmd] of Object.entries(jitSchema.commands)) {
+  for (const [cmdName, cmd] of Object.entries(commands)) {
+    const currentPath = [...parentPath, cmdName];
+    
     if (cmd.subcommands) {
-      for (const [subName, subCmd] of Object.entries(cmd.subcommands)) {
-        tools.push(generateToolFromCommand(subName, subCmd, cmdName));
-      }
+      // Recurse into subcommands
+      tools.push(...generateToolsRecursive(cmd.subcommands, currentPath));
     } else {
-      tools.push(generateToolFromCommand(cmdName, cmd));
+      // Leaf command - generate tool
+      tools.push(generateToolFromCommand(currentPath, cmd));
     }
   }
   
@@ -185,39 +229,69 @@ function generateTools() {
 }
 ```
 
-### CLI Execution
+This correctly handles commands like `doc.assets.list` → `jit_doc_assets_list`.
 
-Each tool call is mapped to a `jit` CLI command with `--json` flag:
+### Input Validation
 
-```javascript
-async function executeTool(name, args) {
-  // jit_issue_create -> jit issue create --title "..." --json
-  const cliArgs = buildCliCommand(name, args);
-  return await runJitCommand(cliArgs);
-}
-```
-
-### Error Handling
-
-Errors from the CLI are parsed and returned in MCP format:
+Arguments are validated with Zod before CLI execution:
 
 ```javascript
-try {
-  const result = await executeTool(name, args);
-  return { content: [{ type: "text", text: JSON.stringify(result) }] };
-} catch (error) {
-  return { 
-    content: [{ type: "text", text: `Error: ${error.message}` }],
-    isError: true 
+// Validate arguments against tool schema
+const validation = validateArguments(args, tool.inputSchema);
+
+if (!validation.success) {
+  return {
+    content: [{
+      type: "text",
+      text: JSON.stringify({
+        success: false,
+        error: { code: "VALIDATION_ERROR", message: validation.error }
+      })
+    }],
+    isError: true
   };
 }
 ```
+
+### CLI Execution with Timeouts
+
+Each command execution includes timeout and concurrency controls:
+
+```javascript
+// Execute with concurrency limiting and timeout
+const result = await concurrencyLimiter.run(async () => {
+  return await executeCommand(cmdPath, args, cmdDef, 30000); // 30s timeout
+});
+```
+
+### Structured Error Responses
+
+All responses follow a consistent envelope format:
+
+```javascript
+// Success
+{
+  "success": true,
+  "data": { /* command output */ }
+}
+
+// Error
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Validation failed: id: Required"
+  }
+}
+```
+
+MCP responses mark errors with `isError: true` for proper client handling.
 
 ## Development
 
 ### Updating Tools
 
-Tools are automatically synchronized with the CLI schema. To refresh:
+Tools are automatically synchronized with the CLI schema. The server prefers loading schema from `jit --schema` at runtime, but you can update the bundled fallback:
 
 ```bash
 cd ..
@@ -241,7 +315,10 @@ npm test
 
 The test suite verifies:
 - MCP protocol initialization
-- Tool listing (59 tools after config consolidation)
+- Tool listing (60+ tools)
+- Nested subcommand tool generation and CLI mapping
+- Input validation with Zod (required fields, type checking)
+- Structured error responses with proper envelopes
 - Schema correctness (new `backlog` and `gated` states)
 - Tool execution and error handling
 - Invalid tool/argument rejection
@@ -299,24 +376,50 @@ node --version  # Should be v16 or later
 ## Architecture
 
 ```
-┌─────────────┐
-│ AI Agent    │  (Claude Desktop, etc.)
-│             │
-└──────┬──────┘
-       │ MCP Protocol (JSON-RPC over stdio)
-       │
-┌──────▼──────────┐
-│  index.js       │  MCP Server
-│                 │  - Loads jit-schema.json
-│                 │  - Generates 29 tools dynamically
-│                 │  - Handles tool calls
-└──────┬──────────┘
-       │ Shell execution
-       │
-┌──────▼──────────┐
-│   jit CLI       │  (with --json flag)
-│                 │
-└─────────────────┘
+┌─────────────────────────────────────────────────────────┐
+│ AI Agent (Claude Desktop, GitHub Copilot, etc.)       │
+└────────────────────┬────────────────────────────────────┘
+                     │ MCP Protocol (JSON-RPC over stdio)
+                     │
+┌────────────────────▼────────────────────────────────────┐
+│ MCP Server (index.js)                                   │
+│                                                          │
+│  ┌─────────────────────────────────────────────┐        │
+│  │ Schema Loader                               │        │
+│  │ - Prefers jit --schema (runtime)            │        │
+│  │ - Falls back to bundled jit-schema.json     │        │
+│  │ - Warns on version mismatch                 │        │
+│  └─────────────────────────────────────────────┘        │
+│                     │                                    │
+│  ┌─────────────────▼─────────────────────┐              │
+│  │ Tool Generator                        │              │
+│  │ - Recursive generation (nested cmds)  │              │
+│  │ - Generates 60+ tools from schema     │              │
+│  └─────────────────────────────────────┬─┘              │
+│                                        │                 │
+│  ┌─────────────────▼─────────────────┐ │                │
+│  │ Validator (Zod)                   │ │                │
+│  │ - Validates args before execution │ │                │
+│  │ - Returns structured errors       │ │                │
+│  └─────────────────────────────────┬─┘ │                │
+│                                    │   │                 │
+│  ┌─────────────────▼───────────────▼─┐                  │
+│  │ CLI Executor                      │                  │
+│  │ - Maps tool calls to CLI args     │                  │
+│  │ - 30s timeout per command         │                  │
+│  │ - Structured error responses      │                  │
+│  └─────────────────┬─────────────────┘                  │
+│                    │                                     │
+│  ┌─────────────────▼─────────────────┐                  │
+│  │ Concurrency Limiter               │                  │
+│  │ - Max 10 concurrent commands      │                  │
+│  └─────────────────┬─────────────────┘                  │
+└────────────────────┼─────────────────────────────────────┘
+                     │ execFile('jit', [...args])
+                     │
+┌────────────────────▼────────────────────────────────────┐
+│ jit CLI (with --json flag)                              │
+└─────────────────────────────────────────────────────────┘
 ```
 
 ## Version
