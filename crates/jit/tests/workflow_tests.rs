@@ -185,7 +185,7 @@ fn test_workflow_dependency_chain_unblocking() {
     run_jit(&temp, &["dep", "add", &task3, &task2]);
 
     // Query ready - should only see task1
-    let output = run_jit(&temp, &["query", "ready"]);
+    let output = run_jit(&temp, &["query", "available"]);
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains(&task1));
     assert!(!stdout.contains(&task2));
@@ -195,7 +195,7 @@ fn test_workflow_dependency_chain_unblocking() {
     run_jit(&temp, &["issue", "update", &task1, "--state", "done"]);
 
     // Query ready - should now see task2
-    let output = run_jit(&temp, &["query", "ready"]);
+    let output = run_jit(&temp, &["query", "available"]);
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(!stdout.contains(&task1)); // done, not ready
     assert!(stdout.contains(&task2));
@@ -205,7 +205,7 @@ fn test_workflow_dependency_chain_unblocking() {
     run_jit(&temp, &["issue", "update", &task2, "--state", "done"]);
 
     // Query ready - should now see task3
-    let output = run_jit(&temp, &["query", "ready"]);
+    let output = run_jit(&temp, &["query", "available"]);
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains(&task3));
 }
@@ -259,7 +259,7 @@ fn test_workflow_gates() {
     assert!(!stdout.contains(&id));
 
     // Issue should be ready
-    let output = run_jit(&temp, &["query", "ready"]);
+    let output = run_jit(&temp, &["query", "available"]);
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains(&id));
 
@@ -300,7 +300,7 @@ fn test_workflow_task_release_and_reassignment() {
     run_jit(&temp, &["issue", "claim", &id, "agent:worker-1"]);
 
     // Verify claimed
-    let output = run_jit(&temp, &["query", "assignee", "agent:worker-1"]);
+    let output = run_jit(&temp, &["query", "all", "--assignee", "agent:worker-1"]);
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains(&id));
 
@@ -309,7 +309,7 @@ fn test_workflow_task_release_and_reassignment() {
     assert!(output.status.success());
 
     // Verify released (back to ready)
-    let output = run_jit(&temp, &["query", "ready"]);
+    let output = run_jit(&temp, &["query", "available"]);
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains(&id));
 
@@ -317,7 +317,7 @@ fn test_workflow_task_release_and_reassignment() {
     let output = run_jit(&temp, &["issue", "claim", &id, "agent:worker-2"]);
     assert!(output.status.success());
 
-    let output = run_jit(&temp, &["query", "assignee", "agent:worker-2"]);
+    let output = run_jit(&temp, &["query", "all", "--assignee", "agent:worker-2"]);
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains(&id));
 }
@@ -399,7 +399,7 @@ fn test_workflow_complex_epic() {
     run_jit(&temp, &["issue", "update", &docs, "--state", "done"]);
 
     // Epic should now be unblocked and ready
-    let output = run_jit(&temp, &["query", "ready"]);
+    let output = run_jit(&temp, &["query", "available"]);
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains(&epic));
 }

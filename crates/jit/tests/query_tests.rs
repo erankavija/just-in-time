@@ -242,7 +242,9 @@ fn test_query_blocked_returns_issues_with_reasons() {
         .as_array()
         .unwrap()
         .is_empty());
-    assert_eq!(child_issue["blocked_reasons"][0]["type"], "dependency");
+    // blocked_reasons are now strings like "dependency:abc123 (Title:State)"
+    let first_reason = child_issue["blocked_reasons"][0].as_str().unwrap();
+    assert!(first_reason.starts_with("dependency:"));
 }
 
 #[test]
@@ -286,9 +288,16 @@ fn test_query_by_assignee() {
         .output()
         .unwrap();
 
-    // Query by assignee
+    // Query by assignee (use --full to get assignee field in response)
     let output = Command::new(&jit)
-        .args(["query", "all", "--assignee", "agent:worker-1", "--json"])
+        .args([
+            "query",
+            "all",
+            "--assignee",
+            "agent:worker-1",
+            "--full",
+            "--json",
+        ])
         .current_dir(temp.path())
         .output()
         .unwrap();

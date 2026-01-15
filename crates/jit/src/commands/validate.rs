@@ -815,11 +815,20 @@ impl<S: IssueStore> CommandExecutor<S> {
                 }
             }
 
-            // Check if issue still exists
-            let issue_path = paths
-                .local_jit
-                .join(format!("issues/{}.json", lease.issue_id));
-            if !issue_path.exists() {
+            // Check if worktree still exists
+            if !check_worktree_exists(&lease.worktree_id)? {
+                invalid_leases.push(format!(
+                    "Lease {} (Issue {}): Worktree {} no longer exists\n  Fix: jit claim force-evict {}",
+                    lease.lease_id,
+                    &lease.issue_id[..8.min(lease.issue_id.len())],
+                    lease.worktree_id,
+                    lease.lease_id
+                ));
+                continue;
+            }
+
+            // Check if issue still exists (use storage layer for proper resolution)
+            if self.storage.load_issue(&lease.issue_id).is_err() {
                 invalid_leases.push(format!(
                     "Lease {} (Issue {}): Issue no longer exists\n  Fix: jit claim release {}",
                     lease.lease_id,
@@ -837,65 +846,117 @@ impl<S: IssueStore> CommandExecutor<S> {
 fn format_duration(duration: chrono::Duration) -> String {
     let secs = duration.num_seconds();
     if secs < 60 {
-        format!("{} seconds", secs)
+        if secs == 1 {
+            "1 second".to_string()
+        } else {
+            format!("{} seconds", secs)
+        }
     } else if secs < 3600 {
-        format!("{} minutes", secs / 60)
+        let mins = secs / 60;
+        if mins == 1 {
+            "1 minute".to_string()
+        } else {
+            format!("{} minutes", mins)
+        }
     } else if secs < 86400 {
-        format!("{} hours", secs / 3600)
+        let hours = secs / 3600;
+        if hours == 1 {
+            "1 hour".to_string()
+        } else {
+            format!("{} hours", hours)
+        }
     } else {
-        format!("{} days", secs / 86400)
+        let days = secs / 86400;
+        if days == 1 {
+            "1 day".to_string()
+        } else {
+            format!("{} days", days)
+        }
     }
+}
+
+/// Check if a worktree with the given ID still exists
+fn check_worktree_exists(worktree_id: &str) -> Result<bool> {
+    use std::path::PathBuf;
+    use std::process::Command;
+
+    // Get all git worktrees
+    let output = Command::new("git")
+        .args(["worktree", "list", "--porcelain"])
+        .output()
+        .context("Failed to execute git worktree list")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        anyhow::bail!("git worktree list failed: {}", stderr);
+    }
+
+    let porcelain_output =
+        String::from_utf8(output.stdout).context("Invalid UTF-8 in git worktree output")?;
+
+    // Parse worktree paths
+    let worktree_paths = porcelain_output
+        .lines()
+        .filter(|line| line.starts_with("worktree "))
+        .filter_map(|line| line.strip_prefix("worktree "))
+        .map(PathBuf::from)
+        .collect::<Vec<_>>();
+
+    // Check each worktree for matching ID
+    for worktree_path in worktree_paths {
+        let identity_path = worktree_path.join(".jit/worktree.json");
+        if let Ok(contents) = std::fs::read_to_string(&identity_path) {
+            // Parse just enough to get the worktree_id
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&contents) {
+                if let Some(id) = json.get("worktree_id").and_then(|v| v.as_str()) {
+                    if id == worktree_id {
+                        return Ok(true);
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(false)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::storage::claim_coordinator::{ClaimsIndex, Lease};
-    use chrono::{Duration, Utc};
-    use std::fs;
-    use tempfile::TempDir;
+    use chrono::Duration;
 
-    fn setup_test_repo() -> (TempDir, crate::storage::JsonFileStorage) {
-        let temp = TempDir::new().unwrap();
-        let jit_root = temp.path().join(".jit");
-        fs::create_dir_all(&jit_root).unwrap();
-
-        let storage = crate::storage::JsonFileStorage::new(&jit_root);
-        storage.init().unwrap();
-
-        (temp, storage)
-    }
+    // Note: validate_leases() and validate_divergence() require git repository setup
+    // and are integration-tested through manual testing and real usage.
+    // Unit tests focus on pure functions like format_duration().
 
     #[test]
-    fn test_validate_leases_no_index() {
-        // This test would require proper git setup with WorktreePaths
-        // For now, just test that the function signature is correct
-        // Real testing would need integration test with actual git repo
-    }
-
-    #[test]
-    fn test_validate_leases_all_valid() {
-        // Would require proper git setup - skip for unit test
-        // Integration tests will cover this
-    }
-
-    #[test]
-    fn test_validate_leases_expired() {
-        // Would require proper git setup - skip for unit test
-        // Integration tests will cover this
-    }
-
-    #[test]
-    fn test_validate_leases_missing_issue() {
-        // Would require proper git setup - skip for unit test
-        // Integration tests will cover this
-    }
-
-    #[test]
-    fn test_format_duration() {
+    fn test_format_duration_seconds() {
+        assert_eq!(format_duration(Duration::seconds(1)), "1 second");
         assert_eq!(format_duration(Duration::seconds(30)), "30 seconds");
-        assert_eq!(format_duration(Duration::seconds(90)), "1 minutes");
-        assert_eq!(format_duration(Duration::seconds(3700)), "1 hours");
-        assert_eq!(format_duration(Duration::seconds(90000)), "1 days");
+        assert_eq!(format_duration(Duration::seconds(59)), "59 seconds");
+    }
+
+    #[test]
+    fn test_format_duration_minutes() {
+        assert_eq!(format_duration(Duration::seconds(60)), "1 minute");
+        assert_eq!(format_duration(Duration::seconds(90)), "1 minute");
+        assert_eq!(format_duration(Duration::seconds(120)), "2 minutes");
+        assert_eq!(format_duration(Duration::seconds(3599)), "59 minutes");
+    }
+
+    #[test]
+    fn test_format_duration_hours() {
+        assert_eq!(format_duration(Duration::seconds(3600)), "1 hour");
+        assert_eq!(format_duration(Duration::seconds(3700)), "1 hour");
+        assert_eq!(format_duration(Duration::seconds(7200)), "2 hours");
+        assert_eq!(format_duration(Duration::seconds(86399)), "23 hours");
+    }
+
+    #[test]
+    fn test_format_duration_days() {
+        assert_eq!(format_duration(Duration::seconds(86400)), "1 day");
+        assert_eq!(format_duration(Duration::seconds(90000)), "1 day");
+        assert_eq!(format_duration(Duration::seconds(172800)), "2 days");
+        assert_eq!(format_duration(Duration::seconds(604800)), "7 days");
     }
 }
