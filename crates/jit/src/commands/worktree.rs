@@ -180,7 +180,10 @@ pub fn execute_worktree_list() -> Result<Vec<WorktreeListEntry>> {
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        anyhow::bail!("git worktree list failed: {}", stderr);
+        anyhow::bail!(
+            "{}",
+            crate::errors::git_command_failed("git worktree list --porcelain", &stderr)
+        );
     }
 
     let porcelain_output =

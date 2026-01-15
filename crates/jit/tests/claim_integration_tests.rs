@@ -148,7 +148,7 @@ fn test_claim_acquire_already_claimed_error() {
         .assert()
         .success();
 
-    // Second claim should fail
+    // Second claim should fail with actionable error
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
         .args([
@@ -162,7 +162,10 @@ fn test_claim_acquire_already_claimed_error() {
         ])
         .assert()
         .failure()
-        .stderr(predicate::str::contains("already claimed"));
+        .stderr(predicate::str::contains("already claimed"))
+        .stderr(predicate::str::contains("Possible causes:"))
+        .stderr(predicate::str::contains("To fix:"))
+        .stderr(predicate::str::contains("jit claim status"));
 }
 
 #[test]
@@ -276,16 +279,17 @@ fn test_claim_release_happy_path() {
 fn test_claim_release_not_found_error() {
     let temp = setup_repo();
 
-    // Try to release non-existent lease
+    // Try to release non-existent lease - should fail with actionable error
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
         .env("JIT_AGENT_ID", "agent:test")
         .args(["claim", "release", "01FAKE0000000000000000000"])
         .assert()
         .failure()
-        .stderr(predicate::str::contains("Lease").and(
-            predicate::str::contains("not found").or(predicate::str::contains("No active lease")),
-        ));
+        .stderr(predicate::str::contains("not found"))
+        .stderr(predicate::str::contains("Possible causes:"))
+        .stderr(predicate::str::contains("To fix:"))
+        .stderr(predicate::str::contains("jit claim list"));
 }
 
 #[test]

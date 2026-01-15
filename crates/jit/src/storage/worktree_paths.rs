@@ -3,6 +3,8 @@ use std::env;
 use std::path::PathBuf;
 use std::process::Command;
 
+use crate::errors;
+
 /// Paths for worktree-aware storage.
 ///
 /// Detects git worktree context and provides paths for both per-worktree data plane
@@ -52,16 +54,20 @@ impl WorktreePaths {
         }
 
         // Get git common dir (shared .git)
-        let common_dir_raw = PathBuf::from(
-            String::from_utf8(
-                Command::new("git")
-                    .args(["rev-parse", "--git-common-dir"])
-                    .output()
-                    .context("Failed to get git common dir")?
-                    .stdout,
-            )?
-            .trim(),
-        );
+        let common_dir_output = Command::new("git")
+            .args(["rev-parse", "--git-common-dir"])
+            .output()
+            .context("Failed to execute git command")?;
+
+        if !common_dir_output.status.success() {
+            let stderr = String::from_utf8_lossy(&common_dir_output.stderr);
+            return Err(anyhow::anyhow!(
+                "{}",
+                errors::git_command_failed("git rev-parse --git-common-dir", &stderr)
+            ));
+        }
+
+        let common_dir_raw = PathBuf::from(String::from_utf8(common_dir_output.stdout)?.trim());
 
         // Canonicalize common_dir to handle relative paths (e.g., ".git" in main worktree)
         let common_dir = if common_dir_raw.is_absolute() {
@@ -71,16 +77,20 @@ impl WorktreePaths {
         };
 
         // Get worktree root
-        let worktree_root = PathBuf::from(
-            String::from_utf8(
-                Command::new("git")
-                    .args(["rev-parse", "--show-toplevel"])
-                    .output()
-                    .context("Failed to get worktree root")?
-                    .stdout,
-            )?
-            .trim(),
-        );
+        let worktree_root_output = Command::new("git")
+            .args(["rev-parse", "--show-toplevel"])
+            .output()
+            .context("Failed to execute git command")?;
+
+        if !worktree_root_output.status.success() {
+            let stderr = String::from_utf8_lossy(&worktree_root_output.stderr);
+            return Err(anyhow::anyhow!(
+                "{}",
+                errors::git_command_failed("git rev-parse --show-toplevel", &stderr)
+            ));
+        }
+
+        let worktree_root = PathBuf::from(String::from_utf8(worktree_root_output.stdout)?.trim());
 
         let local_jit = worktree_root.join(".jit");
         let shared_jit = common_dir.join("jit");

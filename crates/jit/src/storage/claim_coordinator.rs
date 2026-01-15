@@ -21,6 +21,7 @@ use uuid::Uuid;
 
 use super::lock::FileLocker;
 use super::worktree_paths::WorktreePaths;
+use crate::errors;
 
 /// A lease granting exclusive write access to an issue
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -210,21 +211,16 @@ impl ClaimCoordinator {
 
         // 3. Check availability
         if let Some(existing) = index.find_lease(issue_id) {
-            if existing.ttl_secs == 0 {
-                bail!(
-                    "Issue {} already claimed by {} (indefinite lease, last beat: {})",
-                    issue_id,
-                    existing.agent_id,
-                    existing.last_beat
-                );
+            let expires_info = if existing.ttl_secs == 0 {
+                format!("(indefinite lease, last beat: {})", existing.last_beat)
             } else {
-                bail!(
-                    "Issue {} already claimed by {} until {}",
-                    issue_id,
-                    existing.agent_id,
-                    existing.expires_at.unwrap()
-                );
-            }
+                format!("until {}", existing.expires_at.unwrap())
+            };
+            
+            bail!(
+                "{}",
+                errors::already_claimed(issue_id, &existing.agent_id, &expires_info)
+            );
         }
 
         // 4. Create new lease
@@ -389,7 +385,11 @@ impl ClaimCoordinator {
             .context("Failed to get current branch")?;
 
         if !output.status.success() {
-            bail!("git rev-parse failed");
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            bail!(
+                "{}",
+                errors::git_command_failed("git rev-parse --abbrev-ref HEAD", &stderr)
+            );
         }
 
         Ok(String::from_utf8(output.stdout)?.trim().to_string())
@@ -425,15 +425,17 @@ impl ClaimCoordinator {
             .leases
             .iter()
             .find(|l| l.lease_id == lease_id)
-            .ok_or_else(|| anyhow::anyhow!("Lease {} not found", lease_id))?;
+            .ok_or_else(|| anyhow::anyhow!("{}", errors::lease_not_found(lease_id)))?;
 
         // 4. Verify ownership
         if lease.agent_id != self.agent_id {
             bail!(
-                "Cannot renew lease {}: owned by {}, not {}",
-                lease_id,
-                lease.agent_id,
-                self.agent_id
+                "{}",
+                errors::not_owner(
+                    &format!("lease {}", lease_id),
+                    &lease.agent_id,
+                    &self.agent_id
+                )
             );
         }
 
@@ -489,15 +491,17 @@ impl ClaimCoordinator {
             .leases
             .iter()
             .find(|l| l.lease_id == lease_id)
-            .ok_or_else(|| anyhow::anyhow!("Lease {} not found", lease_id))?;
+            .ok_or_else(|| anyhow::anyhow!("{}", errors::lease_not_found(lease_id)))?;
 
         // 4. Verify ownership
         if lease.agent_id != self.agent_id {
             bail!(
-                "Cannot release lease {}: owned by {}, not {}",
-                lease_id,
-                lease.agent_id,
-                self.agent_id
+                "{}",
+                errors::not_owner(
+                    &format!("lease {}", lease_id),
+                    &lease.agent_id,
+                    &self.agent_id
+                )
             );
         }
 
@@ -535,7 +539,7 @@ impl ClaimCoordinator {
 
         // 3. Verify lease exists
         if !index.leases.iter().any(|l| l.lease_id == lease_id) {
-            bail!("Lease {} not found", lease_id);
+            bail!("{}", errors::lease_not_found(lease_id));
         }
 
         // 4. Log eviction
