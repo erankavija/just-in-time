@@ -20,6 +20,7 @@ pub mod schema;
 pub mod search;
 pub mod snapshot;
 pub mod storage;
+pub mod test_utils;
 pub mod type_hierarchy;
 pub mod validation;
 pub mod visualization;

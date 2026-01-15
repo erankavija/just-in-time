@@ -2205,7 +2205,7 @@ strategic_types = {}
                 use jit::commands::claim::execute_claim_release;
                 use jit::output::{JsonError, JsonOutput};
 
-                match execute_claim_release(&storage, &lease_id) {
+                match execute_claim_release(&lease_id) {
                     Ok(()) => {
                         if json {
                             let response = serde_json::json!({
@@ -2347,7 +2347,7 @@ strategic_types = {}
                 use jit::commands::claim::execute_claim_list;
                 use jit::output::{JsonError, JsonOutput};
 
-                match execute_claim_list(&storage) {
+                match execute_claim_list() {
                     Ok(leases) => {
                         if json {
                             let response = serde_json::json!({
@@ -2453,7 +2453,7 @@ strategic_types = {}
                 use jit::commands::worktree::execute_worktree_info;
                 use jit::output::{JsonError, JsonOutput};
 
-                match execute_worktree_info(&storage) {
+                match execute_worktree_info() {
                     Ok(info) => {
                         if json {
                             let response = serde_json::json!({
@@ -2500,7 +2500,7 @@ strategic_types = {}
                 use jit::commands::worktree::execute_worktree_list;
                 use jit::output::{JsonError, JsonOutput};
 
-                match execute_worktree_list(&storage) {
+                match execute_worktree_list() {
                     Ok(worktrees) => {
                         if json {
                             let response = serde_json::json!({

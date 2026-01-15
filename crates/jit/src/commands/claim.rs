@@ -77,7 +77,7 @@ pub fn execute_claim_acquire<S: IssueStore>(
 /// Execute `jit claim release` command.
 ///
 /// Releases a previously acquired lease.
-pub fn execute_claim_release<S: IssueStore>(_storage: &S, lease_id: &str) -> Result<()> {
+pub fn execute_claim_release(lease_id: &str) -> Result<()> {
     use crate::agent_config::resolve_agent_id;
 
     // Detect worktree context
@@ -217,7 +217,7 @@ pub fn execute_claim_status<S: IssueStore>(
 /// # Returns
 ///
 /// Vector of all active leases
-pub fn execute_claim_list<S: IssueStore>(_storage: &S) -> Result<Vec<Lease>> {
+pub fn execute_claim_list() -> Result<Vec<Lease>> {
     // Detect worktree context
     let paths = WorktreePaths::detect()
         .context("Failed to detect worktree paths - are you in a git repository?")?;
@@ -285,40 +285,14 @@ mod tests {
     use super::*;
     use crate::domain::Issue;
     use crate::storage::claim_coordinator::Lease;
-    use crate::storage::worktree_paths::WorktreePaths;
+
     use crate::storage::{ClaimCoordinator, FileLocker, JsonFileStorage};
     use std::fs;
     use std::time::Duration;
     use tempfile::TempDir;
 
-    /// Helper to set up test environment without changing current directory
-    fn setup_test_repo() -> Result<(TempDir, JsonFileStorage)> {
-        let temp = TempDir::new()?;
-
-        // Create .jit directory
-        let jit_root = temp.path().join(".jit");
-        fs::create_dir_all(&jit_root)?;
-
-        // Create .git directory
-        let git_dir = temp.path().join(".git");
-        fs::create_dir_all(&git_dir)?;
-
-        // Initialize storage
-        let storage = JsonFileStorage::new(&jit_root);
-        storage.init()?;
-
-        Ok((temp, storage))
-    }
-
-    /// Create test WorktreePaths from TempDir
-    fn create_test_paths(temp: &TempDir) -> WorktreePaths {
-        WorktreePaths {
-            common_dir: temp.path().join(".git"),
-            worktree_root: temp.path().to_path_buf(),
-            local_jit: temp.path().join(".jit"),
-            shared_jit: temp.path().join(".git/jit"),
-        }
-    }
+    // Use shared test utilities
+    use crate::test_utils::{create_test_paths, setup_test_repo};
 
     /// Execute claim acquire with manually constructed paths (bypassing WorktreePaths::detect)
     fn execute_claim_acquire_test(

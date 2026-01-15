@@ -5,7 +5,6 @@
 use crate::storage::claim_coordinator::ClaimsIndex;
 use crate::storage::worktree_identity::load_or_create_worktree_identity;
 use crate::storage::worktree_paths::WorktreePaths;
-use crate::storage::IssueStore;
 use anyhow::{Context, Result};
 use serde::Serialize;
 use std::process::Command;
@@ -137,7 +136,7 @@ fn count_claims_for_worktree(index: &ClaimsIndex, worktree_id: &str) -> usize {
 ///
 /// Displays current worktree context including ID, branch, paths, and whether
 /// this is the main worktree or a secondary one.
-pub fn execute_worktree_info<S: IssueStore>(_storage: &S) -> Result<WorktreeInfo> {
+pub fn execute_worktree_info() -> Result<WorktreeInfo> {
     // Detect worktree context
     let paths = WorktreePaths::detect()
         .context("Failed to detect worktree paths - are you in a git repository?")?;
@@ -165,7 +164,7 @@ pub fn execute_worktree_info<S: IssueStore>(_storage: &S) -> Result<WorktreeInfo
 ///
 /// Lists all git worktrees with their JIT status including worktree ID, branch,
 /// path, and count of active claims.
-pub fn execute_worktree_list<S: IssueStore>(_storage: &S) -> Result<Vec<WorktreeListEntry>> {
+pub fn execute_worktree_list() -> Result<Vec<WorktreeListEntry>> {
     use crate::storage::claim_coordinator::ClaimsIndex;
     use std::path::PathBuf;
 
@@ -251,29 +250,11 @@ pub fn execute_worktree_list<S: IssueStore>(_storage: &S) -> Result<Vec<Worktree
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::storage::JsonFileStorage;
+
     use anyhow::Result;
-    use std::fs;
-    use tempfile::TempDir;
 
-    /// Helper to set up test environment
-    fn setup_test_repo() -> Result<(TempDir, JsonFileStorage)> {
-        let temp = TempDir::new()?;
-
-        // Create .jit directory
-        let jit_root = temp.path().join(".jit");
-        fs::create_dir_all(&jit_root)?;
-
-        // Create .git directory
-        let git_dir = temp.path().join(".git");
-        fs::create_dir_all(&git_dir)?;
-
-        // Initialize storage
-        let storage = JsonFileStorage::new(&jit_root);
-        storage.init()?;
-
-        Ok((temp, storage))
-    }
+    // Use shared test utilities
+    use crate::test_utils::setup_test_repo;
 
     #[test]
     fn test_worktree_info_structure() -> Result<()> {
@@ -315,10 +296,10 @@ mod tests {
 
     #[test]
     fn test_worktree_list_returns_current_worktree() -> Result<()> {
-        let (_temp, storage) = setup_test_repo()?;
+        let (_temp, _storage) = setup_test_repo()?;
 
         // In an actual git repository, should return at least the current worktree
-        let result = execute_worktree_list(&storage)?;
+        let result = execute_worktree_list()?;
 
         // Should have at least one worktree (current)
         assert!(
@@ -422,9 +403,9 @@ mod tests {
 
     #[test]
     fn test_json_output_structure() -> Result<()> {
-        let (_temp, storage) = setup_test_repo()?;
+        let (_temp, _storage) = setup_test_repo()?;
 
-        let result = execute_worktree_list(&storage)?;
+        let result = execute_worktree_list()?;
 
         // Verify JSON serialization works
         let json = serde_json::to_string(&result)?;
@@ -439,10 +420,10 @@ mod tests {
 
     #[test]
     fn test_worktree_list_with_no_claims_index() -> Result<()> {
-        let (_temp, storage) = setup_test_repo()?;
+        let (_temp, _storage) = setup_test_repo()?;
 
         // Even without claims.index.json, should work and show 0 claims
-        let result = execute_worktree_list(&storage)?;
+        let result = execute_worktree_list()?;
 
         for entry in &result {
             assert_eq!(
