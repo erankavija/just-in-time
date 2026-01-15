@@ -1197,3 +1197,11 @@
 {"type":"gate_passed","id":"fd933183-6e4c-4170-94e5-c6e70d700179","issue_id":"f8e58e7d-6d05-4bbe-a077-be3fb792a27f","timestamp":"2026-01-11T00:13:28.942120975Z","gate_key":"tdd-reminder","updated_by":null}
 {"type":"issue_state_changed","id":"a4263b4a-d7f0-4394-9dab-1e6a56577c58","issue_id":"f8e58e7d-6d05-4bbe-a077-be3fb792a27f","timestamp":"2026-01-11T00:13:28.945146346Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"812c6535-23c4-4e00-b3aa-946158336d1e","issue_id":"f8e58e7d-6d05-4bbe-a077-be3fb792a27f","timestamp":"2026-01-11T00:13:28.945328046Z","assignee":"agent:copilot-cli"}
+{"type":"issue_state_changed","id":"284f6a53-0eab-456b-a40c-7b6d9b2d0bec","issue_id":"f8e58e7d-6d05-4bbe-a077-be3fb792a27f","timestamp":"2026-01-15T20:45:55.845828898Z","from":"in_progress","to":"gated"}
+{"type":"gate_passed","id":"b4e2b7eb-614e-4759-9b47-e9ec01a65b19","issue_id":"f8e58e7d-6d05-4bbe-a077-be3fb792a27f","timestamp":"2026-01-15T20:46:12.327610894Z","gate_key":"tdd-reminder","updated_by":null}
+{"type":"gate_passed","id":"65a95c66-f706-4c88-b256-1936404dab79","issue_id":"f8e58e7d-6d05-4bbe-a077-be3fb792a27f","timestamp":"2026-01-15T20:46:33.256681698Z","gate_key":"tests","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"a3dcb58f-03ab-4ff7-b085-1e20e4483033","issue_id":"f8e58e7d-6d05-4bbe-a077-be3fb792a27f","timestamp":"2026-01-15T20:46:41.773225355Z","gate_key":"clippy","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"d581d02f-7136-42b4-90ae-1afdf72af835","issue_id":"f8e58e7d-6d05-4bbe-a077-be3fb792a27f","timestamp":"2026-01-15T20:46:42.318044010Z","gate_key":"fmt","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"4bea211c-2d0f-4f3b-ba80-86434da4d707","issue_id":"f8e58e7d-6d05-4bbe-a077-be3fb792a27f","timestamp":"2026-01-15T20:46:42.442329432Z","gate_key":"code-review","updated_by":null}
+{"type":"issue_state_changed","id":"ea6aeaf7-4d78-4fe9-8891-d7b2f1a984c4","issue_id":"f8e58e7d-6d05-4bbe-a077-be3fb792a27f","timestamp":"2026-01-15T20:46:42.442696781Z","from":"gated","to":"done"}
+{"type":"issue_completed","id":"4efbd04e-3a78-4333-90f5-a8e6fa98529f","issue_id":"f8e58e7d-6d05-4bbe-a077-be3fb792a27f","timestamp":"2026-01-15T20:46:42.442725451Z"}
