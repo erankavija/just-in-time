@@ -16,6 +16,13 @@
       "label": "Design Document",
       "doc_type": "design",
       "format": "markdown"
+    },
+    {
+      "path": "dev/sessions/session-20260115-cli-quality-phase3.md",
+      "commit": null,
+      "label": "Session Notes: Phase 1-2 complete, Phase 3 in progress",
+      "doc_type": "notes",
+      "format": "markdown"
     }
   ],
   "labels": [
