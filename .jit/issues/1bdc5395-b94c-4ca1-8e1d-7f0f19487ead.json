@@ -11,10 +11,10 @@
   "context": {},
   "documents": [],
   "labels": [
-    "type:refactoring",
     "epic:parallel-work",
     "milestone:v1.0",
     "component:testing",
-    "component:cli"
+    "component:cli",
+    "type:task"
   ]
 }

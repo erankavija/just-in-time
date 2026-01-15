@@ -39,3 +39,4 @@ dirs = "5.0"
 assert_cmd = { workspace = true }
 predicates = { workspace = true }
 proptest = { workspace = true }
+ulid = { workspace = true }

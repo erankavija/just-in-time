@@ -108,6 +108,8 @@ rg "resolve_issue_id" --type rust
 
 **Pre-existing issues:** You must fix ALL warnings/errors that block gates, even if they existed before your changes. Pre-existence is never an excuse. Code quality is everyone's responsibility.
 
+**Path canonicalization:** Always canonicalize paths from external sources (git commands, user input, environment variables) before storage or comparison. Use `canonicalize()` or make paths absolute relative to `current_dir()`. This prevents subtle bugs from relative vs absolute path mismatches.
+
 **Follow-up issues:** If you discover unrelated work or nice-to-have improvements, propose to create follow-up issues and link them to appropriate epics. Don't expand current issue scope.
 
 **Dependencies matter most:** Use `jit dep add` to express "task B needs task A done first". Epic labels are helpful for organization but dependencies are the critical relationship.

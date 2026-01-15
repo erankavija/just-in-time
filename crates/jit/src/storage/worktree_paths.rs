@@ -128,19 +128,20 @@ mod tests {
 
     #[test]
     fn test_detect_in_main_worktree() {
-        // This test requires being in a git repo
-        // We'll test with the actual project directory
-        if let Ok(paths) = WorktreePaths::detect() {
-            // If we're in the main worktree (common_dir == worktree_root/.git)
-            // then is_worktree() should return false
-            if paths.common_dir == paths.worktree_root.join(".git") {
-                assert!(
-                    !paths.is_worktree(),
-                    "Main worktree should have is_worktree() == false"
-                );
-                assert_eq!(paths.local_jit, paths.worktree_root.join(".jit"));
-                assert_eq!(paths.shared_jit, paths.common_dir.join("jit"));
-            }
+        let paths = WorktreePaths::detect().unwrap();
+
+        // Test the is_worktree() invariant: it should be false IFF common_dir == worktree_root/.git
+        let expected_is_main = paths.common_dir == paths.worktree_root.join(".git");
+        assert_eq!(
+            paths.is_worktree(),
+            !expected_is_main,
+            "is_worktree() should be false when common_dir == worktree_root/.git, true otherwise"
+        );
+
+        // If in main worktree, verify path structure
+        if expected_is_main {
+            assert_eq!(paths.local_jit, paths.worktree_root.join(".jit"));
+            assert_eq!(paths.shared_jit, paths.common_dir.join("jit"));
         }
     }
 

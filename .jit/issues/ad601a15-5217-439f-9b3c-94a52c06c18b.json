@@ -38,8 +38,6 @@
   ],
   "labels": [
     "type:epic",
-    "area:storage",
-    "area:coordination",
     "milestone:v1.0"
   ]
 }

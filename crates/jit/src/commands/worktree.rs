@@ -321,7 +321,10 @@ mod tests {
         let result = execute_worktree_list(&storage)?;
 
         // Should have at least one worktree (current)
-        assert!(result.len() >= 1, "Should return at least current worktree");
+        assert!(
+            !result.is_empty(),
+            "Should return at least current worktree"
+        );
 
         // Each entry should have required fields
         for entry in &result {

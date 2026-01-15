@@ -8,6 +8,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use tempfile::TempDir;
+use ulid::Ulid;
 
 /// Get path to jit binary
 fn jit_binary() -> PathBuf {
@@ -183,7 +184,8 @@ fn test_validate_leases_no_claims_index() {
 #[test]
 fn test_validate_leases_detects_expired_lease() {
     let repo = setup_git_repo();
-    let worktree_path = create_worktree(repo.path(), "test-wt");
+    let worktree_name = format!("wt-{}", Ulid::new().to_string().to_lowercase());
+    let worktree_path = create_worktree(repo.path(), &worktree_name);
     let worktree_id = get_worktree_id(&worktree_path);
 
     // Create an issue
@@ -290,7 +292,8 @@ fn test_validate_leases_detects_missing_worktree() {
 #[test]
 fn test_validate_leases_detects_missing_issue() {
     let repo = setup_git_repo();
-    let worktree_path = create_worktree(repo.path(), "test-wt");
+    let worktree_name = format!("wt-{}", Ulid::new().to_string().to_lowercase());
+    let worktree_path = create_worktree(repo.path(), &worktree_name);
     let worktree_id = get_worktree_id(&worktree_path);
 
     // Create lease for non-existent issue
@@ -372,7 +375,8 @@ fn test_validate_leases_all_valid_succeeds() {
 #[test]
 fn test_validate_leases_json_output_on_failure() {
     let repo = setup_git_repo();
-    let worktree_path = create_worktree(repo.path(), "test-wt");
+    let worktree_name = format!("wt-{}", Ulid::new().to_string().to_lowercase());
+    let worktree_path = create_worktree(repo.path(), &worktree_name);
     let worktree_id = get_worktree_id(&worktree_path);
 
     // Create an issue

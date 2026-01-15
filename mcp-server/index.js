@@ -330,6 +330,102 @@ async function executeTool(name, args) {
   return await runJitCommand(cliArgs, hasJsonFlag);
 }
 
+/**
+ * Generate a human-readable summary for the UI from command results
+ * @param {string} toolName - The MCP tool name that was called
+ * @param {object} result - The full result data from jit CLI
+ * @returns {string} A concise summary for users
+ */
+function generateUserSummary(toolName, result) {
+  // Extract command parts from tool name
+  const parts = toolName.replace('jit_', '').split('_');
+  const command = parts[0];
+  const subcommand = parts.slice(1).join('-');
+  
+  // Handle different command types
+  if (command === 'status') {
+    return `Status: ${result.open} open, ${result.ready} ready, ${result.in_progress} in progress, ${result.done} done, ${result.blocked} blocked`;
+  }
+  
+  if (command === 'issue') {
+    if (subcommand === 'create') {
+      return `Created issue: ${result.id.substring(0, 8)} - ${result.title}`;
+    }
+    if (subcommand === 'show') {
+      const gates = result.gates_required?.length || 0;
+      const gatesPassed = Object.values(result.gates_status || {}).filter(g => g.status === 'passed').length;
+      return `Issue ${result.id.substring(0, 8)}: ${result.title} [${result.state}${gates > 0 ? `, ${gatesPassed}/${gates} gates` : ''}]`;
+    }
+    if (subcommand === 'update') {
+      return `Updated issue ${result.id.substring(0, 8)}: ${result.title} → ${result.state}`;
+    }
+    if (subcommand === 'delete') {
+      return `Deleted issue ${result.id.substring(0, 8)}`;
+    }
+  }
+  
+  if (command === 'query') {
+    const count = result.count || result.issues?.length || 0;
+    const queryType = subcommand || 'issues';
+    return `Found ${count} ${queryType === 'all' ? 'issue' : queryType}${count !== 1 ? 's' : ''}`;
+  }
+  
+  if (command === 'gate') {
+    if (subcommand === 'pass' || subcommand === 'fail') {
+      return `Gate ${result.gate_key || 'unknown'} ${subcommand}ed for issue ${result.issue_id?.substring(0, 8)}`;
+    }
+    if (subcommand === 'check') {
+      return `Gate ${result.gate_key}: ${result.passed ? 'passed' : 'failed'}`;
+    }
+    if (subcommand === 'list') {
+      return `${result.gates?.length || 0} gate definition(s)`;
+    }
+  }
+  
+  if (command === 'dep') {
+    if (subcommand === 'add') {
+      return `Added dependency: ${result.from_id?.substring(0, 8)} → ${result.to_id?.substring(0, 8)}`;
+    }
+    if (subcommand === 'rm') {
+      return `Removed dependency: ${result.from_id?.substring(0, 8)} ↛ ${result.to_id?.substring(0, 8)}`;
+    }
+  }
+  
+  if (command === 'validate') {
+    if (result.valid === true) {
+      return `✓ Validation passed`;
+    } else if (result.valid === false) {
+      const validations = result.validations || [];
+      const failed = validations.filter(v => !v.valid);
+      return `✗ Validation failed (${failed.length} issue${failed.length !== 1 ? 's' : ''})`;
+    }
+  }
+  
+  if (command === 'graph') {
+    if (subcommand === 'show') {
+      const deps = result.dependencies?.length || 0;
+      const blocked = result.blocked_by?.length || 0;
+      return `Issue ${result.id?.substring(0, 8)}: ${deps} dependencies, ${blocked} blocked by`;
+    }
+    if (subcommand === 'roots') {
+      const count = result.roots?.length || result.count || 0;
+      return `${count} root issue${count !== 1 ? 's' : ''}`;
+    }
+  }
+  
+  // Default: try to be smart about the result
+  if (result.message) {
+    return result.message;
+  }
+  
+  if (typeof result === 'string') {
+    return result.length > 100 ? result.substring(0, 97) + '...' : result;
+  }
+  
+  // Generic fallback
+  return `Command ${toolName.replace('jit_', 'jit ').replace(/_/g, ' ')} completed`;
+}
+
 // Create MCP server
 const server = new Server(
   {
@@ -355,12 +451,24 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   
   try {
     const result = await executeTool(name, args || {});
+    const userSummary = generateUserSummary(name, result);
+    const fullData = JSON.stringify(result, null, 2);
     
     return {
       content: [
         {
           type: "text",
-          text: JSON.stringify(result, null, 2),
+          text: userSummary + "\n",
+          annotations: {
+            audience: ["user"]
+          }
+        },
+        {
+          type: "text",
+          text: fullData,
+          annotations: {
+            audience: ["assistant"]
+          }
         },
       ],
     };
