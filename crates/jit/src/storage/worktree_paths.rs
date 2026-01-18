@@ -109,6 +109,13 @@ impl WorktreePaths {
     pub fn is_worktree(&self) -> bool {
         self.common_dir != self.worktree_root.join(".git")
     }
+
+    /// Check if this is the main worktree.
+    ///
+    /// Returns true if `common_dir == worktree_root/.git`.
+    pub fn is_main_worktree(&self) -> bool {
+        !self.is_worktree()
+    }
 }
 
 #[cfg(test)]

@@ -5,11 +5,12 @@
 
 use crate::domain::{Event, Issue};
 use crate::storage::{FileLocker, GateRegistry, IssueStore};
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::fs::{self, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::time::Duration;
 
 const ISSUES_DIR: &str = "issues";
@@ -126,6 +127,94 @@ impl JsonFileStorage {
         let index_path = self.root.join(INDEX_FILE);
         self.write_json(&index_path, index)
     }
+
+    /// Load an issue from git HEAD.
+    ///
+    /// This is used as a fallback when an issue doesn't exist in local storage
+    /// but may be committed in git (e.g., reading from a secondary worktree).
+    fn load_issue_from_git(&self, id: &str) -> Result<Issue> {
+        let git_path = format!("HEAD:.jit/issues/{}.json", id);
+        let output = Command::new("git")
+            .arg("show")
+            .arg(&git_path)
+            .current_dir(&self.root)
+            .output()
+            .context("Failed to execute git command")?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            bail!("Issue not in git: {}", stderr.trim());
+        }
+
+        serde_json::from_slice(&output.stdout)
+            .context("Failed to parse issue from git")
+    }
+
+    /// Load an issue from the main worktree's .jit/ directory.
+    ///
+    /// This is used when in a secondary worktree to read uncommitted issues
+    /// from the main worktree.
+    fn load_issue_from_main_worktree(&self, id: &str) -> Result<Issue> {
+        // self.root is .jit/, we need to go up one level to the repo root
+        let repo_root = self.root.parent().ok_or_else(|| anyhow!("Invalid .jit path"))?;
+        
+        // We need to detect worktree context from git commands
+        // First check if we're in a git repo at all
+        let output = Command::new("git")
+            .args(["rev-parse", "--git-common-dir"])
+            .current_dir(repo_root)
+            .output();
+        
+        if output.is_err() {
+            bail!("Not in a git repository");
+        }
+        
+        let output = output.unwrap();
+        if !output.status.success() {
+            bail!("Not in a git repository");
+        }
+        
+        let common_dir = PathBuf::from(String::from_utf8(output.stdout)?.trim());
+        
+        // Get worktree root
+        let output = Command::new("git")
+            .args(["rev-parse", "--show-toplevel"])
+            .current_dir(repo_root)
+            .output()?;
+        
+        if !output.status.success() {
+            bail!("Failed to get worktree root");
+        }
+        
+        let worktree_root = PathBuf::from(String::from_utf8(output.stdout)?.trim());
+        
+        // Check if we're in main worktree
+        let is_main = common_dir == worktree_root.join(".git");
+        if is_main {
+            bail!("Already in main worktree");
+        }
+
+        // Calculate main worktree path
+        // The common_dir (.git) is shared, so we need to find the main worktree root
+        // Main worktree is typically the parent of the .git directory
+        let main_worktree_root = if common_dir.file_name().unwrap() == ".git" {
+            common_dir.parent().unwrap().to_path_buf()
+        } else {
+            // Bare repo or non-standard setup
+            bail!("Cannot determine main worktree location");
+        };
+
+        let main_issue_path = main_worktree_root
+            .join(".jit/issues")
+            .join(format!("{}.json", id));
+
+        if !main_issue_path.exists() {
+            bail!("Issue not in main worktree");
+        }
+
+        // Read directly from main worktree (no lock needed for read-only access)
+        self.read_json(&main_issue_path)
+    }
 }
 
 impl IssueStore for JsonFileStorage {
@@ -185,10 +274,29 @@ impl IssueStore for JsonFileStorage {
     }
 
     fn load_issue(&self, id: &str) -> Result<Issue> {
+        // Try local .jit/issues/ first (current behavior)
         let issue_path = self.issue_path(id);
-        let issue_lock_path = issue_path.with_extension("lock");
-        let _lock = self.locker.lock_shared(&issue_lock_path)?;
-        self.read_json(&issue_path)
+        if issue_path.exists() {
+            let issue_lock_path = issue_path.with_extension("lock");
+            let _lock = self.locker.lock_shared(&issue_lock_path)?;
+            return self.read_json(&issue_path);
+        }
+
+        // Fallback 1: Try reading from git HEAD
+        if let Ok(issue) = self.load_issue_from_git(id) {
+            return Ok(issue);
+        }
+
+        // Fallback 2: Try reading from main worktree (if in secondary)
+        if let Ok(issue) = self.load_issue_from_main_worktree(id) {
+            return Ok(issue);
+        }
+
+        // Issue not found in any source
+        Err(anyhow!(
+            "Issue {} not found in local storage, git, or main worktree",
+            id
+        ))
     }
 
     fn resolve_issue_id(&self, partial_id: &str) -> Result<String> {
@@ -839,5 +947,225 @@ mod tests {
         // Final check
         let final_issues = storage.list_issues().unwrap();
         assert_eq!(final_issues.len(), 8); // 3 initial + 5 new
+    }
+
+    // Tests for cross-worktree issue visibility (TDD)
+    mod cross_worktree_tests {
+        use super::*;
+        use std::fs;
+        use std::process::Command;
+
+        fn setup_git_repo() -> (TempDir, PathBuf) {
+            let temp_dir = TempDir::new().unwrap();
+            let repo_path = temp_dir.path().to_path_buf();
+
+            // Initialize git repository
+            Command::new("git")
+                .args(["init"])
+                .current_dir(&repo_path)
+                .output()
+                .unwrap();
+
+            Command::new("git")
+                .args(["config", "user.name", "Test"])
+                .current_dir(&repo_path)
+                .output()
+                .unwrap();
+
+            Command::new("git")
+                .args(["config", "user.email", "test@example.com"])
+                .current_dir(&repo_path)
+                .output()
+                .unwrap();
+
+            (temp_dir, repo_path)
+        }
+
+        #[test]
+        fn test_load_issue_from_local_first() {
+            // Setup: Create a local .jit directory
+            let (_temp, storage) = setup_storage();
+            storage.init().unwrap();
+
+            // Create and save an issue locally
+            let issue = Issue::new("Local Issue".to_string(), "Description".to_string());
+            let issue_id = issue.id.clone();
+            storage.save_issue(&issue).unwrap();
+
+            // Should read from local storage
+            let loaded = storage.load_issue(&issue_id).unwrap();
+            assert_eq!(loaded.title, "Local Issue");
+        }
+
+        #[test]
+        fn test_load_issue_from_git_when_not_local() {
+            // Setup: Create git repo with committed issue
+            let (_temp_dir, repo_path) = setup_git_repo();
+            let jit_dir = repo_path.join(".jit");
+            let storage = JsonFileStorage::new(&jit_dir);
+            storage.init().unwrap();
+
+            // Create an issue and commit it
+            let issue = Issue::new("Committed Issue".to_string(), "From git".to_string());
+            let issue_id = issue.id.clone();
+            storage.save_issue(&issue).unwrap();
+
+            // Commit to git
+            Command::new("git")
+                .args(["add", ".jit"])
+                .current_dir(&repo_path)
+                .output()
+                .unwrap();
+
+            Command::new("git")
+                .args(["commit", "-m", "Add issue"])
+                .current_dir(&repo_path)
+                .output()
+                .unwrap();
+
+            // Remove from local .jit (simulate reading from different worktree)
+            let issue_path = jit_dir.join("issues").join(format!("{}.json", issue_id));
+            fs::remove_file(&issue_path).unwrap();
+
+            // Update index to not include the issue
+            let index = Index {
+                schema_version: 1,
+                all_ids: vec![],
+            };
+            storage.write_json(&jit_dir.join(INDEX_FILE), &index).unwrap();
+
+            // Should fall back to reading from git
+            let loaded = storage.load_issue(&issue_id).unwrap();
+            assert_eq!(loaded.title, "Committed Issue");
+            assert_eq!(loaded.description, "From git");
+        }
+
+        #[test]
+        fn test_load_issue_from_main_worktree_when_not_in_git() {
+            // Setup: Create git repo with main worktree
+            let (_temp_dir, repo_path) = setup_git_repo();
+            let main_jit = repo_path.join(".jit");
+            let main_storage = JsonFileStorage::new(&main_jit);
+            main_storage.init().unwrap();
+
+            // Create an issue in main worktree (not committed)
+            let issue = Issue::new("Main WT Issue".to_string(), "Uncommitted".to_string());
+            let issue_id = issue.id.clone();
+            main_storage.save_issue(&issue).unwrap();
+
+            // Create secondary worktree with unique name
+            use std::time::SystemTime;
+            let timestamp = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos();
+            let worktree_name = format!("secondary-{}", timestamp);
+            let branch_name = format!("feature-{}", timestamp);
+            let secondary_rel_path = format!("../{}", worktree_name);
+            
+            Command::new("git")
+                .args(["worktree", "add", "-b", &branch_name, &secondary_rel_path])
+                .current_dir(&repo_path)
+                .output()
+                .unwrap();
+
+            let secondary_path = repo_path.parent().unwrap().join(&worktree_name);
+            let secondary_jit = secondary_path.join(".jit");
+            fs::create_dir_all(&secondary_jit.join("issues")).unwrap();
+
+            // Initialize secondary storage
+            let secondary_storage = JsonFileStorage::new(&secondary_jit);
+            secondary_storage.init().unwrap();
+
+            // Should fall back to reading from main worktree
+            let loaded = secondary_storage.load_issue(&issue_id).unwrap();
+            assert_eq!(loaded.title, "Main WT Issue");
+            assert_eq!(loaded.description, "Uncommitted");
+        }
+
+        #[test]
+        fn test_load_issue_prefers_local_over_git() {
+            // Setup: Create git repo with committed issue
+            let (_temp_dir, repo_path) = setup_git_repo();
+            let jit_dir = repo_path.join(".jit");
+            let storage = JsonFileStorage::new(&jit_dir);
+            storage.init().unwrap();
+
+            // Create and commit an issue
+            let mut issue = Issue::new("Original".to_string(), "Old version".to_string());
+            let issue_id = issue.id.clone();
+            storage.save_issue(&issue).unwrap();
+
+            Command::new("git")
+                .args(["add", ".jit"])
+                .current_dir(&repo_path)
+                .output()
+                .unwrap();
+
+            Command::new("git")
+                .args(["commit", "-m", "Add issue"])
+                .current_dir(&repo_path)
+                .output()
+                .unwrap();
+
+            // Update issue locally (not committed)
+            issue.title = "Updated Locally".to_string();
+            issue.description = "New version".to_string();
+            storage.save_issue(&issue).unwrap();
+
+            // Should prefer local version over git version
+            let loaded = storage.load_issue(&issue_id).unwrap();
+            assert_eq!(loaded.title, "Updated Locally");
+            assert_eq!(loaded.description, "New version");
+        }
+
+        #[test]
+        fn test_load_issue_fails_when_not_found_anywhere() {
+            let (_temp, storage) = setup_storage();
+            storage.init().unwrap();
+
+            let fake_id = "00000000-0000-0000-0000-000000000000";
+            let result = storage.load_issue(fake_id);
+
+            assert!(result.is_err());
+            let err_msg = result.unwrap_err().to_string();
+            assert!(err_msg.contains("not found") || err_msg.contains("Issue"));
+        }
+
+        #[test]
+        fn test_load_issue_from_git_handles_invalid_json() {
+            // Setup: Create git repo with invalid JSON committed
+            let (_temp_dir, repo_path) = setup_git_repo();
+            let jit_dir = repo_path.join(".jit");
+            fs::create_dir_all(&jit_dir.join("issues")).unwrap();
+
+            let storage = JsonFileStorage::new(&jit_dir);
+            storage.init().unwrap();
+
+            // Create invalid JSON file
+            let issue_id = "11111111-1111-1111-1111-111111111111";
+            let issue_path = jit_dir.join("issues").join(format!("{}.json", issue_id));
+            fs::write(&issue_path, "{ invalid json }").unwrap();
+
+            // Commit it
+            Command::new("git")
+                .args(["add", ".jit"])
+                .current_dir(&repo_path)
+                .output()
+                .unwrap();
+
+            Command::new("git")
+                .args(["commit", "-m", "Add invalid issue"])
+                .current_dir(&repo_path)
+                .output()
+                .unwrap();
+
+            // Remove from local
+            fs::remove_file(&issue_path).unwrap();
+
+            // Should fail gracefully with parse error (not panic)
+            let result = storage.load_issue(issue_id);
+            assert!(result.is_err());
+        }
     }
 }
