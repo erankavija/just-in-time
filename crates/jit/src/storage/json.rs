@@ -164,10 +164,13 @@ impl JsonFileStorage {
 
     /// Load index from git HEAD.
     fn load_index_from_git(&self) -> Result<Index> {
+        // Run git from repository root, not from .jit directory
+        let repo_root = self.root.parent().ok_or_else(|| anyhow!("Invalid .jit path"))?;
+        
         let output = Command::new("git")
             .arg("show")
             .arg("HEAD:.jit/index.json")
-            .current_dir(&self.root)
+            .current_dir(repo_root)
             .output()
             .context("Failed to execute git command")?;
 
@@ -231,11 +234,14 @@ impl JsonFileStorage {
     /// This is used as a fallback when an issue doesn't exist in local storage
     /// but may be committed in git (e.g., reading from a secondary worktree).
     fn load_issue_from_git(&self, id: &str) -> Result<Issue> {
+        // Run git from repository root, not from .jit directory
+        let repo_root = self.root.parent().ok_or_else(|| anyhow!("Invalid .jit path"))?;
+        
         let git_path = format!("HEAD:.jit/issues/{}.json", id);
         let output = Command::new("git")
             .arg("show")
             .arg(&git_path)
-            .current_dir(&self.root)
+            .current_dir(repo_root)
             .output()
             .context("Failed to execute git command")?;
 
