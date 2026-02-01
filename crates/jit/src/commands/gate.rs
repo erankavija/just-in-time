@@ -245,6 +245,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         example_integration: Option<String>,
         stage_str: String,
     ) -> Result<()> {
+        // Global operation - enforce common history with main
+        crate::commands::worktree::enforce_main_only_operations()?;
+
         let mut registry = self.storage.load_gate_registry()?;
 
         if registry.gates.contains_key(&key) {
@@ -297,6 +300,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         mode: crate::domain::GateMode,
         checker: Option<crate::domain::GateChecker>,
     ) -> Result<()> {
+        // Global operation - enforce common history with main
+        crate::commands::worktree::enforce_main_only_operations()?;
+
         let mut registry = self.storage.load_gate_registry()?;
 
         if registry.gates.contains_key(&key) {
@@ -338,6 +344,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     pub fn remove_gate_definition(&self, key: &str) -> Result<()> {
+        // Global operation - enforce common history with main
+        crate::commands::worktree::enforce_main_only_operations()?;
+
         let mut registry = self.storage.load_gate_registry()?;
 
         if !registry.gates.contains_key(key) {
