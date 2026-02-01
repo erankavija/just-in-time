@@ -138,24 +138,24 @@ impl JsonFileStorage {
     /// Deduplicates IDs across sources.
     fn load_aggregated_index(&self) -> Result<Index> {
         use std::collections::HashSet;
-        
+
         let mut all_ids = HashSet::new();
-        
+
         // 1. Load local index
         if let Ok(local_index) = self.load_index() {
             all_ids.extend(local_index.all_ids);
         }
-        
+
         // 2. Try loading index from git
         if let Ok(git_index) = self.load_index_from_git() {
             all_ids.extend(git_index.all_ids);
         }
-        
+
         // 3. Try loading index from main worktree
         if let Ok(main_index) = self.load_index_from_main_worktree() {
             all_ids.extend(main_index.all_ids);
         }
-        
+
         Ok(Index {
             schema_version: 1,
             all_ids: all_ids.into_iter().collect(),
@@ -165,8 +165,11 @@ impl JsonFileStorage {
     /// Load index from git HEAD.
     fn load_index_from_git(&self) -> Result<Index> {
         // Run git from repository root, not from .jit directory
-        let repo_root = self.root.parent().ok_or_else(|| anyhow!("Invalid .jit path"))?;
-        
+        let repo_root = self
+            .root
+            .parent()
+            .ok_or_else(|| anyhow!("Invalid .jit path"))?;
+
         let output = Command::new("git")
             .arg("show")
             .arg("HEAD:.jit/index.json")
@@ -178,36 +181,38 @@ impl JsonFileStorage {
             bail!("Index not in git");
         }
 
-        serde_json::from_slice(&output.stdout)
-            .context("Failed to parse index from git")
+        serde_json::from_slice(&output.stdout).context("Failed to parse index from git")
     }
 
     /// Load index from main worktree.
     fn load_index_from_main_worktree(&self) -> Result<Index> {
-        let repo_root = self.root.parent().ok_or_else(|| anyhow!("Invalid .jit path"))?;
-        
+        let repo_root = self
+            .root
+            .parent()
+            .ok_or_else(|| anyhow!("Invalid .jit path"))?;
+
         let output = Command::new("git")
             .args(["rev-parse", "--git-common-dir"])
             .current_dir(repo_root)
             .output();
-        
+
         if output.is_err() || !output.as_ref().unwrap().status.success() {
             bail!("Not in a git repository");
         }
-        
+
         let common_dir = PathBuf::from(String::from_utf8(output.unwrap().stdout)?.trim());
-        
+
         let output = Command::new("git")
             .args(["rev-parse", "--show-toplevel"])
             .current_dir(repo_root)
             .output()?;
-        
+
         if !output.status.success() {
             bail!("Failed to get worktree root");
         }
-        
+
         let worktree_root = PathBuf::from(String::from_utf8(output.stdout)?.trim());
-        
+
         // Check if we're in main worktree
         let is_main = common_dir == worktree_root.join(".git");
         if is_main {
@@ -235,8 +240,11 @@ impl JsonFileStorage {
     /// but may be committed in git (e.g., reading from a secondary worktree).
     fn load_issue_from_git(&self, id: &str) -> Result<Issue> {
         // Run git from repository root, not from .jit directory
-        let repo_root = self.root.parent().ok_or_else(|| anyhow!("Invalid .jit path"))?;
-        
+        let repo_root = self
+            .root
+            .parent()
+            .ok_or_else(|| anyhow!("Invalid .jit path"))?;
+
         let git_path = format!("HEAD:.jit/issues/{}.json", id);
         let output = Command::new("git")
             .arg("show")
@@ -250,8 +258,7 @@ impl JsonFileStorage {
             bail!("Issue not in git: {}", stderr.trim());
         }
 
-        serde_json::from_slice(&output.stdout)
-            .context("Failed to parse issue from git")
+        serde_json::from_slice(&output.stdout).context("Failed to parse issue from git")
     }
 
     /// Load an issue from the main worktree's .jit/ directory.
@@ -260,38 +267,41 @@ impl JsonFileStorage {
     /// from the main worktree.
     fn load_issue_from_main_worktree(&self, id: &str) -> Result<Issue> {
         // self.root is .jit/, we need to go up one level to the repo root
-        let repo_root = self.root.parent().ok_or_else(|| anyhow!("Invalid .jit path"))?;
-        
+        let repo_root = self
+            .root
+            .parent()
+            .ok_or_else(|| anyhow!("Invalid .jit path"))?;
+
         // We need to detect worktree context from git commands
         // First check if we're in a git repo at all
         let output = Command::new("git")
             .args(["rev-parse", "--git-common-dir"])
             .current_dir(repo_root)
             .output();
-        
+
         if output.is_err() {
             bail!("Not in a git repository");
         }
-        
+
         let output = output.unwrap();
         if !output.status.success() {
             bail!("Not in a git repository");
         }
-        
+
         let common_dir = PathBuf::from(String::from_utf8(output.stdout)?.trim());
-        
+
         // Get worktree root
         let output = Command::new("git")
             .args(["rev-parse", "--show-toplevel"])
             .current_dir(repo_root)
             .output()?;
-        
+
         if !output.status.success() {
             bail!("Failed to get worktree root");
         }
-        
+
         let worktree_root = PathBuf::from(String::from_utf8(output.stdout)?.trim());
-        
+
         // Check if we're in main worktree
         let is_main = common_dir == worktree_root.join(".git");
         if is_main {
@@ -476,7 +486,7 @@ impl IssueStore for JsonFileStorage {
     fn list_issues(&self) -> Result<Vec<Issue>> {
         let index_lock_path = self.root.join(".index.lock");
         let _lock = self.locker.lock_shared(&index_lock_path)?;
-        
+
         // Use aggregated index to see all issues across sources
         let index = self.load_aggregated_index()?;
 
@@ -489,7 +499,7 @@ impl IssueStore for JsonFileStorage {
                 self.load_issue(id).ok()
             })
             .collect();
-            
+
         Ok(issues)
     }
 
@@ -1138,7 +1148,9 @@ mod tests {
                 schema_version: 1,
                 all_ids: vec![],
             };
-            storage.write_json(&jit_dir.join(INDEX_FILE), &index).unwrap();
+            storage
+                .write_json(&jit_dir.join(INDEX_FILE), &index)
+                .unwrap();
 
             // Should fall back to reading from git
             let loaded = storage.load_issue(&issue_id).unwrap();
@@ -1168,7 +1180,7 @@ mod tests {
             let worktree_name = format!("secondary-{}", timestamp);
             let branch_name = format!("feature-{}", timestamp);
             let secondary_rel_path = format!("../{}", worktree_name);
-            
+
             Command::new("git")
                 .args(["worktree", "add", "-b", &branch_name, &secondary_rel_path])
                 .current_dir(&repo_path)
@@ -1177,7 +1189,7 @@ mod tests {
 
             let secondary_path = repo_path.parent().unwrap().join(&worktree_name);
             let secondary_jit = secondary_path.join(".jit");
-            fs::create_dir_all(&secondary_jit.join("issues")).unwrap();
+            fs::create_dir_all(secondary_jit.join("issues")).unwrap();
 
             // Initialize secondary storage
             let secondary_storage = JsonFileStorage::new(&secondary_jit);
@@ -1222,7 +1234,9 @@ mod tests {
                 schema_version: 1,
                 all_ids: vec![],
             };
-            storage.write_json(&jit_dir.join(INDEX_FILE), &index).unwrap();
+            storage
+                .write_json(&jit_dir.join(INDEX_FILE), &index)
+                .unwrap();
 
             // load_aggregated_index should find it in git
             let aggregated = storage.load_aggregated_index().unwrap();
@@ -1260,7 +1274,7 @@ mod tests {
 
             let secondary_path = repo_path.parent().unwrap().join(&worktree_name);
             let secondary_jit = secondary_path.join(".jit");
-            fs::create_dir_all(&secondary_jit.join("issues")).unwrap();
+            fs::create_dir_all(secondary_jit.join("issues")).unwrap();
 
             let secondary_storage = JsonFileStorage::new(&secondary_jit);
             secondary_storage.init().unwrap();
@@ -1298,7 +1312,11 @@ mod tests {
             // Issue is now in both local AND git
             // Aggregated index should deduplicate
             let aggregated = storage.load_aggregated_index().unwrap();
-            let count = aggregated.all_ids.iter().filter(|id| *id == &issue_id).count();
+            let count = aggregated
+                .all_ids
+                .iter()
+                .filter(|id| *id == &issue_id)
+                .count();
             assert_eq!(count, 1, "Issue ID should appear exactly once");
         }
 
@@ -1356,7 +1374,7 @@ mod tests {
             // Setup: Create git repo with invalid JSON committed
             let (_temp_dir, repo_path) = setup_git_repo();
             let jit_dir = repo_path.join(".jit");
-            fs::create_dir_all(&jit_dir.join("issues")).unwrap();
+            fs::create_dir_all(jit_dir.join("issues")).unwrap();
 
             let storage = JsonFileStorage::new(&jit_dir);
             storage.init().unwrap();

@@ -99,7 +99,9 @@ pub fn lease_not_found(lease_id: &str) -> ActionableError {
         .with_cause("The lease may have expired")
         .with_cause("The lease ID may be incorrect")
         .with_cause("The lease may have been released or evicted")
-        .with_remedy("List all active leases: jit claim list --json | jq -r '.data.leases[].lease_id'")
+        .with_remedy(
+            "List all active leases: jit claim list --json | jq -r '.data.leases[].lease_id'",
+        )
         .with_remedy("Check lease status: jit claim status --json")
 }
 
@@ -182,8 +184,7 @@ mod tests {
 
     #[test]
     fn test_error_without_causes() {
-        let error = ActionableError::new("Simple error")
-            .with_remedy("Just fix it");
+        let error = ActionableError::new("Simple error").with_remedy("Just fix it");
 
         let msg = error.to_error_message();
 
@@ -195,8 +196,7 @@ mod tests {
 
     #[test]
     fn test_error_without_remediation() {
-        let error = ActionableError::new("Diagnostic only")
-            .with_cause("Something went wrong");
+        let error = ActionableError::new("Diagnostic only").with_cause("Something went wrong");
 
         let msg = error.to_error_message();
 

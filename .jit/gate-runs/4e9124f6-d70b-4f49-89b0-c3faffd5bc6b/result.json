@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "4e9124f6-d70b-4f49-89b0-c3faffd5bc6b",
+  "gate_key": "clippy",
+  "stage": "postcheck",
+  "issue_id": "f0235aa4-24cd-434f-9133-09c44c1c1d7a",
+  "commit": "5ee3e5586ce026f7d35d33b1771aa56a70a53fa1",
+  "branch": "feature/worktree-parallel-work",
+  "status": "passed",
+  "started_at": "2026-02-01T15:32:01.930157202Z",
+  "completed_at": "2026-02-01T15:32:06.835256626Z",
+  "duration_ms": 4905,
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "    Blocking waiting for file lock on package cache\n    Blocking waiting for file lock on package cache\n    Checking futures-task v0.3.31\n    Checking hyper v1.8.1\n    Checking chrono v0.4.42\n    Checking uuid v1.18.1\n    Checking rustls v0.23.35\n    Checking tower v0.4.13\n    Checking futures-util v0.3.31\n    Checking hyper-util v0.1.19\n    Checking tower v0.5.2\n    Checking axum-core v0.4.5\n    Checking ureq v2.12.1\n    Checking jit v0.2.0 (/home/vkaskivuo/Projects/just-in-time/crates/jit)\n    Checking axum v0.7.9\n    Checking jit-server v0.1.0 (/home/vkaskivuo/Projects/just-in-time/crates/server)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.79s\n",
+  "command": "cargo clippy --lib -- -D warnings",
+  "by": "auto:executor",
+  "message": null
+}

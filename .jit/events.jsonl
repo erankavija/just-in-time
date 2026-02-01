@@ -1223,3 +1223,10 @@
 {"type":"issue_completed","id":"b41d75ee-9a5f-4742-b362-4c28ffd0424e","issue_id":"f84945f7-738c-44e7-824d-cf76be7edd63","timestamp":"2026-01-18T23:17:34.497349831Z"}
 {"type":"issue_state_changed","id":"44e32c76-47b7-47c8-92fd-c99516a9f02a","issue_id":"f84945f7-738c-44e7-824d-cf76be7edd63","timestamp":"2026-01-18T23:17:37.626964506Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"73046239-47e6-4b14-98de-0a6db9703049","issue_id":"f84945f7-738c-44e7-824d-cf76be7edd63","timestamp":"2026-01-18T23:17:37.626993156Z"}
+{"type":"gate_passed","id":"3dd3fa70-a1b7-4cfc-97f1-9b0615c33a77","issue_id":"f0235aa4-24cd-434f-9133-09c44c1c1d7a","timestamp":"2026-02-01T15:32:02.333574268Z","gate_key":"fmt","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"68885c16-4a2d-4ac2-8414-3eabf6356ab6","issue_id":"f0235aa4-24cd-434f-9133-09c44c1c1d7a","timestamp":"2026-02-01T15:32:06.835545946Z","gate_key":"clippy","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"05816505-44f0-4056-882c-5d334f5c9cd2","issue_id":"f0235aa4-24cd-434f-9133-09c44c1c1d7a","timestamp":"2026-02-01T15:32:24.847094769Z","gate_key":"tests","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"6c68d29d-e62c-4104-8f96-b1921c5aad8d","issue_id":"f0235aa4-24cd-434f-9133-09c44c1c1d7a","timestamp":"2026-02-01T15:32:42.645140231Z","gate_key":"code-review","updated_by":null}
+{"type":"issue_state_changed","id":"62b45878-d901-4222-a536-b83945e8544c","issue_id":"f0235aa4-24cd-434f-9133-09c44c1c1d7a","timestamp":"2026-02-01T15:32:42.655469574Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"2aefae17-397e-403d-899c-3de1c7010d82","issue_id":"f0235aa4-24cd-434f-9133-09c44c1c1d7a","timestamp":"2026-02-01T15:32:42.655488344Z"}
+{"type":"issue_state_changed","id":"d65648b3-cb29-4304-9836-c4ac4a792ffd","issue_id":"608ae1e8-1523-482a-9a17-428b64c95f61","timestamp":"2026-02-01T15:32:42.708648379Z","from":"backlog","to":"ready"}

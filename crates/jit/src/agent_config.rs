@@ -148,7 +148,44 @@ pub fn resolve_agent_id(cli_flag: Option<String>) -> Result<String> {
          \n\
          Format: {{type}}:{{identifier}}\n\
          Examples: agent:copilot-1, human:alice, ci:github-actions"
-    );
+    )
+}
+
+/// Internal implementation that accepts a custom environment reader for testing.
+#[cfg(test)]
+fn resolve_agent_id_with_env<F>(cli_flag: Option<String>, env_reader: F) -> Result<String>
+where
+    F: Fn(&str) -> Result<String, env::VarError>,
+{
+    // Priority 1: CLI flag
+    if let Some(id) = cli_flag {
+        validate_agent_id(&id)?;
+        return Ok(id);
+    }
+
+    // Priority 2: Environment variable
+    if let Ok(id) = env_reader("JIT_AGENT_ID") {
+        validate_agent_id(&id)?;
+        return Ok(id);
+    }
+
+    // Priority 3: Config file
+    if let Some(config) = AgentConfig::load()? {
+        return Ok(config.agent.id);
+    }
+
+    // No configuration found
+    bail!(
+        "No agent identity configured.\n\
+         \n\
+         Set one of the following (priority order):\n\
+         1. CLI flag: --agent-id agent:your-name\n\
+         2. Environment: export JIT_AGENT_ID=agent:your-name\n\
+         3. Config file: ~/.config/jit/agent.toml\n\
+         \n\
+         Format: {{type}}:{{identifier}}\n\
+         Examples: agent:copilot-1, human:alice, ci:github-actions"
+    )
 }
 
 /// Validate agent ID format: {type}:{identifier}
@@ -279,81 +316,67 @@ description = "Alice's development machine"
 
     #[test]
     fn test_resolve_agent_id_cli_flag_priority() {
-        // Save current env state
-        let original = env::var("JIT_AGENT_ID").ok();
+        // Mock environment that returns invalid agent
+        let env_reader = |key: &str| {
+            if key == "JIT_AGENT_ID" {
+                Ok("env:should-not-use".to_string())
+            } else {
+                Err(env::VarError::NotPresent)
+            }
+        };
 
         // CLI flag should take highest priority
-        env::set_var("JIT_AGENT_ID", "env:should-not-use");
-
-        let result = resolve_agent_id(Some("agent:cli-override".to_string())).unwrap();
+        let result =
+            resolve_agent_id_with_env(Some("agent:cli-override".to_string()), env_reader).unwrap();
         assert_eq!(result, "agent:cli-override");
-
-        // Restore original env state
-        match original {
-            Some(val) => env::set_var("JIT_AGENT_ID", val),
-            None => env::remove_var("JIT_AGENT_ID"),
-        }
     }
 
     #[test]
     fn test_resolve_agent_id_env_var() {
-        // Save current env state
-        let original = env::var("JIT_AGENT_ID").ok();
+        // Mock environment with valid agent ID
+        let env_reader = |key: &str| {
+            if key == "JIT_AGENT_ID" {
+                Ok("agent:from-env".to_string())
+            } else {
+                Err(env::VarError::NotPresent)
+            }
+        };
 
-        env::set_var("JIT_AGENT_ID", "agent:from-env");
-
-        let result = resolve_agent_id(None).unwrap();
+        let result = resolve_agent_id_with_env(None, env_reader).unwrap();
         assert_eq!(result, "agent:from-env");
-
-        // Restore original env state
-        match original {
-            Some(val) => env::set_var("JIT_AGENT_ID", val),
-            None => env::remove_var("JIT_AGENT_ID"),
-        }
     }
 
     #[test]
     fn test_resolve_agent_id_invalid_format() {
-        // Save current env state
-        let original = env::var("JIT_AGENT_ID").ok();
+        // Mock environment with invalid format
+        let env_reader = |key: &str| {
+            if key == "JIT_AGENT_ID" {
+                Ok("invalid-no-colon".to_string())
+            } else {
+                Err(env::VarError::NotPresent)
+            }
+        };
 
-        env::set_var("JIT_AGENT_ID", "invalid-no-colon");
-
-        let result = resolve_agent_id(None);
+        let result = resolve_agent_id_with_env(None, env_reader);
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
             .to_string()
             .contains("Invalid agent ID format"));
-
-        // Restore original env state
-        match original {
-            Some(val) => env::set_var("JIT_AGENT_ID", val),
-            None => env::remove_var("JIT_AGENT_ID"),
-        }
     }
 
     #[test]
     fn test_resolve_agent_id_no_config_error() {
-        // Save current env state
-        let original = env::var("JIT_AGENT_ID").ok();
+        // Mock environment with no JIT_AGENT_ID
+        let env_reader = |_key: &str| Err(env::VarError::NotPresent);
 
-        // Ensure no env var set
-        env::remove_var("JIT_AGENT_ID");
-
-        let result = resolve_agent_id(None);
+        let result = resolve_agent_id_with_env(None, env_reader);
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
         assert!(err.contains("No agent identity configured"));
         assert!(err.contains("--agent-id"));
         assert!(err.contains("JIT_AGENT_ID"));
         assert!(err.contains("agent.toml"));
-
-        // Restore original env state
-        match original {
-            Some(val) => env::set_var("JIT_AGENT_ID", val),
-            None => env::remove_var("JIT_AGENT_ID"),
-        }
     }
 
     #[test]

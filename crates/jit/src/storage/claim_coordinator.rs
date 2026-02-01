@@ -216,7 +216,7 @@ impl ClaimCoordinator {
             } else {
                 format!("until {}", existing.expires_at.unwrap())
             };
-            
+
             bail!(
                 "{}",
                 errors::already_claimed(issue_id, &existing.agent_id, &expires_info)

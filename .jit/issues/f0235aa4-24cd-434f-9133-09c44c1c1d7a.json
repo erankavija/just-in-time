@@ -2,7 +2,7 @@
   "id": "f0235aa4-24cd-434f-9133-09c44c1c1d7a",
   "title": "Story: CLI Commands for Claims and Worktrees",
   "description": "Implement the CLI commands for claim management and worktree information, providing the user-facing interface for the parallel work system.\n\n## Goal\n\nExpose claim coordination and worktree features through intuitive CLI commands with full JSON output support for agent consumption.\n\n## Tasks\n\n1. **`jit claim acquire`** - Acquire lease on issue with configurable TTL\n2. **`jit claim renew`** - Extend lease TTL for long-running work\n3. **`jit claim release`** - Explicitly release lease before expiry\n4. **`jit claim force-evict`** - Admin operation to evict stale leases\n5. **`jit claim status`** - Show current claim status (single issue or all)\n6. **`jit claim list`** - List all active claims across worktrees\n7. **`jit worktree info`** - Display current worktree context\n8. **`jit worktree list`** - List all worktrees with claim info\n9. **`jit validate --divergence`** - Explicit divergence validation\n10. **`jit validate --leases`** - Validate lease consistency\n\n## Success Criteria\n\n- All commands support `--json` output for agent consumption\n- Clear error messages with actionable remediation\n- `jit claim acquire` fails gracefully if already claimed\n- `jit claim status` shows remaining TTL and expiry time\n- Commands work in both main worktree and secondary worktrees\n\n## References\n\nSee design document `dev/design/worktree-parallel-work.md`:\n- Section \"New Commands\" for command specifications\n- Section \"Example Usage\" for typical workflows\n- Section \"Configuration\" for default values\n\n## Dependencies\n\nRequires Story: Claim Coordination System (backend implementation)",
-  "state": "in_progress",
+  "state": "done",
   "priority": "high",
   "assignee": "copilot:cli-session",
   "dependencies": [
@@ -26,10 +26,30 @@
     "code-review"
   ],
   "gates_status": {
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-01T15:32:01.930157202Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-02-01T15:32:42.644973681Z"
+    },
     "tdd-reminder": {
       "status": "passed",
       "updated_by": null,
       "updated_at": "2026-01-15T21:56:29.345920322Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-01T15:32:01.930195152Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-01T15:32:01.930162522Z"
     }
   },
   "context": {},
