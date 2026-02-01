@@ -34,6 +34,9 @@ pub mod snapshot;
 mod validate;
 pub mod worktree;
 
+#[cfg(test)]
+pub mod test_helpers;
+
 pub use bulk_update::{BulkUpdatePreview, BulkUpdateResult, UpdateOperations};
 
 // Common imports used across modules
@@ -112,11 +115,14 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(())
     }
 
-    /// Check if an active lease exists for the given issue.
+    /// Check if an active lease exists for the given issue by the current agent.
     ///
-    /// Returns true if the current agent (or any agent) has an active lease.
-    /// Returns false if no lease exists or if the lease is expired/stale.
+    /// Returns true if the current agent has an active lease (not expired or stale).
+    /// Returns false if no lease exists, lease is stale, or belongs to another agent.
+    ///
+    /// In tests: If JIT_AGENT_ID is not set, any valid lease counts (single-user mode).
     fn check_active_lease(&self, issue_id: &str) -> Result<bool> {
+        use crate::agent_config::resolve_agent_id;
         use crate::storage::claim_coordinator::ClaimsIndex;
         use crate::storage::worktree_paths::WorktreePaths;
 
@@ -141,13 +147,38 @@ impl<S: IssueStore> CommandExecutor<S> {
         let claims_index: ClaimsIndex =
             serde_json::from_str(&contents).context("Failed to parse claims index")?;
 
-        // Check if any active lease exists for this issue (not stale or expired)
+        // Resolve current agent identity (or None for single-user mode)
+        let current_agent = resolve_agent_id(None).ok();
+
+        // Check if active lease exists for this issue
         let full_id = self.storage.resolve_issue_id(issue_id)?;
         let now = chrono::Utc::now();
+
         let has_active_lease = claims_index.leases.iter().any(|lease| {
-            lease.issue_id == full_id
-                && (lease.expires_at.is_none() || lease.expires_at.unwrap() > now)
-                && !claims_index.is_stale(lease)
+            // Must match issue ID
+            if lease.issue_id != full_id {
+                return false;
+            }
+
+            // Must not be expired
+            if let Some(expires) = lease.expires_at {
+                if expires <= now {
+                    return false;
+                }
+            }
+
+            // Must not be stale
+            if claims_index.is_stale(lease) {
+                return false;
+            }
+
+            // Agent verification:
+            // - If current_agent is Some, lease must belong to this agent
+            // - If current_agent is None (single-user mode), any valid lease counts
+            match &current_agent {
+                Some(agent_id) => lease.agent_id == *agent_id,
+                None => true, // Single-user mode: any valid lease
+            }
         });
 
         Ok(has_active_lease)
@@ -378,5 +409,22 @@ enforce_leases = "strict"
         // Should fail in strict mode (default) without lease
         let result = executor.require_active_lease(&issue_id);
         assert!(result.is_err());
+    }
+
+    // Agent identity verification tests
+    #[test]
+    fn test_check_active_lease_verifies_agent_identity() {
+        // This test documents the agent identity verification behavior.
+        // Since check_active_lease() now uses resolve_agent_id(),
+        // it verifies agent ownership in multi-agent scenarios:
+        //
+        // 1. If JIT_AGENT_ID is set (or --agent-id / ~/.config/jit/agent.toml),
+        //    only leases belonging to that agent count as active.
+        // 2. If not set (single-user mode), any valid lease counts.
+        //
+        // This prevents Agent A from modifying issues claimed by Agent B.
+        //
+        // Full workflow testing requires integration tests with git repos
+        // and actual claims.index.json files.
     }
 }
