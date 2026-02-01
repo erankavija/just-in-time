@@ -36,17 +36,24 @@ pub struct InMemoryStorage {
     gate_registry: Arc<Mutex<GateRegistry>>,
     events: Arc<Mutex<Vec<Event>>>,
     gate_runs: Arc<Mutex<HashMap<String, crate::domain::GateRunResult>>>,
+    /// Unique root path for parallel test isolation
+    root_path: std::path::PathBuf,
 }
 
 impl InMemoryStorage {
     /// Create a new in-memory storage instance.
     #[allow(dead_code)] // Public API used only in tests, not in binary
     pub fn new() -> Self {
+        // Generate unique root path for parallel test isolation
+        let unique_id = uuid::Uuid::new_v4();
+        let root_path = std::path::PathBuf::from(format!("/tmp/jit-test-{}", unique_id));
+        
         Self {
             issues: Arc::new(Mutex::new(HashMap::new())),
             gate_registry: Arc::new(Mutex::new(GateRegistry::default())),
             events: Arc::new(Mutex::new(Vec::new())),
             gate_runs: Arc::new(Mutex::new(HashMap::new())),
+            root_path,
         }
     }
 }
@@ -161,8 +168,8 @@ impl IssueStore for InMemoryStorage {
     }
 
     fn root(&self) -> &std::path::Path {
-        // In-memory storage doesn't have a real root, return current directory
-        std::path::Path::new(".")
+        // Return unique root path for parallel test isolation
+        &self.root_path
     }
 
     fn save_gate_run_result(&self, result: &crate::domain::GateRunResult) -> Result<()> {
