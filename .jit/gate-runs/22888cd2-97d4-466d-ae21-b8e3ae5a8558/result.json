@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "22888cd2-97d4-466d-ae21-b8e3ae5a8558",
+  "gate_key": "fmt",
+  "stage": "postcheck",
+  "issue_id": "62ff2fd9-47d3-4057-9a5b-92ee2e269cfb",
+  "commit": "01961449dc6ee0af3c5778d08796162e7229aad1",
+  "branch": "feature/worktree-parallel-work",
+  "status": "failed",
+  "started_at": "2026-02-01T23:37:36.649288420Z",
+  "completed_at": "2026-02-01T23:37:37.051730175Z",
+  "duration_ms": 402,
+  "exit_code": 1,
+  "stdout": "Diff in /home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/gate_cli_tests.rs:10:\n     fn setup() -> CommandExecutor<InMemoryStorage> {\n         // Disable worktree divergence checks in tests\n         std::env::set_var(\"JIT_TEST_MODE\", \"1\");\n\u001b[31m-        \n\u001b[m\u000f\u001b[32m+\n\u001b[m\u000f         let storage = InMemoryStorage::new();\n         storage.init().unwrap();\n \nDiff in /home/vkaskivuo/Projects/just-in-time/crates/jit/tests/harness.rs:18:\n     pub fn new() -> Self {\n         // Disable worktree divergence checks in tests\n         std::env::set_var(\"JIT_TEST_MODE\", \"1\");\n\u001b[31m-        \n\u001b[m\u000f\u001b[32m+\n\u001b[m\u000f         let storage = InMemoryStorage::new();\n         storage.init().unwrap();\n         let executor = CommandExecutor::new(storage.clone());\nDiff in /home/vkaskivuo/Projects/just-in-time/crates/jit/tests/harness.rs:18:\n     pub fn new() -> Self {\n         // Disable worktree divergence checks in tests\n         std::env::set_var(\"JIT_TEST_MODE\", \"1\");\n\u001b[31m-        \n\u001b[m\u000f\u001b[32m+\n\u001b[m\u000f         let storage = InMemoryStorage::new();\n         storage.init().unwrap();\n         let executor = CommandExecutor::new(storage.clone());\nDiff in /home/vkaskivuo/Projects/just-in-time/crates/jit/tests/harness.rs:18:\n     pub fn new() -> Self {\n         // Disable worktree divergence checks in tests\n         std::env::set_var(\"JIT_TEST_MODE\", \"1\");\n\u001b[31m-        \n\u001b[m\u000f\u001b[32m+\n\u001b[m\u000f         let storage = InMemoryStorage::new();\n         storage.init().unwrap();\n         let executor = CommandExecutor::new(storage.clone());\nDiff in /home/vkaskivuo/Projects/just-in-time/crates/jit/tests/harness.rs:18:\n     pub fn new() -> Self {\n         // Disable worktree divergence checks in tests\n         std::env::set_var(\"JIT_TEST_MODE\", \"1\");\n\u001b[31m-        \n\u001b[m\u000f\u001b[32m+\n\u001b[m\u000f         let storage = InMemoryStorage::new();\n         storage.init().unwrap();\n         let executor = CommandExecutor::new(storage.clone());\nDiff in /home/vkaskivuo/Projects/just-in-time/crates/jit/tests/harness.rs:18:\n     pub fn new() -> Self {\n         // Disable worktree divergence checks in tests\n         std::env::set_var(\"JIT_TEST_MODE\", \"1\");\n\u001b[31m-        \n\u001b[m\u000f\u001b[32m+\n\u001b[m\u000f         let storage = InMemoryStorage::new();\n         storage.init().unwrap();\n         let executor = CommandExecutor::new(storage.clone());\nDiff in /home/vkaskivuo/Projects/just-in-time/crates/jit/tests/harness.rs:18:\n     pub fn new() -> Self {\n         // Disable worktree divergence checks in tests\n         std::env::set_var(\"JIT_TEST_MODE\", \"1\");\n\u001b[31m-        \n\u001b[m\u000f\u001b[32m+\n\u001b[m\u000f         let storage = InMemoryStorage::new();\n         storage.init().unwrap();\n         let executor = CommandExecutor::new(storage.clone());\n",
+  "stderr": "",
+  "command": "cargo fmt -- --check",
+  "by": "auto:executor",
+  "message": null
+}

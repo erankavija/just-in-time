@@ -1280,3 +1280,10 @@
 {"type":"gate_passed","id":"d9755698-5adc-430e-b885-652494c57137","issue_id":"62ff2fd9-47d3-4057-9a5b-92ee2e269cfb","timestamp":"2026-02-01T23:32:08.667495734Z","gate_key":"tdd-reminder","updated_by":"agent:copilot-session"}
 {"type":"issue_state_changed","id":"d17ff35f-3c7d-4818-bd64-e5860c64c66e","issue_id":"62ff2fd9-47d3-4057-9a5b-92ee2e269cfb","timestamp":"2026-02-01T23:32:24.036915181Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"497eb814-01e8-4745-8914-f97b19fd28db","issue_id":"62ff2fd9-47d3-4057-9a5b-92ee2e269cfb","timestamp":"2026-02-01T23:32:24.039784852Z","assignee":"agent:copilot-session"}
+{"type":"gate_passed","id":"5010abf8-7a34-44c4-bcb7-d14e04e9a99e","issue_id":"62ff2fd9-47d3-4057-9a5b-92ee2e269cfb","timestamp":"2026-02-01T23:37:36.735874335Z","gate_key":"code-review","updated_by":"agent:copilot-session"}
+{"type":"issue_state_changed","id":"20f8eedc-5cb1-4980-a200-aa2d66b7b18d","issue_id":"62ff2fd9-47d3-4057-9a5b-92ee2e269cfb","timestamp":"2026-02-01T23:37:36.829437401Z","from":"in_progress","to":"gated"}
+{"type":"gate_failed","id":"4bdc3367-ae5e-4174-aee4-9ecbc67d0efd","issue_id":"62ff2fd9-47d3-4057-9a5b-92ee2e269cfb","timestamp":"2026-02-01T23:37:37.063877629Z","gate_key":"fmt","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"47ccbefd-a33d-4664-a881-62519a5afccb","issue_id":"62ff2fd9-47d3-4057-9a5b-92ee2e269cfb","timestamp":"2026-02-01T23:37:41.800737744Z","gate_key":"clippy","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"8c475bcc-22c8-4b97-bbfd-21ff4463ce2a","issue_id":"62ff2fd9-47d3-4057-9a5b-92ee2e269cfb","timestamp":"2026-02-01T23:37:55.061161708Z","gate_key":"tests","updated_by":"auto:executor"}
+{"type":"issue_state_changed","id":"cfb3f9a9-328b-4d94-a37c-2dbcfce68517","issue_id":"62ff2fd9-47d3-4057-9a5b-92ee2e269cfb","timestamp":"2026-02-01T23:38:02.384724733Z","from":"gated","to":"gated"}
+{"type":"issue_state_changed","id":"7ab02573-9a04-4ac8-8abd-5883a1241521","issue_id":"62ff2fd9-47d3-4057-9a5b-92ee2e269cfb","timestamp":"2026-02-01T23:38:13.961717525Z","from":"gated","to":"gated"}

@@ -8,6 +8,9 @@ mod tests {
     use std::collections::HashMap;
 
     fn setup() -> CommandExecutor<InMemoryStorage> {
+        // Disable worktree divergence checks in tests
+        std::env::set_var("JIT_TEST_MODE", "1");
+
         let storage = InMemoryStorage::new();
         storage.init().unwrap();
 

@@ -338,23 +338,33 @@ pub fn check_branch_divergence() -> Result<bool> {
 ///   git rebase origin/main
 /// ```
 pub fn enforce_main_only_operations() -> Result<()> {
-    // Skip enforcement in test builds (temp repos don't have origin/main)
-    #[cfg(test)]
-    {
-        Ok(())
+    // Skip enforcement in test environments
+    // Tests set JIT_TEST_MODE=1 to disable this check
+    if std::env::var("JIT_TEST_MODE").is_ok() {
+        return Ok(());
     }
 
-    #[cfg(not(test))]
+    // Skip enforcement if git is not available
+    match std::process::Command::new("git")
+        .args(["rev-parse", "--git-dir"])
+        .output()
     {
-        if check_branch_divergence()? {
-            anyhow::bail!(
-                "Global operations require common history with main\n\n\
-                 Your branch has diverged from origin/main. To proceed:\n  \
-                 git fetch origin\n  \
-                 git rebase origin/main"
-            );
+        Ok(output) if output.status.success() => {
+            // We're in a real git repo, check for divergence
+            if check_branch_divergence()? {
+                anyhow::bail!(
+                    "Global operations require common history with main\n\n\
+                     Your branch has diverged from origin/main. To proceed:\n  \
+                     git fetch origin\n  \
+                     git rebase origin/main"
+                );
+            }
+            Ok(())
         }
-        Ok(())
+        _ => {
+            // Not in a git repo or git not available - skip check
+            Ok(())
+        }
     }
 }
 

@@ -16,6 +16,9 @@ pub struct TestHarness {
 impl TestHarness {
     /// Create a new test harness with isolated in-memory storage
     pub fn new() -> Self {
+        // Disable worktree divergence checks in tests
+        std::env::set_var("JIT_TEST_MODE", "1");
+
         let storage = InMemoryStorage::new();
         storage.init().unwrap();
         let executor = CommandExecutor::new(storage.clone());
