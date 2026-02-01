@@ -1232,3 +1232,5 @@
 {"type":"issue_state_changed","id":"d65648b3-cb29-4304-9836-c4ac4a792ffd","issue_id":"608ae1e8-1523-482a-9a17-428b64c95f61","timestamp":"2026-02-01T15:32:42.708648379Z","from":"backlog","to":"ready"}
 {"type":"issue_state_changed","id":"07ea27a7-12c4-4669-a42a-d3b301e67692","issue_id":"1bdc5395-b94c-4ca1-8e1d-7f0f19487ead","timestamp":"2026-02-01T15:43:32.855399228Z","from":"ready","to":"in_progress"}
 {"type":"issue_created","id":"e7d2d01d-7d42-4991-8bbb-591a8436fecf","issue_id":"657d4976-ba93-40c7-8db8-f70e90692a00","timestamp":"2026-02-01T15:47:13.080504054Z","title":"Add CLI binary integration tests for claim and worktree commands","priority":"normal"}
+{"type":"issue_state_changed","id":"1acffee2-0476-44b0-bf9a-142970656373","issue_id":"1bdc5395-b94c-4ca1-8e1d-7f0f19487ead","timestamp":"2026-02-01T16:24:42.300189221Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"dfb5dbba-43fb-44af-ae1d-65f9baecfdca","issue_id":"1bdc5395-b94c-4ca1-8e1d-7f0f19487ead","timestamp":"2026-02-01T16:24:42.300219601Z"}
