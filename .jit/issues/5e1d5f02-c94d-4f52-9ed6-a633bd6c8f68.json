@@ -2,7 +2,7 @@
   "id": "5e1d5f02-c94d-4f52-9ed6-a633bd6c8f68",
   "title": "Add configurable enforcement modes",
   "description": "Add `enforce_leases` config option with modes: `strict` (block), `warn` (warn but allow), `off` (bypass). Load from `.jit/config.toml` and respect in `require_active_lease()`. See design doc section \"Configuration\".",
-  "state": "gated",
+  "state": "done",
   "priority": "high",
   "assignee": null,
   "dependencies": [
@@ -19,27 +19,27 @@
     "tests": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-02-01T17:00:10.091716487Z"
+      "updated_at": "2026-02-01T17:00:40.645674129Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-02-01T17:01:21.474519420Z"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-02-01T17:01:21.467801778Z"
     },
     "clippy": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-02-01T17:00:27.905527194Z"
+      "updated_at": "2026-02-01T17:00:58.258794438Z"
     },
     "fmt": {
-      "status": "failed",
+      "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-02-01T17:00:31.010537562Z"
-    },
-    "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.592787543Z"
-    },
-    "tdd-reminder": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.592731513Z"
+      "updated_at": "2026-02-01T17:01:00.363326990Z"
     }
   },
   "context": {},

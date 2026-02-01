@@ -2,7 +2,7 @@
   "id": "82b17394-a36b-4093-98aa-703f678d48c4",
   "title": "Implement CLI-level lease enforcement",
   "description": "Add `require_active_lease()` check in `CommandExecutor` before structural operations that modify existing issues: update/delete issue, add/remove deps, add/remove gates, change state.\n\n**IMPORTANT:** Issue creation (`jit issue create`) is EXEMPTED from lease requirement because it allocates a new ULID that cannot conflict. See design doc section \"Issue Creation Workflow\".\n\nSupport configurable enforcement modes (off/warn/strict). See design doc sections \"CLI-Level Enforcement\" and \"Read vs Write Operations\".",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "high",
   "assignee": null,
   "dependencies": [
@@ -21,25 +21,25 @@
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:07.582618270Z"
     },
-    "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.582668030Z"
-    },
     "fmt": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:07.582659180Z"
+    },
+    "tests": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-01-03T20:37:07.582641380Z"
     },
     "clippy": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:07.582650430Z"
     },
-    "tests": {
+    "code-review": {
       "status": "pending",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.582641380Z"
+      "updated_at": "2026-01-03T20:37:07.582668030Z"
     }
   },
   "context": {},
