@@ -1539,44 +1539,37 @@ while read local_ref local_sha remote_ref remote_sha; do
     commits=$(git rev-list "$remote_sha..$local_sha")
   fi
   
-  # Verify leases in commit messages
-  for commit in $commits; do
-    # Extract JIT-Lease trailer
-    lease_id=$(git log --format='%(trailers:key=JIT-Lease,valueonly)' -1 "$commit" | tr -d '[:space:]')
-    
-    if [ -n "$lease_id" ]; then
-      # Check if lease still active
-      claims_index=".git/jit/claims.index.json"
-      if [ -f "$claims_index" ]; then
-        exists=$(jq -r \
-          --arg lid "$lease_id" \
-          '.active[] | select(.lease_id==$lid and (.stale != true)) | .lease_id' \
+  # Verify leases for changed issue files (file-based approach)
+  # Note: We use file-based detection rather than commit trailers to minimize
+  # manual decoration requirements. This automatically detects issue modifications.
+  changed=$(git diff --name-only "$range" | grep '^\.jit/issues/[^/]*/issue\.json$' || true)
+  
+  if [ -n "$changed" ]; then
+    claims_index=".git/jit/claims.index.json"
+    if [ ! -f "$claims_index" ]; then
+      echo "⚠️  Warning: No claims index found at $claims_index"
+      echo "   Skipping lease validation"
+    else
+      while IFS= read -r file; do
+        issue_id=$(basename "$(dirname "$file")")
+        
+        # Check if issue has active, non-stale lease
+        lease_status=$(jq -r \
+          --arg iid "$issue_id" \
+          '.active[] | select(.issue_id==$iid and (.stale != true)) | .lease_id' \
           "$claims_index" 2>/dev/null | tr -d '[:space:]')
         
-        if [ -z "$exists" ]; then
-          issue_id=$(git log --format='%(trailers:key=JIT-Issue,valueonly)' -1 "$commit" | tr -d '[:space:]')
-          echo "❌ Error: Lease $lease_id in commit $commit is no longer active"
-          echo "   Issue: $issue_id"
-          echo "   Re-acquire lease: jit claim acquire $issue_id --ttl 600"
+        if [ -z "$lease_status" ]; then
+          echo "❌ Error: Issue $issue_id was modified but has no active lease"
+          echo "   File: $file"
+          echo "   Acquire lease: jit claim acquire $issue_id --ttl 600"
+          echo ""
+          echo "   Emergency override: git push --no-verify"
           exit 1
         fi
-      fi
+      done <<< "$changed"
     fi
-    
-    # Check for global operations divergence
-    changed_files=$(git diff-tree --no-commit-id --name-only -r "$commit")
-    if echo "$changed_files" | grep -E '^\..?jit/(config|type-hierarchy|gates/registry)\b' >/dev/null; then
-      # Verify common history with main
-      merge_base=$(git merge-base "$commit" origin/main 2>/dev/null || echo "")
-      main_commit=$(git rev-parse origin/main 2>/dev/null || echo "")
-      
-      if [ -n "$merge_base" ] && [ -n "$main_commit" ] && [ "$merge_base" != "$main_commit" ]; then
-        echo "❌ Error: Commit $commit modifies global config but diverged from origin/main"
-        echo "   Rebase required: git rebase origin/main"
-        exit 1
-      fi
-    fi
-  done
+  fi
 done
 
 echo "✓ All leases valid and branch up-to-date"

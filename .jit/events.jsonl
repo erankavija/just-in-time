@@ -1270,3 +1270,13 @@
 {"type":"issue_state_changed","id":"9f9eae0b-72ef-47f6-9d1f-63a3389e31df","issue_id":"bc3742d9-15d5-455f-a5a8-c12976c21f12","timestamp":"2026-02-01T23:05:41.138767918Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"15874f18-8a05-4cc1-97e3-b274e924e1b8","issue_id":"bc3742d9-15d5-455f-a5a8-c12976c21f12","timestamp":"2026-02-01T23:07:36.963310826Z","assignee":"agent:copilot-session"}
 {"type":"issue_state_changed","id":"6634377c-2225-4d86-84f8-275a4297b0e0","issue_id":"bc3742d9-15d5-455f-a5a8-c12976c21f12","timestamp":"2026-02-01T23:26:48.104650780Z","from":"in_progress","to":"gated"}
+{"type":"gate_passed","id":"4e5a2cf1-e0c9-4a91-ba54-1a0f2b8878a1","issue_id":"bc3742d9-15d5-455f-a5a8-c12976c21f12","timestamp":"2026-02-01T23:27:10.583490991Z","gate_key":"tests","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"a716161d-9a73-4e04-b2b0-2eca5e0fadad","issue_id":"bc3742d9-15d5-455f-a5a8-c12976c21f12","timestamp":"2026-02-01T23:27:20.010021848Z","gate_key":"clippy","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"9b6e004a-239d-4640-8a82-a0aaeab46d2e","issue_id":"bc3742d9-15d5-455f-a5a8-c12976c21f12","timestamp":"2026-02-01T23:27:20.569522558Z","gate_key":"fmt","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"361bddf4-8a3a-4ca3-aa32-fe7e02022338","issue_id":"bc3742d9-15d5-455f-a5a8-c12976c21f12","timestamp":"2026-02-01T23:27:20.691216983Z","gate_key":"tdd-reminder","updated_by":null}
+{"type":"gate_passed","id":"335789cf-ec81-4a81-8c81-08616b9e0edc","issue_id":"bc3742d9-15d5-455f-a5a8-c12976c21f12","timestamp":"2026-02-01T23:27:20.818200759Z","gate_key":"code-review","updated_by":null}
+{"type":"issue_state_changed","id":"31870445-6cc0-4945-8cb2-9753ffada8bc","issue_id":"bc3742d9-15d5-455f-a5a8-c12976c21f12","timestamp":"2026-02-01T23:27:20.818692869Z","from":"gated","to":"done"}
+{"type":"issue_completed","id":"c582a002-70e1-4684-8014-fe82220fafc0","issue_id":"bc3742d9-15d5-455f-a5a8-c12976c21f12","timestamp":"2026-02-01T23:27:20.818737119Z"}
+{"type":"gate_passed","id":"d9755698-5adc-430e-b885-652494c57137","issue_id":"62ff2fd9-47d3-4057-9a5b-92ee2e269cfb","timestamp":"2026-02-01T23:32:08.667495734Z","gate_key":"tdd-reminder","updated_by":"agent:copilot-session"}
+{"type":"issue_state_changed","id":"d17ff35f-3c7d-4818-bd64-e5860c64c66e","issue_id":"62ff2fd9-47d3-4057-9a5b-92ee2e269cfb","timestamp":"2026-02-01T23:32:24.036915181Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"497eb814-01e8-4745-8914-f97b19fd28db","issue_id":"62ff2fd9-47d3-4057-9a5b-92ee2e269cfb","timestamp":"2026-02-01T23:32:24.039784852Z","assignee":"agent:copilot-session"}

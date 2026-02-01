@@ -2,7 +2,7 @@
   "id": "bc3742d9-15d5-455f-a5a8-c12976c21f12",
   "title": "Create pre-commit hook for lease and divergence validation",
   "description": "Create pre-commit hook template that validates: (1) structural edits have active, non-stale lease, (2) global operations have common history with main. Extract issue IDs from changed files, check against claims index with `.stale != true` filter.\n\nSee design doc section \"Pre-Commit Hook\".",
-  "state": "gated",
+  "state": "done",
   "priority": "high",
   "assignee": "agent:copilot-session",
   "dependencies": [
@@ -16,30 +16,30 @@
     "code-review"
   ],
   "gates_status": {
-    "tests": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.585171331Z"
-    },
-    "fmt": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.585196411Z"
-    },
-    "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.585208751Z"
-    },
     "clippy": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.585184091Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-01T23:27:14.801072288Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-01T23:26:48.165130987Z"
     },
     "tdd-reminder": {
-      "status": "pending",
+      "status": "passed",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.585142711Z"
+      "updated_at": "2026-02-01T23:27:20.690968983Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-02-01T23:27:20.817934079Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-01T23:27:20.162012322Z"
     }
   },
   "context": {},
