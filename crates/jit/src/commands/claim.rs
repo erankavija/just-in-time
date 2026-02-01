@@ -40,10 +40,13 @@ pub fn execute_claim_acquire<S: IssueStore>(
 ) -> Result<String> {
     use crate::agent_config::resolve_agent_id;
 
+    // Resolve short ID to full ID
+    let full_id = storage.resolve_issue_id(issue_id)?;
+
     // Validate issue exists
     let _issue = storage
-        .load_issue(issue_id)
-        .with_context(|| format!("Issue {} not found", issue_id))?;
+        .load_issue(&full_id)
+        .with_context(|| format!("Issue {} not found", full_id))?;
 
     // Detect worktree context
     let paths = WorktreePaths::detect()
@@ -295,8 +298,11 @@ mod tests {
         ttl_secs: u64,
         agent_id: &str,
     ) -> Result<String> {
+        // Resolve short ID to full ID
+        let full_id = storage.resolve_issue_id(issue_id)?;
+
         // Validate issue exists
-        let _issue = storage.load_issue(issue_id)?;
+        let _issue = storage.load_issue(&full_id)?;
 
         // Get test paths
         let paths = create_test_paths(temp);
