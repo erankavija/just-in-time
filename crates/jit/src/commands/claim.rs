@@ -17,7 +17,12 @@ fn get_current_branch() -> Result<String> {
         .context("Failed to get current git branch")?;
 
     if !output.status.success() {
-        return Ok("main".to_string()); // Default fallback
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        anyhow::bail!(
+            "Failed to get current git branch. Are you in a git repository?\n\
+             Git error: {}",
+            stderr.trim()
+        );
     }
 
     Ok(String::from_utf8(output.stdout)?.trim().to_string())
@@ -115,7 +120,6 @@ pub fn execute_claim_release(lease_id: &str) -> Result<()> {
 ///
 /// # Arguments
 ///
-/// * `_storage` - Issue storage (unused but kept for consistency)
 /// * `lease_id` - ID of the lease to renew
 /// * `extension_secs` - How many seconds to extend the lease by
 ///
@@ -123,7 +127,6 @@ pub fn execute_claim_release(lease_id: &str) -> Result<()> {
 ///
 /// The renewed lease with updated expiry time
 pub fn execute_claim_renew<S: IssueStore>(
-    _storage: &S,
     lease_id: &str,
     extension_secs: u64,
 ) -> Result<Lease> {
@@ -160,7 +163,6 @@ pub fn execute_claim_renew<S: IssueStore>(
 ///
 /// # Arguments
 ///
-/// * `_storage` - Issue storage (unused but kept for consistency)
 /// * `issue_id` - Optional filter by issue ID
 /// * `agent_id` - Optional filter by agent ID
 ///
@@ -168,7 +170,6 @@ pub fn execute_claim_renew<S: IssueStore>(
 ///
 /// Vector of active leases matching the filters
 pub fn execute_claim_status<S: IssueStore>(
-    _storage: &S,
     issue_id: Option<&str>,
     agent_id: Option<&str>,
 ) -> Result<Vec<Lease>> {
@@ -245,7 +246,6 @@ pub fn execute_claim_list() -> Result<Vec<Lease>> {
 ///
 /// # Arguments
 ///
-/// * `_storage` - Issue storage (unused but kept for consistency)
 /// * `lease_id` - ID of the lease to evict
 /// * `reason` - Reason for eviction (for audit trail)
 ///
@@ -253,7 +253,6 @@ pub fn execute_claim_list() -> Result<Vec<Lease>> {
 ///
 /// Ok(()) on success
 pub fn execute_claim_force_evict<S: IssueStore>(
-    _storage: &S,
     lease_id: &str,
     reason: &str,
 ) -> Result<()> {
@@ -882,5 +881,27 @@ mod tests {
         coordinator.init()?;
 
         coordinator.force_evict_lease(lease_id, reason)
+    }
+
+    #[test]
+    fn test_get_current_branch_errors_when_git_fails() {
+        // Create a temp directory that's NOT a git repo
+        let temp = TempDir::new().unwrap();
+        let original_dir = std::env::current_dir().unwrap();
+
+        // Change to non-git directory
+        std::env::set_current_dir(&temp).unwrap();
+
+        // get_current_branch() should return an error, not "main"
+        let result = get_current_branch();
+
+        // Restore directory before assertions
+        std::env::set_current_dir(original_dir).unwrap();
+
+        // Should fail, not return "main" as fallback
+        assert!(
+            result.is_err(),
+            "get_current_branch() should error in non-git directory, not return fallback"
+        );
     }
 }

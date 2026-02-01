@@ -47,7 +47,12 @@ fn get_current_branch() -> Result<String> {
         .context("Failed to get current git branch")?;
 
     if !output.status.success() {
-        return Ok("main".to_string()); // Default fallback
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        anyhow::bail!(
+            "Failed to get current git branch. Are you in a git repository?\n\
+             Git error: {}",
+            stderr.trim()
+        );
     }
 
     Ok(String::from_utf8(output.stdout)?.trim().to_string())

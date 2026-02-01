@@ -2241,7 +2241,7 @@ strategic_types = {}
                 use jit::commands::claim::execute_claim_renew;
                 use jit::output::{JsonError, JsonOutput};
 
-                match execute_claim_renew(&storage, &lease_id, extension) {
+                match execute_claim_renew::<jit::JsonFileStorage>(&lease_id, extension) {
                     Ok(renewed_lease) => {
                         if json {
                             let response = serde_json::json!({
@@ -2275,7 +2275,7 @@ strategic_types = {}
                 use jit::commands::claim::execute_claim_status;
                 use jit::output::{JsonError, JsonOutput};
 
-                match execute_claim_status(&storage, issue.as_deref(), agent.as_deref()) {
+                match execute_claim_status::<jit::JsonFileStorage>(issue.as_deref(), agent.as_deref()) {
                     Ok(leases) => {
                         if json {
                             let response = serde_json::json!({
@@ -2417,7 +2417,7 @@ strategic_types = {}
                 use jit::commands::claim::execute_claim_force_evict;
                 use jit::output::{JsonError, JsonOutput};
 
-                match execute_claim_force_evict(&storage, &lease_id, &reason) {
+                match execute_claim_force_evict::<jit::JsonFileStorage>(&lease_id, &reason) {
                     Ok(()) => {
                         if json {
                             let response = serde_json::json!({
