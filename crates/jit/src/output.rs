@@ -587,6 +587,15 @@ pub struct GraphDownstreamResponse {
     pub count: usize,
 }
 
+/// Response for `graph deps` command
+#[derive(Debug, Serialize)]
+pub struct GraphDepsResponse {
+    pub issue_id: String,
+    pub dependencies: Vec<Issue>,
+    pub count: usize,
+    pub transitive: bool,
+}
+
 /// Response for `graph roots` command
 #[derive(Debug, Serialize)]
 pub struct GraphRootsResponse {

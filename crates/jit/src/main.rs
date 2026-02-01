@@ -1223,6 +1223,41 @@ strategic_types = {}
                     }
                 }
             }
+            GraphCommands::Deps {
+                id,
+                transitive,
+                json,
+            } => {
+                let output_ctx = OutputContext::new(quiet, json);
+                let issues = executor.show_dependencies(&id, transitive)?;
+                if json {
+                    use jit::output::{GraphDepsResponse, JsonOutput};
+
+                    let response = GraphDepsResponse {
+                        issue_id: id.clone(),
+                        dependencies: issues.clone(),
+                        count: issues.len(),
+                        transitive,
+                    };
+                    let output = JsonOutput::success(response, "graph deps");
+                    println!("{}", output.to_json_string()?);
+                } else {
+                    if transitive {
+                        let _ = output_ctx
+                            .print_info(format!("All dependencies of {} (transitive):", id));
+                    } else {
+                        let _ =
+                            output_ctx.print_info(format!("Dependencies of {} (immediate):", id));
+                    }
+                    if issues.is_empty() {
+                        println!("  (none)");
+                    } else {
+                        for issue in issues {
+                            println!("  {} | {}", issue.id, issue.title);
+                        }
+                    }
+                }
+            }
             GraphCommands::Downstream { id, json } => {
                 let output_ctx = OutputContext::new(quiet, json);
                 let issues = executor.show_downstream(&id)?;

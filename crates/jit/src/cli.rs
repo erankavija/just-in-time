@@ -711,6 +711,30 @@ pub enum GraphCommands {
         json: bool,
     },
 
+    /// Show what an issue depends on (upstream dependencies)
+    ///
+    /// Shows the issues that must be completed before this issue can proceed.
+    /// By default shows immediate dependencies only (depth 1).
+    ///
+    /// Example:
+    ///   jit graph deps epic-123
+    ///   Shows: task-456, task-789 (epic depends on these)
+    ///
+    /// "Dependencies" = what this issue needs (upstream in work flow).
+    /// "Dependents" = what needs this issue (downstream in work flow).
+    #[command(alias = "dependencies")]
+    Deps {
+        /// Issue ID
+        id: String,
+
+        /// Show transitive dependencies (all levels)
+        #[arg(long)]
+        transitive: bool,
+
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Show downstream dependents (issues that are blocked by this one)
     ///
     /// "Downstream" means work flow direction (toward completion/delivery).
