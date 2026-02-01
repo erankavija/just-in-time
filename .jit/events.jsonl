@@ -1234,3 +1234,9 @@
 {"type":"issue_created","id":"e7d2d01d-7d42-4991-8bbb-591a8436fecf","issue_id":"657d4976-ba93-40c7-8db8-f70e90692a00","timestamp":"2026-02-01T15:47:13.080504054Z","title":"Add CLI binary integration tests for claim and worktree commands","priority":"normal"}
 {"type":"issue_state_changed","id":"1acffee2-0476-44b0-bf9a-142970656373","issue_id":"1bdc5395-b94c-4ca1-8e1d-7f0f19487ead","timestamp":"2026-02-01T16:24:42.300189221Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"dfb5dbba-43fb-44af-ae1d-65f9baecfdca","issue_id":"1bdc5395-b94c-4ca1-8e1d-7f0f19487ead","timestamp":"2026-02-01T16:24:42.300219601Z"}
+{"type":"issue_state_changed","id":"2094ab57-66de-4868-878a-a87b490a8cbe","issue_id":"5e1d5f02-c94d-4f52-9ed6-a633bd6c8f68","timestamp":"2026-02-01T16:33:46.554745964Z","from":"ready","to":"in_progress"}
+{"type":"issue_state_changed","id":"782f93b2-c36b-4d6a-acc2-42470a513eed","issue_id":"5e1d5f02-c94d-4f52-9ed6-a633bd6c8f68","timestamp":"2026-02-01T17:00:01.754849222Z","from":"in_progress","to":"gated"}
+{"type":"issue_state_changed","id":"11ecf22e-ea73-4084-83f1-5ef85bace955","issue_id":"5e1d5f02-c94d-4f52-9ed6-a633bd6c8f68","timestamp":"2026-02-01T17:00:10.093913088Z","from":"gated","to":"gated"}
+{"type":"gate_passed","id":"41d44d9f-db79-4a75-ba13-b3cf88df2370","issue_id":"5e1d5f02-c94d-4f52-9ed6-a633bd6c8f68","timestamp":"2026-02-01T17:00:27.905421404Z","gate_key":"tests","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"3d51713e-5966-406b-ac2c-eba33ba0fd4d","issue_id":"5e1d5f02-c94d-4f52-9ed6-a633bd6c8f68","timestamp":"2026-02-01T17:00:31.010435472Z","gate_key":"clippy","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"68733cf0-2437-45a3-a954-943a02fdf95c","issue_id":"5e1d5f02-c94d-4f52-9ed6-a633bd6c8f68","timestamp":"2026-02-01T17:00:31.413573237Z","gate_key":"fmt","updated_by":"auto:executor"}

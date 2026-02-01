@@ -15,6 +15,13 @@
       "commit": null,
       "label": "Refactor analysis - status of 7 issues",
       "doc_type": "notes"
+    },
+    {
+      "path": "dev/sessions/session-20260201-refactor-items-5-7.md",
+      "commit": null,
+      "label": "Analysis of items 5 & 7 (test helpers, error messages)",
+      "doc_type": "notes",
+      "format": "markdown"
     }
   ],
   "labels": [

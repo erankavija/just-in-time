@@ -126,10 +126,7 @@ pub fn execute_claim_release(lease_id: &str) -> Result<()> {
 /// # Returns
 ///
 /// The renewed lease with updated expiry time
-pub fn execute_claim_renew<S: IssueStore>(
-    lease_id: &str,
-    extension_secs: u64,
-) -> Result<Lease> {
+pub fn execute_claim_renew<S: IssueStore>(lease_id: &str, extension_secs: u64) -> Result<Lease> {
     use crate::agent_config::resolve_agent_id;
 
     // Detect worktree context
@@ -252,10 +249,7 @@ pub fn execute_claim_list() -> Result<Vec<Lease>> {
 /// # Returns
 ///
 /// Ok(()) on success
-pub fn execute_claim_force_evict<S: IssueStore>(
-    lease_id: &str,
-    reason: &str,
-) -> Result<()> {
+pub fn execute_claim_force_evict<S: IssueStore>(lease_id: &str, reason: &str) -> Result<()> {
     // Detect worktree context
     let paths = WorktreePaths::detect()
         .context("Failed to detect worktree paths - are you in a git repository?")?;

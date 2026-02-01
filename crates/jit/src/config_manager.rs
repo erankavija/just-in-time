@@ -71,6 +71,36 @@ impl ConfigManager {
         Ok(self.default_namespaces())
     }
 
+    /// Get the enforcement mode for lease requirements.
+    ///
+    /// Returns the configured enforcement mode from `.jit/config.toml`,
+    /// defaulting to `EnforcementMode::Strict` if not configured.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if config.toml exists but has an invalid enforcement mode.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use jit::config_manager::ConfigManager;
+    /// use jit::config::EnforcementMode;
+    ///
+    /// let config_mgr = ConfigManager::new(".jit");
+    /// let mode = config_mgr.get_enforcement_mode().unwrap();
+    /// assert_eq!(mode, EnforcementMode::Strict);  // Default
+    /// ```
+    pub fn get_enforcement_mode(&self) -> Result<crate::config::EnforcementMode> {
+        let config = self.load()?;
+
+        if let Some(worktree_config) = config.worktree {
+            worktree_config.enforcement_mode()
+        } else {
+            // No worktree section - default to Strict
+            Ok(crate::config::EnforcementMode::Strict)
+        }
+    }
+
     /// Build LabelNamespaces from configuration.
     fn build_namespaces_from_config(
         &self,
@@ -260,5 +290,58 @@ unique = false
         let result = config_mgr.load();
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_get_enforcement_mode_default_when_missing() {
+        let temp_dir = setup_test_dir();
+        let jit_dir = temp_dir.path().join(".jit");
+        fs::create_dir(&jit_dir).unwrap();
+
+        let config_mgr = ConfigManager::new(&jit_dir);
+        let mode = config_mgr.get_enforcement_mode().unwrap();
+
+        // Default to Strict when no config exists
+        assert_eq!(mode, crate::config::EnforcementMode::Strict);
+    }
+
+    #[test]
+    fn test_get_enforcement_mode_from_config() {
+        let temp_dir = setup_test_dir();
+        let jit_dir = temp_dir.path().join(".jit");
+        fs::create_dir(&jit_dir).unwrap();
+
+        let config_toml = r#"
+[worktree]
+enforce_leases = "warn"
+"#;
+        fs::write(jit_dir.join("config.toml"), config_toml).unwrap();
+
+        let config_mgr = ConfigManager::new(&jit_dir);
+        let mode = config_mgr.get_enforcement_mode().unwrap();
+
+        assert_eq!(mode, crate::config::EnforcementMode::Warn);
+    }
+
+    #[test]
+    fn test_get_enforcement_mode_invalid() {
+        let temp_dir = setup_test_dir();
+        let jit_dir = temp_dir.path().join(".jit");
+        fs::create_dir(&jit_dir).unwrap();
+
+        let config_toml = r#"
+[worktree]
+enforce_leases = "invalid"
+"#;
+        fs::write(jit_dir.join("config.toml"), config_toml).unwrap();
+
+        let config_mgr = ConfigManager::new(&jit_dir);
+        let result = config_mgr.get_enforcement_mode();
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid enforce_leases mode"));
     }
 }

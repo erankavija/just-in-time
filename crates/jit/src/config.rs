@@ -21,6 +21,8 @@ pub struct JitConfig {
     pub documentation: Option<DocumentationConfig>,
     /// Label namespace registry (optional - replaces labels.json).
     pub namespaces: Option<HashMap<String, NamespaceConfig>>,
+    /// Worktree and parallel work configuration (optional).
+    pub worktree: Option<WorktreeConfig>,
 }
 
 /// Schema version configuration.
@@ -128,6 +130,39 @@ pub struct NamespaceConfig {
     pub examples: Option<Vec<String>>,
 }
 
+/// Worktree and parallel work configuration.
+#[derive(Debug, Clone, Deserialize)]
+pub struct WorktreeConfig {
+    /// Lease enforcement mode: "strict", "warn", or "off" (default: "strict").
+    pub enforce_leases: Option<String>,
+}
+
+/// Enforcement mode for lease requirements.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EnforcementMode {
+    /// Block operations without active lease (production-safe default).
+    Strict,
+    /// Warn but allow operations without lease (development-friendly).
+    Warn,
+    /// No enforcement - bypass lease checks (backward compatible).
+    Off,
+}
+
+impl WorktreeConfig {
+    /// Get the enforcement mode, defaulting to Strict if not specified.
+    pub fn enforcement_mode(&self) -> Result<EnforcementMode> {
+        match self.enforce_leases.as_deref() {
+            None | Some("strict") => Ok(EnforcementMode::Strict),
+            Some("warn") => Ok(EnforcementMode::Warn),
+            Some("off") => Ok(EnforcementMode::Off),
+            Some(invalid) => anyhow::bail!(
+                "Invalid enforce_leases mode: '{}'. Valid options: 'strict', 'warn', 'off'",
+                invalid
+            ),
+        }
+    }
+}
+
 impl JitConfig {
     /// Load configuration from `.jit/config.toml` if it exists.
     ///
@@ -144,6 +179,7 @@ impl JitConfig {
                 validation: None,
                 documentation: None,
                 namespaces: None,
+                worktree: None,
             });
         }
 
@@ -375,5 +411,80 @@ unique = false
         assert_eq!(namespaces.len(), 2);
         assert!(namespaces["type"].unique);
         assert!(!namespaces["epic"].unique);
+    }
+
+    #[test]
+    fn test_enforcement_mode_default_to_strict() {
+        let config_toml = r#"
+[worktree]
+# No enforce_leases specified
+"#;
+        let config: JitConfig = toml::from_str(config_toml).unwrap();
+        let worktree = config.worktree.unwrap();
+        assert_eq!(
+            worktree.enforcement_mode().unwrap(),
+            EnforcementMode::Strict
+        );
+    }
+
+    #[test]
+    fn test_enforcement_mode_explicit_strict() {
+        let config_toml = r#"
+[worktree]
+enforce_leases = "strict"
+"#;
+        let config: JitConfig = toml::from_str(config_toml).unwrap();
+        let worktree = config.worktree.unwrap();
+        assert_eq!(
+            worktree.enforcement_mode().unwrap(),
+            EnforcementMode::Strict
+        );
+    }
+
+    #[test]
+    fn test_enforcement_mode_warn() {
+        let config_toml = r#"
+[worktree]
+enforce_leases = "warn"
+"#;
+        let config: JitConfig = toml::from_str(config_toml).unwrap();
+        let worktree = config.worktree.unwrap();
+        assert_eq!(worktree.enforcement_mode().unwrap(), EnforcementMode::Warn);
+    }
+
+    #[test]
+    fn test_enforcement_mode_off() {
+        let config_toml = r#"
+[worktree]
+enforce_leases = "off"
+"#;
+        let config: JitConfig = toml::from_str(config_toml).unwrap();
+        let worktree = config.worktree.unwrap();
+        assert_eq!(worktree.enforcement_mode().unwrap(), EnforcementMode::Off);
+    }
+
+    #[test]
+    fn test_enforcement_mode_invalid() {
+        let config_toml = r#"
+[worktree]
+enforce_leases = "maybe"
+"#;
+        let config: JitConfig = toml::from_str(config_toml).unwrap();
+        let worktree = config.worktree.unwrap();
+        let result = worktree.enforcement_mode();
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("Invalid enforce_leases mode"));
+        assert!(err_msg.contains("maybe"));
+    }
+
+    #[test]
+    fn test_config_without_worktree_section() {
+        let config_toml = r#"
+[type_hierarchy]
+types = { task = 1 }
+"#;
+        let config: JitConfig = toml::from_str(config_toml).unwrap();
+        assert!(config.worktree.is_none());
     }
 }

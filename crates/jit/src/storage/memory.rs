@@ -47,7 +47,7 @@ impl InMemoryStorage {
         // Generate unique root path for parallel test isolation
         let unique_id = uuid::Uuid::new_v4();
         let root_path = std::path::PathBuf::from(format!("/tmp/jit-test-{}", unique_id));
-        
+
         Self {
             issues: Arc::new(Mutex::new(HashMap::new())),
             gate_registry: Arc::new(Mutex::new(GateRegistry::default())),

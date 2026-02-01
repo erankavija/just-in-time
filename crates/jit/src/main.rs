@@ -2275,7 +2275,10 @@ strategic_types = {}
                 use jit::commands::claim::execute_claim_status;
                 use jit::output::{JsonError, JsonOutput};
 
-                match execute_claim_status::<jit::JsonFileStorage>(issue.as_deref(), agent.as_deref()) {
+                match execute_claim_status::<jit::JsonFileStorage>(
+                    issue.as_deref(),
+                    agent.as_deref(),
+                ) {
                     Ok(leases) => {
                         if json {
                             let response = serde_json::json!({

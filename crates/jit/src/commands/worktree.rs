@@ -426,20 +426,9 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn test_worktree_list_with_no_claims_index() -> Result<()> {
-        let (_temp, _storage) = setup_test_repo()?;
-
-        // Even without claims.index.json, should work and show 0 claims
-        let result = execute_worktree_list()?;
-
-        for entry in &result {
-            assert_eq!(
-                entry.active_claims, 0,
-                "Should have 0 claims when no index exists"
-            );
-        }
-
-        Ok(())
-    }
+    // Note: test_worktree_list_with_no_claims_index() removed.
+    // That test used execute_worktree_list() which calls WorktreePaths::detect(),
+    // making it detect the REAL repository, not test temp dirs.
+    // Tests must NEVER touch production .jit/ directory!
+    // The count_claims_for_worktree() function is already tested with mock data above.
 }
