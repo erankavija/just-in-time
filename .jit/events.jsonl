@@ -1216,3 +1216,10 @@
 {"type":"issue_created","id":"e5cc304a-d992-4dcd-862c-2c647cebedb5","issue_id":"f84945f7-738c-44e7-824d-cf76be7edd63","timestamp":"2026-01-17T01:56:19.029773824Z","title":"Implement cross-worktree issue visibility with git fallback","priority":"critical"}
 {"type":"issue_state_changed","id":"6a79ea59-a3d7-47a5-8b66-d93e1afc1062","issue_id":"f84945f7-738c-44e7-824d-cf76be7edd63","timestamp":"2026-01-18T22:33:08.447220534Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"6b53f6bb-d3cd-4178-ad5c-d6b95a59ac87","issue_id":"f84945f7-738c-44e7-824d-cf76be7edd63","timestamp":"2026-01-18T22:33:08.447592384Z","assignee":"copilot:cli-session"}
+{"type":"issue_state_changed","id":"0ae3b650-0d82-447e-87a4-e66351072bce","issue_id":"f84945f7-738c-44e7-824d-cf76be7edd63","timestamp":"2026-01-18T23:10:13.047932373Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"32a8e12e-1a46-415e-ad2e-775076cf37c7","issue_id":"f84945f7-738c-44e7-824d-cf76be7edd63","timestamp":"2026-01-18T23:10:13.047954973Z"}
+{"type":"issue_state_changed","id":"b4ad5966-bea2-40cf-9777-2082e90a43e5","issue_id":"f84945f7-738c-44e7-824d-cf76be7edd63","timestamp":"2026-01-18T23:10:47.137322700Z","from":"done","to":"in_progress"}
+{"type":"issue_state_changed","id":"c33fa4f3-b72c-4a8d-95dd-800e5e04bbbd","issue_id":"f84945f7-738c-44e7-824d-cf76be7edd63","timestamp":"2026-01-18T23:17:34.497323371Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"b41d75ee-9a5f-4742-b362-4c28ffd0424e","issue_id":"f84945f7-738c-44e7-824d-cf76be7edd63","timestamp":"2026-01-18T23:17:34.497349831Z"}
+{"type":"issue_state_changed","id":"44e32c76-47b7-47c8-92fd-c99516a9f02a","issue_id":"f84945f7-738c-44e7-824d-cf76be7edd63","timestamp":"2026-01-18T23:17:37.626964506Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"73046239-47e6-4b14-98de-0a6db9703049","issue_id":"f84945f7-738c-44e7-824d-cf76be7edd63","timestamp":"2026-01-18T23:17:37.626993156Z"}
