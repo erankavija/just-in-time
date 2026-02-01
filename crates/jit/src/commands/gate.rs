@@ -20,6 +20,10 @@ pub struct GateRemoveResult {
 impl<S: IssueStore> CommandExecutor<S> {
     pub fn add_gate(&self, issue_id: &str, gate_key: String) -> Result<()> {
         let full_id = self.storage.resolve_issue_id(issue_id)?;
+
+        // Require active lease for structural operations
+        self.require_active_lease(&full_id)?;
+
         let mut issue = self.storage.load_issue(&full_id)?;
         if !issue.gates_required.contains(&gate_key) {
             issue.gates_required.push(gate_key.clone());
@@ -37,6 +41,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         let full_id = self.storage.resolve_issue_id(issue_id)?;
+
+        // Require active lease for structural operations
+        self.require_active_lease(&full_id)?;
+
         let registry = self.storage.load_gate_registry()?;
         let mut issue = self.storage.load_issue(&full_id)?;
 
@@ -103,6 +111,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         let full_id = self.storage.resolve_issue_id(issue_id)?;
+
+        // Require active lease for structural operations
+        self.require_active_lease(&full_id)?;
+
         let mut issue = self.storage.load_issue(&full_id)?;
 
         let mut removed = Vec::new();
@@ -130,6 +142,10 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     pub fn pass_gate(&self, issue_id: &str, gate_key: String, by: Option<String>) -> Result<()> {
         let full_id = self.storage.resolve_issue_id(issue_id)?;
+
+        // Require active lease for structural operations
+        self.require_active_lease(&full_id)?;
+
         let mut issue = self.storage.load_issue(&full_id)?;
 
         if !issue.gates_required.contains(&gate_key) {
@@ -173,6 +189,10 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     pub fn fail_gate(&self, issue_id: &str, gate_key: String, by: Option<String>) -> Result<()> {
         let full_id = self.storage.resolve_issue_id(issue_id)?;
+
+        // Require active lease for structural operations
+        self.require_active_lease(&full_id)?;
+
         let mut issue = self.storage.load_issue(&full_id)?;
 
         if !issue.gates_required.contains(&gate_key) {
@@ -349,6 +369,15 @@ mod tests {
     fn setup() -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
         storage.init().unwrap();
+
+        // Create config with enforcement off for test backward compatibility
+        std::fs::create_dir_all(storage.root()).unwrap();
+        let config_toml = r#"
+[worktree]
+enforce_leases = "off"
+"#;
+        std::fs::write(storage.root().join("config.toml"), config_toml).unwrap();
+
         CommandExecutor::new(storage)
     }
 

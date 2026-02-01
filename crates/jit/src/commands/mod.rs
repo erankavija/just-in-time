@@ -43,7 +43,7 @@ use crate::graph::DependencyGraph;
 use crate::labels as label_utils;
 use crate::storage::IssueStore;
 // Type hierarchy validation (currently only validates type labels)
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use chrono::Utc;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -110,6 +110,90 @@ impl<S: IssueStore> CommandExecutor<S> {
         self.storage.init()?;
         println!("Initialized jit repository");
         Ok(())
+    }
+
+    /// Check if an active lease exists for the given issue.
+    ///
+    /// Returns true if the current agent (or any agent) has an active lease.
+    /// Returns false if no lease exists or if the lease is expired/stale.
+    fn check_active_lease(&self, issue_id: &str) -> Result<bool> {
+        use crate::storage::claim_coordinator::ClaimsIndex;
+        use crate::storage::worktree_paths::WorktreePaths;
+
+        // Get worktree paths to access shared control plane
+        let paths = match WorktreePaths::detect() {
+            Ok(p) => p,
+            Err(_) => {
+                // Not in a git repository - no claims possible
+                return Ok(false);
+            }
+        };
+
+        // Load claims index
+        let claims_index_path = paths.shared_jit.join("claims.index.json");
+        if !claims_index_path.exists() {
+            // No claims index - no active leases
+            return Ok(false);
+        }
+
+        let contents =
+            std::fs::read_to_string(&claims_index_path).context("Failed to read claims index")?;
+        let claims_index: ClaimsIndex =
+            serde_json::from_str(&contents).context("Failed to parse claims index")?;
+
+        // Check if any active lease exists for this issue (not stale or expired)
+        let full_id = self.storage.resolve_issue_id(issue_id)?;
+        let now = chrono::Utc::now();
+        let has_active_lease = claims_index.leases.iter().any(|lease| {
+            lease.issue_id == full_id
+                && (lease.expires_at.is_none() || lease.expires_at.unwrap() > now)
+                && !claims_index.is_stale(lease)
+        });
+
+        Ok(has_active_lease)
+    }
+
+    /// Require an active lease for the given issue, respecting enforcement mode.
+    ///
+    /// Checks the configured enforcement mode and either blocks, warns, or bypasses
+    /// the lease requirement. Used before structural operations that modify issues.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error in `strict` mode when no active lease exists.
+    /// In `warn` mode, prints a warning but returns Ok.
+    /// In `off` mode, always returns Ok.
+    pub fn require_active_lease(&self, issue_id: &str) -> Result<()> {
+        use crate::config::EnforcementMode;
+
+        let mode = self.config_manager.get_enforcement_mode()?;
+
+        match mode {
+            EnforcementMode::Off => Ok(()),
+            EnforcementMode::Warn | EnforcementMode::Strict => {
+                let has_lease = self.check_active_lease(issue_id)?;
+
+                if !has_lease {
+                    let msg = format!(
+                        "No active lease for issue {}.\nAcquire lease with: jit claim acquire {}",
+                        issue_id, issue_id
+                    );
+
+                    match mode {
+                        EnforcementMode::Warn => {
+                            eprintln!("⚠️  Warning: {}", msg);
+                            Ok(())
+                        }
+                        EnforcementMode::Strict => {
+                            anyhow::bail!("{}", msg)
+                        }
+                        _ => unreachable!(),
+                    }
+                } else {
+                    Ok(())
+                }
+            }
+        }
     }
 }
 
@@ -196,5 +280,103 @@ mod tests {
         assert!(parse_priority("invalid").is_err());
         assert!(parse_priority("").is_err());
         assert!(parse_priority("medium").is_err());
+    }
+
+    // Enforcement tests
+    #[test]
+    fn test_require_active_lease_off_mode() {
+        use crate::storage::InMemoryStorage;
+
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+
+        // Create a test issue
+        let issue = Issue::new("test-issue".to_string(), "Test".to_string());
+        let issue_id = issue.id.clone();
+        storage.save_issue(&issue).unwrap();
+
+        // Create the root directory and config with enforcement off
+        std::fs::create_dir_all(storage.root()).unwrap();
+        let config_toml = r#"
+[worktree]
+enforce_leases = "off"
+"#;
+        std::fs::write(storage.root().join("config.toml"), config_toml).unwrap();
+
+        let executor = CommandExecutor::new(storage);
+
+        // Should always succeed in off mode, even without lease
+        let result = executor.require_active_lease(&issue_id);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_check_active_lease_no_claims_index() {
+        use crate::storage::InMemoryStorage;
+
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+
+        // Create a test issue
+        let issue = Issue::new("test-issue".to_string(), "Test".to_string());
+        let issue_id = issue.id.clone();
+        storage.save_issue(&issue).unwrap();
+
+        let executor = CommandExecutor::new(storage);
+
+        // No claims index - should return false
+        let result = executor.check_active_lease(&issue_id);
+        assert!(result.is_ok());
+        assert!(!result.unwrap());
+    }
+
+    #[test]
+    fn test_require_active_lease_strict_mode_no_lease() {
+        use crate::storage::InMemoryStorage;
+
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+
+        // Create a test issue
+        let issue = Issue::new("test-issue".to_string(), "Test".to_string());
+        let issue_id = issue.id.clone();
+        storage.save_issue(&issue).unwrap();
+
+        // Create the root directory and config with enforcement strict
+        std::fs::create_dir_all(storage.root()).unwrap();
+        let config_toml = r#"
+[worktree]
+enforce_leases = "strict"
+"#;
+        std::fs::write(storage.root().join("config.toml"), config_toml).unwrap();
+
+        let executor = CommandExecutor::new(storage);
+
+        // Should fail in strict mode without lease
+        let result = executor.require_active_lease(&issue_id);
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("No active lease"));
+        assert!(err_msg.contains("jit claim acquire"));
+    }
+
+    #[test]
+    fn test_require_active_lease_strict_mode_default() {
+        use crate::storage::InMemoryStorage;
+
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+
+        // Create a test issue
+        let issue = Issue::new("test-issue".to_string(), "Test".to_string());
+        let issue_id = issue.id.clone();
+        storage.save_issue(&issue).unwrap();
+
+        // No config file - should default to strict mode
+        let executor = CommandExecutor::new(storage);
+
+        // Should fail in strict mode (default) without lease
+        let result = executor.require_active_lease(&issue_id);
+        assert!(result.is_err());
     }
 }

@@ -302,28 +302,12 @@ mod tests {
         assert_eq!(entries[1].branch, "feature/task-1");
     }
 
-    #[test]
-    fn test_worktree_list_returns_current_worktree() -> Result<()> {
-        let (_temp, _storage) = setup_test_repo()?;
-
-        // In an actual git repository, should return at least the current worktree
-        let result = execute_worktree_list()?;
-
-        // Should have at least one worktree (current)
-        assert!(
-            !result.is_empty(),
-            "Should return at least current worktree"
-        );
-
-        // Each entry should have required fields
-        for entry in &result {
-            assert!(!entry.worktree_id.is_empty());
-            assert!(!entry.branch.is_empty());
-            assert!(!entry.path.is_empty());
-        }
-
-        Ok(())
-    }
+    // Note: test_worktree_list_returns_current_worktree() removed.
+    // Note: test_json_output_structure() removed.
+    // These tests used execute_worktree_list() which calls WorktreePaths::detect(),
+    // making them detect the REAL repository, not test temp dirs.
+    // Tests must NEVER touch production .jit/ directory!
+    // The worktree list functionality is tested with parse_git_worktree_porcelain() above.
 
     #[test]
     fn test_worktree_list_entry_structure() {
@@ -408,27 +392,4 @@ mod tests {
         assert!(result.is_ok());
         assert_eq!(result.unwrap().len(), 0);
     }
-
-    #[test]
-    fn test_json_output_structure() -> Result<()> {
-        let (_temp, _storage) = setup_test_repo()?;
-
-        let result = execute_worktree_list()?;
-
-        // Verify JSON serialization works
-        let json = serde_json::to_string(&result)?;
-        assert!(json.contains("worktree_id"));
-        assert!(json.contains("branch"));
-        assert!(json.contains("path"));
-        assert!(json.contains("is_main"));
-        assert!(json.contains("active_claims"));
-
-        Ok(())
-    }
-
-    // Note: test_worktree_list_with_no_claims_index() removed.
-    // That test used execute_worktree_list() which calls WorktreePaths::detect(),
-    // making it detect the REAL repository, not test temp dirs.
-    // Tests must NEVER touch production .jit/ directory!
-    // The count_claims_for_worktree() function is already tested with mock data above.
 }

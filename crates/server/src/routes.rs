@@ -632,6 +632,15 @@ mod tests {
     #[tokio::test]
     async fn test_get_graph() {
         let storage = InMemoryStorage::new();
+
+        // Create config with enforcement off for test backward compatibility
+        std::fs::create_dir_all(storage.root()).unwrap();
+        let config_toml = r#"
+[worktree]
+enforce_leases = "off"
+"#;
+        std::fs::write(storage.root().join("config.toml"), config_toml).unwrap();
+
         let executor = Arc::new(CommandExecutor::new(storage));
 
         // Create issues with dependencies

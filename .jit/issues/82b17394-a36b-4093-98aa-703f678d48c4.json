@@ -16,34 +16,41 @@
     "code-review"
   ],
   "gates_status": {
-    "tdd-reminder": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.582618270Z"
-    },
     "fmt": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:07.582659180Z"
     },
-    "tests": {
+    "code-review": {
       "status": "pending",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.582641380Z"
+      "updated_at": "2026-01-03T20:37:07.582668030Z"
+    },
+    "tdd-reminder": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-01-03T20:37:07.582618270Z"
     },
     "clippy": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:07.582650430Z"
     },
-    "code-review": {
+    "tests": {
       "status": "pending",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.582668030Z"
+      "updated_at": "2026-01-03T20:37:07.582641380Z"
     }
   },
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "dev/sessions/session-20260201-cli-enforcement-82b17394.md",
+      "commit": null,
+      "label": "Implementation plan",
+      "doc_type": "notes"
+    }
+  ],
   "labels": [
     "epic:parallel-work",
     "milestone:v1.0",

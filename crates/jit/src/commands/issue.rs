@@ -136,6 +136,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         remove_labels: Vec<String>,
     ) -> Result<()> {
         let full_id = self.storage.resolve_issue_id(id)?;
+
+        // Require active lease for structural operations
+        self.require_active_lease(&full_id)?;
+
         let mut issue = self.storage.load_issue(&full_id)?;
 
         if let Some(t) = title {
@@ -243,6 +247,10 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     pub fn delete_issue(&self, id: &str) -> Result<()> {
         let full_id = self.storage.resolve_issue_id(id)?;
+
+        // Require active lease for structural operations
+        self.require_active_lease(&full_id)?;
+
         self.storage.delete_issue(&full_id)
     }
 
@@ -252,6 +260,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// and postchecks when transitioning to Gated.
     pub fn update_issue_state(&self, id: &str, new_state: State) -> Result<()> {
         let full_id = self.storage.resolve_issue_id(id)?;
+
+        // Require active lease for structural operations
+        self.require_active_lease(&full_id)?;
+
         let issue = self.storage.load_issue(&full_id)?;
         let old_state = issue.state;
 
@@ -346,6 +358,10 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     pub fn assign_issue(&self, id: &str, assignee: String) -> Result<()> {
         let full_id = self.storage.resolve_issue_id(id)?;
+
+        // Require active lease for structural operations
+        self.require_active_lease(&full_id)?;
+
         let mut issue = self.storage.load_issue(&full_id)?;
         issue.assignee = Some(assignee);
         self.storage.save_issue(&issue)?;
@@ -382,6 +398,10 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     pub fn unassign_issue(&self, id: &str) -> Result<()> {
         let full_id = self.storage.resolve_issue_id(id)?;
+
+        // Require active lease for structural operations
+        self.require_active_lease(&full_id)?;
+
         let mut issue = self.storage.load_issue(&full_id)?;
         issue.assignee = None;
         self.storage.save_issue(&issue)?;
@@ -545,6 +565,15 @@ mod tests {
     fn setup() -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
         storage.init().unwrap();
+
+        // Create config with enforcement off for test backward compatibility
+        std::fs::create_dir_all(storage.root()).unwrap();
+        let config_toml = r#"
+[worktree]
+enforce_leases = "off"
+"#;
+        std::fs::write(storage.root().join("config.toml"), config_toml).unwrap();
+
         CommandExecutor::new(storage)
     }
 
