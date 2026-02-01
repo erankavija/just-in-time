@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+# Pre-push hook for JIT: Validate leases before push
+#
+# This hook enforces that leases mentioned in pushed commits are still active.
+# Prevents pushing work where leases have expired.
+#
+# Installation:
+#   cp scripts/hooks/pre-push .git/hooks/pre-push
+#   chmod +x .git/hooks/pre-push
+#
+# Skip enforcement (emergency override):
+#   git push --no-verify
+
+set -euo pipefail
+
+# Get enforcement mode from config
+enforcement_mode="off"
+if [ -f .jit/config.toml ]; then
+  enforcement_mode=$(grep -E '^\s*enforce_leases\s*=' .jit/config.toml | sed -E 's/.*=\s*"([^"]+)".*/\1/' || echo "off")
+fi
+
+# Skip hook if enforcement is not strict
+if [ "$enforcement_mode" != "strict" ]; then
+  exit 0
+fi
+
+# Check if jq is available
+if ! command -v jq &> /dev/null; then
+  echo "⚠️  Pre-push hook: jq not found, skipping lease validation" >&2
+  echo "   Install jq to enable lease checks" >&2
+  exit 0
+fi
+
+# Read pre-push stdin: <local ref> <local sha> <remote ref> <remote sha>
+while read local_ref local_sha remote_ref remote_sha; do
+  # Get range of commits being pushed
+  if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
+    # New branch, check all commits
+    range="$local_sha"
+  else
+    # Existing branch, check new commits only
+    range="$remote_sha..$local_sha"
+  fi
+  
+  # Get all changed .jit/issues files in this push
+  changed=$(git diff --name-only "$range" | grep -E '^\.?jit/issues/[^/]+/issue\.json$' || true)
+  
+  if [ -z "$changed" ]; then
+    continue
+  fi
+  
+  # Extract unique issue IDs
+  issue_ids=$(echo "$changed" | sed -E 's#^\.?jit/issues/([^/]+)/.*#\1#' | sort -u)
+  
+  # Get current agent
+  agent_id="${JIT_AGENT_ID:-}"
+  if [ -z "$agent_id" ]; then
+    # Try to get from config
+    if [ -f ~/.config/jit/agent.toml ]; then
+      agent_id=$(grep -E '^\s*id\s*=' ~/.config/jit/agent.toml | sed -E 's/.*=\s*"([^"]+)".*/\1/' || echo "")
+    fi
+  fi
+  
+  if [ -z "$agent_id" ]; then
+    echo "❌ Pre-push hook: Pushing structural edits without agent identity" >&2
+    echo "   Set JIT_AGENT_ID environment variable or configure ~/.config/jit/agent.toml" >&2
+    echo "" >&2
+    echo "   Example:" >&2
+    echo "     export JIT_AGENT_ID='agent:your-name'" >&2
+    echo "" >&2
+    echo "   Or skip this hook (emergency only):" >&2
+    echo "     git push --no-verify" >&2
+    exit 1
+  fi
+  
+  # Check each issue has an active, non-stale lease
+  claims_index=".git/jit/claims.index.json"
+  if [ ! -f "$claims_index" ]; then
+    echo "⚠️  Pre-push hook: No claims index found, skipping lease validation" >&2
+    echo "   Expected: $claims_index" >&2
+    exit 0
+  fi
+  
+  for issue_id in $issue_ids; do
+    has_claim=$(jq -r \
+      --arg issue "$issue_id" \
+      --arg agent "$agent_id" \
+      '.leases[] | select(.issue_id | startswith($issue)) | select(.agent_id==$agent) | select(.stale != true) | .lease_id' \
+      "$claims_index" 2>/dev/null || echo "")
+    
+    if [ -z "$has_claim" ]; then
+      echo "❌ Pre-push hook: Lease expired for issue $issue_id" >&2
+      echo "   Agent: $agent_id" >&2
+      echo "" >&2
+      echo "   Your changes are being pushed but the lease has expired." >&2
+      echo "   This may indicate the work took longer than expected." >&2
+      echo "" >&2
+      echo "   Options:" >&2
+      echo "     1. Renew lease: jit claim renew <lease-id>" >&2
+      echo "     2. Skip this hook: git push --no-verify" >&2
+      exit 1
+    fi
+  done
+done
+
+# All checks passed
+exit 0

@@ -1856,6 +1856,57 @@ strategic_types = {}
                 }
             }
         },
+        Commands::Hooks(hooks_cmd) => match hooks_cmd {
+            jit::cli::HooksCommands::Install { json } => {
+                use jit::commands::hooks::install_hooks;
+
+                match install_hooks(None) {
+                    Ok(result) => {
+                        if json {
+                            let output = jit::output::JsonOutput::success(
+                                serde_json::json!({
+                                    "hooks_dir": result.hooks_dir,
+                                    "installed": result.installed,
+                                    "skipped": result.skipped,
+                                }),
+                                "hooks install",
+                            );
+                            println!("{}", output.to_json_string()?);
+                        } else {
+                            println!("Installed hooks to: {}", result.hooks_dir);
+                            if !result.installed.is_empty() {
+                                println!("\nInstalled:");
+                                for hook in &result.installed {
+                                    println!("  ✓ {}", hook);
+                                }
+                            }
+                            if !result.skipped.is_empty() {
+                                println!("\nSkipped (already exist):");
+                                for hook in &result.skipped {
+                                    println!("  - {}", hook);
+                                }
+                            }
+                            println!("\nHooks are now active. Configure enforcement in .jit/config.toml:");
+                            println!("  [worktree]");
+                            println!("  enforce_leases = \"strict\"");
+                        }
+                    }
+                    Err(e) => {
+                        if json {
+                            let json_error = jit::output::JsonError::new(
+                                "HOOKS_INSTALL_ERROR",
+                                e.to_string(),
+                                "hooks install",
+                            );
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
+                        } else {
+                            return Err(e);
+                        }
+                    }
+                }
+            }
+        },
         Commands::Search {
             query,
             regex,

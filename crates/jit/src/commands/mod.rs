@@ -26,6 +26,7 @@ mod gate;
 mod gate_check;
 mod gate_cli_tests;
 mod graph;
+pub mod hooks;
 mod issue;
 mod labels;
 mod query;

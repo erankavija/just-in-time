@@ -2,7 +2,7 @@
   "id": "fb6f6873-60f4-4484-be03-d43fb73375c5",
   "title": "Implement branch divergence detection",
   "description": "Implement `check_branch_divergence()` to detect when branch has diverged from origin/main. Block global operations (config, gates registry, type-hierarchy) when diverged. See design doc section \"Branch Divergence Detection\".",
-  "state": "gated",
+  "state": "done",
   "priority": "high",
   "assignee": null,
   "dependencies": [
@@ -16,30 +16,30 @@
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "pending",
+    "tdd-reminder": {
+      "status": "passed",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.590317642Z"
-    },
-    "tests": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.590284542Z"
-    },
-    "fmt": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.590307642Z"
+      "updated_at": "2026-02-01T22:56:39.172901300Z"
     },
     "clippy": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.590294502Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-01T22:56:33.892114170Z"
     },
-    "tdd-reminder": {
-      "status": "pending",
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-01T22:56:38.649344171Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-01T22:56:09.094543865Z"
+    },
+    "code-review": {
+      "status": "passed",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:07.590258482Z"
+      "updated_at": "2026-02-01T22:56:39.292833215Z"
     }
   },
   "context": {},

@@ -107,6 +107,10 @@ pub enum Commands {
     #[command(subcommand)]
     Worktree(WorktreeCommands),
 
+    /// Git hooks installation and management
+    #[command(subcommand)]
+    Hooks(HooksCommands),
+
     /// Search issues and documents
     Search {
         /// Search query string
@@ -1193,6 +1197,27 @@ pub enum WorktreeCommands {
     ///   jit worktree list          # List all worktrees
     ///   jit worktree list --json   # JSON output
     List {
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+/// Git hooks commands
+#[derive(Debug, Subcommand)]
+pub enum HooksCommands {
+    /// Install git hooks for lease and divergence validation
+    ///
+    /// Copies hook templates to .git/hooks/ and makes them executable.
+    ///
+    /// Hooks installed:
+    ///   - pre-commit: Validates leases and divergence before commit
+    ///   - pre-push: Validates leases before push
+    ///
+    /// Examples:
+    ///   jit hooks install          # Install hooks
+    ///   jit hooks install --json   # JSON output
+    Install {
         /// Output as JSON
         #[arg(long)]
         json: bool,
