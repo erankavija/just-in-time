@@ -74,7 +74,17 @@ impl ConfigManager {
     /// Get the enforcement mode for lease requirements.
     ///
     /// Returns the configured enforcement mode from `.jit/config.toml`,
-    /// defaulting to `EnforcementMode::Strict` if not configured.
+    /// defaulting to `EnforcementMode::Off` if not configured.
+    ///
+    /// **Default Behavior:**
+    /// - Single-agent development: Enforcement OFF (no friction)
+    /// - Multi-agent coordination: Explicitly enable `strict` or `warn` in config
+    ///
+    /// # Enforcement Modes
+    ///
+    /// - `Off`: No lease enforcement (default for single-agent work)
+    /// - `Warn`: Log warnings but allow operations without lease
+    /// - `Strict`: Block operations without active lease (for multi-agent teams)
     ///
     /// # Errors
     ///
@@ -88,7 +98,7 @@ impl ConfigManager {
     ///
     /// let config_mgr = ConfigManager::new(".jit");
     /// let mode = config_mgr.get_enforcement_mode().unwrap();
-    /// assert_eq!(mode, EnforcementMode::Strict);  // Default
+    /// assert_eq!(mode, EnforcementMode::Off);  // Default
     /// ```
     pub fn get_enforcement_mode(&self) -> Result<crate::config::EnforcementMode> {
         let config = self.load()?;
@@ -96,8 +106,8 @@ impl ConfigManager {
         if let Some(worktree_config) = config.worktree {
             worktree_config.enforcement_mode()
         } else {
-            // No worktree section - default to Strict
-            Ok(crate::config::EnforcementMode::Strict)
+            // No worktree section - default to Off for single-agent development
+            Ok(crate::config::EnforcementMode::Off)
         }
     }
 
@@ -301,8 +311,8 @@ unique = false
         let config_mgr = ConfigManager::new(&jit_dir);
         let mode = config_mgr.get_enforcement_mode().unwrap();
 
-        // Default to Strict when no config exists
-        assert_eq!(mode, crate::config::EnforcementMode::Strict);
+        // Default to Off when no config exists (single-agent development)
+        assert_eq!(mode, crate::config::EnforcementMode::Off);
     }
 
     #[test]

@@ -392,7 +392,7 @@ enforce_leases = "strict"
     }
 
     #[test]
-    fn test_require_active_lease_strict_mode_default() {
+    fn test_require_active_lease_off_mode_default() {
         use crate::storage::InMemoryStorage;
 
         let storage = InMemoryStorage::new();
@@ -403,12 +403,12 @@ enforce_leases = "strict"
         let issue_id = issue.id.clone();
         storage.save_issue(&issue).unwrap();
 
-        // No config file - should default to strict mode
+        // No config file - should default to off mode (single-agent development)
         let executor = CommandExecutor::new(storage);
 
-        // Should fail in strict mode (default) without lease
+        // Should succeed in off mode (default) without lease
         let result = executor.require_active_lease(&issue_id);
-        assert!(result.is_err());
+        assert!(result.is_ok());
     }
 
     // Agent identity verification tests
