@@ -19,6 +19,7 @@ pub mod lease;
 pub mod lock;
 pub mod lock_cleanup;
 pub mod memory;
+pub mod temp_cleanup;
 pub mod worktree_identity;
 pub mod worktree_paths;
 

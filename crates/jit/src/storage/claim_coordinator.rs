@@ -20,6 +20,8 @@ use std::path::PathBuf;
 use uuid::Uuid;
 
 use super::lock::FileLocker;
+use super::lock_cleanup;
+use super::temp_cleanup;
 use super::worktree_paths::WorktreePaths;
 use crate::errors;
 
@@ -738,7 +740,7 @@ impl ClaimCoordinator {
     pub fn startup_recovery(&self) -> Result<()> {
         // 1. Clean up stale locks
         let lock_dir = self.paths.shared_jit.join("locks");
-        crate::storage::lock_cleanup::cleanup_stale_locks(&lock_dir)?;
+        lock_cleanup::cleanup_stale_locks(&lock_dir)?;
 
         // 2. Rebuild index if corrupted
         if !self.verify_index_consistency()? {
@@ -751,6 +753,13 @@ impl ClaimCoordinator {
         let mut index = self.load_claims_index()?;
         self.evict_expired(&mut index)?;
         self.write_index_atomic(&index)?;
+
+        // 4. Clean up orphaned temp files (1 hour threshold)
+        let jit_data_dir = &self.paths.local_jit;
+        if let Err(e) = temp_cleanup::cleanup_orphaned_temp_files(jit_data_dir, 3600) {
+            // Log but don't fail - temp file cleanup is best-effort
+            eprintln!("Warning: Failed to cleanup orphaned temp files: {}", e);
+        }
 
         Ok(())
     }
