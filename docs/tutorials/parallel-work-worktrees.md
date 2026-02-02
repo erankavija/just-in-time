@@ -1,59 +1,249 @@
 # Tutorial: Parallel Work with Git Worktrees
 
-**Status:** 🚧 Coming Soon
+> **Diátaxis Type:** Tutorial  
+> **Time to complete:** 15 minutes  
+> **Prerequisites:** Basic familiarity with jit ([Quickstart](./quickstart.md))
 
-This tutorial will guide you through setting up parallel workflows using git worktrees for multi-agent coordination.
+This tutorial guides you through setting up parallel work using git worktrees. You'll learn how multiple agents can work on different issues simultaneously without conflicts.
 
 ## What You'll Learn
 
-- How to set up multiple worktrees for parallel work
-- Reading issues across worktrees (local, git, main worktree)
-- Understanding the 3-tier fallback strategy
-- Creating and claiming issues in secondary worktrees
-- Managing dependencies across worktrees
+- Create a secondary worktree for parallel work
+- Configure agent identity for coordination
+- Claim issues to prevent conflicts
+- Work in isolation and merge back
 
-## Prerequisites
+## Before You Start
 
-- Basic familiarity with `jit` commands (see [Quickstart](./quickstart.md))
-- Git worktrees knowledge (see [git-worktree documentation](https://git-scm.com/docs/git-worktree))
-- Understanding of issue dependencies (see [Dependency Management](../how-to/dependency-management.md))
+You need:
+- A git repository with jit initialized
+- Basic understanding of git worktrees ([git-worktree docs](https://git-scm.com/docs/git-worktree))
 
-## Topics to be Covered
+## Step 1: Create a Secondary Worktree
 
-1. **Setting Up Worktrees**
-   - Creating a secondary worktree
-   - Initializing jit in secondary worktree
-   - Understanding worktree isolation
+First, create a new worktree from your main branch:
 
-2. **Cross-Worktree Issue Visibility**
-   - How issues are resolved (local → git → main)
-   - Reading committed issues from git
-   - Reading uncommitted issues from main worktree
-   - Local modifications and isolation
+```bash
+# From your main worktree
+git worktree add ../my-feature -b feature/my-work
+cd ../my-feature
+```
 
-3. **Parallel Workflows**
-   - Working on different issues simultaneously
-   - Dependency checking across worktrees
-   - Committing and merging work
+Initialize jit in the new worktree:
 
-4. **Advanced Topics**
-   - Issue claiming and coordination (future)
-   - Lease management (future)
-   - Conflict resolution (future)
+```bash
+jit init
+```
 
-## Implementation Status
+Verify the worktree is detected:
 
-✅ Cross-worktree issue visibility (Phase 1-3 complete)  
-⏳ Issue claiming and leases (planned)  
-⏳ Pre-commit hooks (planned)  
-⏳ Web UI integration (planned)
+```bash
+jit worktree info
+```
+
+You should see output like:
+
+```
+Worktree Information:
+  ID:         wt:abc12345
+  Branch:     feature/my-work
+  Root:       /path/to/my-feature
+  Type:       secondary worktree
+  Common dir: /path/to/main/.git
+```
+
+## Step 2: Configure Agent Identity
+
+Agents need unique identities for claim coordination. Set yours:
+
+```bash
+# Option 1: Environment variable (recommended for sessions)
+export JIT_AGENT_ID=agent:alice-feature
+
+# Option 2: Persistent config file
+mkdir -p ~/.config/jit
+cat > ~/.config/jit/agent.toml << 'EOF'
+[agent]
+id = "agent:alice"
+description = "Alice's development session"
+EOF
+```
+
+Verify your identity:
+
+```bash
+echo $JIT_AGENT_ID
+```
+
+## Step 3: View Available Issues
+
+From your secondary worktree, you can see all issues from the main worktree:
+
+```bash
+jit query available
+```
+
+This shows issues that are:
+- Unassigned
+- In "ready" state
+- Not blocked by dependencies
+
+The issue visibility works through a 3-tier fallback:
+1. **Local `.jit/`** — Issues you've modified in this worktree
+2. **Git HEAD** — Committed issues (canonical state)
+3. **Main worktree `.jit/`** — Uncommitted issues from main
+
+## Step 4: Claim an Issue
+
+Before working on an issue, claim it to prevent conflicts:
+
+```bash
+# Find an available issue
+jit query available
+
+# Claim it (requires agent identity)
+jit claim acquire <issue-id>
+```
+
+You should see:
+
+```
+✓ Acquired lease: abc123-def456...
+  Issue: <issue-id>
+  TTL: 600 seconds
+```
+
+The claim creates a **lease** that:
+- Prevents other agents from claiming the same issue
+- Expires after TTL (default: 10 minutes)
+- Can be renewed if you need more time
+
+View active claims:
+
+```bash
+jit claim list
+```
+
+## Step 5: Work on the Issue
+
+Now work on your claimed issue. The key principle: **changes stay local until committed and merged**.
+
+```bash
+# Update issue state
+jit issue update <issue-id> --state in_progress
+
+# Do your work...
+# (edit code, run tests, etc.)
+
+# Run gates when ready
+jit gate check-all <issue-id>
+
+# Complete the issue
+jit issue update <issue-id> --state done
+```
+
+Your changes to `.jit/` are isolated to this worktree until you commit them.
+
+## Step 6: Commit and Merge
+
+When your work is complete:
+
+```bash
+# Stage changes (including .jit/)
+git add -A
+
+# Commit
+git commit -m "Complete feature work
+
+Closes issue <issue-id>"
+
+# Push and create PR (or merge directly)
+git push origin feature/my-work
+```
+
+After merging to main, other worktrees will see your issue updates via git.
+
+## Step 7: Clean Up
+
+Release your claim (if not expired):
+
+```bash
+jit claim release <lease-id>
+```
+
+Remove the worktree when done:
+
+```bash
+cd ..
+git worktree remove my-feature
+```
+
+## How It All Works Together
+
+```
+Main Worktree                    Secondary Worktree
+─────────────                    ──────────────────
+.jit/                            .jit/
+├── issues/                      ├── issues/
+│   └── task-1.json              │   └── (reads from main)
+│                                │
+.git/jit/  ◄────── Shared ──────►  (uses same control plane)
+├── claims.jsonl                  
+└── claims.index.json             
+```
+
+- **Issue data** is per-worktree (isolated)
+- **Claims** are shared (via `.git/jit/`)
+- **Visibility** spans all worktrees
+
+## Try It Yourself
+
+1. Create two worktrees
+2. Set different `JIT_AGENT_ID` in each
+3. Try claiming the same issue from both — the second should fail
+4. Complete an issue in one worktree, commit, and see it update in the other
+
+## Common Scenarios
+
+### Scenario: Agent Times Out
+
+If an agent crashes or the lease expires:
+
+```bash
+# List stale leases
+jit claim list
+
+# Force evict if needed (admin operation)
+jit claim force-evict <lease-id> --reason "agent crashed"
+```
+
+### Scenario: Need More Time
+
+Renew your lease before it expires:
+
+```bash
+jit claim renew <lease-id> --extension 600
+```
+
+### Scenario: Check Dependencies
+
+Dependencies work across worktrees:
+
+```bash
+# See what blocks an issue
+jit graph deps <issue-id>
+
+# See the full dependency tree
+jit graph show
+```
+
+## What's Next?
+
+- [How-to: Multi-Agent Coordination](../how-to/multi-agent-coordination.md) — Advanced coordination patterns
+- [Configuration Reference](../reference/configuration.md) — Customize TTL, enforcement, and more
+- [Troubleshooting Guide](../how-to/troubleshooting.md) — Common issues and solutions
 
 ## See Also
 
-- [How-to: Multi-Agent Coordination](../how-to/multi-agent-coordination.md)
+- [CLI Commands Reference](../reference/cli-commands.md) — Full command documentation
 - Design document: `dev/design/worktree-parallel-work.md`
-- [CLI Commands Reference](../reference/cli-commands.md)
-
----
-
-**Documentation TODO:** Full tutorial content pending completion of story for parallel work documentation.

@@ -1185,6 +1185,24 @@ pub enum ClaimCommands {
         json: bool,
     },
 
+    /// Send heartbeat for an indefinite lease
+    ///
+    /// Updates the last_beat timestamp without changing expiration.
+    /// Used to signal the agent is still actively working on the issue.
+    /// Only needed for TTL=0 (indefinite) leases to prevent staleness.
+    ///
+    /// Examples:
+    ///   jit claim heartbeat abc12345-6789-...       # Send heartbeat
+    ///   jit claim heartbeat abc12345-6789-... --json
+    Heartbeat {
+        /// Lease ID to heartbeat
+        lease_id: String,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Show active lease status
     ///
     /// By default, shows leases for the current agent.

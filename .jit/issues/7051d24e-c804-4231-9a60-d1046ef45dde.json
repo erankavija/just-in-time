@@ -2,9 +2,9 @@
   "id": "7051d24e-c804-4231-9a60-d1046ef45dde",
   "title": "Story: Configuration System",
   "description": "Implement configuration system for worktree mode, lease enforcement, and coordination settings.\n\n## Goal\n\nProvide flexible configuration to support different deployment scenarios from single-agent sequential work to multi-agent parallel coordination.\n\n## Tasks\n\n1. **Repository config schema** - `.jit/config.toml` with worktree and coordination sections\n2. **Agent config** - `~/.config/jit/agent.toml` for persistent agent identity\n3. **Worktree mode setting** - `auto`, `on`, `off` modes for feature enablement\n4. **Enforcement mode setting** - `strict`, `warn`, `off` for lease enforcement\n5. **TTL and heartbeat settings** - Configurable defaults for lease management\n6. **Config commands** - `jit config show/get/set/validate`\n7. **Environment variable overrides** - `JIT_AGENT_ID` and similar\n\n## Success Criteria\n\n- Sequential workflows unaffected when `worktree.mode = \"off\"`\n- Configuration loading follows documented priority order\n- `jit config show` displays effective merged configuration\n- All settings documented with examples\n- Invalid configuration rejected with clear error messages\n\n## References\n\nSee design document `dev/design/worktree-parallel-work.md`:\n- Section \"Configuration\" for schema and loading order\n- Section \"Repository Configuration\" for `.jit/config.toml` schema\n- Section \"Agent Configuration\" for `~/.config/jit/agent.toml` schema\n\n## Dependencies\n\nRequires Story: Worktree Foundation Infrastructure (paths for config files)",
-  "state": "ready",
+  "state": "done",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "copilot:cli-session",
   "dependencies": [
     "d41c6a08-81ce-491f-8bf9-6aab78febcbf",
     "d1d7c7fc-5fac-4538-b85f-5c558c61804b",
@@ -20,7 +20,33 @@
     "fmt",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-02-02T17:16:37.803866872Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T17:20:52.226062553Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-02-02T17:21:15.656241447Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T17:21:12.443144067Z"
+    },
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T17:21:12.240533859Z"
+    }
+  },
   "context": {},
   "documents": [
     {

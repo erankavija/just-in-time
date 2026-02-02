@@ -288,3 +288,119 @@ proptest! {
             "All threads claiming different issues should succeed");
     }
 }
+
+// Property 8: Staleness computation is consistent
+// A lease is stale iff now - last_beat > stale_threshold_secs
+proptest! {
+    #[test]
+    fn prop_staleness_consistent_with_threshold(
+        secs_since_beat in 0u64..10000u64,
+        threshold in 60u64..7200u64
+    ) {
+        let index = ClaimsIndex {
+            schema_version: 1,
+            generated_at: chrono::Utc::now(),
+            last_seq: 0,
+            stale_threshold_secs: threshold,
+            leases: Vec::new(),
+            sequence_gaps: Vec::new(),
+        };
+
+        // Create a lease with specific last_beat
+        let lease = Lease {
+            lease_id: uuid::Uuid::new_v4().to_string(),
+            issue_id: "test".to_string(),
+            agent_id: "agent:test".to_string(),
+            worktree_id: "wt:test".to_string(),
+            branch: None,
+            ttl_secs: 0, // Indefinite
+            acquired_at: chrono::Utc::now() - chrono::Duration::seconds(secs_since_beat as i64),
+            expires_at: None,
+            last_beat: chrono::Utc::now() - chrono::Duration::seconds(secs_since_beat as i64),
+            stale: false, // Not yet computed
+        };
+
+        let is_stale = index.is_stale(&lease);
+
+        // Staleness should be exactly: elapsed > threshold
+        let expected = secs_since_beat > threshold;
+        prop_assert_eq!(is_stale, expected,
+            "Staleness({}) should equal (secs_since_beat {} > threshold {})",
+            is_stale, secs_since_beat, threshold);
+    }
+}
+
+// Property 9: Finite leases are never stale (use expiration instead)
+proptest! {
+    #[test]
+    fn prop_finite_leases_never_stale(
+        ttl in 1u64..7200u64,
+        secs_since_beat in 0u64..100000u64,
+        threshold in 60u64..7200u64
+    ) {
+        let index = ClaimsIndex {
+            schema_version: 1,
+            generated_at: chrono::Utc::now(),
+            last_seq: 0,
+            stale_threshold_secs: threshold,
+            leases: Vec::new(),
+            sequence_gaps: Vec::new(),
+        };
+
+        // Create a finite lease (ttl > 0)
+        let lease = Lease {
+            lease_id: uuid::Uuid::new_v4().to_string(),
+            issue_id: "test".to_string(),
+            agent_id: "agent:test".to_string(),
+            worktree_id: "wt:test".to_string(),
+            branch: None,
+            ttl_secs: ttl,
+            acquired_at: chrono::Utc::now() - chrono::Duration::seconds(secs_since_beat as i64),
+            expires_at: Some(chrono::Utc::now() + chrono::Duration::seconds(3600)),
+            last_beat: chrono::Utc::now() - chrono::Duration::seconds(secs_since_beat as i64),
+            stale: false,
+        };
+
+        let is_stale = index.is_stale(&lease);
+
+        // Finite leases should never be stale (they use expiration instead)
+        prop_assert!(!is_stale,
+            "Finite lease (ttl={}) should never be stale, regardless of last_beat ({}s ago)",
+            ttl, secs_since_beat);
+    }
+}
+
+// Property 10: Staleness field is correctly set during index rebuild
+proptest! {
+    #[test]
+    fn prop_staleness_computed_during_rebuild(
+        issue_ids in prop::collection::vec(issue_id_strategy(), 1..5)
+    ) {
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp_dir);
+
+        // Acquire indefinite leases
+        for issue_id in &issue_ids {
+            // Use acquire_claim (not with_reason) since this is just for testing
+            // The _with_reason version requires policy params
+            let _ = coordinator.acquire_claim(issue_id, 0);
+        }
+
+        // Rebuild index - staleness should be computed
+        let index = coordinator.rebuild_index_from_log().unwrap();
+
+        for lease in &index.leases {
+            if lease.ttl_secs == 0 {
+                // For indefinite leases, verify stale matches is_stale()
+                let expected_stale = index.is_stale(lease);
+                prop_assert_eq!(lease.stale, expected_stale,
+                    "Lease {} stale field ({}) should match is_stale() ({})",
+                    lease.lease_id, lease.stale, expected_stale);
+            } else {
+                // Finite leases should have stale = false
+                prop_assert!(!lease.stale,
+                    "Finite lease {} should have stale=false", lease.lease_id);
+            }
+        }
+    }
+}

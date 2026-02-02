@@ -46,6 +46,9 @@ pub struct Lease {
     pub expires_at: Option<DateTime<Utc>>,
     /// Last heartbeat timestamp (for indefinite leases)
     pub last_beat: DateTime<Utc>,
+    /// Whether the lease is stale (computed during index rebuild for TTL=0 leases)
+    #[serde(default)]
+    pub stale: bool,
 }
 
 /// Claim operation types for audit log
@@ -61,6 +64,11 @@ pub enum ClaimOp {
     Renew {
         lease_id: String,
         new_expires_at: Option<DateTime<Utc>>,
+        new_last_beat: DateTime<Utc>,
+    },
+    /// Heartbeat for indefinite leases (updates last_beat only)
+    Heartbeat {
+        lease_id: String,
         new_last_beat: DateTime<Utc>,
     },
     /// Release a lease explicitly
@@ -246,6 +254,7 @@ impl ClaimCoordinator {
                 None
             },
             last_beat: now,
+            stale: false,
         };
 
         // 5. Append to audit log
@@ -260,6 +269,198 @@ impl ClaimCoordinator {
 
         // 7. Lock released via RAII
         Ok(lease)
+    }
+
+    /// Acquire a claim with reason validation for indefinite leases.
+    ///
+    /// This is the preferred entry point for acquiring claims when indefinite
+    /// leases (TTL=0) are possible, as it enforces policy requirements.
+    ///
+    /// # Arguments
+    ///
+    /// * `issue_id` - Issue to claim
+    /// * `ttl_secs` - Time-to-live in seconds (0 = indefinite)
+    /// * `reason` - Reason for the claim (required for TTL=0)
+    /// * `max_indefinite_per_agent` - Maximum indefinite leases per agent
+    /// * `max_indefinite_per_repo` - Maximum indefinite leases per repository
+    ///
+    /// # Policy Enforcement
+    ///
+    /// - TTL=0 requires a non-empty reason
+    /// - Per-agent limit enforced from config
+    /// - Per-repo limit enforced from config
+    pub fn acquire_claim_with_reason(
+        &self,
+        issue_id: &str,
+        ttl_secs: u64,
+        reason: Option<&str>,
+        max_indefinite_per_agent: u32,
+        max_indefinite_per_repo: u32,
+    ) -> Result<Lease> {
+        // Policy: TTL=0 requires a reason
+        if ttl_secs == 0 {
+            match reason {
+                None | Some("") => {
+                    bail!(
+                        "Indefinite leases (TTL=0) require --reason flag.\n\
+                         Example: jit claim acquire {} --ttl 0 --reason \"Manual oversight\"",
+                        issue_id
+                    );
+                }
+                Some(_) => {}
+            }
+        }
+
+        // 1. Acquire exclusive lock with metadata for diagnostics
+        let lock_path = self.paths.shared_jit.join("locks/claims.lock");
+        fs::create_dir_all(lock_path.parent().unwrap())?;
+        let _guard = self
+            .locker
+            .lock_exclusive_with_metadata(&lock_path, &self.agent_id)?;
+
+        // 2. Load index and evict expired leases
+        let mut index = self.load_claims_index()?;
+        self.evict_expired(&mut index)?;
+
+        // 3. Check availability
+        if let Some(existing) = index.find_lease(issue_id) {
+            let expires_info = if existing.ttl_secs == 0 {
+                format!("(indefinite lease, last beat: {})", existing.last_beat)
+            } else {
+                format!("until {}", existing.expires_at.unwrap())
+            };
+
+            bail!(
+                "{}",
+                errors::already_claimed(issue_id, &existing.agent_id, &expires_info)
+            );
+        }
+
+        // 4. Policy: Check indefinite lease limits for TTL=0
+        if ttl_secs == 0 {
+            // Per-agent limit
+            let agent_indefinite_count = index
+                .leases
+                .iter()
+                .filter(|l| l.agent_id == self.agent_id && l.ttl_secs == 0)
+                .count() as u32;
+
+            if agent_indefinite_count >= max_indefinite_per_agent {
+                bail!(
+                    "Exceeded per-agent limit for indefinite leases.\n\
+                     Agent {} already has {} indefinite lease(s) (max: {}).\n\
+                     Release an existing indefinite lease or use a finite TTL.",
+                    self.agent_id,
+                    agent_indefinite_count,
+                    max_indefinite_per_agent
+                );
+            }
+
+            // Per-repo limit
+            let repo_indefinite_count =
+                index.leases.iter().filter(|l| l.ttl_secs == 0).count() as u32;
+
+            if repo_indefinite_count >= max_indefinite_per_repo {
+                bail!(
+                    "Exceeded per-repository limit for indefinite leases.\n\
+                     Repository has {} indefinite lease(s) (max: {}).\n\
+                     Wait for leases to be released or use a finite TTL.",
+                    repo_indefinite_count,
+                    max_indefinite_per_repo
+                );
+            }
+        }
+
+        // 5. Create new lease
+        let now = Utc::now();
+        let lease = Lease {
+            lease_id: Uuid::new_v4().to_string(),
+            issue_id: issue_id.to_string(),
+            agent_id: self.agent_id.clone(),
+            worktree_id: self.worktree_id.clone(),
+            branch: self.get_current_branch().ok(),
+            ttl_secs,
+            acquired_at: now,
+            expires_at: if ttl_secs > 0 {
+                Some(now + Duration::seconds(ttl_secs as i64))
+            } else {
+                None
+            },
+            last_beat: now,
+            stale: false,
+        };
+
+        // 6. Append to audit log
+        let op = ClaimOp::Acquire {
+            lease: lease.clone(),
+        };
+        self.append_claim_op(&op)?;
+
+        // 7. Update index atomically
+        index.add_lease(lease.clone());
+        self.write_index_atomic(&index)?;
+
+        // 8. Lock released via RAII
+        Ok(lease)
+    }
+
+    /// Send a heartbeat for an indefinite lease.
+    ///
+    /// Updates `last_beat` without changing expiration. This is used to
+    /// signal that the agent is still active and working on the issue.
+    ///
+    /// # Arguments
+    ///
+    /// * `lease_id` - Lease to heartbeat
+    ///
+    /// # Returns
+    ///
+    /// The updated lease with new `last_beat` timestamp.
+    pub fn heartbeat(&self, lease_id: &str) -> Result<Lease> {
+        // 1. Acquire exclusive lock
+        let lock_path = self.paths.shared_jit.join("locks/claims.lock");
+        fs::create_dir_all(lock_path.parent().unwrap())?;
+        let _guard = self
+            .locker
+            .lock_exclusive_with_metadata(&lock_path, &self.agent_id)?;
+
+        // 2. Load index
+        let mut index = self.load_claims_index()?;
+
+        // 3. Find the lease
+        let lease = index
+            .find_lease_by_id(lease_id)
+            .ok_or_else(|| anyhow::anyhow!("Lease {} not found", lease_id))?
+            .clone();
+
+        // 4. Verify ownership
+        if lease.agent_id != self.agent_id {
+            bail!(
+                "Cannot heartbeat lease {} owned by {} (you are {})",
+                lease_id,
+                lease.agent_id,
+                self.agent_id
+            );
+        }
+
+        // 5. Update last_beat
+        let now = Utc::now();
+        let new_last_beat = now;
+
+        // 6. Append heartbeat operation to log
+        let op = ClaimOp::Heartbeat {
+            lease_id: lease_id.to_string(),
+            new_last_beat,
+        };
+        self.append_claim_op(&op)?;
+
+        // 7. Update index
+        let mut updated_lease = lease;
+        updated_lease.last_beat = new_last_beat;
+        index.add_lease(updated_lease.clone());
+        self.write_index_atomic(&index)?;
+
+        Ok(updated_lease)
     }
 
     /// Load claims index (or create empty if missing)
@@ -698,6 +899,14 @@ impl ClaimCoordinator {
                             lease.last_beat = new_last_beat;
                         }
                     }
+                    ClaimOp::Heartbeat {
+                        lease_id,
+                        new_last_beat,
+                    } => {
+                        if let Some(lease) = active.get_mut(&lease_id) {
+                            lease.last_beat = new_last_beat;
+                        }
+                    }
                     ClaimOp::Release { lease_id, .. }
                     | ClaimOp::AutoEvict { lease_id, .. }
                     | ClaimOp::ForceEvict { lease_id, .. } => {
@@ -709,6 +918,7 @@ impl ClaimCoordinator {
 
         // Filter out expired finite leases
         let now = Utc::now();
+        let stale_threshold_secs = 3600u64; // 1 hour default
         active.retain(|_, lease| {
             if lease.ttl_secs > 0 {
                 // Finite lease - check expiration
@@ -719,12 +929,28 @@ impl ClaimCoordinator {
             }
         });
 
+        // Compute staleness for each lease
+        let leases: Vec<Lease> = active
+            .into_values()
+            .map(|mut lease| {
+                if lease.ttl_secs == 0 {
+                    // Indefinite lease: compute staleness from last_beat
+                    let elapsed = now.signed_duration_since(lease.last_beat);
+                    lease.stale = elapsed.num_seconds() as u64 > stale_threshold_secs;
+                } else {
+                    // Finite lease: not stale (uses expiration instead)
+                    lease.stale = false;
+                }
+                lease
+            })
+            .collect();
+
         Ok(ClaimsIndex {
             schema_version: 1,
             generated_at: Utc::now(),
             last_seq: max_seq,
-            stale_threshold_secs: 3600, // 1 hour default
-            leases: active.into_values().collect(),
+            stale_threshold_secs,
+            leases,
             sequence_gaps,
         })
     }
@@ -976,6 +1202,7 @@ mod tests {
             acquired_at: Utc::now() - Duration::seconds(120),
             expires_at: Some(Utc::now() - Duration::seconds(60)),
             last_beat: Utc::now() - Duration::seconds(120),
+            stale: false,
         };
         index.add_lease(expired_lease);
         coordinator.write_index_atomic(&index).unwrap();
@@ -1349,6 +1576,7 @@ mod tests {
                     acquired_at: Utc::now(),
                     expires_at: Some(Utc::now() + Duration::seconds(600)),
                     last_beat: Utc::now(),
+                    stale: false,
                 },
             },
         };
@@ -1368,6 +1596,7 @@ mod tests {
                     acquired_at: Utc::now(),
                     expires_at: Some(Utc::now() + Duration::seconds(600)),
                     last_beat: Utc::now(),
+                    stale: false,
                 },
             },
         };
@@ -1388,6 +1617,7 @@ mod tests {
                     acquired_at: Utc::now(),
                     expires_at: Some(Utc::now() + Duration::seconds(600)),
                     last_beat: Utc::now(),
+                    stale: false,
                 },
             },
         };
@@ -1434,6 +1664,7 @@ mod tests {
             acquired_at: Utc::now() - Duration::seconds(7200),
             expires_at: None,
             last_beat: Utc::now() - Duration::seconds(7200),
+            stale: true, // would be computed as true by is_stale
         };
         assert!(index.is_stale(&stale_lease));
 
@@ -1448,6 +1679,7 @@ mod tests {
             acquired_at: Utc::now() - Duration::seconds(60),
             expires_at: None,
             last_beat: Utc::now() - Duration::seconds(60),
+            stale: false,
         };
         assert!(!index.is_stale(&fresh_lease));
 
@@ -1462,6 +1694,7 @@ mod tests {
             acquired_at: Utc::now() - Duration::seconds(7200),
             expires_at: Some(Utc::now() + Duration::seconds(600)),
             last_beat: Utc::now() - Duration::seconds(7200),
+            stale: false,
         };
         assert!(!index.is_stale(&finite_lease));
     }
@@ -1549,6 +1782,105 @@ mod tests {
 
         assert!(!lock_path.exists(), "Stale lock should be removed");
         assert!(!meta_path.exists(), "Stale lock metadata should be removed");
+    }
+
+    #[test]
+    fn test_indefinite_lease_per_agent_limit() {
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp_dir);
+
+        // Default limit is 2 indefinite leases per agent
+        // First two should succeed
+        coordinator
+            .acquire_claim_with_reason("issue-1", 0, Some("Manual task 1"), 2, 10)
+            .unwrap();
+        coordinator
+            .acquire_claim_with_reason("issue-2", 0, Some("Manual task 2"), 2, 10)
+            .unwrap();
+
+        // Third should fail - exceeds per-agent limit
+        let result =
+            coordinator.acquire_claim_with_reason("issue-3", 0, Some("Manual task 3"), 2, 10);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("per-agent limit") || err.contains("indefinite"),
+            "Expected per-agent limit error, got: {}",
+            err
+        );
+
+        // But finite TTL should still work
+        coordinator.acquire_claim("issue-4", 600).unwrap();
+    }
+
+    #[test]
+    fn test_indefinite_lease_requires_reason() {
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp_dir);
+
+        // TTL=0 without reason should fail
+        let result = coordinator.acquire_claim_with_reason("issue-1", 0, None, 2, 10);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("reason") || err.contains("--reason"),
+            "Expected reason required error, got: {}",
+            err
+        );
+
+        // TTL=0 with reason should succeed
+        coordinator
+            .acquire_claim_with_reason("issue-1", 0, Some("Manual oversight"), 2, 10)
+            .unwrap();
+    }
+
+    #[test]
+    fn test_heartbeat_operation_updates_last_beat() {
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp_dir);
+
+        // Acquire indefinite lease
+        let lease = coordinator
+            .acquire_claim_with_reason("issue-1", 0, Some("Long task"), 2, 10)
+            .unwrap();
+        let original_beat = lease.last_beat;
+
+        // Wait a bit
+        std::thread::sleep(StdDuration::from_millis(50));
+
+        // Send heartbeat
+        let updated = coordinator.heartbeat(&lease.lease_id).unwrap();
+
+        // last_beat should be updated
+        assert!(
+            updated.last_beat > original_beat,
+            "Heartbeat should update last_beat"
+        );
+        // expires_at should remain None
+        assert!(
+            updated.expires_at.is_none(),
+            "Indefinite lease should not get expiry"
+        );
+    }
+
+    #[test]
+    fn test_heartbeat_logs_to_audit_trail() {
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp_dir);
+
+        let lease = coordinator
+            .acquire_claim_with_reason("issue-1", 0, Some("Manual"), 2, 10)
+            .unwrap();
+
+        coordinator.heartbeat(&lease.lease_id).unwrap();
+
+        // Check audit log contains heartbeat operation
+        let log_path = temp_dir.path().join(".git/jit/claims.jsonl");
+        let content = fs::read_to_string(log_path).unwrap();
+        assert!(
+            content.contains("heartbeat"),
+            "Audit log should contain heartbeat operation"
+        );
     }
 }
 

@@ -2842,6 +2842,38 @@ strategic_types = {}
                     }
                 }
             }
+            ClaimCommands::Heartbeat { lease_id, json } => {
+                use jit::commands::claim::execute_claim_heartbeat;
+                use jit::output::{JsonError, JsonOutput};
+
+                match execute_claim_heartbeat(&lease_id) {
+                    Ok(()) => {
+                        if json {
+                            let response = serde_json::json!({
+                                "lease_id": lease_id,
+                                "message": format!("Heartbeat sent for lease {}", lease_id),
+                            });
+                            let output = JsonOutput::success(response, "claim heartbeat");
+                            println!("{}", output.to_json_string()?);
+                        } else {
+                            println!("✓ Heartbeat sent: {}", lease_id);
+                        }
+                    }
+                    Err(e) => {
+                        if json {
+                            let json_error = JsonError::new(
+                                "CLAIM_HEARTBEAT_ERROR",
+                                e.to_string(),
+                                "claim heartbeat",
+                            );
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
+                        } else {
+                            return Err(e);
+                        }
+                    }
+                }
+            }
             ClaimCommands::Status { issue, agent, json } => {
                 use jit::commands::claim::execute_claim_status;
                 use jit::output::{JsonError, JsonOutput};
@@ -2895,10 +2927,16 @@ strategic_types = {}
                                         since_beat.num_seconds()
                                     );
 
-                                    // Warn if stale (>1 hour since last beat)
-                                    if since_beat.num_seconds() > 3600 {
-                                        println!("  ⚠️  WARNING: Lease may be stale (no heartbeat for {} minutes)", 
-                                            since_beat.num_minutes());
+                                    // Show stale status
+                                    if lease.stale {
+                                        println!(
+                                            "  ⚠️  STALE: Lease marked stale (no heartbeat for {} minutes)",
+                                            since_beat.num_minutes()
+                                        );
+                                        println!(
+                                            "     Use 'jit claim heartbeat {}' to refresh",
+                                            lease.lease_id
+                                        );
                                     }
                                 }
                                 println!();

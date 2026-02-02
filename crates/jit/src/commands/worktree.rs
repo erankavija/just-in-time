@@ -463,6 +463,7 @@ mod tests {
                     acquired_at: Utc::now(),
                     expires_at: None,
                     last_beat: Utc::now(),
+                    stale: false,
                 },
                 Lease {
                     lease_id: "lease-2".to_string(),
@@ -474,6 +475,7 @@ mod tests {
                     acquired_at: Utc::now(),
                     expires_at: None,
                     last_beat: Utc::now(),
+                    stale: false,
                 },
                 Lease {
                     lease_id: "lease-3".to_string(),
@@ -485,6 +487,7 @@ mod tests {
                     acquired_at: Utc::now(),
                     expires_at: None,
                     last_beat: Utc::now(),
+                    stale: false,
                 },
             ],
         };

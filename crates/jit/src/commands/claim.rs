@@ -2,6 +2,7 @@
 //!
 //! Provides CLI interface to the lease-based claim coordination system.
 
+use crate::config::ConfigLoader;
 use crate::storage::worktree_identity::load_or_create_worktree_identity;
 use crate::storage::worktree_paths::WorktreePaths;
 use crate::storage::{ClaimCoordinator, FileLocker, IssueStore, Lease};
@@ -36,7 +37,7 @@ pub fn execute_claim_acquire<S: IssueStore>(
     issue_id: &str,
     ttl_secs: u64,
     agent_id: Option<&str>,
-    _reason: Option<&str>,
+    reason: Option<&str>,
 ) -> Result<String> {
     use crate::agent_config::resolve_agent_id;
 
@@ -62,6 +63,13 @@ pub fn execute_claim_acquire<S: IssueStore>(
     // Resolve agent ID using proper priority: CLI flag > JIT_AGENT_ID > ~/.config/jit/agent.toml > error
     let agent = resolve_agent_id(agent_id.map(|s| s.to_string()))?;
 
+    // Load config for policy limits
+    let config = ConfigLoader::new()
+        .with_repo_config(&paths.local_jit)
+        .unwrap_or_else(|_| ConfigLoader::new())
+        .build();
+    let coord_config = config.coordination();
+
     // Create file locker with 5-second timeout
     let locker = FileLocker::new(Duration::from_secs(5));
 
@@ -76,10 +84,46 @@ pub fn execute_claim_acquire<S: IssueStore>(
     // Initialize control plane if needed
     coordinator.init()?;
 
-    // Acquire claim - coordinator already has agent_id, worktree_id, branch baked in
-    let lease = coordinator.acquire_claim(issue_id, ttl_secs)?;
+    // Acquire claim with reason validation for TTL=0 leases
+    let lease = coordinator.acquire_claim_with_reason(
+        issue_id,
+        ttl_secs,
+        reason,
+        coord_config.max_indefinite_leases_per_agent(),
+        coord_config.max_indefinite_leases_per_repo(),
+    )?;
 
     Ok(lease.lease_id)
+}
+
+/// Execute `jit claim heartbeat` command.
+///
+/// Sends a heartbeat for an indefinite lease to prevent staleness.
+pub fn execute_claim_heartbeat(lease_id: &str) -> Result<()> {
+    use crate::agent_config::resolve_agent_id;
+
+    // Detect worktree context
+    let paths = WorktreePaths::detect()
+        .context("Failed to detect worktree paths - are you in a git repository?")?;
+
+    // Get current branch for identity
+    let branch = get_current_branch()?;
+
+    // Load worktree identity
+    let identity =
+        load_or_create_worktree_identity(&paths.local_jit, &paths.worktree_root, &branch)?;
+
+    // Resolve agent ID
+    let agent = resolve_agent_id(None)?;
+
+    // Create coordinator
+    let locker = FileLocker::new(Duration::from_secs(5));
+    let coordinator = ClaimCoordinator::new(paths, locker, identity.worktree_id, agent);
+
+    // Send heartbeat
+    coordinator.heartbeat(lease_id)?;
+
+    Ok(())
 }
 
 /// Execute `jit claim release` command.
