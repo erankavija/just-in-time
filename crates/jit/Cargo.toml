@@ -34,6 +34,7 @@ pulldown-cmark = "0.9"
 ureq = "2.10"
 tempfile = { workspace = true }
 dirs = "5.0"
+nix = { version = "0.31.1", features = ["signal"] }
 
 [dev-dependencies]
 assert_cmd = { workspace = true }

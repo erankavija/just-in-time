@@ -2,7 +2,7 @@
   "id": "26893ec6-2110-4e2c-b787-45b85664caaa",
   "title": "Implement claims index rebuild from JSONL log",
   "description": "Implement `rebuild_index_from_log()` to reconstruct claims index from append-only JSONL. Verify sequence continuity, apply operations in order, filter expired leases. See design doc section \"Rebuilding\".",
-  "state": "gated",
+  "state": "done",
   "priority": "high",
   "assignee": "agent:copilot-session",
   "dependencies": [
@@ -16,6 +16,16 @@
     "code-review"
   ],
   "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_by": "agent:copilot-session",
+      "updated_at": "2026-02-02T10:16:02.440227559Z"
+    },
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T10:23:46.247300655Z"
+    },
     "tests": {
       "status": "passed",
       "updated_by": "auto:executor",
@@ -26,20 +36,10 @@
       "updated_by": "agent:copilot-session",
       "updated_at": "2026-02-02T10:14:40.024651860Z"
     },
-    "clippy": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-02T10:23:46.247300655Z"
-    },
     "fmt": {
-      "status": "failed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-02T10:23:48.451342966Z"
-    },
-    "code-review": {
       "status": "passed",
-      "updated_by": "agent:copilot-session",
-      "updated_at": "2026-02-02T10:16:02.440227559Z"
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T10:24:38.139683112Z"
     }
   },
   "context": {},

@@ -1317,7 +1317,7 @@ mod tests {
 
         let mut file = fs::OpenOptions::new()
             .create(true)
-            .write(true)
+            .append(true)
             .open(&log_path)
             .unwrap();
 
