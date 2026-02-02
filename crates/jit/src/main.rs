@@ -2123,6 +2123,124 @@ strategic_types = {}
                     println!("Set {} = {} in {}", key, value, config_path.display());
                 }
             }
+            jit::cli::ConfigCommands::Validate { json } => {
+                use jit::config::{ConfigLoader, JitConfig};
+                use jit::output::JsonOutput;
+                use serde_json::json;
+
+                #[derive(Default)]
+                struct ValidationResult {
+                    errors: Vec<String>,
+                    warnings: Vec<String>,
+                }
+
+                let mut result = ValidationResult::default();
+
+                // Check repo config
+                let repo_config_path = jit_dir.join("config.toml");
+                if repo_config_path.exists() {
+                    match JitConfig::load(&jit_dir) {
+                        Ok(cfg) => {
+                            // Check for invalid values
+                            if let Some(ref wt) = cfg.worktree {
+                                if let Err(e) = wt.worktree_mode() {
+                                    result.errors.push(format!("repo config: {}", e));
+                                }
+                                if let Err(e) = wt.enforcement_mode() {
+                                    result.errors.push(format!("repo config: {}", e));
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            result.errors.push(format!("repo config: {}", e));
+                        }
+                    }
+                }
+
+                // Check user config
+                if let Some(home) = dirs::home_dir() {
+                    let user_config_path = home.join(".config/jit/config.toml");
+                    if user_config_path.exists() {
+                        let user_dir = home.join(".config/jit");
+                        match JitConfig::load(&user_dir) {
+                            Ok(cfg) => {
+                                if let Some(ref wt) = cfg.worktree {
+                                    if let Err(e) = wt.worktree_mode() {
+                                        result.errors.push(format!("user config: {}", e));
+                                    }
+                                    if let Err(e) = wt.enforcement_mode() {
+                                        result.errors.push(format!("user config: {}", e));
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                result.errors.push(format!("user config: {}", e));
+                            }
+                        }
+                    }
+                }
+
+                // Check env vars
+                if let Ok(val) = std::env::var("JIT_WORKTREE_MODE") {
+                    if !["auto", "on", "off"].contains(&val.to_lowercase().as_str()) {
+                        result.errors.push(format!(
+                            "JIT_WORKTREE_MODE='{}' is invalid. Use: auto, on, off",
+                            val
+                        ));
+                    }
+                }
+                if let Ok(val) = std::env::var("JIT_ENFORCE_LEASES") {
+                    if !["strict", "warn", "off"].contains(&val.to_lowercase().as_str()) {
+                        result.errors.push(format!(
+                            "JIT_ENFORCE_LEASES='{}' is invalid. Use: strict, warn, off",
+                            val
+                        ));
+                    }
+                }
+
+                // Try to build effective config to catch merge issues
+                let loader = ConfigLoader::new();
+                let _ = loader.with_repo_config(&jit_dir);
+
+                let has_errors = !result.errors.is_empty();
+                let has_warnings = !result.warnings.is_empty();
+
+                if json {
+                    let output = json!({
+                        "valid": !has_errors,
+                        "errors": result.errors,
+                        "warnings": result.warnings,
+                    });
+                    println!(
+                        "{}",
+                        JsonOutput::success(output, "config validate").to_json_string()?
+                    );
+                } else {
+                    if result.errors.is_empty() && result.warnings.is_empty() {
+                        println!("✓ Configuration is valid");
+                    } else {
+                        if !result.errors.is_empty() {
+                            println!("Errors:");
+                            for err in &result.errors {
+                                println!("  ✗ {}", err);
+                            }
+                        }
+                        if !result.warnings.is_empty() {
+                            println!("Warnings:");
+                            for warn in &result.warnings {
+                                println!("  ⚠ {}", warn);
+                            }
+                        }
+                    }
+                }
+
+                // Exit with appropriate code
+                if has_errors {
+                    std::process::exit(1);
+                } else if has_warnings {
+                    std::process::exit(2);
+                }
+            }
             jit::cli::ConfigCommands::ShowHierarchy { json } => {
                 let output_ctx = OutputContext::new(quiet, json);
                 use jit::config_manager::ConfigManager;

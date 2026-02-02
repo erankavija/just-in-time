@@ -1017,6 +1017,23 @@ pub enum ConfigCommands {
         json: bool,
     },
 
+    /// Validate configuration files for errors and warnings
+    ///
+    /// Checks configuration for:
+    /// - Syntax errors in TOML files
+    /// - Invalid values (e.g., unknown mode values)
+    /// - Deprecated options
+    /// - Missing required fields
+    ///
+    /// Exit codes:
+    ///   0 - Valid configuration
+    ///   1 - Errors found (invalid configuration)
+    ///   2 - Warnings only (valid but may cause issues)
+    Validate {
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Show current type hierarchy
     ShowHierarchy {
         #[arg(long)]
