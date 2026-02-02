@@ -245,6 +245,16 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Validate transitive reduction (no redundant dependencies)
         self.validate_transitive_reduction(&graph, &issues)?;
 
+        // Validate claims index (if worktree mode is active)
+        let index_issues = validate_claims_index()
+            .unwrap_or_else(|e| vec![format!("Failed to validate claims index: {}", e)]);
+        if !index_issues.is_empty() {
+            return Err(anyhow!(
+                "Claims index validation failed:\n  {}",
+                index_issues.join("\n  ")
+            ));
+        }
+
         Ok(())
     }
 
@@ -918,6 +928,65 @@ fn check_worktree_exists(worktree_id: &str) -> Result<bool> {
     }
 
     Ok(false)
+}
+
+/// Validate claims index consistency
+///
+/// Checks for:
+/// - Duplicate leases for the same issue
+/// - Schema version mismatches
+/// - Sequence gaps (reported from index)
+///
+/// Returns vector of issues found (empty if valid)
+pub fn validate_claims_index() -> Result<Vec<String>> {
+    use crate::storage::claim_coordinator::ClaimsIndex;
+    use crate::storage::worktree_paths::WorktreePaths;
+    use std::collections::HashSet;
+
+    let paths = WorktreePaths::detect().context("Failed to detect worktree paths")?;
+
+    // Load claims index
+    let claims_index_path = paths.shared_jit.join("claims.index.json");
+    if !claims_index_path.exists() {
+        // No claims index - valid (no claims coordination active)
+        return Ok(vec![]);
+    }
+
+    let contents =
+        std::fs::read_to_string(&claims_index_path).context("Failed to read claims index")?;
+    let index: ClaimsIndex =
+        serde_json::from_str(&contents).context("Failed to parse claims index")?;
+
+    let mut issues = Vec::new();
+
+    // Check schema version
+    if index.schema_version != 1 {
+        issues.push(format!(
+            "Invalid schema version: expected 1, found {}",
+            index.schema_version
+        ));
+    }
+
+    // Check for duplicate leases (same issue claimed twice)
+    let mut seen_issues = HashSet::new();
+    for lease in &index.leases {
+        if !seen_issues.insert(&lease.issue_id) {
+            issues.push(format!(
+                "Duplicate lease detected for issue {}: Multiple leases exist for the same issue",
+                &lease.issue_id[..8.min(lease.issue_id.len())]
+            ));
+        }
+    }
+
+    // Report sequence gaps (if any were detected during rebuild)
+    if !index.sequence_gaps.is_empty() {
+        issues.push(format!(
+            "Sequence gaps detected in claims log: missing sequences {:?}",
+            index.sequence_gaps
+        ));
+    }
+
+    Ok(issues)
 }
 
 #[cfg(test)]
