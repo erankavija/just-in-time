@@ -475,7 +475,21 @@ pub struct EffectiveConfig {
 
 impl EffectiveConfig {
     /// Get the effective worktree mode.
+    /// Priority: env var > repo > user > system > default
     pub fn worktree_mode(&self) -> Result<WorktreeMode> {
+        // Check env var first (highest priority)
+        if let Ok(val) = std::env::var("JIT_WORKTREE_MODE") {
+            return match val.to_lowercase().as_str() {
+                "auto" => Ok(WorktreeMode::Auto),
+                "on" => Ok(WorktreeMode::On),
+                "off" => Ok(WorktreeMode::Off),
+                invalid => anyhow::bail!(
+                    "Invalid JIT_WORKTREE_MODE: '{}'. Valid options: 'auto', 'on', 'off'",
+                    invalid
+                ),
+            };
+        }
+
         // Check repo first, then user, then system
         if let Some(ref cfg) = self.repo_config {
             if let Some(ref wt) = cfg.worktree {
@@ -503,7 +517,21 @@ impl EffectiveConfig {
     }
 
     /// Get the effective enforcement mode.
+    /// Priority: env var > repo > user > system > default
     pub fn enforcement_mode(&self) -> Result<EnforcementMode> {
+        // Check env var first (highest priority)
+        if let Ok(val) = std::env::var("JIT_ENFORCE_LEASES") {
+            return match val.to_lowercase().as_str() {
+                "strict" => Ok(EnforcementMode::Strict),
+                "warn" => Ok(EnforcementMode::Warn),
+                "off" => Ok(EnforcementMode::Off),
+                invalid => anyhow::bail!(
+                    "Invalid JIT_ENFORCE_LEASES: '{}'. Valid options: 'strict', 'warn', 'off'",
+                    invalid
+                ),
+            };
+        }
+
         if let Some(ref cfg) = self.repo_config {
             if let Some(ref wt) = cfg.worktree {
                 if wt.enforce_leases.is_some() {
@@ -526,6 +554,12 @@ impl EffectiveConfig {
             }
         }
         Ok(EnforcementMode::Strict)
+    }
+
+    /// Get the effective agent ID from environment variable.
+    /// Returns None if JIT_AGENT_ID is not set.
+    pub fn agent_id(&self) -> Option<String> {
+        std::env::var("JIT_AGENT_ID").ok()
     }
 
     /// Get effective coordination config with merged values.
@@ -1514,5 +1548,61 @@ enforce_leases = "warn"
 
         assert_eq!(config.worktree_mode().unwrap(), WorktreeMode::On);
         assert_eq!(config.enforcement_mode().unwrap(), EnforcementMode::Warn);
+    }
+
+    // ============================================================
+    // Environment variable override tests (TDD)
+    // ============================================================
+
+    #[test]
+    fn test_env_override_worktree_mode() {
+        std::env::set_var("JIT_WORKTREE_MODE", "off");
+        let config = ConfigLoader::new().build();
+        assert_eq!(config.worktree_mode().unwrap(), WorktreeMode::Off);
+        std::env::remove_var("JIT_WORKTREE_MODE");
+    }
+
+    #[test]
+    fn test_env_override_enforce_leases() {
+        std::env::set_var("JIT_ENFORCE_LEASES", "warn");
+        let config = ConfigLoader::new().build();
+        assert_eq!(config.enforcement_mode().unwrap(), EnforcementMode::Warn);
+        std::env::remove_var("JIT_ENFORCE_LEASES");
+    }
+
+    #[test]
+    fn test_env_override_agent_id() {
+        std::env::set_var("JIT_AGENT_ID", "agent:env-test");
+        let config = ConfigLoader::new().build();
+        assert_eq!(config.agent_id(), Some("agent:env-test".to_string()));
+        std::env::remove_var("JIT_AGENT_ID");
+    }
+
+    #[test]
+    fn test_env_overrides_config_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_toml = r#"
+[worktree]
+mode = "on"
+enforce_leases = "strict"
+"#;
+        std::fs::write(temp_dir.path().join("config.toml"), config_toml).unwrap();
+
+        // Env var should override config file
+        std::env::set_var("JIT_WORKTREE_MODE", "off");
+        let config = ConfigLoader::new()
+            .with_repo_config(temp_dir.path())
+            .unwrap()
+            .build();
+        assert_eq!(config.worktree_mode().unwrap(), WorktreeMode::Off);
+        std::env::remove_var("JIT_WORKTREE_MODE");
+    }
+
+    #[test]
+    fn test_env_invalid_value_returns_error() {
+        std::env::set_var("JIT_WORKTREE_MODE", "invalid");
+        let config = ConfigLoader::new().build();
+        assert!(config.worktree_mode().is_err());
+        std::env::remove_var("JIT_WORKTREE_MODE");
     }
 }
