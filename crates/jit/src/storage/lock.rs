@@ -251,11 +251,7 @@ impl FileLocker {
     /// - The file cannot be opened
     /// - The lock cannot be acquired within the timeout
     /// - Metadata file cannot be written
-    pub fn lock_exclusive_with_metadata(
-        &self,
-        path: &Path,
-        agent_id: &str,
-    ) -> Result<LockGuard> {
+    pub fn lock_exclusive_with_metadata(&self, path: &Path, agent_id: &str) -> Result<LockGuard> {
         let file = self.open_or_create(path)?;
 
         // Try to acquire lock with polling and timeout
@@ -279,7 +275,9 @@ impl FileLocker {
                         serde_json::to_string_pretty(&metadata)
                             .context("Failed to serialize lock metadata")?,
                     )
-                    .with_context(|| format!("Failed to write lock metadata: {}", meta_path.display()))?;
+                    .with_context(|| {
+                        format!("Failed to write lock metadata: {}", meta_path.display())
+                    })?;
 
                     return Ok(LockGuard::new_with_metadata(
                         file,

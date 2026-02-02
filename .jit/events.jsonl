@@ -1311,3 +1311,12 @@
 {"type":"issue_state_changed","id":"1ed1b83b-d231-4fd4-bdec-06d2d3ddf8c1","issue_id":"dacbda85-fe92-46c5-977d-940121c189ed","timestamp":"2026-02-02T10:01:19.554449013Z","from":"ready","to":"in_progress"}
 {"type":"gate_passed","id":"9c5a95c3-c891-4125-b5d4-988e6ed12f10","issue_id":"dacbda85-fe92-46c5-977d-940121c189ed","timestamp":"2026-02-02T10:01:35.028244011Z","gate_key":"tdd-reminder","updated_by":"agent:copilot-session"}
 {"type":"issue_claimed","id":"e182ed97-0ba1-4270-a6b5-af7e593ca207","issue_id":"dacbda85-fe92-46c5-977d-940121c189ed","timestamp":"2026-02-02T10:01:35.031205191Z","assignee":"agent:copilot-session"}
+{"type":"gate_passed","id":"7cc9a49c-0d5a-4756-8ea1-39d95bda1af9","issue_id":"dacbda85-fe92-46c5-977d-940121c189ed","timestamp":"2026-02-02T10:09:56.969618287Z","gate_key":"tests","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"f243c858-1e2d-444f-aba3-ef2781f67ca4","issue_id":"dacbda85-fe92-46c5-977d-940121c189ed","timestamp":"2026-02-02T10:09:59.874592158Z","gate_key":"clippy","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"f2e05943-d315-4389-8c1f-7f23933b8181","issue_id":"dacbda85-fe92-46c5-977d-940121c189ed","timestamp":"2026-02-02T10:10:00.277542293Z","gate_key":"fmt","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"fcb124f3-3ae8-43ad-aa85-e30a37a08e55","issue_id":"dacbda85-fe92-46c5-977d-940121c189ed","timestamp":"2026-02-02T10:11:20.259172336Z","gate_key":"tests","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"306a122a-a07f-491d-a3cb-834033151eec","issue_id":"dacbda85-fe92-46c5-977d-940121c189ed","timestamp":"2026-02-02T10:11:20.461897654Z","gate_key":"clippy","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"f7d758ae-f2d2-4060-bdf8-9771693fbb44","issue_id":"dacbda85-fe92-46c5-977d-940121c189ed","timestamp":"2026-02-02T10:11:20.864721310Z","gate_key":"fmt","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"4ff733be-e962-426e-97b6-2b22f571c95c","issue_id":"dacbda85-fe92-46c5-977d-940121c189ed","timestamp":"2026-02-02T10:11:27.382581324Z","gate_key":"code-review","updated_by":"agent:copilot-session"}
+{"type":"issue_state_changed","id":"2e55faf0-b4e9-49c0-897e-4e2da6b5cdea","issue_id":"dacbda85-fe92-46c5-977d-940121c189ed","timestamp":"2026-02-02T10:13:09.420726328Z","from":"in_progress","to":"gated"}
+{"type":"issue_state_changed","id":"92d52b8f-8e86-41a2-acda-d86a9a659058","issue_id":"dacbda85-fe92-46c5-977d-940121c189ed","timestamp":"2026-02-02T10:13:19.617102145Z","from":"gated","to":"gated"}

@@ -2,7 +2,7 @@
   "id": "dacbda85-fe92-46c5-977d-940121c189ed",
   "title": "Implement lock metadata for diagnostics",
   "description": "Implement lock metadata files (`*.lock.meta`) with PID, agent_id, created_at, and last_updated. Enable diagnosis of stuck processes. Clean up metadata on lock release. See design doc section \"Lock Hygiene and Metadata\".",
-  "state": "in_progress",
+  "state": "gated",
   "priority": "high",
   "assignee": "agent:copilot-session",
   "dependencies": [
@@ -16,30 +16,30 @@
     "code-review"
   ],
   "gates_status": {
-    "fmt": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.071403652Z"
-    },
     "clippy": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.071395422Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T10:11:20.259282906Z"
     },
-    "tests": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.071386722Z"
+    "fmt": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T10:11:20.461997424Z"
     },
     "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.071412002Z"
+      "status": "passed",
+      "updated_by": "agent:copilot-session",
+      "updated_at": "2026-02-02T10:11:27.382416014Z"
     },
     "tdd-reminder": {
       "status": "passed",
       "updated_by": "agent:copilot-session",
       "updated_at": "2026-02-02T10:01:35.028074600Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T10:11:00.344319769Z"
     }
   },
   "context": {},
