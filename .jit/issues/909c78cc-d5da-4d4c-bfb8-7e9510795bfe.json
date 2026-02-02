@@ -2,7 +2,7 @@
   "id": "909c78cc-d5da-4d4c-bfb8-7e9510795bfe",
   "title": "Story: Parallel Work Documentation",
   "description": "Create comprehensive documentation for the parallel work feature including tutorials, how-to guides, and reference documentation.\n\n## Goal\n\nEnable users and agents to successfully adopt parallel multi-agent work through clear, practical documentation.\n\n## Tasks\n\n1. **Tutorial: Parallel Work with Git Worktrees** - Step-by-step guide for first-time setup\n2. **How-To: Multi-Agent Coordination** - Recipes for common coordination patterns\n3. **Reference: Claim Commands** - Complete command reference with all options\n4. **Reference: Configuration Options** - All config settings with defaults and examples\n5. **Troubleshooting Guide** - Common issues and resolutions\n6. **Migration Guide** - Upgrading from single-worktree to parallel mode\n\n## Success Criteria\n\n- New user can set up parallel work in <15 minutes following tutorial\n- All commands documented with examples\n- Configuration options explained with use cases\n- Common errors have documented solutions\n- Documentation follows Diátaxis framework\n\n## References\n\nSee design document `dev/design/worktree-parallel-work.md`:\n- Section \"Example Usage\" for typical workflows\n- Section \"Migration Path\" for phased adoption\n- Full document as technical reference\n\n## Dependencies\n\nRequires all implementation stories complete for accurate documentation",
-  "state": "backlog",
+  "state": "done",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -16,7 +16,13 @@
   "gates_required": [
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-02-02T17:56:14.145407009Z"
+    }
+  },
   "context": {},
   "documents": [
     {

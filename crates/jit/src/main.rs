@@ -2215,21 +2215,19 @@ strategic_types = {}
                         "{}",
                         JsonOutput::success(output, "config validate").to_json_string()?
                     );
+                } else if result.errors.is_empty() && result.warnings.is_empty() {
+                    println!("✓ Configuration is valid");
                 } else {
-                    if result.errors.is_empty() && result.warnings.is_empty() {
-                        println!("✓ Configuration is valid");
-                    } else {
-                        if !result.errors.is_empty() {
-                            println!("Errors:");
-                            for err in &result.errors {
-                                println!("  ✗ {}", err);
-                            }
+                    if !result.errors.is_empty() {
+                        println!("Errors:");
+                        for err in &result.errors {
+                            println!("  ✗ {}", err);
                         }
-                        if !result.warnings.is_empty() {
-                            println!("Warnings:");
-                            for warn in &result.warnings {
-                                println!("  ⚠ {}", warn);
-                            }
+                    }
+                    if !result.warnings.is_empty() {
+                        println!("Warnings:");
+                        for warn in &result.warnings {
+                            println!("  ⚠ {}", warn);
                         }
                     }
                 }
