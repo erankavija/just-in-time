@@ -2,7 +2,7 @@
   "id": "1a7d02ff-4c29-407e-b32a-eaadd96f349f",
   "title": "Write multi-agent coordination how-to guide",
   "description": "Write how-to guide with recipes for common coordination patterns: multiple agents on same machine, long-running work with heartbeat, handoff between agents, recovering from crashes. Place in docs/how-to/.",
-  "state": "ready",
+  "state": "done",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -13,9 +13,9 @@
   ],
   "gates_status": {
     "code-review": {
-      "status": "pending",
+      "status": "passed",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:20.945500733Z"
+      "updated_at": "2026-02-02T17:53:39.602805784Z"
     }
   },
   "context": {},
