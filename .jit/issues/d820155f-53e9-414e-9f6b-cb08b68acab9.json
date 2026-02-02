@@ -2,18 +2,18 @@
   "id": "d820155f-53e9-414e-9f6b-cb08b68acab9",
   "title": "Write guarantees.md (System Guarantees)",
   "description": "Write complete docs/concepts/guarantees.md documenting system invariants and reliability properties.\n\n## Current State\n\nFile exists at docs/concepts/guarantees.md (33 lines) with section headings only:\n- Invariants (DAG Property, Atomic Operations, Event Logging, Git Optional)\n- Consistency Model\n- Failure Modes\n\n## Content Needed\n\n### 1. Invariants (~150-180 lines)\n\n**DAG Property:**\n- Dependencies must form directed acyclic graph\n- No cycles allowed (strictly enforced)\n- How cycle detection works (DFS algorithm)\n- Why this matters (prevents deadlocks)\n- Transitive reduction (minimal edges preferred)\n\n**Atomic Operations:**\n- All file writes use temp + rename pattern\n- Why this provides atomicity (POSIX rename guarantee)\n- Race condition prevention\n- **Multi-agent safety:**\n  - Claim operations are atomic\n  - No lost updates\n  - First-writer-wins semantics\n- **Example:** Two agents claiming simultaneously\n\n**Event Logging:**\n- All state changes logged to .jit/events.jsonl\n- Append-only log (never modified)\n- Complete audit trail\n- **Event types:** state_changed, dependency_added, gate_passed, etc.\n- **Benefits:**\n  - Observability for debugging\n  - Compliance/audit requirements\n  - Undo/replay capabilities (future)\n\n**Git Optional:**\n- Core functionality works without git\n- Document versioning uses git when available\n- Fallback to filesystem for doc show\n- **When git IS required:**\n  - `jit doc show --at <commit>`\n  - `jit doc archive` (git history tracking)\n  - Snapshot export with `--at`\n\n### 2. Consistency Model (~80-100 lines)\n\n- **Eventually consistent** (file-based coordination)\n- **Read-your-own-writes** guarantee (same process)\n- **Concurrent modification semantics:**\n  - Atomic operations serialize updates\n  - Last-writer-wins for non-conflicting fields\n  - Claim operations detect conflicts\n- **What JIT does NOT guarantee:**\n  - Strong consistency across processes\n  - Distributed coordination\n  - Snapshot isolation\n- **Implications for agents:**\n  - Poll-based coordination works\n  - File operations are the synchronization point\n  - No need for distributed locks\n\n### 3. Failure Modes (~80-100 lines)\n\n**Partial Write Recovery:**\n- Atomic operations prevent partial writes\n- Temp files cleaned up on restart\n- No corruption from crashes\n\n**Corrupted JSON Detection:**\n- Validation on read\n- Clear error messages\n- Recovery: restore from git or manual edit\n\n**Lock Timeout Behavior:**\n- No traditional locks used\n- File-based atomicity instead\n- Stale temp files cleaned by validate\n\n**Missing File Handling:**\n- Graceful error messages\n- Suggestions for recovery\n- Validate command detects issues\n\n**Network Errors (External Assets):**\n- Only affects external document references\n- Core functionality unaffected\n- Clear error reporting\n\n**Graceful Degradation:**\n- Missing git → core features still work\n- Corrupted issue → affects only that issue\n- No cascading failures\n\n## Acceptance Criteria\n\n- [ ] All invariants clearly explained (300-400 lines total)\n- [ ] Consistency model documented with examples\n- [ ] Failure modes and recovery strategies covered\n- [ ] Technical details accurate (verify with codebase)\n- [ ] Examples demonstrate guarantees in action\n- [ ] Cross-references to implementation (storage.rs)\n\n## References\n\n- File: docs/concepts/guarantees.md\n- Codebase: crates/jit/src/storage.rs (atomic operations)\n- Codebase: crates/jit/src/graph.rs (cycle detection)\n- Codebase: crates/jit/src/events.rs (event logging)\n- Parent story: c8254dbf (Core Concepts Documentation)",
-  "state": "ready",
+  "state": "done",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:docs-worker",
   "dependencies": [],
   "gates_required": [
     "code-review"
   ],
   "gates_status": {
     "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-02T22:02:40.833698224Z"
+      "status": "passed",
+      "updated_by": "agent:docs-worker",
+      "updated_at": "2026-02-02T21:05:02.139209693Z"
     }
   },
   "context": {},
