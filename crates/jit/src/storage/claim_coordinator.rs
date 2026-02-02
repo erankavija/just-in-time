@@ -1252,11 +1252,11 @@ mod tests {
     fn test_rebuild_detects_sequence_gaps() {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = setup_coordinator(&temp_dir);
-        
+
         // Create log with gap: sequences 1, 2, 4 (missing 3)
         let log_path = temp_dir.path().join(".git/jit/claims.jsonl");
         fs::create_dir_all(log_path.parent().unwrap()).unwrap();
-        
+
         let entry1 = ClaimLogEntry {
             schema_version: 1,
             seq: 1,
@@ -1275,7 +1275,7 @@ mod tests {
                 },
             },
         };
-        
+
         let entry2 = ClaimLogEntry {
             schema_version: 1,
             seq: 2,
@@ -1294,7 +1294,7 @@ mod tests {
                 },
             },
         };
-        
+
         // Skip seq 3, jump to 4
         let entry4 = ClaimLogEntry {
             schema_version: 1,
@@ -1314,26 +1314,29 @@ mod tests {
                 },
             },
         };
-        
+
         let mut file = fs::OpenOptions::new()
             .create(true)
             .write(true)
             .open(&log_path)
             .unwrap();
-        
+
         use std::io::Write;
         writeln!(file, "{}", serde_json::to_string(&entry1).unwrap()).unwrap();
         writeln!(file, "{}", serde_json::to_string(&entry2).unwrap()).unwrap();
         writeln!(file, "{}", serde_json::to_string(&entry4).unwrap()).unwrap();
         drop(file);
-        
+
         // Should succeed but detect gap
         let rebuilt = coordinator.rebuild_index_from_log().unwrap();
-        
+
         // Should still work despite gap
         assert_eq!(rebuilt.leases.len(), 3);
         assert_eq!(rebuilt.last_seq, 4);
-        assert!(rebuilt.sequence_gaps.contains(&3), "Should detect missing sequence 3");
+        assert!(
+            rebuilt.sequence_gaps.contains(&3),
+            "Should detect missing sequence 3"
+        );
     }
 
     #[test]
