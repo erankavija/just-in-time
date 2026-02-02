@@ -30,6 +30,37 @@ const { schema: jitSchema, warnings: schemaWarnings } = await loadSchema(schemaP
 // Create concurrency limiter (max 10 concurrent commands)
 const concurrencyLimiter = new ConcurrencyLimiter(10);
 
+// Server instructions for AI agents
+const SERVER_INSTRUCTIONS = `JIT (Just-In-Time) is a repository-local issue tracker designed for AI agents.
+
+Key concepts:
+- Issues have states: backlog → ready → in_progress → done (or rejected)
+- Dependencies are CRITICAL: use jit_dep_add to express "B needs A done first"
+- Gates are quality checkpoints (tests, clippy, fmt, code-review) that must pass
+- Labels organize issues: type:task/story/epic, epic:*, milestone:*, component:*
+- Claims/leases prevent concurrent edits across multiple agents
+
+Label hierarchy:
+- type:epic → contains stories, has epic:* label for grouping
+- type:story → contains tasks, has story:* label linking to parent
+- type:task → leaf work items, should have epic:* or story:* label
+- type:bug → defects, should link to epic:* for tracking
+
+Common workflows:
+1. Find work: jit_query_available (unassigned ready issues)
+2. Claim issue: jit_issue_claim or jit_claim_acquire  
+3. Check details: jit_issue_show (includes labels, gates, documents)
+4. Check dependencies: jit_graph_deps (what blocks this issue)
+5. Run gates: jit_gate_check-all
+6. Complete: jit_issue_update with state=done
+
+Tips:
+- Short IDs work: "92bf3a9b" instead of full UUID
+- Dependencies matter more than labels for workflow
+- jit_recover cleans up stale locks and corrupted state
+- jit_validate checks repository consistency
+- Always check gates before marking done: jit_gate_check-all`;
+
 // Create MCP server
 const server = new Server(
   {
@@ -40,6 +71,7 @@ const server = new Server(
     capabilities: {
       tools: {},
     },
+    instructions: SERVER_INSTRUCTIONS,
   }
 );
 
