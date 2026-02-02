@@ -2,7 +2,7 @@
   "id": "4114f001-4931-47d3-920c-56be0823b98e",
   "title": "Write configuration options reference",
   "description": "Write reference documentation for all configuration options: repo config, agent config, environment variables. Include defaults, valid values, and examples for each option.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "normal",
   "assignee": null,
   "dependencies": [

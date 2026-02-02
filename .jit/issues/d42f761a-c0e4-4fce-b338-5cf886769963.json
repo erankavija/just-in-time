@@ -2,7 +2,7 @@
   "id": "d42f761a-c0e4-4fce-b338-5cf886769963",
   "title": "Write troubleshooting guide",
   "description": "Write troubleshooting guide covering common issues: stale locks, expired leases, divergence errors, concurrent claim failures, recovery procedures. Include symptoms, causes, and solutions.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "normal",
   "assignee": null,
   "dependencies": [

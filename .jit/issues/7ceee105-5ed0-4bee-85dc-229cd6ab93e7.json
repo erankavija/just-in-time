@@ -2,7 +2,7 @@
   "id": "7ceee105-5ed0-4bee-85dc-229cd6ab93e7",
   "title": "Write jit worktree and validate command reference",
   "description": "Write complete CLI reference for `jit worktree` subcommands (info, list) and `jit validate` flags (--divergence, --leases). Include examples and integration with other commands.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "normal",
   "assignee": null,
   "dependencies": [

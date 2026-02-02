@@ -2,7 +2,7 @@
   "id": "d3676939-edcd-4f33-9d32-787fd46015c2",
   "title": "Write jit claim command reference",
   "description": "Write complete CLI reference for `jit claim` subcommands (acquire, renew, release, force-evict, status, list) with all options, examples, and exit codes. Place in docs/reference/.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "normal",
   "assignee": null,
   "dependencies": [

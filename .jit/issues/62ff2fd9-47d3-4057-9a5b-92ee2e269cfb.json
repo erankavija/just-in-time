@@ -2,7 +2,7 @@
   "id": "62ff2fd9-47d3-4057-9a5b-92ee2e269cfb",
   "title": "Create pre-push hook for lease validation",
   "description": "Create pre-push hook template for strict teams that validates leases referenced in commit trailers are still active and non-stale. Parse JIT-Lease trailer from commits being pushed. Check `.stale != true` in claims index.\n\nSee design doc section \"Pre-Push Hook\".",
-  "state": "gated",
+  "state": "done",
   "priority": "high",
   "assignee": "agent:copilot-session",
   "dependencies": [
@@ -16,30 +16,30 @@
     "code-review"
   ],
   "gates_status": {
-    "fmt": {
-      "status": "failed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-01T23:37:36.649288420Z"
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": "agent:copilot-session",
+      "updated_at": "2026-02-01T23:32:08.667318064Z"
     },
-    "tests": {
+    "fmt": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-02-01T23:37:36.647109419Z"
+      "updated_at": "2026-02-01T23:38:42.499004160Z"
     },
     "code-review": {
       "status": "passed",
       "updated_by": "agent:copilot-session",
       "updated_at": "2026-02-01T23:37:36.650442190Z"
     },
-    "tdd-reminder": {
+    "tests": {
       "status": "passed",
-      "updated_by": "agent:copilot-session",
-      "updated_at": "2026-02-01T23:32:08.667318064Z"
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-01T23:38:21.379895567Z"
     },
     "clippy": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-02-01T23:37:36.648437480Z"
+      "updated_at": "2026-02-01T23:38:40.294623289Z"
     }
   },
   "context": {},

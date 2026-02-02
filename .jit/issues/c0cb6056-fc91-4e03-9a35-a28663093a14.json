@@ -2,7 +2,7 @@
   "id": "c0cb6056-fc91-4e03-9a35-a28663093a14",
   "title": "Write parallel work setup tutorial",
   "description": "Write step-by-step tutorial for setting up parallel work: create worktree, configure agent identity, claim issues, work in isolation, merge back. Target: complete in 15 minutes. Place in docs/tutorials/.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "normal",
   "assignee": null,
   "dependencies": [

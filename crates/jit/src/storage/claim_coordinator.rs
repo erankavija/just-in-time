@@ -200,10 +200,12 @@ impl ClaimCoordinator {
     /// - Lock timeout
     /// - I/O errors
     pub fn acquire_claim(&self, issue_id: &str, ttl_secs: u64) -> Result<Lease> {
-        // 1. Acquire exclusive lock
+        // 1. Acquire exclusive lock with metadata for diagnostics
         let lock_path = self.paths.shared_jit.join("locks/claims.lock");
         fs::create_dir_all(lock_path.parent().unwrap())?;
-        let _guard = self.locker.lock_exclusive(&lock_path)?;
+        let _guard = self
+            .locker
+            .lock_exclusive_with_metadata(&lock_path, &self.agent_id)?;
 
         // 2. Load index and evict expired leases
         let mut index = self.load_claims_index()?;
@@ -412,9 +414,11 @@ impl ClaimCoordinator {
     /// - Lease not owned by current agent
     /// - Lease already expired
     pub fn renew_lease(&self, lease_id: &str, extension_secs: u64) -> Result<Lease> {
-        // 1. Acquire exclusive lock
+        // 1. Acquire exclusive lock with metadata
         let lock_path = self.paths.shared_jit.join("locks/claims.lock");
-        let _guard = self.locker.lock_exclusive(&lock_path)?;
+        let _guard = self
+            .locker
+            .lock_exclusive_with_metadata(&lock_path, &self.agent_id)?;
 
         // 2. Load index and evict expired
         let mut index = self.load_claims_index()?;
@@ -479,9 +483,11 @@ impl ClaimCoordinator {
     /// - Lease not found
     /// - Lease not owned by current agent
     pub fn release_lease(&self, lease_id: &str) -> Result<()> {
-        // 1. Acquire exclusive lock
+        // 1. Acquire exclusive lock with metadata
         let lock_path = self.paths.shared_jit.join("locks/claims.lock");
-        let _guard = self.locker.lock_exclusive(&lock_path)?;
+        let _guard = self
+            .locker
+            .lock_exclusive_with_metadata(&lock_path, &self.agent_id)?;
 
         // 2. Load index
         let mut index = self.load_claims_index()?;
@@ -530,9 +536,11 @@ impl ClaimCoordinator {
     ///
     /// - Lease not found
     pub fn force_evict_lease(&self, lease_id: &str, reason: &str) -> Result<()> {
-        // 1. Acquire exclusive lock
+        // 1. Acquire exclusive lock with metadata
         let lock_path = self.paths.shared_jit.join("locks/claims.lock");
-        let _guard = self.locker.lock_exclusive(&lock_path)?;
+        let _guard = self
+            .locker
+            .lock_exclusive_with_metadata(&lock_path, &self.agent_id)?;
 
         // 2. Load index
         let mut index = self.load_claims_index()?;
@@ -576,9 +584,11 @@ impl ClaimCoordinator {
         issue_id: Option<&str>,
         agent_id: Option<&str>,
     ) -> Result<Vec<Lease>> {
-        // 1. Acquire exclusive lock (needed for evict_expired which writes)
+        // 1. Acquire exclusive lock with metadata (needed for evict_expired which writes)
         let lock_path = self.paths.shared_jit.join("locks/claims.lock");
-        let _guard = self.locker.lock_exclusive(&lock_path)?;
+        let _guard = self
+            .locker
+            .lock_exclusive_with_metadata(&lock_path, &self.agent_id)?;
 
         // 2. Load index and evict expired leases
         let mut index = self.load_claims_index()?;
