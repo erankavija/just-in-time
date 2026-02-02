@@ -131,6 +131,72 @@ function assertEqual(actual, expected, message) {
   }
 }
 
+/**
+ * Extract JSON data from MCP tool response content.
+ * Handles both old format (single text block) and new format (user summary + assistant JSON).
+ */
+function extractJsonFromContent(content) {
+  if (!content || !Array.isArray(content) || content.length === 0) {
+    throw new Error('No content in response');
+  }
+  
+  // Try to find the assistant-targeted content with JSON
+  for (const item of content) {
+    if (item.type === 'text' && item.annotations?.audience?.includes('assistant')) {
+      return JSON.parse(item.text);
+    }
+  }
+  
+  // Fallback: try to find any JSON content (last text block usually has JSON)
+  for (let i = content.length - 1; i >= 0; i--) {
+    const item = content[i];
+    if (item.type === 'text') {
+      try {
+        return JSON.parse(item.text);
+      } catch {
+        // Not JSON, try next
+      }
+    }
+  }
+  
+  throw new Error('No JSON content found in response');
+}
+
+/**
+ * Get the user-facing summary text from content.
+ */
+function getUserSummary(content) {
+  if (!content || !Array.isArray(content) || content.length === 0) {
+    return '';
+  }
+  
+  // Try to find the user-targeted content
+  for (const item of content) {
+    if (item.type === 'text' && item.annotations?.audience?.includes('user')) {
+      return item.text;
+    }
+  }
+  
+  // Fallback to first text block
+  const first = content.find(c => c.type === 'text');
+  return first?.text || '';
+}
+
+/**
+ * Check if response contains an error message anywhere.
+ */
+function responseHasError(response) {
+  if (response.error) return true;
+  if (!response.result?.content) return false;
+  
+  for (const item of response.result.content) {
+    if (item.type === 'text' && (item.text.includes('Error') || item.text.includes('error'))) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // Test suite
 const tests = [
   {
@@ -164,7 +230,7 @@ const tests = [
       // Check for key tools
       const toolNames = response.result.tools.map(t => t.name);
       assert(toolNames.includes('jit_issue_create'), 'Should have jit_issue_create tool');
-      assert(toolNames.includes('jit_issue_list'), 'Should have jit_issue_list tool');
+      assert(toolNames.includes('jit_query_all'), 'Should have jit_query_all tool');
       assert(toolNames.includes('jit_status'), 'Should have jit_status tool');
 
       console.log(`  ✓ Found ${response.result.tools.length} tools`);
@@ -226,7 +292,7 @@ const tests = [
       assert(content.type === 'text', 'Content should be text');
       
       // MCP server unwraps the {success, data} wrapper
-      const output = JSON.parse(content.text);
+      const output = extractJsonFromContent(response.result.content);
       assert(typeof output.total === 'number', 'Should have total count');
       
       console.log(`  ✓ Status: ${output.total} total issues`);
@@ -248,9 +314,7 @@ const tests = [
       assert(response.result, 'Should have result');
       assert(response.result.content, 'Should have content');
       
-      const content = response.result.content[0].text;
-      assert(content.includes('Error') || content.includes('error'), 
-        'Should contain error message');
+      assert(responseHasError(response), 'Should contain error message');
       
       console.log(`  ✓ Error handling works correctly`);
     }
@@ -265,8 +329,7 @@ const tests = [
       });
 
       // Should return error
-      assert(response.error || 
-        (response.result && response.result.content[0].text.includes('Error')),
+      assert(response.error || responseHasError(response),
         'Should return error for invalid tool');
       
       console.log(`  ✓ Invalid tool rejection works`);
@@ -307,7 +370,7 @@ const tests = [
       assert(content.type === 'text', 'Content should be text');
       
       // Parse the output (MCP server unwraps {success, data})
-      const output = JSON.parse(content.text);
+      const output = extractJsonFromContent(response.result.content);
       assert(output.query === 'priority', 'Should echo query');
       assert(typeof output.total === 'number', 'Should have total count');
       assert(Array.isArray(output.results), 'Should have results array');
@@ -328,15 +391,15 @@ const tests = [
       });
 
       assert(response.result, 'Should have result');
-      const text = response.result.content[0].text;
+      const summary = getUserSummary(response.result.content);
       
       // Check if it's specifically a ripgrep-not-installed error
-      if (text.includes('ripgrep') && text.includes('not installed')) {
+      if (summary.includes('ripgrep') && summary.includes('not installed')) {
         console.log(`  ⚠ Regex search skipped (ripgrep not installed)`);
         return;
       }
       
-      const output = JSON.parse(text);
+      const output = extractJsonFromContent(response.result.content);
       assert(Array.isArray(output.results), 'Should have results');
       
       console.log(`  ✓ Regex search works`);
@@ -355,15 +418,15 @@ const tests = [
       });
 
       assert(response.result, 'Should have result');
-      const text = response.result.content[0].text;
+      const summary = getUserSummary(response.result.content);
       
       // Check if it's specifically a ripgrep-not-installed error
-      if (text.includes('ripgrep') && text.includes('not installed')) {
+      if (summary.includes('ripgrep') && summary.includes('not installed')) {
         console.log(`  ⚠ Glob search skipped (ripgrep not installed)`);
         return;
       }
       
-      const output = JSON.parse(text);
+      const output = extractJsonFromContent(response.result.content);
       assert(Array.isArray(output.results), 'Should have results');
       
       // All results should be from .json files (if any results)
