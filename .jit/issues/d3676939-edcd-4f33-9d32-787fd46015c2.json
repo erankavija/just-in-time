@@ -2,9 +2,9 @@
   "id": "d3676939-edcd-4f33-9d32-787fd46015c2",
   "title": "Write jit claim command reference",
   "description": "Write complete CLI reference for `jit claim` subcommands (acquire, renew, release, force-evict, status, list) with all options, examples, and exit codes. Place in docs/reference/.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "copilot:cli-session",
   "dependencies": [
     "730d25b5-f16c-4327-99fd-fb337e65edb9"
   ],
@@ -13,9 +13,9 @@
   ],
   "gates_status": {
     "code-review": {
-      "status": "pending",
+      "status": "passed",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:20.948377644Z"
+      "updated_at": "2026-02-02T17:52:58.661765601Z"
     }
   },
   "context": {},
