@@ -64,6 +64,10 @@ impl<S: IssueStore> CommandExecutor<S> {
             let reduction_fixes = self.fix_all_transitive_reductions(dry_run, quiet)?;
             total_fixes += reduction_fixes;
 
+            // Fix pending state transitions
+            let transition_fixes = self.check_pending_transitions(dry_run, quiet)?;
+            total_fixes += transition_fixes;
+
             if !quiet {
                 if dry_run {
                     println!(
@@ -720,6 +724,72 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         Ok(total_redundancies)
+    }
+
+    /// Check for and fix pending state transitions.
+    ///
+    /// After worktree merges, issues in backlog state may have all dependencies
+    /// completed but never auto-transition to ready. This method detects and fixes
+    /// those pending transitions.
+    ///
+    /// Uses multiple passes to handle cascading transitions (e.g., when tasks complete,
+    /// stories become ready, then epics that depend on those stories also become ready).
+    ///
+    /// # Arguments
+    ///
+    /// * `dry_run` - If true, report what would be fixed without applying changes
+    /// * `quiet` - If true, suppress progress messages
+    ///
+    /// # Returns
+    ///
+    /// Count of issues transitioned (or that would be transitioned if dry_run)
+    fn check_pending_transitions(&mut self, dry_run: bool, quiet: bool) -> Result<usize> {
+        use std::collections::HashMap;
+
+        let mut total_fixed = 0;
+        let max_passes = 10; // Safety limit to prevent infinite loops
+
+        // Keep checking until no more transitions found (cascading transitions)
+        // In dry-run mode, only do one pass since we don't actually change state
+        let num_passes = if dry_run { 1 } else { max_passes };
+
+        for _pass in 0..num_passes {
+            let issues = self.storage.list_issues()?;
+            let resolved: HashMap<String, &Issue> =
+                issues.iter().map(|i| (i.id.clone(), i)).collect();
+
+            // Find backlog issues that should transition to ready
+            let backlog_issues: Vec<_> = issues
+                .iter()
+                .filter(|i| i.state == State::Backlog)
+                .collect();
+
+            let mut pass_fixed = 0;
+            for issue in backlog_issues {
+                if issue.should_auto_transition_to_ready(&resolved) {
+                    if !quiet {
+                        println!(
+                            "  → Transitioning {} to ready (dependencies complete)",
+                            &issue.id[..8.min(issue.id.len())]
+                        );
+                    }
+
+                    if !dry_run {
+                        self.auto_transition_to_ready(&issue.id)?;
+                    }
+                    pass_fixed += 1;
+                }
+            }
+
+            total_fixed += pass_fixed;
+
+            // If no fixes this pass, we're done
+            if pass_fixed == 0 {
+                break;
+            }
+        }
+
+        Ok(total_fixed)
     }
 
     /// Validate branch hasn't diverged from main.
