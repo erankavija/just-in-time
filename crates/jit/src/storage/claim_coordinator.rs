@@ -107,6 +107,9 @@ pub struct ClaimsIndex {
     pub stale_threshold_secs: u64,
     /// Active leases by issue ID
     pub leases: Vec<Lease>,
+    /// Detected sequence gaps (for diagnostics)
+    #[serde(default)]
+    pub sequence_gaps: Vec<u64>,
 }
 
 impl ClaimsIndex {
@@ -268,6 +271,7 @@ impl ClaimCoordinator {
                 last_seq: 0,
                 stale_threshold_secs: 3600, // 1 hour default
                 leases: Vec::new(),
+                sequence_gaps: Vec::new(),
             });
         }
 
@@ -648,6 +652,8 @@ impl ClaimCoordinator {
         let log_path = self.paths.shared_jit.join("claims.jsonl");
         let mut active: HashMap<String, Lease> = HashMap::new();
         let mut max_seq = 0u64;
+        let mut expected_seq = 1u64;
+        let mut sequence_gaps = Vec::new();
 
         if log_path.exists() {
             let file = fs::File::open(&log_path).context("Failed to open claims log")?;
@@ -662,6 +668,18 @@ impl ClaimCoordinator {
                 let entry: ClaimLogEntry =
                     serde_json::from_str(&line).context("Failed to parse claim log entry")?;
 
+                // Check for sequence gaps
+                if entry.seq != expected_seq {
+                    // Detect missing sequences
+                    for missing in expected_seq..entry.seq {
+                        eprintln!(
+                            "Warning: Sequence gap detected - missing sequence {}",
+                            missing
+                        );
+                        sequence_gaps.push(missing);
+                    }
+                }
+                expected_seq = entry.seq + 1;
                 max_seq = max_seq.max(entry.seq);
 
                 match entry.operation {
@@ -705,6 +723,7 @@ impl ClaimCoordinator {
             last_seq: max_seq,
             stale_threshold_secs: 3600, // 1 hour default
             leases: active.into_values().collect(),
+            sequence_gaps,
         })
     }
 }
@@ -1227,6 +1246,94 @@ mod tests {
 
         // Should track last sequence number
         assert_eq!(rebuilt.last_seq, 3);
+    }
+
+    #[test]
+    fn test_rebuild_detects_sequence_gaps() {
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp_dir);
+        
+        // Create log with gap: sequences 1, 2, 4 (missing 3)
+        let log_path = temp_dir.path().join(".git/jit/claims.jsonl");
+        fs::create_dir_all(log_path.parent().unwrap()).unwrap();
+        
+        let entry1 = ClaimLogEntry {
+            schema_version: 1,
+            seq: 1,
+            timestamp: Utc::now(),
+            operation: ClaimOp::Acquire {
+                lease: Lease {
+                    lease_id: "lease-1".to_string(),
+                    issue_id: "issue-1".to_string(),
+                    agent_id: "agent:test".to_string(),
+                    worktree_id: "wt:main".to_string(),
+                    branch: None,
+                    ttl_secs: 600,
+                    acquired_at: Utc::now(),
+                    expires_at: Some(Utc::now() + Duration::seconds(600)),
+                    last_beat: Utc::now(),
+                },
+            },
+        };
+        
+        let entry2 = ClaimLogEntry {
+            schema_version: 1,
+            seq: 2,
+            timestamp: Utc::now(),
+            operation: ClaimOp::Acquire {
+                lease: Lease {
+                    lease_id: "lease-2".to_string(),
+                    issue_id: "issue-2".to_string(),
+                    agent_id: "agent:test".to_string(),
+                    worktree_id: "wt:main".to_string(),
+                    branch: None,
+                    ttl_secs: 600,
+                    acquired_at: Utc::now(),
+                    expires_at: Some(Utc::now() + Duration::seconds(600)),
+                    last_beat: Utc::now(),
+                },
+            },
+        };
+        
+        // Skip seq 3, jump to 4
+        let entry4 = ClaimLogEntry {
+            schema_version: 1,
+            seq: 4,
+            timestamp: Utc::now(),
+            operation: ClaimOp::Acquire {
+                lease: Lease {
+                    lease_id: "lease-3".to_string(),
+                    issue_id: "issue-3".to_string(),
+                    agent_id: "agent:test".to_string(),
+                    worktree_id: "wt:main".to_string(),
+                    branch: None,
+                    ttl_secs: 600,
+                    acquired_at: Utc::now(),
+                    expires_at: Some(Utc::now() + Duration::seconds(600)),
+                    last_beat: Utc::now(),
+                },
+            },
+        };
+        
+        let mut file = fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .open(&log_path)
+            .unwrap();
+        
+        use std::io::Write;
+        writeln!(file, "{}", serde_json::to_string(&entry1).unwrap()).unwrap();
+        writeln!(file, "{}", serde_json::to_string(&entry2).unwrap()).unwrap();
+        writeln!(file, "{}", serde_json::to_string(&entry4).unwrap()).unwrap();
+        drop(file);
+        
+        // Should succeed but detect gap
+        let rebuilt = coordinator.rebuild_index_from_log().unwrap();
+        
+        // Should still work despite gap
+        assert_eq!(rebuilt.leases.len(), 3);
+        assert_eq!(rebuilt.last_seq, 4);
+        assert!(rebuilt.sequence_gaps.contains(&3), "Should detect missing sequence 3");
     }
 
     #[test]

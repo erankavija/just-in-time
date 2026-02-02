@@ -210,6 +210,7 @@ pub fn execute_worktree_list() -> Result<Vec<WorktreeListEntry>> {
             last_seq: 0,
             stale_threshold_secs: 3600,
             leases: vec![],
+            sequence_gaps: Vec::new(),
         }
     };
 
@@ -450,6 +451,7 @@ mod tests {
             generated_at: Utc::now(),
             last_seq: 3,
             stale_threshold_secs: 3600,
+            sequence_gaps: Vec::new(),
             leases: vec![
                 Lease {
                     lease_id: "lease-1".to_string(),

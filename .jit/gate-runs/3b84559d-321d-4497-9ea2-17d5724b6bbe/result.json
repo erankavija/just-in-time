@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "3b84559d-321d-4497-9ea2-17d5724b6bbe",
+  "gate_key": "fmt",
+  "stage": "postcheck",
+  "issue_id": "26893ec6-2110-4e2c-b787-45b85664caaa",
+  "commit": "4993f254553c56fb4c6b48b7aab5056dbb7bc54e",
+  "branch": "feature/worktree-parallel-work",
+  "status": "passed",
+  "started_at": "2026-02-02T10:16:25.812077476Z",
+  "completed_at": "2026-02-02T10:16:26.214409391Z",
+  "duration_ms": 402,
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "",
+  "command": "cargo fmt -- --check",
+  "by": "auto:executor",
+  "message": null
+}
