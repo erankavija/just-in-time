@@ -164,7 +164,7 @@ const tests = [
       // Check for key tools
       const toolNames = response.result.tools.map(t => t.name);
       assert(toolNames.includes('jit_issue_create'), 'Should have jit_issue_create tool');
-      assert(toolNames.includes('jit_issue_list'), 'Should have jit_issue_list tool');
+      assert(toolNames.includes('jit_query_all'), 'Should have jit_query_all tool');
       assert(toolNames.includes('jit_status'), 'Should have jit_status tool');
 
       console.log(`  ✓ Found ${response.result.tools.length} tools`);
