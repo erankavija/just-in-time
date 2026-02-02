@@ -1572,3 +1572,6 @@
 {"type":"gate_passed","id":"0ac0ca7d-66a5-4df5-b731-6a4f65ac1984","issue_id":"d820155f-53e9-414e-9f6b-cb08b68acab9","timestamp":"2026-02-02T21:05:02.139404363Z","gate_key":"code-review","updated_by":"agent:docs-worker"}
 {"type":"issue_state_changed","id":"e0257d9b-fecc-4210-90c3-cf532048cc59","issue_id":"d820155f-53e9-414e-9f6b-cb08b68acab9","timestamp":"2026-02-02T21:05:02.146810705Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"a3a513f0-3949-443e-9828-303e74bf8094","issue_id":"d820155f-53e9-414e-9f6b-cb08b68acab9","timestamp":"2026-02-02T21:05:02.146834805Z"}
+{"type":"gate_passed","id":"99bf8bab-7d11-4d13-a903-a46f21cb4f37","issue_id":"8847805b-9320-4f1f-b9cf-cb7fe9944f7a","timestamp":"2026-02-02T21:35:06.069539962Z","gate_key":"code-review","updated_by":"agent:mcp-worker"}
+{"type":"issue_state_changed","id":"675c9846-c251-4e2e-8f51-b229e6b4dcef","issue_id":"8847805b-9320-4f1f-b9cf-cb7fe9944f7a","timestamp":"2026-02-02T21:35:06.662040081Z","from":"ready","to":"done"}
+{"type":"issue_completed","id":"41262c34-78f1-449c-9d06-f77d7886b96e","issue_id":"8847805b-9320-4f1f-b9cf-cb7fe9944f7a","timestamp":"2026-02-02T21:35:06.662068481Z"}
