@@ -1576,3 +1576,5 @@
 {"type":"issue_claimed","id":"22c5e940-b365-46e4-8ca2-9bafb24eb9b1","issue_id":"8847805b-9320-4f1f-b9cf-cb7fe9944f7a","timestamp":"2026-02-02T21:34:13.937106206Z","assignee":"agent:intruder"}
 {"type":"issue_state_changed","id":"c38f56ba-2c29-4a55-95ac-0c7fe37008e0","issue_id":"c8355d70-4c21-4c96-b8d9-1f8036910368","timestamp":"2026-02-02T21:37:12.676079784Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"c512b316-50ac-4874-9dda-662d322e50c5","issue_id":"c8355d70-4c21-4c96-b8d9-1f8036910368","timestamp":"2026-02-02T21:37:12.679035645Z","assignee":"agent:intruder"}
+{"type":"issue_state_changed","id":"7d554f44-69c2-4d10-a09b-012c65f0d7c8","issue_id":"304573c5-e65e-47e8-923a-f446da8ff6fb","timestamp":"2026-02-02T21:41:49.640699854Z","from":"ready","to":"done"}
+{"type":"issue_completed","id":"202c7ecf-0532-4bf5-89d6-036f6d8cf5ce","issue_id":"304573c5-e65e-47e8-923a-f446da8ff6fb","timestamp":"2026-02-02T21:41:49.640724364Z"}
