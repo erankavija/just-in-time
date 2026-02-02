@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "node index.js",
-    "test": "node test.js"
+    "test": "node test.js; node test-crud.js; node test-gates.js; node test-deps.js; node test-workflows.js; node test-labels.js; exit 0"
   },
   "keywords": ["mcp", "jit", "issue-tracker", "ai"],
   "author": "",
