@@ -281,6 +281,117 @@ git worktree remove ../old-worktree
 # Claims from that worktree will expire naturally
 ```
 
+## Launching Parallel Copilot CLI Agents
+
+This section covers the complete workflow for running multiple Copilot CLI agents in parallel on the same repository.
+
+### Prerequisites
+
+- Git repository with jit initialized
+- Copilot CLI installed
+- Issues available for work (`jit query available`)
+
+### Step-by-Step: Launch Two Parallel Agents
+
+**Terminal 1: Main agent (your current session)**
+
+```bash
+# Already in main worktree
+export JIT_AGENT_ID=agent:main-agent
+# Continue working...
+```
+
+**Terminal 2: Second agent for MCP work**
+
+```bash
+# 1. Create worktree with feature branch
+git worktree add ../jit-mcp-work -b feature/mcp-tests
+
+# 2. Enter worktree and set identity
+cd ../jit-mcp-work
+export JIT_AGENT_ID=agent:mcp-worker
+
+# 3. Verify setup
+jit worktree info
+jit claim list  # See all active claims
+
+# 4. Claim your issue
+jit claim acquire e748afbb  # MCP test coverage issue
+
+# 5. Launch Copilot CLI
+copilot-cli
+```
+
+**Terminal 3: Third agent for documentation**
+
+```bash
+# Same pattern with different identity
+git worktree add ../jit-docs -b feature/docs-tutorial
+cd ../jit-docs
+export JIT_AGENT_ID=agent:docs-worker
+jit claim acquire 84c358ec  # Tutorial documentation
+copilot-cli
+```
+
+### Instructing the Agent
+
+When Copilot CLI starts, give it context:
+
+```
+You are agent:docs-worker. Your task is issue 84c358ec (Tutorial Documentation).
+
+Check the issue with: jit issue show 84c358ec
+Check dependencies with: jit graph deps 84c358ec
+
+Follow the standard workflow:
+1. Understand requirements from issue description
+2. Implement the changes
+3. Run tests/lints
+4. Commit with conventional format
+5. Mark issue done when complete
+6. Release your lease when finished
+```
+
+### Monitoring All Agents
+
+From any terminal:
+
+```bash
+# See all active work
+jit claim list
+
+# Check specific agent
+jit claim status --agent agent:docs-worker
+
+# View work distribution
+jit query all --state in_progress
+```
+
+### Completing Parallel Work
+
+When each agent finishes:
+
+```bash
+# In the agent's worktree
+jit issue update <issue-id> --state done
+git add -A && git commit -m "feat: complete issue description"
+git push origin <branch-name>
+
+# Clean up lease (or let it expire)
+jit claim release <lease-id>
+```
+
+Then merge from main:
+
+```bash
+# Back in main worktree
+git fetch origin
+git merge origin/feature/mcp-tests
+git merge origin/feature/docs-tutorial
+git worktree remove ../jit-mcp-work
+git worktree remove ../jit-docs
+```
+
 ## Best Practices
 
 ### Do
