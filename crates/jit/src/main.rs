@@ -1816,6 +1816,313 @@ strategic_types = {}
             }
         },
         Commands::Config(config_cmd) => match config_cmd {
+            jit::cli::ConfigCommands::Show { json } => {
+                use jit::config::ConfigLoader;
+                use jit::output::JsonOutput;
+                use serde_json::json;
+
+                // Build effective config from all sources
+                let mut loader = ConfigLoader::new();
+
+                // Try to load system config
+                let system_path = std::path::Path::new("/etc/jit");
+                if system_path.exists() {
+                    loader = loader.with_system_config(system_path)?;
+                }
+
+                // Try to load user config
+                if let Some(home) = dirs::home_dir() {
+                    let user_path = home.join(".config/jit");
+                    if user_path.exists() {
+                        loader = loader.with_user_config(&user_path)?;
+                    }
+                }
+
+                // Load repo config
+                loader = loader.with_repo_config(&jit_dir)?;
+
+                let config = loader.build();
+
+                if json {
+                    let output = json!({
+                        "worktree": {
+                            "mode": format!("{:?}", config.worktree_mode().unwrap_or(jit::config::WorktreeMode::Auto)).to_lowercase(),
+                            "enforce_leases": format!("{:?}", config.enforcement_mode().unwrap_or(jit::config::EnforcementMode::Strict)).to_lowercase(),
+                        },
+                        "coordination": {
+                            "default_ttl_secs": config.coordination().default_ttl_secs(),
+                            "heartbeat_interval_secs": config.coordination().heartbeat_interval_secs(),
+                            "lease_renewal_threshold_pct": config.coordination().lease_renewal_threshold_pct(),
+                            "stale_threshold_secs": config.coordination().stale_threshold_secs(),
+                            "max_indefinite_leases_per_agent": config.coordination().max_indefinite_leases_per_agent(),
+                            "max_indefinite_leases_per_repo": config.coordination().max_indefinite_leases_per_repo(),
+                            "auto_renew_leases": config.coordination().auto_renew_leases(),
+                        },
+                        "global_operations": {
+                            "require_main_history": config.global_operations().require_main_history(),
+                            "allowed_branches": config.global_operations().allowed_branches(),
+                        },
+                        "locks": {
+                            "max_age_secs": config.locks().max_age_secs(),
+                            "enable_metadata": config.locks().enable_metadata(),
+                        },
+                        "events": {
+                            "enable_sequences": config.events().enable_sequences(),
+                            "use_unified_envelope": config.events().use_unified_envelope(),
+                        },
+                    });
+                    println!(
+                        "{}",
+                        JsonOutput::success(output, "config show").to_json_string()?
+                    );
+                } else {
+                    println!("Effective Configuration:");
+                    println!();
+                    println!("[worktree]");
+                    println!(
+                        "  mode = {:?}",
+                        config
+                            .worktree_mode()
+                            .unwrap_or(jit::config::WorktreeMode::Auto)
+                    );
+                    println!(
+                        "  enforce_leases = {:?}",
+                        config
+                            .enforcement_mode()
+                            .unwrap_or(jit::config::EnforcementMode::Strict)
+                    );
+                    println!();
+                    println!("[coordination]");
+                    println!(
+                        "  default_ttl_secs = {}",
+                        config.coordination().default_ttl_secs()
+                    );
+                    println!(
+                        "  heartbeat_interval_secs = {}",
+                        config.coordination().heartbeat_interval_secs()
+                    );
+                    println!(
+                        "  lease_renewal_threshold_pct = {}",
+                        config.coordination().lease_renewal_threshold_pct()
+                    );
+                    println!(
+                        "  stale_threshold_secs = {}",
+                        config.coordination().stale_threshold_secs()
+                    );
+                    println!(
+                        "  max_indefinite_leases_per_agent = {}",
+                        config.coordination().max_indefinite_leases_per_agent()
+                    );
+                    println!(
+                        "  max_indefinite_leases_per_repo = {}",
+                        config.coordination().max_indefinite_leases_per_repo()
+                    );
+                    println!(
+                        "  auto_renew_leases = {}",
+                        config.coordination().auto_renew_leases()
+                    );
+                    println!();
+                    println!("[global_operations]");
+                    println!(
+                        "  require_main_history = {}",
+                        config.global_operations().require_main_history()
+                    );
+                    println!(
+                        "  allowed_branches = {:?}",
+                        config.global_operations().allowed_branches()
+                    );
+                    println!();
+                    println!("[locks]");
+                    println!("  max_age_secs = {}", config.locks().max_age_secs());
+                    println!("  enable_metadata = {}", config.locks().enable_metadata());
+                    println!();
+                    println!("[events]");
+                    println!(
+                        "  enable_sequences = {}",
+                        config.events().enable_sequences()
+                    );
+                    println!(
+                        "  use_unified_envelope = {}",
+                        config.events().use_unified_envelope()
+                    );
+                }
+            }
+            jit::cli::ConfigCommands::Get { key, json } => {
+                use jit::config::ConfigLoader;
+                use jit::output::JsonOutput;
+                use serde_json::json;
+
+                // Build effective config
+                let mut loader = ConfigLoader::new();
+                let system_path = std::path::Path::new("/etc/jit");
+                if system_path.exists() {
+                    loader = loader.with_system_config(system_path)?;
+                }
+                if let Some(home) = dirs::home_dir() {
+                    let user_path = home.join(".config/jit");
+                    if user_path.exists() {
+                        loader = loader.with_user_config(&user_path)?;
+                    }
+                }
+                loader = loader.with_repo_config(&jit_dir)?;
+                let config = loader.build();
+
+                // Parse key and get value
+                let value: Option<serde_json::Value> = match key.as_str() {
+                    "worktree.mode" => Some(json!(format!(
+                        "{:?}",
+                        config
+                            .worktree_mode()
+                            .unwrap_or(jit::config::WorktreeMode::Auto)
+                    )
+                    .to_lowercase())),
+                    "worktree.enforce_leases" => Some(json!(format!(
+                        "{:?}",
+                        config
+                            .enforcement_mode()
+                            .unwrap_or(jit::config::EnforcementMode::Strict)
+                    )
+                    .to_lowercase())),
+                    "coordination.default_ttl_secs" => {
+                        Some(json!(config.coordination().default_ttl_secs()))
+                    }
+                    "coordination.heartbeat_interval_secs" => {
+                        Some(json!(config.coordination().heartbeat_interval_secs()))
+                    }
+                    "coordination.lease_renewal_threshold_pct" => {
+                        Some(json!(config.coordination().lease_renewal_threshold_pct()))
+                    }
+                    "coordination.stale_threshold_secs" => {
+                        Some(json!(config.coordination().stale_threshold_secs()))
+                    }
+                    "coordination.max_indefinite_leases_per_agent" => Some(json!(config
+                        .coordination()
+                        .max_indefinite_leases_per_agent())),
+                    "coordination.max_indefinite_leases_per_repo" => Some(json!(config
+                        .coordination()
+                        .max_indefinite_leases_per_repo())),
+                    "coordination.auto_renew_leases" => {
+                        Some(json!(config.coordination().auto_renew_leases()))
+                    }
+                    "global_operations.require_main_history" => {
+                        Some(json!(config.global_operations().require_main_history()))
+                    }
+                    "global_operations.allowed_branches" => {
+                        Some(json!(config.global_operations().allowed_branches()))
+                    }
+                    "locks.max_age_secs" => Some(json!(config.locks().max_age_secs())),
+                    "locks.enable_metadata" => Some(json!(config.locks().enable_metadata())),
+                    "events.enable_sequences" => Some(json!(config.events().enable_sequences())),
+                    "events.use_unified_envelope" => {
+                        Some(json!(config.events().use_unified_envelope()))
+                    }
+                    _ => None,
+                };
+
+                match value {
+                    Some(v) => {
+                        if json {
+                            println!(
+                                "{}",
+                                JsonOutput::success(json!({"key": key, "value": v}), "config get")
+                                    .to_json_string()?
+                            );
+                        } else {
+                            println!("{}", v);
+                        }
+                    }
+                    None => {
+                        anyhow::bail!(
+                            "Unknown config key: {}. Use 'jit config show' to see available keys.",
+                            key
+                        );
+                    }
+                }
+            }
+            jit::cli::ConfigCommands::Set {
+                key,
+                value,
+                global,
+                json,
+            } => {
+                use jit::output::JsonOutput;
+                use serde_json::json;
+                use std::fs;
+
+                // Determine target config file
+                let config_path = if global {
+                    let home = dirs::home_dir()
+                        .ok_or_else(|| anyhow::anyhow!("Could not determine home directory"))?;
+                    let config_dir = home.join(".config/jit");
+                    fs::create_dir_all(&config_dir)?;
+                    config_dir.join("config.toml")
+                } else {
+                    jit_dir.join("config.toml")
+                };
+
+                // Load existing config or create empty
+                let mut doc = if config_path.exists() {
+                    let content = fs::read_to_string(&config_path)?;
+                    content
+                        .parse::<toml_edit::DocumentMut>()
+                        .map_err(|e| anyhow::anyhow!("Failed to parse config: {}", e))?
+                } else {
+                    toml_edit::DocumentMut::new()
+                };
+
+                // Parse key into section.field
+                let parts: Vec<&str> = key.split('.').collect();
+                if parts.len() != 2 {
+                    anyhow::bail!("Config key must be in format 'section.field' (e.g., coordination.default_ttl_secs)");
+                }
+                let section = parts[0];
+                let field = parts[1];
+
+                // Ensure section exists
+                if doc.get(section).is_none() {
+                    doc[section] = toml_edit::Item::Table(toml_edit::Table::new());
+                }
+
+                // Parse and set value based on expected type
+                let parsed_value: toml_edit::Item = match key.as_str() {
+                    k if k.ends_with("_secs") || k.ends_with("_pct") || k.contains("max_") => {
+                        let num: i64 = value
+                            .parse()
+                            .map_err(|_| anyhow::anyhow!("Expected numeric value for {}", key))?;
+                        toml_edit::value(num)
+                    }
+                    k if k.contains("enable_") || k.contains("require_") || k.contains("auto_") => {
+                        let b: bool = value.parse().map_err(|_| {
+                            anyhow::anyhow!("Expected boolean (true/false) for {}", key)
+                        })?;
+                        toml_edit::value(b)
+                    }
+                    _ => toml_edit::value(&value),
+                };
+
+                doc[section][field] = parsed_value;
+
+                // Write back
+                fs::write(&config_path, doc.to_string())?;
+
+                if json {
+                    println!(
+                        "{}",
+                        JsonOutput::success(
+                            json!({
+                                "key": key,
+                                "value": value,
+                                "file": config_path.display().to_string(),
+                                "scope": if global { "user" } else { "repo" }
+                            }),
+                            "config set"
+                        )
+                        .to_json_string()?
+                    );
+                } else {
+                    println!("Set {} = {} in {}", key, value, config_path.display());
+                }
+            }
             jit::cli::ConfigCommands::ShowHierarchy { json } => {
                 let output_ctx = OutputContext::new(quiet, json);
                 use jit::config_manager::ConfigManager;

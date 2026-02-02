@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "28509c4c-2c99-4531-b455-77be4a229ecb",
+  "gate_key": "clippy",
+  "stage": "postcheck",
+  "issue_id": "765f06b2-f0cc-4805-9692-0a80efd77aed",
+  "commit": "889efc401186a805351d985509c405a453a25d37",
+  "branch": "feature/worktree-parallel-work",
+  "status": "passed",
+  "started_at": "2026-02-02T17:03:26.507464171Z",
+  "completed_at": "2026-02-02T17:03:31.013474950Z",
+  "duration_ms": 4506,
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "    Checking toml_edit v0.22.27\n    Checking toml v0.8.23\n    Checking jit v0.2.0 (/home/vkaskivuo/Projects/just-in-time/crates/jit)\n    Checking jit-dispatch v0.1.0 (/home/vkaskivuo/Projects/just-in-time/crates/dispatch)\n    Checking jit-server v0.1.0 (/home/vkaskivuo/Projects/just-in-time/crates/server)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.36s\n",
+  "command": "cargo clippy --lib -- -D warnings",
+  "by": "auto:executor",
+  "message": null
+}

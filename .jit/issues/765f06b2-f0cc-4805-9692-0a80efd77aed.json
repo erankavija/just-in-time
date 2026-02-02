@@ -2,9 +2,9 @@
   "id": "765f06b2-f0cc-4805-9692-0a80efd77aed",
   "title": "Implement jit config show/get/set commands",
   "description": "Implement `jit config show` (display effective config), `jit config get <key>` (get specific value), `jit config set <key> <value>` (set repo-level), `jit config set --global <key> <value>` (set user-level). Support `--json` output.",
-  "state": "ready",
+  "state": "done",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "copilot:cli-session",
   "dependencies": [
     "65e7dccd-a7f0-4274-90c3-2d0a9384005b"
   ],
@@ -17,29 +17,29 @@
   ],
   "gates_status": {
     "fmt": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.082058206Z"
-    },
-    "tdd-reminder": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.082013406Z"
-    },
-    "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.082068046Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T17:08:13.112624749Z"
     },
     "clippy": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.082048626Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T17:08:12.909965451Z"
     },
     "tests": {
-      "status": "pending",
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T17:07:52.995123273Z"
+    },
+    "tdd-reminder": {
+      "status": "passed",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.082038776Z"
+      "updated_at": "2026-02-02T16:55:22.180863174Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-02-02T17:08:50.268078629Z"
     }
   },
   "context": {},

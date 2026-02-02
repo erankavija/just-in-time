@@ -973,6 +973,50 @@ pub enum LabelCommands {
 
 #[derive(Subcommand)]
 pub enum ConfigCommands {
+    /// Show effective configuration from all sources
+    ///
+    /// Displays merged configuration with values from:
+    /// 1. Repository config (.jit/config.toml) - highest priority
+    /// 2. User config (~/.config/jit/config.toml)
+    /// 3. System config (/etc/jit/config.toml)
+    /// 4. Defaults - lowest priority
+    Show {
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Get a specific configuration value
+    ///
+    /// Examples:
+    ///   jit config get coordination.default_ttl_secs
+    ///   jit config get worktree.mode
+    Get {
+        /// Configuration key (e.g., coordination.default_ttl_secs)
+        key: String,
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Set a configuration value
+    ///
+    /// By default, sets value in repository config (.jit/config.toml).
+    /// Use --global to set in user config (~/.config/jit/config.toml).
+    ///
+    /// Examples:
+    ///   jit config set coordination.default_ttl_secs 1200
+    ///   jit config set --global worktree.enforce_leases warn
+    Set {
+        /// Configuration key (e.g., coordination.default_ttl_secs)
+        key: String,
+        /// Value to set
+        value: String,
+        /// Set in user config instead of repository config
+        #[arg(long)]
+        global: bool,
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Show current type hierarchy
     ShowHierarchy {
         #[arg(long)]
