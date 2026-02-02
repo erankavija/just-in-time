@@ -125,6 +125,32 @@ function assert(condition, message) {
   }
 }
 
+/**
+ * Extract JSON data from MCP response content
+ * Handles dual-audience responses where user summary comes first
+ * @param {Array} content - Array of content items from MCP response
+ * @returns {object} Parsed JSON data
+ */
+function extractJsonFromContent(content) {
+  // Look for content with assistant audience annotation, or the last JSON-parseable item
+  for (const item of content) {
+    if (item.annotations?.audience?.includes('assistant')) {
+      return JSON.parse(item.text);
+    }
+  }
+  
+  // Fallback: try to parse the last item (or first if only one)
+  for (let i = content.length - 1; i >= 0; i--) {
+    try {
+      return JSON.parse(content[i].text);
+    } catch {
+      // Not JSON, try previous item
+    }
+  }
+  
+  throw new Error('No JSON content found in response');
+}
+
 function assertEqual(actual, expected, message) {
   if (actual !== expected) {
     throw new Error(`${message}\n  Expected: ${expected}\n  Actual: ${actual}`);
@@ -222,11 +248,8 @@ const tests = [
       assert(response.result.content, 'Should have content');
       assert(response.result.content.length > 0, 'Should have content items');
       
-      const content = response.result.content[0];
-      assert(content.type === 'text', 'Content should be text');
-      
-      // MCP server unwraps the {success, data} wrapper
-      const output = JSON.parse(content.text);
+      // MCP server returns dual-audience content: user summary + assistant JSON
+      const output = extractJsonFromContent(response.result.content);
       assert(typeof output.total === 'number', 'Should have total count');
       
       console.log(`  ✓ Status: ${output.total} total issues`);
@@ -310,11 +333,9 @@ const tests = [
 
       assert(response.result, 'Should have result');
       assert(response.result.content, 'Should have content');
-      const content = response.result.content[0];
-      assert(content.type === 'text', 'Content should be text');
       
-      // Parse the output
-      const output = JSON.parse(content.text);
+      // Parse the output - handles dual-audience responses
+      const output = extractJsonFromContent(response.result.content);
       
       // Check if it's a ripgrep-not-installed error by checking error code
       if (output && output.error && 
@@ -343,15 +364,27 @@ const tests = [
       });
 
       assert(response.result, 'Should have result');
-      const text = response.result.content[0].text;
+      
+      // Use helper for dual-audience responses
+      let output;
+      try {
+        output = extractJsonFromContent(response.result.content);
+      } catch {
+        // If no JSON found, check for ripgrep error in text
+        const text = response.result.content[0]?.text || '';
+        if (text.includes('ripgrep') && text.includes('not installed')) {
+          console.log(`  ⚠ Regex search skipped (ripgrep not installed)`);
+          return;
+        }
+        throw new Error('Unexpected response format');
+      }
       
       // Check if it's specifically a ripgrep-not-installed error
-      if (text.includes('ripgrep') && text.includes('not installed')) {
+      if (output.error && output.error.code === 'RIPGREP_NOT_FOUND') {
         console.log(`  ⚠ Regex search skipped (ripgrep not installed)`);
         return;
       }
       
-      const output = JSON.parse(text);
       assert(Array.isArray(output.results), 'Should have results');
       
       console.log(`  ✓ Regex search works`);
@@ -370,15 +403,27 @@ const tests = [
       });
 
       assert(response.result, 'Should have result');
-      const text = response.result.content[0].text;
+      
+      // Use helper for dual-audience responses
+      let output;
+      try {
+        output = extractJsonFromContent(response.result.content);
+      } catch {
+        // If no JSON found, check for ripgrep error in text
+        const text = response.result.content[0]?.text || '';
+        if (text.includes('ripgrep') && text.includes('not installed')) {
+          console.log(`  ⚠ Glob search skipped (ripgrep not installed)`);
+          return;
+        }
+        throw new Error('Unexpected response format');
+      }
       
       // Check if it's specifically a ripgrep-not-installed error
-      if (text.includes('ripgrep') && text.includes('not installed')) {
+      if (output.error && output.error.code === 'RIPGREP_NOT_FOUND') {
         console.log(`  ⚠ Glob search skipped (ripgrep not installed)`);
         return;
       }
       
-      const output = JSON.parse(text);
       assert(Array.isArray(output.results), 'Should have results');
       
       // All results should be from .json files (if any results)

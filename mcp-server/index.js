@@ -61,6 +61,336 @@ Tips:
 - jit_validate checks repository consistency
 - Always check gates before marking done: jit_gate_check-all`;
 
+/**
+ * Generate a human-readable summary for tool results
+ * @param {string} toolName - The MCP tool name
+ * @param {object} result - The result data
+ * @returns {string} Human-readable summary
+ */
+function generateUserSummary(toolName, result) {
+  // Extract command parts from tool name
+  const parts = toolName.replace('jit_', '').split('_');
+  const command = parts[0];
+  const subcommand = parts.slice(1).join('-');
+  
+  // Handle different command types
+  if (command === 'status') {
+    return `Status: ${result.open || 0} open, ${result.ready || 0} ready, ${result.in_progress || 0} in progress, ${result.done || 0} done, ${result.blocked || 0} blocked`;
+  }
+  
+  if (command === 'issue') {
+    if (subcommand === 'create') {
+      return `Created issue: ${result.id?.substring(0, 8)} - ${result.title}`;
+    }
+    if (subcommand === 'show') {
+      const gates = result.gates_required?.length || 0;
+      const gatesPassed = Object.values(result.gates_status || {}).filter(g => g.status === 'passed').length;
+      return `Issue ${result.id?.substring(0, 8)}: ${result.title} [${result.state}${gates > 0 ? `, ${gatesPassed}/${gates} gates` : ''}]`;
+    }
+    if (subcommand === 'update') {
+      return `Updated issue ${result.id?.substring(0, 8)}: ${result.title} → ${result.state}`;
+    }
+    if (subcommand === 'search') {
+      const count = result.length || result.count || 0;
+      return `Found ${count} issue${count !== 1 ? 's' : ''} matching query`;
+    }
+    if (subcommand === 'claim') {
+      return `Claimed issue ${result.id?.substring(0, 8) || result.issue_id?.substring(0, 8)}`;
+    }
+    if (subcommand === 'claim-next') {
+      if (result.id) {
+        return `Claimed next issue: ${result.id.substring(0, 8)} - ${result.title}`;
+      }
+      return `No issues available to claim`;
+    }
+    if (subcommand === 'delete') {
+      return `Deleted issue ${result.id?.substring(0, 8)}`;
+    }
+  }
+  
+  if (command === 'query') {
+    const count = result.count || result.issues?.length || 0;
+    const queryType = subcommand || 'issues';
+    return `Found ${count} ${queryType === 'all' ? 'issue' : queryType}${count !== 1 ? 's' : ''}`;
+  }
+  
+  if (command === 'gate') {
+    if (subcommand === 'pass' || subcommand === 'fail') {
+      return `Gate ${result.gate_key || 'unknown'} ${subcommand}ed for issue ${result.issue_id?.substring(0, 8)}`;
+    }
+    if (subcommand === 'check') {
+      return `Gate ${result.gate_key}: ${result.status || (result.passed ? 'passed' : 'failed')}`;
+    }
+    if (subcommand === 'check-all') {
+      if (Array.isArray(result)) {
+        const passed = result.filter(g => g.status === 'passed').length;
+        const failed = result.filter(g => g.status === 'failed').length;
+        const total = result.length;
+        if (failed > 0) {
+          return `Gates: ${passed}/${total} passed, ${failed} failed`;
+        }
+        return `All ${total} gates passed`;
+      }
+      return `Gate check completed`;
+    }
+    if (subcommand === 'list' || subcommand === 'define' || subcommand === 'show') {
+      if (result.gates) {
+        return `${result.gates.length} gate definition(s)`;
+      }
+      if (result.key) {
+        return `Gate ${result.key}: ${result.title}`;
+      }
+    }
+    if (subcommand === 'add') {
+      return `Added gate(s) to issue ${result.issue_id?.substring(0, 8) || 'unknown'}`;
+    }
+    if (subcommand === 'remove') {
+      return `Removed gate from issue`;
+    }
+  }
+  
+  if (command === 'dep') {
+    if (subcommand === 'add') {
+      if (result.added_count) {
+        return `Added ${result.added_count} dependenc${result.added_count !== 1 ? 'ies' : 'y'}`;
+      }
+      return `Added dependency: ${result.from_id?.substring(0, 8)} → ${result.to_id?.substring(0, 8)}`;
+    }
+    if (subcommand === 'rm') {
+      return `Removed dependency: ${result.from_id?.substring(0, 8)} ↛ ${result.to_id?.substring(0, 8)}`;
+    }
+  }
+  
+  if (command === 'claim') {
+    if (subcommand === 'acquire') {
+      return `Acquired lease ${result.lease_id?.substring(0, 8)} on issue ${result.issue_id?.substring(0, 8)}`;
+    }
+    if (subcommand === 'release') {
+      return `Released lease ${result.lease_id?.substring(0, 8)}`;
+    }
+    if (subcommand === 'renew') {
+      return `Renewed lease ${result.lease_id?.substring(0, 8)}`;
+    }
+    if (subcommand === 'heartbeat') {
+      return `Heartbeat sent for lease ${result.lease_id?.substring(0, 8)}`;
+    }
+    if (subcommand === 'status') {
+      const count = result.leases?.length || 0;
+      return `${count} active lease${count !== 1 ? 's' : ''}`;
+    }
+    if (subcommand === 'list') {
+      const count = Array.isArray(result) ? result.length : result.leases?.length || 0;
+      return `${count} lease${count !== 1 ? 's' : ''} found`;
+    }
+    if (subcommand === 'force-evict') {
+      return `Force-evicted lease`;
+    }
+  }
+  
+  if (command === 'doc') {
+    if (subcommand === 'list') {
+      const count = result.count || result.documents?.length || 0;
+      return `${count} document${count !== 1 ? 's' : ''} attached`;
+    }
+    if (subcommand === 'add') {
+      return `Added document reference`;
+    }
+    if (subcommand === 'remove') {
+      return `Removed document reference`;
+    }
+    if (subcommand === 'show') {
+      return `Document content retrieved`;
+    }
+    if (subcommand === 'check-links') {
+      const broken = result.broken_links?.length || 0;
+      if (broken === 0) {
+        return `✓ All links valid`;
+      }
+      return `Found ${broken} broken link${broken !== 1 ? 's' : ''}`;
+    }
+  }
+  
+  if (command === 'graph') {
+    if (subcommand === 'deps') {
+      const count = result.dependencies?.length || result.count || 0;
+      return `${count} dependenc${count !== 1 ? 'ies' : 'y'}`;
+    }
+    if (subcommand === 'downstream') {
+      const count = result.dependents?.length || result.count || 0;
+      return `${count} dependent${count !== 1 ? 's' : ''}`;
+    }
+    if (subcommand === 'roots') {
+      const count = Array.isArray(result) ? result.length : result.roots?.length || 0;
+      return `${count} root issue${count !== 1 ? 's' : ''}`;
+    }
+  }
+  
+  if (command === 'validate') {
+    if (result.valid === true) {
+      return `✓ Validation passed`;
+    } else if (result.valid === false) {
+      const validations = result.validations || [];
+      const failed = validations.filter(v => !v.valid);
+      return `✗ Validation failed (${failed.length} issue${failed.length !== 1 ? 's' : ''})`;
+    }
+  }
+  
+  if (command === 'label') {
+    if (subcommand === 'namespaces') {
+      const count = Array.isArray(result) ? result.length : result.namespaces?.length || 0;
+      return `${count} label namespace${count !== 1 ? 's' : ''}`;
+    }
+    if (subcommand === 'values') {
+      const count = Array.isArray(result) ? result.length : result.values?.length || 0;
+      return `${count} value${count !== 1 ? 's' : ''} in namespace`;
+    }
+  }
+  
+  if (command === 'worktree') {
+    if (subcommand === 'info') {
+      return `Worktree: ${result.worktree_id || result.id || 'unknown'}`;
+    }
+    if (subcommand === 'list') {
+      const count = Array.isArray(result) ? result.length : result.worktrees?.length || 0;
+      return `${count} worktree${count !== 1 ? 's' : ''}`;
+    }
+  }
+  
+  if (command === 'recover') {
+    return `Recovery: ${result.stale_locks_cleaned || 0} locks cleaned, ${result.expired_leases_evicted || 0} leases evicted`;
+  }
+  
+  if (command === 'search') {
+    const count = result.results?.length || result.count || (Array.isArray(result) ? result.length : 0);
+    return `Found ${count} result${count !== 1 ? 's' : ''}`;
+  }
+  
+  // Default: try to be smart about the result
+  if (result.message) {
+    return result.message;
+  }
+  
+  if (typeof result === 'string') {
+    return result.length > 100 ? result.substring(0, 97) + '...' : result;
+  }
+  
+  // Generic fallback
+  return `Command ${toolName.replace('jit_', 'jit ').replace(/_/g, ' ')} completed`;
+}
+
+/**
+ * Compact result data for assistant consumption
+ * Reduces context usage by trimming verbose fields and limiting arrays
+ * @param {string} toolName - The MCP tool name
+ * @param {object} result - The full result data
+ * @returns {object} Compacted result
+ */
+function compactForAssistant(toolName, result) {
+  const MAX_ARRAY_ITEMS = 20;
+  const MAX_DESCRIPTION_LENGTH = 200;
+  
+  // Helper to truncate descriptions
+  const truncateDesc = (desc) => {
+    if (!desc || typeof desc !== 'string') return desc;
+    return desc.length > MAX_DESCRIPTION_LENGTH 
+      ? desc.substring(0, MAX_DESCRIPTION_LENGTH) + '...' 
+      : desc;
+  };
+  
+  // Helper to compact an issue object
+  const compactIssue = (issue) => {
+    if (!issue || typeof issue !== 'object') return issue;
+    return {
+      id: issue.id,
+      title: issue.title,
+      state: issue.state,
+      priority: issue.priority,
+      assignee: issue.assignee,
+      labels: issue.labels,
+      // Omit: full description, dependencies list, gates_status details
+    };
+  };
+  
+  // Extract command parts
+  const parts = toolName.replace('jit_', '').split('_');
+  const command = parts[0];
+  const subcommand = parts.slice(1).join('-');
+  
+  // For gate check-all, return summary only (omit huge stdout/stderr)
+  if (command === 'gate' && subcommand === 'check-all') {
+    if (Array.isArray(result)) {
+      return result.map(g => ({
+        gate_key: g.gate_key,
+        status: g.status,
+        duration_ms: g.duration_ms,
+      }));
+    }
+  }
+  
+  // For query commands, compact issues and limit count
+  if (command === 'query') {
+    if (result.issues && Array.isArray(result.issues)) {
+      return {
+        count: result.count,
+        filters: result.filters,
+        issues: result.issues.slice(0, MAX_ARRAY_ITEMS).map(compactIssue),
+        truncated: result.issues.length > MAX_ARRAY_ITEMS,
+      };
+    }
+    if (Array.isArray(result)) {
+      return {
+        count: result.length,
+        issues: result.slice(0, MAX_ARRAY_ITEMS).map(compactIssue),
+        truncated: result.length > MAX_ARRAY_ITEMS,
+      };
+    }
+  }
+  
+  // For issue search, compact results
+  if (command === 'issue' && subcommand === 'search') {
+    if (Array.isArray(result)) {
+      return {
+        count: result.length,
+        issues: result.slice(0, MAX_ARRAY_ITEMS).map(compactIssue),
+        truncated: result.length > MAX_ARRAY_ITEMS,
+      };
+    }
+  }
+  
+  // For graph commands, compact issue data
+  if (command === 'graph') {
+    if (result.dependencies && Array.isArray(result.dependencies)) {
+      return {
+        ...result,
+        dependencies: result.dependencies.slice(0, MAX_ARRAY_ITEMS).map(compactIssue),
+        truncated: result.dependencies.length > MAX_ARRAY_ITEMS,
+      };
+    }
+    if (Array.isArray(result)) {
+      return result.slice(0, MAX_ARRAY_ITEMS).map(compactIssue);
+    }
+  }
+  
+  // For issue show, truncate description
+  if (command === 'issue' && subcommand === 'show') {
+    return {
+      ...result,
+      description: truncateDesc(result.description),
+    };
+  }
+  
+  // Default: return as-is for small results, truncate large arrays
+  if (Array.isArray(result) && result.length > MAX_ARRAY_ITEMS) {
+    return {
+      count: result.length,
+      items: result.slice(0, MAX_ARRAY_ITEMS),
+      truncated: true,
+    };
+  }
+  
+  return result;
+}
+
 // Create MCP server
 const server = new Server(
   {
@@ -184,12 +514,26 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       };
     }
     
-    // Return success
+    // Generate user-friendly summary and compact data for assistant
+    const userSummary = generateUserSummary(name, result.data);
+    const compactData = compactForAssistant(name, result.data);
+    
+    // Return success with dual-audience content
     return {
       content: [
         {
           type: "text",
-          text: JSON.stringify(result.data, null, 2),
+          text: userSummary,
+          annotations: {
+            audience: ["user"],
+          },
+        },
+        {
+          type: "text",
+          text: JSON.stringify(compactData, null, 2),
+          annotations: {
+            audience: ["assistant"],
+          },
         },
       ],
     };
