@@ -2,9 +2,9 @@
   "id": "aeae2290-3acb-4b1b-9e92-755fa8740a6e",
   "title": "Define agent config.toml schema",
   "description": "Define `~/.config/jit/agent.toml` schema with `[agent]` section (id, created_at, description, default_ttl) and `[behavior]` section (auto_heartbeat, heartbeat_interval). See design doc section \"Agent Configuration\".",
-  "state": "ready",
+  "state": "done",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "copilot:cli-session",
   "dependencies": [
     "65e7dccd-a7f0-4274-90c3-2d0a9384005b"
   ],
@@ -16,30 +16,30 @@
     "code-review"
   ],
   "gates_status": {
-    "tests": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.077249524Z"
-    },
     "tdd-reminder": {
-      "status": "pending",
+      "status": "passed",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.077231614Z"
-    },
-    "clippy": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.077258054Z"
+      "updated_at": "2026-02-02T16:39:54.919890902Z"
     },
     "code-review": {
-      "status": "pending",
+      "status": "passed",
       "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.077277914Z"
+      "updated_at": "2026-02-02T16:45:37.085394307Z"
     },
     "fmt": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.077269394Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T16:42:00.442606335Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T16:41:38.322832476Z"
+    },
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T16:41:58.138119045Z"
     }
   },
   "context": {},

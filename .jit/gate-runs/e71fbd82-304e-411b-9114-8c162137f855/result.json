@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "e71fbd82-304e-411b-9114-8c162137f855",
+  "gate_key": "fmt",
+  "stage": "postcheck",
+  "issue_id": "aeae2290-3acb-4b1b-9e92-755fa8740a6e",
+  "commit": "98807071af83d74b7ec050d12b12f17aa3cdfc65",
+  "branch": "feature/worktree-parallel-work",
+  "status": "failed",
+  "started_at": "2026-02-02T16:41:28.171506312Z",
+  "completed_at": "2026-02-02T16:41:28.574257677Z",
+  "duration_ms": 402,
+  "exit_code": 1,
+  "stdout": "Diff in /home/vkaskivuo/Projects/just-in-time/crates/jit/src/config.rs:369:\n             return Ok(None);\n         }\n \n\u001b[31m-        let content =\n\u001b[m\u000f\u001b[31m-            std::fs::read_to_string(&config_path).context(\"Failed to read agent.toml\")?;\n\u001b[m\u000f\u001b[32m+        let content = std::fs::read_to_string(&config_path).context(\"Failed to read agent.toml\")?;\n\u001b[m\u000f \n\u001b[31m-        let config: AgentConfig =\n\u001b[m\u000f\u001b[31m-            toml::from_str(&content).context(\"Failed to parse agent.toml\")?;\n\u001b[m\u000f\u001b[32m+        let config: AgentConfig = toml::from_str(&content).context(\"Failed to parse agent.toml\")?;\n\u001b[m\u000f \n         Ok(Some(config))\n     }\nDiff in /home/vkaskivuo/Projects/just-in-time/crates/jit/src/config.rs:935:\n         let config: AgentConfig = toml::from_str(config_toml).unwrap();\n \n         assert_eq!(config.agent.id, \"agent:copilot-1\");\n\u001b[31m-        assert_eq!(config.agent.created_at, Some(\"2026-01-03T12:00:00Z\".to_string()));\n\u001b[m\u000f\u001b[31m-        assert_eq!(config.agent.description, Some(\"GitHub Copilot Workspace Session 1\".to_string()));\n\u001b[m\u000f\u001b[32m+        assert_eq!(\n\u001b[m\u000f\u001b[32m+            config.agent.created_at,\n\u001b[m\u000f\u001b[32m+            Some(\"2026-01-03T12:00:00Z\".to_string())\n\u001b[m\u000f\u001b[32m+        );\n\u001b[m\u000f\u001b[32m+        assert_eq!(\n\u001b[m\u000f\u001b[32m+            config.agent.description,\n\u001b[m\u000f\u001b[32m+            Some(\"GitHub Copilot Workspace Session 1\".to_string())\n\u001b[m\u000f\u001b[32m+        );\n\u001b[m\u000f         assert_eq!(config.agent.default_ttl_secs, Some(900));\n \n         let behavior = config.behavior.unwrap();\n",
+  "stderr": "",
+  "command": "cargo fmt -- --check",
+  "by": "auto:executor",
+  "message": null
+}

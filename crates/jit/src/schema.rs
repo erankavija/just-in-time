@@ -308,21 +308,29 @@ impl CommandSchema {
             "issue_update" => (Some(schema_to_value::<Issue>()), "Issue"),
 
             // Query commands
-            "query_available" | "query_all" | "query_ready" | "query_strategic" | "query_closed" => {
-                (Some(schema_to_value::<IssueListResponse>()), "IssueListResponse")
-            }
+            "query_available" | "query_all" | "query_ready" | "query_strategic"
+            | "query_closed" => (
+                Some(schema_to_value::<IssueListResponse>()),
+                "IssueListResponse",
+            ),
             "query_blocked" => (
                 Some(schema_to_value::<BlockedListResponse>()),
                 "BlockedListResponse",
             ),
 
             // Graph commands
-            "graph_deps" => (Some(schema_to_value::<GraphDepsResponse>()), "GraphDepsResponse"),
+            "graph_deps" => (
+                Some(schema_to_value::<GraphDepsResponse>()),
+                "GraphDepsResponse",
+            ),
             "graph_downstream" => (
                 Some(schema_to_value::<GraphDownstreamResponse>()),
                 "GraphDownstreamResponse",
             ),
-            "graph_roots" => (Some(schema_to_value::<GraphRootsResponse>()), "GraphRootsResponse"),
+            "graph_roots" => (
+                Some(schema_to_value::<GraphRootsResponse>()),
+                "GraphRootsResponse",
+            ),
 
             // Registry commands
             "registry_list" | "gate_list" => (

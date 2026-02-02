@@ -764,10 +764,7 @@ mod tests {
     #[test]
     fn test_ready_query_response_serialization() {
         let issues = vec![test_minimal_issue()];
-        let response = ReadyQueryResponse {
-            issues,
-            count: 1,
-        };
+        let response = ReadyQueryResponse { issues, count: 1 };
 
         let json_output = JsonOutput::success(response, "query ready");
         let serialized = json_output.to_json_string().unwrap();

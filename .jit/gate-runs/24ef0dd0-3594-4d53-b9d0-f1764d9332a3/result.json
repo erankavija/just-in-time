@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "24ef0dd0-3594-4d53-b9d0-f1764d9332a3",
+  "gate_key": "clippy",
+  "stage": "postcheck",
+  "issue_id": "3a043943-7f75-40a9-8cf1-13592e903972",
+  "commit": "98807071af83d74b7ec050d12b12f17aa3cdfc65",
+  "branch": "feature/worktree-parallel-work",
+  "status": "passed",
+  "started_at": "2026-02-02T16:34:00.802191739Z",
+  "completed_at": "2026-02-02T16:34:03.106330378Z",
+  "duration_ms": 2304,
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "    Checking jit v0.2.0 (/home/vkaskivuo/Projects/just-in-time/crates/jit)\n    Checking jit-server v0.1.0 (/home/vkaskivuo/Projects/just-in-time/crates/server)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.14s\n",
+  "command": "cargo clippy --lib -- -D warnings",
+  "by": "auto:executor",
+  "message": null
+}
