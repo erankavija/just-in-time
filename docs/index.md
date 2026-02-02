@@ -17,8 +17,9 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 ### 🎓 [Tutorials](tutorials/) - Learning-Oriented
 *Step-by-step lessons to get started*
 
-- [Quickstart](tutorials/quickstart.md) - Get started in 10 minutes (draft)
-- [First Workflow](tutorials/first-workflow.md) - Complete walkthrough (draft)
+- [Quickstart](tutorials/quickstart.md) - Get started in 10 minutes
+- [First Workflow](tutorials/first-workflow.md) - Complete walkthrough with epic → tasks workflow
+- [Parallel Work with Git Worktrees](tutorials/parallel-work-worktrees.md) - Multi-agent coordination
 
 ### 🔧 [How-To Guides](how-to/) - Goal-Oriented
 *Practical recipes for specific use cases*
@@ -49,7 +50,7 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 ## Getting Started
 
 1. **New to JIT?** Start with [Concepts](concepts/) to understand the core model
-2. **Want to try it?** Follow the [Tutorials](tutorials/) (coming in Phase 2)
+2. **Want to try it?** Follow the [Tutorials](tutorials/)
 3. **Solving a specific problem?** Check [How-To Guides](how-to/)
 4. **Need technical details?** See [Reference](reference/)
 
