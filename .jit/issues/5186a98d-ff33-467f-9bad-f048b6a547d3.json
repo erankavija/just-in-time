@@ -1,0 +1,51 @@
+{
+  "id": "5186a98d-ff33-467f-9bad-f048b6a547d3",
+  "title": "Implement worktree identity generation and persistence",
+  "description": "Implement deterministic worktree ID generation (hash of absolute path + creation timestamp, truncated to 8 hex chars). Persist in `<worktree>/.jit/worktree.json` with schema version, branch, root path, and created_at. Handle worktree relocation detection. See design doc section \"Worktree Identity\".",
+  "state": "done",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "tdd-reminder",
+    "tests",
+    "clippy",
+    "fmt",
+    "code-review"
+  ],
+  "gates_status": {
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-06T20:24:19.825017846Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "agent:copilot-worktree-foundation",
+      "updated_at": "2026-01-06T20:24:17.462388833Z"
+    },
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-06T20:24:19.054916706Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-06T20:24:18.441096631Z"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-01-06T20:24:21.499749577Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "epic:parallel-work",
+    "milestone:v1.0",
+    "component:storage",
+    "type:task"
+  ]
+}

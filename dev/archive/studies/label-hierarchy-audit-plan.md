@@ -320,7 +320,7 @@ Should be: main.rs uses `use jit::labels;`
   jit issue create --label "type:epic" --label "milestone:v1.0" --title "Test Epic"
   
   # 3. Query by label
-  jit query label "milestone:*"
+  jit query all --label "milestone:*"
   
   # 4. List namespaces
   jit label namespaces

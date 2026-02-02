@@ -1,0 +1,60 @@
+{
+  "id": "82b17394-a36b-4093-98aa-703f678d48c4",
+  "title": "Implement CLI-level lease enforcement",
+  "description": "Add `require_active_lease()` check in `CommandExecutor` before structural operations that modify existing issues: update/delete issue, add/remove deps, add/remove gates, change state.\n\n**IMPORTANT:** Issue creation (`jit issue create`) is EXEMPTED from lease requirement because it allocates a new ULID that cannot conflict. See design doc section \"Issue Creation Workflow\".\n\nSupport configurable enforcement modes (off/warn/strict). See design doc sections \"CLI-Level Enforcement\" and \"Read vs Write Operations\".",
+  "state": "done",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "b74af86f-388d-49a2-a172-bc9fdaa7bb9c"
+  ],
+  "gates_required": [
+    "tdd-reminder",
+    "tests",
+    "clippy",
+    "fmt",
+    "code-review"
+  ],
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-02-01T21:57:56.087191798Z"
+    },
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-01T21:57:04.854595950Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-01T21:56:38.509303963Z"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-02-01T21:57:10.135537011Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-01T21:57:09.610794271Z"
+    }
+  },
+  "context": {},
+  "documents": [
+    {
+      "path": "dev/sessions/session-20260201-cli-enforcement-82b17394.md",
+      "commit": null,
+      "label": "Implementation plan",
+      "doc_type": "notes"
+    }
+  ],
+  "labels": [
+    "epic:parallel-work",
+    "milestone:v1.0",
+    "component:cli",
+    "type:task"
+  ]
+}

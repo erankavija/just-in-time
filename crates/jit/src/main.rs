@@ -17,8 +17,8 @@ mod output_macros;
 use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 use jit::cli::{
-    Cli, Commands, DepCommands, DocCommands, EventCommands, GateCommands, GraphCommands,
-    IssueCommands, RegistryCommands,
+    ClaimCommands, Cli, Commands, DepCommands, DocCommands, EventCommands, GateCommands,
+    GraphCommands, IssueCommands, RegistryCommands,
 };
 use jit::commands::{parse_priority, parse_state, CommandExecutor};
 use jit::output::{ExitCode, JsonOutput, OutputContext};
@@ -223,46 +223,6 @@ strategic_types = {}
                                     }
                                 }
                             }
-                        }
-                    }
-                }
-                IssueCommands::List {
-                    state,
-                    assignee,
-                    priority,
-                    json,
-                } => {
-                    let state_filter = state.map(|s| parse_state(&s)).transpose()?;
-                    let priority_filter = priority.map(|p| parse_priority(&p)).transpose()?;
-                    let issues = executor.list_issues(state_filter, assignee, priority_filter)?;
-
-                    if json {
-                        use jit::output::JsonOutput;
-                        use serde_json::json;
-
-                        // Count issues by state
-                        let mut state_counts = std::collections::HashMap::new();
-                        for issue in &issues {
-                            *state_counts.entry(issue.state).or_insert(0) += 1;
-                        }
-
-                        let output = JsonOutput::success(
-                            json!({
-                                "issues": issues,
-                                "summary": {
-                                    "total": issues.len(),
-                                    "by_state": state_counts,
-                                }
-                            }),
-                            "issue list",
-                        );
-                        println!("{}", output.to_json_string()?);
-                    } else {
-                        for issue in issues {
-                            println!(
-                                "{} | {} | {:?} | {:?}",
-                                issue.id, issue.title, issue.state, issue.priority
-                            );
                         }
                     }
                 }
@@ -1209,11 +1169,14 @@ strategic_types = {}
                 if let Some(issue_id) = id {
                     let issues = executor.show_graph(&issue_id)?;
                     if json {
+                        use jit::domain::MinimalIssue;
                         use jit::output::{GraphShowResponse, JsonOutput};
 
+                        let minimal_issues: Vec<MinimalIssue> =
+                            issues.iter().map(MinimalIssue::from).collect();
                         let response = GraphShowResponse {
                             issue_id: issue_id.clone(),
-                            dependencies: issues.clone(),
+                            dependencies: minimal_issues,
                             count: issues.len(),
                         };
                         let output = JsonOutput::success(response, "graph show");
@@ -1263,15 +1226,57 @@ strategic_types = {}
                     }
                 }
             }
+            GraphCommands::Deps {
+                id,
+                transitive,
+                json,
+            } => {
+                let output_ctx = OutputContext::new(quiet, json);
+                let issues = executor.show_dependencies(&id, transitive)?;
+                if json {
+                    use jit::domain::MinimalIssue;
+                    use jit::output::{GraphDepsResponse, JsonOutput};
+
+                    let minimal_issues: Vec<MinimalIssue> =
+                        issues.iter().map(MinimalIssue::from).collect();
+                    let response = GraphDepsResponse {
+                        issue_id: id.clone(),
+                        dependencies: minimal_issues,
+                        count: issues.len(),
+                        transitive,
+                        truncated: false,
+                    };
+                    let output = JsonOutput::success(response, "graph deps");
+                    println!("{}", output.to_json_string()?);
+                } else {
+                    if transitive {
+                        let _ = output_ctx
+                            .print_info(format!("All dependencies of {} (transitive):", id));
+                    } else {
+                        let _ =
+                            output_ctx.print_info(format!("Dependencies of {} (immediate):", id));
+                    }
+                    if issues.is_empty() {
+                        println!("  (none)");
+                    } else {
+                        for issue in issues {
+                            println!("  {} | {}", issue.id, issue.title);
+                        }
+                    }
+                }
+            }
             GraphCommands::Downstream { id, json } => {
                 let output_ctx = OutputContext::new(quiet, json);
                 let issues = executor.show_downstream(&id)?;
                 if json {
+                    use jit::domain::MinimalIssue;
                     use jit::output::{GraphDownstreamResponse, JsonOutput};
 
+                    let minimal_issues: Vec<MinimalIssue> =
+                        issues.iter().map(MinimalIssue::from).collect();
                     let response = GraphDownstreamResponse {
                         issue_id: id.clone(),
-                        dependents: issues.clone(),
+                        dependents: minimal_issues,
                         count: issues.len(),
                     };
                     let output = JsonOutput::success(response, "graph downstream");
@@ -1287,10 +1292,13 @@ strategic_types = {}
                 let output_ctx = OutputContext::new(quiet, json);
                 let issues = executor.show_roots()?;
                 if json {
+                    use jit::domain::MinimalIssue;
                     use jit::output::{GraphRootsResponse, JsonOutput};
 
+                    let minimal_issues: Vec<MinimalIssue> =
+                        issues.iter().map(MinimalIssue::from).collect();
                     let response = GraphRootsResponse {
-                        roots: issues.clone(),
+                        roots: minimal_issues,
                         count: issues.len(),
                     };
                     let output = JsonOutput::success(response, "graph roots");
@@ -1485,64 +1493,184 @@ strategic_types = {}
             }
         },
         Commands::Query(query_cmd) => match query_cmd {
-            jit::cli::QueryCommands::Ready { json } => {
+            jit::cli::QueryCommands::All {
+                state,
+                assignee,
+                priority,
+                label,
+                full,
+                json,
+            } => {
                 let output_ctx = OutputContext::new(quiet, json);
-                let issues = executor.query_ready()?;
-                if json {
-                    use jit::output::{JsonOutput, ReadyQueryResponse};
+                let state_filter = state.as_ref().map(|s| parse_state(s)).transpose()?;
+                let priority_filter = priority.as_ref().map(|p| parse_priority(p)).transpose()?;
+                let issues = executor.query_all(
+                    state_filter,
+                    assignee.as_deref(),
+                    priority_filter,
+                    label.as_deref(),
+                )?;
 
-                    let response = ReadyQueryResponse {
-                        issues: issues.clone(),
-                        count: issues.len(),
+                if json {
+                    use jit::domain::MinimalIssue;
+                    use jit::output::JsonOutput;
+                    use serde_json::json;
+
+                    let output = if full {
+                        JsonOutput::success(
+                            json!({
+                                "count": issues.len(),
+                                "issues": issues,
+                                "filters": {
+                                    "state": state,
+                                    "assignee": assignee,
+                                    "priority": priority,
+                                    "label": label,
+                                }
+                            }),
+                            "query all",
+                        )
+                    } else {
+                        let minimal: Vec<MinimalIssue> =
+                            issues.iter().map(MinimalIssue::from).collect();
+                        JsonOutput::success(
+                            json!({
+                                "count": minimal.len(),
+                                "issues": minimal,
+                                "filters": {
+                                    "state": state,
+                                    "assignee": assignee,
+                                    "priority": priority,
+                                    "label": label,
+                                }
+                            }),
+                            "query all",
+                        )
                     };
-                    let output = JsonOutput::success(response, "registry show");
                     println!("{}", output.to_json_string()?);
                 } else {
-                    let _ = output_ctx.print_info("Ready issues (unassigned, unblocked):");
+                    let _ = output_ctx.print_info("All issues (filtered):");
+                    for issue in &issues {
+                        println!(
+                            "  {} | {} | {:?} | {:?}",
+                            issue.id, issue.title, issue.state, issue.priority
+                        );
+                    }
+                    let _ = output_ctx.print_info(format!("\nTotal: {}", issues.len()));
+                }
+            }
+            jit::cli::QueryCommands::Available {
+                priority,
+                label,
+                full,
+                json,
+            } => {
+                let output_ctx = OutputContext::new(quiet, json);
+                let priority_filter = priority.as_ref().map(|p| parse_priority(p)).transpose()?;
+                let issues = executor.query_available(priority_filter, label.as_deref())?;
+
+                if json {
+                    use jit::domain::MinimalIssue;
+                    use jit::output::JsonOutput;
+                    use serde_json::json;
+
+                    let output = if full {
+                        JsonOutput::success(
+                            json!({
+                                "count": issues.len(),
+                                "issues": issues,
+                            }),
+                            "query available",
+                        )
+                    } else {
+                        let minimal: Vec<MinimalIssue> =
+                            issues.iter().map(MinimalIssue::from).collect();
+                        JsonOutput::success(
+                            json!({
+                                "count": minimal.len(),
+                                "issues": minimal,
+                            }),
+                            "query available",
+                        )
+                    };
+                    println!("{}", output.to_json_string()?);
+                } else {
+                    let _ = output_ctx.print_info("Available issues (unassigned, unblocked):");
                     for issue in &issues {
                         println!("  {} | {} | {:?}", issue.id, issue.title, issue.priority);
                     }
                     let _ = output_ctx.print_info(format!("\nTotal: {}", issues.len()));
                 }
             }
-            jit::cli::QueryCommands::Blocked { json } => {
+            jit::cli::QueryCommands::Blocked {
+                priority,
+                label,
+                full,
+                json,
+            } => {
                 let output_ctx = OutputContext::new(quiet, json);
-                let blocked = executor.query_blocked()?;
+                let priority_filter = priority.as_ref().map(|p| parse_priority(p)).transpose()?;
+                let blocked = executor.query_blocked_filtered(priority_filter, label.as_deref())?;
+
                 if json {
-                    use jit::output::{
-                        BlockedIssue, BlockedQueryResponse, BlockedReason, BlockedReasonType,
-                        JsonOutput,
-                    };
+                    use jit::domain::MinimalIssue;
+                    use jit::output::JsonOutput;
+                    use serde_json::json;
 
-                    let blocked_issues: Vec<BlockedIssue> = blocked
-                        .iter()
-                        .map(|(issue, reasons)| {
-                            let blocked_reasons = reasons
-                                .iter()
-                                .map(|r| {
-                                    let parts: Vec<&str> = r.splitn(2, ':').collect();
-                                    let reason_type = match parts[0] {
-                                        "gate" => BlockedReasonType::Gate,
-                                        _ => BlockedReasonType::Dependency,
-                                    };
-                                    BlockedReason {
-                                        reason_type,
-                                        detail: parts.get(1).unwrap_or(&"").to_string(),
-                                    }
-                                })
-                                .collect();
-                            BlockedIssue {
-                                issue: (*issue).clone(),
-                                blocked_reasons,
-                            }
-                        })
-                        .collect();
+                    let output = if full {
+                        use jit::output::{BlockedIssue, BlockedReason, BlockedReasonType};
+                        let blocked_issues: Vec<BlockedIssue> = blocked
+                            .iter()
+                            .map(|(issue, reasons)| {
+                                let blocked_reasons = reasons
+                                    .iter()
+                                    .map(|r| {
+                                        let parts: Vec<&str> = r.splitn(2, ':').collect();
+                                        let reason_type = match parts[0] {
+                                            "gate" => BlockedReasonType::Gate,
+                                            _ => BlockedReasonType::Dependency,
+                                        };
+                                        BlockedReason {
+                                            reason_type,
+                                            detail: parts.get(1).unwrap_or(&"").to_string(),
+                                        }
+                                    })
+                                    .collect();
+                                BlockedIssue {
+                                    issue: MinimalIssue::from(issue),
+                                    blocked_reasons,
+                                }
+                            })
+                            .collect();
 
-                    let response = BlockedQueryResponse {
-                        issues: blocked_issues,
-                        count: blocked.len(),
+                        JsonOutput::success(
+                            json!({
+                                "count": blocked_issues.len(),
+                                "issues": blocked_issues,
+                            }),
+                            "query blocked",
+                        )
+                    } else {
+                        use jit::domain::MinimalBlockedIssue;
+                        let minimal: Vec<MinimalBlockedIssue> = blocked
+                            .iter()
+                            .map(|(issue, reasons)| MinimalBlockedIssue {
+                                id: issue.id.clone(),
+                                title: issue.title.clone(),
+                                state: issue.state,
+                                priority: issue.priority,
+                                blocked_reasons: reasons.clone(),
+                            })
+                            .collect();
+
+                        JsonOutput::success(
+                            json!({
+                                "count": minimal.len(),
+                                "issues": minimal,
+                            }),
+                            "query blocked",
+                        )
                     };
-                    let output = JsonOutput::success(response, "registry show");
                     println!("{}", output.to_json_string()?);
                 } else {
                     let _ = output_ctx.print_info("Blocked issues:");
@@ -1555,180 +1683,84 @@ strategic_types = {}
                     let _ = output_ctx.print_info(format!("\nTotal: {}", blocked.len()));
                 }
             }
-            jit::cli::QueryCommands::Assignee { assignee, json } => {
+            jit::cli::QueryCommands::Strategic {
+                priority,
+                label,
+                full,
+                json,
+            } => {
                 let output_ctx = OutputContext::new(quiet, json);
-                let issues = executor.query_by_assignee(&assignee)?;
-                if json {
-                    use jit::output::{AssigneeQueryResponse, JsonOutput};
+                let priority_filter = priority.as_ref().map(|p| parse_priority(p)).transpose()?;
+                let issues =
+                    executor.query_strategic_filtered(priority_filter, label.as_deref())?;
 
-                    let response = AssigneeQueryResponse {
-                        assignee: assignee.clone(),
-                        issues: issues.clone(),
-                        count: issues.len(),
+                if json {
+                    use jit::domain::MinimalIssue;
+                    use jit::output::JsonOutput;
+                    use serde_json::json;
+
+                    let output = if full {
+                        JsonOutput::success(
+                            json!({
+                                "count": issues.len(),
+                                "issues": issues,
+                            }),
+                            "query strategic",
+                        )
+                    } else {
+                        let minimal: Vec<MinimalIssue> =
+                            issues.iter().map(MinimalIssue::from).collect();
+                        JsonOutput::success(
+                            json!({
+                                "count": minimal.len(),
+                                "issues": minimal,
+                            }),
+                            "query strategic",
+                        )
                     };
-                    let output = JsonOutput::success(response, "registry show");
                     println!("{}", output.to_json_string()?);
                 } else {
-                    let _ = output_ctx.print_info(format!("Issues assigned to {}:", assignee));
+                    let _ = output_ctx.print_info("Strategic issues:");
                     for issue in &issues {
-                        println!(
-                            "  {} | {} | {:?} | {:?}",
-                            issue.id, issue.title, issue.state, issue.priority
-                        );
+                        println!("  {} | {} | {:?}", issue.id, issue.title, issue.priority);
                     }
                     let _ = output_ctx.print_info(format!("\nTotal: {}", issues.len()));
                 }
             }
-            jit::cli::QueryCommands::State { state, json } => {
+            jit::cli::QueryCommands::Closed {
+                priority,
+                label,
+                full,
+                json,
+            } => {
                 let output_ctx = OutputContext::new(quiet, json);
-                match parse_state(&state) {
-                    Ok(parsed_state) => {
-                        let issues = executor.query_by_state(parsed_state)?;
-                        if json {
-                            use jit::output::{JsonOutput, StateQueryResponse};
+                let priority_filter = priority.as_ref().map(|p| parse_priority(p)).transpose()?;
+                let issues = executor.query_closed_filtered(priority_filter, label.as_deref())?;
 
-                            let response = StateQueryResponse {
-                                state: parsed_state,
-                                issues: issues.clone(),
-                                count: issues.len(),
-                            };
-                            let output = JsonOutput::success(response, "registry show");
-                            println!("{}", output.to_json_string()?);
-                        } else {
-                            let _ =
-                                output_ctx.print_info(format!("Issues with state '{}':", state));
-                            for issue in &issues {
-                                println!("  {} | {} | {:?}", issue.id, issue.title, issue.priority);
-                            }
-                            let _ = output_ctx.print_info(format!("\nTotal: {}", issues.len()));
-                        }
-                    }
-                    Err(e) => {
-                        if json {
-                            use jit::output::JsonError;
-                            let json_error = JsonError::invalid_state(&state, "query state");
-                            println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error.exit_code().code());
-                        } else {
-                            return Err(e);
-                        }
-                    }
-                }
-            }
-            jit::cli::QueryCommands::Priority { priority, json } => {
-                let output_ctx = OutputContext::new(quiet, json);
-                match parse_priority(&priority) {
-                    Ok(parsed_priority) => {
-                        let issues = executor.query_by_priority(parsed_priority)?;
-                        if json {
-                            use jit::output::{JsonOutput, PriorityQueryResponse};
-
-                            let response = PriorityQueryResponse {
-                                priority: parsed_priority,
-                                issues: issues.clone(),
-                                count: issues.len(),
-                            };
-                            let output = JsonOutput::success(response, "registry show");
-                            println!("{}", output.to_json_string()?);
-                        } else {
-                            let _ = output_ctx
-                                .print_info(format!("Issues with priority '{}':", priority));
-                            for issue in &issues {
-                                println!("  {} | {} | {:?}", issue.id, issue.title, issue.state);
-                            }
-                            let _ = output_ctx.print_info(format!("\nTotal: {}", issues.len()));
-                        }
-                    }
-                    Err(e) => {
-                        if json {
-                            use jit::output::JsonError;
-                            let json_error =
-                                JsonError::invalid_priority(&priority, "query priority");
-                            println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error.exit_code().code());
-                        } else {
-                            return Err(e);
-                        }
-                    }
-                }
-            }
-            jit::cli::QueryCommands::Label { pattern, json } => {
-                let output_ctx = OutputContext::new(quiet, json);
-                match executor.query_by_label(&pattern) {
-                    Ok(issues) => {
-                        if json {
-                            use jit::output::{JsonOutput, LabelQueryResponse};
-                            let response = LabelQueryResponse {
-                                pattern: pattern.clone(),
-                                issues: issues.clone(),
-                                count: issues.len(),
-                            };
-                            let output = JsonOutput::success(response, "registry show");
-                            println!("{}", output.to_json_string()?);
-                        } else {
-                            let _ = output_ctx
-                                .print_info(format!("Issues matching label '{}':", pattern));
-                            for issue in &issues {
-                                println!("  {} | {} | {:?}", issue.id, issue.title, issue.state);
-                            }
-                            let _ = output_ctx.print_info(format!("\nTotal: {}", issues.len()));
-                        }
-                    }
-                    Err(e) => {
-                        if json {
-                            use jit::output::JsonError;
-                            let json_error = JsonError::new("INVALID_LABEL_PATTERN", e.to_string(), "query label")
-                                .with_suggestion("Use 'namespace:value' for exact match or 'namespace:*' for wildcard");
-                            println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error.exit_code().code());
-                        } else {
-                            return Err(e);
-                        }
-                    }
-                }
-            }
-            jit::cli::QueryCommands::Strategic { json } => {
-                let output_ctx = OutputContext::new(quiet, json);
-                match executor.query_strategic() {
-                    Ok(issues) => {
-                        if json {
-                            use jit::output::{JsonOutput, StrategicQueryResponse};
-                            let response = StrategicQueryResponse {
-                                issues: issues.clone(),
-                                count: issues.len(),
-                            };
-                            let output = JsonOutput::success(response, "registry show");
-                            println!("{}", output.to_json_string()?);
-                        } else {
-                            let _ = output_ctx.print_info("Strategic issues:");
-                            for issue in &issues {
-                                println!("  {} | {} | {:?}", issue.id, issue.title, issue.state);
-                            }
-                            let _ = output_ctx.print_info(format!("\nTotal: {}", issues.len()));
-                        }
-                    }
-                    Err(e) => {
-                        if json {
-                            use jit::output::JsonError;
-                            let json_error = JsonError::new("QUERY_FAILED", e.to_string(), "query");
-                            println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error.exit_code().code());
-                        } else {
-                            return Err(e);
-                        }
-                    }
-                }
-            }
-            jit::cli::QueryCommands::Closed { json } => {
-                let output_ctx = OutputContext::new(quiet, json);
-                let issues = executor.query_closed()?;
                 if json {
-                    use jit::output::{ClosedQueryResponse, JsonOutput};
-                    let response = ClosedQueryResponse {
-                        issues: issues.clone(),
-                        count: issues.len(),
+                    use jit::domain::MinimalIssue;
+                    use jit::output::JsonOutput;
+                    use serde_json::json;
+
+                    let output = if full {
+                        JsonOutput::success(
+                            json!({
+                                "count": issues.len(),
+                                "issues": issues,
+                            }),
+                            "query closed",
+                        )
+                    } else {
+                        let minimal: Vec<MinimalIssue> =
+                            issues.iter().map(MinimalIssue::from).collect();
+                        JsonOutput::success(
+                            json!({
+                                "count": minimal.len(),
+                                "issues": minimal,
+                            }),
+                            "query closed",
+                        )
                     };
-                    let output = JsonOutput::success(response, "registry show");
                     println!("{}", output.to_json_string()?);
                 } else {
                     let _ = output_ctx.print_info("Closed issues (Done or Rejected):");
@@ -1784,6 +1816,429 @@ strategic_types = {}
             }
         },
         Commands::Config(config_cmd) => match config_cmd {
+            jit::cli::ConfigCommands::Show { json } => {
+                use jit::config::ConfigLoader;
+                use jit::output::JsonOutput;
+                use serde_json::json;
+
+                // Build effective config from all sources
+                let mut loader = ConfigLoader::new();
+
+                // Try to load system config
+                let system_path = std::path::Path::new("/etc/jit");
+                if system_path.exists() {
+                    loader = loader.with_system_config(system_path)?;
+                }
+
+                // Try to load user config
+                if let Some(home) = dirs::home_dir() {
+                    let user_path = home.join(".config/jit");
+                    if user_path.exists() {
+                        loader = loader.with_user_config(&user_path)?;
+                    }
+                }
+
+                // Load repo config
+                loader = loader.with_repo_config(&jit_dir)?;
+
+                let config = loader.build();
+
+                if json {
+                    let output = json!({
+                        "worktree": {
+                            "mode": format!("{:?}", config.worktree_mode().unwrap_or(jit::config::WorktreeMode::Auto)).to_lowercase(),
+                            "enforce_leases": format!("{:?}", config.enforcement_mode().unwrap_or(jit::config::EnforcementMode::Strict)).to_lowercase(),
+                        },
+                        "coordination": {
+                            "default_ttl_secs": config.coordination().default_ttl_secs(),
+                            "heartbeat_interval_secs": config.coordination().heartbeat_interval_secs(),
+                            "lease_renewal_threshold_pct": config.coordination().lease_renewal_threshold_pct(),
+                            "stale_threshold_secs": config.coordination().stale_threshold_secs(),
+                            "max_indefinite_leases_per_agent": config.coordination().max_indefinite_leases_per_agent(),
+                            "max_indefinite_leases_per_repo": config.coordination().max_indefinite_leases_per_repo(),
+                            "auto_renew_leases": config.coordination().auto_renew_leases(),
+                        },
+                        "global_operations": {
+                            "require_main_history": config.global_operations().require_main_history(),
+                            "allowed_branches": config.global_operations().allowed_branches(),
+                        },
+                        "locks": {
+                            "max_age_secs": config.locks().max_age_secs(),
+                            "enable_metadata": config.locks().enable_metadata(),
+                        },
+                        "events": {
+                            "enable_sequences": config.events().enable_sequences(),
+                            "use_unified_envelope": config.events().use_unified_envelope(),
+                        },
+                    });
+                    println!(
+                        "{}",
+                        JsonOutput::success(output, "config show").to_json_string()?
+                    );
+                } else {
+                    println!("Effective Configuration:");
+                    println!();
+                    println!("[worktree]");
+                    println!(
+                        "  mode = {:?}",
+                        config
+                            .worktree_mode()
+                            .unwrap_or(jit::config::WorktreeMode::Auto)
+                    );
+                    println!(
+                        "  enforce_leases = {:?}",
+                        config
+                            .enforcement_mode()
+                            .unwrap_or(jit::config::EnforcementMode::Strict)
+                    );
+                    println!();
+                    println!("[coordination]");
+                    println!(
+                        "  default_ttl_secs = {}",
+                        config.coordination().default_ttl_secs()
+                    );
+                    println!(
+                        "  heartbeat_interval_secs = {}",
+                        config.coordination().heartbeat_interval_secs()
+                    );
+                    println!(
+                        "  lease_renewal_threshold_pct = {}",
+                        config.coordination().lease_renewal_threshold_pct()
+                    );
+                    println!(
+                        "  stale_threshold_secs = {}",
+                        config.coordination().stale_threshold_secs()
+                    );
+                    println!(
+                        "  max_indefinite_leases_per_agent = {}",
+                        config.coordination().max_indefinite_leases_per_agent()
+                    );
+                    println!(
+                        "  max_indefinite_leases_per_repo = {}",
+                        config.coordination().max_indefinite_leases_per_repo()
+                    );
+                    println!(
+                        "  auto_renew_leases = {}",
+                        config.coordination().auto_renew_leases()
+                    );
+                    println!();
+                    println!("[global_operations]");
+                    println!(
+                        "  require_main_history = {}",
+                        config.global_operations().require_main_history()
+                    );
+                    println!(
+                        "  allowed_branches = {:?}",
+                        config.global_operations().allowed_branches()
+                    );
+                    println!();
+                    println!("[locks]");
+                    println!("  max_age_secs = {}", config.locks().max_age_secs());
+                    println!("  enable_metadata = {}", config.locks().enable_metadata());
+                    println!();
+                    println!("[events]");
+                    println!(
+                        "  enable_sequences = {}",
+                        config.events().enable_sequences()
+                    );
+                    println!(
+                        "  use_unified_envelope = {}",
+                        config.events().use_unified_envelope()
+                    );
+                }
+            }
+            jit::cli::ConfigCommands::Get { key, json } => {
+                use jit::config::ConfigLoader;
+                use jit::output::JsonOutput;
+                use serde_json::json;
+
+                // Build effective config
+                let mut loader = ConfigLoader::new();
+                let system_path = std::path::Path::new("/etc/jit");
+                if system_path.exists() {
+                    loader = loader.with_system_config(system_path)?;
+                }
+                if let Some(home) = dirs::home_dir() {
+                    let user_path = home.join(".config/jit");
+                    if user_path.exists() {
+                        loader = loader.with_user_config(&user_path)?;
+                    }
+                }
+                loader = loader.with_repo_config(&jit_dir)?;
+                let config = loader.build();
+
+                // Parse key and get value
+                let value: Option<serde_json::Value> = match key.as_str() {
+                    "worktree.mode" => Some(json!(format!(
+                        "{:?}",
+                        config
+                            .worktree_mode()
+                            .unwrap_or(jit::config::WorktreeMode::Auto)
+                    )
+                    .to_lowercase())),
+                    "worktree.enforce_leases" => Some(json!(format!(
+                        "{:?}",
+                        config
+                            .enforcement_mode()
+                            .unwrap_or(jit::config::EnforcementMode::Strict)
+                    )
+                    .to_lowercase())),
+                    "coordination.default_ttl_secs" => {
+                        Some(json!(config.coordination().default_ttl_secs()))
+                    }
+                    "coordination.heartbeat_interval_secs" => {
+                        Some(json!(config.coordination().heartbeat_interval_secs()))
+                    }
+                    "coordination.lease_renewal_threshold_pct" => {
+                        Some(json!(config.coordination().lease_renewal_threshold_pct()))
+                    }
+                    "coordination.stale_threshold_secs" => {
+                        Some(json!(config.coordination().stale_threshold_secs()))
+                    }
+                    "coordination.max_indefinite_leases_per_agent" => Some(json!(config
+                        .coordination()
+                        .max_indefinite_leases_per_agent())),
+                    "coordination.max_indefinite_leases_per_repo" => Some(json!(config
+                        .coordination()
+                        .max_indefinite_leases_per_repo())),
+                    "coordination.auto_renew_leases" => {
+                        Some(json!(config.coordination().auto_renew_leases()))
+                    }
+                    "global_operations.require_main_history" => {
+                        Some(json!(config.global_operations().require_main_history()))
+                    }
+                    "global_operations.allowed_branches" => {
+                        Some(json!(config.global_operations().allowed_branches()))
+                    }
+                    "locks.max_age_secs" => Some(json!(config.locks().max_age_secs())),
+                    "locks.enable_metadata" => Some(json!(config.locks().enable_metadata())),
+                    "events.enable_sequences" => Some(json!(config.events().enable_sequences())),
+                    "events.use_unified_envelope" => {
+                        Some(json!(config.events().use_unified_envelope()))
+                    }
+                    _ => None,
+                };
+
+                match value {
+                    Some(v) => {
+                        if json {
+                            println!(
+                                "{}",
+                                JsonOutput::success(json!({"key": key, "value": v}), "config get")
+                                    .to_json_string()?
+                            );
+                        } else {
+                            println!("{}", v);
+                        }
+                    }
+                    None => {
+                        anyhow::bail!(
+                            "Unknown config key: {}. Use 'jit config show' to see available keys.",
+                            key
+                        );
+                    }
+                }
+            }
+            jit::cli::ConfigCommands::Set {
+                key,
+                value,
+                global,
+                json,
+            } => {
+                use jit::output::JsonOutput;
+                use serde_json::json;
+                use std::fs;
+
+                // Determine target config file
+                let config_path = if global {
+                    let home = dirs::home_dir()
+                        .ok_or_else(|| anyhow::anyhow!("Could not determine home directory"))?;
+                    let config_dir = home.join(".config/jit");
+                    fs::create_dir_all(&config_dir)?;
+                    config_dir.join("config.toml")
+                } else {
+                    jit_dir.join("config.toml")
+                };
+
+                // Load existing config or create empty
+                let mut doc = if config_path.exists() {
+                    let content = fs::read_to_string(&config_path)?;
+                    content
+                        .parse::<toml_edit::DocumentMut>()
+                        .map_err(|e| anyhow::anyhow!("Failed to parse config: {}", e))?
+                } else {
+                    toml_edit::DocumentMut::new()
+                };
+
+                // Parse key into section.field
+                let parts: Vec<&str> = key.split('.').collect();
+                if parts.len() != 2 {
+                    anyhow::bail!("Config key must be in format 'section.field' (e.g., coordination.default_ttl_secs)");
+                }
+                let section = parts[0];
+                let field = parts[1];
+
+                // Ensure section exists
+                if doc.get(section).is_none() {
+                    doc[section] = toml_edit::Item::Table(toml_edit::Table::new());
+                }
+
+                // Parse and set value based on expected type
+                let parsed_value: toml_edit::Item = match key.as_str() {
+                    k if k.ends_with("_secs") || k.ends_with("_pct") || k.contains("max_") => {
+                        let num: i64 = value
+                            .parse()
+                            .map_err(|_| anyhow::anyhow!("Expected numeric value for {}", key))?;
+                        toml_edit::value(num)
+                    }
+                    k if k.contains("enable_") || k.contains("require_") || k.contains("auto_") => {
+                        let b: bool = value.parse().map_err(|_| {
+                            anyhow::anyhow!("Expected boolean (true/false) for {}", key)
+                        })?;
+                        toml_edit::value(b)
+                    }
+                    _ => toml_edit::value(&value),
+                };
+
+                doc[section][field] = parsed_value;
+
+                // Write back
+                fs::write(&config_path, doc.to_string())?;
+
+                if json {
+                    println!(
+                        "{}",
+                        JsonOutput::success(
+                            json!({
+                                "key": key,
+                                "value": value,
+                                "file": config_path.display().to_string(),
+                                "scope": if global { "user" } else { "repo" }
+                            }),
+                            "config set"
+                        )
+                        .to_json_string()?
+                    );
+                } else {
+                    println!("Set {} = {} in {}", key, value, config_path.display());
+                }
+            }
+            jit::cli::ConfigCommands::Validate { json } => {
+                use jit::config::{ConfigLoader, JitConfig};
+                use jit::output::JsonOutput;
+                use serde_json::json;
+
+                #[derive(Default)]
+                struct ValidationResult {
+                    errors: Vec<String>,
+                    warnings: Vec<String>,
+                }
+
+                let mut result = ValidationResult::default();
+
+                // Check repo config
+                let repo_config_path = jit_dir.join("config.toml");
+                if repo_config_path.exists() {
+                    match JitConfig::load(&jit_dir) {
+                        Ok(cfg) => {
+                            // Check for invalid values
+                            if let Some(ref wt) = cfg.worktree {
+                                if let Err(e) = wt.worktree_mode() {
+                                    result.errors.push(format!("repo config: {}", e));
+                                }
+                                if let Err(e) = wt.enforcement_mode() {
+                                    result.errors.push(format!("repo config: {}", e));
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            result.errors.push(format!("repo config: {}", e));
+                        }
+                    }
+                }
+
+                // Check user config
+                if let Some(home) = dirs::home_dir() {
+                    let user_config_path = home.join(".config/jit/config.toml");
+                    if user_config_path.exists() {
+                        let user_dir = home.join(".config/jit");
+                        match JitConfig::load(&user_dir) {
+                            Ok(cfg) => {
+                                if let Some(ref wt) = cfg.worktree {
+                                    if let Err(e) = wt.worktree_mode() {
+                                        result.errors.push(format!("user config: {}", e));
+                                    }
+                                    if let Err(e) = wt.enforcement_mode() {
+                                        result.errors.push(format!("user config: {}", e));
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                result.errors.push(format!("user config: {}", e));
+                            }
+                        }
+                    }
+                }
+
+                // Check env vars
+                if let Ok(val) = std::env::var("JIT_WORKTREE_MODE") {
+                    if !["auto", "on", "off"].contains(&val.to_lowercase().as_str()) {
+                        result.errors.push(format!(
+                            "JIT_WORKTREE_MODE='{}' is invalid. Use: auto, on, off",
+                            val
+                        ));
+                    }
+                }
+                if let Ok(val) = std::env::var("JIT_ENFORCE_LEASES") {
+                    if !["strict", "warn", "off"].contains(&val.to_lowercase().as_str()) {
+                        result.errors.push(format!(
+                            "JIT_ENFORCE_LEASES='{}' is invalid. Use: strict, warn, off",
+                            val
+                        ));
+                    }
+                }
+
+                // Try to build effective config to catch merge issues
+                let loader = ConfigLoader::new();
+                let _ = loader.with_repo_config(&jit_dir);
+
+                let has_errors = !result.errors.is_empty();
+                let has_warnings = !result.warnings.is_empty();
+
+                if json {
+                    let output = json!({
+                        "valid": !has_errors,
+                        "errors": result.errors,
+                        "warnings": result.warnings,
+                    });
+                    println!(
+                        "{}",
+                        JsonOutput::success(output, "config validate").to_json_string()?
+                    );
+                } else if result.errors.is_empty() && result.warnings.is_empty() {
+                    println!("✓ Configuration is valid");
+                } else {
+                    if !result.errors.is_empty() {
+                        println!("Errors:");
+                        for err in &result.errors {
+                            println!("  ✗ {}", err);
+                        }
+                    }
+                    if !result.warnings.is_empty() {
+                        println!("Warnings:");
+                        for warn in &result.warnings {
+                            println!("  ⚠ {}", warn);
+                        }
+                    }
+                }
+
+                // Exit with appropriate code
+                if has_errors {
+                    std::process::exit(1);
+                } else if has_warnings {
+                    std::process::exit(2);
+                }
+            }
             jit::cli::ConfigCommands::ShowHierarchy { json } => {
                 let output_ctx = OutputContext::new(quiet, json);
                 use jit::config_manager::ConfigManager;
@@ -1834,6 +2289,57 @@ strategic_types = {}
                         println!("  {}", template.name);
                         println!("    {}", template.description);
                         println!();
+                    }
+                }
+            }
+        },
+        Commands::Hooks(hooks_cmd) => match hooks_cmd {
+            jit::cli::HooksCommands::Install { json } => {
+                use jit::commands::hooks::install_hooks;
+
+                match install_hooks(None) {
+                    Ok(result) => {
+                        if json {
+                            let output = jit::output::JsonOutput::success(
+                                serde_json::json!({
+                                    "hooks_dir": result.hooks_dir,
+                                    "installed": result.installed,
+                                    "skipped": result.skipped,
+                                }),
+                                "hooks install",
+                            );
+                            println!("{}", output.to_json_string()?);
+                        } else {
+                            println!("Installed hooks to: {}", result.hooks_dir);
+                            if !result.installed.is_empty() {
+                                println!("\nInstalled:");
+                                for hook in &result.installed {
+                                    println!("  ✓ {}", hook);
+                                }
+                            }
+                            if !result.skipped.is_empty() {
+                                println!("\nSkipped (already exist):");
+                                for hook in &result.skipped {
+                                    println!("  - {}", hook);
+                                }
+                            }
+                            println!("\nHooks are now active. Configure enforcement in .jit/config.toml:");
+                            println!("  [worktree]");
+                            println!("  enforce_leases = \"strict\"");
+                        }
+                    }
+                    Err(e) => {
+                        if json {
+                            let json_error = jit::output::JsonError::new(
+                                "HOOKS_INSTALL_ERROR",
+                                e.to_string(),
+                                "hooks install",
+                            );
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
+                        } else {
+                            return Err(e);
+                        }
                     }
                 }
             }
@@ -1948,12 +2454,108 @@ strategic_types = {}
                 executor.status()?;
             }
         }
-        Commands::Validate { json, fix, dry_run } => {
+        Commands::Validate {
+            json,
+            fix,
+            dry_run,
+            divergence,
+            leases,
+        } => {
             // Validate dry_run requires fix
             if dry_run && !fix {
                 return Err(anyhow!("--dry-run requires --fix to be specified"));
             }
 
+            // Handle specific validations if requested
+            if divergence || leases {
+                let mut validation_results = Vec::new();
+
+                if divergence {
+                    match executor.validate_divergence() {
+                        Ok(()) => {
+                            if !json {
+                                println!("✓ Branch is up-to-date with origin/main");
+                            }
+                            validation_results.push(("divergence", true, String::new()));
+                        }
+                        Err(e) => {
+                            if json {
+                                validation_results.push(("divergence", false, e.to_string()));
+                            } else {
+                                eprintln!("❌ Divergence validation failed:\n{}", e);
+                                std::process::exit(1);
+                            }
+                        }
+                    }
+                }
+
+                if leases {
+                    match executor.validate_leases() {
+                        Ok(invalid_leases) => {
+                            if invalid_leases.is_empty() {
+                                if !json {
+                                    println!("✓ All active leases are valid");
+                                }
+                                validation_results.push(("leases", true, String::new()));
+                            } else {
+                                let message = format!(
+                                    "Found {} invalid lease(s):\n{}",
+                                    invalid_leases.len(),
+                                    invalid_leases.join("\n\n")
+                                );
+                                if json {
+                                    validation_results.push(("leases", false, message.clone()));
+                                } else {
+                                    eprintln!("❌ Lease validation failed:\n{}", message);
+                                    std::process::exit(1);
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            if json {
+                                validation_results.push(("leases", false, format!("Error: {}", e)));
+                            } else {
+                                eprintln!("❌ Lease validation error: {}", e);
+                                std::process::exit(1);
+                            }
+                        }
+                    }
+                }
+
+                if json {
+                    use jit::output::JsonOutput;
+                    use serde_json::json;
+
+                    let all_valid = validation_results.iter().all(|(_, valid, _)| *valid);
+                    let results_json: Vec<_> = validation_results
+                        .iter()
+                        .map(|(name, valid, message)| {
+                            json!({
+                                "validation": name,
+                                "valid": valid,
+                                "message": message
+                            })
+                        })
+                        .collect();
+
+                    let output = JsonOutput::success(
+                        json!({
+                            "valid": all_valid,
+                            "validations": results_json
+                        }),
+                        "validate",
+                    );
+                    println!("{}", output.to_json_string()?);
+
+                    if !all_valid {
+                        std::process::exit(1);
+                    }
+                }
+
+                return Ok(());
+            }
+
+            // Standard repository validation (existing code)
             if fix {
                 // Use auto-fix mode (pass quiet=true if json mode)
                 let fixes_applied = executor.validate_with_fix(true, dry_run, json)?;
@@ -2073,6 +2675,484 @@ strategic_types = {}
                 }
             }
         }
+        Commands::Recover { json } => {
+            use jit::commands::claim::execute_recover;
+            use jit::output::JsonOutput;
+            use serde_json::json;
+
+            match execute_recover(&storage) {
+                Ok(report) => {
+                    if json {
+                        let output = JsonOutput::success(
+                            json!({
+                                "success": true,
+                                "stale_locks_cleaned": report.stale_locks_cleaned,
+                                "index_rebuilt": report.index_rebuilt,
+                                "expired_leases_evicted": report.expired_leases_evicted,
+                                "temp_files_removed": report.temp_files_removed,
+                            }),
+                            "recover",
+                        );
+                        println!("{}", output.to_json_string()?);
+                    } else {
+                        println!("Recovery complete:");
+                        println!("  • Stale locks cleaned: {}", report.stale_locks_cleaned);
+                        println!("  • Index rebuilt: {}", report.index_rebuilt);
+                        println!(
+                            "  • Expired leases evicted: {}",
+                            report.expired_leases_evicted
+                        );
+                        println!("  • Temp files removed: {}", report.temp_files_removed);
+                    }
+                }
+                Err(e) => {
+                    if json {
+                        let output = jit::output::JsonError::new(
+                            "recovery_failed",
+                            e.to_string(),
+                            "recover",
+                        );
+                        eprintln!("{}", serde_json::to_string(&output)?);
+                        std::process::exit(1);
+                    } else {
+                        eprintln!("Recovery failed: {}", e);
+                        std::process::exit(1);
+                    }
+                }
+            }
+        }
+        Commands::Claim(claim_cmd) => match claim_cmd {
+            ClaimCommands::Acquire {
+                issue_id,
+                ttl,
+                agent_id,
+                reason,
+                json,
+            } => {
+                use jit::commands::claim::execute_claim_acquire;
+                use jit::output::{JsonError, JsonOutput};
+
+                match execute_claim_acquire(
+                    &storage,
+                    &issue_id,
+                    ttl,
+                    agent_id.as_deref(),
+                    reason.as_deref(),
+                ) {
+                    Ok(lease_id) => {
+                        if json {
+                            let response = serde_json::json!({
+                                "lease_id": lease_id,
+                                "issue_id": issue_id,
+                                "ttl_secs": ttl,
+                                "message": format!("Acquired lease {} on issue {}", lease_id, issue_id),
+                            });
+                            let output = JsonOutput::success(response, "claim acquire");
+                            println!("{}", output.to_json_string()?);
+                        } else {
+                            println!("✓ Acquired lease: {}", lease_id);
+                            println!("  Issue: {}", issue_id);
+                            println!("  TTL: {} seconds", ttl);
+                        }
+                    }
+                    Err(e) => {
+                        if json {
+                            let json_error = JsonError::new(
+                                "CLAIM_ACQUIRE_ERROR",
+                                e.to_string(),
+                                "claim acquire",
+                            );
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
+                        } else {
+                            return Err(e);
+                        }
+                    }
+                }
+            }
+            ClaimCommands::Release { lease_id, json } => {
+                use jit::commands::claim::execute_claim_release;
+                use jit::output::{JsonError, JsonOutput};
+
+                match execute_claim_release(&lease_id) {
+                    Ok(()) => {
+                        if json {
+                            let response = serde_json::json!({
+                                "lease_id": lease_id,
+                                "message": format!("Released lease {}", lease_id),
+                            });
+                            let output = JsonOutput::success(response, "claim release");
+                            println!("{}", output.to_json_string()?);
+                        } else {
+                            println!("✓ Released lease: {}", lease_id);
+                        }
+                    }
+                    Err(e) => {
+                        if json {
+                            let json_error = JsonError::new(
+                                "CLAIM_RELEASE_ERROR",
+                                e.to_string(),
+                                "claim release",
+                            );
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
+                        } else {
+                            return Err(e);
+                        }
+                    }
+                }
+            }
+            ClaimCommands::Renew {
+                lease_id,
+                extension,
+                json,
+            } => {
+                use jit::commands::claim::execute_claim_renew;
+                use jit::output::{JsonError, JsonOutput};
+
+                match execute_claim_renew::<jit::JsonFileStorage>(&lease_id, extension) {
+                    Ok(renewed_lease) => {
+                        if json {
+                            let response = serde_json::json!({
+                                "lease": renewed_lease,
+                                "message": format!("Renewed lease {} by {} seconds", lease_id, extension),
+                            });
+                            let output = JsonOutput::success(response, "claim renew");
+                            println!("{}", output.to_json_string()?);
+                        } else {
+                            println!("✓ Renewed lease: {}", lease_id);
+                            println!("  Issue: {}", renewed_lease.issue_id);
+                            println!("  Extended by: {} seconds", extension);
+                            if let Some(expires_at) = renewed_lease.expires_at {
+                                println!("  New expiry: {}", expires_at.to_rfc3339());
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        if json {
+                            let json_error =
+                                JsonError::new("CLAIM_RENEW_ERROR", e.to_string(), "claim renew");
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
+                        } else {
+                            return Err(e);
+                        }
+                    }
+                }
+            }
+            ClaimCommands::Heartbeat { lease_id, json } => {
+                use jit::commands::claim::execute_claim_heartbeat;
+                use jit::output::{JsonError, JsonOutput};
+
+                match execute_claim_heartbeat(&lease_id) {
+                    Ok(()) => {
+                        if json {
+                            let response = serde_json::json!({
+                                "lease_id": lease_id,
+                                "message": format!("Heartbeat sent for lease {}", lease_id),
+                            });
+                            let output = JsonOutput::success(response, "claim heartbeat");
+                            println!("{}", output.to_json_string()?);
+                        } else {
+                            println!("✓ Heartbeat sent: {}", lease_id);
+                        }
+                    }
+                    Err(e) => {
+                        if json {
+                            let json_error = JsonError::new(
+                                "CLAIM_HEARTBEAT_ERROR",
+                                e.to_string(),
+                                "claim heartbeat",
+                            );
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
+                        } else {
+                            return Err(e);
+                        }
+                    }
+                }
+            }
+            ClaimCommands::Status { issue, agent, json } => {
+                use jit::commands::claim::execute_claim_status;
+                use jit::output::{JsonError, JsonOutput};
+
+                match execute_claim_status::<jit::JsonFileStorage>(
+                    issue.as_deref(),
+                    agent.as_deref(),
+                ) {
+                    Ok(leases) => {
+                        if json {
+                            let response = serde_json::json!({
+                                "leases": leases,
+                                "count": leases.len(),
+                            });
+                            let output = JsonOutput::success(response, "claim status");
+                            println!("{}", output.to_json_string()?);
+                        } else if leases.is_empty() {
+                            println!("No active leases found.");
+                        } else {
+                            use chrono::Utc;
+                            println!("Active leases ({}):\n", leases.len());
+                            for lease in &leases {
+                                println!("Lease: {}", lease.lease_id);
+                                println!("  Issue:    {}", lease.issue_id);
+                                println!("  Agent:    {}", lease.agent_id);
+                                println!("  Worktree: {}", lease.worktree_id);
+                                if let Some(branch) = &lease.branch {
+                                    println!("  Branch:   {}", branch);
+                                }
+                                println!("  Acquired: {}", lease.acquired_at);
+
+                                if lease.ttl_secs > 0 {
+                                    // Finite lease - show expiry and remaining time
+                                    if let Some(expires_at) = lease.expires_at {
+                                        let now = Utc::now();
+                                        let remaining = expires_at.signed_duration_since(now);
+                                        println!(
+                                            "  Expires:  {} ({} seconds remaining)",
+                                            expires_at,
+                                            remaining.num_seconds().max(0)
+                                        );
+                                    }
+                                } else {
+                                    // Indefinite lease - show last beat and time since
+                                    let now = Utc::now();
+                                    let since_beat = now.signed_duration_since(lease.last_beat);
+                                    println!("  TTL:      indefinite");
+                                    println!(
+                                        "  Last beat: {} ({} seconds ago)",
+                                        lease.last_beat,
+                                        since_beat.num_seconds()
+                                    );
+
+                                    // Show stale status
+                                    if lease.stale {
+                                        println!(
+                                            "  ⚠️  STALE: Lease marked stale (no heartbeat for {} minutes)",
+                                            since_beat.num_minutes()
+                                        );
+                                        println!(
+                                            "     Use 'jit claim heartbeat {}' to refresh",
+                                            lease.lease_id
+                                        );
+                                    }
+                                }
+                                println!();
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        if json {
+                            let json_error =
+                                JsonError::new("CLAIM_STATUS_ERROR", e.to_string(), "claim status");
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
+                        } else {
+                            return Err(e);
+                        }
+                    }
+                }
+            }
+            ClaimCommands::List { json } => {
+                use jit::commands::claim::execute_claim_list;
+                use jit::output::{JsonError, JsonOutput};
+
+                match execute_claim_list() {
+                    Ok(leases) => {
+                        if json {
+                            let response = serde_json::json!({
+                                "leases": leases,
+                                "count": leases.len(),
+                            });
+                            let output = JsonOutput::success(response, "claim list");
+                            println!("{}", output.to_json_string()?);
+                        } else if leases.is_empty() {
+                            println!("No active leases.");
+                        } else {
+                            use chrono::Utc;
+                            println!("All active leases ({}):\n", leases.len());
+                            for lease in &leases {
+                                println!("Lease: {}", lease.lease_id);
+                                println!("  Issue:    {}", lease.issue_id);
+                                println!("  Agent:    {}", lease.agent_id);
+                                println!("  Worktree: {}", lease.worktree_id);
+                                if let Some(branch) = &lease.branch {
+                                    println!("  Branch:   {}", branch);
+                                }
+                                println!("  Acquired: {}", lease.acquired_at);
+
+                                if lease.ttl_secs > 0 {
+                                    // Finite lease
+                                    if let Some(expires_at) = lease.expires_at {
+                                        let now = Utc::now();
+                                        let remaining = expires_at.signed_duration_since(now);
+                                        println!(
+                                            "  Expires:  {} ({} seconds remaining)",
+                                            expires_at,
+                                            remaining.num_seconds().max(0)
+                                        );
+                                    }
+                                } else {
+                                    // Indefinite lease
+                                    let now = Utc::now();
+                                    let since_beat = now.signed_duration_since(lease.last_beat);
+                                    println!("  TTL:      indefinite");
+                                    println!(
+                                        "  Last beat: {} ({} seconds ago)",
+                                        lease.last_beat,
+                                        since_beat.num_seconds()
+                                    );
+                                }
+                                println!();
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        if json {
+                            let json_error =
+                                JsonError::new("CLAIM_LIST_ERROR", e.to_string(), "claim list");
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
+                        } else {
+                            return Err(e);
+                        }
+                    }
+                }
+            }
+            ClaimCommands::ForceEvict {
+                lease_id,
+                reason,
+                json,
+            } => {
+                use jit::commands::claim::execute_claim_force_evict;
+                use jit::output::{JsonError, JsonOutput};
+
+                match execute_claim_force_evict::<jit::JsonFileStorage>(&lease_id, &reason) {
+                    Ok(()) => {
+                        if json {
+                            let response = serde_json::json!({
+                                "lease_id": lease_id,
+                                "reason": reason,
+                                "message": format!("Force-evicted lease {}", lease_id),
+                            });
+                            let output = JsonOutput::success(response, "claim force-evict");
+                            println!("{}", output.to_json_string()?);
+                        } else {
+                            println!("✓ Force-evicted lease: {}", lease_id);
+                            println!("  Reason: {}", reason);
+                        }
+                    }
+                    Err(e) => {
+                        if json {
+                            let json_error = JsonError::new(
+                                "CLAIM_FORCE_EVICT_ERROR",
+                                e.to_string(),
+                                "claim force-evict",
+                            );
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
+                        } else {
+                            return Err(e);
+                        }
+                    }
+                }
+            }
+        },
+        Commands::Worktree(worktree_cmd) => match worktree_cmd {
+            jit::cli::WorktreeCommands::Info { json } => {
+                use jit::commands::worktree::execute_worktree_info;
+                use jit::output::{JsonError, JsonOutput};
+
+                match execute_worktree_info() {
+                    Ok(info) => {
+                        if json {
+                            let response = serde_json::json!({
+                                "worktree_id": info.worktree_id,
+                                "branch": info.branch,
+                                "root_path": info.root_path,
+                                "is_main_worktree": info.is_main_worktree,
+                                "common_dir": info.common_dir,
+                            });
+                            let output = JsonOutput::success(response, "worktree info");
+                            println!("{}", output.to_json_string()?);
+                        } else {
+                            println!("Worktree Information:");
+                            println!("  ID:         {}", info.worktree_id);
+                            println!("  Branch:     {}", info.branch);
+                            println!("  Root:       {}", info.root_path);
+                            println!(
+                                "  Type:       {}",
+                                if info.is_main_worktree {
+                                    "main worktree"
+                                } else {
+                                    "secondary worktree"
+                                }
+                            );
+                            println!("  Common dir: {}", info.common_dir);
+                        }
+                    }
+                    Err(e) => {
+                        if json {
+                            let json_error = JsonError::new(
+                                "WORKTREE_INFO_ERROR",
+                                e.to_string(),
+                                "worktree info",
+                            );
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
+                        } else {
+                            return Err(e);
+                        }
+                    }
+                }
+            }
+            jit::cli::WorktreeCommands::List { json } => {
+                use jit::commands::worktree::execute_worktree_list;
+                use jit::output::{JsonError, JsonOutput};
+
+                match execute_worktree_list() {
+                    Ok(worktrees) => {
+                        if json {
+                            let response = serde_json::json!({
+                                "worktrees": worktrees,
+                            });
+                            let output = JsonOutput::success(response, "worktree list");
+                            println!("{}", output.to_json_string()?);
+                        } else {
+                            // Human-readable table format
+                            println!(
+                                "{:<16} {:<25} {:<50} {:>6}",
+                                "WORKTREE ID", "BRANCH", "PATH", "CLAIMS"
+                            );
+                            println!("{}", "-".repeat(100));
+
+                            for entry in worktrees {
+                                println!(
+                                    "{:<16} {:<25} {:<50} {:>6}",
+                                    entry.worktree_id,
+                                    entry.branch,
+                                    entry.path,
+                                    entry.active_claims
+                                );
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        if json {
+                            let json_error = JsonError::new(
+                                "WORKTREE_LIST_ERROR",
+                                e.to_string(),
+                                "worktree list",
+                            );
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
+                        } else {
+                            return Err(e);
+                        }
+                    }
+                }
+            }
+        },
         Commands::Snapshot(snapshot_cmd) => match snapshot_cmd {
             jit::cli::SnapshotCommands::Export {
                 out,

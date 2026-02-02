@@ -1,0 +1,53 @@
+{
+  "id": "62ff2fd9-47d3-4057-9a5b-92ee2e269cfb",
+  "title": "Create pre-push hook for lease validation",
+  "description": "Create pre-push hook template for strict teams that validates leases referenced in commit trailers are still active and non-stale. Parse JIT-Lease trailer from commits being pushed. Check `.stale != true` in claims index.\n\nSee design doc section \"Pre-Push Hook\".",
+  "state": "done",
+  "priority": "high",
+  "assignee": "agent:copilot-session",
+  "dependencies": [
+    "b74af86f-388d-49a2-a172-bc9fdaa7bb9c"
+  ],
+  "gates_required": [
+    "tdd-reminder",
+    "tests",
+    "clippy",
+    "fmt",
+    "code-review"
+  ],
+  "gates_status": {
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": "agent:copilot-session",
+      "updated_at": "2026-02-01T23:32:08.667318064Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-01T23:38:42.499004160Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "agent:copilot-session",
+      "updated_at": "2026-02-01T23:37:36.650442190Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-01T23:38:21.379895567Z"
+    },
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-01T23:38:40.294623289Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "epic:parallel-work",
+    "milestone:v1.0",
+    "component:cli",
+    "type:task"
+  ]
+}

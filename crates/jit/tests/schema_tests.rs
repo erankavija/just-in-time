@@ -31,12 +31,12 @@ fn test_schema_issue_subcommands() {
 
     let subcommands = issue_cmd.subcommands.as_ref().unwrap();
     assert!(subcommands.contains_key("create"));
-    assert!(subcommands.contains_key("list"));
     assert!(subcommands.contains_key("show"));
     assert!(subcommands.contains_key("update"));
     assert!(subcommands.contains_key("delete"));
     assert!(subcommands.contains_key("claim"));
     assert!(subcommands.contains_key("unassign"));
+    // Note: 'list' was removed - use 'jit query all' instead
 }
 
 #[test]
@@ -71,16 +71,16 @@ fn test_schema_has_json_flags() {
     let schema = CommandSchema::generate();
 
     // Check that commands with --json flag have it in flags
-    let issue_list = schema
+    let query_all = schema
         .commands
-        .get("issue")
+        .get("query")
         .unwrap()
         .subcommands
         .as_ref()
         .unwrap()
-        .get("list")
+        .get("all")
         .unwrap();
-    assert!(issue_list.flags.iter().any(|f| f.name == "json"));
+    assert!(query_all.flags.iter().any(|f| f.name == "json"));
 
     let status = schema.commands.get("status").unwrap();
     assert!(status.flags.iter().any(|f| f.name == "json"));

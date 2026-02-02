@@ -1,0 +1,53 @@
+{
+  "id": "fb6f6873-60f4-4484-be03-d43fb73375c5",
+  "title": "Implement branch divergence detection",
+  "description": "Implement `check_branch_divergence()` to detect when branch has diverged from origin/main. Block global operations (config, gates registry, type-hierarchy) when diverged. See design doc section \"Branch Divergence Detection\".",
+  "state": "done",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "b74af86f-388d-49a2-a172-bc9fdaa7bb9c"
+  ],
+  "gates_required": [
+    "tdd-reminder",
+    "tests",
+    "clippy",
+    "fmt",
+    "code-review"
+  ],
+  "gates_status": {
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-02-01T22:56:39.172901300Z"
+    },
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-01T22:56:33.892114170Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-01T22:56:38.649344171Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-01T22:56:09.094543865Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-02-01T22:56:39.292833215Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "epic:parallel-work",
+    "milestone:v1.0",
+    "component:cli",
+    "type:task"
+  ]
+}

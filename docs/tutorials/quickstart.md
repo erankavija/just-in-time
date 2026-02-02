@@ -24,7 +24,7 @@
 **Essential Commands:**
 ```bash
 # Find ready work
-jit query ready --json
+jit query available --json
 
 # Claim atomically (race-safe)
 jit issue claim <short-hash> agent:your-id
@@ -106,7 +106,7 @@ TASK2=$(jit issue create \
   --json | jq -r '.id')
 
 # List all issues
-jit issue list
+jit query all
 ```
 
 ## Try the Dependency Graph
@@ -119,14 +119,14 @@ jit dep add $TASK2 $TASK1
 jit graph show
 
 # Check what's ready to work on
-jit query ready
+jit query available
 # Only TASK1 shows up (TASK2 is blocked)
 
 # Mark TASK1 done
 jit issue update $TASK1 --state done
 
 # Check ready again
-jit query ready
+jit query available
 # Now TASK2 shows up (no longer blocked)
 ```
 

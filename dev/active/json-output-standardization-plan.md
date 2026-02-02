@@ -42,7 +42,7 @@ This inconsistency forces users to handle multiple formats and makes client libr
 - Most mutation commands
 
 ### Commands Using Direct Format
-- `jit issue list --json`
+- `jit query all --json`
 - `jit query * --json`
 - Most read-only commands
 

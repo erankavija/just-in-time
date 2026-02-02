@@ -1,0 +1,42 @@
+{
+  "id": "4b2cb4cd-0351-48d1-bb90-7c0d14909623",
+  "title": "Refactor: Address code quality improvements from CLI command implementation",
+  "description": "Address seven code quality issues identified during CLI command implementation (claim/worktree commands):\n\n1. **Test quality: Conditional assertions** - Tests with if !condition { assert } can silently pass when bug exists. Add clippy rule or use property-based testing.\n\n2. **Unused storage parameter** - Most execute_* functions take unused _storage parameter. Remove or make Optional.\n\n3. **Git detection silent fallbacks** - get_current_branch() returns main on error. Return clear error instead.\n\n4. **Path handling inconsistency** - Inconsistent canonicalize usage. Always canonicalize paths from external sources.\n\n5. **Test helper duplication** - Each module has setup_test_repo(). Extract to shared test_utils.\n\n6. **Missing integration tests** - No end-to-end CLI tests. Add tests that run actual jit binary.\n\n7. **Error messages not actionable** - Add hints like: jit claim list for remediation.\n\nSee design document (dev/design/cli-quality-improvements.md) for full details, examples, and implementation guidance.",
+  "state": "done",
+  "priority": "high",
+  "assignee": "copilot:cli-session",
+  "dependencies": [],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [
+    {
+      "path": "dev/design/cli-quality-improvements.md",
+      "commit": null,
+      "label": "Design Document",
+      "doc_type": "design",
+      "format": "markdown"
+    },
+    {
+      "path": "dev/sessions/session-20260115-cli-quality-phase3.md",
+      "commit": null,
+      "label": "Session Notes: Phase 1-2 complete, Phase 3 in progress",
+      "doc_type": "notes",
+      "format": "markdown"
+    },
+    {
+      "path": "dev/sessions/session-20260115-phase3-issue7-complete.md",
+      "commit": null,
+      "label": "Session Notes: Phase 3 Issue #7 complete - Actionable errors implemented",
+      "doc_type": "notes",
+      "format": "markdown"
+    }
+  ],
+  "labels": [
+    "epic:parallel-work",
+    "milestone:v1.0",
+    "component:testing",
+    "component:cli",
+    "type:task"
+  ]
+}

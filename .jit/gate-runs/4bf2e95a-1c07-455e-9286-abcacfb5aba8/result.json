@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "4bf2e95a-1c07-455e-9286-abcacfb5aba8",
+  "gate_key": "fmt",
+  "stage": "postcheck",
+  "issue_id": "dacbda85-fe92-46c5-977d-940121c189ed",
+  "commit": "29ba401d21d1d4415779baa181e33257fc2c0aa7",
+  "branch": "feature/worktree-parallel-work",
+  "status": "failed",
+  "started_at": "2026-02-02T10:09:59.874678658Z",
+  "completed_at": "2026-02-02T10:10:00.277259633Z",
+  "duration_ms": 402,
+  "exit_code": 1,
+  "stdout": "Diff in /home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/lock.rs:251:\n     /// - The file cannot be opened\n     /// - The lock cannot be acquired within the timeout\n     /// - Metadata file cannot be written\n\u001b[31m-    pub fn lock_exclusive_with_metadata(\n\u001b[m\u000f\u001b[31m-        &self,\n\u001b[m\u000f\u001b[31m-        path: &Path,\n\u001b[m\u000f\u001b[31m-        agent_id: &str,\n\u001b[m\u000f\u001b[31m-    ) -> Result<LockGuard> {\n\u001b[m\u000f\u001b[32m+    pub fn lock_exclusive_with_metadata(&self, path: &Path, agent_id: &str) -> Result<LockGuard> {\n\u001b[m\u000f         let file = self.open_or_create(path)?;\n \n         // Try to acquire lock with polling and timeout\nDiff in /home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/lock.rs:279:\n                         serde_json::to_string_pretty(&metadata)\n                             .context(\"Failed to serialize lock metadata\")?,\n                     )\n\u001b[31m-                    .with_context(|| format!(\"Failed to write lock metadata: {}\", meta_path.display()))?;\n\u001b[m\u000f\u001b[32m+                    .with_context(|| {\n\u001b[m\u000f\u001b[32m+                        format!(\"Failed to write lock metadata: {}\", meta_path.display())\n\u001b[m\u000f\u001b[32m+                    })?;\n\u001b[m\u000f \n                     return Ok(LockGuard::new_with_metadata(\n                         file,\n",
+  "stderr": "",
+  "command": "cargo fmt -- --check",
+  "by": "auto:executor",
+  "message": null
+}

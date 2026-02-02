@@ -291,7 +291,7 @@ fn test_issue_create_list_show() {
 
     // List issues
     let output = Command::new(&jit)
-        .args(["issue", "list"])
+        .args(["query", "all"])
         .current_dir(temp.path())
         .output()
         .unwrap();

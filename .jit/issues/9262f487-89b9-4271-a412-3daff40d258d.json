@@ -1,0 +1,53 @@
+{
+  "id": "9262f487-89b9-4271-a412-3daff40d258d",
+  "title": "Implement jit worktree list command",
+  "description": "Implement `jit worktree list` showing all git worktrees with their JIT status: worktree ID, branch, active claims count. Support `--json` output.",
+  "state": "done",
+  "priority": "high",
+  "assignee": "agent:copilot-cli",
+  "dependencies": [
+    "b74af86f-388d-49a2-a172-bc9fdaa7bb9c"
+  ],
+  "gates_required": [
+    "tdd-reminder",
+    "tests",
+    "clippy",
+    "fmt",
+    "code-review"
+  ],
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-01-10T22:38:43.336317991Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-10T22:38:43.334888201Z"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-01-10T22:29:46.247694899Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-10T22:38:43.332433400Z"
+    },
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-10T22:38:43.333411040Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "epic:parallel-work",
+    "milestone:v1.0",
+    "component:cli",
+    "type:task"
+  ]
+}

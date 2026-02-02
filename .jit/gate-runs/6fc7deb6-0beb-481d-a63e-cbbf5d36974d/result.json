@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "6fc7deb6-0beb-481d-a63e-cbbf5d36974d",
+  "gate_key": "clippy",
+  "stage": "postcheck",
+  "issue_id": "ee20327b-2f2a-48f8-80d6-06cb1cb31a6e",
+  "commit": "e4807ad995df6500015ef54318030b522b998f2f",
+  "branch": "feature/worktree-parallel-work",
+  "status": "passed",
+  "started_at": "2026-01-08T21:13:41.538823315Z",
+  "completed_at": "2026-01-08T21:13:53.649481371Z",
+  "duration_ms": 12110,
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "    Blocking waiting for file lock on build directory\n   Compiling ring v0.17.14\n    Checking jit-dispatch v0.1.0 (/home/vkaskivuo/Projects/just-in-time/crates/dispatch)\n   Compiling rustls v0.23.35\n    Checking rustls-webpki v0.103.8\n    Checking ureq v2.12.1\n    Checking jit v0.2.0 (/home/vkaskivuo/Projects/just-in-time/crates/jit)\n    Checking jit-server v0.1.0 (/home/vkaskivuo/Projects/just-in-time/crates/server)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 11.85s\n",
+  "command": "cargo clippy --lib -- -D warnings",
+  "by": "auto:executor",
+  "message": null
+}

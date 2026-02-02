@@ -150,7 +150,7 @@ jit query blocked
 # Shows: Epic is blocked (waiting for tasks)
 
 # Query what's ready
-jit query ready
+jit query available
 # Shows: Nothing ready (tasks have unpassed gates)
 ```
 
@@ -181,7 +181,7 @@ jit issue update $TASK3 --state ready
 
 # Check status
 jit status
-jit query ready
+jit query available
 # Shows: All 3 tasks are now ready to claim
 ```
 
@@ -206,8 +206,8 @@ jit status
 # Shows: 2 in_progress, 1 ready
 
 # View who's working on what
-jit issue list --assignee "agent:worker-1"
-jit issue list --assignee "agent:worker-2"
+jit query all --assignee "agent:worker-1"
+jit query all --assignee "agent:worker-2"
 ```
 
 **What we did:**
@@ -311,13 +311,13 @@ Examine what we built:
 jit graph show $EPIC
 
 # View all auth work
-jit query label "epic:auth"
+jit query all --label "epic:auth"
 
 # View event log
 jit events query --issue-id $EPIC
 
 # Check milestone progress
-jit query label "milestone:v1.0"
+jit query all --label "milestone:v1.0"
 jit status
 ```
 
@@ -341,7 +341,7 @@ jit status
 - `jit dep add` - Build dependency graph
 - `jit issue claim` - Atomic agent assignment
 - `jit gate pass` - Mark gates as passed
-- `jit query ready/blocked` - Find available work
+- `jit query available/blocked` - Find available work
 - `jit graph show` - Visualize relationships
 
 ## Next Steps

@@ -4,22 +4,56 @@
 //! to prevent race conditions when multiple processes access `.jit/` concurrently.
 
 use anyhow::{Context, Result};
+use chrono::{DateTime, Utc};
 use fs4::fs_std::FileExt as Fs4FileExt;
+use serde::{Deserialize, Serialize};
 use std::fs::{File, OpenOptions};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+/// Metadata for lock diagnostics
+///
+/// Written alongside lock files to enable diagnosis of stuck processes.
+/// Only used when claim coordination is active.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LockMetadata {
+    /// Process ID of lock holder
+    pub pid: u32,
+    /// Agent identifier (e.g., "agent:copilot-1")
+    pub agent_id: String,
+    /// When the lock was acquired
+    pub created_at: DateTime<Utc>,
+    /// Last time the lock was updated
+    pub last_updated: DateTime<Utc>,
+}
+
 /// Lock guard that automatically releases the lock when dropped (RAII pattern)
+///
+/// Optionally tracks lock metadata for diagnostics when claim coordination is active.
 #[derive(Debug)]
 pub struct LockGuard {
     file: File,
     #[allow(dead_code)]
     path: PathBuf,
+    /// Path to metadata file (if tracking enabled)
+    meta_path: Option<PathBuf>,
 }
 
 impl LockGuard {
     fn new(file: File, path: PathBuf) -> Self {
-        Self { file, path }
+        Self {
+            file,
+            path,
+            meta_path: None,
+        }
+    }
+
+    fn new_with_metadata(file: File, path: PathBuf, meta_path: PathBuf) -> Self {
+        Self {
+            file,
+            path,
+            meta_path: Some(meta_path),
+        }
     }
 
     /// Get the path of the locked file
@@ -32,8 +66,12 @@ impl LockGuard {
 impl Drop for LockGuard {
     fn drop(&mut self) {
         // fs4 automatically unlocks on file close (drop)
-        // No explicit unlock needed, but we could log errors if unlock fails
         let _ = Fs4FileExt::unlock(&self.file);
+
+        // Clean up metadata file if it exists
+        if let Some(ref meta_path) = self.meta_path {
+            let _ = std::fs::remove_file(meta_path);
+        }
     }
 }
 
@@ -193,6 +231,77 @@ impl FileLocker {
         }
     }
 
+    /// Acquire an exclusive lock with metadata tracking
+    ///
+    /// Writes a `.lock.meta` file alongside the lock file containing PID,
+    /// agent ID, and timestamps for diagnostics. Metadata is automatically
+    /// cleaned up when the lock is released.
+    ///
+    /// **Note:** Only use this when claim coordination is active. Regular
+    /// locking without metadata is faster and sufficient for single-agent use.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Path to the lock file
+    /// * `agent_id` - Agent identifier (e.g., "agent:copilot-1")
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The file cannot be opened
+    /// - The lock cannot be acquired within the timeout
+    /// - Metadata file cannot be written
+    pub fn lock_exclusive_with_metadata(&self, path: &Path, agent_id: &str) -> Result<LockGuard> {
+        let file = self.open_or_create(path)?;
+
+        // Try to acquire lock with polling and timeout
+        let start = std::time::Instant::now();
+        let poll_interval = Duration::from_millis(10);
+
+        loop {
+            match Fs4FileExt::try_lock_exclusive(&file) {
+                Ok(true) => {
+                    // Lock acquired - write metadata
+                    let meta_path = path.with_extension("lock.meta");
+                    let metadata = LockMetadata {
+                        pid: std::process::id(),
+                        agent_id: agent_id.to_string(),
+                        created_at: Utc::now(),
+                        last_updated: Utc::now(),
+                    };
+
+                    std::fs::write(
+                        &meta_path,
+                        serde_json::to_string_pretty(&metadata)
+                            .context("Failed to serialize lock metadata")?,
+                    )
+                    .with_context(|| {
+                        format!("Failed to write lock metadata: {}", meta_path.display())
+                    })?;
+
+                    return Ok(LockGuard::new_with_metadata(
+                        file,
+                        path.to_path_buf(),
+                        meta_path,
+                    ));
+                }
+                Ok(false) => {
+                    if start.elapsed() >= self.timeout {
+                        anyhow::bail!(
+                            "Lock timeout: could not acquire exclusive lock on {} after {:?}",
+                            path.display(),
+                            self.timeout
+                        );
+                    }
+                    std::thread::sleep(poll_interval);
+                }
+                Err(e) => {
+                    anyhow::bail!("IO error while trying to lock {}: {}", path.display(), e);
+                }
+            }
+        }
+    }
+
     /// Open file for locking, creating it if it doesn't exist
     fn open_or_create(&self, path: &Path) -> Result<File> {
         OpenOptions::new()
@@ -345,5 +454,49 @@ mod tests {
         // All threads should acquire shared lock
         let count = *success_count.lock().unwrap();
         assert_eq!(count, 3, "All threads should acquire shared lock");
+    }
+
+    #[test]
+    fn test_lock_with_metadata_writes_meta_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("test.lock");
+
+        let locker = FileLocker::new(Duration::from_millis(100));
+        let _guard = locker
+            .lock_exclusive_with_metadata(&file_path, "agent:test-1")
+            .unwrap();
+
+        // Metadata file should exist
+        let meta_path = file_path.with_extension("lock.meta");
+        assert!(meta_path.exists(), "Metadata file should exist");
+
+        // Verify metadata content
+        let content = std::fs::read_to_string(&meta_path).unwrap();
+        let metadata: LockMetadata = serde_json::from_str(&content).unwrap();
+
+        assert_eq!(metadata.agent_id, "agent:test-1");
+        assert_eq!(metadata.pid, std::process::id());
+    }
+
+    #[test]
+    fn test_lock_with_metadata_cleans_up_on_drop() {
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("test.lock");
+        let meta_path = file_path.with_extension("lock.meta");
+
+        let locker = FileLocker::new(Duration::from_millis(100));
+
+        {
+            let _guard = locker
+                .lock_exclusive_with_metadata(&file_path, "agent:test-1")
+                .unwrap();
+            assert!(meta_path.exists(), "Metadata should exist while locked");
+        } // Lock dropped
+
+        // Metadata should be cleaned up
+        assert!(
+            !meta_path.exists(),
+            "Metadata file should be removed on lock release"
+        );
     }
 }

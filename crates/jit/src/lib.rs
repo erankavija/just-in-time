@@ -3,12 +3,14 @@
 //! This library provides the core functionality for JIT issue tracking.
 //! It is primarily used for testing, but can also be embedded in other applications.
 
+pub mod agent_config;
 pub mod cli;
 pub mod commands;
 pub mod config;
 pub mod config_manager;
 pub mod document;
 pub mod domain;
+pub mod errors;
 pub mod gate_execution;
 pub mod graph;
 pub mod hierarchy_templates;
@@ -19,6 +21,7 @@ pub mod schema;
 pub mod search;
 pub mod snapshot;
 pub mod storage;
+pub mod test_utils;
 pub mod type_hierarchy;
 pub mod validation;
 pub mod visualization;

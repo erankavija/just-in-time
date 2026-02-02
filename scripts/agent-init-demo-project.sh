@@ -340,7 +340,7 @@ echo ""
 
 # Count by type
 echo "Issue Count by Type:"
-jit issue list --json | jq -r '[.[] | .labels[] | select(startswith("type:"))] | group_by(.) | map("\(.[]): \(length)") | .[]' | sed 's/type:/  /'
+jit query all --json | jq -r '[.[] | .labels[] | select(startswith("type:"))] | group_by(.) | map("\(.[]): \(length)") | .[]' | sed 's/type:/  /'
 
 echo ""
 echo "Strategic View (Milestone + Epics):"
@@ -353,7 +353,7 @@ jit graph show $MILESTONE
 
 echo ""
 echo "Ready Issues (foundation to start with):"
-jit query ready --json 2>/dev/null | jq -r '.[] | "  \(.id): \(.title)"' || echo "  None (all blocked by dependencies)"
+jit query available --json 2>/dev/null | jq -r '.[] | "  \(.id): \(.title)"' || echo "  None (all blocked by dependencies)"
 
 echo ""
 echo "✅ Project Structure Complete!"

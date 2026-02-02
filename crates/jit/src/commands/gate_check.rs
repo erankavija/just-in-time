@@ -230,6 +230,15 @@ mod tests {
     fn setup() -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
         storage.init().unwrap();
+
+        // Create config with enforcement off for test backward compatibility
+        std::fs::create_dir_all(storage.root()).unwrap();
+        let config_toml = r#"
+[worktree]
+enforce_leases = "off"
+"#;
+        std::fs::write(storage.root().join("config.toml"), config_toml).unwrap();
+
         CommandExecutor::new(storage)
     }
 

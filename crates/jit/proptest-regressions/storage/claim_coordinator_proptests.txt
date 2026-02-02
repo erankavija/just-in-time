@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc bb88a8923c968b2c2da461abca25fe3b9180ba717aac1c2ecb86003ec26bfe88 # shrinks to issue_ids = ["ebm-591", "ogg-185"], ttls = [7103, 0, 0, 60, 600, 0, 600, 0]

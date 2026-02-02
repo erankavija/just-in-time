@@ -1,0 +1,53 @@
+{
+  "id": "aeae2290-3acb-4b1b-9e92-755fa8740a6e",
+  "title": "Define agent config.toml schema",
+  "description": "Define `~/.config/jit/agent.toml` schema with `[agent]` section (id, created_at, description, default_ttl) and `[behavior]` section (auto_heartbeat, heartbeat_interval). See design doc section \"Agent Configuration\".",
+  "state": "done",
+  "priority": "normal",
+  "assignee": "copilot:cli-session",
+  "dependencies": [
+    "65e7dccd-a7f0-4274-90c3-2d0a9384005b"
+  ],
+  "gates_required": [
+    "tdd-reminder",
+    "tests",
+    "clippy",
+    "fmt",
+    "code-review"
+  ],
+  "gates_status": {
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-02-02T16:39:54.919890902Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-02-02T16:45:37.085394307Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T16:42:00.442606335Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T16:41:38.322832476Z"
+    },
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T16:41:58.138119045Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "epic:parallel-work",
+    "milestone:v1.0",
+    "component:cli",
+    "type:task"
+  ]
+}

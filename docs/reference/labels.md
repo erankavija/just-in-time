@@ -32,7 +32,7 @@ jit issue create --title "Add login" \
 **Labels** (membership/grouping):
 - Purpose: Organization, filtering, reporting
 - Relationship: "belongs to" (many-to-many)
-- Query: `jit query label "epic:auth"` shows all members
+- Query: `jit query all --label "epic:auth"` shows all members
 - No workflow impact
 
 **Dependencies** (work order/blocking):
@@ -572,7 +572,7 @@ jit issue breakdown $EPIC
 # - milestone:v1.0 (inherited)
 
 # 4. Agent can add component labels to tasks
-TASK_IDS=$(jit issue list --json | jq -r '.[] | select(.dependencies[] == "'$EPIC'") | .id')
+TASK_IDS=$(jit query all --json | jq -r '.[] | select(.dependencies[] == "'$EPIC'") | .id')
 for task in $TASK_IDS; do
   jit issue update $task --label "component:backend"
 done
@@ -582,11 +582,11 @@ done
 
 ```bash
 # Agent wants to see high-level progress
-jit query label "milestone:*" --or label "epic:*"
+jit query all --label "milestone:*" --or label "epic:*"
 # Returns all strategic issues
 
 # Check milestone progress
-MILESTONE_ID=$(jit query label "milestone:v1.0" --json | jq -r '.[0].id')
+MILESTONE_ID=$(jit query all --label "milestone:v1.0" --json | jq -r '.[0].id')
 jit graph downstream $MILESTONE_ID --json | \
   jq '[.[] | .state] | group_by(.) | map({state: .[0], count: length})'
 # Returns: {"state":"done","count":12}, {"state":"in_progress","count":5}, ...
@@ -828,7 +828,7 @@ jit issue create \
 **DO:**
 - ✅ Use `type:task` + `epic:auth` for tasks
 - ✅ Use `type:epic` + `epic:auth` + `milestone:v1.0` for epics
-- ✅ Query by membership: `jit query label "epic:auth"`
+- ✅ Query by membership: `jit query all --label "epic:auth"`
 - ✅ Use lowercase for namespaces
 
 **DON'T:**

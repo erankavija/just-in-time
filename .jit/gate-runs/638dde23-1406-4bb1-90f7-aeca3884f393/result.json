@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "638dde23-1406-4bb1-90f7-aeca3884f393",
+  "gate_key": "clippy",
+  "stage": "postcheck",
+  "issue_id": "61783d2f-afd5-4f69-bb41-54081d8a6158",
+  "commit": "dc6212e0f54163cded2c30cd35a6420e1b12d6b0",
+  "branch": "agents/identity-work",
+  "status": "passed",
+  "started_at": "2026-01-06T20:24:07.051541306Z",
+  "completed_at": "2026-01-06T20:24:15.159298269Z",
+  "duration_ms": 8107,
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "    Blocking waiting for file lock on build directory\n   Compiling getrandom v0.3.4\n    Checking getrandom v0.2.16\n   Compiling num-traits v0.2.19\n    Checking futures-task v0.3.31\n    Checking hyper v1.8.1\n    Checking tower v0.4.13\n    Checking jit-dispatch v0.1.0 (/home/vkaskivuo/Projects/just-in-time-worktrees/task-identity/crates/dispatch)\n    Checking futures-util v0.3.31\n    Checking ring v0.17.14\n    Checking tempfile v3.23.0\n    Checking uuid v1.18.1\n    Checking hyper-util v0.1.19\n    Checking chrono v0.4.42\n    Checking rustls-webpki v0.103.8\n    Checking rustls v0.23.35\n    Checking tower v0.5.2\n    Checking axum-core v0.4.5\n    Checking axum v0.7.9\n    Checking ureq v2.12.1\n    Checking jit v0.2.0 (/home/vkaskivuo/Projects/just-in-time-worktrees/task-identity/crates/jit)\n    Checking jit-server v0.1.0 (/home/vkaskivuo/Projects/just-in-time-worktrees/task-identity/crates/server)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.92s\n",
+  "command": "cargo clippy --lib -- -D warnings",
+  "by": "auto:executor",
+  "message": null
+}

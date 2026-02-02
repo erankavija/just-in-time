@@ -368,7 +368,7 @@ fn test_batch_add_gates() {
 
     // Verify both issues have the gate
     let output = Command::new(&jit)
-        .args(["query", "label", "type:task", "--json"])
+        .args(["query", "all", "--label", "type:task", "--full", "--json"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -526,7 +526,7 @@ fn test_batch_remove_gates() {
 
     // Verify gates removed
     let output = Command::new(&jit)
-        .args(["query", "label", "type:task", "--json"])
+        .args(["query", "all", "--label", "type:task", "--full", "--json"])
         .current_dir(temp.path())
         .output()
         .unwrap();

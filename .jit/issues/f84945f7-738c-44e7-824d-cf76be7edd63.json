@@ -1,0 +1,68 @@
+{
+  "id": "f84945f7-738c-44e7-824d-cf76be7edd63",
+  "title": "Implement cross-worktree issue visibility with git fallback",
+  "description": "Implement the layered resolution strategy for issue reads as specified in the parallel work design document (dev/design/worktree-parallel-work.md lines 444-464).\n\n## Problem\n\nCurrently, `JsonFileStorage::load_issue()` only reads from the local `.jit/issues/` directory. This violates the fundamental design principle: \"All issue data remains readable from any worktree regardless of claims.\"\n\n**Impact:**\n- Secondary worktrees cannot read issues from main worktree or git\n- Breaks dependency checking across worktrees\n- Makes `jit query all`, `jit graph show`, etc. non-functional in secondary worktrees\n- Violates read/write separation principle from design\n\n## Solution\n\nImplement multi-source fallback for issue reads:\n\n1. **Local `.jit/`** - Check for local write copy first (already works)\n2. **Git HEAD** - Read committed issue state from git  \n3. **Main worktree `.jit/`** - Read uncommitted issues from main worktree\n\n## Implementation Details\n\n### Primary: `load_issue()` fallback chain\n\n```rust\nimpl JsonFileStorage {\n    fn load_issue(&self, id: &str) -> Result<Issue> {\n        // 1. Try local .jit/issues/ (current implementation)\n        let local_path = self.issue_path(id);\n        if local_path.exists() {\n            return self.read_json(&local_path);\n        }\n        \n        // 2. Try git HEAD\n        if let Ok(issue) = self.load_issue_from_git(id) {\n            return Ok(issue);\n        }\n        \n        // 3. Try main worktree .jit/ (if in secondary worktree)\n        if let Ok(issue) = self.load_issue_from_main_worktree(id) {\n            return Ok(issue);\n        }\n        \n        Err(anyhow!(\"Issue {} not found\", id))\n    }\n    \n    fn load_issue_from_git(&self, id: &str) -> Result<Issue> {\n        let output = Command::new(\"git\")\n            .args([\"show\", &format!(\"HEAD:.jit/issues/{}.json\", id)])\n            .output()?;\n            \n        if !output.status.success() {\n            bail!(\"Issue not in git\");\n        }\n        \n        serde_json::from_slice(&output.stdout)\n            .context(\"Failed to parse issue from git\")\n    }\n    \n    fn load_issue_from_main_worktree(&self, id: &str) -> Result<Issue> {\n        let paths = WorktreePaths::detect()?;\n        if paths.is_main_worktree() {\n            bail!(\"Already in main worktree\");\n        }\n        \n        let main_issue_path = paths.worktree_root\n            .parent().unwrap()\n            .join(\".jit/issues\")\n            .join(format!(\"{}.json\", id));\n            \n        if !main_issue_path.exists() {\n            bail!(\"Issue not in main worktree\");\n        }\n        \n        self.read_json(&main_issue_path)\n    }\n}\n```\n\n### Secondary: Update `query all` and index loading\n\n- `load_index()` should aggregate IDs from all sources\n- `list_all_issues()` should merge issues from local + git + main\n- Performance: Consider caching git reads\n\n## Acceptance Criteria\n\n- [ ] `jit issue show <id>` works from secondary worktree for issues in git\n- [ ] `jit issue show <id>` works from secondary worktree for uncommitted issues in main\n- [ ] `jit query all` shows all issues (local + git + main) from any worktree\n- [ ] `jit graph show` works across worktrees\n- [ ] Fallback order is correct: local → git → main worktree\n- [ ] Error messages are clear when issue truly doesn't exist\n- [ ] All existing tests still pass\n- [ ] New integration tests verify cross-worktree visibility\n\n## Testing Strategy\n\n```bash\n# Setup\ncd main-worktree\njit issue create --title \"Issue A\"  # Uncommitted\ngit add .jit && git commit -m \"Committed issue A\"\njit issue create --title \"Issue B\"  # Uncommitted\n\n# Create secondary worktree\ngit worktree add ../secondary test-branch\ncd ../secondary\njit init\n\n# Test reads\njit issue show <issue-A>  # Should work (from git)\njit issue show <issue-B>  # Should work (from main .jit/)\njit query all             # Should show both A and B\n\n# Claim in secondary\njit claim acquire <issue-A> --agent-id agent:test\n# Now issue-A has local write copy + exists in git\n\njit issue show <issue-A>  # Should read from local (preferred)\n```\n\n## References\n\n- Design doc: dev/design/worktree-parallel-work.md lines 444-464\n- Story review: dev/sessions/session-20260115-story-review-f023.md",
+  "state": "done",
+  "priority": "critical",
+  "assignee": "copilot:cli-session",
+  "dependencies": [],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [
+    {
+      "path": "dev/design/worktree-parallel-work.md",
+      "commit": null,
+      "label": "Referenced in implementation plan (embedded in issue description)",
+      "doc_type": "design",
+      "format": "markdown",
+      "assets": [
+        {
+          "original_path": "https://automerge.org/",
+          "resolved_path": null,
+          "asset_type": "external",
+          "mime_type": null,
+          "content_hash": null,
+          "is_shared": false
+        },
+        {
+          "original_path": "https://git-scm.com/docs/git-worktree",
+          "resolved_path": null,
+          "asset_type": "external",
+          "mime_type": null,
+          "content_hash": null,
+          "is_shared": false
+        },
+        {
+          "original_path": "https://docs.rs/fs4/",
+          "resolved_path": null,
+          "asset_type": "external",
+          "mime_type": null,
+          "content_hash": null,
+          "is_shared": false
+        },
+        {
+          "original_path": "https://github.com/ulid/spec",
+          "resolved_path": null,
+          "asset_type": "external",
+          "mime_type": null,
+          "content_hash": null,
+          "is_shared": false
+        }
+      ]
+    },
+    {
+      "path": "dev/sessions/session-20260118-f849-manual-testing.md",
+      "commit": null,
+      "label": "Manual testing report - all 7 tests passed",
+      "doc_type": "notes",
+      "format": "markdown"
+    }
+  ],
+  "labels": [
+    "epic:parallel-work",
+    "component:storage",
+    "milestone:v1.0",
+    "type:task"
+  ]
+}

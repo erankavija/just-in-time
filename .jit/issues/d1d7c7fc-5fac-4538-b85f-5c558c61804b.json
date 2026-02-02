@@ -1,0 +1,53 @@
+{
+  "id": "d1d7c7fc-5fac-4538-b85f-5c558c61804b",
+  "title": "Implement environment variable overrides",
+  "description": "Implement environment variable overrides: `JIT_AGENT_ID`, `JIT_WORKTREE_MODE`, `JIT_ENFORCE_LEASES`. Document precedence over config files.",
+  "state": "done",
+  "priority": "normal",
+  "assignee": "copilot:cli-session",
+  "dependencies": [
+    "65e7dccd-a7f0-4274-90c3-2d0a9384005b"
+  ],
+  "gates_required": [
+    "tdd-reminder",
+    "tests",
+    "clippy",
+    "fmt",
+    "code-review"
+  ],
+  "gates_status": {
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-02-02T17:09:27.832550627Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T17:11:29.195628249Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-02-02T17:11:37.753397907Z"
+    },
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T17:11:26.891160970Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T17:11:07.175983359Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "epic:parallel-work",
+    "milestone:v1.0",
+    "component:cli",
+    "type:task"
+  ]
+}

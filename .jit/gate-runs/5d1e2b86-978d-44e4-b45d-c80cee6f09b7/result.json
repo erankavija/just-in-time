@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "5d1e2b86-978d-44e4-b45d-c80cee6f09b7",
+  "gate_key": "fmt",
+  "stage": "postcheck",
+  "issue_id": "608ae1e8-1523-482a-9a17-428b64c95f61",
+  "commit": "41817b666fc4de9677bf52454641a519eac67326",
+  "branch": "feature/worktree-parallel-work",
+  "status": "failed",
+  "started_at": "2026-02-02T17:47:04.846335813Z",
+  "completed_at": "2026-02-02T17:47:05.248735938Z",
+  "duration_ms": 402,
+  "exit_code": 1,
+  "stdout": "Diff in /home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/claim_coordinator.rs:1799:\n             .unwrap();\n \n         // Third should fail - exceeds per-agent limit\n\u001b[31m-        let result = coordinator.acquire_claim_with_reason(\"issue-3\", 0, Some(\"Manual task 3\"), 2, 10);\n\u001b[m\u000f\u001b[32m+        let result =\n\u001b[m\u000f\u001b[32m+            coordinator.acquire_claim_with_reason(\"issue-3\", 0, Some(\"Manual task 3\"), 2, 10);\n\u001b[m\u000f         assert!(result.is_err());\n         let err = result.unwrap_err().to_string();\n         assert!(\nDiff in /home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:2933:\n                                             \"  ⚠️  STALE: Lease marked stale (no heartbeat for {} minutes)\",\n                                             since_beat.num_minutes()\n                                         );\n\u001b[31m-                                        println!(\"     Use 'jit claim heartbeat {}' to refresh\", lease.lease_id);\n\u001b[m\u000f\u001b[32m+                                        println!(\n\u001b[m\u000f\u001b[32m+                                            \"     Use 'jit claim heartbeat {}' to refresh\",\n\u001b[m\u000f\u001b[32m+                                            lease.lease_id\n\u001b[m\u000f\u001b[32m+                                        );\n\u001b[m\u000f                                     }\n                                 }\n                                 println!();\n",
+  "stderr": "",
+  "command": "cargo fmt -- --check",
+  "by": "auto:executor",
+  "message": null
+}

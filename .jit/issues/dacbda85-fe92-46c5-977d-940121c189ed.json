@@ -1,0 +1,53 @@
+{
+  "id": "dacbda85-fe92-46c5-977d-940121c189ed",
+  "title": "Implement lock metadata for diagnostics",
+  "description": "Implement lock metadata files (`*.lock.meta`) with PID, agent_id, created_at, and last_updated. Enable diagnosis of stuck processes. Clean up metadata on lock release. See design doc section \"Lock Hygiene and Metadata\".",
+  "state": "done",
+  "priority": "high",
+  "assignee": "agent:copilot-session",
+  "dependencies": [
+    "b74af86f-388d-49a2-a172-bc9fdaa7bb9c"
+  ],
+  "gates_required": [
+    "tdd-reminder",
+    "tests",
+    "clippy",
+    "fmt",
+    "code-review"
+  ],
+  "gates_status": {
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": "agent:copilot-session",
+      "updated_at": "2026-02-02T10:01:35.028074600Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T10:11:00.344319769Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "agent:copilot-session",
+      "updated_at": "2026-02-02T10:11:27.382416014Z"
+    },
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T10:11:20.259282906Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T10:14:27.675670697Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "epic:parallel-work",
+    "milestone:v1.0",
+    "component:storage",
+    "type:task"
+  ]
+}

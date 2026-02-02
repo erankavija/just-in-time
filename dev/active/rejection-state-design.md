@@ -73,8 +73,8 @@ jit issue reject <id>  # shortcuts to --state rejected
 ### 4. Query Support
 
 ```bash
-jit query state rejected
-jit query state done
+jit query all --state rejected
+jit query all --state done
 
 # Query terminal states
 jit query closed  # returns both Done and Rejected
@@ -121,7 +121,7 @@ Existing issues: No migration needed
 |--------|------|----------|
 | **Meaning** | Successfully delivered | Won't implement |
 | **Gates** | Must pass all gates | Bypasses gates |
-| **Query** | `jit query state done` | `jit query state rejected` |
+| **Query** | `jit query all --state done` | `jit query all --state rejected` |
 | **Metrics** | Counts as completion | Counts as closure |
 | **Labels** | Optional | Optional (resolution:*) |
 

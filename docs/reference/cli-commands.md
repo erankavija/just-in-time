@@ -740,7 +740,7 @@ jit issue show $ISSUE
 jit issue reject $ISSUE --reason "duplicate"
 
 # Query rejected issues
-jit query state rejected --json | jq -r '.issues[] | {id, title, labels}'
+jit query all --state rejected --json | jq -r '.issues[] | {id, title, labels}'
 ```
 
 **State transition examples:**
@@ -1022,10 +1022,10 @@ jit issue show abc123 --json | jq '.data.gates_status'
 **Find issues with specific gate status:**
 ```bash
 # Find all gated issues (waiting for gates)
-jit query state gated
+jit query all --state gated
 
 # Use jq to filter by specific gate
-jit issue list --json | jq '.issues[] | select(.gates_status.tests.status == "failed")'
+jit query all --json | jq '.issues[] | select(.gates_status.tests.status == "failed")'
 ```
 
 ### Exit Codes
@@ -1043,7 +1043,7 @@ All gate commands use standard exit codes:
 
 ## Query Commands
 
-<!-- jit query ready, blocked, etc. -->
+<!-- jit query available, blocked, etc. -->
 
 ## Document Commands
 
@@ -1076,8 +1076,8 @@ echo "Created issue: $ISSUE_ID"
 jit issue update $ISSUE_ID --state done --quiet
 
 # Pipe to other commands without headers
-jit issue list --quiet | grep "Bug"
-jit query ready --quiet | head -5
+jit query all --quiet | grep "Bug"
+jit query available --quiet | head -5
 
 # Dependency operations silently succeed
 jit dep add $ISSUE1 $ISSUE2 --quiet
@@ -1095,10 +1095,10 @@ ISSUE_ID=$(jit issue create --title "Add feature" --orphan --quiet --json | jq -
 jit issue show $ISSUE_ID --json --quiet | jq -r '.data.title'
 
 # Process lists
-jit issue list --json --quiet | jq -r '.data.issues[] | select(.priority == "High") | .id'
+jit query all --json --quiet | jq -r '.data.issues[] | select(.priority == "High") | .id'
 
 # Query and filter
-jit query ready --json --quiet | jq -r '.data.issues[0].id'
+jit query available --json --quiet | jq -r '.data.issues[0].id'
 
 # Get status counts
 jit status --json --quiet | jq -r '.data.summary.by_state'
@@ -1110,14 +1110,14 @@ JIT handles broken pipes gracefully (no panics):
 
 ```bash
 # Safe to pipe to head/tail
-jit issue list | head -1          # Clean exit, no error
-jit query ready --quiet | head -3  # Works perfectly
+jit query all | head -1          # Clean exit, no error
+jit query available --quiet | head -3  # Works perfectly
 
 # Chain with grep
-jit issue list --quiet | grep -i "bug"
+jit query all --quiet | grep -i "bug"
 
 # Use with while loops
-jit query ready --quiet | while read -r line; do
+jit query available --quiet | while read -r line; do
   echo "Processing: $line"
 done
 ```
@@ -1145,7 +1145,7 @@ done < issues.csv
 #!/bin/bash
 # Find ready issues and process them
 
-jit query ready --quiet | while read -r line; do
+jit query available --quiet | while read -r line; do
   # Extract issue ID (first field)
   ISSUE_ID=$(echo "$line" | awk '{print $1}')
   
@@ -1198,8 +1198,8 @@ echo "Date: $(date)"
 echo ""
 
 # Get counts
-READY=$(jit query ready --json --quiet | jq -r '.data.count')
-IN_PROGRESS=$(jit query state in_progress --json --quiet | jq -r '.data.count')
+READY=$(jit query available --json --quiet | jq -r '.data.count')
+IN_PROGRESS=$(jit query all --state in_progress --json --quiet | jq -r '.data.count')
 BLOCKED=$(jit query blocked --json --quiet | jq -r '.data.count')
 DONE_TODAY=$(jit events query --event-type state_changed --limit 100 --json | \
   jq -r '[.[] | select(.new_state == "done")] | length')

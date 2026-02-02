@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "1ec773bb-c2c5-428b-b3ba-0115f4292204",
+  "gate_key": "clippy",
+  "stage": "postcheck",
+  "issue_id": "62ff2fd9-47d3-4057-9a5b-92ee2e269cfb",
+  "commit": "01961449dc6ee0af3c5778d08796162e7229aad1",
+  "branch": "feature/worktree-parallel-work",
+  "status": "passed",
+  "started_at": "2026-02-01T23:37:36.648437480Z",
+  "completed_at": "2026-02-01T23:37:41.753560940Z",
+  "duration_ms": 5105,
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "    Blocking waiting for file lock on package cache\n    Blocking waiting for file lock on package cache\n    Blocking waiting for file lock on package cache\n    Checking jit-dispatch v0.1.0 (/home/vkaskivuo/Projects/just-in-time/crates/dispatch)\n    Checking jit v0.2.0 (/home/vkaskivuo/Projects/just-in-time/crates/jit)\n    Checking jit-server v0.1.0 (/home/vkaskivuo/Projects/just-in-time/crates/server)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.81s\n",
+  "command": "cargo clippy --lib -- -D warnings",
+  "by": "auto:executor",
+  "message": null
+}

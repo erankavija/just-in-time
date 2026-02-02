@@ -1,0 +1,53 @@
+{
+  "id": "e8f9a2ff-e921-439d-9a9e-0710218368ff",
+  "title": "Implement index consistency validation",
+  "description": "Implement `verify_index_consistency()` to detect: duplicate leases per issue, expired entries in index, missing sequence numbers, schema version mismatches. Return detailed validation results. See design doc section \"Index Consistency Validation\".",
+  "state": "done",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "b74af86f-388d-49a2-a172-bc9fdaa7bb9c"
+  ],
+  "gates_required": [
+    "tdd-reminder",
+    "tests",
+    "clippy",
+    "fmt",
+    "code-review"
+  ],
+  "gates_status": {
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": "agent:copilot-session",
+      "updated_at": "2026-02-02T11:06:53.236641759Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T11:23:10.920602186Z"
+    },
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T11:23:30.635735447Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T11:23:32.939925976Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "agent:copilot-session",
+      "updated_at": "2026-02-02T11:10:59.700403152Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "epic:parallel-work",
+    "milestone:v1.0",
+    "component:storage",
+    "type:task"
+  ]
+}

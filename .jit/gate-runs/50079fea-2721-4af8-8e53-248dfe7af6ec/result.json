@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "50079fea-2721-4af8-8e53-248dfe7af6ec",
+  "gate_key": "fmt",
+  "stage": "postcheck",
+  "issue_id": "608ae1e8-1523-482a-9a17-428b64c95f61",
+  "commit": "41817b666fc4de9677bf52454641a519eac67326",
+  "branch": "feature/worktree-parallel-work",
+  "status": "failed",
+  "started_at": "2026-02-02T17:34:51.113419711Z",
+  "completed_at": "2026-02-02T17:34:51.515997456Z",
+  "duration_ms": 402,
+  "exit_code": 1,
+  "stdout": "Diff in /home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/claim_coordinator.rs:351:\n \n             // Per-repo limit (default: 10)\n             let max_per_repo = 10u64;\n\u001b[31m-            let repo_indefinite_count = index.leases.iter().filter(|l| l.ttl_secs == 0).count() as u64;\n\u001b[m\u000f\u001b[32m+            let repo_indefinite_count =\n\u001b[m\u000f\u001b[32m+                index.leases.iter().filter(|l| l.ttl_secs == 0).count() as u64;\n\u001b[m\u000f \n             if repo_indefinite_count >= max_per_repo {\n                 bail!(\n",
+  "stderr": "",
+  "command": "cargo fmt -- --check",
+  "by": "auto:executor",
+  "message": null
+}

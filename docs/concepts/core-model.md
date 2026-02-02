@@ -573,30 +573,30 @@ jit issue update abc123 \
 **Exact match:**
 ```bash
 # Find all auth epic issues
-jit query label "epic:auth"
+jit query all --label "epic:auth"
 
 # Find all v1.0 milestone issues
-jit query label "milestone:v1.0"
+jit query all --label "milestone:v1.0"
 ```
 
 **Wildcard (namespace match):**
 ```bash
 # Find all issues with ANY milestone
-jit query label "milestone:*"
+jit query all --label "milestone:*"
 
 # Find all issues with ANY epic
-jit query label "epic:*"
+jit query all --label "epic:*"
 
 # Find all component-tagged issues
-jit query label "component:*"
+jit query all --label "component:*"
 ```
 
 **Boolean queries:**
 ```bash
 # Complex filters
-jit issue list --filter "label:epic:auth AND label:component:backend"
-jit issue list --filter "label:milestone:v1.0 OR label:milestone:v1.1"
-jit issue list --filter "label:type:task AND NOT label:epic:*"
+jit query all --filter "label:epic:auth AND label:component:backend"
+jit query all --filter "label:milestone:v1.0 OR label:milestone:v1.1"
+jit query all --filter "label:type:task AND NOT label:epic:*"
 ```
 
 ### Label vs Dependency Semantics

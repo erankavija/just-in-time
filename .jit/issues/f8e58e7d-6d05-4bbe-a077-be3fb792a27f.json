@@ -1,0 +1,61 @@
+{
+  "id": "f8e58e7d-6d05-4bbe-a077-be3fb792a27f",
+  "title": "Add divergence and lease validation to jit validate",
+  "description": "Add `--divergence` and `--leases` flags to `jit validate` command. Validate branch divergence from main and lease consistency respectively. Report issues with fix suggestions.",
+  "state": "done",
+  "priority": "high",
+  "assignee": "agent:copilot-cli",
+  "dependencies": [
+    "b74af86f-388d-49a2-a172-bc9fdaa7bb9c"
+  ],
+  "gates_required": [
+    "tdd-reminder",
+    "tests",
+    "clippy",
+    "fmt",
+    "code-review"
+  ],
+  "gates_status": {
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-15T20:46:37.065729138Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-15T20:46:41.914738999Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-15T20:46:12.438670549Z"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-01-15T20:46:12.327384154Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-01-15T20:46:42.442070312Z"
+    }
+  },
+  "context": {},
+  "documents": [
+    {
+      "path": "dev/sessions/session-20260111-validate-implementation.md",
+      "commit": null,
+      "label": "Implementation Session Notes - Code Review Findings",
+      "doc_type": "notes",
+      "format": "markdown"
+    }
+  ],
+  "labels": [
+    "epic:parallel-work",
+    "milestone:v1.0",
+    "component:cli",
+    "type:task"
+  ]
+}

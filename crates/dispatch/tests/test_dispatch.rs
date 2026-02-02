@@ -72,15 +72,15 @@ fn create_ready_issue(repo_path: &Path, title: &str) -> String {
     id
 }
 
-/// Test helper: Query ready issues from jit
+/// Test helper: Query available issues from jit
 fn query_ready_issues(repo_path: &Path) -> Vec<serde_json::Value> {
     let output = std::process::Command::new(jit_binary())
-        .args(["query", "ready", "--json"])
+        .args(["query", "available", "--json"])
         .current_dir(repo_path)
         .output()
         .unwrap();
 
-    assert!(output.status.success(), "Failed to query ready issues");
+    assert!(output.status.success(), "Failed to query available issues");
 
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     json["data"]["issues"].as_array().unwrap().to_vec()
@@ -119,7 +119,7 @@ fn test_dispatch_claims_issues_for_agents() {
 
     // Query by assignee should show 1
     let output = std::process::Command::new(jit_binary())
-        .args(["query", "assignee", "agent:test-worker", "--json"])
+        .args(["query", "all", "--assignee", "agent:test-worker", "--json"])
         .current_dir(repo.path())
         .output()
         .unwrap();
@@ -146,7 +146,7 @@ fn test_dispatch_respects_priority() {
 
     // Query high priority should return 1
     let output = std::process::Command::new(jit_binary())
-        .args(["query", "priority", "high", "--json"])
+        .args(["query", "all", "--priority", "high", "--json"])
         .current_dir(repo.path())
         .output()
         .unwrap();

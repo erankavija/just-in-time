@@ -94,6 +94,23 @@ pub enum Commands {
     #[command(subcommand)]
     Snapshot(SnapshotCommands),
 
+    /// Claim coordination commands
+    ///
+    /// Manage lease-based claims on issues for parallel work coordination.
+    /// Leases prevent conflicting edits across multiple agents and worktrees.
+    #[command(subcommand)]
+    Claim(ClaimCommands),
+
+    /// Worktree information commands
+    ///
+    /// Display and manage git worktree context for parallel work.
+    #[command(subcommand)]
+    Worktree(WorktreeCommands),
+
+    /// Git hooks installation and management
+    #[command(subcommand)]
+    Hooks(HooksCommands),
+
     /// Search issues and documents
     Search {
         /// Search query string
@@ -142,6 +159,28 @@ pub enum Commands {
         /// Show what would be fixed without applying changes (requires --fix)
         #[arg(long)]
         dry_run: bool,
+
+        /// Validate branch hasn't diverged from main
+        #[arg(long)]
+        divergence: bool,
+
+        /// Validate active leases are consistent and not stale
+        #[arg(long)]
+        leases: bool,
+    },
+
+    /// Run recovery routines to fix common issues
+    ///
+    /// Performs automatic recovery operations:
+    /// - Cleans up stale locks from crashed processes (PID check)
+    /// - Rebuilds corrupted claims index from append-only log
+    /// - Evicts expired leases
+    /// - Removes orphaned temp files (older than 1 hour)
+    ///
+    /// Safe to run at any time - only removes provably stale data.
+    Recover {
+        #[arg(long)]
+        json: bool,
     },
 }
 
@@ -176,21 +215,6 @@ pub enum IssueCommands {
         /// Explicitly allow orphaned leaf issues (tasks without parent labels)
         #[arg(long)]
         orphan: bool,
-
-        #[arg(long)]
-        json: bool,
-    },
-
-    /// List issues
-    List {
-        #[arg(short, long)]
-        state: Option<String>,
-
-        #[arg(short, long)]
-        assignee: Option<String>,
-
-        #[arg(short, long)]
-        priority: Option<String>,
 
         #[arg(long)]
         json: bool,
@@ -705,6 +729,30 @@ pub enum GraphCommands {
         json: bool,
     },
 
+    /// Show what an issue depends on (upstream dependencies)
+    ///
+    /// Shows the issues that must be completed before this issue can proceed.
+    /// By default shows immediate dependencies only (depth 1).
+    ///
+    /// Example:
+    ///   jit graph deps epic-123
+    ///   Shows: task-456, task-789 (epic depends on these)
+    ///
+    /// "Dependencies" = what this issue needs (upstream in work flow).
+    /// "Dependents" = what needs this issue (downstream in work flow).
+    #[command(alias = "dependencies")]
+    Deps {
+        /// Issue ID
+        id: String,
+
+        /// Show transitive dependencies (all levels)
+        #[arg(long)]
+        transitive: bool,
+
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Show downstream dependents (issues that are blocked by this one)
     ///
     /// "Downstream" means work flow direction (toward completion/delivery).
@@ -806,46 +854,63 @@ pub enum EventCommands {
 
 #[derive(Subcommand)]
 pub enum QueryCommands {
-    /// Query ready issues (unassigned, state=ready, unblocked)
-    Ready {
+    /// Query all issues with optional filters
+    All {
+        /// Filter by state
+        #[arg(short = 's', long)]
+        state: Option<String>,
+
+        /// Filter by assignee (format: type:identifier)
+        #[arg(short = 'a', long)]
+        assignee: Option<String>,
+
+        /// Filter by priority
+        #[arg(short = 'p', long)]
+        priority: Option<String>,
+
+        /// Filter by label pattern (exact match or wildcard)
+        #[arg(short = 'l', long)]
+        label: Option<String>,
+
+        /// Return full issue objects instead of minimal summaries
+        #[arg(long)]
+        full: bool,
+
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Query available issues (unassigned, state=ready, unblocked)
+    Available {
+        /// Filter by priority
+        #[arg(short = 'p', long)]
+        priority: Option<String>,
+
+        /// Filter by label pattern (exact match or wildcard)
+        #[arg(short = 'l', long)]
+        label: Option<String>,
+
+        /// Return full issue objects instead of minimal summaries
+        #[arg(long)]
+        full: bool,
+
         #[arg(long)]
         json: bool,
     },
 
     /// Query blocked issues with reasons
     Blocked {
+        /// Filter by priority
+        #[arg(short = 'p', long)]
+        priority: Option<String>,
+
+        /// Filter by label pattern (exact match or wildcard)
+        #[arg(short = 'l', long)]
+        label: Option<String>,
+
+        /// Return full issue objects instead of minimal summaries
         #[arg(long)]
-        json: bool,
-    },
-
-    /// Query issues by assignee
-    Assignee {
-        assignee: String,
-
-        #[arg(long)]
-        json: bool,
-    },
-
-    /// Query issues by state
-    State {
-        state: String,
-
-        #[arg(long)]
-        json: bool,
-    },
-
-    /// Query issues by priority
-    Priority {
-        priority: String,
-
-        #[arg(long)]
-        json: bool,
-    },
-
-    /// Query issues by label (exact match or wildcard)
-    Label {
-        /// Label pattern: 'namespace:value' for exact match, 'namespace:*' for wildcard
-        pattern: String,
+        full: bool,
 
         #[arg(long)]
         json: bool,
@@ -853,12 +918,36 @@ pub enum QueryCommands {
 
     /// Query strategic issues (those with labels from strategic namespaces)
     Strategic {
+        /// Filter by priority
+        #[arg(short = 'p', long)]
+        priority: Option<String>,
+
+        /// Filter by label pattern (exact match or wildcard)
+        #[arg(short = 'l', long)]
+        label: Option<String>,
+
+        /// Return full issue objects instead of minimal summaries
+        #[arg(long)]
+        full: bool,
+
         #[arg(long)]
         json: bool,
     },
 
     /// Query closed issues (Done or Rejected states)
     Closed {
+        /// Filter by priority
+        #[arg(short = 'p', long)]
+        priority: Option<String>,
+
+        /// Filter by label pattern (exact match or wildcard)
+        #[arg(short = 'l', long)]
+        label: Option<String>,
+
+        /// Return full issue objects instead of minimal summaries
+        #[arg(long)]
+        full: bool,
+
         #[arg(long)]
         json: bool,
     },
@@ -884,6 +973,67 @@ pub enum LabelCommands {
 
 #[derive(Subcommand)]
 pub enum ConfigCommands {
+    /// Show effective configuration from all sources
+    ///
+    /// Displays merged configuration with values from:
+    /// 1. Repository config (.jit/config.toml) - highest priority
+    /// 2. User config (~/.config/jit/config.toml)
+    /// 3. System config (/etc/jit/config.toml)
+    /// 4. Defaults - lowest priority
+    Show {
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Get a specific configuration value
+    ///
+    /// Examples:
+    ///   jit config get coordination.default_ttl_secs
+    ///   jit config get worktree.mode
+    Get {
+        /// Configuration key (e.g., coordination.default_ttl_secs)
+        key: String,
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Set a configuration value
+    ///
+    /// By default, sets value in repository config (.jit/config.toml).
+    /// Use --global to set in user config (~/.config/jit/config.toml).
+    ///
+    /// Examples:
+    ///   jit config set coordination.default_ttl_secs 1200
+    ///   jit config set --global worktree.enforce_leases warn
+    Set {
+        /// Configuration key (e.g., coordination.default_ttl_secs)
+        key: String,
+        /// Value to set
+        value: String,
+        /// Set in user config instead of repository config
+        #[arg(long)]
+        global: bool,
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Validate configuration files for errors and warnings
+    ///
+    /// Checks configuration for:
+    /// - Syntax errors in TOML files
+    /// - Invalid values (e.g., unknown mode values)
+    /// - Deprecated options
+    /// - Missing required fields
+    ///
+    /// Exit codes:
+    ///   0 - Valid configuration
+    ///   1 - Errors found (invalid configuration)
+    ///   2 - Warnings only (valid but may cause issues)
+    Validate {
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Show current type hierarchy
     ShowHierarchy {
         #[arg(long)]
@@ -959,6 +1109,209 @@ pub enum SnapshotCommands {
         force: bool,
 
         /// Output metadata as JSON instead of human-readable format
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum ClaimCommands {
+    /// Acquire a lease on an issue
+    ///
+    /// Acquires an exclusive lease to work on an issue. Only one agent can hold
+    /// a lease on an issue at a time, preventing conflicting edits.
+    ///
+    /// Examples:
+    ///   jit claim acquire abc123 --ttl 600        # 10-minute lease
+    ///   jit claim acquire abc123 --ttl 3600       # 1-hour lease
+    ///   jit claim acquire abc123 --ttl 0 --reason "Manual oversight"  # Indefinite (requires reason)
+    Acquire {
+        /// Issue ID to claim
+        issue_id: String,
+
+        /// Time-to-live in seconds (0 for indefinite, requires --reason)
+        #[arg(long, default_value = "600")]
+        ttl: u64,
+
+        /// Agent identifier (defaults to current agent from config)
+        #[arg(long)]
+        agent_id: Option<String>,
+
+        /// Reason for claim (required for TTL=0)
+        #[arg(long)]
+        reason: Option<String>,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Release a lease
+    ///
+    /// Explicitly releases a lease before it expires, making the issue available
+    /// for other agents to claim.
+    ///
+    /// Examples:
+    ///   jit claim release abc12345-6789-...
+    ///   jit claim release abc12345-6789-... --json
+    Release {
+        /// Lease ID to release
+        lease_id: String,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Renew a lease
+    ///
+    /// Extends the expiry time of an existing lease. Allows agents to continue
+    /// working on an issue beyond the original TTL.
+    ///
+    /// Examples:
+    ///   jit claim renew abc12345-6789-... --extension 600   # Extend by 10 minutes
+    ///   jit claim renew abc12345-6789-... --extension 3600  # Extend by 1 hour
+    ///   jit claim renew abc12345-6789-...                   # Use default (10 minutes)
+    Renew {
+        /// Lease ID to renew
+        lease_id: String,
+
+        /// How many seconds to extend the lease by
+        #[arg(long, default_value = "600")]
+        extension: u64,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Send heartbeat for an indefinite lease
+    ///
+    /// Updates the last_beat timestamp without changing expiration.
+    /// Used to signal the agent is still actively working on the issue.
+    /// Only needed for TTL=0 (indefinite) leases to prevent staleness.
+    ///
+    /// Examples:
+    ///   jit claim heartbeat abc12345-6789-...       # Send heartbeat
+    ///   jit claim heartbeat abc12345-6789-... --json
+    Heartbeat {
+        /// Lease ID to heartbeat
+        lease_id: String,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Show active lease status
+    ///
+    /// By default, shows leases for the current agent.
+    /// Use --issue or --agent to filter by specific issue or agent.
+    ///
+    /// Examples:
+    ///   jit claim status                        # Show my leases
+    ///   jit claim status --issue 01ABC          # Check who has issue
+    ///   jit claim status --agent agent:copilot  # Show copilot's leases
+    ///   jit claim status --json
+    Status {
+        /// Filter by issue ID
+        #[arg(long)]
+        issue: Option<String>,
+
+        /// Filter by agent ID (format: type:identifier)
+        #[arg(long)]
+        agent: Option<String>,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// List all active leases
+    ///
+    /// Shows all active leases across all agents and worktrees. Useful for
+    /// seeing the global state of who is working on what.
+    ///
+    /// Examples:
+    ///   jit claim list             # Show all leases
+    ///   jit claim list --json      # JSON output
+    List {
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Force-evict a lease (admin operation)
+    ///
+    /// Removes a lease immediately, regardless of who owns it. This is an
+    /// administrative operation for handling stale leases or emergency situations.
+    /// The eviction is logged with the provided reason for audit trail.
+    ///
+    /// Examples:
+    ///   jit claim force-evict abc12345-6789-... --reason "Stale after crash"
+    ///   jit claim force-evict abc12345-6789-... --reason "Admin override" --json
+    ForceEvict {
+        /// Lease ID to evict
+        lease_id: String,
+
+        /// Reason for eviction (required for audit trail)
+        #[arg(long)]
+        reason: String,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+/// Worktree commands
+#[derive(Debug, Subcommand)]
+pub enum WorktreeCommands {
+    /// Show current worktree information
+    ///
+    /// Displays worktree ID, branch, root path, and whether this is the
+    /// main worktree or a secondary one.
+    ///
+    /// Examples:
+    ///   jit worktree info          # Show current worktree info
+    ///   jit worktree info --json   # JSON output
+    Info {
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// List all git worktrees with JIT status
+    ///
+    /// Shows all worktrees with their worktree ID, branch, path,
+    /// and count of active claims.
+    ///
+    /// Examples:
+    ///   jit worktree list          # List all worktrees
+    ///   jit worktree list --json   # JSON output
+    List {
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+/// Git hooks commands
+#[derive(Debug, Subcommand)]
+pub enum HooksCommands {
+    /// Install git hooks for lease and divergence validation
+    ///
+    /// Copies hook templates to .git/hooks/ and makes them executable.
+    ///
+    /// Hooks installed:
+    ///   - pre-commit: Validates leases and divergence before commit
+    ///   - pre-push: Validates leases before push
+    ///
+    /// Examples:
+    ///   jit hooks install          # Install hooks
+    ///   jit hooks install --json   # JSON output
+    Install {
+        /// Output as JSON
         #[arg(long)]
         json: bool,
     },

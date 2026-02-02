@@ -139,7 +139,7 @@ After creating the structure, provide:
 1. Summary of created issues (count by type)
 2. Dependency graph visualization (`jit graph show <milestone-id>`)
 3. Strategic view (`jit query strategic`)
-4. List of ready-to-work tasks (`jit query ready`)
+4. List of ready-to-work tasks (`jit query available`)
 ```
 
 ---
@@ -325,7 +325,7 @@ jit graph show $MILESTONE
 jit query strategic
 
 # Count issues by type
-jit issue list --json | jq 'group_by(.labels[] | select(startswith("type:"))) | map({type: .[0].labels[] | select(startswith("type:")), count: length})'
+jit query all --json | jq 'group_by(.labels[] | select(startswith("type:"))) | map({type: .[0].labels[] | select(startswith("type:")), count: length})'
 
 # Verify no cycles
 jit validate
@@ -482,13 +482,13 @@ echo "Strategic View:"
 jit query strategic --json | jq -r '.[] | "[\(.labels[] | select(startswith("type:")))] \(.title)"'
 echo ""
 echo "Issue Count by Type:"
-jit issue list --json | jq -r '[.[] | .labels[] | select(startswith("type:"))] | group_by(.) | map({type: .[0], count: length}) | .[]' | jq -r '"\(.type): \(.count)"'
+jit query all --json | jq -r '[.[] | .labels[] | select(startswith("type:"))] | group_by(.) | map({type: .[0], count: length}) | .[]' | jq -r '"\(.type): \(.count)"'
 echo ""
 echo "Dependency Graph (milestone):"
 jit graph show $MILESTONE
 echo ""
 echo "Ready Issues (should be none initially):"
-jit query ready
+jit query available
 echo ""
 echo "✅ Project initialized successfully!"
 echo "Milestone ID: $MILESTONE"

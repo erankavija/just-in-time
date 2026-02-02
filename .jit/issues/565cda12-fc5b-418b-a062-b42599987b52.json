@@ -1,0 +1,51 @@
+{
+  "id": "565cda12-fc5b-418b-a062-b42599987b52",
+  "title": "Create control plane directory structure",
+  "description": "Create `.git/jit/` control plane directory structure with proper 0700 permissions. Create subdirectories: `locks/`, `heartbeat/`, `events/`. Ensure atomic directory creation. See design doc section \"Directory Layout\".",
+  "state": "done",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "tdd-reminder",
+    "tests",
+    "clippy",
+    "fmt",
+    "code-review"
+  ],
+  "gates_status": {
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-06T20:50:40.087951650Z"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-01-06T20:50:35.270669196Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-01-06T20:50:40.493997857Z"
+    },
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-06T20:50:36.580051063Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-06T20:50:35.273624676Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "epic:parallel-work",
+    "milestone:v1.0",
+    "component:storage",
+    "type:task"
+  ]
+}

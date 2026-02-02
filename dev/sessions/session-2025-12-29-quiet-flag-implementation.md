@@ -244,7 +244,7 @@ Search for `Commands::Event` or `EventCommands::`
 2. Clippy passes with zero warnings
 3. `cargo fmt --all`
 4. Manual smoke test of common operations in quiet mode
-5. Test broken pipe handling: `jit issue list | head -1`
+5. Test broken pipe handling: `jit query all | head -1`
 
 ---
 

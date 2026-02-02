@@ -1,0 +1,53 @@
+{
+  "id": "bc3742d9-15d5-455f-a5a8-c12976c21f12",
+  "title": "Create pre-commit hook for lease and divergence validation",
+  "description": "Create pre-commit hook template that validates: (1) structural edits have active, non-stale lease, (2) global operations have common history with main. Extract issue IDs from changed files, check against claims index with `.stale != true` filter.\n\nSee design doc section \"Pre-Commit Hook\".",
+  "state": "done",
+  "priority": "high",
+  "assignee": "agent:copilot-session",
+  "dependencies": [
+    "b74af86f-388d-49a2-a172-bc9fdaa7bb9c"
+  ],
+  "gates_required": [
+    "tdd-reminder",
+    "tests",
+    "clippy",
+    "fmt",
+    "code-review"
+  ],
+  "gates_status": {
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-01T23:27:14.801072288Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-01T23:26:48.165130987Z"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-02-01T23:27:20.690968983Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-02-01T23:27:20.817934079Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-01T23:27:20.162012322Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "epic:parallel-work",
+    "milestone:v1.0",
+    "component:cli",
+    "type:task"
+  ]
+}

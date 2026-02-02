@@ -4,6 +4,7 @@ use super::*;
 use crate::type_hierarchy::{
     detect_validation_issues, generate_fixes, ValidationFix, ValidationIssue,
 };
+use anyhow::Context;
 
 /// Validation configuration flags loaded from config.toml.
 #[derive(Debug, Clone)]
@@ -62,6 +63,10 @@ impl<S: IssueStore> CommandExecutor<S> {
             // Fix transitive reduction violations (both dry-run and actual fix)
             let reduction_fixes = self.fix_all_transitive_reductions(dry_run, quiet)?;
             total_fixes += reduction_fixes;
+
+            // Fix pending state transitions
+            let transition_fixes = self.check_pending_transitions(dry_run, quiet)?;
+            total_fixes += transition_fixes;
 
             if !quiet {
                 if dry_run {
@@ -243,6 +248,18 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Validate transitive reduction (no redundant dependencies)
         self.validate_transitive_reduction(&graph, &issues)?;
+
+        // Validate claims index (if worktree mode is active and not in test mode)
+        if std::env::var("JIT_TEST_MODE").is_err() {
+            let index_issues = validate_claims_index()
+                .unwrap_or_else(|e| vec![format!("Failed to validate claims index: {}", e)]);
+            if !index_issues.is_empty() {
+                return Err(anyhow!(
+                    "Claims index validation failed:\n  {}",
+                    index_issues.join("\n  ")
+                ));
+            }
+        }
 
         Ok(())
     }
@@ -707,5 +724,386 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         Ok(total_redundancies)
+    }
+
+    /// Check for and fix pending state transitions.
+    ///
+    /// After worktree merges, issues in backlog state may have all dependencies
+    /// completed but never auto-transition to ready. This method detects and fixes
+    /// those pending transitions.
+    ///
+    /// Uses multiple passes to handle cascading transitions (e.g., when tasks complete,
+    /// stories become ready, then epics that depend on those stories also become ready).
+    ///
+    /// # Arguments
+    ///
+    /// * `dry_run` - If true, report what would be fixed without applying changes
+    /// * `quiet` - If true, suppress progress messages
+    ///
+    /// # Returns
+    ///
+    /// Count of issues transitioned (or that would be transitioned if dry_run)
+    fn check_pending_transitions(&mut self, dry_run: bool, quiet: bool) -> Result<usize> {
+        use std::collections::HashMap;
+
+        let mut total_fixed = 0;
+        let max_passes = 10; // Safety limit to prevent infinite loops
+
+        // Keep checking until no more transitions found (cascading transitions)
+        // In dry-run mode, only do one pass since we don't actually change state
+        let num_passes = if dry_run { 1 } else { max_passes };
+
+        for _pass in 0..num_passes {
+            let issues = self.storage.list_issues()?;
+            let resolved: HashMap<String, &Issue> =
+                issues.iter().map(|i| (i.id.clone(), i)).collect();
+
+            // Find backlog issues that should transition to ready
+            let backlog_issues: Vec<_> = issues
+                .iter()
+                .filter(|i| i.state == State::Backlog)
+                .collect();
+
+            let mut pass_fixed = 0;
+            for issue in backlog_issues {
+                if issue.should_auto_transition_to_ready(&resolved) {
+                    if !quiet {
+                        println!(
+                            "  → Transitioning {} to ready (dependencies complete)",
+                            &issue.id[..8.min(issue.id.len())]
+                        );
+                    }
+
+                    if !dry_run {
+                        self.auto_transition_to_ready(&issue.id)?;
+                    }
+                    pass_fixed += 1;
+                }
+            }
+
+            total_fixed += pass_fixed;
+
+            // If no fixes this pass, we're done
+            if pass_fixed == 0 {
+                break;
+            }
+        }
+
+        Ok(total_fixed)
+    }
+
+    /// Validate branch hasn't diverged from main.
+    ///
+    /// Checks that the current branch shares common history with origin/main
+    /// by comparing merge-base with the main commit.
+    ///
+    /// # Returns
+    /// Ok(()) if branch is up-to-date, Err with helpful message if diverged
+    pub fn validate_divergence(&self) -> Result<()> {
+        use std::process::Command;
+
+        // Get merge-base between HEAD and origin/main
+        let merge_base_output = Command::new("git")
+            .args(["merge-base", "HEAD", "origin/main"])
+            .output()
+            .context("Failed to execute git merge-base")?;
+
+        if !merge_base_output.status.success() {
+            let stderr = String::from_utf8_lossy(&merge_base_output.stderr);
+            anyhow::bail!(
+                "Failed to get merge-base with origin/main: {}",
+                stderr.trim()
+            );
+        }
+
+        let merge_base = String::from_utf8(merge_base_output.stdout)?
+            .trim()
+            .to_string();
+
+        // Get current origin/main commit
+        let main_commit_output = Command::new("git")
+            .args(["rev-parse", "origin/main"])
+            .output()
+            .context("Failed to execute git rev-parse")?;
+
+        if !main_commit_output.status.success() {
+            let stderr = String::from_utf8_lossy(&main_commit_output.stderr);
+            anyhow::bail!("Failed to get origin/main commit: {}", stderr.trim());
+        }
+
+        let main_commit = String::from_utf8(main_commit_output.stdout)?
+            .trim()
+            .to_string();
+
+        // If merge-base != main commit, branch has diverged
+        if merge_base != main_commit {
+            anyhow::bail!(
+                "Branch has diverged from origin/main\n\
+                 Merge base: {}\n\
+                 Main commit: {}\n\
+                 Fix: git rebase origin/main",
+                merge_base,
+                main_commit
+            );
+        }
+
+        Ok(())
+    }
+
+    /// Validate all active leases are consistent and not stale.
+    ///
+    /// Checks claims.index.json for:
+    /// - Expired leases (TTL exceeded)
+    /// - Leases referencing non-existent worktrees
+    /// - Leases referencing non-existent issues
+    ///
+    /// # Returns
+    /// Vector of invalid lease descriptions with fix suggestions
+    pub fn validate_leases(&self) -> Result<Vec<String>> {
+        use crate::storage::claim_coordinator::ClaimsIndex;
+        use crate::storage::worktree_paths::WorktreePaths;
+        use chrono::Utc;
+
+        let paths = WorktreePaths::detect().context("Failed to detect worktree paths")?;
+
+        // Load claims index
+        let claims_index_path = paths.shared_jit.join("claims.index.json");
+        if !claims_index_path.exists() {
+            // No claims index means no leases - valid
+            return Ok(vec![]);
+        }
+
+        let contents =
+            std::fs::read_to_string(&claims_index_path).context("Failed to read claims index")?;
+        let index: ClaimsIndex =
+            serde_json::from_str(&contents).context("Failed to parse claims index")?;
+
+        let mut invalid_leases = Vec::new();
+        let now = Utc::now();
+
+        for lease in &index.leases {
+            // Check if lease has expired
+            if let Some(expires_at) = lease.expires_at {
+                if expires_at < now {
+                    let duration = now.signed_duration_since(expires_at);
+                    invalid_leases.push(format!(
+                        "Lease {} (Issue {}): Expired {} ago\n  Fix: jit claim release {}",
+                        lease.lease_id,
+                        &lease.issue_id[..8.min(lease.issue_id.len())],
+                        format_duration(duration),
+                        &lease.issue_id[..8.min(lease.issue_id.len())]
+                    ));
+                    continue;
+                }
+            }
+
+            // Check if worktree still exists
+            if !check_worktree_exists(&lease.worktree_id)? {
+                invalid_leases.push(format!(
+                    "Lease {} (Issue {}): Worktree {} no longer exists\n  Fix: jit claim force-evict {}",
+                    lease.lease_id,
+                    &lease.issue_id[..8.min(lease.issue_id.len())],
+                    lease.worktree_id,
+                    lease.lease_id
+                ));
+                continue;
+            }
+
+            // Check if issue still exists (use storage layer for proper resolution)
+            if self.storage.load_issue(&lease.issue_id).is_err() {
+                invalid_leases.push(format!(
+                    "Lease {} (Issue {}): Issue no longer exists\n  Fix: jit claim release {}",
+                    lease.lease_id,
+                    &lease.issue_id[..8.min(lease.issue_id.len())],
+                    &lease.issue_id[..8.min(lease.issue_id.len())]
+                ));
+            }
+        }
+
+        Ok(invalid_leases)
+    }
+}
+
+/// Format duration in human-readable form
+fn format_duration(duration: chrono::Duration) -> String {
+    let secs = duration.num_seconds();
+    if secs < 60 {
+        if secs == 1 {
+            "1 second".to_string()
+        } else {
+            format!("{} seconds", secs)
+        }
+    } else if secs < 3600 {
+        let mins = secs / 60;
+        if mins == 1 {
+            "1 minute".to_string()
+        } else {
+            format!("{} minutes", mins)
+        }
+    } else if secs < 86400 {
+        let hours = secs / 3600;
+        if hours == 1 {
+            "1 hour".to_string()
+        } else {
+            format!("{} hours", hours)
+        }
+    } else {
+        let days = secs / 86400;
+        if days == 1 {
+            "1 day".to_string()
+        } else {
+            format!("{} days", days)
+        }
+    }
+}
+
+/// Check if a worktree with the given ID still exists
+fn check_worktree_exists(worktree_id: &str) -> Result<bool> {
+    use std::path::PathBuf;
+    use std::process::Command;
+
+    // Get all git worktrees
+    let output = Command::new("git")
+        .args(["worktree", "list", "--porcelain"])
+        .output()
+        .context("Failed to execute git worktree list")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        anyhow::bail!("git worktree list failed: {}", stderr);
+    }
+
+    let porcelain_output =
+        String::from_utf8(output.stdout).context("Invalid UTF-8 in git worktree output")?;
+
+    // Parse worktree paths
+    let worktree_paths = porcelain_output
+        .lines()
+        .filter(|line| line.starts_with("worktree "))
+        .filter_map(|line| line.strip_prefix("worktree "))
+        .map(PathBuf::from)
+        .collect::<Vec<_>>();
+
+    // Check each worktree for matching ID
+    for worktree_path in worktree_paths {
+        let identity_path = worktree_path.join(".jit/worktree.json");
+        if let Ok(contents) = std::fs::read_to_string(&identity_path) {
+            // Parse just enough to get the worktree_id
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&contents) {
+                if let Some(id) = json.get("worktree_id").and_then(|v| v.as_str()) {
+                    if id == worktree_id {
+                        return Ok(true);
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(false)
+}
+
+/// Validate claims index consistency
+///
+/// Checks for structural corruption:
+/// - Duplicate leases for the same issue (invariant violation)
+/// - Schema version mismatches (incompatibility)
+/// - Sequence gaps (data loss indicator)
+///
+/// Note: Does NOT check for expired leases - those are normal state handled by
+/// evict_expired(). Use validate_leases() for expiration checks.
+///
+/// Returns vector of corruption issues found (empty if structurally valid)
+pub fn validate_claims_index() -> Result<Vec<String>> {
+    use crate::storage::claim_coordinator::ClaimsIndex;
+    use crate::storage::worktree_paths::WorktreePaths;
+    use std::collections::HashSet;
+
+    let paths = WorktreePaths::detect().context("Failed to detect worktree paths")?;
+
+    // Load claims index
+    let claims_index_path = paths.shared_jit.join("claims.index.json");
+    if !claims_index_path.exists() {
+        // No claims index - valid (no claims coordination active)
+        return Ok(vec![]);
+    }
+
+    let contents =
+        std::fs::read_to_string(&claims_index_path).context("Failed to read claims index")?;
+    let index: ClaimsIndex =
+        serde_json::from_str(&contents).context("Failed to parse claims index")?;
+
+    let mut issues = Vec::new();
+
+    // Check schema version
+    if index.schema_version != 1 {
+        issues.push(format!(
+            "Invalid schema version: expected 1, found {}",
+            index.schema_version
+        ));
+    }
+
+    // Check for duplicate leases (same issue claimed twice)
+    let mut seen_issues = HashSet::new();
+    for lease in &index.leases {
+        if !seen_issues.insert(&lease.issue_id) {
+            issues.push(format!(
+                "Duplicate lease detected for issue {}: Multiple leases exist for the same issue",
+                &lease.issue_id[..8.min(lease.issue_id.len())]
+            ));
+        }
+    }
+
+    // Note: Expired leases are NOT considered corruption - they are normal state
+    // handled by startup_recovery's evict_expired(). Use validate_leases() to check expiration.
+
+    // Report sequence gaps (if any were detected during rebuild)
+    if !index.sequence_gaps.is_empty() {
+        issues.push(format!(
+            "Sequence gaps detected in claims log: missing sequences {:?}",
+            index.sequence_gaps
+        ));
+    }
+
+    Ok(issues)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Duration;
+
+    // Note: validate_leases() and validate_divergence() require git repository setup
+    // and are integration-tested through manual testing and real usage.
+    // Unit tests focus on pure functions like format_duration().
+
+    #[test]
+    fn test_format_duration_seconds() {
+        assert_eq!(format_duration(Duration::seconds(1)), "1 second");
+        assert_eq!(format_duration(Duration::seconds(30)), "30 seconds");
+        assert_eq!(format_duration(Duration::seconds(59)), "59 seconds");
+    }
+
+    #[test]
+    fn test_format_duration_minutes() {
+        assert_eq!(format_duration(Duration::seconds(60)), "1 minute");
+        assert_eq!(format_duration(Duration::seconds(90)), "1 minute");
+        assert_eq!(format_duration(Duration::seconds(120)), "2 minutes");
+        assert_eq!(format_duration(Duration::seconds(3599)), "59 minutes");
+    }
+
+    #[test]
+    fn test_format_duration_hours() {
+        assert_eq!(format_duration(Duration::seconds(3600)), "1 hour");
+        assert_eq!(format_duration(Duration::seconds(3700)), "1 hour");
+        assert_eq!(format_duration(Duration::seconds(7200)), "2 hours");
+        assert_eq!(format_duration(Duration::seconds(86399)), "23 hours");
+    }
+
+    #[test]
+    fn test_format_duration_days() {
+        assert_eq!(format_duration(Duration::seconds(86400)), "1 day");
+        assert_eq!(format_duration(Duration::seconds(90000)), "1 day");
+        assert_eq!(format_duration(Duration::seconds(172800)), "2 days");
+        assert_eq!(format_duration(Duration::seconds(604800)), "7 days");
     }
 }

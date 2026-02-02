@@ -1,0 +1,53 @@
+{
+  "id": "3a043943-7f75-40a9-8cf1-13592e903972",
+  "title": "Define repository config.toml schema",
+  "description": "Define `.jit/config.toml` schema with sections: `[worktree]` (mode), `[coordination]` (ttl, heartbeat, enforcement), `[global_operations]` (require_main_history), `[locks]` (max_age, metadata), `[events]` (sequences, envelope). See design doc section \"Repository Configuration\".",
+  "state": "done",
+  "priority": "normal",
+  "assignee": "copilot:cli-session",
+  "dependencies": [
+    "65e7dccd-a7f0-4274-90c3-2d0a9384005b"
+  ],
+  "gates_required": [
+    "tdd-reminder",
+    "tests",
+    "clippy",
+    "fmt",
+    "code-review"
+  ],
+  "gates_status": {
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T16:34:00.802191739Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-02-02T16:39:39.171184877Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T16:33:38.585257542Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T16:34:03.106680238Z"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-02-02T16:28:10.649644319Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "epic:parallel-work",
+    "milestone:v1.0",
+    "component:cli",
+    "type:task"
+  ]
+}

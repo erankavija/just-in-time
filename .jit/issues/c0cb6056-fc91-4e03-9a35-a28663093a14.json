@@ -1,0 +1,29 @@
+{
+  "id": "c0cb6056-fc91-4e03-9a35-a28663093a14",
+  "title": "Write parallel work setup tutorial",
+  "description": "Write step-by-step tutorial for setting up parallel work: create worktree, configure agent identity, claim issues, work in isolation, merge back. Target: complete in 15 minutes. Place in docs/tutorials/.",
+  "state": "done",
+  "priority": "normal",
+  "assignee": "copilot:cli-session",
+  "dependencies": [
+    "730d25b5-f16c-4327-99fd-fb337e65edb9"
+  ],
+  "gates_required": [
+    "code-review"
+  ],
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-02-02T17:28:59.957159644Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "epic:parallel-work",
+    "milestone:v1.0",
+    "component:docs",
+    "type:task"
+  ]
+}

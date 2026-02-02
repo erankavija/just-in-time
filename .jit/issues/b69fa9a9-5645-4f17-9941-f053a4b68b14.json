@@ -1,0 +1,51 @@
+{
+  "id": "b69fa9a9-5645-4f17-9941-f053a4b68b14",
+  "title": "Implement WorktreePaths detection",
+  "description": "Implement `WorktreePaths::detect()` to identify git worktree context using `git rev-parse --git-common-dir` and `--show-toplevel`. Handle main worktree vs secondary worktrees, and gracefully fall back when not in a git repository. See design doc section \"Path Resolution\".",
+  "state": "done",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "tdd-reminder",
+    "tests",
+    "clippy",
+    "fmt",
+    "code-review"
+  ],
+  "gates_status": {
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-01-06T20:25:56.433094025Z"
+    },
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-06T20:28:00.433364538Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-01-06T20:28:17.735824957Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-06T20:25:56.437061154Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-06T20:28:07.626390694Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "epic:parallel-work",
+    "milestone:v1.0",
+    "component:storage",
+    "type:task"
+  ]
+}

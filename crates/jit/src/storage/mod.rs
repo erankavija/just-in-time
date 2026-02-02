@@ -9,12 +9,22 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+pub mod claim_coordinator;
+pub mod claims_log;
+pub mod control_plane;
 pub mod gate_runs;
+pub mod heartbeat;
 pub mod json;
+pub mod lease;
 pub mod lock;
+pub mod lock_cleanup;
 pub mod memory;
+pub mod temp_cleanup;
+pub mod worktree_identity;
+pub mod worktree_paths;
 
 // Re-export for convenience
+pub use claim_coordinator::{ClaimCoordinator, Lease};
 pub use json::JsonFileStorage;
 pub use lock::FileLocker;
 

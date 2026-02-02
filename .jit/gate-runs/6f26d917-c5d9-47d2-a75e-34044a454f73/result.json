@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "6f26d917-c5d9-47d2-a75e-34044a454f73",
+  "gate_key": "clippy",
+  "stage": "postcheck",
+  "issue_id": "bc3742d9-15d5-455f-a5a8-c12976c21f12",
+  "commit": "bb4e53e87c3bed2cc56552bd1f68d1bc08e127be",
+  "branch": "feature/worktree-parallel-work",
+  "status": "passed",
+  "started_at": "2026-02-01T23:27:14.801072288Z",
+  "completed_at": "2026-02-01T23:27:20.009399498Z",
+  "duration_ms": 5208,
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "   Compiling ring v0.17.14\n   Compiling rustls v0.23.35\n    Checking rustls-webpki v0.103.8\n    Checking ureq v2.12.1\n    Checking jit v0.2.0 (/home/vkaskivuo/Projects/just-in-time/crates/jit)\n    Checking jit-server v0.1.0 (/home/vkaskivuo/Projects/just-in-time/crates/server)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.03s\n",
+  "command": "cargo clippy --lib -- -D warnings",
+  "by": "auto:executor",
+  "message": null
+}

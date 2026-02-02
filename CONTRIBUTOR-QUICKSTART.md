@@ -13,14 +13,14 @@ git log --oneline -10
 
 # What's the current work state?
 jit status
-jit query ready --json | jq -r '.issues[] | "\(.priority) | \(.id[0:8]) | \(.title)"' | head -10
+jit query available --json | jq -r '.issues[] | "\(.priority) | \(.id[0:8]) | \(.title)"' | head -10
 ```
 
 ## 2. Find Your Next Task (1 minute)
 
 ```bash
 # See what's ready to work on (prioritized)
-jit query ready | grep -E "critical|high"
+jit query available | grep -E "critical|high"
 
 # Claim a task
 jit issue claim <short-hash> agent:your-name
@@ -59,7 +59,7 @@ jit gate pass <short-hash> fmt
 jit issue update <short-hash> --state done
 
 # Find next task
-jit query ready --json | head -5
+jit query available --json | head -5
 ```
 
 ## Key Files to Know
@@ -107,6 +107,8 @@ rg "resolve_issue_id" --type rust
 **Gate strictness:** Gates may use stricter checks than manual commands (e.g., `clippy` gate uses `-D warnings`). Check gate definition: `jit gate show <gate-key>`.
 
 **Pre-existing issues:** You must fix ALL warnings/errors that block gates, even if they existed before your changes. Pre-existence is never an excuse. Code quality is everyone's responsibility.
+
+**Path canonicalization:** Always canonicalize paths from external sources (git commands, user input, environment variables) before storage or comparison. Use `canonicalize()` or make paths absolute relative to `current_dir()`. This prevents subtle bugs from relative vs absolute path mismatches.
 
 **Follow-up issues:** If you discover unrelated work or nice-to-have improvements, propose to create follow-up issues and link them to appropriate epics. Don't expand current issue scope.
 

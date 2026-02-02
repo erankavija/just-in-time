@@ -1,0 +1,53 @@
+{
+  "id": "77206cf6-f935-49d0-b132-054e6a1edfae",
+  "title": "Implement jit claim renew command",
+  "description": "Implement `jit claim renew <lease-id>` with `--ttl <seconds>` option. Extend lease expiry time for finite leases, or update last_beat for indefinite leases. Verify ownership before renewal. Support `--json` output.\n\nSee design doc section \"Lease Operations\" (renew/heartbeat).",
+  "state": "done",
+  "priority": "high",
+  "assignee": "agent:copilot-cli-commands",
+  "dependencies": [
+    "b74af86f-388d-49a2-a172-bc9fdaa7bb9c"
+  ],
+  "gates_required": [
+    "tdd-reminder",
+    "tests",
+    "clippy",
+    "fmt",
+    "code-review"
+  ],
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-01-08T22:09:31.638668097Z"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-01-08T22:04:31.828020842Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-08T22:10:00.833325827Z"
+    },
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-08T22:10:00.529792646Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-08T22:09:44.715778747Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "epic:parallel-work",
+    "milestone:v1.0",
+    "component:cli",
+    "type:task"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "id": "657d4976-ba93-40c7-8db8-f70e90692a00",
+  "title": "Add CLI binary integration tests for claim and worktree commands",
+  "description": "Add end-to-end integration tests that run the actual `jit` binary to verify:\n\n## Goal\n\nTest the full CLI experience including exit codes, JSON output format, error messages, and command chaining - areas not covered by unit tests.\n\n## Scope\n\n**Commands to test:**\n- `jit claim acquire/renew/release/list/status/force-evict`\n- `jit worktree info/list`\n- `jit validate --divergence --leases`\n\n## Test Coverage\n\n**1. Exit Codes**\n- Success: exit 0\n- User errors (invalid args): exit 1\n- System errors (git not found): exit 2\n- Lease conflicts: appropriate non-zero exit\n\n**2. Output Format**\n- Valid JSON with `--json` flag\n- Human-readable output without flag\n- Consistent structure across commands\n\n**3. Error Messages**\n- Clear, actionable error messages\n- Proper stderr vs stdout usage\n- Help text accessibility\n\n**4. Command Integration**\n- Claim → work → release workflow\n- Multiple worktrees interacting\n- State persistence across invocations\n\n## Implementation Approach\n\n```rust\n// crates/jit/tests/cli_integration_tests.rs\nuse assert_cmd::Command;\nuse predicates::prelude::*;\n\n#[test]\nfn test_claim_acquire_success() {\n    let mut cmd = Command::cargo_bin(\"jit\").unwrap();\n    cmd.args([\"claim\", \"acquire\", \"test-issue\", \"--agent-id\", \"agent:test\"])\n        .assert()\n        .success()\n        .stdout(predicate::str::contains(\"Acquired lease\"));\n}\n\n#[test]\nfn test_claim_acquire_json_output() {\n    let mut cmd = Command::cargo_bin(\"jit\").unwrap();\n    let output = cmd.args([\"claim\", \"acquire\", \"issue\", \"--json\"])\n        .assert()\n        .success()\n        .get_output();\n    \n    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();\n    assert_eq!(json[\"success\"], true);\n    assert!(json[\"data\"][\"lease_id\"].is_string());\n}\n```\n\n## Dependencies\n\n- `assert_cmd` crate for running binaries in tests\n- `predicates` crate for output assertions\n- Test fixtures for git repos and issues\n\n## Acceptance Criteria\n\n- [ ] All claim commands have exit code tests\n- [ ] All worktree commands have exit code tests\n- [ ] JSON output structure validated\n- [ ] Error message quality verified\n- [ ] At least one full workflow test (acquire → work → release)\n- [ ] Tests run in CI alongside unit tests\n\n## References\n\n- Related issue: 1bdc5395 (item #6 in refactor list)\n- Similar patterns: cross_worktree_integration_tests.rs",
+  "state": "done",
+  "priority": "normal",
+  "assignee": "agent:copilot",
+  "dependencies": [],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "epic:parallel-work",
+    "milestone:v1.0",
+    "component:testing",
+    "type:task"
+  ]
+}

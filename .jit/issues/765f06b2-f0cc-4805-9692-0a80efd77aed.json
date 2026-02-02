@@ -1,0 +1,53 @@
+{
+  "id": "765f06b2-f0cc-4805-9692-0a80efd77aed",
+  "title": "Implement jit config show/get/set commands",
+  "description": "Implement `jit config show` (display effective config), `jit config get <key>` (get specific value), `jit config set <key> <value>` (set repo-level), `jit config set --global <key> <value>` (set user-level). Support `--json` output.",
+  "state": "done",
+  "priority": "normal",
+  "assignee": "copilot:cli-session",
+  "dependencies": [
+    "65e7dccd-a7f0-4274-90c3-2d0a9384005b"
+  ],
+  "gates_required": [
+    "tdd-reminder",
+    "tests",
+    "clippy",
+    "fmt",
+    "code-review"
+  ],
+  "gates_status": {
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T17:08:13.112624749Z"
+    },
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T17:08:12.909965451Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T17:07:52.995123273Z"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-02-02T16:55:22.180863174Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-02-02T17:08:50.268078629Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "epic:parallel-work",
+    "milestone:v1.0",
+    "component:cli",
+    "type:task"
+  ]
+}

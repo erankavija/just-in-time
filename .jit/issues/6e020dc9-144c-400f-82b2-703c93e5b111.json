@@ -1,0 +1,53 @@
+{
+  "id": "6e020dc9-144c-400f-82b2-703c93e5b111",
+  "title": "Implement jit claim list command",
+  "description": "Implement `jit claim list` showing all active claims across all agents/worktrees. Include lease ID, issue ID, agent, worktree, expiry. Support `--json` output.",
+  "state": "done",
+  "priority": "high",
+  "assignee": "agent:copilot-cli-commands",
+  "dependencies": [
+    "b74af86f-388d-49a2-a172-bc9fdaa7bb9c"
+  ],
+  "gates_required": [
+    "tdd-reminder",
+    "tests",
+    "clippy",
+    "fmt",
+    "code-review"
+  ],
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-01-08T22:23:57.577734448Z"
+    },
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-08T22:23:54.763696811Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-08T22:23:57.171296092Z"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-01-08T22:21:25.610199730Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-08T22:23:38.947592010Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "epic:parallel-work",
+    "milestone:v1.0",
+    "component:cli",
+    "type:task"
+  ]
+}

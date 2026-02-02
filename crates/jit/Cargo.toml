@@ -18,6 +18,7 @@ path = "src/main.rs"
 clap = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+schemars = { workspace = true }
 anyhow = { workspace = true }
 thiserror = { workspace = true }
 uuid = { workspace = true }
@@ -28,13 +29,17 @@ which = "6.0"
 similar = "2.6"
 regex = "1.12.2"
 toml = "0.8"
+toml_edit = "0.22"
 sha2 = "0.10"
 tar = "0.4"
 pulldown-cmark = "0.9"
 ureq = "2.10"
 tempfile = { workspace = true }
+dirs = "5.0"
+nix = { version = "0.31.1", features = ["signal"] }
 
 [dev-dependencies]
 assert_cmd = { workspace = true }
 predicates = { workspace = true }
 proptest = { workspace = true }
+ulid = { workspace = true }

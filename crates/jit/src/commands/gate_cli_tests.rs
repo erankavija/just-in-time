@@ -8,8 +8,20 @@ mod tests {
     use std::collections::HashMap;
 
     fn setup() -> CommandExecutor<InMemoryStorage> {
+        // Disable worktree divergence checks in tests
+        std::env::set_var("JIT_TEST_MODE", "1");
+
         let storage = InMemoryStorage::new();
         storage.init().unwrap();
+
+        // Create config with enforcement off for test backward compatibility
+        std::fs::create_dir_all(storage.root()).unwrap();
+        let config_toml = r#"
+[worktree]
+enforce_leases = "off"
+"#;
+        std::fs::write(storage.root().join("config.toml"), config_toml).unwrap();
+
         CommandExecutor::new(storage)
     }
 

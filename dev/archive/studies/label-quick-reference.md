@@ -266,12 +266,12 @@ Both flow: Task → Epic → Milestone
 **Labels** = Organizational membership
 - "This task is part of the auth epic"
 - Purpose: Grouping, filtering, reporting
-- Query: `jit query label "epic:auth"`
+- Query: `jit query all --label "epic:auth"`
 
 **Dependencies** = Work requirements  
 - "The auth epic requires this task to complete"
 - Purpose: Workflow control, blocking, state transitions
-- Query: `jit query ready` (unblocked work)
+- Query: `jit query available` (unblocked work)
 
 ### Key: They're Independent
 

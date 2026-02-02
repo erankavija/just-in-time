@@ -175,7 +175,7 @@ Index lock is held briefly only during ID registration, then issue writes happen
 
 ```bash
 # Agent 1 (reader)
-jit issue list
+jit query all
 
 # Agent 2 (writer, concurrent)
 jit issue create --title "New"

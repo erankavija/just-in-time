@@ -1,0 +1,53 @@
+{
+  "id": "d728c8db-f966-4636-948a-9b1c34036fed",
+  "title": "Implement orphaned temp file cleanup",
+  "description": "Implement orphaned temp file cleanup. Find `*.tmp` files older than threshold (e.g., 1 hour), verify no active operation, remove. Run during startup recovery.",
+  "state": "done",
+  "priority": "high",
+  "assignee": "copilot:cli-session",
+  "dependencies": [
+    "b74af86f-388d-49a2-a172-bc9fdaa7bb9c"
+  ],
+  "gates_required": [
+    "tdd-reminder",
+    "tests",
+    "clippy",
+    "fmt",
+    "code-review"
+  ],
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_by": "agent:copilot-session",
+      "updated_at": "2026-02-02T12:12:13.379855510Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T12:11:46.960786922Z"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": "copilot:session",
+      "updated_at": "2026-02-02T11:47:35.093351629Z"
+    },
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T12:11:44.556758674Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T12:11:22.039095492Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "epic:parallel-work",
+    "milestone:v1.0",
+    "component:storage",
+    "type:task"
+  ]
+}

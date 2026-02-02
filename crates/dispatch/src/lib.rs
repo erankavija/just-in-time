@@ -137,19 +137,19 @@ impl Orchestrator {
         }
     }
 
-    /// Query ready issues from jit
+    /// Query available issues from jit
     pub fn query_ready_issues(&self) -> Result<Vec<ReadyIssue>> {
         let jit_binary = self.find_jit_binary()?;
 
         let output = Command::new(jit_binary)
-            .args(["query", "ready", "--json"])
+            .args(["query", "available", "--json"])
             .current_dir(&self.repo_path)
             .output()
-            .context("Failed to execute jit query ready")?;
+            .context("Failed to execute jit query available")?;
 
         if !output.status.success() {
             bail!(
-                "jit query ready failed: {}",
+                "jit query available failed: {}",
                 String::from_utf8_lossy(&output.stderr)
             );
         }

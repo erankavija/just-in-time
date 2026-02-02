@@ -1,0 +1,60 @@
+{
+  "id": "5e1d5f02-c94d-4f52-9ed6-a633bd6c8f68",
+  "title": "Add configurable enforcement modes",
+  "description": "Add `enforce_leases` config option with modes: `strict` (block), `warn` (warn but allow), `off` (bypass). Load from `.jit/config.toml` and respect in `require_active_lease()`. See design doc section \"Configuration\".",
+  "state": "done",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "b74af86f-388d-49a2-a172-bc9fdaa7bb9c"
+  ],
+  "gates_required": [
+    "tdd-reminder",
+    "tests",
+    "clippy",
+    "fmt",
+    "code-review"
+  ],
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-02-01T17:01:21.474519420Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-01T17:00:40.645674129Z"
+    },
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-01T17:00:58.258794438Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-01T17:01:00.363326990Z"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-02-01T17:01:21.467801778Z"
+    }
+  },
+  "context": {},
+  "documents": [
+    {
+      "path": "dev/sessions/session-20260201-enforcement-modes-5e1d5f02.md",
+      "commit": null,
+      "label": "Implementation context and plan",
+      "doc_type": "notes"
+    }
+  ],
+  "labels": [
+    "epic:parallel-work",
+    "milestone:v1.0",
+    "component:cli",
+    "type:task"
+  ]
+}
