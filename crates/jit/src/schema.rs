@@ -5,6 +5,7 @@
 //! available commands, arguments, and types.
 
 use clap::{Arg, ArgAction, CommandFactory};
+use schemars::{schema_for, JsonSchema};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -75,10 +76,13 @@ pub struct Flag {
     pub description: String,
 }
 
-/// Output schema
+/// Output schema - contains actual JSON Schema for structured responses
 #[derive(Debug, Serialize, Deserialize)]
 pub struct OutputSchema {
-    /// Success output type reference
+    /// Success output JSON Schema (full schema, not just a reference)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub success_schema: Option<Value>,
+    /// Success output type name (for documentation)
     pub success: String,
     /// Error output type reference
     pub error: String,
@@ -121,7 +125,7 @@ impl CommandSchema {
                 continue;
             }
 
-            let cmd = Self::extract_command(subcmd);
+            let cmd = Self::extract_command_with_path(subcmd, name);
             commands.insert(name.to_string(), cmd);
         }
 
@@ -134,8 +138,8 @@ impl CommandSchema {
         }
     }
 
-    /// Extract command from clap Command
-    fn extract_command(clap_cmd: &clap::Command) -> Command {
+    /// Extract command from clap Command with full path for output schema lookup
+    fn extract_command_with_path(clap_cmd: &clap::Command, cmd_path: &str) -> Command {
         let description = clap_cmd
             .get_about()
             .map(|s| s.to_string())
@@ -149,7 +153,12 @@ impl CommandSchema {
             for subcmd in subcommands_vec {
                 let name = subcmd.get_name();
                 if name != "help" {
-                    sub_map.insert(name.to_string(), Self::extract_command(subcmd));
+                    // Build path for subcommand (e.g., "issue_show")
+                    let sub_path = format!("{}_{}", cmd_path, name);
+                    sub_map.insert(
+                        name.to_string(),
+                        Self::extract_command_with_path(subcmd, &sub_path),
+                    );
                 }
             }
             Some(sub_map)
@@ -179,7 +188,7 @@ impl CommandSchema {
             subcommands,
             args,
             flags,
-            output: Self::infer_output_schema(clap_cmd.get_name()),
+            output: Self::get_output_schema_for_command(cmd_path),
         }
     }
 
@@ -279,20 +288,55 @@ impl CommandSchema {
         }
     }
 
-    /// Infer output schema based on command name
-    fn infer_output_schema(cmd_name: &str) -> Option<OutputSchema> {
-        // Commands that don't have structured output
-        let no_output = ["init", "validate"];
-        if no_output.contains(&cmd_name) {
-            return Some(OutputSchema {
-                success: "void".to_string(),
-                error: "ErrorResponse".to_string(),
-            });
+    /// Get output schema for a specific command path (e.g., "issue_show", "query_available")
+    fn get_output_schema_for_command(cmd_path: &str) -> Option<OutputSchema> {
+        use crate::domain::Issue;
+        use crate::output::*;
+
+        // Helper to convert schemars schema to serde_json Value
+        fn schema_to_value<T: JsonSchema>() -> Value {
+            serde_json::to_value(schema_for!(T)).unwrap_or(json!({}))
         }
 
-        // Most commands have some output
+        let (schema, type_name) = match cmd_path {
+            // Status command
+            "status" => (Some(schema_to_value::<StatusResponse>()), "StatusResponse"),
+
+            // Issue commands
+            "issue_show" => (Some(schema_to_value::<Issue>()), "Issue"),
+            "issue_create" => (Some(schema_to_value::<Issue>()), "Issue"),
+            "issue_update" => (Some(schema_to_value::<Issue>()), "Issue"),
+
+            // Query commands
+            "query_available" | "query_all" | "query_ready" | "query_strategic" | "query_closed" => {
+                (Some(schema_to_value::<IssueListResponse>()), "IssueListResponse")
+            }
+            "query_blocked" => (
+                Some(schema_to_value::<BlockedListResponse>()),
+                "BlockedListResponse",
+            ),
+
+            // Graph commands
+            "graph_deps" => (Some(schema_to_value::<GraphDepsResponse>()), "GraphDepsResponse"),
+            "graph_downstream" => (
+                Some(schema_to_value::<GraphDownstreamResponse>()),
+                "GraphDownstreamResponse",
+            ),
+            "graph_roots" => (Some(schema_to_value::<GraphRootsResponse>()), "GraphRootsResponse"),
+
+            // Registry commands
+            "registry_list" | "gate_list" => (
+                Some(schema_to_value::<RegistryListResponse>()),
+                "RegistryListResponse",
+            ),
+
+            // Default: no specific schema
+            _ => (None, "CommandResponse"),
+        };
+
         Some(OutputSchema {
-            success: "CommandResponse".to_string(),
+            success_schema: schema,
+            success: type_name.to_string(),
             error: "ErrorResponse".to_string(),
         })
     }

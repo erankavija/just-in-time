@@ -74,9 +74,19 @@ async function runJitCommand(cmdArgs, useJsonFlag = true) {
       try {
         const result = JSON.parse(error.stdout);
         if (!result.success && result.error) {
-          throw new Error(`${result.error.code}: ${result.error.message}`);
+          const errMsg = `${result.error.code}: ${result.error.message}`;
+          const suggestions = result.error.suggestions;
+          if (suggestions && suggestions.length > 0) {
+            throw new Error(`${errMsg}\nSuggestions: ${suggestions.join(', ')}`);
+          }
+          throw new Error(errMsg);
         }
-      } catch {}
+      } catch (parseError) {
+        // If it's our error, rethrow it; otherwise continue with original
+        if (parseError.message.includes(':')) {
+          throw parseError;
+        }
+      }
     }
     throw error;
   }
@@ -137,7 +147,7 @@ function generateToolFromCommand(name, cmd, parentPath = "") {
     }
   }
   
-  return {
+  const tool = {
     name: toolName,
     description: cmd.description,
     inputSchema: {
@@ -146,6 +156,13 @@ function generateToolFromCommand(name, cmd, parentPath = "") {
       required,
     },
   };
+  
+  // Add output schema if available
+  if (cmd.output?.success_schema) {
+    tool.outputSchema = cmd.output.success_schema;
+  }
+  
+  return tool;
 }
 
 /**
@@ -589,15 +606,18 @@ function compactForAssistant(toolName, result) {
   // Helper to compact an issue object
   const compactIssue = (issue) => {
     if (!issue || typeof issue !== 'object') return issue;
-    return {
+    const result = {
       id: issue.id,
       title: issue.title,
       state: issue.state,
       priority: issue.priority,
-      assignee: issue.assignee,
       // Omit full description, dependencies list, gates_status details
-      labels: issue.labels,
     };
+    // Only include optional fields if present
+    if (issue.assignee) result.assignee = issue.assignee;
+    if (issue.labels?.length) result.labels = issue.labels;
+    if (issue.blocked_reasons?.length) result.blocked_reasons = issue.blocked_reasons;
+    return result;
   };
   
   // Extract command parts
@@ -732,6 +752,14 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
   };
 });
 
+// Build a lookup for tools with output schemas
+const toolOutputSchemas = new Map();
+for (const tool of generateTools()) {
+  if (tool.outputSchema) {
+    toolOutputSchemas.set(tool.name, tool.outputSchema);
+  }
+}
+
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
   
@@ -739,28 +767,57 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const result = await executeTool(name, args || {});
     const userSummary = generateUserSummary(name, result);
     
-    // Smart output handling - limit JSON size for context efficiency
-    const compactResult = compactForAssistant(name, result);
-    const fullData = JSON.stringify(compactResult, null, 2);
+    // Check if this tool has a defined output schema
+    const hasOutputSchema = toolOutputSchemas.has(name);
     
-    return {
-      content: [
-        {
-          type: "text",
-          text: userSummary + "\n",
-          annotations: {
-            audience: ["user"]
+    // Smart compaction applied to reduce token usage
+    const compactResult = compactForAssistant(name, result);
+    
+    if (hasOutputSchema) {
+      // Use structuredContent for clients that support it
+      // Also include JSON in content for backwards compatibility
+      return {
+        content: [
+          {
+            type: "text",
+            text: userSummary,
+            annotations: {
+              audience: ["user"]
+            }
+          },
+          {
+            type: "text",
+            text: JSON.stringify(compactResult, null, 2),
+            annotations: {
+              audience: ["assistant"]
+            }
           }
-        },
-        {
-          type: "text",
-          text: fullData,
-          annotations: {
-            audience: ["assistant"]
-          }
-        },
-      ],
-    };
+        ],
+        structuredContent: compactResult,
+      };
+    } else {
+      // Fallback: return both user summary and JSON in content
+      const fullData = JSON.stringify(compactResult, null, 2);
+      
+      return {
+        content: [
+          {
+            type: "text",
+            text: userSummary + "\n",
+            annotations: {
+              audience: ["user"]
+            }
+          },
+          {
+            type: "text",
+            text: fullData,
+            annotations: {
+              audience: ["assistant"]
+            }
+          },
+        ],
+      };
+    }
   } catch (error) {
     return {
       content: [

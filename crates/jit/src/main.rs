@@ -1169,11 +1169,14 @@ strategic_types = {}
                 if let Some(issue_id) = id {
                     let issues = executor.show_graph(&issue_id)?;
                     if json {
+                        use jit::domain::MinimalIssue;
                         use jit::output::{GraphShowResponse, JsonOutput};
 
+                        let minimal_issues: Vec<MinimalIssue> =
+                            issues.iter().map(MinimalIssue::from).collect();
                         let response = GraphShowResponse {
                             issue_id: issue_id.clone(),
-                            dependencies: issues.clone(),
+                            dependencies: minimal_issues,
                             count: issues.len(),
                         };
                         let output = JsonOutput::success(response, "graph show");
@@ -1231,13 +1234,17 @@ strategic_types = {}
                 let output_ctx = OutputContext::new(quiet, json);
                 let issues = executor.show_dependencies(&id, transitive)?;
                 if json {
+                    use jit::domain::MinimalIssue;
                     use jit::output::{GraphDepsResponse, JsonOutput};
 
+                    let minimal_issues: Vec<MinimalIssue> =
+                        issues.iter().map(MinimalIssue::from).collect();
                     let response = GraphDepsResponse {
                         issue_id: id.clone(),
-                        dependencies: issues.clone(),
+                        dependencies: minimal_issues,
                         count: issues.len(),
                         transitive,
+                        truncated: false,
                     };
                     let output = JsonOutput::success(response, "graph deps");
                     println!("{}", output.to_json_string()?);
@@ -1262,11 +1269,14 @@ strategic_types = {}
                 let output_ctx = OutputContext::new(quiet, json);
                 let issues = executor.show_downstream(&id)?;
                 if json {
+                    use jit::domain::MinimalIssue;
                     use jit::output::{GraphDownstreamResponse, JsonOutput};
 
+                    let minimal_issues: Vec<MinimalIssue> =
+                        issues.iter().map(MinimalIssue::from).collect();
                     let response = GraphDownstreamResponse {
                         issue_id: id.clone(),
-                        dependents: issues.clone(),
+                        dependents: minimal_issues,
                         count: issues.len(),
                     };
                     let output = JsonOutput::success(response, "graph downstream");
@@ -1282,10 +1292,13 @@ strategic_types = {}
                 let output_ctx = OutputContext::new(quiet, json);
                 let issues = executor.show_roots()?;
                 if json {
+                    use jit::domain::MinimalIssue;
                     use jit::output::{GraphRootsResponse, JsonOutput};
 
+                    let minimal_issues: Vec<MinimalIssue> =
+                        issues.iter().map(MinimalIssue::from).collect();
                     let response = GraphRootsResponse {
-                        roots: issues.clone(),
+                        roots: minimal_issues,
                         count: issues.len(),
                     };
                     let output = JsonOutput::success(response, "graph roots");
@@ -1600,6 +1613,7 @@ strategic_types = {}
                 let blocked = executor.query_blocked_filtered(priority_filter, label.as_deref())?;
 
                 if json {
+                    use jit::domain::MinimalIssue;
                     use jit::output::JsonOutput;
                     use serde_json::json;
 
@@ -1623,7 +1637,7 @@ strategic_types = {}
                                     })
                                     .collect();
                                 BlockedIssue {
-                                    issue: (*issue).clone(),
+                                    issue: MinimalIssue::from(issue),
                                     blocked_reasons,
                                 }
                             })

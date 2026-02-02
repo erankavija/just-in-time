@@ -4,12 +4,13 @@
 //! issues, gates, events, and their associated states and priorities.
 
 use chrono::{DateTime, Utc};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 
 /// Issue lifecycle state
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum State {
     /// Created but not actionable yet (blocked by dependencies or gates)
@@ -46,7 +47,7 @@ impl State {
 }
 
 /// Issue priority level
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Priority {
     /// Low priority
@@ -60,7 +61,7 @@ pub enum Priority {
 }
 
 /// Quality gate status
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum GateStatus {
     /// Gate not yet evaluated
@@ -72,7 +73,7 @@ pub enum GateStatus {
 }
 
 /// State of a quality gate for a specific issue
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct GateState {
     /// Current status of the gate
     pub status: GateStatus,
@@ -83,7 +84,7 @@ pub struct GateState {
 }
 
 /// An issue representing a unit of work
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Issue {
     /// Unique identifier (UUID)
     pub id: String,
@@ -201,12 +202,18 @@ impl Issue {
 ///
 /// Returns only essential fields to reduce token usage. Use `jit issue show`
 /// for full details.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct MinimalIssue {
     pub id: String,
     pub title: String,
     pub state: State,
     pub priority: Priority,
+    /// Assigned agent or person (optional for context)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub assignee: Option<String>,
+    /// Labels for categorization (optional for context)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub labels: Vec<String>,
 }
 
 impl From<&Issue> for MinimalIssue {
@@ -216,12 +223,14 @@ impl From<&Issue> for MinimalIssue {
             title: issue.title.clone(),
             state: issue.state,
             priority: issue.priority,
+            assignee: issue.assignee.clone(),
+            labels: issue.labels.clone(),
         }
     }
 }
 
 /// Minimal blocked issue for queries - includes blocking reasons
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct MinimalBlockedIssue {
     pub id: String,
     pub title: String,
@@ -245,7 +254,7 @@ impl crate::graph::GraphNode for Issue {
 ///
 /// Documents can reference files at HEAD or specific git commits for
 /// version-aware knowledge management.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct DocumentReference {
     /// Path relative to repository root (e.g., "docs/api-design.md")
     pub path: String,

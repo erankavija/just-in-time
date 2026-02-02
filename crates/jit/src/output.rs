@@ -5,12 +5,13 @@
 //! AI agents and automation tools.
 
 use chrono::Utc;
+use schemars::JsonSchema;
 use serde::{Serialize, Serializer};
 use serde_json::Value;
 use std::fmt::Display;
 use std::io::{self, Write};
 
-use crate::domain::{Issue, Priority, State};
+use crate::domain::{MinimalBlockedIssue, MinimalIssue, Priority, State};
 
 /// Version of the JSON output format
 const OUTPUT_VERSION: &str = "0.2.0";
@@ -467,30 +468,58 @@ where
 // Query Response Types
 // ============================================================================
 
+/// Response for `status` command
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct StatusResponse {
+    pub open: usize,
+    pub ready: usize,
+    pub in_progress: usize,
+    pub gated: usize,
+    pub done: usize,
+    pub rejected: usize,
+    pub blocked: usize,
+    pub total: usize,
+}
+
+/// Generic response for issue list queries (available, all, ready, etc.)
+/// Uses MinimalIssue for efficiency - contains only id, title, state, priority
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct IssueListResponse {
+    pub issues: Vec<MinimalIssue>,
+    pub count: usize,
+}
+
+/// Response for blocked query with reasons (minimal issue + reasons)
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct BlockedListResponse {
+    pub issues: Vec<MinimalBlockedIssue>,
+    pub count: usize,
+}
+
 /// Response for `query ready` command
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct ReadyQueryResponse {
-    pub issues: Vec<Issue>,
+    pub issues: Vec<MinimalIssue>,
     pub count: usize,
 }
 
 /// Response for `query blocked` command
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct BlockedQueryResponse {
-    pub issues: Vec<BlockedIssue>,
+    pub issues: Vec<MinimalBlockedIssue>,
     pub count: usize,
 }
 
-/// Issue with blocking reasons
-#[derive(Debug, Serialize)]
+/// Issue with blocking reasons (minimal version for lists)
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct BlockedIssue {
     #[serde(flatten)]
-    pub issue: Issue,
+    pub issue: MinimalIssue,
     pub blocked_reasons: Vec<BlockedReason>,
 }
 
 /// Reason why an issue is blocked
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct BlockedReason {
     #[serde(rename = "type")]
     pub reason_type: BlockedReasonType,
@@ -498,7 +527,7 @@ pub struct BlockedReason {
 }
 
 /// Type of blocking reason
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum BlockedReasonType {
     Dependency,
@@ -506,48 +535,48 @@ pub enum BlockedReasonType {
 }
 
 /// Response for `query assignee` command
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct AssigneeQueryResponse {
     pub assignee: String,
-    pub issues: Vec<Issue>,
+    pub issues: Vec<MinimalIssue>,
     pub count: usize,
 }
 
 /// Response for `query state` command
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct StateQueryResponse {
     pub state: State,
-    pub issues: Vec<Issue>,
+    pub issues: Vec<MinimalIssue>,
     pub count: usize,
 }
 
 /// Response for `query priority` command
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct PriorityQueryResponse {
     pub priority: Priority,
-    pub issues: Vec<Issue>,
+    pub issues: Vec<MinimalIssue>,
     pub count: usize,
 }
 
 /// Response for `query label` command
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct LabelQueryResponse {
     pub pattern: String,
-    pub issues: Vec<Issue>,
+    pub issues: Vec<MinimalIssue>,
     pub count: usize,
 }
 
 /// Response for `query strategic` command
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct StrategicQueryResponse {
-    pub issues: Vec<Issue>,
+    pub issues: Vec<MinimalIssue>,
     pub count: usize,
 }
 
 /// Response for `query closed` command
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct ClosedQueryResponse {
-    pub issues: Vec<Issue>,
+    pub issues: Vec<MinimalIssue>,
     pub count: usize,
 }
 
@@ -556,22 +585,22 @@ pub struct ClosedQueryResponse {
 // ============================================================================
 
 /// Response for `graph show <id>` command
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct GraphShowResponse {
     pub issue_id: String,
-    pub dependencies: Vec<Issue>,
+    pub dependencies: Vec<MinimalIssue>,
     pub count: usize,
 }
 
 /// Response for `graph show` (all) command
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct GraphShowAllResponse {
     pub dependencies: Vec<DependencyPair>,
     pub count: usize,
 }
 
 /// A pair of issues with a dependency relationship
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct DependencyPair {
     pub from_id: String,
     pub from_title: String,
@@ -580,26 +609,29 @@ pub struct DependencyPair {
 }
 
 /// Response for `graph downstream` command
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct GraphDownstreamResponse {
     pub issue_id: String,
-    pub dependents: Vec<Issue>,
+    pub dependents: Vec<MinimalIssue>,
     pub count: usize,
 }
 
 /// Response for `graph deps` command
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct GraphDepsResponse {
     pub issue_id: String,
-    pub dependencies: Vec<Issue>,
+    pub dependencies: Vec<MinimalIssue>,
     pub count: usize,
     pub transitive: bool,
+    /// Whether the list was truncated due to size limits
+    #[serde(default)]
+    pub truncated: bool,
 }
 
 /// Response for `graph roots` command
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct GraphRootsResponse {
-    pub roots: Vec<Issue>,
+    pub roots: Vec<MinimalIssue>,
     pub count: usize,
 }
 
@@ -608,14 +640,14 @@ pub struct GraphRootsResponse {
 // ============================================================================
 
 /// Response for `registry list` command
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct RegistryListResponse {
     pub gates: Vec<GateDefinition>,
     pub count: usize,
 }
 
 /// Gate definition structure (for registry responses)
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct GateDefinition {
     pub key: String,
     pub title: String,
@@ -717,11 +749,23 @@ mod tests {
     // Query Response Tests
     // ========================================================================
 
+    /// Create a test MinimalIssue
+    fn test_minimal_issue() -> MinimalIssue {
+        MinimalIssue {
+            id: "test-id".to_string(),
+            title: "Issue 1".to_string(),
+            state: State::Ready,
+            priority: Priority::Normal,
+            assignee: None,
+            labels: Vec::new(),
+        }
+    }
+
     #[test]
     fn test_ready_query_response_serialization() {
-        let issues = vec![Issue::new("Issue 1".to_string(), "".to_string())];
+        let issues = vec![test_minimal_issue()];
         let response = ReadyQueryResponse {
-            issues: issues.clone(),
+            issues,
             count: 1,
         };
 
@@ -736,15 +780,12 @@ mod tests {
 
     #[test]
     fn test_blocked_query_response_serialization() {
-        let issue = Issue::new("Issue 1".to_string(), "".to_string());
-        let reasons = vec![BlockedReason {
-            reason_type: BlockedReasonType::Dependency,
-            detail: "Waiting on ABC123".to_string(),
-        }];
-
-        let blocked_issue = BlockedIssue {
-            issue,
-            blocked_reasons: reasons,
+        let blocked_issue = MinimalBlockedIssue {
+            id: "test-id".to_string(),
+            title: "Issue 1".to_string(),
+            state: State::Ready,
+            priority: Priority::Normal,
+            blocked_reasons: vec!["dep:abc123".to_string()],
         };
 
         let response = BlockedQueryResponse {
@@ -757,17 +798,16 @@ mod tests {
 
         assert!(serialized.contains("\"success\": true"));
         assert!(serialized.contains("\"blocked_reasons\""));
-        assert!(serialized.contains("\"dependency\""));
         assert!(serialized.contains("\"command\": \"query blocked\""));
     }
 
     #[test]
     fn test_assignee_query_response() {
-        let issues = vec![Issue::new("Issue 1".to_string(), "".to_string())];
+        let issues = vec![test_minimal_issue()];
 
         let response = AssigneeQueryResponse {
             assignee: "copilot:session-1".to_string(),
-            issues: issues.clone(),
+            issues,
             count: 1,
         };
 
@@ -781,11 +821,11 @@ mod tests {
 
     #[test]
     fn test_state_query_response() {
-        let issues = vec![Issue::new("Issue 1".to_string(), "".to_string())];
+        let issues = vec![test_minimal_issue()];
 
         let response = StateQueryResponse {
             state: State::Ready,
-            issues: issues.clone(),
+            issues,
             count: 1,
         };
 
@@ -799,11 +839,11 @@ mod tests {
 
     #[test]
     fn test_priority_query_response() {
-        let issues = vec![Issue::new("Issue 1".to_string(), "".to_string())];
+        let issues = vec![test_minimal_issue()];
 
         let response = PriorityQueryResponse {
             priority: Priority::High,
-            issues: issues.clone(),
+            issues,
             count: 1,
         };
 

@@ -132,10 +132,16 @@ function assertEqual(actual, expected, message) {
 }
 
 /**
- * Extract JSON data from MCP tool response content.
- * Handles both old format (single text block) and new format (user summary + assistant JSON).
+ * Extract JSON data from MCP tool response.
+ * Handles: structuredContent (new), assistant-targeted content, or plain JSON text.
  */
-function extractJsonFromContent(content) {
+function extractJsonFromResponse(response) {
+  // First check for structuredContent (new MCP structured response)
+  if (response.structuredContent) {
+    return response.structuredContent;
+  }
+  
+  const content = response.content;
   if (!content || !Array.isArray(content) || content.length === 0) {
     throw new Error('No content in response');
   }
@@ -160,6 +166,11 @@ function extractJsonFromContent(content) {
   }
   
   throw new Error('No JSON content found in response');
+}
+
+// Legacy function for backwards compatibility
+function extractJsonFromContent(content) {
+  return extractJsonFromResponse({ content });
 }
 
 /**
@@ -292,7 +303,7 @@ const tests = [
       assert(content.type === 'text', 'Content should be text');
       
       // MCP server unwraps the {success, data} wrapper
-      const output = extractJsonFromContent(response.result.content);
+      const output = extractJsonFromResponse(response.result);
       assert(typeof output.total === 'number', 'Should have total count');
       
       console.log(`  ✓ Status: ${output.total} total issues`);
@@ -370,7 +381,7 @@ const tests = [
       assert(content.type === 'text', 'Content should be text');
       
       // Parse the output (MCP server unwraps {success, data})
-      const output = extractJsonFromContent(response.result.content);
+      const output = extractJsonFromResponse(response.result);
       assert(output.query === 'priority', 'Should echo query');
       assert(typeof output.total === 'number', 'Should have total count');
       assert(Array.isArray(output.results), 'Should have results array');
@@ -399,7 +410,7 @@ const tests = [
         return;
       }
       
-      const output = extractJsonFromContent(response.result.content);
+      const output = extractJsonFromResponse(response.result);
       assert(Array.isArray(output.results), 'Should have results');
       
       console.log(`  ✓ Regex search works`);
@@ -426,7 +437,7 @@ const tests = [
         return;
       }
       
-      const output = extractJsonFromContent(response.result.content);
+      const output = extractJsonFromResponse(response.result);
       assert(Array.isArray(output.results), 'Should have results');
       
       // All results should be from .json files (if any results)

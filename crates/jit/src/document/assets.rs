@@ -4,6 +4,7 @@
 //! resolves paths, and computes metadata (MIME types, hashes).
 
 use crate::document::AdapterRegistry;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
@@ -11,7 +12,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 /// Asset reference discovered in a document
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Asset {
     /// Original path as written in the document
     pub original_path: String,
@@ -28,7 +29,7 @@ pub struct Asset {
 }
 
 /// Type of asset reference
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum AssetType {
     /// Local file asset (relative or root-relative path)
