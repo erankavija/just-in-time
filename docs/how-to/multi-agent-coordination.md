@@ -101,6 +101,27 @@ jit claim acquire <issue-id> --ttl 3600  # 1 hour
 jit claim renew <lease-id> --extension 600  # Add 10 minutes
 ```
 
+### Pattern 5: Indefinite Leases for Manual Oversight
+
+For tasks requiring human oversight or unpredictable duration:
+
+```bash
+# Acquire indefinite lease (requires reason)
+jit claim acquire <issue-id> --ttl 0 --reason "Manual review needed"
+
+# Send periodic heartbeats to prevent staleness
+jit claim heartbeat <lease-id>
+
+# Check status (shows time since last heartbeat)
+jit claim status
+```
+
+**Policy limits apply:**
+- Max 2 indefinite leases per agent (configurable)
+- Max 10 indefinite leases per repository (configurable)
+
+Leases become **stale** after 1 hour without heartbeat. Stale leases are rejected by pre-commit hooks.
+
 ## Handling Conflicts
 
 ### Conflict: Same Issue Claimed
