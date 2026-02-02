@@ -2,7 +2,7 @@
   "id": "c8355d70-4c21-4c96-b8d9-1f8036910368",
   "title": "Write design-philosophy.md",
   "description": "Write complete docs/concepts/design-philosophy.md explaining JIT's design principles.\n\n## Current State\n\nFile exists at docs/concepts/design-philosophy.md (29 lines) with section headings only:\n- Domain Agnostic\n- Agent-First Design\n- Functional Programming Principles\n- CLI as Primary Interface\n- Dogfooding\n\n## Content Needed\n\n### 1. Domain Agnostic (~80-100 lines)\n- Why JIT avoids software-specific terminology\n- Issue/Gate/Dependency work across domains\n- Configurable workflows for different contexts\n- **Examples:**\n  - Software: Issue=Feature/Bug, Gate=CI check\n  - Research: Issue=Experiment, Gate=Peer review\n  - Knowledge work: Issue=Document, Gate=Approval\n- Domain mapping table\n\n### 2. Agent-First Design (~80-100 lines)\n- Built for programmatic agents, humans benefit too\n- Why this design choice matters\n- **Key principles:**\n  - JSON-first output (--json flag everywhere)\n  - Atomic file operations (no race conditions)\n  - Clear exit codes for scripting\n  - MCP protocol integration\n  - Structured errors\n- **Examples:** Multi-agent claiming, coordination patterns\n\n### 3. Functional Programming Principles (~80-100 lines)\n- Immutability where practical\n- Pure functions over stateful objects\n- Iterator combinators over explicit loops\n- Expression-oriented code\n- **Why it matters:**\n  - Easier to reason about\n  - Better testability\n  - Fewer bugs\n  - Composability\n- **Examples from codebase:**\n  - Query functions using .filter().map()\n  - Result/Option for error handling\n\n### 4. CLI as Primary Interface (~80-100 lines)\n- Why CLI over web-first?\n- **Benefits:**\n  - Scriptability and automation\n  - Agent-friendly by default\n  - UNIX philosophy (do one thing well)\n  - Composable with other tools\n- MCP and web UI built on CLI foundation\n- Human ergonomics (short hashes, --quiet mode)\n\n### 5. Dogfooding (~80-100 lines)\n- We use JIT to track JIT development\n- Real-world validation of design decisions\n- Continuous feedback loop\n- **Specific examples:**\n  - This very repository uses JIT\n  - Gate system tested on our own workflow\n  - Documentation tracked as issues\n  - Multi-agent coordination proven in practice\n- **Benefits:**\n  - Catches usability issues early\n  - Validates agent orchestration claims\n  - Ensures production readiness\n\n## Acceptance Criteria\n\n- [ ] All 5 sections complete (400-500 lines total)\n- [ ] Each section explains *why* not just *what*\n- [ ] Real examples from JIT codebase/usage\n- [ ] Cross-references to other docs (concepts, how-tos)\n- [ ] Maintains neutral, educational tone\n- [ ] Domain-agnostic language (per strategy)\n\n## References\n\n- File: docs/concepts/design-philosophy.md\n- Strategy: dev/studies/documentation-organization-strategy.md (see Design Principles section)\n- Codebase: crates/jit/src/ (for FP examples)\n- .copilot-instructions.md (FP guidelines)\n- Parent story: c8254dbf (Core Concepts Documentation)",
-  "state": "ready",
+  "state": "done",
   "priority": "high",
   "assignee": null,
   "dependencies": [],
@@ -11,13 +11,63 @@
   ],
   "gates_status": {
     "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-02T22:02:40.830603203Z"
+      "status": "passed",
+      "updated_by": "agent:docs-worker",
+      "updated_at": "2026-02-02T21:42:43.546300657Z"
     }
   },
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "docs/concepts/design-philosophy.md",
+      "commit": null,
+      "label": "Design Philosophy Documentation",
+      "doc_type": "design",
+      "format": "markdown",
+      "assets": [
+        {
+          "original_path": "../../CONTRIBUTOR-QUICKSTART.md",
+          "resolved_path": "CONTRIBUTOR-QUICKSTART.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "79e5cb32e6e4871c016cdd75721b0443b57217a93beb6e1c4aba1f3eeefe6dc6",
+          "is_shared": false
+        },
+        {
+          "original_path": "../how-to/multi-agent-coordination.md",
+          "resolved_path": "docs/how-to/multi-agent-coordination.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "ba46815ec103d18b0989a448e38e29f1b008ac2ff8cce11ea027a0d38b18f021",
+          "is_shared": false
+        },
+        {
+          "original_path": "guarantees.md",
+          "resolved_path": "docs/concepts/guarantees.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "5e643c6c2a9421f67ce99deb53ccbd907427f877da1b3cd486faa6f7bad6d5c5",
+          "is_shared": false
+        },
+        {
+          "original_path": "core-model.md",
+          "resolved_path": "docs/concepts/core-model.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "622fe686e1e409376fd906b5e456888205cd21b16ec803f0304f2796680df4f7",
+          "is_shared": false
+        },
+        {
+          "original_path": "../tutorials/quickstart.md",
+          "resolved_path": "docs/tutorials/quickstart.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "12f48b11167913e249c7f2de53dded5a14d3b9a8ecdb92b93d3cf335245c32d4",
+          "is_shared": false
+        }
+      ]
+    }
+  ],
   "labels": [
     "type:task",
     "epic:docs",
