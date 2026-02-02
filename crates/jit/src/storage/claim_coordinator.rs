@@ -263,7 +263,7 @@ impl ClaimCoordinator {
     }
 
     /// Load claims index (or create empty if missing)
-    fn load_claims_index(&self) -> Result<ClaimsIndex> {
+    pub fn load_claims_index(&self) -> Result<ClaimsIndex> {
         let index_path = self.paths.shared_jit.join("claims.index.json");
 
         if !index_path.exists() {
@@ -282,7 +282,7 @@ impl ClaimCoordinator {
     }
 
     /// Write claims index atomically (temp + rename)
-    fn write_index_atomic(&self, index: &ClaimsIndex) -> Result<()> {
+    pub fn write_index_atomic(&self, index: &ClaimsIndex) -> Result<()> {
         let index_path = self.paths.shared_jit.join("claims.index.json");
         let temp_path = index_path.with_extension("tmp");
 
@@ -301,7 +301,7 @@ impl ClaimCoordinator {
     }
 
     /// Evict expired leases from index
-    fn evict_expired(&self, index: &mut ClaimsIndex) -> Result<()> {
+    pub fn evict_expired(&self, index: &mut ClaimsIndex) -> Result<()> {
         let now = Utc::now();
         let expired: Vec<_> = index
             .leases
@@ -771,7 +771,7 @@ impl ClaimCoordinator {
     /// Note: Does NOT check for expired leases - those are handled by evict_expired().
     /// Expired leases are normal state, not corruption. Treating them as corruption
     /// would trigger unnecessary full index rebuilds.
-    fn verify_index_consistency(&self) -> Result<bool> {
+    pub fn verify_index_consistency(&self) -> Result<bool> {
         use std::collections::HashSet;
 
         let index_path = self.paths.shared_jit.join("claims.index.json");

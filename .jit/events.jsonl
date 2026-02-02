@@ -1408,3 +1408,12 @@
 {"type":"issue_state_changed","id":"88cb0c36-8a18-4ea1-9ddb-3941c74adc6f","issue_id":"fe91699f-7c1a-430b-bcb9-c6f80202c124","timestamp":"2026-02-02T12:26:54.249856569Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"a2939c47-b301-4ba3-90e0-a3565b79f4ec","issue_id":"fe91699f-7c1a-430b-bcb9-c6f80202c124","timestamp":"2026-02-02T12:26:54.249881609Z"}
 {"type":"issue_state_changed","id":"f2a33c2c-a43d-49ed-836d-1f5a3d12fde3","issue_id":"92bf3a9b-914a-4015-8d26-b52535afe479","timestamp":"2026-02-02T12:26:54.281898718Z","from":"backlog","to":"ready"}
+{"type":"gate_passed","id":"78a55fa8-c662-4ac3-bad8-571fecf795fb","issue_id":"92bf3a9b-914a-4015-8d26-b52535afe479","timestamp":"2026-02-02T12:29:37.050362297Z","gate_key":"tdd-reminder","updated_by":"copilot:session"}
+{"type":"issue_state_changed","id":"2a89bcf5-ba3a-410c-aae7-0903f959c384","issue_id":"92bf3a9b-914a-4015-8d26-b52535afe479","timestamp":"2026-02-02T12:29:37.053196428Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"50085de4-a2ee-4b89-8a31-b98cb9614eff","issue_id":"92bf3a9b-914a-4015-8d26-b52535afe479","timestamp":"2026-02-02T12:29:37.053338968Z","assignee":"copilot:cli-session"}
+{"type":"gate_passed","id":"6a21365a-4fb0-43c1-8a8c-8624630b80b7","issue_id":"92bf3a9b-914a-4015-8d26-b52535afe479","timestamp":"2026-02-02T12:59:37.904273465Z","gate_key":"tests","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"23ab748d-dcd5-4db2-af8c-515c63a27773","issue_id":"92bf3a9b-914a-4015-8d26-b52535afe479","timestamp":"2026-02-02T12:59:40.808532456Z","gate_key":"clippy","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"602e5889-cc29-4584-b831-b2402b6a67ae","issue_id":"92bf3a9b-914a-4015-8d26-b52535afe479","timestamp":"2026-02-02T12:59:41.211437941Z","gate_key":"fmt","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"69d29b19-5395-467b-8666-0fac3ed2277d","issue_id":"92bf3a9b-914a-4015-8d26-b52535afe479","timestamp":"2026-02-02T12:59:59.375285488Z","gate_key":"code-review","updated_by":"copilot:cli-session"}
+{"type":"issue_state_changed","id":"6f69a5c8-fb80-403c-b55e-299b07afe473","issue_id":"92bf3a9b-914a-4015-8d26-b52535afe479","timestamp":"2026-02-02T13:00:03.808232716Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"6ecbf3af-9f7f-45e0-860e-67aff0e03b4a","issue_id":"92bf3a9b-914a-4015-8d26-b52535afe479","timestamp":"2026-02-02T13:00:03.808260426Z"}

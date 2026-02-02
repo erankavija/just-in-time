@@ -276,6 +276,101 @@ pub fn execute_claim_force_evict<S: IssueStore>(lease_id: &str, reason: &str) ->
     coordinator.force_evict_lease(lease_id, reason)
 }
 
+/// Report of recovery actions taken.
+#[derive(Debug, Clone, Default)]
+pub struct RecoveryReport {
+    /// Number of stale locks cleaned up
+    pub stale_locks_cleaned: usize,
+    /// Whether the claims index was rebuilt
+    pub index_rebuilt: bool,
+    /// Number of expired leases evicted
+    pub expired_leases_evicted: usize,
+    /// Number of orphaned temp files removed
+    pub temp_files_removed: usize,
+}
+
+/// Execute recovery routines to fix common issues.
+///
+/// Performs automatic recovery operations:
+/// - Cleans up stale locks from crashed processes (PID check)
+/// - Rebuilds corrupted claims index from append-only log
+/// - Evicts expired leases
+/// - Removes orphaned temp files (older than 1 hour)
+///
+/// Safe to run at any time - only removes provably stale data.
+pub fn execute_recover<S: IssueStore>(_storage: &S) -> Result<RecoveryReport> {
+    use crate::storage::lock_cleanup;
+    use crate::storage::temp_cleanup;
+
+    // Detect worktree context
+    let paths = WorktreePaths::detect()
+        .context("Failed to detect worktree paths - are you in a git repository?")?;
+
+    // Get current branch for identity
+    let branch = get_current_branch()?;
+
+    // Load worktree identity
+    let identity =
+        load_or_create_worktree_identity(&paths.local_jit, &paths.worktree_root, &branch)?;
+
+    // Create claim coordinator
+    let agent = "system:recovery".to_string();
+    let locker = FileLocker::new(Duration::from_secs(5));
+    let coordinator = ClaimCoordinator::new(paths.clone(), locker, identity.worktree_id, agent);
+    coordinator.init()?;
+
+    let mut report = RecoveryReport::default();
+
+    // 1. Clean up stale locks
+    let lock_dir = paths.shared_jit.join("locks");
+    if lock_dir.exists() {
+        // Count locks before cleanup
+        let locks_before = std::fs::read_dir(&lock_dir)
+            .map(|entries| {
+                entries
+                    .filter_map(|e| e.ok())
+                    .filter(|e| e.path().extension().is_some_and(|ext| ext == "lock"))
+                    .count()
+            })
+            .unwrap_or(0);
+
+        lock_cleanup::cleanup_stale_locks(&lock_dir)?;
+
+        let locks_after = std::fs::read_dir(&lock_dir)
+            .map(|entries| {
+                entries
+                    .filter_map(|e| e.ok())
+                    .filter(|e| e.path().extension().is_some_and(|ext| ext == "lock"))
+                    .count()
+            })
+            .unwrap_or(0);
+
+        report.stale_locks_cleaned = locks_before.saturating_sub(locks_after);
+    }
+
+    // 2. Rebuild index if corrupted
+    if !coordinator.verify_index_consistency()? {
+        let index = coordinator.rebuild_index_from_log()?;
+        coordinator.write_index_atomic(&index)?;
+        report.index_rebuilt = true;
+    }
+
+    // 3. Evict expired leases
+    let mut index = coordinator.load_claims_index()?;
+    let leases_before = index.leases.len();
+    coordinator.evict_expired(&mut index)?;
+    coordinator.write_index_atomic(&index)?;
+    report.expired_leases_evicted = leases_before.saturating_sub(index.leases.len());
+
+    // 4. Clean up orphaned temp files (1 hour threshold)
+    let jit_data_dir = &paths.local_jit;
+    if let Ok(removed) = temp_cleanup::cleanup_orphaned_temp_files(jit_data_dir, 3600) {
+        report.temp_files_removed = removed;
+    }
+
+    Ok(report)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

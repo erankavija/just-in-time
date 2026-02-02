@@ -2238,6 +2238,52 @@ strategic_types = {}
                 }
             }
         }
+        Commands::Recover { json } => {
+            use jit::commands::claim::execute_recover;
+            use jit::output::JsonOutput;
+            use serde_json::json;
+
+            match execute_recover(&storage) {
+                Ok(report) => {
+                    if json {
+                        let output = JsonOutput::success(
+                            json!({
+                                "success": true,
+                                "stale_locks_cleaned": report.stale_locks_cleaned,
+                                "index_rebuilt": report.index_rebuilt,
+                                "expired_leases_evicted": report.expired_leases_evicted,
+                                "temp_files_removed": report.temp_files_removed,
+                            }),
+                            "recover",
+                        );
+                        println!("{}", output.to_json_string()?);
+                    } else {
+                        println!("Recovery complete:");
+                        println!("  • Stale locks cleaned: {}", report.stale_locks_cleaned);
+                        println!("  • Index rebuilt: {}", report.index_rebuilt);
+                        println!(
+                            "  • Expired leases evicted: {}",
+                            report.expired_leases_evicted
+                        );
+                        println!("  • Temp files removed: {}", report.temp_files_removed);
+                    }
+                }
+                Err(e) => {
+                    if json {
+                        let output = jit::output::JsonError::new(
+                            "recovery_failed",
+                            e.to_string(),
+                            "recover",
+                        );
+                        eprintln!("{}", serde_json::to_string(&output)?);
+                        std::process::exit(1);
+                    } else {
+                        eprintln!("Recovery failed: {}", e);
+                        std::process::exit(1);
+                    }
+                }
+            }
+        }
         Commands::Claim(claim_cmd) => match claim_cmd {
             ClaimCommands::Acquire {
                 issue_id,

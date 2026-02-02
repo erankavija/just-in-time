@@ -168,6 +168,20 @@ pub enum Commands {
         #[arg(long)]
         leases: bool,
     },
+
+    /// Run recovery routines to fix common issues
+    ///
+    /// Performs automatic recovery operations:
+    /// - Cleans up stale locks from crashed processes (PID check)
+    /// - Rebuilds corrupted claims index from append-only log
+    /// - Evicts expired leases
+    /// - Removes orphaned temp files (older than 1 hour)
+    ///
+    /// Safe to run at any time - only removes provably stale data.
+    Recover {
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Subcommand)]
