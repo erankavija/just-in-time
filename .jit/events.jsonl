@@ -1592,3 +1592,4 @@
 {"type":"gate_passed","id":"99bf8bab-7d11-4d13-a903-a46f21cb4f37","issue_id":"8847805b-9320-4f1f-b9cf-cb7fe9944f7a","timestamp":"2026-02-02T21:35:06.069539962Z","gate_key":"code-review","updated_by":"agent:mcp-worker"}
 {"type":"issue_state_changed","id":"675c9846-c251-4e2e-8f51-b229e6b4dcef","issue_id":"8847805b-9320-4f1f-b9cf-cb7fe9944f7a","timestamp":"2026-02-02T21:35:06.662040081Z","from":"ready","to":"done"}
 {"type":"issue_completed","id":"41262c34-78f1-449c-9d06-f77d7886b96e","issue_id":"8847805b-9320-4f1f-b9cf-cb7fe9944f7a","timestamp":"2026-02-02T21:35:06.662068481Z"}
+{"type":"issue_created","id":"26ee7080-c8a5-4c40-8b33-ca96ec5284cb","issue_id":"a66e16a4-7d95-46d9-91f3-586459f94b1e","timestamp":"2026-02-02T21:46:41.341850890Z","title":"Add git merge driver for .jit/events.jsonl","priority":"normal"}

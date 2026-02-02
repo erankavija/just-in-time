@@ -1,0 +1,18 @@
+{
+  "id": "a66e16a4-7d95-46d9-91f3-586459f94b1e",
+  "title": "Add git merge driver for .jit/events.jsonl",
+  "description": "## Problem\n\nWhen merging branches with concurrent jit activity, `.jit/events.jsonl` always conflicts because both branches appended events. The resolution is always the same: keep all lines from both sides (union merge).\n\nCurrently we manually resolve with:\n```bash\ncat .jit/events.jsonl | grep -v \"^<<<<<<<\" | grep -v \"^=======\" | grep -v \"^>>>>>>>\" > /tmp/events.jsonl\nmv /tmp/events.jsonl .jit/events.jsonl\n```\n\n## Solution\n\nCreate a custom git merge driver that automatically unions append-only logs:\n\n1. Create merge driver script (e.g., `scripts/merge-jsonl.sh`)\n2. Register in `.gitattributes`: `.jit/events.jsonl merge=union-jsonl`\n3. Document in `.gitconfig` or `jit hooks install`\n\n## Implementation\n\n```bash\n#!/bin/bash\n# merge-jsonl.sh - Union merge for append-only JSONL files\n# Args: %O %A %B (ancestor, current, other)\ncat \"$2\" \"$3\" | sort -u > /tmp/merged.jsonl\nmv /tmp/merged.jsonl \"$2\"\nexit 0\n```\n\nOr simpler - use git's built-in `union` driver:\n```\n.jit/events.jsonl merge=union\n```\n\n## Acceptance Criteria\n\n- [ ] Merges of events.jsonl auto-resolve without conflicts\n- [ ] No duplicate lines in merged result\n- [ ] Works with `jit hooks install` or documented setup\n- [ ] Tested with concurrent branch activity",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:production-polish",
+    "component:core"
+  ]
+}

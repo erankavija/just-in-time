@@ -6,16 +6,17 @@
   "priority": "normal",
   "assignee": null,
   "dependencies": [
-    "13c69884-dfe9-4a62-b2ef-59fa4d2f76f3",
     "7004d5b6-0f4d-4dd7-9623-6d953ff94025",
+    "56b7e503-c4c8-4509-96c5-ae40e37d3132",
+    "12ef7efb-956e-4456-bd89-237ebfe22937",
+    "32f804f1-9c96-40d4-b9aa-94e3fbf1cd7d",
+    "11682766-316e-4fd7-9bbf-eaddf7c01b04",
+    "a66e16a4-7d95-46d9-91f3-586459f94b1e",
     "cbf75d46-2bea-46ce-8b70-80ae2f8e003d",
     "f65b5b9c-521c-4aab-bb36-0fc99a0efecf",
-    "56b7e503-c4c8-4509-96c5-ae40e37d3132",
+    "13c69884-dfe9-4a62-b2ef-59fa4d2f76f3",
     "c097f2a7-a393-49eb-b796-bb836500915d",
-    "11682766-316e-4fd7-9bbf-eaddf7c01b04",
-    "408ed86a-12a5-45ec-8623-5739e14b1cb7",
-    "32f804f1-9c96-40d4-b9aa-94e3fbf1cd7d",
-    "12ef7efb-956e-4456-bd89-237ebfe22937"
+    "408ed86a-12a5-45ec-8623-5739e14b1cb7"
   ],
   "gates_required": [
     "code-review"
