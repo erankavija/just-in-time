@@ -5,7 +5,399 @@
 
 ## Issues
 
-<!-- What are issues? Properties, lifecycle -->
+Issues are the fundamental unit of work in JIT. Everything you track - features, bugs, research questions, learning goals - is represented as an issue.
+
+### What Are Issues?
+
+**Issues** are universal work items that:
+- Represent any trackable unit of work (domain-agnostic)
+- Serve as the primary entity in the JIT system
+- Can be organized hierarchically or independently
+- Support arbitrary dependency relationships
+
+**Relationship to traditional systems:**
+- Similar to "tickets" (Jira), "issues" (GitHub), "cards" (Trello)
+- But more flexible - not tied to software development terminology
+- Usable for research, knowledge work, personal projects, any domain
+
+### Core Properties
+
+Every issue has the following properties:
+
+#### ID - Unique Identifier
+```
+Full: abc12345-6789-4def-1234-567890abcdef (UUID)
+Short: abc12345 (first 8 characters, case-insensitive)
+```
+
+- **Format**: UUID for global uniqueness
+- **Short hash support**: Use minimum 4 characters (like git)
+- **Collision-free**: UUIDs prevent conflicts across repositories
+
+**Examples:**
+```bash
+jit issue show abc12345           # Short hash
+jit issue show abc12345-6789      # Longer prefix
+jit dep add 003f 9db2             # Minimal (4 chars)
+```
+
+#### Title - Human-Readable Summary
+
+Short, descriptive summary of the work (single line):
+
+```
+"Fix login redirect bug"
+"Add dark mode support"
+"Research: Compare database options"
+"Learn: Complete Python tutorial"
+```
+
+**Best practices:**
+- Keep under 80 characters
+- Start with verb (action-oriented)
+- Be specific enough to differentiate from similar work
+
+#### Description - Detailed Explanation
+
+Markdown-formatted detailed explanation including:
+- **What**: Specific work to be done
+- **Why**: Context and motivation
+- **Acceptance criteria**: How to know it's complete
+- **Notes**: Any additional context, links, or constraints
+
+**Example:**
+```markdown
+## Problem
+Users get redirected to /home after login instead of their 
+intended destination.
+
+## Solution
+Store the intended URL in session before redirecting to login page.
+After successful auth, redirect to stored URL or default to /home.
+
+## Acceptance Criteria
+- [ ] Pre-login URL captured in session
+- [ ] Post-login redirect uses stored URL
+- [ ] Falls back to /home if no stored URL
+- [ ] Works across browser sessions
+```
+
+#### State - Current Lifecycle Position
+
+The issue's current position in the workflow. See [States](#states) for complete state machine.
+
+**Primary states:**
+- `backlog` - Created but not ready for work
+- `ready` - All dependencies done, can start work
+- `in_progress` - Currently being worked on
+- `done` - Completed successfully
+
+#### Priority - Importance Level
+
+Four priority levels:
+- `critical` - Urgent, blocks other work
+- `high` - Important, should be done soon
+- `normal` - Default priority
+- `low` - Nice to have, do when time permits
+
+**Priority affects:**
+- Query ordering (higher priority listed first)
+- Agent decision-making (claim higher priority first)
+- Work scheduling and planning
+
+**Note:** Priority does not affect state transitions or blocking.
+
+#### Assignee - Current Owner
+
+Who is working on this issue (optional):
+
+**Format**: `{type}:{identifier}`
+
+**Examples:**
+```
+human:alice          # Human developer
+agent:copilot-1      # AI agent instance
+ci:github-actions    # CI system
+team:backend         # Group assignment
+```
+
+See [Assignees](#assignees) for complete specification.
+
+#### Dependencies - Work Order
+
+List of issue IDs that must complete before this issue can be done.
+
+**Semantics:** "This issue depends on those issues"
+- Blocks completion (state transition to `done`)
+- Does not block starting work (can `in_progress` while dependencies pending)
+- Enforces DAG structure (no cycles)
+
+See [Dependencies](#dependencies-vs-labels-understanding-the-difference) for complete explanation.
+
+#### Gates - Quality Requirements
+
+List of gate keys that must pass before issue can progress.
+
+**Prechecks:** Block transition to `in_progress`
+**Postchecks:** Block transition to `done`
+
+**Examples:**
+```json
+"gates_required": ["tests", "code-review", "security-scan"]
+```
+
+See [Gates](#gates) for complete gate system.
+
+#### Labels - Organizational Tags
+
+Flexible categorization using `namespace:value` format.
+
+**Common namespaces:**
+```
+type:task               # Issue type
+epic:auth               # Epic membership
+milestone:v1.0          # Milestone membership
+component:backend       # System component
+priority:high           # Alternative to priority field
+```
+
+See [Labels](#labels) for complete labeling system.
+
+#### Documents - Attached References
+
+List of design documents, notes, and artifacts linked to this issue.
+
+**Example:**
+```json
+"documents": [
+  {
+    "path": "dev/design/auth-design.md",
+    "label": "Design Document",
+    "doc_type": "design",
+    "commit": "abc123..."
+  }
+]
+```
+
+Documents can be versioned via git, archived when work completes, and validated for broken links.
+
+#### Context - Agent Metadata
+
+Flexible key-value storage for agent-specific data (optional).
+
+**Use cases:**
+- Store intermediate state during long-running tasks
+- Track agent-specific preferences or settings
+- Cache computed values across operations
+
+**Example:**
+```json
+"context": {
+  "last_build_time": "2026-02-02T20:00:00Z",
+  "retry_count": "2",
+  "checkpoint": "step-3-complete"
+}
+```
+
+### Issue Lifecycle
+
+Issues progress through states as work advances:
+
+```
+Creation → Backlog → Ready → In Progress → Done
+                        ↓           ↓
+                    Gated ←─────────┘
+                        ↓
+                      Done
+```
+
+**1. Creation**
+```bash
+jit issue create \
+  --title "Implement feature X" \
+  --description "..." \
+  --priority high \
+  --label "type:task"
+```
+
+New issues start in `backlog` state.
+
+**2. Transition to Ready**
+
+Issues become `ready` when:
+- ✓ All dependencies in terminal state (`done` or `rejected`)
+- ✓ All precheck gates passed
+
+**3. Work Begins**
+
+```bash
+jit issue claim $ISSUE agent:worker-1
+# Automatically transitions to in_progress
+```
+
+**4. Completion**
+
+```bash
+# Check postchecks
+jit gate check-all $ISSUE
+
+# Mark complete
+jit issue update $ISSUE --state done
+```
+
+Issue moves to `gated` if postchecks unpassed, otherwise to `done`.
+
+See [States](#states) for complete state machine details.
+
+### JSON Structure
+
+Issues are stored as JSON files in `.jit/issues/{id}.json`:
+
+```json
+{
+  "id": "abc12345-6789-4def-1234-567890abcdef",
+  "title": "Implement user authentication",
+  "description": "Add JWT-based authentication system with...",
+  "state": "in_progress",
+  "priority": "high",
+  "assignee": "agent:worker-1",
+  "dependencies": [
+    "xyz78901-2345-6abc-7890-def123456789"
+  ],
+  "gates_required": ["tests", "code-review"],
+  "gates_status": {
+    "tests": {
+      "status": "passed",
+      "updated_by": "ci:github-actions",
+      "updated_at": "2026-02-02T20:00:00Z"
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-02-01T15:00:00Z"
+    }
+  },
+  "context": {
+    "build_status": "success",
+    "coverage": "94%"
+  },
+  "documents": [
+    {
+      "path": "dev/design/auth-design.md",
+      "label": "Authentication Design",
+      "doc_type": "design",
+      "commit": "a1b2c3d4"
+    }
+  ],
+  "labels": [
+    "type:task",
+    "epic:auth",
+    "milestone:v1.0",
+    "component:backend"
+  ]
+}
+```
+
+**Storage guarantees:**
+- Atomic writes (write-temp-rename pattern)
+- No partial writes from crashes
+- JSON validation on read
+- Git-optional (works without version control)
+
+### Relationship to Other Concepts
+
+Issues are the central concept that ties together all other JIT features:
+
+**Dependencies** control workflow:
+```
+Issue A depends on Issue B
+  → A cannot complete until B is done
+  → Determines what work is available (ready vs blocked)
+```
+
+**Gates** ensure quality:
+```
+Issue requires ["tests", "review"]
+  → Cannot complete without passing gates
+  → Enforces process and standards
+```
+
+**Labels** organize work:
+```
+Issue has label "epic:auth"
+  → Groups related work together
+  → Enables filtering and reporting
+  → Provides hierarchy and context
+```
+
+**Assignees** prevent conflicts:
+```
+Issue assigned to "agent:worker-1"
+  → Indicates ownership
+  → Combined with claims for atomicity
+  → Enables coordination across agents
+```
+
+**States** track progress:
+```
+Issue state: in_progress
+  → Shows current workflow position
+  → Determines valid transitions
+  → Affects query results (available, blocked, done)
+```
+
+### Domain-Agnostic Examples
+
+Issues work for any domain:
+
+**Software Development:**
+```json
+{
+  "title": "Add user registration endpoint",
+  "labels": ["type:task", "epic:auth", "component:api"],
+  "gates_required": ["tests", "code-review"],
+  "priority": "high"
+}
+```
+
+**Research:**
+```json
+{
+  "title": "Literature review: Neural architecture search",
+  "labels": ["type:task", "project:nas-research", "phase:background"],
+  "gates_required": ["peer-review"],
+  "priority": "normal"
+}
+```
+
+**Knowledge Work:**
+```json
+{
+  "title": "Learn: Complete Rust async programming chapter",
+  "labels": ["type:task", "goal:learn-rust", "topic:async"],
+  "gates_required": ["exercises-complete"],
+  "priority": "low"
+}
+```
+
+**Project Management:**
+```json
+{
+  "title": "Finalize Q1 budget proposal",
+  "labels": ["type:task", "milestone:q1-planning", "team:finance"],
+  "gates_required": ["manager-approval", "stakeholder-review"],
+  "priority": "critical"
+}
+```
+
+### See Also
+
+- [States](#states) - Complete state machine and transitions
+- [Dependencies](#dependencies-vs-labels-understanding-the-difference) - Workflow control with DAG
+- [Gates](#gates) - Quality enforcement and process integration
+- [Labels](#labels) - Organizational taxonomy
+- [Assignees](#assignees) - Ownership and coordination
+- [System Guarantees](guarantees.md) - Atomicity, consistency, failure handling
 
 ## Dependencies vs Labels: Understanding the Difference
 

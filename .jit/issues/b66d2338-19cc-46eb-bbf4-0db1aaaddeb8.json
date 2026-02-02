@@ -2,7 +2,7 @@
   "id": "b66d2338-19cc-46eb-bbf4-0db1aaaddeb8",
   "title": "Complete Issues section in core-model.md",
   "description": "Complete the Issues section in docs/concepts/core-model.md with comprehensive explanation.\n\n## Current State\n\nFile exists at docs/concepts/core-model.md (862 lines) with placeholder:\n```markdown\n## Issues\n\n<!-- What are issues? Properties, lifecycle -->\n```\n\nOther sections (Dependencies, Labels, Gates, States, Assignees) are complete.\n\n## Content Needed\n\n### 1. What Are Issues?\n- Universal work units (domain-agnostic)\n- Primary entity in JIT system\n- Relationship to traditional tickets/tasks/stories\n\n### 2. Core Properties\n- **ID** - UUID with short hash support\n- **Title** - Human-readable summary\n- **Description** - Detailed explanation (Markdown)\n- **State** - Current lifecycle position (link to States section)\n- **Priority** - critical, high, normal, low\n- **Assignee** - Who's working on it (link to Assignees section)\n- **Dependencies** - What blocks this (link to Dependencies section)\n- **Gates** - Quality requirements (link to Gates section)\n- **Labels** - Organizational tags (link to Labels section)\n- **Documents** - Attached references\n- **Events** - Audit trail\n\n### 3. Issue Lifecycle\n- Creation and initialization\n- State transitions overview (reference States section)\n- Completion criteria\n\n### 4. JSON Structure Example\n```json\n{\n  \"id\": \"abc123...\",\n  \"title\": \"Implement authentication\",\n  \"description\": \"Add JWT-based auth...\",\n  \"state\": \"in_progress\",\n  \"priority\": \"high\",\n  \"assignee\": \"agent:worker-1\",\n  \"dependencies\": [\"xyz789...\"],\n  \"gates_required\": [\"tests\", \"code-review\"],\n  \"labels\": [\"type:task\", \"epic:auth\"],\n  ...\n}\n```\n\n### 5. Relationship to Other Concepts\n- How issues use dependencies for workflow\n- How gates ensure quality\n- How labels organize work\n- How assignees prevent conflicts\n\n## Acceptance Criteria\n\n- [ ] Issues section complete (200-300 lines)\n- [ ] All core properties explained\n- [ ] JSON structure example included\n- [ ] Cross-references to other sections\n- [ ] Domain-agnostic language throughout\n- [ ] Examples show different domains (if space)\n\n## References\n\n- File: docs/concepts/core-model.md\n- Strategy: dev/studies/documentation-organization-strategy.md\n- Parent story: c8254dbf (Core Concepts Documentation)",
-  "state": "ready",
+  "state": "done",
   "priority": "high",
   "assignee": null,
   "dependencies": [],
@@ -11,9 +11,9 @@
   ],
   "gates_status": {
     "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-02T22:02:40.825162361Z"
+      "status": "passed",
+      "updated_by": "agent:docs-worker",
+      "updated_at": "2026-02-02T21:27:41.458741307Z"
     }
   },
   "context": {},
