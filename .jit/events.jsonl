@@ -1572,3 +1572,7 @@
 {"type":"gate_passed","id":"0ac0ca7d-66a5-4df5-b731-6a4f65ac1984","issue_id":"d820155f-53e9-414e-9f6b-cb08b68acab9","timestamp":"2026-02-02T21:05:02.139404363Z","gate_key":"code-review","updated_by":"agent:docs-worker"}
 {"type":"issue_state_changed","id":"e0257d9b-fecc-4210-90c3-cf532048cc59","issue_id":"d820155f-53e9-414e-9f6b-cb08b68acab9","timestamp":"2026-02-02T21:05:02.146810705Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"a3a513f0-3949-443e-9828-303e74bf8094","issue_id":"d820155f-53e9-414e-9f6b-cb08b68acab9","timestamp":"2026-02-02T21:05:02.146834805Z"}
+{"type":"issue_state_changed","id":"a7b8c06f-ea45-40a9-8bdf-68cbfabf1f3b","issue_id":"8847805b-9320-4f1f-b9cf-cb7fe9944f7a","timestamp":"2026-02-02T21:34:13.934247796Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"22c5e940-b365-46e4-8ca2-9bafb24eb9b1","issue_id":"8847805b-9320-4f1f-b9cf-cb7fe9944f7a","timestamp":"2026-02-02T21:34:13.937106206Z","assignee":"agent:intruder"}
+{"type":"issue_state_changed","id":"c38f56ba-2c29-4a55-95ac-0c7fe37008e0","issue_id":"c8355d70-4c21-4c96-b8d9-1f8036910368","timestamp":"2026-02-02T21:37:12.676079784Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"c512b316-50ac-4874-9dda-662d322e50c5","issue_id":"c8355d70-4c21-4c96-b8d9-1f8036910368","timestamp":"2026-02-02T21:37:12.679035645Z","assignee":"agent:intruder"}

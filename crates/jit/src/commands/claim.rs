@@ -93,6 +93,13 @@ pub fn execute_claim_acquire<S: IssueStore>(
         coord_config.max_indefinite_leases_per_repo(),
     )?;
 
+    // Also set the assignee on the issue for visibility
+    let mut issue = storage.load_issue(&full_id)?;
+    if issue.assignee.is_none() || issue.assignee.as_ref() != Some(&agent) {
+        issue.assignee = Some(agent);
+        storage.save_issue(&issue)?;
+    }
+
     Ok(lease.lease_id)
 }
 
@@ -284,6 +291,53 @@ pub fn execute_claim_list() -> Result<Vec<Lease>> {
 
     // Get all active leases (no filters)
     coordinator.get_active_leases(None, None)
+}
+
+/// Check if an issue has an active lease held by another agent.
+///
+/// Returns Ok(None) if no conflicting lease exists.
+/// Returns Ok(Some(lease)) if there's a lease held by a different agent.
+/// Returns Err if there's an error checking leases.
+pub fn check_issue_lease(issue_id: &str, current_agent: Option<&str>) -> Result<Option<Lease>> {
+    // Try to detect worktree context - if not in a git repo, no leases are active
+    let paths = match WorktreePaths::detect() {
+        Ok(p) => p,
+        Err(_) => return Ok(None), // Not in a git repo, no lease system active
+    };
+
+    // Get current branch for identity
+    let branch = match get_current_branch() {
+        Ok(b) => b,
+        Err(_) => return Ok(None), // Can't determine branch, skip lease check
+    };
+
+    // Load worktree identity
+    let identity = match load_or_create_worktree_identity(&paths.local_jit, &paths.worktree_root, &branch) {
+        Ok(i) => i,
+        Err(_) => return Ok(None), // Can't load identity, skip lease check
+    };
+
+    // Create coordinator to check leases
+    let agent = current_agent.unwrap_or("system:check").to_string();
+    let locker = FileLocker::new(Duration::from_secs(5));
+    let coordinator = ClaimCoordinator::new(paths, locker, identity.worktree_id, agent.clone());
+    
+    // Don't fail if control plane doesn't exist yet
+    if coordinator.init().is_err() {
+        return Ok(None);
+    }
+
+    // Get leases for this issue
+    let leases = coordinator.get_active_leases(Some(issue_id), None)?;
+    
+    // Check if any lease is held by a different agent
+    for lease in leases {
+        if current_agent.is_none() || Some(lease.agent_id.as_str()) != current_agent {
+            return Ok(Some(lease));
+        }
+    }
+    
+    Ok(None)
 }
 
 /// Force-evicts a lease (admin operation).
