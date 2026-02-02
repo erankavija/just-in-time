@@ -410,6 +410,364 @@ impl JitConfig {
     }
 }
 
+// ============================================================
+// Config Loader with Priority and Merging
+// ============================================================
+
+/// Builder for loading configuration from multiple sources with priority.
+///
+/// Priority order (highest to lowest):
+/// 1. Repository config (`.jit/config.toml`)
+/// 2. User config (`~/.config/jit/config.toml`)
+/// 3. System config (`/etc/jit/config.toml`)
+/// 4. Defaults (hardcoded)
+#[derive(Debug, Default)]
+pub struct ConfigLoader {
+    system_config: Option<JitConfig>,
+    user_config: Option<JitConfig>,
+    repo_config: Option<JitConfig>,
+}
+
+impl ConfigLoader {
+    /// Create a new config loader with only defaults.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Load and add system-level config (`/etc/jit/config.toml`).
+    pub fn with_system_config(mut self, config_dir: &Path) -> Result<Self> {
+        self.system_config = Some(JitConfig::load(config_dir)?);
+        Ok(self)
+    }
+
+    /// Load and add user-level config (`~/.config/jit/config.toml`).
+    pub fn with_user_config(mut self, config_dir: &Path) -> Result<Self> {
+        self.user_config = Some(JitConfig::load(config_dir)?);
+        Ok(self)
+    }
+
+    /// Load and add repository-level config (`.jit/config.toml`).
+    pub fn with_repo_config(mut self, jit_root: &Path) -> Result<Self> {
+        self.repo_config = Some(JitConfig::load(jit_root)?);
+        Ok(self)
+    }
+
+    /// Build the effective configuration by merging all sources.
+    pub fn build(self) -> EffectiveConfig {
+        EffectiveConfig {
+            system_config: self.system_config,
+            user_config: self.user_config,
+            repo_config: self.repo_config,
+        }
+    }
+}
+
+/// Merged configuration from all sources with priority resolution.
+///
+/// When accessing a config value, checks sources in order:
+/// repo > user > system > default
+#[derive(Debug, Default)]
+pub struct EffectiveConfig {
+    system_config: Option<JitConfig>,
+    user_config: Option<JitConfig>,
+    repo_config: Option<JitConfig>,
+}
+
+impl EffectiveConfig {
+    /// Get the effective worktree mode.
+    pub fn worktree_mode(&self) -> Result<WorktreeMode> {
+        // Check repo first, then user, then system
+        if let Some(ref cfg) = self.repo_config {
+            if let Some(ref wt) = cfg.worktree {
+                if wt.mode.is_some() {
+                    return wt.worktree_mode();
+                }
+            }
+        }
+        if let Some(ref cfg) = self.user_config {
+            if let Some(ref wt) = cfg.worktree {
+                if wt.mode.is_some() {
+                    return wt.worktree_mode();
+                }
+            }
+        }
+        if let Some(ref cfg) = self.system_config {
+            if let Some(ref wt) = cfg.worktree {
+                if wt.mode.is_some() {
+                    return wt.worktree_mode();
+                }
+            }
+        }
+        // Default
+        Ok(WorktreeMode::Auto)
+    }
+
+    /// Get the effective enforcement mode.
+    pub fn enforcement_mode(&self) -> Result<EnforcementMode> {
+        if let Some(ref cfg) = self.repo_config {
+            if let Some(ref wt) = cfg.worktree {
+                if wt.enforce_leases.is_some() {
+                    return wt.enforcement_mode();
+                }
+            }
+        }
+        if let Some(ref cfg) = self.user_config {
+            if let Some(ref wt) = cfg.worktree {
+                if wt.enforce_leases.is_some() {
+                    return wt.enforcement_mode();
+                }
+            }
+        }
+        if let Some(ref cfg) = self.system_config {
+            if let Some(ref wt) = cfg.worktree {
+                if wt.enforce_leases.is_some() {
+                    return wt.enforcement_mode();
+                }
+            }
+        }
+        Ok(EnforcementMode::Strict)
+    }
+
+    /// Get effective coordination config with merged values.
+    pub fn coordination(&self) -> MergedCoordinationConfig {
+        MergedCoordinationConfig {
+            repo: self
+                .repo_config
+                .as_ref()
+                .and_then(|c| c.coordination.clone()),
+            user: self
+                .user_config
+                .as_ref()
+                .and_then(|c| c.coordination.clone()),
+            system: self
+                .system_config
+                .as_ref()
+                .and_then(|c| c.coordination.clone()),
+        }
+    }
+
+    /// Get effective global operations config with merged values.
+    pub fn global_operations(&self) -> MergedGlobalOperationsConfig {
+        MergedGlobalOperationsConfig {
+            repo: self
+                .repo_config
+                .as_ref()
+                .and_then(|c| c.global_operations.clone()),
+            user: self
+                .user_config
+                .as_ref()
+                .and_then(|c| c.global_operations.clone()),
+            system: self
+                .system_config
+                .as_ref()
+                .and_then(|c| c.global_operations.clone()),
+        }
+    }
+
+    /// Get effective locks config with merged values.
+    pub fn locks(&self) -> MergedLocksConfig {
+        MergedLocksConfig {
+            repo: self.repo_config.as_ref().and_then(|c| c.locks.clone()),
+            user: self.user_config.as_ref().and_then(|c| c.locks.clone()),
+            system: self.system_config.as_ref().and_then(|c| c.locks.clone()),
+        }
+    }
+
+    /// Get effective events config with merged values.
+    pub fn events(&self) -> MergedEventsConfig {
+        MergedEventsConfig {
+            repo: self.repo_config.as_ref().and_then(|c| c.events.clone()),
+            user: self.user_config.as_ref().and_then(|c| c.events.clone()),
+            system: self.system_config.as_ref().and_then(|c| c.events.clone()),
+        }
+    }
+}
+
+/// Merged coordination config with priority resolution per field.
+#[derive(Debug)]
+pub struct MergedCoordinationConfig {
+    repo: Option<CoordinationConfig>,
+    user: Option<CoordinationConfig>,
+    system: Option<CoordinationConfig>,
+}
+
+impl MergedCoordinationConfig {
+    pub fn default_ttl_secs(&self) -> u64 {
+        self.repo
+            .as_ref()
+            .and_then(|c| c.default_ttl_secs)
+            .or_else(|| self.user.as_ref().and_then(|c| c.default_ttl_secs))
+            .or_else(|| self.system.as_ref().and_then(|c| c.default_ttl_secs))
+            .unwrap_or(600)
+    }
+
+    pub fn heartbeat_interval_secs(&self) -> u64 {
+        self.repo
+            .as_ref()
+            .and_then(|c| c.heartbeat_interval_secs)
+            .or_else(|| self.user.as_ref().and_then(|c| c.heartbeat_interval_secs))
+            .or_else(|| self.system.as_ref().and_then(|c| c.heartbeat_interval_secs))
+            .unwrap_or(30)
+    }
+
+    pub fn lease_renewal_threshold_pct(&self) -> u8 {
+        self.repo
+            .as_ref()
+            .and_then(|c| c.lease_renewal_threshold_pct)
+            .or_else(|| {
+                self.user
+                    .as_ref()
+                    .and_then(|c| c.lease_renewal_threshold_pct)
+            })
+            .or_else(|| {
+                self.system
+                    .as_ref()
+                    .and_then(|c| c.lease_renewal_threshold_pct)
+            })
+            .unwrap_or(10)
+    }
+
+    pub fn stale_threshold_secs(&self) -> u64 {
+        self.repo
+            .as_ref()
+            .and_then(|c| c.stale_threshold_secs)
+            .or_else(|| self.user.as_ref().and_then(|c| c.stale_threshold_secs))
+            .or_else(|| self.system.as_ref().and_then(|c| c.stale_threshold_secs))
+            .unwrap_or(3600)
+    }
+
+    pub fn max_indefinite_leases_per_agent(&self) -> u32 {
+        self.repo
+            .as_ref()
+            .and_then(|c| c.max_indefinite_leases_per_agent)
+            .or_else(|| {
+                self.user
+                    .as_ref()
+                    .and_then(|c| c.max_indefinite_leases_per_agent)
+            })
+            .or_else(|| {
+                self.system
+                    .as_ref()
+                    .and_then(|c| c.max_indefinite_leases_per_agent)
+            })
+            .unwrap_or(2)
+    }
+
+    pub fn max_indefinite_leases_per_repo(&self) -> u32 {
+        self.repo
+            .as_ref()
+            .and_then(|c| c.max_indefinite_leases_per_repo)
+            .or_else(|| {
+                self.user
+                    .as_ref()
+                    .and_then(|c| c.max_indefinite_leases_per_repo)
+            })
+            .or_else(|| {
+                self.system
+                    .as_ref()
+                    .and_then(|c| c.max_indefinite_leases_per_repo)
+            })
+            .unwrap_or(10)
+    }
+
+    pub fn auto_renew_leases(&self) -> bool {
+        self.repo
+            .as_ref()
+            .and_then(|c| c.auto_renew_leases)
+            .or_else(|| self.user.as_ref().and_then(|c| c.auto_renew_leases))
+            .or_else(|| self.system.as_ref().and_then(|c| c.auto_renew_leases))
+            .unwrap_or(false)
+    }
+}
+
+/// Merged global operations config with priority resolution per field.
+#[derive(Debug)]
+pub struct MergedGlobalOperationsConfig {
+    repo: Option<GlobalOperationsConfig>,
+    user: Option<GlobalOperationsConfig>,
+    system: Option<GlobalOperationsConfig>,
+}
+
+impl MergedGlobalOperationsConfig {
+    pub fn require_main_history(&self) -> bool {
+        self.repo
+            .as_ref()
+            .and_then(|c| c.require_main_history)
+            .or_else(|| self.user.as_ref().and_then(|c| c.require_main_history))
+            .or_else(|| self.system.as_ref().and_then(|c| c.require_main_history))
+            .unwrap_or(true)
+    }
+
+    pub fn allowed_branches(&self) -> Vec<String> {
+        self.repo
+            .as_ref()
+            .and_then(|c| c.allowed_branches.clone())
+            .or_else(|| self.user.as_ref().and_then(|c| c.allowed_branches.clone()))
+            .or_else(|| {
+                self.system
+                    .as_ref()
+                    .and_then(|c| c.allowed_branches.clone())
+            })
+            .unwrap_or_else(|| vec!["main".to_string()])
+    }
+}
+
+/// Merged locks config with priority resolution per field.
+#[derive(Debug)]
+pub struct MergedLocksConfig {
+    repo: Option<LocksConfig>,
+    user: Option<LocksConfig>,
+    system: Option<LocksConfig>,
+}
+
+impl MergedLocksConfig {
+    pub fn max_age_secs(&self) -> u64 {
+        self.repo
+            .as_ref()
+            .and_then(|c| c.max_age_secs)
+            .or_else(|| self.user.as_ref().and_then(|c| c.max_age_secs))
+            .or_else(|| self.system.as_ref().and_then(|c| c.max_age_secs))
+            .unwrap_or(3600)
+    }
+
+    pub fn enable_metadata(&self) -> bool {
+        self.repo
+            .as_ref()
+            .and_then(|c| c.enable_metadata)
+            .or_else(|| self.user.as_ref().and_then(|c| c.enable_metadata))
+            .or_else(|| self.system.as_ref().and_then(|c| c.enable_metadata))
+            .unwrap_or(true)
+    }
+}
+
+/// Merged events config with priority resolution per field.
+#[derive(Debug)]
+pub struct MergedEventsConfig {
+    repo: Option<EventsConfig>,
+    user: Option<EventsConfig>,
+    system: Option<EventsConfig>,
+}
+
+impl MergedEventsConfig {
+    pub fn enable_sequences(&self) -> bool {
+        self.repo
+            .as_ref()
+            .and_then(|c| c.enable_sequences)
+            .or_else(|| self.user.as_ref().and_then(|c| c.enable_sequences))
+            .or_else(|| self.system.as_ref().and_then(|c| c.enable_sequences))
+            .unwrap_or(true)
+    }
+
+    pub fn use_unified_envelope(&self) -> bool {
+        self.repo
+            .as_ref()
+            .and_then(|c| c.use_unified_envelope)
+            .or_else(|| self.user.as_ref().and_then(|c| c.use_unified_envelope))
+            .or_else(|| self.system.as_ref().and_then(|c| c.use_unified_envelope))
+            .unwrap_or(true)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1002,5 +1360,159 @@ description = "Test agent"
         let config = AgentConfig::load(temp_dir.path()).unwrap().unwrap();
         assert_eq!(config.agent.id, "agent:test-agent");
         assert_eq!(config.agent.description, Some("Test agent".to_string()));
+    }
+
+    // ============================================================
+    // Config loading with priority and merging tests (TDD)
+    // ============================================================
+
+    #[test]
+    fn test_config_loader_defaults_only() {
+        let loader = ConfigLoader::new();
+        let config = loader.build();
+
+        // Should have all defaults
+        assert_eq!(config.coordination().default_ttl_secs(), 600);
+        assert_eq!(config.coordination().heartbeat_interval_secs(), 30);
+        assert!(config.global_operations().require_main_history());
+        assert_eq!(config.locks().max_age_secs(), 3600);
+        assert!(config.events().enable_sequences());
+    }
+
+    #[test]
+    fn test_config_loader_repo_overrides_defaults() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_toml = r#"
+[coordination]
+default_ttl_secs = 1200
+"#;
+        std::fs::write(temp_dir.path().join("config.toml"), config_toml).unwrap();
+
+        let loader = ConfigLoader::new()
+            .with_repo_config(temp_dir.path())
+            .unwrap();
+        let config = loader.build();
+
+        // Repo value overrides default
+        assert_eq!(config.coordination().default_ttl_secs(), 1200);
+        // Other defaults preserved
+        assert_eq!(config.coordination().heartbeat_interval_secs(), 30);
+    }
+
+    #[test]
+    fn test_config_loader_repo_overrides_user() {
+        let user_dir = TempDir::new().unwrap();
+        let repo_dir = TempDir::new().unwrap();
+
+        // User config sets TTL to 900
+        let user_config = r#"
+[coordination]
+default_ttl_secs = 900
+heartbeat_interval_secs = 60
+"#;
+        std::fs::write(user_dir.path().join("config.toml"), user_config).unwrap();
+
+        // Repo config sets TTL to 1200 (overrides user)
+        let repo_config = r#"
+[coordination]
+default_ttl_secs = 1200
+"#;
+        std::fs::write(repo_dir.path().join("config.toml"), repo_config).unwrap();
+
+        let loader = ConfigLoader::new()
+            .with_user_config(user_dir.path())
+            .unwrap()
+            .with_repo_config(repo_dir.path())
+            .unwrap();
+        let config = loader.build();
+
+        // Repo overrides user for TTL
+        assert_eq!(config.coordination().default_ttl_secs(), 1200);
+        // User value used for heartbeat (not in repo config)
+        assert_eq!(config.coordination().heartbeat_interval_secs(), 60);
+    }
+
+    #[test]
+    fn test_config_loader_full_priority_chain() {
+        let system_dir = TempDir::new().unwrap();
+        let user_dir = TempDir::new().unwrap();
+        let repo_dir = TempDir::new().unwrap();
+
+        // System config (lowest priority after defaults)
+        let system_config = r#"
+[coordination]
+default_ttl_secs = 300
+heartbeat_interval_secs = 15
+stale_threshold_secs = 1800
+"#;
+        std::fs::write(system_dir.path().join("config.toml"), system_config).unwrap();
+
+        // User config overrides system
+        let user_config = r#"
+[coordination]
+default_ttl_secs = 600
+heartbeat_interval_secs = 30
+"#;
+        std::fs::write(user_dir.path().join("config.toml"), user_config).unwrap();
+
+        // Repo config overrides user
+        let repo_config = r#"
+[coordination]
+default_ttl_secs = 1200
+"#;
+        std::fs::write(repo_dir.path().join("config.toml"), repo_config).unwrap();
+
+        let loader = ConfigLoader::new()
+            .with_system_config(system_dir.path())
+            .unwrap()
+            .with_user_config(user_dir.path())
+            .unwrap()
+            .with_repo_config(repo_dir.path())
+            .unwrap();
+        let config = loader.build();
+
+        // Repo wins for TTL
+        assert_eq!(config.coordination().default_ttl_secs(), 1200);
+        // User wins for heartbeat (not in repo)
+        assert_eq!(config.coordination().heartbeat_interval_secs(), 30);
+        // System wins for stale_threshold (not in user or repo)
+        assert_eq!(config.coordination().stale_threshold_secs(), 1800);
+    }
+
+    #[test]
+    fn test_config_loader_missing_files_ok() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Loading from non-existent paths should succeed (use defaults)
+        let loader = ConfigLoader::new()
+            .with_system_config(temp_dir.path())
+            .unwrap()
+            .with_user_config(temp_dir.path())
+            .unwrap()
+            .with_repo_config(temp_dir.path())
+            .unwrap();
+        let config = loader.build();
+
+        // All defaults
+        assert_eq!(config.coordination().default_ttl_secs(), 600);
+    }
+
+    #[test]
+    fn test_effective_config_worktree_mode() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_toml = r#"
+[worktree]
+mode = "on"
+enforce_leases = "warn"
+"#;
+        std::fs::write(temp_dir.path().join("config.toml"), config_toml).unwrap();
+
+        let loader = ConfigLoader::new()
+            .with_repo_config(temp_dir.path())
+            .unwrap();
+        let config = loader.build();
+
+        assert_eq!(config.worktree_mode().unwrap(), WorktreeMode::On);
+        assert_eq!(config.enforcement_mode().unwrap(), EnforcementMode::Warn);
     }
 }
