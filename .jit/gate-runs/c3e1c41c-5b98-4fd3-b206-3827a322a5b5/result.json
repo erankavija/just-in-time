@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "c3e1c41c-5b98-4fd3-b206-3827a322a5b5",
+  "gate_key": "fmt",
+  "stage": "postcheck",
+  "issue_id": "5f567491-ff8d-4f85-8788-7c4d60ea7a87",
+  "commit": "be6ea904bf544705933362ad1ef1db53f2127a5e",
+  "branch": "feature/worktree-parallel-work",
+  "status": "failed",
+  "started_at": "2026-02-02T10:58:30.562849513Z",
+  "completed_at": "2026-02-02T10:58:30.965639438Z",
+  "duration_ms": 402,
+  "exit_code": 1,
+  "stdout": "Diff in /home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/claim_coordinator.rs:758:\n     /// Verify index consistency\n     ///\n     /// Returns true if index is valid, false if it needs rebuilding.\n\u001b[31m-    /// \n\u001b[m\u001b[32m+    ///\n\u001b[m     /// Note: Does NOT check for expired leases - those are handled by evict_expired().\n     /// Expired leases are normal state, not corruption. Treating them as corruption\n     /// would trigger unnecessary full index rebuilds.\n",
+  "stderr": "",
+  "command": "cargo fmt -- --check",
+  "by": "auto:executor",
+  "message": null
+}

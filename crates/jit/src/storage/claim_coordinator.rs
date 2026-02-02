@@ -726,6 +726,74 @@ impl ClaimCoordinator {
             sequence_gaps,
         })
     }
+
+    /// Startup recovery routine - runs on every jit command
+    ///
+    /// Performs automatic recovery:
+    /// 1. Cleanup stale locks from dead processes
+    /// 2. Rebuild index if corrupted or inconsistent
+    /// 3. Evict expired leases
+    ///
+    /// This is safe to call repeatedly and has minimal overhead when no recovery needed.
+    pub fn startup_recovery(&self) -> Result<()> {
+        // 1. Clean up stale locks
+        let lock_dir = self.paths.shared_jit.join("locks");
+        crate::storage::lock_cleanup::cleanup_stale_locks(&lock_dir)?;
+
+        // 2. Rebuild index if corrupted
+        if !self.verify_index_consistency()? {
+            eprintln!("Warning: Claims index inconsistent, rebuilding from log...");
+            let index = self.rebuild_index_from_log()?;
+            self.write_index_atomic(&index)?;
+        }
+
+        // 3. Evict expired leases
+        let mut index = self.load_claims_index()?;
+        self.evict_expired(&mut index)?;
+        self.write_index_atomic(&index)?;
+
+        Ok(())
+    }
+
+    /// Verify index consistency
+    ///
+    /// Returns true if index is valid, false if it needs rebuilding.
+    ///
+    /// Note: Does NOT check for expired leases - those are handled by evict_expired().
+    /// Expired leases are normal state, not corruption. Treating them as corruption
+    /// would trigger unnecessary full index rebuilds.
+    fn verify_index_consistency(&self) -> Result<bool> {
+        use std::collections::HashSet;
+
+        let index_path = self.paths.shared_jit.join("claims.index.json");
+        if !index_path.exists() {
+            return Ok(false);
+        }
+
+        // Try to parse index
+        let index: ClaimsIndex = match fs::read_to_string(&index_path)
+            .ok()
+            .and_then(|s| serde_json::from_str(&s).ok())
+        {
+            Some(idx) => idx,
+            None => return Ok(false), // Corrupted JSON
+        };
+
+        // Check for duplicates (actual corruption)
+        let mut seen_issues = HashSet::new();
+        for lease in &index.leases {
+            if !seen_issues.insert(&lease.issue_id) {
+                eprintln!(
+                    "Error: Duplicate active lease for issue: {}",
+                    lease.issue_id
+                );
+                return Ok(false);
+            }
+        }
+
+        // All checks passed
+        Ok(true)
+    }
 }
 
 #[cfg(test)]
@@ -1387,6 +1455,91 @@ mod tests {
             last_beat: Utc::now() - Duration::seconds(7200),
         };
         assert!(!index.is_stale(&finite_lease));
+    }
+
+    #[test]
+    fn test_startup_recovery_runs_successfully() {
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp_dir);
+
+        // Should succeed without error
+        coordinator.startup_recovery().unwrap();
+    }
+
+    #[test]
+    fn test_startup_recovery_rebuilds_corrupted_index() {
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp_dir);
+
+        // Acquire a claim to create log entries and index
+        let _lease = coordinator.acquire_claim("issue-001", 600).unwrap();
+
+        // Verify index exists
+        let index_path = temp_dir.path().join(".git/jit/claims.index.json");
+        assert!(index_path.exists(), "Index should exist after claim");
+
+        // Corrupt the index by writing invalid JSON
+        fs::write(&index_path, "invalid json{{{").unwrap();
+
+        // Recovery should rebuild from log
+        coordinator.startup_recovery().unwrap();
+
+        // Index should be valid and contain the lease
+        let index = coordinator.load_claims_index().unwrap();
+        assert_eq!(index.leases.len(), 1);
+        assert_eq!(index.leases[0].issue_id, "issue-001");
+    }
+
+    #[test]
+    fn test_startup_recovery_evicts_expired_leases() {
+        use std::thread;
+        use std::time::Duration as StdDuration;
+
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp_dir);
+
+        // Create a lease with 1-second TTL
+        coordinator.acquire_claim("issue-001", 1).unwrap();
+
+        // Wait for it to expire
+        thread::sleep(StdDuration::from_secs(2));
+
+        // Recovery should evict the expired lease
+        coordinator.startup_recovery().unwrap();
+
+        // Index should be empty
+        let index = coordinator.load_claims_index().unwrap();
+        assert_eq!(index.leases.len(), 0, "Expired lease should be evicted");
+    }
+
+    #[test]
+    fn test_startup_recovery_cleans_stale_locks() {
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp_dir);
+
+        // Create a lock directory in the correct location (shared control plane)
+        let lock_dir = temp_dir.path().join(".git/jit/locks");
+        fs::create_dir_all(&lock_dir).unwrap();
+
+        // Create an unheld lock file (will be cleaned)
+        let lock_path = lock_dir.join("stale.lock");
+        fs::write(&lock_path, "").unwrap();
+
+        // Create metadata with dead process PID
+        let meta_path = lock_dir.join("stale.lock.meta");
+        let metadata = crate::storage::lock::LockMetadata {
+            pid: u32::MAX - 1,
+            agent_id: "agent:dead".to_string(),
+            created_at: Utc::now(),
+            last_updated: Utc::now(),
+        };
+        fs::write(&meta_path, serde_json::to_string_pretty(&metadata).unwrap()).unwrap();
+
+        // Recovery should remove stale lock
+        coordinator.startup_recovery().unwrap();
+
+        assert!(!lock_path.exists(), "Stale lock should be removed");
+        assert!(!meta_path.exists(), "Stale lock metadata should be removed");
     }
 }
 

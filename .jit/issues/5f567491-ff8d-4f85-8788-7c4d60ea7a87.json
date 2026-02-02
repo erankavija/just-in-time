@@ -2,7 +2,7 @@
   "id": "5f567491-ff8d-4f85-8788-7c4d60ea7a87",
   "title": "Implement startup recovery routine",
   "description": "Implement startup recovery routine that runs on every `jit` command: cleanup stale locks, verify index consistency, evict expired leases, remove orphaned temp files. See design doc section \"Crash Recovery\".",
-  "state": "ready",
+  "state": "gated",
   "priority": "high",
   "assignee": null,
   "dependencies": [
@@ -16,30 +16,30 @@
     "code-review"
   ],
   "gates_status": {
-    "tdd-reminder": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.063417060Z"
-    },
     "tests": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.063437500Z"
-    },
-    "clippy": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.063446090Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T10:58:38.367027275Z"
     },
     "fmt": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.063454360Z"
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T10:58:58.184718545Z"
+    },
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T10:58:57.981882317Z"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": "agent:copilot-session",
+      "updated_at": "2026-02-02T10:47:48.990201167Z"
     },
     "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.063462860Z"
+      "status": "passed",
+      "updated_by": "agent:copilot-session",
+      "updated_at": "2026-02-02T10:58:38.366981055Z"
     }
   },
   "context": {},
