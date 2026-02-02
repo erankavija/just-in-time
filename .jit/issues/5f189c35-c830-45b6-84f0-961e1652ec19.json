@@ -16,30 +16,30 @@
     "code-review"
   ],
   "gates_status": {
-    "tests": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.065456101Z"
-    },
-    "tdd-reminder": {
-      "status": "passed",
-      "updated_by": "agent:copilot-session",
-      "updated_at": "2026-02-02T10:25:34.443776180Z"
-    },
     "fmt": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.065472811Z"
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T10:42:53.169952582Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T10:42:31.651601566Z"
     },
     "clippy": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-01-03T20:37:15.065464671Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T10:42:52.867291416Z"
     },
     "code-review": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-01-03T20:37:15.065481321Z"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": "agent:copilot-session",
+      "updated_at": "2026-02-02T10:25:34.443776180Z"
     }
   },
   "context": {},

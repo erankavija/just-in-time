@@ -1343,3 +1343,10 @@
 {"type":"issue_state_changed","id":"a73357e6-cad9-4801-967c-4115697f087d","issue_id":"5f189c35-c830-45b6-84f0-961e1652ec19","timestamp":"2026-02-02T10:25:34.446783401Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"6b0c0bd3-8a45-44c2-b776-7b93628b021b","issue_id":"5f189c35-c830-45b6-84f0-961e1652ec19","timestamp":"2026-02-02T10:25:34.446961801Z","assignee":"agent:copilot-session"}
 {"type":"issue_state_changed","id":"0d15e13a-7b40-4dab-a7dc-d67356ef2317","issue_id":"5f189c35-c830-45b6-84f0-961e1652ec19","timestamp":"2026-02-02T10:32:57.823743622Z","from":"in_progress","to":"gated"}
+{"type":"issue_state_changed","id":"4519ee88-c97d-4e80-b961-be8c1d962ae9","issue_id":"5f189c35-c830-45b6-84f0-961e1652ec19","timestamp":"2026-02-02T10:33:21.218077136Z","from":"gated","to":"gated"}
+{"type":"gate_passed","id":"8a7f86dc-d860-40c3-9fb8-9a1567ff702e","issue_id":"5f189c35-c830-45b6-84f0-961e1652ec19","timestamp":"2026-02-02T10:42:17.964048370Z","gate_key":"tests","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"cc1b2c11-0bd7-4c79-8361-998c597cfebb","issue_id":"5f189c35-c830-45b6-84f0-961e1652ec19","timestamp":"2026-02-02T10:42:22.771262625Z","gate_key":"clippy","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"8366981b-484f-44c9-a7fb-ad7d115ccfd1","issue_id":"5f189c35-c830-45b6-84f0-961e1652ec19","timestamp":"2026-02-02T10:42:23.174555781Z","gate_key":"fmt","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"f09214a2-9fd9-4a74-b6e3-4fb02323bf95","issue_id":"5f189c35-c830-45b6-84f0-961e1652ec19","timestamp":"2026-02-02T10:42:52.867177546Z","gate_key":"tests","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"885a4b1a-94e1-4dda-a525-05a4e0055287","issue_id":"5f189c35-c830-45b6-84f0-961e1652ec19","timestamp":"2026-02-02T10:42:53.169857222Z","gate_key":"clippy","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"ad4f91d2-f13c-4314-8d0e-34e0422c71bf","issue_id":"5f189c35-c830-45b6-84f0-961e1652ec19","timestamp":"2026-02-02T10:42:53.572903868Z","gate_key":"fmt","updated_by":"auto:executor"}

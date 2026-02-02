@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "4d176092-c5ea-4ffe-a857-3084131337eb",
+  "gate_key": "clippy",
+  "stage": "postcheck",
+  "issue_id": "5f189c35-c830-45b6-84f0-961e1652ec19",
+  "commit": "dc966e9fdc3c3798cf401612391fef18d5c831dc",
+  "branch": "feature/worktree-parallel-work",
+  "status": "passed",
+  "started_at": "2026-02-02T10:42:17.964148420Z",
+  "completed_at": "2026-02-02T10:42:22.770989175Z",
+  "duration_ms": 4806,
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "    Checking hyper v1.8.1\n    Checking tower v0.5.2\n    Checking uuid v1.18.1\n    Checking rustls v0.23.35\n    Checking jit-dispatch v0.1.0 (/home/vkaskivuo/Projects/just-in-time/crates/dispatch)\n    Checking hyper-util v0.1.19\n    Checking axum v0.7.9\n    Checking ureq v2.12.1\n    Checking jit v0.2.0 (/home/vkaskivuo/Projects/just-in-time/crates/jit)\n    Checking jit-server v0.1.0 (/home/vkaskivuo/Projects/just-in-time/crates/server)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.71s\n",
+  "command": "cargo clippy --lib -- -D warnings",
+  "by": "auto:executor",
+  "message": null
+}

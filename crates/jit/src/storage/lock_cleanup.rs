@@ -35,8 +35,11 @@ pub fn process_exists(_pid: u32) -> bool {
 
 /// Clean up stale lock files from dead processes
 ///
-/// Reads lock metadata files (.lock.meta) and checks if the PID still exists.
-/// Removes locks from dead processes.
+/// Uses two-stage detection:
+/// 1. Try to acquire lock non-blocking - if successful, lock was stale
+/// 2. If lock is held, check metadata:
+///    - If process is dead, force remove lock
+///    - If process is alive but lock is > 1 hour old, log error
 ///
 /// # Arguments
 ///
@@ -45,14 +48,14 @@ pub fn process_exists(_pid: u32) -> bool {
 /// # Errors
 ///
 /// Returns error if lock directory cannot be read
-pub fn cleanup_stale_locks(lock_dir: &Path) -> Result<Vec<String>> {
+pub fn cleanup_stale_locks(lock_dir: &Path) -> Result<()> {
     use crate::storage::lock::LockMetadata;
-    use std::fs;
-
-    let mut removed = Vec::new();
+    use chrono::Utc;
+    use fs4::fs_std::FileExt;
+    use std::fs::{self, OpenOptions};
 
     if !lock_dir.exists() {
-        return Ok(removed);
+        return Ok(());
     }
 
     // Iterate through lock files
@@ -60,43 +63,66 @@ pub fn cleanup_stale_locks(lock_dir: &Path) -> Result<Vec<String>> {
         let entry = entry?;
         let path = entry.path();
 
-        // Only process .lock files (not .lock.meta)
+        // Skip metadata files
+        if path.extension().is_none_or(|e| e == "meta") {
+            continue;
+        }
+
+        // Only process .lock files
         if path.extension().is_none_or(|ext| ext != "lock") {
             continue;
         }
 
-        // Read metadata
-        let meta_path = path.with_extension("lock.meta");
-        let metadata = match fs::read_to_string(&meta_path) {
-            Ok(content) => match serde_json::from_str::<LockMetadata>(&content) {
-                Ok(meta) => meta,
-                Err(_) => {
-                    // Can't parse metadata, assume stale and remove
-                    let _ = fs::remove_file(&path);
-                    let _ = fs::remove_file(&meta_path);
-                    removed.push(path.to_string_lossy().to_string());
-                    continue;
-                }
-            },
-            Err(_) => {
-                // No metadata, assume stale
-                let _ = fs::remove_file(&path);
-                removed.push(path.to_string_lossy().to_string());
-                continue;
-            }
-        };
+        let metadata_path = path.with_extension("lock.meta");
 
-        // Check if process still exists
-        if !process_exists(metadata.pid) {
-            // Process is dead, remove lock and metadata
-            let _ = fs::remove_file(&path);
-            let _ = fs::remove_file(&meta_path);
-            removed.push(path.to_string_lossy().to_string());
+        // Try to acquire lock non-blocking
+        if let Ok(file) = OpenOptions::new().write(true).open(&path) {
+            match file.try_lock_exclusive() {
+                Ok(true) => {
+                    // Lock acquired => it was stale
+                    eprintln!("Warning: Removed stale lock: {}", path.display());
+                    // Lock automatically released when file dropped
+                    drop(file);
+                    let _ = fs::remove_file(&path);
+                    let _ = fs::remove_file(&metadata_path);
+                }
+                Ok(false) | Err(_) => {
+                    // Lock held, check metadata
+                    if let Ok(meta_json) = fs::read_to_string(&metadata_path) {
+                        if let Ok(meta) = serde_json::from_str::<LockMetadata>(&meta_json) {
+                            // Check if process still exists
+                            if !process_exists(meta.pid) {
+                                eprintln!(
+                                    "Warning: Removing lock from dead process {}: {}",
+                                    meta.pid,
+                                    path.display()
+                                );
+                                // Force remove (process dead, lock should be stale)
+                                let _ = fs::remove_file(&path);
+                                let _ = fs::remove_file(&metadata_path);
+                                continue;
+                            }
+
+                            // Check age (1 hour TTL for locks)
+                            let age = Utc::now().signed_duration_since(meta.created_at);
+                            if age.num_seconds() > 3600 {
+                                eprintln!(
+                                    "Error: Lock very old: {} ({}s, pid={}, agent={})",
+                                    path.display(),
+                                    age.num_seconds(),
+                                    meta.pid,
+                                    meta.agent_id
+                                );
+                                // Don't auto-remove if process exists, require manual intervention
+                            }
+                        }
+                    }
+                }
+            }
         }
-        // If process exists, preserve the lock
     }
 
-    Ok(removed)
+    Ok(())
 }
 
 #[cfg(test)]
@@ -114,10 +140,7 @@ mod tests {
     fn test_process_exists_for_invalid_pid() {
         // Use a very high PID that is unlikely to exist
         let invalid_pid = u32::MAX - 1;
-        assert!(
-            !process_exists(invalid_pid),
-            "Invalid PID should not exist"
-        );
+        assert!(!process_exists(invalid_pid), "Invalid PID should not exist");
     }
 
     #[test]
@@ -126,19 +149,54 @@ mod tests {
         let lock_dir = temp_dir.path().join("locks");
         std::fs::create_dir(&lock_dir).unwrap();
 
-        let removed = cleanup_stale_locks(&lock_dir).unwrap();
-        assert_eq!(removed.len(), 0, "No locks to clean up");
+        cleanup_stale_locks(&lock_dir).unwrap();
+        // Should succeed with no errors
     }
 
     #[test]
-    fn test_cleanup_removes_locks_from_dead_process() {
+    fn test_cleanup_removes_unheld_locks() {
         let temp_dir = TempDir::new().unwrap();
         let lock_dir = temp_dir.path().join("locks");
         std::fs::create_dir(&lock_dir).unwrap();
 
-        // Create a lock file with metadata for a dead process
+        // Create a lock file that isn't held
         let lock_path = lock_dir.join("test.lock");
         std::fs::write(&lock_path, "").unwrap();
+
+        let meta_path = lock_dir.join("test.lock.meta");
+        let metadata = crate::storage::lock::LockMetadata {
+            pid: std::process::id(),
+            agent_id: "agent:test".to_string(),
+            created_at: chrono::Utc::now(),
+            last_updated: chrono::Utc::now(),
+        };
+        std::fs::write(&meta_path, serde_json::to_string_pretty(&metadata).unwrap()).unwrap();
+
+        cleanup_stale_locks(&lock_dir).unwrap();
+
+        // Lock should be removed because it's not actually held
+        assert!(!lock_path.exists(), "Lock file should be removed");
+        assert!(!meta_path.exists(), "Metadata file should be removed");
+    }
+
+    #[test]
+    fn test_cleanup_removes_locks_from_dead_process() {
+        use fs4::fs_std::FileExt;
+        use std::fs::OpenOptions;
+
+        let temp_dir = TempDir::new().unwrap();
+        let lock_dir = temp_dir.path().join("locks");
+        std::fs::create_dir(&lock_dir).unwrap();
+
+        // Create a lock file with metadata for a dead process, and hold it
+        let lock_path = lock_dir.join("test.lock");
+        let lock_file = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(&lock_path)
+            .unwrap();
+        lock_file.lock_exclusive().unwrap();
 
         let meta_path = lock_dir.join("test.lock.meta");
         let metadata = crate::storage::lock::LockMetadata {
@@ -147,28 +205,34 @@ mod tests {
             created_at: chrono::Utc::now(),
             last_updated: chrono::Utc::now(),
         };
-        std::fs::write(
-            &meta_path,
-            serde_json::to_string_pretty(&metadata).unwrap(),
-        )
-        .unwrap();
+        std::fs::write(&meta_path, serde_json::to_string_pretty(&metadata).unwrap()).unwrap();
 
-        let removed = cleanup_stale_locks(&lock_dir).unwrap();
+        cleanup_stale_locks(&lock_dir).unwrap();
 
-        assert_eq!(removed.len(), 1, "Should remove one stale lock");
+        // Lock should be removed despite being held (dead process)
+        drop(lock_file);
         assert!(!lock_path.exists(), "Lock file should be removed");
         assert!(!meta_path.exists(), "Metadata file should be removed");
     }
 
     #[test]
     fn test_cleanup_preserves_locks_from_live_processes() {
+        use fs4::fs_std::FileExt;
+        use std::fs::OpenOptions;
+
         let temp_dir = TempDir::new().unwrap();
         let lock_dir = temp_dir.path().join("locks");
         std::fs::create_dir(&lock_dir).unwrap();
 
-        // Create a lock file with metadata for current process
+        // Create a lock file with metadata for current process and hold it
         let lock_path = lock_dir.join("test.lock");
-        std::fs::write(&lock_path, "").unwrap();
+        let lock_file = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(&lock_path)
+            .unwrap();
+        lock_file.lock_exclusive().unwrap();
 
         let meta_path = lock_dir.join("test.lock.meta");
         let metadata = crate::storage::lock::LockMetadata {
@@ -177,16 +241,54 @@ mod tests {
             created_at: chrono::Utc::now(),
             last_updated: chrono::Utc::now(),
         };
-        std::fs::write(
-            &meta_path,
-            serde_json::to_string_pretty(&metadata).unwrap(),
-        )
-        .unwrap();
+        std::fs::write(&meta_path, serde_json::to_string_pretty(&metadata).unwrap()).unwrap();
 
-        let removed = cleanup_stale_locks(&lock_dir).unwrap();
+        cleanup_stale_locks(&lock_dir).unwrap();
 
-        assert_eq!(removed.len(), 0, "Should not remove locks from live process");
+        // Lock should be preserved (held by live process)
         assert!(lock_path.exists(), "Lock file should still exist");
         assert!(meta_path.exists(), "Metadata file should still exist");
+
+        drop(lock_file);
+    }
+
+    #[test]
+    fn test_cleanup_detects_old_locks() {
+        use chrono::Duration;
+        use fs4::fs_std::FileExt;
+        use std::fs::OpenOptions;
+
+        let temp_dir = TempDir::new().unwrap();
+        let lock_dir = temp_dir.path().join("locks");
+        std::fs::create_dir(&lock_dir).unwrap();
+
+        // Create a lock file with old timestamp
+        let lock_path = lock_dir.join("test.lock");
+        let lock_file = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(&lock_path)
+            .unwrap();
+        lock_file.lock_exclusive().unwrap();
+
+        let meta_path = lock_dir.join("test.lock.meta");
+        let old_time = chrono::Utc::now() - Duration::hours(2); // 2 hours old
+        let metadata = crate::storage::lock::LockMetadata {
+            pid: std::process::id(),
+            agent_id: "agent:live".to_string(),
+            created_at: old_time,
+            last_updated: old_time,
+        };
+        std::fs::write(&meta_path, serde_json::to_string_pretty(&metadata).unwrap()).unwrap();
+
+        // Should not panic, just log error (can't verify logging in test)
+        cleanup_stale_locks(&lock_dir).unwrap();
+
+        // Lock should still exist (live process, even if old)
+        assert!(lock_path.exists(), "Lock file should still exist");
+        assert!(meta_path.exists(), "Metadata file should still exist");
+
+        drop(lock_file);
     }
 }
