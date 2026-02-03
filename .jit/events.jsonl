@@ -1593,3 +1593,5 @@
 {"type":"issue_state_changed","id":"675c9846-c251-4e2e-8f51-b229e6b4dcef","issue_id":"8847805b-9320-4f1f-b9cf-cb7fe9944f7a","timestamp":"2026-02-02T21:35:06.662040081Z","from":"ready","to":"done"}
 {"type":"issue_completed","id":"41262c34-78f1-449c-9d06-f77d7886b96e","issue_id":"8847805b-9320-4f1f-b9cf-cb7fe9944f7a","timestamp":"2026-02-02T21:35:06.662068481Z"}
 {"type":"issue_created","id":"26ee7080-c8a5-4c40-8b33-ca96ec5284cb","issue_id":"a66e16a4-7d95-46d9-91f3-586459f94b1e","timestamp":"2026-02-02T21:46:41.341850890Z","title":"Add git merge driver for .jit/events.jsonl","priority":"normal"}
+{"type":"issue_state_changed","id":"5abcbf73-3382-4a3d-bc70-c1a741fefe66","issue_id":"a66e16a4-7d95-46d9-91f3-586459f94b1e","timestamp":"2026-02-03T18:37:52.280865712Z","from":"ready","to":"done"}
+{"type":"issue_completed","id":"582c6ad7-1d45-4afc-9e1d-6cdb78eb4ac5","issue_id":"a66e16a4-7d95-46d9-91f3-586459f94b1e","timestamp":"2026-02-03T18:37:52.280889042Z"}
