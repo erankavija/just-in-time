@@ -484,103 +484,9 @@ jit query all --filter "labels.type:bug AND labels.component:frontend"
 
 ## Coordinate Multiple Contributors
 
-### Recipe: Team Coordination
+For team coordination, claiming work, leases, and parallel work patterns, see the dedicated guide:
 
-**Step 1: Set up agent identifiers**
-
-```bash
-# Each developer/agent has unique ID
-export AGENT_ID="agent:alice"
-# or agent:copilot-session-1, agent:codewhisperer, human:bob, etc.
-```
-
-**Step 2: Claim work atomically**
-
-```bash
-# Find available work
-AVAILABLE=$(jit query available --json | jq -r '.issues[0].id')
-
-# Atomic claim (race-safe)
-jit issue claim $AVAILABLE $AGENT_ID
-
-# If already claimed by another, you'll get an error
-# Try claiming next available
-jit issue claim-next $AGENT_ID --filter "labels.component:backend"
-```
-
-**Step 3: Use leases for long-running work**
-
-```bash
-# Acquire lease with TTL
-jit claim acquire $ISSUE $AGENT_ID --ttl 3600  # 1 hour
-
-# Renew lease if work continues
-LEASE_ID=$(jit claim status --issue $ISSUE --json | jq -r '.lease_id')
-jit claim renew $LEASE_ID --extension 1800  # Add 30 min
-
-# Release when done
-jit claim release $LEASE_ID
-```
-
-**Step 4: Coordinate across components**
-
-```bash
-# Backend team
-jit query available --filter "labels.component:backend"
-
-# Frontend team
-jit query available --filter "labels.component:frontend"
-
-# Full-stack issues
-jit query available --filter "labels.component:backend AND labels.component:frontend"
-```
-
-**Step 5: Handoff between agents**
-
-```bash
-# Agent A finishes API, hands off to Agent B for UI
-jit issue update $API_TASK --state done --assignee ""
-jit issue update $UI_TASK --state ready  # Now unblocked
-
-# Agent B claims
-jit issue claim $UI_TASK agent:bob
-```
-
-### Check Active Work
-
-```bash
-# What's your agent working on?
-jit query all --assignee $AGENT_ID --state in_progress
-
-# What's blocked on you?
-MYTASKS=$(jit query all --assignee $AGENT_ID --json | jq -r '.issues[].id')
-for task in $MYTASKS; do
-  jit graph downstream $task
-done
-
-# Team status
-jit query all --state in_progress | grep -E "assignee:"
-```
-
-### Parallel Work Patterns
-
-```bash
-# Independent tasks (no dependencies)
-TASK_A=$(jit issue create --title "Add logout button")
-TASK_B=$(jit issue create --title "Update footer links")
-
-jit issue claim $TASK_A agent:alice
-jit issue claim $TASK_B agent:bob
-# Both can work in parallel
-
-# Sequential tasks (with dependencies)
-TASK_C=$(jit issue create --title "API endpoint")
-TASK_D=$(jit issue create --title "UI integration")
-jit dep add $TASK_D $TASK_C
-
-jit issue claim $TASK_C agent:alice
-# Bob must wait for Alice to finish before claiming TASK_D
-```
+→ **[Multi-Agent Coordination](multi-agent-coordination.md)**
 
 ## Integrate with CI/CD
 
@@ -724,5 +630,6 @@ echo "![JIT Progress](https://img.shields.io/badge/Progress-$STATUS-blue)"
 ## See Also
 
 - [First Workflow Tutorial](../tutorials/first-workflow.md) - Complete walkthrough
+- [Multi-Agent Coordination](multi-agent-coordination.md) - Team and agent coordination
 - [Dependency Management](dependency-management.md) - Advanced dependency patterns
 - [CLI Reference](../reference/cli-commands.md) - Full command documentation
