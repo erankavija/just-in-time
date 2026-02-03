@@ -60,6 +60,55 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
     }
 }
 
+/// Set up .gitattributes with merge drivers for jit files.
+/// Only runs if we're in a git repository.
+fn setup_gitattributes() -> Result<()> {
+    use std::fs;
+    use std::path::Path;
+    use std::process::Command;
+
+    // Check if we're in a git repository
+    let output = Command::new("git")
+        .args(["rev-parse", "--show-toplevel"])
+        .output();
+
+    let repo_root = match output {
+        Ok(o) if o.status.success() => {
+            String::from_utf8(o.stdout)?.trim().to_string()
+        }
+        _ => return Ok(()), // Not in a git repo, skip
+    };
+
+    let gitattributes_path = Path::new(&repo_root).join(".gitattributes");
+    let jit_marker = "# JIT merge drivers";
+    let jit_config = format!(
+        "{}\n.jit/events.jsonl merge=union\n.jit/claims.jsonl merge=union\n",
+        jit_marker
+    );
+
+    if gitattributes_path.exists() {
+        let content = fs::read_to_string(&gitattributes_path)?;
+        
+        // Check if already configured (idempotent)
+        if content.contains(jit_marker) {
+            return Ok(());
+        }
+        
+        // Append to existing file
+        let new_content = if content.ends_with('\n') {
+            format!("{}\n{}", content, jit_config)
+        } else {
+            format!("{}\n\n{}", content, jit_config)
+        };
+        fs::write(&gitattributes_path, new_content)?;
+    } else {
+        // Create new file
+        fs::write(&gitattributes_path, jit_config)?;
+    }
+
+    Ok(())
+}
+
 fn main() {
     let exit_code = match run() {
         Ok(()) => ExitCode::Success,
@@ -108,6 +157,11 @@ fn run() -> Result<()> {
         Commands::Init { hierarchy_template } => {
             let output_ctx = OutputContext::new(quiet, false);
             executor.init()?;
+
+            // Set up .gitattributes for merge drivers (if in git repo)
+            if let Err(e) = setup_gitattributes() {
+                eprintln!("Warning: Could not set up .gitattributes: {}", e);
+            }
 
             // If a template is specified, write it to config.toml
             if let Some(template_name) = hierarchy_template {
