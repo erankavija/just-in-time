@@ -99,7 +99,7 @@ describe('explorationGraph', () => {
     { from: 't2', to: 's0' },
   ];
 
-  const hierarchyConfig = createHierarchyConfig(['milestone', 'epic']);
+  const hierarchyConfig = createHierarchyConfig({ 1: ['milestone'], 2: ['epic'], 3: ['story'], 4: ['task'] });
 
   describe('isVirtualNode', () => {
     it('should identify virtual nodes', () => {
@@ -182,7 +182,7 @@ describe('explorationGraph', () => {
     });
 
     it('should work with no primary tier (minimal hierarchy)', () => {
-      const minimalConfig = createHierarchyConfig(['milestone']);
+      const minimalConfig = createHierarchyConfig({ 1: ['milestone'], 2: ['task'] });
       const result = applyPrimaryTierWindowing(
         milestones.slice(0, 5),
         minimalConfig,
@@ -276,7 +276,7 @@ describe('explorationGraph', () => {
     });
 
     it('should handle minimal hierarchy (no secondary tier)', () => {
-      const minimalConfig = createHierarchyConfig(['milestone']);
+      const minimalConfig = createHierarchyConfig({ 1: ['milestone'], 2: ['task'] });
       const nodesInTier = [milestones[10], ...tasks];
       
       const result = applyProgressiveDisclosure(

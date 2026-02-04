@@ -1,5 +1,6 @@
 import type { GraphNode, GraphEdge } from '../types/models';
 import type { HierarchyConfig, NodeCounts } from '../types/hierarchy';
+import { getPrimaryTier, getSecondaryTier, getHierarchyLevels } from '../types/hierarchy';
 import type {
   VirtualNode,
   VirtualNodeMetadata,
@@ -33,6 +34,10 @@ function createPrimaryBucketNode(
   hierarchyConfig: HierarchyConfig
 ): VirtualNode {
   const counts = countNodesByType(nodes, hierarchyConfig);
+  const primaryTier = getPrimaryTier(hierarchyConfig);
+  const tierName = (primaryTier && primaryTier.types.length === 1) 
+    ? primaryTier.types[0]
+    : 'Items';
   
   return {
     id: createVirtualNodeId('bucket', range[0], range[1]),
@@ -41,7 +46,7 @@ function createPrimaryBucketNode(
       range,
       counts,
     },
-    label: `${hierarchyConfig.primaryTier || 'Items'} ${range[0] + 1}-${range[1] + 1}`,
+    label: `${tierName} ${range[0] + 1}-${range[1] + 1}`,
   };
 }
 
@@ -86,7 +91,12 @@ function createMoreNode(scope: string, count: number): VirtualNode {
  */
 function countNodesByType(nodes: GraphNode[], hierarchyConfig: HierarchyConfig): NodeCounts {
   const counts: NodeCounts = { total: nodes.length };
-  const { primaryTier, secondaryTier, tacticalTiers } = hierarchyConfig;
+  const primaryTier = getPrimaryTier(hierarchyConfig);
+  const secondaryTier = getSecondaryTier(hierarchyConfig);
+  const levels = getHierarchyLevels(hierarchyConfig);
+  const tacticalLevels = levels.filter(l => 
+    l !== primaryTier?.level && l !== secondaryTier?.level
+  );
 
   let primaryCount = 0;
   let secondaryCount = 0;
@@ -96,11 +106,14 @@ function countNodesByType(nodes: GraphNode[], hierarchyConfig: HierarchyConfig):
     const nodeType = extractNodeType(node);
     if (!nodeType) continue;
 
-    if (nodeType === primaryTier) {
+    const nodeLevel = hierarchyConfig.types[nodeType];
+    if (nodeLevel === undefined) continue;
+
+    if (primaryTier && nodeLevel === primaryTier.level) {
       primaryCount++;
-    } else if (nodeType === secondaryTier) {
+    } else if (secondaryTier && nodeLevel === secondaryTier.level) {
       secondaryCount++;
-    } else if (tacticalTiers.includes(nodeType)) {
+    } else if (tacticalLevels.includes(nodeLevel)) {
       tacticalCounts[nodeType] = (tacticalCounts[nodeType] || 0) + 1;
     }
   }
@@ -129,7 +142,7 @@ export function applyPrimaryTierWindowing(
   windowConfig: WindowConfig,
   expandedBuckets: Set<number>
 ): WindowingResult {
-  const { primaryTier } = hierarchyConfig;
+  const primaryTier = getPrimaryTier(hierarchyConfig);
   const { visiblePrimaryTierCount } = windowConfig;
 
   // If no primary tier, no windowing
@@ -203,23 +216,30 @@ export function applyProgressiveDisclosure(
   expandedSecondaryGroups: Set<string>,
   selectedPath: Set<string>
 ): DisclosureResult {
-  const { secondaryTier } = hierarchyConfig;
+  const primaryTier = getPrimaryTier(hierarchyConfig);
+  const secondaryTier = getSecondaryTier(hierarchyConfig);
   const { tacticalBudget } = windowConfig;
 
   const result: (GraphNode | VirtualNode)[] = [];
 
-  // Separate nodes by type
+  // Separate nodes by hierarchy level
   const primaryNodes = nodesInTier.filter(n => {
     const type = extractNodeType(n);
-    return type === hierarchyConfig.primaryTier;
+    return type && primaryTier && primaryTier.types.includes(type);
   });
   
-  const secondaryNodes = nodesInTier.filter(n => extractNodeType(n) === secondaryTier);
+  const secondaryNodes = nodesInTier.filter(n => {
+    const type = extractNodeType(n);
+    return type && secondaryTier && secondaryTier.types.includes(type);
+  });
   
   // Tactical nodes = everything that's NOT primary or secondary
   const tacticalNodes = nodesInTier.filter(n => {
     const type = extractNodeType(n);
-    return type !== hierarchyConfig.primaryTier && type !== secondaryTier;
+    if (!type) return false;
+    if (primaryTier && primaryTier.types.includes(type)) return false;
+    if (secondaryTier && secondaryTier.types.includes(type)) return false;
+    return true;
   });
 
   // Always include primary tier nodes
@@ -248,8 +268,17 @@ export function applyProgressiveDisclosure(
     let parentSecondary: string | null = null;
     
     for (const secondaryNode of secondaryNodes) {
-      // Get the secondary tier label (e.g., 'epic:auth')
-      const secondaryLabel = secondaryNode.labels.find(l => l.startsWith(`${secondaryTier}:`));
+      // Try each secondary type to find matching label
+      // If single type, use label namespace; otherwise use type name
+      const secondaryType = extractNodeType(secondaryNode);
+      if (!secondaryType) continue;
+
+      const labelNamespace = 
+        (secondaryTier?.labelNamespace) || 
+        (hierarchyConfig.label_associations?.[secondaryType]) || 
+        secondaryType;
+
+      const secondaryLabel = secondaryNode.labels.find(l => l.startsWith(`${labelNamespace}:`));
       if (secondaryLabel && tacticalNode.labels.includes(secondaryLabel)) {
         parentSecondary = secondaryNode.id;
         break;

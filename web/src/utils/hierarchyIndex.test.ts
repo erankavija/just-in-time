@@ -86,7 +86,7 @@ describe('hierarchyIndex', () => {
   });
 
   describe('derivePrimaryTierIndex - default hierarchy (milestone → epic)', () => {
-    const config = createHierarchyConfig(['milestone', 'epic']);
+    const config = createHierarchyConfig({ 1: ['milestone'], 2: ['epic'] });
 
     const milestones: GraphNode[] = [
       {
@@ -179,7 +179,7 @@ describe('hierarchyIndex', () => {
   });
 
   describe('derivePrimaryTierIndex - agile hierarchy (release → epic)', () => {
-    const config = createHierarchyConfig(['release', 'epic']);
+    const config = createHierarchyConfig({ 1: ['release'], 2: ['epic'] });
 
     const releases: GraphNode[] = [
       {
@@ -222,7 +222,7 @@ describe('hierarchyIndex', () => {
   });
 
   describe('derivePrimaryTierIndex - minimal hierarchy (milestone → task only)', () => {
-    const config = createHierarchyConfig(['milestone']);
+    const config = createHierarchyConfig({ 1: ['milestone'] });
 
     const milestone: GraphNode = {
       id: 'm1',
@@ -251,7 +251,7 @@ describe('hierarchyIndex', () => {
   });
 
   describe('groupNodesByPrimaryTier', () => {
-    const config = createHierarchyConfig(['milestone', 'epic']);
+    const config = createHierarchyConfig({ 1: ['milestone'], 2: ['epic'] });
 
     const nodes: GraphNode[] = [
       {

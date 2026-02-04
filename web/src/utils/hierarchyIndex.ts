@@ -1,5 +1,6 @@
 import type { GraphNode } from '../types/models';
 import type { HierarchyConfig } from '../types/hierarchy';
+import { getPrimaryTier } from '../types/hierarchy';
 
 /**
  * Extract the node type from type:X label
@@ -35,7 +36,7 @@ export function derivePrimaryTierIndex(
   allNodes: GraphNode[],
   config: HierarchyConfig
 ): number {
-  const { primaryTier } = config;
+  const primaryTier = getPrimaryTier(config);
   
   // If no primary tier configured, all nodes go to index 0
   if (!primaryTier) return 0;
@@ -43,23 +44,24 @@ export function derivePrimaryTierIndex(
   const nodeType = extractNodeType(node);
   
   // If this node IS a primary tier node, derive its index
-  if (nodeType === primaryTier) {
-    return derivePrimaryTierNodeIndex(node, allNodes, primaryTier);
+  if (nodeType && primaryTier.types.includes(nodeType)) {
+    return derivePrimaryTierNodeIndex(node, allNodes, primaryTier.types);
   }
 
   // Otherwise, inherit from parent primary tier label
-  const primaryLabel = extractTierLabel(node, primaryTier);
-  if (!primaryLabel) {
-    return -1; // Unassigned
-  }
+  // Try each primary tier type to find matching label
+  for (const primaryType of primaryTier.types) {
+    const primaryLabel = extractTierLabel(node, primaryType);
+    if (!primaryLabel) continue;
 
-  // Find the primary tier node with matching label and get its index
-  const primaryNode = allNodes.find(
-    (n) => extractNodeType(n) === primaryTier && extractTierLabel(n, primaryTier) === primaryLabel
-  );
+    // Find the primary tier node with matching label and get its index
+    const primaryNode = allNodes.find(
+      (n) => extractNodeType(n) === primaryType && extractTierLabel(n, primaryType) === primaryLabel
+    );
 
-  if (primaryNode) {
-    return derivePrimaryTierNodeIndex(primaryNode, allNodes, primaryTier);
+    if (primaryNode) {
+      return derivePrimaryTierNodeIndex(primaryNode, allNodes, primaryTier.types);
+    }
   }
 
   // If we can't find the primary tier node, assign to unassigned bucket
@@ -73,10 +75,13 @@ export function derivePrimaryTierIndex(
 function derivePrimaryTierNodeIndex(
   node: GraphNode,
   allNodes: GraphNode[],
-  primaryTier: string
+  primaryTierTypes: string[]
 ): number {
-  // Find all primary tier nodes
-  const primaryTierNodes = allNodes.filter((n) => extractNodeType(n) === primaryTier);
+  // Find all primary tier nodes (any type at primary level)
+  const primaryTierNodes = allNodes.filter((n) => {
+    const type = extractNodeType(n);
+    return type && primaryTierTypes.includes(type);
+  });
   
   // Find index of this node among primary tier nodes
   const index = primaryTierNodes.findIndex((n) => n.id === node.id);
