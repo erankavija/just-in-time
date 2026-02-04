@@ -11,13 +11,14 @@ import { apiClient } from './api/client';
 import type { Issue } from './types/models';
 import './App.css';
 
-import type { ViewMode } from './components/Graph/GraphView';
+import type { ViewMode, LayoutAlgorithm } from './components/Graph/GraphView';
 
 function App() {
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [allIssues, setAllIssues] = useState<Issue[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('tactical');
+  const [layoutAlgorithm, setLayoutAlgorithm] = useState<LayoutAlgorithm>('dagre');
   const [labelFilters, setLabelFilters] = useState<string[]>([]);
   const [documentViewerState, setDocumentViewerState] = useState<{
     path: string;
@@ -178,6 +179,8 @@ function App() {
               onNodeClick={setSelectedIssueId} 
               viewMode={viewMode}
               labelFilters={labelFilters}
+              layoutAlgorithm={layoutAlgorithm}
+              onLayoutChange={setLayoutAlgorithm}
             />
           </div>
           

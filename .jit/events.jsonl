@@ -1625,3 +1625,4 @@
 {"type":"gate_passed","id":"3b1b2431-b5d2-47d8-a406-7a3d3ea1e314","issue_id":"cfb3ba94-7406-4bc3-9f36-cecdcebacf0e","timestamp":"2026-02-04T12:05:12.458183266Z","gate_key":"code-review","updated_by":"agent:copilot-cli"}
 {"type":"issue_state_changed","id":"fb4fd5d7-1f8a-4a20-b9ec-83866d2fae88","issue_id":"cfb3ba94-7406-4bc3-9f36-cecdcebacf0e","timestamp":"2026-02-04T12:05:13.124989066Z","from":"ready","to":"done"}
 {"type":"issue_completed","id":"1f5f0986-4ee5-4fdf-8e6c-08d63ce5a83a","issue_id":"cfb3ba94-7406-4bc3-9f36-cecdcebacf0e","timestamp":"2026-02-04T12:05:13.125016336Z"}
+{"type":"issue_created","id":"0b73a440-b4c2-4531-abfb-5c180a69c501","issue_id":"d4290046-9f21-430e-b7e3-3c13d7ff51fe","timestamp":"2026-02-04T12:38:23.007932176Z","title":"Improve DAG layout for large graphs in web UI","priority":"normal"}

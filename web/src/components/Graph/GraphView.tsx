@@ -42,12 +42,26 @@ const priorityColors: Record<Priority, string> = {
   low: 'var(--success)',
 };
 
+// Layout algorithm types
+export type LayoutAlgorithm = 'dagre' | 'compact';
+
+// Layout configuration
+const LAYOUT_CONFIG = {
+  nodeWidth: 220,
+  nodeHeight: 100,  // Slightly taller to account for labels
+  rankSpacing: 280, // Horizontal space between ranks (column width)
+  nodeSpacing: 20,  // Vertical space between nodes
+  maxNodesPerColumn: 6, // Max nodes per column before starting new column in same rank
+  columnSpacing: 240, // Horizontal space between columns within same rank
+  margin: 40,
+};
+
 // Dagre layout algorithm
-const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'LR') => {
+const getDagreLayout = (nodes: Node[], edges: Edge[]) => {
   const dagreGraph = new dagre.graphlib.Graph();
   dagreGraph.setDefaultEdgeLabel(() => ({}));
   dagreGraph.setGraph({ 
-    rankdir: direction,
+    rankdir: 'LR',
     nodesep: 80,
     ranksep: 120,
     marginx: 40,
@@ -55,7 +69,7 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'LR') => 
   });
 
   nodes.forEach((node) => {
-    dagreGraph.setNode(node.id, { width: 220, height: 80 });
+    dagreGraph.setNode(node.id, { width: LAYOUT_CONFIG.nodeWidth, height: LAYOUT_CONFIG.nodeHeight });
   });
 
   edges.forEach((edge) => {
@@ -69,13 +83,163 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'LR') => 
     return {
       ...node,
       position: {
-        x: nodeWithPosition.x - 110,
-        y: nodeWithPosition.y - 40,
+        x: nodeWithPosition.x - LAYOUT_CONFIG.nodeWidth / 2,
+        y: nodeWithPosition.y - LAYOUT_CONFIG.nodeHeight / 2,
       },
     };
   });
 
   return { nodes: layoutedNodes, edges };
+};
+
+// Compact layered layout - vertical stacking within ranks
+const getCompactLayout = (nodes: Node[], edges: Edge[]) => {
+  if (nodes.length === 0) {
+    return { nodes: [], edges };
+  }
+
+  // Build adjacency list (source -> targets, where source depends on targets)
+  const dependsOn = new Map<string, Set<string>>();
+  const dependedBy = new Map<string, Set<string>>();
+  
+  nodes.forEach(node => {
+    dependsOn.set(node.id, new Set());
+    dependedBy.set(node.id, new Set());
+  });
+
+  edges.forEach(edge => {
+    // edge.source is the dependency, edge.target is the dependent
+    // so target depends on source
+    dependsOn.get(edge.target)?.add(edge.source);
+    dependedBy.get(edge.source)?.add(edge.target);
+  });
+
+  // Compute ranks via topological sort (BFS from roots)
+  const ranks = new Map<string, number>();
+  const nodeSet = new Set(nodes.map(n => n.id));
+  
+  // Find roots (nodes with no dependencies within our visible set)
+  const roots: string[] = [];
+  nodes.forEach(node => {
+    const deps = dependsOn.get(node.id);
+    const visibleDeps = deps ? [...deps].filter(d => nodeSet.has(d)) : [];
+    if (visibleDeps.length === 0) {
+      roots.push(node.id);
+    }
+  });
+
+  // BFS to assign ranks
+  const queue = [...roots];
+  roots.forEach(id => ranks.set(id, 0));
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    const currentRank = ranks.get(current)!;
+    
+    const dependents = dependedBy.get(current) || new Set();
+    dependents.forEach(dep => {
+      if (!nodeSet.has(dep)) return;
+      
+      // Rank is max of all dependency ranks + 1
+      const existingRank = ranks.get(dep) ?? -1;
+      const newRank = currentRank + 1;
+      
+      if (newRank > existingRank) {
+        ranks.set(dep, newRank);
+        // Re-process this node's dependents
+        if (!queue.includes(dep)) {
+          queue.push(dep);
+        }
+      }
+    });
+  }
+
+  // Handle any unranked nodes (disconnected or cycles)
+  nodes.forEach(node => {
+    if (!ranks.has(node.id)) {
+      ranks.set(node.id, 0);
+    }
+  });
+
+  // Group nodes by rank
+  const nodesByRank = new Map<number, string[]>();
+  ranks.forEach((rank, nodeId) => {
+    if (!nodesByRank.has(rank)) {
+      nodesByRank.set(rank, []);
+    }
+    nodesByRank.get(rank)!.push(nodeId);
+  });
+
+  // Sort ranks
+  const sortedRanks = [...nodesByRank.keys()].sort((a, b) => a - b);
+  
+  // Calculate how many columns each rank needs
+  const columnsPerRank = new Map<number, number>();
+  sortedRanks.forEach(rank => {
+    const count = nodesByRank.get(rank)!.length;
+    columnsPerRank.set(rank, Math.ceil(count / LAYOUT_CONFIG.maxNodesPerColumn));
+  });
+  
+  // Calculate cumulative X offset for each rank (accounting for multi-column ranks)
+  const rankStartX = new Map<number, number>();
+  let currentX = LAYOUT_CONFIG.margin;
+  sortedRanks.forEach(rank => {
+    rankStartX.set(rank, currentX);
+    const cols = columnsPerRank.get(rank)!;
+    currentX += cols * LAYOUT_CONFIG.columnSpacing + LAYOUT_CONFIG.rankSpacing;
+  });
+  
+  // Calculate positions
+  const positions = new Map<string, { x: number; y: number }>();
+  
+  // Max height based on maxNodesPerColumn
+  const totalHeightMax = LAYOUT_CONFIG.maxNodesPerColumn * (LAYOUT_CONFIG.nodeHeight + LAYOUT_CONFIG.nodeSpacing);
+
+  sortedRanks.forEach(rank => {
+    const nodesInRank = nodesByRank.get(rank)!;
+    const baseX = rankStartX.get(rank)!;
+    
+    nodesInRank.forEach((nodeId, index) => {
+      const col = Math.floor(index / LAYOUT_CONFIG.maxNodesPerColumn);
+      const row = index % LAYOUT_CONFIG.maxNodesPerColumn;
+      
+      // Calculate how many nodes in this column for vertical centering
+      const nodesInThisColumn = Math.min(
+        LAYOUT_CONFIG.maxNodesPerColumn,
+        nodesInRank.length - col * LAYOUT_CONFIG.maxNodesPerColumn
+      );
+      const columnHeight = nodesInThisColumn * (LAYOUT_CONFIG.nodeHeight + LAYOUT_CONFIG.nodeSpacing);
+      const startY = (totalHeightMax - columnHeight) / 2;
+      
+      positions.set(nodeId, {
+        x: baseX + col * LAYOUT_CONFIG.columnSpacing,
+        y: startY + row * (LAYOUT_CONFIG.nodeHeight + LAYOUT_CONFIG.nodeSpacing) + LAYOUT_CONFIG.margin,
+      });
+    });
+  });
+
+  // Apply positions to nodes
+  const layoutedNodes = nodes.map(node => ({
+    ...node,
+    position: positions.get(node.id) || { x: 0, y: 0 },
+  }));
+
+  return { nodes: layoutedNodes, edges };
+};
+
+// Main layout function
+const getLayoutedElements = (
+  nodes: Node[], 
+  edges: Edge[], 
+  algorithm: LayoutAlgorithm = 'dagre'
+) => {
+  switch (algorithm) {
+    case 'compact':
+      return getCompactLayout(nodes, edges);
+    case 'dagre':
+    default:
+      return getDagreLayout(nodes, edges);
+  }
 };
 
 export type ViewMode = 'tactical' | 'strategic';
@@ -84,9 +248,17 @@ interface GraphViewProps {
   onNodeClick?: (issueId: string) => void;
   viewMode?: ViewMode;
   labelFilters?: string[]; // e.g., ["milestone:v1.0", "epic:*"]
+  layoutAlgorithm?: LayoutAlgorithm;
+  onLayoutChange?: (algorithm: LayoutAlgorithm) => void;
 }
 
-export function GraphView({ onNodeClick, viewMode = 'tactical', labelFilters = [] }: GraphViewProps) {
+export function GraphView({ 
+  onNodeClick, 
+  viewMode = 'tactical', 
+  labelFilters = [],
+  layoutAlgorithm = 'dagre',
+  onLayoutChange,
+}: GraphViewProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [loading, setLoading] = useState(true);
@@ -286,8 +458,8 @@ export function GraphView({ onNodeClick, viewMode = 'tactical', labelFilters = [
         })
         .filter((edge): edge is Edge => edge !== null);
 
-      // Apply dagre layout
-      const layouted = getLayoutedElements(flowNodes, flowEdges);
+      // Apply layout algorithm
+      const layouted = getLayoutedElements(flowNodes, flowEdges, layoutAlgorithm);
       setNodes(layouted.nodes);
       setEdges(layouted.edges);
     } catch (err) {
@@ -297,7 +469,7 @@ export function GraphView({ onNodeClick, viewMode = 'tactical', labelFilters = [
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setNodes, setEdges, viewMode, labelFilters, strategicTypes]); // nodeStats is setState, not a dependency
+  }, [setNodes, setEdges, viewMode, labelFilters, strategicTypes, layoutAlgorithm]); // nodeStats is setState, not a dependency
 
   useEffect(() => {
     loadGraph();
@@ -373,6 +545,56 @@ export function GraphView({ onNodeClick, viewMode = 'tactical', labelFilters = [
           style={{ backgroundColor: 'var(--bg-primary)' }}
         />
       </ReactFlow>
+      
+      {/* Layout Algorithm Toggle */}
+      <div style={{
+        position: 'absolute',
+        top: '16px',
+        right: '16px',
+        backgroundColor: 'var(--bg-tertiary)',
+        padding: '8px 12px',
+        borderRadius: '8px',
+        border: '1px solid var(--border)',
+        fontFamily: 'var(--font-mono)',
+        fontSize: '11px',
+        display: 'flex',
+        gap: '8px',
+        alignItems: 'center',
+      }}>
+        <span style={{ color: 'var(--text-secondary)' }}>Layout:</span>
+        <button
+          onClick={() => onLayoutChange?.('dagre')}
+          style={{
+            padding: '4px 8px',
+            backgroundColor: layoutAlgorithm === 'dagre' ? 'var(--accent)' : 'var(--bg-secondary)',
+            border: '1px solid var(--border)',
+            borderRadius: '4px',
+            color: layoutAlgorithm === 'dagre' ? 'var(--bg-primary)' : 'var(--text-primary)',
+            fontFamily: 'var(--font-mono)',
+            fontSize: '10px',
+            cursor: 'pointer',
+          }}
+        >
+          Dagre
+        </button>
+        <button
+          onClick={() => onLayoutChange?.('compact')}
+          style={{
+            padding: '4px 8px',
+            backgroundColor: layoutAlgorithm === 'compact' ? 'var(--accent)' : 'var(--bg-secondary)',
+            border: '1px solid var(--border)',
+            borderRadius: '4px',
+            color: layoutAlgorithm === 'compact' ? 'var(--bg-primary)' : 'var(--text-primary)',
+            fontFamily: 'var(--font-mono)',
+            fontSize: '10px',
+            cursor: 'pointer',
+          }}
+        >
+          Compact
+        </button>
+      </div>
+
+      {/* State Legend */}
       <div style={{ 
         position: 'absolute', 
         bottom: '16px', 

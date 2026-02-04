@@ -1,0 +1,18 @@
+{
+  "id": "d4290046-9f21-430e-b7e3-3c13d7ff51fe",
+  "title": "Improve DAG layout for large graphs in web UI",
+  "description": "## Problem\n\nThe current dagre layout produces extremely wide graphs when issues have many dependencies. Zooming out far enough to see the whole graph makes nodes illegible. The web UI lacks a usable birds-eye view for large repositories (100+ issues).\n\n## Current State\n\n- Using dagre with ReactFlow\n- Toggle added to switch between 'dagre' and 'compact' layouts (compact is broken)\n- Layout algorithm in `web/src/components/Graph/GraphView.tsx`\n\n## Requirements\n\n1. **Hierarchical layout based on strategic/tactical distinction**\n   - Strategic nodes (milestones, epics) should follow strict L→R rank flow\n   - Tactical nodes (tasks, stories) can be positioned more flexibly to reduce graph dimensions\n\n2. **Bounded graph dimensions**\n   - Neither width nor height should grow unboundedly with node count\n   - Some form of grid, stacking, or clustering within ranks\n\n3. **Readable at all zoom levels**\n   - Consider semantic zoom (simplified node rendering at low zoom)\n   - Maintain edge readability (beziers preferred, no orthogonal - they overlap)\n\n4. **Preserve dependency flow**\n   - Dependencies should generally flow left-to-right\n   - Edges should never point \"backwards\" (right-to-left)\n\n## Failed Approaches\n\n- **ELK/Graphviz WASM**: Heavy, poor results\n- **Orthogonal edges**: Complete overlap, impossible to trace\n- **Simple vertical stacking per rank**: Graph becomes too tall\n- **Grid within rank**: Lost visual hierarchy, unreadable\n\n## Potential Approaches\n\n1. **Force-directed with X constraints**: Fix strategic node X by rank, let force simulation handle Y and relax non-strategic X\n\n2. **Collapsible groups**: Epics collapse to summary nodes, click to expand\n\n3. **Subgraph focus mode**: Show only N levels from selected node\n\n4. **Semantic zoom**: Simplified node rendering at low zoom levels\n\n## Acceptance Criteria\n\n- [ ] Graph viewable at repository scale (150+ issues)\n- [ ] Strategic issues visually distinguishable from tactical\n- [ ] Dependency flow readable (can trace edges)\n- [ ] Toggle or option to switch layout modes\n- [ ] No performance regression\n\n## Related\n\nPart of Epic 9d427a6b (Production Polish)",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:production-polish",
+    "component:web"
+  ]
+}
