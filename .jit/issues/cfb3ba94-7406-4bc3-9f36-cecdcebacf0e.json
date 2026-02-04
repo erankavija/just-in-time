@@ -35,6 +35,13 @@
           "is_shared": false
         }
       ]
+    },
+    {
+      "path": "dev/docs-audit-plan.md",
+      "commit": null,
+      "label": "Documentation Audit Plan",
+      "doc_type": "notes",
+      "format": "markdown"
     }
   ],
   "labels": [

@@ -1595,3 +1595,15 @@
 {"type":"issue_created","id":"26ee7080-c8a5-4c40-8b33-ca96ec5284cb","issue_id":"a66e16a4-7d95-46d9-91f3-586459f94b1e","timestamp":"2026-02-02T21:46:41.341850890Z","title":"Add git merge driver for .jit/events.jsonl","priority":"normal"}
 {"type":"issue_state_changed","id":"5abcbf73-3382-4a3d-bc70-c1a741fefe66","issue_id":"a66e16a4-7d95-46d9-91f3-586459f94b1e","timestamp":"2026-02-03T18:37:52.280865712Z","from":"ready","to":"done"}
 {"type":"issue_completed","id":"582c6ad7-1d45-4afc-9e1d-6cdb78eb4ac5","issue_id":"a66e16a4-7d95-46d9-91f3-586459f94b1e","timestamp":"2026-02-03T18:37:52.280889042Z"}
+{"type":"issue_state_changed","id":"80a8e17b-6b11-4184-a593-3cd80bfabce9","issue_id":"2a48ca4d-8ad3-46b7-9cf4-5207fa95b143","timestamp":"2026-02-03T20:11:35.621723213Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"3cee032d-d988-49e7-8562-aedaebd37097","issue_id":"2a48ca4d-8ad3-46b7-9cf4-5207fa95b143","timestamp":"2026-02-03T20:11:35.624737493Z","assignee":"agent:copilot-cli"}
+{"type":"gate_passed","id":"ec45afef-a275-4991-9d9d-8cc06ec64abd","issue_id":"2a48ca4d-8ad3-46b7-9cf4-5207fa95b143","timestamp":"2026-02-03T20:13:43.731481995Z","gate_key":"code-review","updated_by":"agent:copilot-cli"}
+{"type":"issue_state_changed","id":"90854398-0342-4297-875f-c6c6770716be","issue_id":"2a48ca4d-8ad3-46b7-9cf4-5207fa95b143","timestamp":"2026-02-03T20:13:44.984857714Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"986f94e7-4e08-4940-b1c4-fc3a2b5bb473","issue_id":"2a48ca4d-8ad3-46b7-9cf4-5207fa95b143","timestamp":"2026-02-03T20:13:44.984884304Z"}
+{"type":"issue_state_changed","id":"02d3e9fc-c314-4a9e-94c4-a66019743d07","issue_id":"d037eece-a1ec-448d-a5e2-2ec1345acf91","timestamp":"2026-02-04T10:52:56.926357550Z","from":"ready","to":"gated"}
+{"type":"gate_passed","id":"ddeda156-150e-4471-a199-30d399f4360b","issue_id":"d037eece-a1ec-448d-a5e2-2ec1345acf91","timestamp":"2026-02-04T10:53:12.001032683Z","gate_key":"code-review","updated_by":"agent:copilot-cli"}
+{"type":"issue_state_changed","id":"bb9a6c68-c87e-403c-8d1e-3b113eacb82c","issue_id":"d037eece-a1ec-448d-a5e2-2ec1345acf91","timestamp":"2026-02-04T10:53:12.004027824Z","from":"gated","to":"done"}
+{"type":"issue_completed","id":"06c6e3a3-d40e-4aca-8c93-ca7fd4a42676","issue_id":"d037eece-a1ec-448d-a5e2-2ec1345acf91","timestamp":"2026-02-04T10:53:12.004047654Z"}
+{"type":"issue_state_changed","id":"548795e5-60f5-4087-a66d-ac561b37009a","issue_id":"5326b331-e14c-4157-b430-447e93f5f91b","timestamp":"2026-02-04T10:53:12.077662635Z","from":"backlog","to":"ready"}
+{"type":"issue_state_changed","id":"d8707bf5-8822-4d04-9fdb-1dcbca95ba9f","issue_id":"5326b331-e14c-4157-b430-447e93f5f91b","timestamp":"2026-02-04T11:08:24.943996098Z","from":"ready","to":"done"}
+{"type":"issue_completed","id":"f813a6f4-c103-4b41-8a48-714860a5ac54","issue_id":"5326b331-e14c-4157-b430-447e93f5f91b","timestamp":"2026-02-04T11:08:24.944025328Z"}
