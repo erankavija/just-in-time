@@ -1,21 +1,110 @@
 # Configuration Reference
 
-> **Diátaxis Type:** Reference  
-> **Last Updated:** 2026-02-02
+> **Diátaxis Type:** Reference
 
-Complete reference for jit configuration options.
+Complete reference for JIT configuration options.
 
-## Configuration Sources (Priority Order)
+**Quick links:**
+- [Example config.toml](example-config.toml) - Full annotated example with all options
+- [Schema Configuration](#schema-configuration) - Issue types, validation, namespaces
+- [Runtime Configuration](#runtime-configuration) - Worktrees, coordination, locks
 
-Configuration is loaded from multiple sources, with later sources overriding earlier ones:
+## Configuration Files
 
-1. **Hardcoded defaults** (lowest priority)
-2. **System config** — `/etc/jit/config.toml`
-3. **User config** — `~/.config/jit/config.toml`
-4. **Repository config** — `.jit/config.toml`
-5. **Environment variables** (highest priority)
+| File | Purpose |
+|------|---------|
+| `.jit/config.toml` | Repository config (schema + runtime) |
+| `~/.config/jit/config.toml` | User defaults |
+| `~/.config/jit/agent.toml` | Agent identity |
+| `/etc/jit/config.toml` | System defaults |
 
-## Repository Config (`.jit/config.toml`)
+Priority: environment variables > repository > user > system > hardcoded defaults.
+
+---
+
+## Schema Configuration
+
+These settings define how issues are organized and validated. See [example-config.toml](example-config.toml) for full annotated examples.
+
+### `[version]`
+
+```toml
+[version]
+schema = 2
+```
+
+Schema version. Required for newer features like namespace registry and documentation lifecycle.
+
+### `[documentation]`
+
+```toml
+[documentation]
+development_root = "dev"
+managed_paths = ["dev/active", "dev/studies", "dev/sessions"]
+archive_root = "dev/archive"
+permanent_paths = ["docs/"]
+
+[documentation.categories]
+design = "features"
+session = "sessions"
+study = "studies"
+```
+
+Controls document lifecycle management. Documents in `managed_paths` can be archived; documents in `permanent_paths` never archive.
+
+### `[type_hierarchy]`
+
+```toml
+[type_hierarchy]
+types = { milestone = 1, epic = 2, story = 3, task = 4, bug = 4 }
+strategic_types = ["milestone", "epic"]
+
+[type_hierarchy.label_associations]
+milestone = "milestone"
+epic = "epic"
+story = "story"
+```
+
+| Field | Description |
+|-------|-------------|
+| `types` | Type name → hierarchy level (lower = more strategic) |
+| `strategic_types` | Types shown in `jit query strategic` |
+| `label_associations` | Type → membership label namespace mapping |
+
+### `[validation]`
+
+```toml
+[validation]
+strictness = "loose"
+default_type = "task"
+require_type_label = false
+label_regex = '^[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9._-]*$'
+reject_malformed_labels = false
+enforce_namespace_registry = false
+warn_orphaned_leaves = true
+warn_strategic_consistency = true
+```
+
+| Field | Description |
+|-------|-------------|
+| `strictness` | `"strict"`, `"loose"`, or `"permissive"` |
+| `default_type` | Auto-assign when no type:* label |
+| `warn_orphaned_leaves` | Warn when tasks lack parent labels |
+
+### `[namespaces.*]`
+
+```toml
+[namespaces.epic]
+description = "Epic membership"
+unique = false
+examples = ["epic:auth", "epic:docs"]
+```
+
+Define label namespaces for documentation and optional enforcement. Set `enforce_namespace_registry = true` to require defined namespaces only.
+
+---
+
+## Runtime Configuration
 
 ### `[worktree]` Section
 
@@ -241,52 +330,19 @@ Exit codes:
 
 ## Example Configurations
 
-### Single Agent (Default)
+See [example-config.toml](example-config.toml) for a complete annotated template.
 
-No configuration needed — defaults work for single-agent workflows.
+**Common patterns:**
 
-### Multi-Agent Team
-
-`.jit/config.toml`:
-```toml
-[worktree]
-mode = "on"
-enforce_leases = "strict"
-
-[coordination]
-default_ttl_secs = 1800  # 30 minutes for longer tasks
-stale_threshold_secs = 7200
-```
-
-### CI/CD Environment
-
-`.jit/config.toml`:
-```toml
-[worktree]
-mode = "off"  # CI doesn't use worktrees
-enforce_leases = "off"
-
-[coordination]
-auto_renew_leases = true  # Keep leases alive during long builds
-```
-
-Agent config in CI:
-```bash
-export JIT_AGENT_ID=ci:github-actions-${{ github.run_id }}
-```
-
-### Relaxed Development
-
-For solo development with optional coordination:
-
-```toml
-[worktree]
-mode = "auto"
-enforce_leases = "warn"  # Warn but don't block
-```
+| Use Case | Key Settings |
+|----------|--------------|
+| Single agent | Defaults work, no config needed |
+| Multi-agent team | `enforce_leases = "strict"`, longer TTL |
+| CI/CD | `worktree.mode = "off"`, `JIT_AGENT_ID` env var |
+| Solo dev | `enforce_leases = "warn"` for flexibility |
 
 ## See Also
 
-- [Example config.toml](./example-config.toml)
+- [Example config.toml](example-config.toml) - Full annotated configuration
 - [Tutorial: Parallel Work](../tutorials/parallel-work-worktrees.md)
 - [How-to: Multi-Agent Coordination](../how-to/multi-agent-coordination.md)
