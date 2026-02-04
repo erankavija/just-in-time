@@ -127,6 +127,8 @@ archive/        → After 1-2 releases
 - **Session notes?** → Add to `sessions/` (use `session-YYYY-MM-DD-topic.md`)
 - **User guide?** → Add to `docs/` (product documentation)
 
+**Authoring guidelines:** See [authoring-conventions.md](authoring-conventions.md) for asset management and link patterns that ensure documents remain portable during archival.
+
 **See also:**
 - [docs/index.md](../docs/index.md) - Product documentation
 - [ROADMAP.md](../ROADMAP.md) - Project roadmap

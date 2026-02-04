@@ -422,6 +422,6 @@ fi
 
 ## See Also
 
-- [Development Documentation Index](../dev/index.md) - Organization and lifecycle
-- [Documentation Lifecycle Design](../dev/active/documentation-lifecycle-design.md) - System design
-- [README.md](README.md) - Documentation navigation and overview
+- [Development Documentation Index](index.md) - Organization and lifecycle
+- [Documentation Lifecycle Design](active/documentation-lifecycle-design.md) - System design
+- [Product Documentation](../docs/index.md) - User-facing documentation
