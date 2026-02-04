@@ -203,7 +203,7 @@ export function applyProgressiveDisclosure(
   expandedSecondaryGroups: Set<string>,
   selectedPath: Set<string>
 ): DisclosureResult {
-  const { secondaryTier, tacticalTiers } = hierarchyConfig;
+  const { secondaryTier } = hierarchyConfig;
   const { tacticalBudget } = windowConfig;
 
   const result: (GraphNode | VirtualNode)[] = [];
@@ -216,9 +216,10 @@ export function applyProgressiveDisclosure(
   
   const secondaryNodes = nodesInTier.filter(n => extractNodeType(n) === secondaryTier);
   
+  // Tactical nodes = everything that's NOT primary or secondary
   const tacticalNodes = nodesInTier.filter(n => {
     const type = extractNodeType(n);
-    return type && tacticalTiers.includes(type);
+    return type !== hierarchyConfig.primaryTier && type !== secondaryTier;
   });
 
   // Always include primary tier nodes
@@ -284,8 +285,8 @@ export function applyProgressiveDisclosure(
 
       result.push(...visible);
       if (remaining > 0) {
-        const scope = tacticalTiers.length > 0 ? `${tacticalTiers[0]}s` : 'items';
-        result.push(createMoreNode(scope, remaining));
+        // Use generic scope since we don't track tactical tier names explicitly
+        result.push(createMoreNode('items', remaining));
       }
     }
   }
