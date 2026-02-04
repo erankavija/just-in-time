@@ -2,7 +2,7 @@
   "id": "cfb3ba94-7406-4bc3-9f36-cecdcebacf0e",
   "title": "Epic: User Documentation (Product Docs Phase 2)",
   "description": "Complete Phase 2 of documentation organization strategy: Create comprehensive user-facing product documentation following Diátaxis framework.\n\nPhase 1 (165cf162, DONE) created the docs/ structure and separation. Phase 2 populates it with content for end users and agents across five story areas: Gate System, Core Concepts, Tutorials, How-To Guides, and Reference.\n\nSee: dev/studies/documentation-organization-strategy.md (linked)",
-  "state": "backlog",
+  "state": "done",
   "priority": "high",
   "assignee": null,
   "dependencies": [
@@ -16,7 +16,13 @@
   "gates_required": [
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_by": "agent:copilot-cli",
+      "updated_at": "2026-02-04T12:05:12.458002316Z"
+    }
+  },
   "context": {},
   "documents": [
     {
