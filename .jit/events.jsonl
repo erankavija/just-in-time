@@ -1626,3 +1626,21 @@
 {"type":"issue_state_changed","id":"fb4fd5d7-1f8a-4a20-b9ec-83866d2fae88","issue_id":"cfb3ba94-7406-4bc3-9f36-cecdcebacf0e","timestamp":"2026-02-04T12:05:13.124989066Z","from":"ready","to":"done"}
 {"type":"issue_completed","id":"1f5f0986-4ee5-4fdf-8e6c-08d63ce5a83a","issue_id":"cfb3ba94-7406-4bc3-9f36-cecdcebacf0e","timestamp":"2026-02-04T12:05:13.125016336Z"}
 {"type":"issue_created","id":"0b73a440-b4c2-4531-abfb-5c180a69c501","issue_id":"d4290046-9f21-430e-b7e3-3c13d7ff51fe","timestamp":"2026-02-04T12:38:23.007932176Z","title":"Improve DAG layout for large graphs in web UI","priority":"normal"}
+{"type":"issue_created","id":"7ff82103-0591-46a8-9028-74e7fc708414","issue_id":"783a8086-2933-4b6a-9d4a-b5c5f1d3ddc0","timestamp":"2026-02-04T13:58:40.640344492Z","title":"Phase 1: Milestone windowing + exploration DAG","priority":"normal"}
+{"type":"issue_created","id":"2675308f-a470-4352-b564-3d6c0e50e1d9","issue_id":"6f678db0-aef5-4986-95d4-71fa63548fd2","timestamp":"2026-02-04T13:58:40.640771402Z","title":"Phase 2: Custom layout engine (anchored columns)","priority":"normal"}
+{"type":"issue_created","id":"a7ccf80f-b269-4ecf-b545-858f49a47e0d","issue_id":"402d1a8f-3eec-42ef-aecc-a5c1c783405b","timestamp":"2026-02-04T13:58:40.641177992Z","title":"Phase 3: Edge bundling and zoom tiers","priority":"normal"}
+{"type":"issue_created","id":"95b0e4c5-325e-4b84-9edb-bedd2775a546","issue_id":"1f10fe7c-7a8e-4962-b4e4-639a65834876","timestamp":"2026-02-04T13:58:40.641525062Z","title":"Phase 4: Performance optimization","priority":"normal"}
+{"type":"issue_created","id":"0d07eb3a-bda7-4bc1-9f8f-5a669d8536c6","issue_id":"7ef1d3d9-0afa-40cc-91c3-167f2b4dc7a4","timestamp":"2026-02-04T13:58:40.642278372Z","title":"Phase 5: UX polish for high-density","priority":"normal"}
+{"type":"issue_state_changed","id":"ddd35661-c76b-4cb9-b27c-9cb3618b3a4c","issue_id":"d4290046-9f21-430e-b7e3-3c13d7ff51fe","timestamp":"2026-02-04T13:58:40.648467154Z","from":"ready","to":"backlog"}
+{"type":"gate_added","id":"9d85cdcb-7329-44e2-b441-40f1fcd1e506","issue_id":"1f10fe7c-7a8e-4962-b4e4-639a65834876","timestamp":"2026-02-04T14:07:22.850127257Z","gate_key":"tdd-reminder"}
+{"type":"gate_added","id":"d3debfcf-0ee0-451b-b448-f2c52f5d4a83","issue_id":"1f10fe7c-7a8e-4962-b4e4-639a65834876","timestamp":"2026-02-04T14:07:22.850154397Z","gate_key":"code-review"}
+{"type":"gate_added","id":"9c006ba7-7a85-4078-9129-e3e56d066ee6","issue_id":"7ef1d3d9-0afa-40cc-91c3-167f2b4dc7a4","timestamp":"2026-02-04T14:07:22.850302097Z","gate_key":"tdd-reminder"}
+{"type":"gate_added","id":"f11938cd-8975-40dc-9a5c-b2827228f1ab","issue_id":"7ef1d3d9-0afa-40cc-91c3-167f2b4dc7a4","timestamp":"2026-02-04T14:07:22.850320897Z","gate_key":"code-review"}
+{"type":"gate_added","id":"d7dbe53c-f1f9-44e8-929d-e3f1f3936ed8","issue_id":"783a8086-2933-4b6a-9d4a-b5c5f1d3ddc0","timestamp":"2026-02-04T14:07:22.850563277Z","gate_key":"tdd-reminder"}
+{"type":"gate_added","id":"4edb9acf-eb32-40c0-95ce-d2954c4d4d9b","issue_id":"783a8086-2933-4b6a-9d4a-b5c5f1d3ddc0","timestamp":"2026-02-04T14:07:22.850580637Z","gate_key":"code-review"}
+{"type":"gate_added","id":"bcdb789d-90ac-4c2b-8e67-21106b53727c","issue_id":"6f678db0-aef5-4986-95d4-71fa63548fd2","timestamp":"2026-02-04T14:07:22.850614977Z","gate_key":"tdd-reminder"}
+{"type":"gate_added","id":"3c70a727-22ac-48d3-b6cf-6d611e1341b0","issue_id":"6f678db0-aef5-4986-95d4-71fa63548fd2","timestamp":"2026-02-04T14:07:22.850633687Z","gate_key":"code-review"}
+{"type":"gate_added","id":"4ac0b345-212d-4c0e-b469-82e75b579a0e","issue_id":"402d1a8f-3eec-42ef-aecc-a5c1c783405b","timestamp":"2026-02-04T14:07:22.850650747Z","gate_key":"tdd-reminder"}
+{"type":"gate_added","id":"fc48e5d9-f834-4125-abf0-341ee03edc89","issue_id":"402d1a8f-3eec-42ef-aecc-a5c1c783405b","timestamp":"2026-02-04T14:07:22.850664917Z","gate_key":"code-review"}
+{"type":"gate_passed","id":"99ed5e24-054f-4ec5-baf0-cdf325197a8c","issue_id":"783a8086-2933-4b6a-9d4a-b5c5f1d3ddc0","timestamp":"2026-02-04T17:51:01.770505030Z","gate_key":"tdd-reminder","updated_by":"agent:copilot-session"}
+{"type":"issue_state_changed","id":"27f67509-3029-49bc-afee-89859f845142","issue_id":"783a8086-2933-4b6a-9d4a-b5c5f1d3ddc0","timestamp":"2026-02-04T17:51:10.565717276Z","from":"ready","to":"in_progress"}

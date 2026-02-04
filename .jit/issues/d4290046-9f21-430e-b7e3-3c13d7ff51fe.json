@@ -1,18 +1,32 @@
 {
   "id": "d4290046-9f21-430e-b7e3-3c13d7ff51fe",
   "title": "Improve DAG layout for large graphs in web UI",
-  "description": "## Problem\n\nThe current dagre layout produces extremely wide graphs when issues have many dependencies. Zooming out far enough to see the whole graph makes nodes illegible. The web UI lacks a usable birds-eye view for large repositories (100+ issues).\n\n## Current State\n\n- Using dagre with ReactFlow\n- Toggle added to switch between 'dagre' and 'compact' layouts (compact is broken)\n- Layout algorithm in `web/src/components/Graph/GraphView.tsx`\n\n## Requirements\n\n1. **Hierarchical layout based on strategic/tactical distinction**\n   - Strategic nodes (milestones, epics) should follow strict L→R rank flow\n   - Tactical nodes (tasks, stories) can be positioned more flexibly to reduce graph dimensions\n\n2. **Bounded graph dimensions**\n   - Neither width nor height should grow unboundedly with node count\n   - Some form of grid, stacking, or clustering within ranks\n\n3. **Readable at all zoom levels**\n   - Consider semantic zoom (simplified node rendering at low zoom)\n   - Maintain edge readability (beziers preferred, no orthogonal - they overlap)\n\n4. **Preserve dependency flow**\n   - Dependencies should generally flow left-to-right\n   - Edges should never point \"backwards\" (right-to-left)\n\n## Failed Approaches\n\n- **ELK/Graphviz WASM**: Heavy, poor results\n- **Orthogonal edges**: Complete overlap, impossible to trace\n- **Simple vertical stacking per rank**: Graph becomes too tall\n- **Grid within rank**: Lost visual hierarchy, unreadable\n\n## Potential Approaches\n\n1. **Force-directed with X constraints**: Fix strategic node X by rank, let force simulation handle Y and relax non-strategic X\n\n2. **Collapsible groups**: Epics collapse to summary nodes, click to expand\n\n3. **Subgraph focus mode**: Show only N levels from selected node\n\n4. **Semantic zoom**: Simplified node rendering at low zoom levels\n\n## Acceptance Criteria\n\n- [ ] Graph viewable at repository scale (150+ issues)\n- [ ] Strategic issues visually distinguishable from tactical\n- [ ] Dependency flow readable (can trace edges)\n- [ ] Toggle or option to switch layout modes\n- [ ] No performance regression\n\n## Related\n\nPart of Epic 9d427a6b (Production Polish)",
-  "state": "ready",
+  "description": "## Objective\n\nImplement a zoom-aware, hierarchy-aware DAG exploration system that makes large dependency graphs (100+ issues) readable and navigable in the web UI.\n\n## Architectural Approach\n\nReplace the current unbounded dagre layout with a **milestone-anchored, progressive disclosure system**:\n\n1. **Milestone columns as X-axis**: Width is proportional to *visible milestones*, not graph complexity\n2. **Time-monotonic dependencies**: Enforce left-to-right flow (prerequisites always left of dependents)\n3. **Hierarchy-first structure**: Milestone → Epic → Story → Task\n4. **Bounded height**: Progressive collapse with deterministic budgets (never stack everything)\n5. **Edge bundling**: Aggregate edges at appropriate zoom tiers; expand on demand\n\n## Key Invariants\n\n- Milestones define global X-axis (chronological columns)\n- Dependencies flow with time: for every edge u → v, enforce milestoneIndex(u) ≤ milestoneIndex(v)\n- Each task has a single visual home (de-duplicate shared dependencies)\n- Layout stability: ordering derived from local dependency topology + stable issue IDs\n- Height is budgeted: collapse progressively with deterministic rules\n\n## Implementation Phases\n\n1. **Phase 1**: Milestone windowing + exploration DAG (immediate relief)\n2. **Phase 2**: Custom layout engine with anchored columns + hierarchical packing\n3. **Phase 3**: Edge bundling + zoom tiers\n4. **Phase 4**: Performance optimization (Web Worker, caching, incremental repack)\n5. **Phase 5**: UX polish (side panels, mini-map, telemetry)\n\n## Acceptance Criteria\n\n- [ ] Width bounded by visible milestone window (old milestones collapsed)\n- [ ] Height bounded by budgets (epics visible, stories/tasks fold by default)\n- [ ] L→R semantics always hold (no Dagre-induced inversions)\n- [ ] Stable layout (expanding/collapsing unfolds deterministically)\n- [ ] Fast \"why/what's needed\" flows (path-based reveal shows minimal subgraph)\n\nSee linked design document for full details.",
+  "state": "backlog",
   "priority": "normal",
   "assignee": null,
-  "dependencies": [],
+  "dependencies": [
+    "6f678db0-aef5-4986-95d4-71fa63548fd2",
+    "783a8086-2933-4b6a-9d4a-b5c5f1d3ddc0",
+    "1f10fe7c-7a8e-4962-b4e4-639a65834876",
+    "7ef1d3d9-0afa-40cc-91c3-167f2b4dc7a4",
+    "402d1a8f-3eec-42ef-aecc-a5c1c783405b"
+  ],
   "gates_required": [],
   "gates_status": {},
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "dev/design/exploration-dag.md",
+      "commit": null,
+      "label": "DAG exploration plan",
+      "doc_type": "design",
+      "format": "markdown"
+    }
+  ],
   "labels": [
-    "type:task",
     "epic:production-polish",
-    "component:web"
+    "component:web",
+    "type:story"
   ]
 }

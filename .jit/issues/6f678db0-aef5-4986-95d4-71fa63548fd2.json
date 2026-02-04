@@ -1,0 +1,32 @@
+{
+  "id": "6f678db0-aef5-4986-95d4-71fa63548fd2",
+  "title": "Phase 2: Custom layout engine (anchored columns)",
+  "description": "Replace Dagre with milestone-anchored X placement and hierarchical Y packing",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "tdd-reminder",
+    "code-review"
+  ],
+  "gates_status": {
+    "code-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-02-04T14:07:22.850633367Z"
+    },
+    "tdd-reminder": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-02-04T14:07:22.850608327Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "epic:production-polish",
+    "component:web",
+    "type:task"
+  ]
+}

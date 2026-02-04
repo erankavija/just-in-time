@@ -1,0 +1,32 @@
+{
+  "id": "783a8086-2933-4b6a-9d4a-b5c5f1d3ddc0",
+  "title": "Phase 1: Milestone windowing + exploration DAG",
+  "description": "## Objective\n\nProvide immediate relief from width/height explosion by implementing hierarchy-agnostic primary tier windowing and exploration graph structure. This phase keeps the existing dagre layout but introduces collapsible tier buckets and progressive disclosure that works with any configured type hierarchy.\n\n## Key Insight: Hierarchy Agnostic\n\nThe implementation uses the **top 2 strategic types** from the configured hierarchy, not hardcoded \"milestone\" and \"epic\":\n- **Tier 0 (Primary)**: First strategic type (milestone/release/program depending on config)\n- **Tier 1 (Secondary)**: Second strategic type (epic/milestone depending on config)\n- **Tier 2+ (Tactical)**: All remaining types (stories, tasks, bugs, enhancements)\n\nThis works across all hierarchy templates: default, agile, extended, minimal.\n\n## Scope\n\n### 1. Data Model Extensions\n- Add HierarchyConfig type to capture strategic types from API\n- Add primaryTierIndex derivation to all nodes (tier 0 from config)\n  - Primary tier nodes: own index (chronological order)\n  - Secondary/tactical nodes: inherit from parent primary tier via labels\n  - Unassigned nodes: special pre-primary bucket\n- Extend graph model to support virtual nodes:\n  - CollapsedPrimaryBucket (range of tier 0 items)\n  - CollapsedSecondaryGroup (tier 1 with hidden tactical items)\n  - MoreNode (tactical items summary)\n\n### 2. Primary Tier Windowing\n- Default: show last N=10 primary tier items expanded (configurable)\n- Collapse older primary tier items into buckets\n- Each collapsed bucket shows counts and bundled edge counts\n- Expansion API: expand bucket reveals contained primary tier items\n- Edge case: If no primary tier (minimal template), skip windowing\n\n### 3. Progressive Disclosure (within visible primary tiers)\n- Per primary tier: show all secondary tier headers (if configured)\n- Per secondary tier: collapse tactical items into summary (show 0-2 key items)\n- If no secondary tier: collapse tactical items directly under primary\n- Tasks: always collapsed (count badges only)\n\n### 4. Relevance Scoring\nOrder items by: (1) selected path, (2) blocked/blocking, (3) high-degree, (4) stable ID\n\n### 5. Auto-Expansion on Search/Focus\n- Search auto-expands primary tier bucket and secondary tier containing the item\n- Explain blocked auto-expands only paths to blockers\n\n### 6. UI Controls (Dynamic Labels)\n- Show more history button (uses config primary tier name)\n- Show all toggle, reset button\n- Per-secondary-tier expand/collapse toggles\n- Persist expansion state in URL params or local storage\n\n## Technical Implementation\n\nFiles to create/modify:\n- web/src/utils/hierarchyIndex.ts (new) - Hierarchy-agnostic tier extraction and indexing\n- web/src/utils/explorationGraph.ts (new) - Build exploration graph from base DAG\n- web/src/utils/relevanceScoring.ts (new) - Score and rank items\n- web/src/components/Graph/GraphView.tsx - Fetch hierarchy config, build exploration graph\n- web/src/types/models.ts - Add HierarchyConfig and virtual node types\n\nData Flow:\n1. Load base DAG from API\n2. Fetch strategic types and build HierarchyConfig\n3. Derive primaryTierIndex for all nodes using hierarchy config\n4. Build exploration graph (windowing + disclosure budgets)\n5. Pass to dagre layout (unchanged)\n6. Render with ReactFlow (dynamic UI labels from config)\n\n## Acceptance Criteria\n\n- Works with all hierarchy templates (default, agile, extended, minimal)\n- Primary tier indexing: all nodes have valid index based on configured tier 0\n- Default shows last 10 primary tier items, older collapsed\n- Each primary tier shows secondary tier headers (if configured)\n- Clicking summary expands secondary tier to show tactical items\n- Search auto-expands relevant tiers\n- Width reasonable with 50+ primary tier items\n- Height controlled (max 20 secondary tier headers visible)\n- Expansion state persists during session\n- UI labels use configured type names (not hardcoded milestone/epic)\n- No performance regression on small graphs\n\n## Non-Goals (later phases)\n- Custom layout engine (still using dagre)\n- Edge bundling\n- Tactical-level nodes rendering (remain as counts only)\n- Zoom-based tier switching\n- Web Worker optimization\n\n## Testing Strategy\n- Unit tests: hierarchy indexing with each template (default, agile, extended, minimal)\n- Unit tests: exploration graph builder with different configs\n- Integration test: 100 issues across 15 primary tiers renders in under 2s\n- Visual regression: collapsed buckets display correctly\n- Manual test: switch hierarchy templates, verify UI labels update",
+  "state": "in_progress",
+  "priority": "normal",
+  "assignee": "agent:copilot-session",
+  "dependencies": [],
+  "gates_required": [
+    "tdd-reminder",
+    "code-review"
+  ],
+  "gates_status": {
+    "code-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-02-04T14:07:22.850580307Z"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": "agent:copilot-session",
+      "updated_at": "2026-02-04T17:51:01.770336500Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "epic:production-polish",
+    "component:web",
+    "type:task"
+  ]
+}

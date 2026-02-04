@@ -1,0 +1,32 @@
+{
+  "id": "402d1a8f-3eec-42ef-aecc-a5c1c783405b",
+  "title": "Phase 3: Edge bundling and zoom tiers",
+  "description": "Implement aggregated edges with counts and tier-based rendering",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "tdd-reminder",
+    "code-review"
+  ],
+  "gates_status": {
+    "tdd-reminder": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-02-04T14:07:22.850645537Z"
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-02-04T14:07:22.850664527Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "epic:production-polish",
+    "component:web",
+    "type:task"
+  ]
+}
