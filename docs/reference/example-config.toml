@@ -1,112 +1,156 @@
 # JIT Configuration File (Schema v2)
 #
-# Place this file at `.jit/config.toml` to customize type hierarchy, validation, and namespace registry.
-# All settings are optional - JIT will use sensible defaults if this file doesn't exist.
+# Place this file at `.jit/config.toml` to customize JIT behavior.
+# All settings are optional - JIT uses sensible defaults if this file doesn't exist.
 
 [version]
 # Schema version - required for new features
-# Schema v2 introduced namespace registry and enhanced validation
 schema = 2
+
+# =============================================================================
+# DOCUMENTATION LIFECYCLE
+# =============================================================================
+# Configure how JIT manages development documentation (design docs, session notes)
+
+[documentation]
+# Root directory for development documentation
+development_root = "dev"
+
+# Paths managed by JIT's document lifecycle (archived when issues complete)
+managed_paths = ["dev/active", "dev/studies", "dev/sessions"]
+
+# Where archived documents go
+archive_root = "dev/archive"
+
+# Paths that never archive (permanent documentation)
+permanent_paths = ["docs/"]
+
+# Archive category mappings (doc-type → archive subdirectory)
+[documentation.categories]
+design = "features"
+analysis = "bug-fixes"
+refactor = "refactorings"
+session = "sessions"
+study = "studies"
+
+# =============================================================================
+# TYPE HIERARCHY
+# =============================================================================
+# Define issue types and their strategic importance
 
 [type_hierarchy]
 # Type name to hierarchy level mapping (lower numbers = more strategic)
 # Default: { milestone = 1, epic = 2, story = 3, task = 4 }
-types = { milestone = 1, epic = 2, story = 3, task = 4 }
+types = { milestone = 1, epic = 2, story = 3, task = 4, bug = 4, enhancement = 4 }
 
-# List of type names that are considered strategic (for 'jit query strategic')
-# Default: ["milestone", "epic"] (levels 1-2)
-# Fully configurable - you can mark ANY types as strategic regardless of level
+# Types shown in 'jit query strategic' (high-level planning view)
 strategic_types = ["milestone", "epic"]
 
-# Type name to membership label namespace mapping
-# Example: epic type uses "epic:*" labels for membership
-# Default: { milestone = "milestone", epic = "epic", story = "story" }
+# Type → membership label namespace mapping
+# Example: issues with type:epic use "epic:name" labels to group children
 [type_hierarchy.label_associations]
-epic = "epic"
 milestone = "milestone"
+epic = "epic"
 story = "story"
 
-[validation]
-# Auto-assign default type when missing (optional)
-# If set, issues without a type:* label will automatically get this type
-# default_type = "task"
+# =============================================================================
+# VALIDATION
+# =============================================================================
+# Control how strictly JIT validates issues and labels
 
-# Require type:* label on all issues (default: false)
-# When true, creating an issue without a type label fails (unless default_type is set)
+[validation]
+# Strictness level: "strict", "loose", or "permissive"
+# - strict: Enforce all rules, fail on violations
+# - loose: Warn on violations but allow operations (default)
+# - permissive: Minimal validation
+strictness = "loose"
+
+# Auto-assign this type when creating issues without a type:* label
+default_type = "task"
+
+# Require exactly one type:* label per issue
 require_type_label = false
 
-# Label format validation regex (optional)
-# Validates that all labels follow the format: namespace:value
-# Example: "^[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9._-]*$"
-# label_regex = '^[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9._-]*$'
+# Label format validation regex
+# Validates namespace:value format
+label_regex = '^[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9._-]*$'
 
 # Reject malformed labels vs warn (default: false)
-# When true, operations fail if labels don't match label_regex
-# When false, warnings are logged but operations proceed
 reject_malformed_labels = false
 
-# Enforce namespace registry (default: false)
-# When true, only namespaces defined in [namespaces.*] sections can be used
-# When false, any namespace can be used (registry is for documentation only)
+# Only allow namespaces defined in [namespaces.*] sections (default: false)
 enforce_namespace_registry = false
 
-# Namespace registry - replaces labels.json (schema v2)
-# Each [namespaces.X] section defines a label namespace
+# Validation warnings (only apply when strictness = "loose")
+warn_orphaned_leaves = true       # Warn when tasks lack parent labels
+warn_strategic_consistency = true  # Warn on hierarchy inconsistencies
+
+# =============================================================================
+# NAMESPACE REGISTRY
+# =============================================================================
+# Define label namespaces for documentation and optional enforcement
 
 [namespaces.type]
-description = "Issue type (hierarchical)"
-unique = true  # Only one type:* label allowed per issue
+description = "Issue type (hierarchical). Exactly one per issue."
+unique = true
 examples = ["type:task", "type:story", "type:epic", "type:milestone"]
 
 [namespaces.epic]
 description = "Epic membership - which epic does this issue belong to?"
-unique = false  # Issues can belong to multiple epics
+unique = false
 examples = ["epic:auth", "epic:production-stability"]
 
 [namespaces.milestone]
-description = "Milestone membership - which milestone is this issue part of?"
+description = "Milestone membership - target release or time period"
 unique = false
-examples = ["milestone:v1.0", "milestone:mvp"]
+examples = ["milestone:v1.0", "milestone:2026-q1"]
+
+[namespaces.story]
+description = "Story membership - parent story for tasks"
+unique = false
+examples = ["story:user-login", "story:checkout-flow"]
 
 [namespaces.component]
-description = "Component or system area affected"
+description = "Technical component or subsystem affected"
 unique = false
 examples = ["component:api", "component:web", "component:cli"]
 
-[namespaces.priority]
-description = "Priority level (alternative to priority field)"
+[namespaces.team]
+description = "Owning team"
 unique = true
-examples = ["priority:critical", "priority:high"]
+examples = ["team:core", "team:platform"]
 
-# Add more namespaces as needed for your workflow
-# [namespaces.team]
-# description = "Team ownership"
-# unique = false
-# examples = ["team:backend", "team:frontend"]
+[namespaces.resolution]
+description = "Reason for issue closure (used with rejected state)"
+unique = true
+examples = ["resolution:wont-fix", "resolution:duplicate", "resolution:obsolete"]
 
-# Example: Minimal 2-level hierarchy
+# =============================================================================
+# EXAMPLES: Alternative Configurations
+# =============================================================================
+
+# Minimal 2-level hierarchy (simple projects):
 # [type_hierarchy]
 # types = { epic = 1, task = 2 }
 # strategic_types = ["epic"]
-# 
 # [type_hierarchy.label_associations]
 # epic = "epic"
 
-# Example: Extended 5-level hierarchy
+# Extended 5-level hierarchy (large organizations):
 # [type_hierarchy]
 # types = { program = 1, milestone = 2, epic = 3, story = 4, task = 5 }
 # strategic_types = ["program", "milestone", "epic"]
-# 
 # [type_hierarchy.label_associations]
 # program = "program"
 # milestone = "milestone"
 # epic = "epic"
+# story = "story"
 
-# Example: Custom naming (theme instead of epic)
+# Research project configuration:
 # [type_hierarchy]
-# types = { release = 1, theme = 2, task = 3 }
-# strategic_types = ["release", "theme"]
-# 
-# [type_hierarchy.label_associations]
-# theme = "epic"
-# release = "milestone"
+# types = { program = 1, study = 2, experiment = 3, analysis = 4 }
+# strategic_types = ["program", "study"]
+# [namespaces.dataset]
+# description = "Dataset being analyzed"
+# unique = false
+# examples = ["dataset:census-2024", "dataset:survey-q1"]
