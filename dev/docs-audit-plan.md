@@ -107,8 +107,13 @@ Document this distinction clearly:
 
 ## Success Criteria
 
-- [ ] No broken cross-reference links
-- [ ] No "Draft" or "Status: Draft" markers in production docs
-- [ ] Consistent command syntax throughout
-- [ ] No redundant content (single source of truth)
-- [ ] All claim/gate examples use appropriate commands
+- [x] No broken cross-reference links
+- [x] No "Draft" or "Status: Draft" markers in production docs
+- [x] Consistent command syntax throughout
+- [x] No redundant content (single source of truth)
+- [x] All claim/gate examples use appropriate commands
+
+## Completion
+
+**Completed:** 2026-02-04  
+**Commit:** 678da3c
