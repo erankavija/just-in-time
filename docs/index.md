@@ -11,6 +11,7 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 
 - [Overview](concepts/overview.md) - What is JIT and why it exists
 - [Core Model](concepts/core-model.md) - Issues, dependencies, gates, states
+- [Scope](concepts/scope.md) - Domain coverage and boundaries
 - [System Guarantees](concepts/guarantees.md) - Invariants and consistency
 - [Design Philosophy](concepts/design-philosophy.md) - Domain-agnostic principles
 
