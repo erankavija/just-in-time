@@ -370,7 +370,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     pub fn claim_issue(&self, id: &str, assignee: String) -> Result<()> {
         use super::claim::check_issue_lease;
-        
+
         let full_id = self.storage.resolve_issue_id(id)?;
         let issue = self.storage.load_issue(&full_id)?;
 
@@ -383,9 +383,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         let short_id = &full_id[..8];
         let conflicting_lease = check_issue_lease(short_id, Some(&assignee))?
             .or(check_issue_lease(&full_id, Some(&assignee))?);
-        
+
         if let Some(lease) = conflicting_lease {
-            let expires_str = lease.expires_at
+            let expires_str = lease
+                .expires_at
                 .map(|t| t.format("%Y-%m-%d %H:%M:%S UTC").to_string())
                 .unwrap_or_else(|| "indefinitely".to_string());
             return Err(anyhow!(

@@ -312,16 +312,17 @@ pub fn check_issue_lease(issue_id: &str, current_agent: Option<&str>) -> Result<
     };
 
     // Load worktree identity
-    let identity = match load_or_create_worktree_identity(&paths.local_jit, &paths.worktree_root, &branch) {
-        Ok(i) => i,
-        Err(_) => return Ok(None), // Can't load identity, skip lease check
-    };
+    let identity =
+        match load_or_create_worktree_identity(&paths.local_jit, &paths.worktree_root, &branch) {
+            Ok(i) => i,
+            Err(_) => return Ok(None), // Can't load identity, skip lease check
+        };
 
     // Create coordinator to check leases
     let agent = current_agent.unwrap_or("system:check").to_string();
     let locker = FileLocker::new(Duration::from_secs(5));
     let coordinator = ClaimCoordinator::new(paths, locker, identity.worktree_id, agent.clone());
-    
+
     // Don't fail if control plane doesn't exist yet
     if coordinator.init().is_err() {
         return Ok(None);
@@ -329,14 +330,14 @@ pub fn check_issue_lease(issue_id: &str, current_agent: Option<&str>) -> Result<
 
     // Get leases for this issue
     let leases = coordinator.get_active_leases(Some(issue_id), None)?;
-    
+
     // Check if any lease is held by a different agent
     for lease in leases {
         if current_agent.is_none() || Some(lease.agent_id.as_str()) != current_agent {
             return Ok(Some(lease));
         }
     }
-    
+
     Ok(None)
 }
 

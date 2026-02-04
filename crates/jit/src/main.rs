@@ -73,9 +73,7 @@ fn setup_gitattributes() -> Result<()> {
         .output();
 
     let repo_root = match output {
-        Ok(o) if o.status.success() => {
-            String::from_utf8(o.stdout)?.trim().to_string()
-        }
+        Ok(o) if o.status.success() => String::from_utf8(o.stdout)?.trim().to_string(),
         _ => return Ok(()), // Not in a git repo, skip
     };
 
@@ -88,12 +86,12 @@ fn setup_gitattributes() -> Result<()> {
 
     if gitattributes_path.exists() {
         let content = fs::read_to_string(&gitattributes_path)?;
-        
+
         // Check if already configured (idempotent)
         if content.contains(jit_marker) {
             return Ok(());
         }
-        
+
         // Append to existing file
         let new_content = if content.ends_with('\n') {
             format!("{}\n{}", content, jit_config)
