@@ -5,6 +5,19 @@
 
 This guide covers practical patterns for coordinating multiple agents working on the same repository.
 
+## Choosing the Right Claim Command
+
+JIT provides two ways to claim work:
+
+| Command | Use Case | TTL | Lease Management |
+|---------|----------|-----|------------------|
+| `jit issue claim <id> <assignee>` | Single developer, simple workflows | None | No |
+| `jit claim acquire <id>` | Multi-agent coordination | Default 10min | Yes (renew/release) |
+
+**Use `jit issue claim`** for simple, single-developer workflows where you don't need automatic expiry.
+
+**Use `jit claim acquire`** when running multiple agents in parallel—the TTL prevents stale claims if an agent crashes.
+
 ## Quick Reference
 
 ### Set Up Agent Identity

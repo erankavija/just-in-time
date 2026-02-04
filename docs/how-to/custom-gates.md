@@ -1,6 +1,5 @@
 # How-To: Custom Gates
 
-> **Status:** Draft - Story 5326b331  
 > **Diátaxis Type:** How-To Guide
 
 Quality gates enforce process requirements before issues can be completed. This guide shows how to define and use custom gates for your workflow.
@@ -20,7 +19,7 @@ jit gate define code-review \
   --mode manual
 
 # Add to an issue
-jit issue update $ISSUE --add-gate code-review
+jit gate add $ISSUE code-review
 
 # Later, mark as passed
 jit gate pass $ISSUE code-review --by "human:reviewer"
@@ -47,7 +46,7 @@ jit gate define tests \
   --timeout 300
 
 # Add to an issue
-jit issue update $ISSUE --add-gate tests
+jit gate add $ISSUE tests
 
 # Run the checker
 jit gate check $ISSUE tests
@@ -110,12 +109,10 @@ Most workflows use both manual and automated gates:
 
 ```bash
 # Automated quality checks
-jit issue update $ISSUE --add-gate tests
-jit issue update $ISSUE --add-gate clippy
-jit issue update $ISSUE --add-gate fmt
+jit gate add $ISSUE tests clippy fmt
 
 # Manual process gate
-jit issue update $ISSUE --add-gate code-review
+jit gate add $ISSUE code-review
 
 # Automated gates run automatically, manual gate requires sign-off
 ```
@@ -477,25 +474,9 @@ The gate system adapts to any workflow requiring quality checkpoints.
 
 ## Common Workflows
 
-### Workflow 1: TDD Enforcement
+For complete workflow examples including TDD and CI/CD integration, see [Software Development](software-development.md).
 
-```bash
-# Setup gates
-jit gate define tdd-reminder --title "Write Tests First" --stage precheck --mode manual
-jit gate define tests --title "Tests Pass" --stage postcheck --mode auto --checker-command "cargo test"
-
-# Apply to issue
-jit issue update $ISSUE --add-gate tdd-reminder --add-gate tests
-
-# Developer workflow
-jit issue claim $ISSUE agent:me      # Manual precheck reminder
-# Write tests first...
-jit gate pass $ISSUE tdd-reminder    # Mark precheck complete
-# Now implement feature...
-jit issue update $ISSUE --state done # Auto-runs tests postcheck
-```
-
-### Workflow 2: Code Quality Pipeline
+### Workflow 1: Code Quality Pipeline
 
 ```bash
 # Define quality gates
@@ -503,7 +484,7 @@ jit gate define fmt --mode auto --stage postcheck --checker-command "cargo fmt -
 jit gate define clippy --mode auto --stage postcheck --checker-command "cargo clippy -- -D warnings"
 jit gate define tests --mode auto --stage postcheck --checker-command "cargo test"
 
-# Apply to all issues in epic
+# Apply to all issues in epic (batch mode still uses --add-gate)
 jit issue update --filter "label:epic:auth" --add-gate fmt --add-gate clippy --add-gate tests
 
 # Developer completes work
@@ -517,10 +498,10 @@ jit issue update $ISSUE --state done
 
 ```bash
 # Automated checks
-jit issue update $ISSUE --add-gate tests --add-gate clippy
+jit gate add $ISSUE tests clippy
 
 # Manual review
-jit issue update $ISSUE --add-gate code-review
+jit gate add $ISSUE code-review
 
 # Complete work
 jit issue update $ISSUE --state done

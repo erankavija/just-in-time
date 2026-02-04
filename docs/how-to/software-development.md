@@ -1,6 +1,5 @@
 # How-To: Software Development
 
-> **Status:** Draft - Story 5326b331  
 > **Diátaxis Type:** How-To Guide
 
 Practical recipes for common software development workflows using JIT.

@@ -4,7 +4,7 @@
 
 Labels provide organizational membership and classification for issues. This guide covers label format, namespaces, validation rules, and usage patterns.
 
-**Related:** For work ordering and blocking relationships, see [Dependencies](../concepts/dependencies.md)
+**Related:** For work ordering and blocking relationships, see [Core Model: Dependencies](../concepts/core-model.md#dependencies)
 
 ---
 

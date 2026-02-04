@@ -1,6 +1,5 @@
 # Glossary
 
-> **Status:** Draft - Story 5bad7437  
 > **Diátaxis Type:** Reference
 
 ## Core Concepts

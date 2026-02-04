@@ -1,6 +1,5 @@
 # CLI Commands Reference
 
-> **Status:** Draft - Story 5bad7437  
 > **Diátaxis Type:** Reference
 
 ## MCP Tools Reference

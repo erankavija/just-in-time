@@ -1,6 +1,5 @@
 # Overview
 
-> **Status:** Draft - Story c8254dbf  
 > **Diátaxis Type:** Explanation
 
 ## What is JIT?

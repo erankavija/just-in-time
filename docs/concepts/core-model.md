@@ -1,6 +1,5 @@
 # Core Model
 
-> **Status:** Draft - Story c8254dbf  
 > **Diátaxis Type:** Explanation
 
 ## Issues

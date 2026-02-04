@@ -9,10 +9,10 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 ### 📚 [Concepts](concepts/) - Understanding JIT
 *Explanation-oriented: Learn about core concepts and design principles*
 
-- [Overview](concepts/overview.md) - What is JIT and why it exists (draft)
-- [Core Model](concepts/core-model.md) - Issues, dependencies, gates, states (draft)
-- [System Guarantees](concepts/guarantees.md) - Invariants and consistency (draft)
-- [Design Philosophy](concepts/design-philosophy.md) - Domain-agnostic principles (draft)
+- [Overview](concepts/overview.md) - What is JIT and why it exists
+- [Core Model](concepts/core-model.md) - Issues, dependencies, gates, states
+- [System Guarantees](concepts/guarantees.md) - Invariants and consistency
+- [Design Philosophy](concepts/design-philosophy.md) - Domain-agnostic principles
 
 ### 🎓 [Tutorials](tutorials/) - Learning-Oriented
 *Step-by-step lessons to get started*
@@ -24,19 +24,22 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 ### 🔧 [How-To Guides](how-to/) - Goal-Oriented
 *Practical recipes for specific use cases*
 
-- [Software Development](how-to/software-development.md) - Feature dev, TDD, CI/CD (draft)
-- [Research Projects](how-to/research-projects.md) - Research questions, experiments (draft)
-- [Knowledge Work](how-to/knowledge-work.md) - Personal projects, learning goals (draft)
-- [Custom Gates](how-to/custom-gates.md) - Define and use quality gates (draft)
-- [Dependency Management](how-to/dependency-management.md) - Graph strategies (draft)
+- [Software Development](how-to/software-development.md) - Feature dev, TDD, CI/CD
+- [Research Projects](how-to/research-projects.md) - Research questions, experiments
+- [Knowledge Work](how-to/knowledge-work.md) - Personal projects, learning goals
+- [Custom Gates](how-to/custom-gates.md) - Define and use quality gates
+- [Dependency Management](how-to/dependency-management.md) - Graph strategies
+- [Multi-Agent Coordination](how-to/multi-agent-coordination.md) - Team and parallel work
+- [Troubleshooting](how-to/troubleshooting.md) - Common issues and solutions
 
 ### 📖 [Reference](reference/) - Information-Oriented
 *Technical specifications and API documentation*
 
-- [CLI Commands](reference/cli-commands.md) - Complete command reference (draft)
-- [Storage Format](reference/storage-format.md) - On-disk format specification (draft)
-- [Configuration](reference/configuration.md) - config.toml and settings (draft)
-- [Glossary](reference/glossary.md) - Term definitions (draft)
+- [CLI Commands](reference/cli-commands.md) - Complete command reference
+- [Storage Format](reference/storage-format.md) - On-disk format specification
+- [Configuration](reference/configuration.md) - config.toml and settings
+- [Glossary](reference/glossary.md) - Term definitions
+- [Claim System](reference/claim.md) - Leases and coordination
 - [Example Config](reference/example-config.toml) - Sample configuration
 - [Labels](reference/labels.md) - Label system reference
 
@@ -65,4 +68,4 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 
 ---
 
-**Note:** This documentation is under active development. Many sections are planned for Phase 2 of the documentation reorganization project.
+
