@@ -31,6 +31,7 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 - [Custom Gates](how-to/custom-gates.md) - Define and use quality gates
 - [Dependency Management](how-to/dependency-management.md) - Graph strategies
 - [Multi-Agent Coordination](how-to/multi-agent-coordination.md) - Team and parallel work
+- [Deployment](how-to/deployment.md) - Running the web UI
 - [Troubleshooting](how-to/troubleshooting.md) - Common issues and solutions
 
 ### 📖 [Reference](reference/) - Information-Oriented

@@ -21,7 +21,7 @@ files=(
     "docker/nginx.conf"
     "docker/entrypoint.sh"
     "INSTALL.md"
-    "DEPLOYMENT.md"
+    "docs/how-to/deployment.md"
 )
 
 for file in "${files[@]}"; do
@@ -77,7 +77,7 @@ fi
 
 echo
 echo "📝 Checking documentation..."
-docs=("INSTALL.md" "DEPLOYMENT.md" "README.md" "CI_CD_IMPLEMENTATION_PLAN.md")
+docs=("INSTALL.md" "docs/how-to/deployment.md" "README.md")
 for doc in "${docs[@]}"; do
     if [ -f "$doc" ]; then
         lines=$(wc -l < "$doc")

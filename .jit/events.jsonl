@@ -1607,3 +1607,15 @@
 {"type":"issue_state_changed","id":"548795e5-60f5-4087-a66d-ac561b37009a","issue_id":"5326b331-e14c-4157-b430-447e93f5f91b","timestamp":"2026-02-04T10:53:12.077662635Z","from":"backlog","to":"ready"}
 {"type":"issue_state_changed","id":"d8707bf5-8822-4d04-9fdb-1dcbca95ba9f","issue_id":"5326b331-e14c-4157-b430-447e93f5f91b","timestamp":"2026-02-04T11:08:24.943996098Z","from":"ready","to":"done"}
 {"type":"issue_completed","id":"f813a6f4-c103-4b41-8a48-714860a5ac54","issue_id":"5326b331-e14c-4157-b430-447e93f5f91b","timestamp":"2026-02-04T11:08:24.944025328Z"}
+{"type":"issue_state_changed","id":"44be916d-3f3a-442a-a7a1-afb924746414","issue_id":"5bad7437-b121-4d2a-b2db-7aa8ee7f4d8b","timestamp":"2026-02-04T11:51:25.672222460Z","from":"ready","to":"done"}
+{"type":"issue_completed","id":"97697104-1d70-4033-959a-e437806f9f6a","issue_id":"5bad7437-b121-4d2a-b2db-7aa8ee7f4d8b","timestamp":"2026-02-04T11:51:25.672257550Z"}
+{"type":"issue_state_changed","id":"49aeb472-aa36-4125-b187-46508c013cf1","issue_id":"865051b2-50ea-4c52-84cb-5fcb6366ee70","timestamp":"2026-02-04T11:53:21.594607246Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"53ec1ed6-317d-4faf-99c7-9c47192756ce","issue_id":"865051b2-50ea-4c52-84cb-5fcb6366ee70","timestamp":"2026-02-04T11:53:21.595358626Z","assignee":"agent:copilot-cli"}
+{"type":"gate_passed","id":"015d93ac-6d95-4c60-b42e-74df00c88662","issue_id":"865051b2-50ea-4c52-84cb-5fcb6366ee70","timestamp":"2026-02-04T11:55:11.446923145Z","gate_key":"code-review","updated_by":"agent:copilot-cli"}
+{"type":"issue_state_changed","id":"085718c3-b8c2-4699-ad1d-ea3086f93b22","issue_id":"865051b2-50ea-4c52-84cb-5fcb6366ee70","timestamp":"2026-02-04T11:55:14.230100971Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"ac5f2da2-d183-4520-befd-b240a0d9c008","issue_id":"865051b2-50ea-4c52-84cb-5fcb6366ee70","timestamp":"2026-02-04T11:55:14.230127621Z"}
+{"type":"issue_state_changed","id":"1198e5e7-2840-4148-8252-b826a79cfab4","issue_id":"c8254dbf-19b6-4523-b8b5-bc22b8117a90","timestamp":"2026-02-04T11:55:14.273737794Z","from":"backlog","to":"ready"}
+{"type":"issue_state_changed","id":"129363fb-7dcc-46ca-b477-c53772bc9000","issue_id":"c8254dbf-19b6-4523-b8b5-bc22b8117a90","timestamp":"2026-02-04T11:55:37.858351651Z","from":"ready","to":"done"}
+{"type":"issue_completed","id":"feedc8ab-4495-476a-94f7-f59913196376","issue_id":"c8254dbf-19b6-4523-b8b5-bc22b8117a90","timestamp":"2026-02-04T11:55:37.858378431Z"}
+{"type":"issue_state_changed","id":"3c0ec815-0351-44e5-9cdf-2726f21a9712","issue_id":"6535ba30-1236-4c10-a718-81ceeb11acb4","timestamp":"2026-02-04T11:55:55.498288508Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"a0bc9eda-1559-41bf-b70f-43724bce1057","issue_id":"6535ba30-1236-4c10-a718-81ceeb11acb4","timestamp":"2026-02-04T11:55:55.499070698Z","assignee":"agent:copilot-cli"}
