@@ -196,62 +196,35 @@ Labels are **optional** - use them when you need organizational structure. Depen
 
 ## Documentation
 
-JIT follows the [Diátaxis](https://diataxis.fr/) framework for clear, organized documentation:
+**→ [Full Documentation](docs/index.md)** - Tutorials, how-to guides, concepts, and reference.
 
-### 📚 [Concepts](docs/concepts/) - Understanding JIT
-Learn core mental models: dependencies, gates, states, and the issue lifecycle.
-
-### 🎓 [Tutorials](docs/tutorials/) - Get Started
-- [Quickstart](docs/tutorials/quickstart.md) - Basic CLI usage in 10 minutes
-- [First Workflow](docs/tutorials/first-workflow.md) - Complete agent orchestration walkthrough
-
-### 🔧 [How-To Guides](docs/how-to/) - Solve Specific Problems
-- [Custom Gates](docs/how-to/custom-gates.md) - Define quality checkpoints for your workflow
-- [Software Development](docs/how-to/software-development.md) - TDD, CI/CD integration, code quality
-- [Dependency Management](docs/how-to/dependency-management.md) - Graph strategies and patterns
-
-### 📖 [Reference](docs/reference/) - Look Up Details
+Quick links:
+- [Quickstart](docs/tutorials/quickstart.md) - Get started in 10 minutes
 - [CLI Commands](docs/reference/cli-commands.md) - Complete command reference
-- [Configuration](docs/reference/configuration.md) - Config options and customization
-- [Glossary](docs/reference/glossary.md) - Term definitions
-
-**New to JIT?** Start with [Concepts](docs/concepts/), then try the [Quickstart Tutorial](docs/tutorials/quickstart.md).
+- [Configuration](docs/reference/configuration.md) - Customization options
 
 ## Configuration
 
-JIT is domain-agnostic and configurable via `.jit/config.toml`:
+JIT is configurable via `.jit/config.toml`. Key options:
 
-**Example: Research Project Configuration**
+- **Issue hierarchies** - Define type levels (milestone → epic → story → task)
+- **Validation rules** - Enforce or relax organizational requirements
+- **Strategic types** - Control what shows in high-level queries
+- **Documentation lifecycle** - Configure archival paths and categories
+
 ```toml
-# Custom issue hierarchy for research workflows
+[version]
+schema = 2
+
 [type_hierarchy]
-types = ["program", "study", "experiment", "analysis"]
-strategic_types = ["program", "study"]
+types = { milestone = 1, epic = 2, story = 3, task = 4, bug = 4 }
+strategic_types = ["milestone", "epic"]
 
-# Label namespaces for organizing research
-[[namespaces]]
-key = "dataset"
-description = "Dataset being analyzed"
-unique = false
-
-[[namespaces]]
-key = "method"
-description = "Analytical method"
-unique = false
-
-# Validation rules
-[type_hierarchy.validation]
-strictness = "loose"           # Allow flexible organization
-warn_orphaned_leaves = false   # Individual analyses can stand alone
+[validation]
+strictness = "loose"  # "strict", "loose", or "permissive"
 ```
 
-**Common configurations:**
-- **Issue hierarchies** - Define your own type levels (milestone → epic → story → task)
-- **Label namespaces** - Custom categorization (dataset, method, experiment, author, etc.)
-- **Validation rules** - Enforce or relax organizational requirements
-- **Strategic types** - What shows up in high-level queries
-
-See [Configuration Reference](docs/reference/configuration.md) for complete options and examples across different domains.
+See [Configuration Reference](docs/reference/configuration.md) for complete options and [Example Config](docs/reference/example-config.toml) for a full template.
 
 ## Project Status
 
