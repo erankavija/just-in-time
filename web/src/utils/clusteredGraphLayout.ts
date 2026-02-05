@@ -5,15 +5,18 @@ import type {
   ExpansionState,
   VirtualEdge 
 } from '../types/subgraphCluster';
-import { assignNodesToSubgraphs, aggregateEdgesForCollapsed } from './subgraphClustering';
+import { assignNodesToSubgraphs, aggregateEdgesForCollapsed, getNodeLevel } from './subgraphClustering';
 
 /**
  * Result of preparing clustered graph for ReactFlow rendering.
  * Contains clusters, visible nodes/edges, and virtual edges for collapsed containers.
  */
 export interface ClusteredGraphForReactFlow {
-  /** Map of container ID to subgraph cluster */
-  clusters: Map<string, SubgraphCluster>;
+  /** Subgraph clusters (array for easy iteration) */
+  clusters: SubgraphCluster[];
+  
+  /** Edges that cross cluster boundaries */
+  crossClusterEdges: GraphEdge[];
   
   /** Nodes that should be rendered (accounting for collapsed containers) */
   visibleNodes: GraphNode[];
@@ -56,10 +59,29 @@ export function prepareClusteredGraphForReactFlow(
   const visibleNodeIds = new Set<string>();
   
   // Build container map for visibility checks
+  // A node's container is the edge source with the LOWEST hierarchy level (most strategic)
   const containerMap = new Map<string, string>();
+  const nodeMap = new Map(nodes.map(n => [n.id, n]));
+  
   edges.forEach(edge => {
-    if (!containerMap.has(edge.to)) {
+    const currentParent = containerMap.get(edge.to);
+    if (!currentParent) {
+      // No parent yet, use this one
       containerMap.set(edge.to, edge.from);
+    } else {
+      // Compare hierarchy levels - keep the more strategic parent (lower level number)
+      const currentParentNode = nodeMap.get(currentParent);
+      const newParentNode = nodeMap.get(edge.from);
+      
+      if (currentParentNode && newParentNode) {
+        const currentLevel = getNodeLevel(currentParentNode, hierarchy);
+        const newLevel = getNodeLevel(newParentNode, hierarchy);
+        
+        if (newLevel < currentLevel) {
+          // New parent is more strategic, use it
+          containerMap.set(edge.to, edge.from);
+        }
+      }
     }
   });
   
@@ -101,7 +123,8 @@ export function prepareClusteredGraphForReactFlow(
   );
   
   return {
-    clusters: clusteredGraph.clusters,
+    clusters: Array.from(clusteredGraph.clusters.values()),
+    crossClusterEdges: clusteredGraph.crossClusterEdges,
     visibleNodes,
     visibleEdges,
     virtualEdges: filteredVirtualEdges,

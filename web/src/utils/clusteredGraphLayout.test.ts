@@ -40,7 +40,7 @@ describe('clusteredGraphLayout', () => {
 
       const result = prepareClusteredGraphForReactFlow(nodes, edges, hierarchy, expansionState);
 
-      expect(result.clusters.size).toBe(1);
+      expect(result.clusters.length).toBe(1);
       expect(result.visibleNodes).toHaveLength(2); // Epic + Task both visible
       expect(result.visibleEdges).toHaveLength(1); // Internal edge
       expect(result.virtualEdges).toHaveLength(0); // No collapsed containers
@@ -198,7 +198,7 @@ describe('clusteredGraphLayout', () => {
 
       const result = prepareClusteredGraphForReactFlow(nodes, edges, hierarchy, expansionState);
 
-      expect(result.clusters.size).toBe(2);
+      expect(result.clusters.length).toBe(2);
       expect(result.visibleNodes).toHaveLength(4); // All nodes visible
       
       // Should have cross-cluster edge preserved
@@ -256,7 +256,7 @@ describe('clusteredGraphLayout', () => {
 
       const result = prepareClusteredGraphForReactFlow(nodes, edges, hierarchy, expansionState);
 
-      const cluster = result.clusters.get('epic-1')!;
+      const cluster = result.clusters.find(c => c.containerId === 'epic-1')!;
       expect(cluster).toBeDefined();
       expect(cluster.nodes).toHaveLength(4); // All 4 nodes in cluster
       

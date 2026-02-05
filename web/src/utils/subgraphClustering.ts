@@ -95,7 +95,21 @@ export function assignNodesToSubgraphs(
     const visited = new Set<string>([container.id]);
     const queue = [container.id];
     
-    // BFS to find all lower-level dependents
+    // First pass: Mark DIRECT children (nodes with edge from container)
+    const directChildren = new Set<string>();
+    const containerEdges = edgesByNode.get(container.id) || [];
+    for (const edge of containerEdges) {
+      const targetNode = nodeMap.get(edge.to);
+      if (targetNode) {
+        const targetLevel = getNodeLevel(targetNode, hierarchy);
+        if (targetLevel > containerLevel) {
+          directChildren.add(targetNode.id);
+          assignedNodes.add(targetNode.id); // Reserve immediately
+        }
+      }
+    }
+    
+    // Second pass: BFS to find all transitive lower-level dependents
     while (queue.length > 0) {
       const currentId = queue.shift()!;
       const outgoingEdges = edgesByNode.get(currentId) || [];
@@ -106,13 +120,17 @@ export function assignNodesToSubgraphs(
         
         const targetLevel = getNodeLevel(targetNode, hierarchy);
         
-        // Only include nodes at HIGHER level numbers (more tactical)
-        if (targetLevel > containerLevel) {
+        // Include if: higher level AND (direct child OR not assigned to another cluster)
+        const isDirect = directChildren.has(targetNode.id);
+        const isAvailable = !assignedNodes.has(targetNode.id);
+        
+        if (targetLevel > containerLevel && (isDirect || isAvailable)) {
           clusterNodes.push(targetNode);
           visited.add(targetNode.id);
           assignedNodes.add(targetNode.id);
           queue.push(targetNode.id);
         }
+        // Note: If targetLevel <= containerLevel, this is a cross-cluster edge (boundary)
       }
     }
     
