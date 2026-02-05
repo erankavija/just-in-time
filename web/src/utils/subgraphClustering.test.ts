@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { getNodeLevel, extractNodeType, assignNodesToSubgraphs } from './subgraphClustering';
+import { 
+  getNodeLevel, 
+  extractNodeType, 
+  assignNodesToSubgraphs,
+  aggregateEdgesForCollapsed 
+} from './subgraphClustering';
 import type { GraphNode, GraphEdge } from '../types/models';
-import type { HierarchyLevelMap } from '../types/subgraphCluster';
+import type { HierarchyLevelMap, ExpansionState } from '../types/subgraphCluster';
 
 describe('subgraphClustering', () => {
   describe('getNodeLevel', () => {
@@ -397,6 +402,233 @@ describe('subgraphClustering', () => {
       const cluster = result.clusters.get('epic-1')!;
       expect(cluster.nodes).toHaveLength(4); // epic + story + 2 tasks
       expect(cluster.nodes.map(n => n.id).sort()).toEqual(['epic-1', 'story-1', 'task-1', 'task-2']);
+    });
+  });
+
+  describe('aggregateEdgesForCollapsed', () => {
+    it('should aggregate edges from collapsed story to external nodes', () => {
+      const story: GraphNode = {
+        id: 'story-1',
+        title: 'Story 1',
+        state: 'in_progress',
+        priority: 'normal',
+        labels: ['type:story'],
+        dependencies: ['task-1', 'task-2'],
+      };
+
+      const task1: GraphNode = {
+        id: 'task-1',
+        title: 'Task 1',
+        state: 'done',
+        priority: 'normal',
+        labels: ['type:task'],
+        dependencies: [],
+      };
+
+      const task2: GraphNode = {
+        id: 'task-2',
+        title: 'Task 2',
+        state: 'ready',
+        priority: 'normal',
+        labels: ['type:task'],
+        dependencies: ['external-1'], // Edge to external node
+      };
+
+      const nodes = [story, task1, task2];
+      const edges: GraphEdge[] = [
+        { from: 'story-1', to: 'task-1' },
+        { from: 'story-1', to: 'task-2' },
+        { from: 'task-2', to: 'external-1' }, // This should aggregate to story-1
+      ];
+
+      const expansionState: ExpansionState = {
+        'story-1': false, // Collapsed
+      };
+
+      const virtualEdges = aggregateEdgesForCollapsed(nodes, edges, expansionState);
+
+      // Should have 1 virtual edge: story-1 → external-1
+      expect(virtualEdges).toHaveLength(1);
+      expect(virtualEdges[0].from).toBe('story-1');
+      expect(virtualEdges[0].to).toBe('external-1');
+      expect(virtualEdges[0].count).toBe(1);
+      expect(virtualEdges[0].sourceEdgeIds).toContain('task-2→external-1');
+    });
+
+    it('should aggregate multiple edges into single virtual edge', () => {
+      const story: GraphNode = {
+        id: 'story-1',
+        title: 'Story 1',
+        state: 'in_progress',
+        priority: 'normal',
+        labels: ['type:story'],
+        dependencies: ['task-1', 'task-2'],
+      };
+
+      const task1: GraphNode = {
+        id: 'task-1',
+        title: 'Task 1',
+        state: 'done',
+        priority: 'normal',
+        labels: ['type:task'],
+        dependencies: ['external-1'],
+      };
+
+      const task2: GraphNode = {
+        id: 'task-2',
+        title: 'Task 2',
+        state: 'ready',
+        priority: 'normal',
+        labels: ['type:task'],
+        dependencies: ['external-1'], // Same target
+      };
+
+      const nodes = [story, task1, task2];
+      const edges: GraphEdge[] = [
+        { from: 'story-1', to: 'task-1' },
+        { from: 'story-1', to: 'task-2' },
+        { from: 'task-1', to: 'external-1' },
+        { from: 'task-2', to: 'external-1' }, // Both tasks → external-1
+      ];
+
+      const expansionState: ExpansionState = {
+        'story-1': false,
+      };
+
+      const virtualEdges = aggregateEdgesForCollapsed(nodes, edges, expansionState);
+
+      // Should aggregate 2 edges into 1 virtual edge with count=2
+      expect(virtualEdges).toHaveLength(1);
+      expect(virtualEdges[0].from).toBe('story-1');
+      expect(virtualEdges[0].to).toBe('external-1');
+      expect(virtualEdges[0].count).toBe(2);
+      expect(virtualEdges[0].sourceEdgeIds).toHaveLength(2);
+    });
+
+    it('should aggregate incoming edges to collapsed container', () => {
+      const story: GraphNode = {
+        id: 'story-1',
+        title: 'Story 1',
+        state: 'in_progress',
+        priority: 'normal',
+        labels: ['type:story'],
+        dependencies: ['task-1'],
+      };
+
+      const task1: GraphNode = {
+        id: 'task-1',
+        title: 'Task 1',
+        state: 'done',
+        priority: 'normal',
+        labels: ['type:task'],
+        dependencies: [],
+      };
+
+      const nodes = [story, task1];
+      const edges: GraphEdge[] = [
+        { from: 'story-1', to: 'task-1' },
+        { from: 'external-1', to: 'task-1' }, // External → child
+        { from: 'external-2', to: 'task-1' }, // Another external → child
+      ];
+
+      const expansionState: ExpansionState = {
+        'story-1': false,
+      };
+
+      const virtualEdges = aggregateEdgesForCollapsed(nodes, edges, expansionState);
+
+      // Should aggregate: external-1 → task-1 becomes external-1 → story-1
+      //                   external-2 → task-1 becomes external-2 → story-1
+      expect(virtualEdges).toHaveLength(2);
+      
+      const incoming1 = virtualEdges.find(e => e.from === 'external-1' && e.to === 'story-1');
+      const incoming2 = virtualEdges.find(e => e.from === 'external-2' && e.to === 'story-1');
+      
+      expect(incoming1).toBeDefined();
+      expect(incoming2).toBeDefined();
+    });
+
+    it('should not aggregate edges when container is expanded', () => {
+      const story: GraphNode = {
+        id: 'story-1',
+        title: 'Story 1',
+        state: 'in_progress',
+        priority: 'normal',
+        labels: ['type:story'],
+        dependencies: ['task-1'],
+      };
+
+      const task1: GraphNode = {
+        id: 'task-1',
+        title: 'Task 1',
+        state: 'done',
+        priority: 'normal',
+        labels: ['type:task'],
+        dependencies: ['external-1'],
+      };
+
+      const nodes = [story, task1];
+      const edges: GraphEdge[] = [
+        { from: 'story-1', to: 'task-1' },
+        { from: 'task-1', to: 'external-1' },
+      ];
+
+      const expansionState: ExpansionState = {
+        'story-1': true, // Expanded
+      };
+
+      const virtualEdges = aggregateEdgesForCollapsed(nodes, edges, expansionState);
+
+      // Should have no virtual edges when expanded
+      expect(virtualEdges).toHaveLength(0);
+    });
+
+    it('should handle nested collapse (story in epic)', () => {
+      const epic: GraphNode = {
+        id: 'epic-1',
+        title: 'Epic 1',
+        state: 'in_progress',
+        priority: 'high',
+        labels: ['type:epic'],
+        dependencies: ['story-1'],
+      };
+
+      const story: GraphNode = {
+        id: 'story-1',
+        title: 'Story 1',
+        state: 'in_progress',
+        priority: 'normal',
+        labels: ['type:story'],
+        dependencies: ['task-1'],
+      };
+
+      const task1: GraphNode = {
+        id: 'task-1',
+        title: 'Task 1',
+        state: 'done',
+        priority: 'normal',
+        labels: ['type:task'],
+        dependencies: ['external-1'],
+      };
+
+      const nodes = [epic, story, task1];
+      const edges: GraphEdge[] = [
+        { from: 'epic-1', to: 'story-1' },
+        { from: 'story-1', to: 'task-1' },
+        { from: 'task-1', to: 'external-1' },
+      ];
+
+      const expansionState: ExpansionState = {
+        'epic-1': false, // Epic collapsed (hides story too)
+        'story-1': false,
+      };
+
+      const virtualEdges = aggregateEdgesForCollapsed(nodes, edges, expansionState);
+
+      // Epic collapsed → should aggregate all children's edges
+      const epicEdge = virtualEdges.find(e => e.from === 'epic-1' && e.to === 'external-1');
+      expect(epicEdge).toBeDefined();
+      expect(epicEdge!.count).toBe(1);
     });
   });
 });

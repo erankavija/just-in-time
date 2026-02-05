@@ -1,5 +1,11 @@
 import type { GraphNode, GraphEdge } from '../types/models';
-import type { HierarchyLevelMap, SubgraphCluster, ClusteredGraph } from '../types/subgraphCluster';
+import type { 
+  HierarchyLevelMap, 
+  SubgraphCluster, 
+  ClusteredGraph,
+  ExpansionState,
+  VirtualEdge 
+} from '../types/subgraphCluster';
 
 /**
  * Extract the node type from type:X label.
@@ -152,4 +158,123 @@ export function assignNodesToSubgraphs(
     crossClusterEdges,
     orphanNodes,
   };
+}
+
+/**
+ * Build child-parent map for efficient lookup of which containers own which nodes.
+ * Uses dependency edges where from → to means "from contains/owns to" in the hierarchy.
+ * @param nodes - All nodes in the graph
+ * @param edges - All edges in the graph
+ * @returns Map of node ID → parent container ID
+ */
+function buildContainerMap(nodes: GraphNode[], edges: GraphEdge[]): Map<string, string> {
+  const containerMap = new Map<string, string>();
+  
+  // In a dependency graph, edge from→to means "from depends on to"
+  // For containment, we want the REVERSE: if epic→story, then story's parent is epic
+  edges.forEach(edge => {
+    // Only set parent if not already set (use first parent found)
+    if (!containerMap.has(edge.to)) {
+      containerMap.set(edge.to, edge.from);
+    }
+  });
+  
+  return containerMap;
+}
+
+/**
+ * Aggregate edges for collapsed containers.
+ * When a container is collapsed, all edges to/from its children are "bubbled up"
+ * to the container itself, creating virtual edges.
+ * 
+ * @param nodes - All nodes in the cluster/graph
+ * @param edges - All edges in the cluster/graph  
+ * @param expansionState - Which containers are expanded/collapsed
+ * @returns Array of virtual edges representing aggregated child edges
+ */
+export function aggregateEdgesForCollapsed(
+  nodes: GraphNode[],
+  edges: GraphEdge[],
+  expansionState: ExpansionState
+): VirtualEdge[] {
+  // Build map of which nodes are children of which containers
+  const containerMap = buildContainerMap(nodes, edges);
+  const nodeSet = new Set(nodes.map(n => n.id));
+  
+  // Helper: Find which nodes are hidden by collapsed containers
+  const isVisible = (nodeId: string): boolean => {
+    // Check if this node itself is collapsed (it's still visible, just its children are hidden)
+    // A node is hidden if it's INSIDE a collapsed parent
+    let parent = containerMap.get(nodeId);
+    
+    while (parent) {
+      if (expansionState[parent] === false) {
+        // This node is inside a collapsed parent
+        return false;
+      }
+      parent = containerMap.get(parent);
+    }
+    
+    return true;  // No collapsed parents, so visible
+  };
+  
+  // Helper: Get the visible representative for a node
+  const getVisibleRepresentative = (nodeId: string): string => {
+    // Traverse up the container hierarchy until we find a visible node
+    let current = nodeId;
+    let parent = containerMap.get(current);
+    
+    while (parent) {
+      if (expansionState[parent] === false) {
+        // Parent is collapsed, so current is hidden
+        // Continue up to find the collapsed ancestor
+        current = parent;
+        parent = containerMap.get(current);
+      } else {
+        // Parent is expanded (or doesn't exist), so current is visible
+        break;
+      }
+    }
+    
+    return current;
+  };
+  
+  // Collect edges that need aggregation
+  const edgeAggregation = new Map<string, { from: string; to: string; sourceIds: string[] }>();
+  
+  edges.forEach(edge => {
+    const fromRep = getVisibleRepresentative(edge.from);
+    const toRep = getVisibleRepresentative(edge.to);
+    
+    // Only create virtual edges if at least one endpoint changed (got aggregated)
+    if (fromRep === edge.from && toRep === edge.to) {
+      // Both endpoints visible as-is, no aggregation needed
+      return;
+    }
+    
+    // Skip internal edges within same collapsed container
+    if (fromRep === toRep) return;
+    
+    // Create virtual edge
+    const key = `${fromRep}→${toRep}`;
+    const edgeId = `${edge.from}→${edge.to}`;
+    
+    if (!edgeAggregation.has(key)) {
+      edgeAggregation.set(key, {
+        from: fromRep,
+        to: toRep,
+        sourceIds: [],
+      });
+    }
+    
+    edgeAggregation.get(key)!.sourceIds.push(edgeId);
+  });
+  
+  // Convert to VirtualEdge array
+  return Array.from(edgeAggregation.values()).map(agg => ({
+    from: agg.from,
+    to: agg.to,
+    count: agg.sourceIds.length,
+    sourceEdgeIds: agg.sourceIds,
+  }));
 }
