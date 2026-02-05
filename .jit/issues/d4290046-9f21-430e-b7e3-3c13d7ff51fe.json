@@ -22,6 +22,12 @@
       "label": "DAG exploration plan",
       "doc_type": "design",
       "format": "markdown"
+    },
+    {
+      "path": "dev/design/subgraph-clustering-layout.md",
+      "commit": null,
+      "label": "Subgraph Clustering Layout Implementation Plan",
+      "doc_type": "design"
     }
   ],
   "labels": [

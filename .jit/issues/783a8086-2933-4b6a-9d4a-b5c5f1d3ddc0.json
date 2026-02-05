@@ -1,7 +1,7 @@
 {
   "id": "783a8086-2933-4b6a-9d4a-b5c5f1d3ddc0",
-  "title": "Phase 1: Milestone windowing + exploration DAG",
-  "description": "## Objective\n\nProvide immediate relief from width/height explosion by implementing hierarchy-agnostic primary tier windowing and exploration graph structure. This phase keeps the existing dagre layout but prepares the data layer for custom layout.\n\n## Hierarchy-Agnostic Approach\n\n**Key insight:** JIT's type hierarchy is fully configurable with numeric levels and label associations. We must NOT hardcode type names like \"milestone\" or \"epic\".\n\n**Configuration model:**\n```typescript\n{\n  types: { milestone: 1, epic: 2, story: 3, task: 4, bug: 4 },\n  strategic_types: [\"milestone\", \"epic\"],\n  label_associations: { epic: \"epic\", milestone: \"milestone\", story: \"story\" }\n}\n```\n\n**Tier terminology:**\n- **Tier/Level N:** All types with same numeric level (e.g., level 4 = [task, bug, enhancement])\n- **Primary tier (level 1):** Lowest numeric level - defines chronological axis\n- **Secondary tier (level 2):** Second lowest level - provides grouping structure\n- **Tactical tiers (level 3+):** Higher levels - leaf work items\n\nThis works with ALL hierarchy templates:\n- Default: milestone(1) → epic(2) → story(3) → task(4)\n- Agile: release(1) → epic(2) → story(3) → task(4)\n- Extended: program(1) → milestone(2) → epic(3) → story(4) → task(5)\n- Minimal: milestone(1) → task(2)\n\n## Implementation Plan\n\n### Step 1: Hierarchy-agnostic tier indexing ✅\n- Parse config into level-based tiers\n- Support multiple types per level\n- Use label_associations for parent matching\n- Derive primary tier index for any node\n\n### Step 2: Relevance scoring ✅\n- 5-factor algorithm for importance ranking\n- Works with any type configuration\n\n### Step 3: Exploration graph builder ✅ (REFACTORED)\n- Refactored to use numeric levels not type names\n- Window primary tier (show last N items)\n- Progressive disclosure within tiers\n- Virtual nodes for collapsed content\n- Budget-based item visibility\n\n### Step 4: GraphView integration (TODO)\n- Fetch hierarchy config from API\n- Build exploration graph before layout\n- Render virtual nodes with expansion controls\n- Dynamic UI labels from config\n- Wire up expansion state\n\n## Success Criteria\n- Width proportional to visible primary tier items (not total graph size)\n- Height controlled by budgets and progressive disclosure\n- Works with default/agile/extended/minimal hierarchy templates\n- Deterministic output (stable ordering)\n- All tests passing with TDD approach",
+  "title": "Phase 1: Subgraph clustering infrastructure",
+  "description": "Implement core data structures and algorithms for hierarchy-aware subgraph clustering with collapsible containers.\n\n## Scope\n\nBuild the foundational infrastructure for clustering lower-level issues into visual subgraphs under higher-level container nodes (epics/milestones), with edge aggregation for collapsed nodes.\n\n**Key deliverables:**\n1. Hierarchy level mapping from config.toml\n2. Subgraph assignment algorithm (follow deps, respect hierarchy boundaries)\n3. Edge aggregation for collapsed containers\n4. TypeScript types for clusters, expansion state, virtual edges\n\n## Approach\n\n**Hierarchy-agnostic design:**\n- Read `type_hierarchy.types` from config (e.g., `{milestone: 1, epic: 2, story: 3, task: 4}`)\n- Level numbers define structure (lower = more strategic)\n- No hardcoded type names\n\n**Subgraph membership:**\n- Each Level 1 node (epic) becomes a container\n- Follow dependencies downward (to higher level numbers)\n- Stop at hierarchy boundaries (don't cross to same/lower level)\n- Cross-level edges preserved but don't pull nodes into subgraph\n\n**Edge aggregation:**\n- When container collapses, bubble up all child edges\n- Story (collapsed) inherits task dependencies\n- Preserve information (show aggregated edge counts)\n\n## TDD Implementation Steps\n\n1. **Hierarchy derivation** (reuse/adapt existing hierarchyIndex.ts)\n   - Tests: various config.toml structures\n   - Function: `getNodeLevel(node, hierarchy)` → number\n\n2. **Subgraph assignment algorithm**\n   - Tests: simple tree, cross-cluster deps, multiple epics\n   - Function: `assignNodesToSubgraphs(nodes, edges, hierarchy)` → Map<clusterId, SubgraphCluster>\n\n3. **Edge aggregation for collapsed nodes**\n   - Tests: single collapse, nested collapse, cross-cluster edges\n   - Function: `aggregateEdgesForCollapsed(cluster, expansionState)` → VirtualEdge[]\n\n## Success Criteria\n\n- [ ] All tests passing (unit tests for each algorithm)\n- [ ] Works with any hierarchy config (not hardcoded)\n- [ ] Correctly assigns Epic ad601a15's 37 nodes to single cluster\n- [ ] Cross-epic task dependencies preserved\n- [ ] Edge aggregation produces correct virtual edges\n\n## Related Documents\n\n- dev/design/subgraph-clustering-layout.md - Full implementation plan",
   "state": "in_progress",
   "priority": "normal",
   "assignee": "agent:copilot-session",
@@ -11,15 +11,15 @@
     "code-review"
   ],
   "gates_status": {
-    "tdd-reminder": {
-      "status": "passed",
-      "updated_by": "agent:copilot-session",
-      "updated_at": "2026-02-04T17:51:01.770336500Z"
-    },
     "code-review": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-02-04T14:07:22.850580307Z"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": "agent:copilot-session",
+      "updated_at": "2026-02-04T17:51:01.770336500Z"
     }
   },
   "context": {},
