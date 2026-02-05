@@ -94,11 +94,188 @@ const getDagreLayout = (nodes: Node[], edges: Edge[]) => {
   return { nodes: layoutedNodes, edges };
 };
 
+// Cluster-aware layout - groups nodes by cluster with visual separation
+const getClusterAwareLayout = (
+  nodes: Node[],
+  edges: Edge[],
+  clusterData: ReturnType<typeof prepareClusteredGraphForReactFlow>
+) => {
+  const CLUSTER_MARGIN = 60;
+  const CLUSTER_PADDING = 40;
+  const CLUSTER_HEADER_HEIGHT = 40;
+  
+  // Create a map of node ID -> cluster ID
+  const nodeToCluster = new Map<string, string>();
+  clusterData.clusters.forEach(cluster => {
+    cluster.nodes.forEach(node => {
+      nodeToCluster.set(node.id, cluster.containerId);
+    });
+  });
+  
+  // Group nodes by cluster
+  const nodesByCluster = new Map<string, Node[]>();
+  nodes.forEach(node => {
+    const clusterId = nodeToCluster.get(node.id);
+    if (clusterId) {
+      if (!nodesByCluster.has(clusterId)) {
+        nodesByCluster.set(clusterId, []);
+      }
+      nodesByCluster.get(clusterId)!.push(node);
+    }
+  });
+  
+  // Layout each cluster independently using dagre
+  const clusterLayouts = new Map<string, { nodes: Node[]; width: number; height: number }>();
+  
+  clusterData.clusters.forEach(cluster => {
+    const clusterNodes = nodesByCluster.get(cluster.containerId) || [];
+    if (clusterNodes.length === 0) return;
+    
+    // Use dagre to layout nodes within this cluster (left-to-right for dependency flow)
+    const dagreGraph = new dagre.graphlib.Graph();
+    dagreGraph.setDefaultEdgeLabel(() => ({}));
+    dagreGraph.setGraph({ 
+      rankdir: 'LR', // Left-to-right: dependencies flow toward goals
+      nodesep: 40,
+      ranksep: 80,
+    });
+    
+    clusterNodes.forEach(node => {
+      dagreGraph.setNode(node.id, { 
+        width: LAYOUT_CONFIG.nodeWidth, 
+        height: LAYOUT_CONFIG.nodeHeight 
+      });
+    });
+    
+    // Add edges within this cluster
+    // REVERSE edge direction: in jit, A→B means "A depends on B" (B must complete first)
+    // So for dagre's LR layout, we need B on left → A on right, thus setEdge(to, from)
+    cluster.internalEdges.forEach(edge => {
+      dagreGraph.setEdge(edge.to, edge.from);
+    });
+    
+    dagre.layout(dagreGraph);
+    
+    // Calculate cluster bounds
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    
+    const layoutedClusterNodes = clusterNodes.map(node => {
+      const pos = dagreGraph.node(node.id);
+      minX = Math.min(minX, pos.x - LAYOUT_CONFIG.nodeWidth / 2);
+      minY = Math.min(minY, pos.y - LAYOUT_CONFIG.nodeHeight / 2);
+      maxX = Math.max(maxX, pos.x + LAYOUT_CONFIG.nodeWidth / 2);
+      maxY = Math.max(maxY, pos.y + LAYOUT_CONFIG.nodeHeight / 2);
+      
+      return {
+        ...node,
+        position: {
+          x: pos.x - LAYOUT_CONFIG.nodeWidth / 2,
+          y: pos.y - LAYOUT_CONFIG.nodeHeight / 2,
+        },
+      };
+    });
+    
+    const width = maxX - minX + 2 * CLUSTER_PADDING;
+    const height = maxY - minY + 2 * CLUSTER_PADDING + CLUSTER_HEADER_HEIGHT;
+    
+    clusterLayouts.set(cluster.containerId, {
+      nodes: layoutedClusterNodes,
+      width,
+      height,
+    });
+  });
+  
+  // Sort clusters for left-to-right temporal flow
+  // Strategy: Strategic goals (milestones, level 1) on RIGHT, tactical work (epics, level 2+) on LEFT
+  const sortedClusters = [...clusterData.clusters].sort((a, b) => {
+    // Lower level number = more strategic = should be RIGHT (later in array)
+    // Higher level number = more tactical = should be LEFT (earlier in array)
+    // So we want ASCENDING order by level: [2, 2, 2, 1] → left to right
+    return b.containerLevel - a.containerLevel; // Reverse: tactical (2) before strategic (1)
+  });
+  
+  // Arrange clusters horizontally from left to right (tactical → strategic)
+  let currentX = CLUSTER_MARGIN;
+  const finalNodes: Node[] = [];
+  
+  sortedClusters.forEach(cluster => {
+    const layout = clusterLayouts.get(cluster.containerId);
+    if (!layout) return;
+    
+    // Find the container node itself and add it at the RIGHT edge of its cluster
+    const containerNode = nodes.find(n => n.id === cluster.containerId);
+    if (containerNode) {
+      finalNodes.push({
+        ...containerNode,
+        position: {
+          x: currentX + layout.width - LAYOUT_CONFIG.nodeWidth - CLUSTER_PADDING,
+          y: CLUSTER_MARGIN + CLUSTER_HEADER_HEIGHT + CLUSTER_PADDING,
+        },
+        data: {
+          ...containerNode.data,
+          isContainer: true, // Mark as container for styling
+        },
+      });
+    }
+    
+    // Offset all child nodes in this cluster (excluding the container itself)
+    layout.nodes
+      .filter(node => node.id !== cluster.containerId) // Don't duplicate container
+      .forEach(node => {
+        finalNodes.push({
+          ...node,
+          position: {
+            x: currentX + CLUSTER_PADDING + node.position.x,
+            y: CLUSTER_MARGIN + CLUSTER_HEADER_HEIGHT + CLUSTER_PADDING + node.position.y,
+          },
+          data: {
+            ...node.data,
+            clusterId: cluster.containerId,
+          },
+        });
+      });
+    
+    currentX += layout.width + CLUSTER_MARGIN;
+  });
+  
+  // Handle orphan nodes (not in any cluster) - place them on the far left
+  clusterData.orphanNodes.forEach((orphanNode, index) => {
+    const node = nodes.find(n => n.id === orphanNode.id);
+    if (node) {
+      finalNodes.push({
+        ...node,
+        position: {
+          x: CLUSTER_MARGIN,
+          y: CLUSTER_MARGIN + index * (LAYOUT_CONFIG.nodeHeight + LAYOUT_CONFIG.nodeSpacing),
+        },
+      });
+    }
+  });
+  
+  return { nodes: finalNodes, edges };
+};
+
 // Compact layered layout - vertical stacking within ranks
-const getCompactLayout = (nodes: Node[], edges: Edge[]) => {
+const getCompactLayout = (
+  nodes: Node[], 
+  edges: Edge[],
+  clusterData?: ReturnType<typeof prepareClusteredGraphForReactFlow> | null
+) => {
   if (nodes.length === 0) {
     return { nodes: [], edges };
   }
+
+  // If we have cluster data, use cluster-aware layout
+  if (clusterData && clusterData.clusters.length > 0) {
+    return getClusterAwareLayout(nodes, edges, clusterData);
+  }
+
+  // Otherwise fall back to basic rank-based layout
+  return getBasicRankLayout(nodes, edges);
+};
+
+// Extract the existing compact layout logic to a separate function
+const getBasicRankLayout = (nodes: Node[], edges: Edge[]) => {
 
   // Build adjacency list (source -> targets, where source depends on targets)
   const dependsOn = new Map<string, Set<string>>();
@@ -233,11 +410,12 @@ const getCompactLayout = (nodes: Node[], edges: Edge[]) => {
 const getLayoutedElements = (
   nodes: Node[], 
   edges: Edge[], 
-  algorithm: LayoutAlgorithm = 'dagre'
+  algorithm: LayoutAlgorithm = 'dagre',
+  clusterData?: ReturnType<typeof prepareClusteredGraphForReactFlow> | null
 ) => {
   switch (algorithm) {
     case 'compact':
-      return getCompactLayout(nodes, edges);
+      return getCompactLayout(nodes, edges, clusterData);
     case 'dagre':
     default:
       return getDagreLayout(nodes, edges);
@@ -288,8 +466,9 @@ export function GraphView({
   useEffect(() => {
     const fetchHierarchyConfig = async () => {
       try {
-        const response = await apiClient.get<{ data: HierarchyLevelMap }>('/config/hierarchy');
-        setHierarchyConfig(response.data);
+        const config = await apiClient.getHierarchy();
+        // Extract just the types mapping
+        setHierarchyConfig(config.types);
       } catch (err) {
         console.warn('Failed to fetch hierarchy config:', err);
         // Fallback config based on strategic types
@@ -339,6 +518,7 @@ export function GraphView({
       // Apply clustering if using compact layout and hierarchy config is available
       let nodesToRender = visibleNodes;
       let edgesToRender = data.edges;
+      let clusterData = null;
       
       if (layoutAlgorithm === 'compact' && hierarchyConfig) {
         const clustered = prepareClusteredGraphForReactFlow(
@@ -349,6 +529,7 @@ export function GraphView({
         );
         
         nodesToRender = clustered.visibleNodes;
+        clusterData = clustered; // Pass to layout function
         
         // Combine regular edges with virtual edges
         // Virtual edges need to be converted to the same format as regular edges
@@ -512,7 +693,7 @@ export function GraphView({
         .filter((edge): edge is Edge => edge !== null);
 
       // Apply layout algorithm
-      const layouted = getLayoutedElements(flowNodes, flowEdges, layoutAlgorithm);
+      const layouted = getLayoutedElements(flowNodes, flowEdges, layoutAlgorithm, clusterData);
       setNodes(layouted.nodes);
       setEdges(layouted.edges);
     } catch (err) {
