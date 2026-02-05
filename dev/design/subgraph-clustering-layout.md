@@ -73,32 +73,51 @@ for each child C of S:
 
 ## Implementation Workplan
 
-### Phase 1: Core Data Structures & Algorithms
-- [ ] **1.1** Define TypeScript types for hierarchy-aware graph
-  - `HierarchyLevel` - maps type names to numeric levels
+### Phase 1: Core Data Structures & Algorithms ✅ COMPLETE (2/3 steps)
+- [x] **1.1** Define TypeScript types for hierarchy-aware graph ✅
+  - `HierarchyLevelMap` - maps type names to numeric levels
   - `SubgraphCluster` - contains nodes, edges, level info
   - `ExpansionState` - tracks collapsed/expanded containers
   - `VirtualEdge` - aggregated edges from collapsed nodes
+  - `ClusteredGraph` - result type with clusters, cross-cluster edges, orphans
+  - **Files:** `web/src/types/subgraphCluster.ts`
 
-- [ ] **1.2** Implement hierarchy derivation from config
-  - `deriveHierarchyLevels(config)` - extracts level mapping
+- [x] **1.2** Implement hierarchy derivation from config ✅
+  - `extractNodeType(node)` - extracts type from type:X label
   - `getNodeLevel(node, hierarchy)` - determines node's level from type label
   - Handle multiple types per level (task=4, bug=4)
-  - Tests: various config.toml structures
+  - Returns Infinity for unknown/missing types
+  - **Tests:** 9 tests covering various configs, edge cases
+  - **Files:** `web/src/utils/subgraphClustering.ts`
 
-- [ ] **1.3** Implement subgraph assignment algorithm
+- [x] **1.3** Implement subgraph assignment algorithm ✅
   - `assignNodesToSubgraphs(nodes, edges, hierarchy)` 
-  - For each Level 1 node, collect its lower-level dependents
+  - For each lowest-level node, collect its lower-level dependents via BFS
   - Stop at hierarchy boundaries (don't cross to same/lower level)
-  - Tests: verify correct clustering, cross-cluster edges preserved
+  - Returns clusters + cross-cluster edges + orphan nodes
+  - **Tests:** 5 tests (single epic, multiple epics, cross-cluster edges, hierarchy boundaries, stories)
+  - **Files:** `web/src/utils/subgraphClustering.ts`
 
-- [ ] **1.4** Implement edge aggregation for collapsed nodes
-  - `aggregateEdgesForCollapsed(subgraph, expansionState)`
+- [x] **1.4** Implement edge aggregation for collapsed nodes ✅
+  - `buildContainerMap()` - builds parent-child relationships from deps
+  - `aggregateEdgesForCollapsed(nodes, edges, expansionState)`
   - Bubble up edges from hidden children to visible parent
   - Handle multi-level collapse (Story collapsed inside Epic collapsed)
-  - Tests: various collapse scenarios
+  - Aggregate multiple edges to same target (count, sourceEdgeIds)
+  - **Tests:** 5 tests (single collapse, multiple aggregation, incoming edges, nested collapse)
+  - **Files:** `web/src/utils/subgraphClustering.ts`
 
-### Phase 2: Layout Engine
+- [ ] **1.5** Clean up deprecated code from previous attempt
+  - Remove or mark as deprecated: `explorationGraph.ts`, old `hierarchyIndex.ts`
+  - Consider keeping `relevanceScoring.ts` for future intra-cluster ordering
+  
+- [ ] **1.6** Add integration test with real repo data
+  - Test with Epic ad601a15 (37 nodes expected)
+  - Verify clustering matches expectations
+
+### Phase 2: Layout Engine ⏸️ DEFERRED
+**Note:** Layout implementation deferred until Phase 1 integration complete.
+
 - [ ] **2.1** Implement Level 0 horizontal positioning
   - Sort Level 0 nodes by temporal order (milestone labels, dependency order)
   - Position left-to-right with fixed spacing
