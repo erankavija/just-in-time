@@ -21,11 +21,10 @@ describe('subgraphClustering', () => {
     it('should return correct level for milestone', () => {
       const node: GraphNode = {
         id: 'milestone-1',
-        title: 'Version 1.0',
+        label: 'Version 1.0',
         state: 'backlog',
         priority: 'critical',
         labels: ['type:milestone', 'milestone:v1.0'],
-        dependencies: [],
       };
       
       expect(getNodeLevel(node, hierarchy)).toBe(1);
@@ -34,11 +33,10 @@ describe('subgraphClustering', () => {
     it('should return correct level for epic', () => {
       const node: GraphNode = {
         id: 'epic-1',
-        title: 'Feature Epic',
+        label: 'Feature Epic',
         state: 'in_progress',
         priority: 'high',
         labels: ['type:epic', 'epic:feature-x'],
-        dependencies: [],
       };
       
       expect(getNodeLevel(node, hierarchy)).toBe(2);
@@ -47,11 +45,11 @@ describe('subgraphClustering', () => {
     it('should return correct level for task', () => {
       const node: GraphNode = {
         id: 'task-1',
-        title: 'Implement feature',
+        label: 'Implement feature',
         state: 'ready',
-        priority: 'normal',
+        priority: "normal",
+        blocked: false,
         labels: ['type:task', 'epic:feature-x'],
-        dependencies: [],
       };
       
       expect(getNodeLevel(node, hierarchy)).toBe(4);
@@ -60,20 +58,19 @@ describe('subgraphClustering', () => {
     it('should handle multiple types at same level (task vs bug)', () => {
       const taskNode: GraphNode = {
         id: 'task-1',
-        title: 'Task',
+        label: 'Task',
         state: 'ready',
-        priority: 'normal',
+        priority: "normal",
+        blocked: false,
         labels: ['type:task'],
-        dependencies: [],
       };
       
       const bugNode: GraphNode = {
         id: 'bug-1',
-        title: 'Bug',
+        label: 'Bug',
         state: 'ready',
         priority: 'high',
         labels: ['type:bug'],
-        dependencies: [],
       };
       
       expect(getNodeLevel(taskNode, hierarchy)).toBe(4);
@@ -83,11 +80,11 @@ describe('subgraphClustering', () => {
     it('should return Infinity for nodes without type label', () => {
       const node: GraphNode = {
         id: 'orphan-1',
-        title: 'Orphan',
+        label: 'Orphan',
         state: 'ready',
-        priority: 'normal',
+        priority: "normal",
+        blocked: false,
         labels: ['component:backend'],
-        dependencies: [],
       };
       
       expect(getNodeLevel(node, hierarchy)).toBe(Infinity);
@@ -96,11 +93,11 @@ describe('subgraphClustering', () => {
     it('should return Infinity for unknown type', () => {
       const node: GraphNode = {
         id: 'unknown-1',
-        title: 'Unknown',
+        label: 'Unknown',
         state: 'ready',
-        priority: 'normal',
+        priority: "normal",
+        blocked: false,
         labels: ['type:unknown'],
-        dependencies: [],
       };
       
       expect(getNodeLevel(node, hierarchy)).toBe(Infinity);
@@ -111,11 +108,11 @@ describe('subgraphClustering', () => {
     it('should extract type from type:X label', () => {
       const node: GraphNode = {
         id: 'test-1',
-        title: 'Test',
+        label: 'Test',
         state: 'ready',
-        priority: 'normal',
+        priority: "normal",
+        blocked: false,
         labels: ['type:task', 'epic:test'],
-        dependencies: [],
       };
       
       expect(extractNodeType(node)).toBe('task');
@@ -124,11 +121,11 @@ describe('subgraphClustering', () => {
     it('should return null if no type label exists', () => {
       const node: GraphNode = {
         id: 'test-1',
-        title: 'Test',
+        label: 'Test',
         state: 'ready',
-        priority: 'normal',
+        priority: "normal",
+        blocked: false,
         labels: ['epic:test', 'component:web'],
-        dependencies: [],
       };
       
       expect(extractNodeType(node)).toBeNull();
@@ -137,11 +134,11 @@ describe('subgraphClustering', () => {
     it('should return first type if multiple exist (invalid but defensive)', () => {
       const node: GraphNode = {
         id: 'test-1',
-        title: 'Test',
+        label: 'Test',
         state: 'ready',
-        priority: 'normal',
+        priority: "normal",
+        blocked: false,
         labels: ['type:task', 'type:bug'],
-        dependencies: [],
       };
       
       expect(extractNodeType(node)).toBe('task');
@@ -159,29 +156,28 @@ describe('subgraphClustering', () => {
     it('should create cluster for single epic with tasks', () => {
       const epic: GraphNode = {
         id: 'epic-1',
-        title: 'Epic 1',
+        label: 'Epic 1',
         state: 'in_progress',
         priority: 'high',
         labels: ['type:epic'],
-        dependencies: ['task-1', 'task-2'],
       };
 
       const task1: GraphNode = {
         id: 'task-1',
-        title: 'Task 1',
+        label: 'Task 1',
         state: 'done',
-        priority: 'normal',
+        priority: "normal",
+        blocked: false,
         labels: ['type:task'],
-        dependencies: [],
       };
 
       const task2: GraphNode = {
         id: 'task-2',
-        title: 'Task 2',
+        label: 'Task 2',
         state: 'ready',
-        priority: 'normal',
+        priority: "normal",
+        blocked: false,
         labels: ['type:task'],
-        dependencies: [],
       };
 
       const nodes = [epic, task1, task2];
@@ -205,38 +201,37 @@ describe('subgraphClustering', () => {
     it('should create separate clusters for multiple epics', () => {
       const epic1: GraphNode = {
         id: 'epic-1',
-        title: 'Epic 1',
+        label: 'Epic 1',
         state: 'in_progress',
         priority: 'high',
         labels: ['type:epic'],
-        dependencies: ['task-1'],
       };
 
       const epic2: GraphNode = {
         id: 'epic-2',
-        title: 'Epic 2',
+        label: 'Epic 2',
         state: 'ready',
-        priority: 'normal',
+        priority: "normal",
+        blocked: false,
         labels: ['type:epic'],
-        dependencies: ['task-2'],
       };
 
       const task1: GraphNode = {
         id: 'task-1',
-        title: 'Task 1',
+        label: 'Task 1',
         state: 'done',
-        priority: 'normal',
+        priority: "normal",
+        blocked: false,
         labels: ['type:task'],
-        dependencies: [],
       };
 
       const task2: GraphNode = {
         id: 'task-2',
-        title: 'Task 2',
+        label: 'Task 2',
         state: 'ready',
-        priority: 'normal',
+        priority: "normal",
+        blocked: false,
         labels: ['type:task'],
-        dependencies: [],
       };
 
       const nodes = [epic1, epic2, task1, task2];
@@ -261,38 +256,37 @@ describe('subgraphClustering', () => {
     it('should preserve cross-cluster edges', () => {
       const epic1: GraphNode = {
         id: 'epic-1',
-        title: 'Epic 1',
+        label: 'Epic 1',
         state: 'in_progress',
         priority: 'high',
         labels: ['type:epic'],
-        dependencies: ['task-1'],
       };
 
       const epic2: GraphNode = {
         id: 'epic-2',
-        title: 'Epic 2',
+        label: 'Epic 2',
         state: 'ready',
-        priority: 'normal',
+        priority: "normal",
+        blocked: false,
         labels: ['type:epic'],
-        dependencies: ['task-2'],
       };
 
       const task1: GraphNode = {
         id: 'task-1',
-        title: 'Task 1',
+        label: 'Task 1',
         state: 'done',
-        priority: 'normal',
+        priority: "normal",
+        blocked: false,
         labels: ['type:task'],
-        dependencies: [],
       };
 
       const task2: GraphNode = {
         id: 'task-2',
-        title: 'Task 2',
+        label: 'Task 2',
         state: 'ready',
-        priority: 'normal',
+        priority: "normal",
+        blocked: false,
         labels: ['type:task'],
-        dependencies: ['task-1'], // Cross-cluster dependency
       };
 
       const nodes = [epic1, epic2, task1, task2];
@@ -311,29 +305,28 @@ describe('subgraphClustering', () => {
     it('should not pull higher-level nodes into cluster', () => {
       const epic1: GraphNode = {
         id: 'epic-1',
-        title: 'Epic 1',
+        label: 'Epic 1',
         state: 'in_progress',
         priority: 'high',
         labels: ['type:epic'],
-        dependencies: ['epic-2', 'task-1'],
       };
 
       const epic2: GraphNode = {
         id: 'epic-2',
-        title: 'Epic 2',
+        label: 'Epic 2',
         state: 'done',
-        priority: 'normal',
+        priority: "normal",
+        blocked: false,
         labels: ['type:epic'],
-        dependencies: [],
       };
 
       const task1: GraphNode = {
         id: 'task-1',
-        title: 'Task 1',
+        label: 'Task 1',
         state: 'ready',
-        priority: 'normal',
+        priority: "normal",
+        blocked: false,
         labels: ['type:task'],
-        dependencies: [],
       };
 
       const nodes = [epic1, epic2, task1];
@@ -356,38 +349,37 @@ describe('subgraphClustering', () => {
     it('should handle stories as intermediate level', () => {
       const epic: GraphNode = {
         id: 'epic-1',
-        title: 'Epic 1',
+        label: 'Epic 1',
         state: 'in_progress',
         priority: 'high',
         labels: ['type:epic'],
-        dependencies: ['story-1'],
       };
 
       const story: GraphNode = {
         id: 'story-1',
-        title: 'Story 1',
+        label: 'Story 1',
         state: 'in_progress',
-        priority: 'normal',
+        priority: "normal",
+        blocked: false,
         labels: ['type:story'],
-        dependencies: ['task-1', 'task-2'],
       };
 
       const task1: GraphNode = {
         id: 'task-1',
-        title: 'Task 1',
+        label: 'Task 1',
         state: 'done',
-        priority: 'normal',
+        priority: "normal",
+        blocked: false,
         labels: ['type:task'],
-        dependencies: [],
       };
 
       const task2: GraphNode = {
         id: 'task-2',
-        title: 'Task 2',
+        label: 'Task 2',
         state: 'ready',
-        priority: 'normal',
+        priority: "normal",
+        blocked: false,
         labels: ['type:task'],
-        dependencies: [],
       };
 
       const nodes = [epic, story, task1, task2];
@@ -409,29 +401,29 @@ describe('subgraphClustering', () => {
     it('should aggregate edges from collapsed story to external nodes', () => {
       const story: GraphNode = {
         id: 'story-1',
-        title: 'Story 1',
+        label: 'Story 1',
         state: 'in_progress',
-        priority: 'normal',
+        priority: "normal",
+        blocked: false,
         labels: ['type:story'],
-        dependencies: ['task-1', 'task-2'],
       };
 
       const task1: GraphNode = {
         id: 'task-1',
-        title: 'Task 1',
+        label: 'Task 1',
         state: 'done',
-        priority: 'normal',
+        priority: "normal",
+        blocked: false,
         labels: ['type:task'],
-        dependencies: [],
       };
 
       const task2: GraphNode = {
         id: 'task-2',
-        title: 'Task 2',
+        label: 'Task 2',
         state: 'ready',
-        priority: 'normal',
+        priority: "normal",
+        blocked: false,
         labels: ['type:task'],
-        dependencies: ['external-1'], // Edge to external node
       };
 
       const nodes = [story, task1, task2];
@@ -458,29 +450,29 @@ describe('subgraphClustering', () => {
     it('should aggregate multiple edges into single virtual edge', () => {
       const story: GraphNode = {
         id: 'story-1',
-        title: 'Story 1',
+        label: 'Story 1',
         state: 'in_progress',
-        priority: 'normal',
+        priority: "normal",
+        blocked: false,
         labels: ['type:story'],
-        dependencies: ['task-1', 'task-2'],
       };
 
       const task1: GraphNode = {
         id: 'task-1',
-        title: 'Task 1',
+        label: 'Task 1',
         state: 'done',
-        priority: 'normal',
+        priority: "normal",
+        blocked: false,
         labels: ['type:task'],
-        dependencies: ['external-1'],
       };
 
       const task2: GraphNode = {
         id: 'task-2',
-        title: 'Task 2',
+        label: 'Task 2',
         state: 'ready',
-        priority: 'normal',
+        priority: "normal",
+        blocked: false,
         labels: ['type:task'],
-        dependencies: ['external-1'], // Same target
       };
 
       const nodes = [story, task1, task2];
@@ -508,20 +500,20 @@ describe('subgraphClustering', () => {
     it('should aggregate incoming edges to collapsed container', () => {
       const story: GraphNode = {
         id: 'story-1',
-        title: 'Story 1',
+        label: 'Story 1',
         state: 'in_progress',
-        priority: 'normal',
+        priority: "normal",
+        blocked: false,
         labels: ['type:story'],
-        dependencies: ['task-1'],
       };
 
       const task1: GraphNode = {
         id: 'task-1',
-        title: 'Task 1',
+        label: 'Task 1',
         state: 'done',
-        priority: 'normal',
+        priority: "normal",
+        blocked: false,
         labels: ['type:task'],
-        dependencies: [],
       };
 
       const nodes = [story, task1];
@@ -551,20 +543,20 @@ describe('subgraphClustering', () => {
     it('should not aggregate edges when container is expanded', () => {
       const story: GraphNode = {
         id: 'story-1',
-        title: 'Story 1',
+        label: 'Story 1',
         state: 'in_progress',
-        priority: 'normal',
+        priority: "normal",
+        blocked: false,
         labels: ['type:story'],
-        dependencies: ['task-1'],
       };
 
       const task1: GraphNode = {
         id: 'task-1',
-        title: 'Task 1',
+        label: 'Task 1',
         state: 'done',
-        priority: 'normal',
+        priority: "normal",
+        blocked: false,
         labels: ['type:task'],
-        dependencies: ['external-1'],
       };
 
       const nodes = [story, task1];
@@ -586,29 +578,28 @@ describe('subgraphClustering', () => {
     it('should handle nested collapse (story in epic)', () => {
       const epic: GraphNode = {
         id: 'epic-1',
-        title: 'Epic 1',
+        label: 'Epic 1',
         state: 'in_progress',
         priority: 'high',
         labels: ['type:epic'],
-        dependencies: ['story-1'],
       };
 
       const story: GraphNode = {
         id: 'story-1',
-        title: 'Story 1',
+        label: 'Story 1',
         state: 'in_progress',
-        priority: 'normal',
+        priority: "normal",
+        blocked: false,
         labels: ['type:story'],
-        dependencies: ['task-1'],
       };
 
       const task1: GraphNode = {
         id: 'task-1',
-        title: 'Task 1',
+        label: 'Task 1',
         state: 'done',
-        priority: 'normal',
+        priority: "normal",
+        blocked: false,
         labels: ['type:task'],
-        dependencies: ['external-1'],
       };
 
       const nodes = [epic, story, task1];

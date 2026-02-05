@@ -15,19 +15,18 @@ describe('clusteredGraphLayout', () => {
       const nodes: GraphNode[] = [
         {
           id: 'epic-1',
-          title: 'Epic 1',
+          label: 'Epic 1',
           state: 'in_progress',
           priority: 'high',
           labels: ['type:epic'],
-          dependencies: ['task-1'],
         },
         {
           id: 'task-1',
-          title: 'Task 1',
+          label: 'Task 1',
           state: 'done',
-          priority: 'normal',
+          priority: "normal",
+        blocked: false,
           labels: ['type:task'],
-          dependencies: [],
         },
       ];
 
@@ -51,27 +50,26 @@ describe('clusteredGraphLayout', () => {
       const nodes: GraphNode[] = [
         {
           id: 'epic-1',
-          title: 'Epic 1',
+          label: 'Epic 1',
           state: 'in_progress',
           priority: 'high',
           labels: ['type:epic'],
-          dependencies: ['task-1', 'task-2'],
         },
         {
           id: 'task-1',
-          title: 'Task 1',
+          label: 'Task 1',
           state: 'done',
-          priority: 'normal',
+          priority: "normal",
+        blocked: false,
           labels: ['type:task'],
-          dependencies: [],
         },
         {
           id: 'task-2',
-          title: 'Task 2',
+          label: 'Task 2',
           state: 'ready',
-          priority: 'normal',
+          priority: "normal",
+        blocked: false,
           labels: ['type:task'],
-          dependencies: [],
         },
       ];
 
@@ -96,35 +94,34 @@ describe('clusteredGraphLayout', () => {
       const nodes: GraphNode[] = [
         {
           id: 'epic-1',
-          title: 'Epic 1',
+          label: 'Epic 1',
           state: 'in_progress',
           priority: 'high',
           labels: ['type:epic'],
-          dependencies: ['task-1'],
         },
         {
           id: 'epic-2',
-          title: 'Epic 2',
+          label: 'Epic 2',
           state: 'done',
-          priority: 'normal',
+          priority: "normal",
+        blocked: false,
           labels: ['type:epic'],
-          dependencies: ['task-2'],
         },
         {
           id: 'task-1',
-          title: 'Task 1',
+          label: 'Task 1',
           state: 'done',
-          priority: 'normal',
+          priority: "normal",
+        blocked: false,
           labels: ['type:task'],
-          dependencies: ['task-2'], // Cross-cluster dependency
         },
         {
           id: 'task-2',
-          title: 'Task 2',
+          label: 'Task 2',
           state: 'done',
-          priority: 'normal',
+          priority: "normal",
+        blocked: false,
           labels: ['type:task'],
-          dependencies: [],
         },
       ];
 
@@ -157,35 +154,34 @@ describe('clusteredGraphLayout', () => {
       const nodes: GraphNode[] = [
         {
           id: 'epic-1',
-          title: 'Epic 1',
+          label: 'Epic 1',
           state: 'in_progress',
           priority: 'high',
           labels: ['type:epic'],
-          dependencies: ['task-1'],
         },
         {
           id: 'epic-2',
-          title: 'Epic 2',
+          label: 'Epic 2',
           state: 'ready',
-          priority: 'normal',
+          priority: "normal",
+        blocked: false,
           labels: ['type:epic'],
-          dependencies: ['task-2'],
         },
         {
           id: 'task-1',
-          title: 'Task 1',
+          label: 'Task 1',
           state: 'done',
-          priority: 'normal',
+          priority: "normal",
+        blocked: false,
           labels: ['type:task'],
-          dependencies: [],
         },
         {
           id: 'task-2',
-          title: 'Task 2',
+          label: 'Task 2',
           state: 'ready',
-          priority: 'normal',
+          priority: "normal",
+        blocked: false,
           labels: ['type:task'],
-          dependencies: ['task-1'], // Cross-cluster dependency
         },
       ];
 
@@ -216,35 +212,34 @@ describe('clusteredGraphLayout', () => {
       const nodes: GraphNode[] = [
         {
           id: 'epic-1',
-          title: 'Epic 1',
+          label: 'Epic 1',
           state: 'in_progress',
           priority: 'high',
           labels: ['type:epic'],
-          dependencies: ['story-1'],
         },
         {
           id: 'story-1',
-          title: 'Story 1',
+          label: 'Story 1',
           state: 'in_progress',
-          priority: 'normal',
+          priority: "normal",
+        blocked: false,
           labels: ['type:story'],
-          dependencies: ['task-1', 'task-2'],
         },
         {
           id: 'task-1',
-          title: 'Task 1',
+          label: 'Task 1',
           state: 'done',
-          priority: 'normal',
+          priority: "normal",
+        blocked: false,
           labels: ['type:task'],
-          dependencies: [],
         },
         {
           id: 'task-2',
-          title: 'Task 2',
+          label: 'Task 2',
           state: 'ready',
-          priority: 'normal',
+          priority: "normal",
+        blocked: false,
           labels: ['type:task'],
-          dependencies: [],
         },
       ];
 
@@ -274,19 +269,18 @@ describe('clusteredGraphLayout', () => {
       const nodes: GraphNode[] = [
         {
           id: 'epic-1',
-          title: 'Epic 1',
+          label: 'Epic 1',
           state: 'in_progress',
           priority: 'high',
           labels: ['type:epic'],
-          dependencies: ['task-1'],
         },
         {
           id: 'task-1',
-          title: 'Task 1',
+          label: 'Task 1',
           state: 'done',
-          priority: 'normal',
+          priority: "normal",
+        blocked: false,
           labels: ['type:task'],
-          dependencies: [],
         },
       ];
 

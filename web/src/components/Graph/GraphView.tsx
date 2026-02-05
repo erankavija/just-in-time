@@ -16,6 +16,8 @@ import type { State, Priority, GraphNode as ApiGraphNode } from '../../types/mod
 import { LabelBadge } from '../Labels/LabelBadge';
 import { calculateDownstreamStats, type DownstreamStats } from '../../utils/strategicView';
 import { applyFiltersToNode, applyFiltersToEdge, createStrategicFilter, createLabelFilter, type GraphFilter } from '../../utils/graphFilter';
+import type { HierarchyLevelMap, ExpansionState } from '../../types/subgraphCluster';
+import { prepareClusteredGraphForReactFlow } from '../../utils/clusteredGraphLayout';
 
 // State colors using CSS variables
 const stateColors: Record<State, string> = {
@@ -265,6 +267,8 @@ export function GraphView({
   const [error, setError] = useState<string | null>(null);
   const [nodeStats, setNodeStats] = useState<Map<string, DownstreamStats>>(new Map());
   const [strategicTypes, setStrategicTypes] = useState<string[]>(['milestone', 'epic']); // Default fallback
+  const [hierarchyConfig, setHierarchyConfig] = useState<HierarchyLevelMap | null>(null);
+  const [expansionState, setExpansionState] = useState<ExpansionState>({});
 
   // Fetch strategic types from API on mount
   useEffect(() => {
@@ -278,6 +282,28 @@ export function GraphView({
       }
     };
     fetchStrategicTypes();
+  }, []);
+
+  // Fetch hierarchy config from API on mount
+  useEffect(() => {
+    const fetchHierarchyConfig = async () => {
+      try {
+        const response = await apiClient.get<{ data: HierarchyLevelMap }>('/config/hierarchy');
+        setHierarchyConfig(response.data);
+      } catch (err) {
+        console.warn('Failed to fetch hierarchy config:', err);
+        // Fallback config based on strategic types
+        const fallback: HierarchyLevelMap = {
+          milestone: 1,
+          epic: 2,
+          story: 3,
+          task: 4,
+          bug: 4,
+        };
+        setHierarchyConfig(fallback);
+      }
+    };
+    fetchHierarchyConfig();
   }, []);
 
   const loadGraph = useCallback(async () => {
@@ -310,7 +336,34 @@ export function GraphView({
       }
       setNodeStats(stats);
       
-      const flowNodes: Node[] = visibleNodes.map((node: ApiGraphNode) => {
+      // Apply clustering if using compact layout and hierarchy config is available
+      let nodesToRender = visibleNodes;
+      let edgesToRender = data.edges;
+      
+      if (layoutAlgorithm === 'compact' && hierarchyConfig) {
+        const clustered = prepareClusteredGraphForReactFlow(
+          visibleNodes,
+          data.edges,
+          hierarchyConfig,
+          expansionState
+        );
+        
+        nodesToRender = clustered.visibleNodes;
+        
+        // Combine regular edges with virtual edges
+        // Virtual edges need to be converted to the same format as regular edges
+        edgesToRender = [
+          ...clustered.visibleEdges,
+          // Add virtual edges as regular edges with metadata
+          ...clustered.virtualEdges.map(ve => ({
+            from: ve.from,
+            to: ve.to,
+            // Could add metadata here for rendering (e.g., thickness based on count)
+          })),
+        ];
+      }
+      
+      const flowNodes: Node[] = nodesToRender.map((node: ApiGraphNode) => {
         const stats = nodeStats.get(node.id);
         const hasDownstream = stats && stats.total > 0;
         const filterResult = nodeFilterResults.get(node.id)!;
@@ -418,7 +471,7 @@ export function GraphView({
 
       // Note: edge.from depends on edge.to, so for L->R layout, 
       // the dependency (to) should be on the left, and dependent (from) on the right
-      const flowEdges: Edge[] = data.edges
+      const flowEdges: Edge[] = edgesToRender
         .map((edge) => {
           const sourceResult = nodeFilterResults.get(edge.to);
           const targetResult = nodeFilterResults.get(edge.from);
@@ -469,7 +522,7 @@ export function GraphView({
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setNodes, setEdges, viewMode, labelFilters, strategicTypes, layoutAlgorithm]); // nodeStats is setState, not a dependency
+  }, [setNodes, setEdges, viewMode, labelFilters, strategicTypes, layoutAlgorithm, hierarchyConfig, expansionState]); // nodeStats is setState, not a dependency
 
   useEffect(() => {
     loadGraph();

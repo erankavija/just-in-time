@@ -163,11 +163,10 @@ export function assignNodesToSubgraphs(
 /**
  * Build child-parent map for efficient lookup of which containers own which nodes.
  * Uses dependency edges where from → to means "from contains/owns to" in the hierarchy.
- * @param nodes - All nodes in the graph
  * @param edges - All edges in the graph
  * @returns Map of node ID → parent container ID
  */
-function buildContainerMap(nodes: GraphNode[], edges: GraphEdge[]): Map<string, string> {
+function buildContainerMap(edges: GraphEdge[]): Map<string, string> {
   const containerMap = new Map<string, string>();
   
   // In a dependency graph, edge from→to means "from depends on to"
@@ -198,8 +197,7 @@ export function aggregateEdgesForCollapsed(
   expansionState: ExpansionState
 ): VirtualEdge[] {
   // Build map of which nodes are children of which containers
-  const containerMap = buildContainerMap(nodes, edges);
-  const nodeSet = new Set(nodes.map(n => n.id));
+  const containerMap = buildContainerMap(edges);
   
   // Helper: Find which nodes are hidden by collapsed containers
   const isVisible = (nodeId: string): boolean => {
