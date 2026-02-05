@@ -188,6 +188,7 @@ describe('subgraphClustering', () => {
 
       const result = assignNodesToSubgraphs(nodes, edges, hierarchy);
 
+      // Now uses level 2 (epic) as container level
       expect(result.clusters.size).toBe(1);
       expect(result.clusters.has('epic-1')).toBe(true);
       
@@ -242,6 +243,7 @@ describe('subgraphClustering', () => {
 
       const result = assignNodesToSubgraphs(nodes, edges, hierarchy);
 
+      // Uses level 2 (epic) as container level
       expect(result.clusters.size).toBe(2);
       expect(result.clusters.has('epic-1')).toBe(true);
       expect(result.clusters.has('epic-2')).toBe(true);

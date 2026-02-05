@@ -264,16 +264,26 @@ describe('clusteredGraphLayout - Integration Tests', () => {
       {} // All expanded
     );
 
-    // Should create clusters at the LOWEST strategic level present
-    // With milestones (level 1) present, clustering should happen at milestone level
-    expect(result.clusters.length).toBeGreaterThan(0);
+    // Should create clusters at epic level (level 2) when milestones present
+    expect(result.clusters.length).toBe(2); // E1 and E2
 
-    // Milestone M1 cluster should contain everything
-    const m1Cluster = result.clusters.find(c => c.containerId === 'M1');
-    expect(m1Cluster).toBeDefined();
-    expect(m1Cluster!.nodes.map(n => n.id)).toContain('E1');
-    expect(m1Cluster!.nodes.map(n => n.id)).toContain('E2');
-    expect(m1Cluster!.nodes.map(n => n.id)).toContain('T1');
+    // Epic E1 cluster should contain its stories and tasks
+    const e1Cluster = result.clusters.find(c => c.containerId === 'E1');
+    expect(e1Cluster).toBeDefined();
+    expect(e1Cluster!.nodes.map(n => n.id)).toContain('E1');
+    expect(e1Cluster!.nodes.map(n => n.id)).toContain('S1');
+    expect(e1Cluster!.nodes.map(n => n.id)).toContain('T1');
+    expect(e1Cluster!.nodes.map(n => n.id)).toContain('T2');
+
+    // Epic E2 cluster should contain its stories and tasks
+    const e2Cluster = result.clusters.find(c => c.containerId === 'E2');
+    expect(e2Cluster).toBeDefined();
+    expect(e2Cluster!.nodes.map(n => n.id)).toContain('E2');
+    expect(e2Cluster!.nodes.map(n => n.id)).toContain('S2');
+    expect(e2Cluster!.nodes.map(n => n.id)).toContain('T3');
+    
+    // Milestone M1 should be an orphan node (not in any cluster)
+    expect(result.orphanNodes.map(n => n.id)).toContain('M1');
 
     // All nodes visible
     expect(result.visibleNodes).toHaveLength(8);

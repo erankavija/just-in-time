@@ -62,10 +62,11 @@ export function assignNodesToSubgraphs(
   
   const uniqueLevels = [...new Set(nodeLevels.map(nl => nl.level))].sort((a, b) => a - b);
   
-  // Container level is the LOWEST level present (most strategic nodes become containers)
-  // e.g., if we have epic=2, story=3, task=4 → containers are at level 2 (epics)
-  //       if we have milestone=1, epic=2, ... → containers are at level 1 (milestones)
-  const containerLevel = uniqueLevels[0];
+  // Container level selection strategy:
+  // - Prefer level 2 (typically "epic") if it exists
+  // - Fall back to lowest level if level 2 doesn't exist
+  // - This allows milestones (level 1) to be visible nodes, not containers
+  const containerLevel = uniqueLevels.includes(2) ? 2 : uniqueLevels[0];
   
   // Find all container nodes
   const containerNodes = nodes.filter(n => getNodeLevel(n, hierarchy) === containerLevel);
@@ -176,10 +177,12 @@ export function assignNodesToSubgraphs(
     return fromCluster !== toCluster && fromCluster && toCluster;
   });
   
-  // Find orphan nodes (not assigned to any cluster and not containers)
+  // Find orphan nodes (not assigned to any cluster)
+  // This includes:
+  // 1. Nodes with level > containerLevel (more tactical, no parent)
+  // 2. Nodes with level < containerLevel (more strategic, shown as regular nodes)
   const orphanNodes = nodes.filter(n => 
-    !assignedNodes.has(n.id) && 
-    getNodeLevel(n, hierarchy) > containerLevel
+    !assignedNodes.has(n.id) && !containerNodes.some(c => c.id === n.id)
   );
   
   return {

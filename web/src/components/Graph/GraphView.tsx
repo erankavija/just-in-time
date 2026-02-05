@@ -102,38 +102,65 @@ const getClusterAwareLayout = (
   clusterData: ReturnType<typeof prepareClusteredGraphForReactFlow>
 ) => {
   // Use the new cluster-aware layout algorithm
+  // Note: edges here have swapped source/target for ReactFlow display
+  // We need to swap back to get original from→to semantics
   const layoutResult = createClusterAwareLayout(
     clusterData.clusters,
-    clusterData.crossClusterEdges
+    clusterData.crossClusterEdges,
+    clusterData.orphanNodes,
+    edges.map(e => ({ from: e.target, to: e.source, type: 'depends_on' })) // Swap back: target→source
   );
   
+  const finalNodes: Node[] = [];
+  
+  // Add cluster container boxes (rendered behind nodes)
+  layoutResult.clusters.forEach((clusterPos, clusterId) => {
+    const cluster = clusterData.clusters.find(c => c.containerId === clusterId);
+    if (!cluster) return;
+    
+    const containerNode = nodes.find(n => n.id === clusterId);
+    const clusterTitle = containerNode?.data?.label || clusterId.substring(0, 8);
+    
+    finalNodes.push({
+      id: `cluster-${clusterId}`,
+      type: 'group', // ReactFlow group node type
+      position: {
+        x: clusterPos.x,
+        y: clusterPos.y,
+      },
+      style: {
+        width: clusterPos.width,
+        height: clusterPos.height,
+        backgroundColor: 'rgba(200, 200, 200, 0.1)',
+        border: '2px solid rgba(150, 150, 150, 0.3)',
+        borderRadius: '8px',
+        padding: '40px 20px 20px 20px',
+        zIndex: -1,
+      },
+      data: {
+        label: clusterTitle,
+      },
+      draggable: false,
+      selectable: false,
+    });
+  });
+  
   // Convert layout result to ReactFlow nodes
-  const finalNodes: Node[] = layoutResult.nodes.map(layoutNode => {
+  layoutResult.nodes.forEach(layoutNode => {
     const originalNode = nodes.find(n => n.id === layoutNode.id);
     if (!originalNode) {
       throw new Error(`Node ${layoutNode.id} not found in original nodes`);
     }
     
-    return {
+    finalNodes.push({
       ...originalNode,
       position: layoutNode.position,
-    };
+      zIndex: 10, // Ensure nodes appear above cluster containers
+    });
   });
   
-  // Handle orphan nodes (not in any cluster) - place them on the far left
-  const ORPHAN_X = 60;
-  clusterData.orphanNodes.forEach((orphanNode, index) => {
-    const node = nodes.find(n => n.id === orphanNode.id);
-    if (node) {
-      finalNodes.push({
-        ...node,
-        position: {
-          x: ORPHAN_X,
-          y: 60 + index * (LAYOUT_CONFIG.nodeHeight + LAYOUT_CONFIG.nodeSpacing),
-        },
-      });
-    }
-  });
+  // Orphan nodes are now positioned by the layout algorithm (in layoutResult.nodes)
+  // No need for separate orphan handling
   
   return { nodes: finalNodes, edges };
 };
@@ -414,10 +441,17 @@ export function GraphView({
         nodesToRender = clustered.visibleNodes;
         clusterData = clustered; // Pass to layout function
         
-        // Combine regular edges with virtual edges
-        // Virtual edges need to be converted to the same format as regular edges
+        // Collect all edges that should be visible:
+        // 1. visibleEdges (edges between visible nodes)
+        // 2. Internal cluster edges (edges within each cluster)
+        // 3. Cross-cluster edges (edges between different clusters)
+        // 4. Virtual edges (for collapsed containers)
+        const allInternalEdges = clustered.clusters.flatMap(c => c.internalEdges);
+        
         edgesToRender = [
           ...clustered.visibleEdges,
+          ...allInternalEdges,
+          ...clustered.crossClusterEdges, // Add cross-cluster edges!
           // Add virtual edges as regular edges with metadata
           ...clustered.virtualEdges.map(ve => ({
             from: ve.from,
@@ -425,6 +459,16 @@ export function GraphView({
             // Could add metadata here for rendering (e.g., thickness based on count)
           })),
         ];
+        
+        // Deduplicate edges by ID
+        const edgeMap = new Map();
+        edgesToRender.forEach(e => {
+          const key = `${e.from}-${e.to}`;
+          if (!edgeMap.has(key)) {
+            edgeMap.set(key, e);
+          }
+        });
+        edgesToRender = Array.from(edgeMap.values());
       }
       
       const flowNodes: Node[] = nodesToRender.map((node: ApiGraphNode) => {
