@@ -104,7 +104,7 @@ describe('clusteredGraphLayout - Integration Tests', () => {
     // Epic E1 cluster should contain all its stories and tasks
     const e1Cluster = result.clusters.find(c => c.containerId === 'E1');
     expect(e1Cluster).toBeDefined();
-    expect(e1Cluster!.nodes).toHaveLength(11); // E1 + 3 stories + 8 tasks
+    expect(e1Cluster!.nodes).toHaveLength(12); // E1 + 3 stories + 8 tasks
 
     // Epic E2 cluster should contain only T9
     const e2Cluster = result.clusters.find(c => c.containerId === 'E2');

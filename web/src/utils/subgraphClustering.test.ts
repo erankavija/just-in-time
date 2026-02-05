@@ -398,6 +398,14 @@ describe('subgraphClustering', () => {
   });
 
   describe('aggregateEdgesForCollapsed', () => {
+    const hierarchy: HierarchyLevelMap = {
+      milestone: 1,
+      epic: 2,
+      story: 3,
+      task: 4,
+      bug: 4,
+    };
+
     it('should aggregate edges from collapsed story to external nodes', () => {
       const story: GraphNode = {
         id: 'story-1',
@@ -437,7 +445,7 @@ describe('subgraphClustering', () => {
         'story-1': false, // Collapsed
       };
 
-      const virtualEdges = aggregateEdgesForCollapsed(nodes, edges, expansionState);
+      const virtualEdges = aggregateEdgesForCollapsed(nodes, edges, expansionState, hierarchy);
 
       // Should have 1 virtual edge: story-1 → external-1
       expect(virtualEdges).toHaveLength(1);
@@ -487,7 +495,7 @@ describe('subgraphClustering', () => {
         'story-1': false,
       };
 
-      const virtualEdges = aggregateEdgesForCollapsed(nodes, edges, expansionState);
+      const virtualEdges = aggregateEdgesForCollapsed(nodes, edges, expansionState, hierarchy);
 
       // Should aggregate 2 edges into 1 virtual edge with count=2
       expect(virtualEdges).toHaveLength(1);
@@ -527,7 +535,7 @@ describe('subgraphClustering', () => {
         'story-1': false,
       };
 
-      const virtualEdges = aggregateEdgesForCollapsed(nodes, edges, expansionState);
+      const virtualEdges = aggregateEdgesForCollapsed(nodes, edges, expansionState, hierarchy);
 
       // Should aggregate: external-1 → task-1 becomes external-1 → story-1
       //                   external-2 → task-1 becomes external-2 → story-1
@@ -569,7 +577,7 @@ describe('subgraphClustering', () => {
         'story-1': true, // Expanded
       };
 
-      const virtualEdges = aggregateEdgesForCollapsed(nodes, edges, expansionState);
+      const virtualEdges = aggregateEdgesForCollapsed(nodes, edges, expansionState, hierarchy);
 
       // Should have no virtual edges when expanded
       expect(virtualEdges).toHaveLength(0);
@@ -614,7 +622,7 @@ describe('subgraphClustering', () => {
         'story-1': false,
       };
 
-      const virtualEdges = aggregateEdgesForCollapsed(nodes, edges, expansionState);
+      const virtualEdges = aggregateEdgesForCollapsed(nodes, edges, expansionState, hierarchy);
 
       // Epic collapsed → should aggregate all children's edges
       const epicEdge = virtualEdges.find(e => e.from === 'epic-1' && e.to === 'external-1');

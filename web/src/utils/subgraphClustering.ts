@@ -90,26 +90,35 @@ export function assignNodesToSubgraphs(
   const clusters = new Map<string, SubgraphCluster>();
   const assignedNodes = new Set<string>();
   
+  // FIRST PASS: Mark ALL direct children of ALL containers
+  // This prevents transitive dependencies from stealing direct children
+  const directChildrenMap = new Map<string, Set<string>>();
   for (const container of containerNodes) {
-    const clusterNodes: GraphNode[] = [container];
-    const visited = new Set<string>([container.id]);
-    const queue = [container.id];
-    
-    // First pass: Mark DIRECT children (nodes with edge from container)
     const directChildren = new Set<string>();
     const containerEdges = edgesByNode.get(container.id) || [];
+    
     for (const edge of containerEdges) {
       const targetNode = nodeMap.get(edge.to);
       if (targetNode) {
         const targetLevel = getNodeLevel(targetNode, hierarchy);
         if (targetLevel > containerLevel) {
           directChildren.add(targetNode.id);
-          assignedNodes.add(targetNode.id); // Reserve immediately
+          assignedNodes.add(targetNode.id); // Reserve globally
         }
       }
     }
     
-    // Second pass: BFS to find all transitive lower-level dependents
+    directChildrenMap.set(container.id, directChildren);
+  }
+  
+  // SECOND PASS: Build clusters with BFS
+  for (const container of containerNodes) {
+    const clusterNodes: GraphNode[] = [container];
+    const visited = new Set<string>([container.id]);
+    const queue = [container.id];
+    const myDirectChildren = directChildrenMap.get(container.id) || new Set();
+    
+    // BFS to find all transitive lower-level dependents
     while (queue.length > 0) {
       const currentId = queue.shift()!;
       const outgoingEdges = edgesByNode.get(currentId) || [];
@@ -120,14 +129,16 @@ export function assignNodesToSubgraphs(
         
         const targetLevel = getNodeLevel(targetNode, hierarchy);
         
-        // Include if: higher level AND (direct child OR not assigned to another cluster)
-        const isDirect = directChildren.has(targetNode.id);
+        // Include if: higher level AND (my direct child OR not assigned to another cluster)
+        const isMyDirectChild = myDirectChildren.has(targetNode.id);
         const isAvailable = !assignedNodes.has(targetNode.id);
         
-        if (targetLevel > containerLevel && (isDirect || isAvailable)) {
+        if (targetLevel > containerLevel && (isMyDirectChild || isAvailable)) {
           clusterNodes.push(targetNode);
           visited.add(targetNode.id);
-          assignedNodes.add(targetNode.id);
+          if (!isMyDirectChild) {
+            assignedNodes.add(targetNode.id); // Claim if not already claimed
+          }
           queue.push(targetNode.id);
         }
         // Note: If targetLevel <= containerLevel, this is a cross-cluster edge (boundary)
@@ -181,18 +192,48 @@ export function assignNodesToSubgraphs(
 /**
  * Build child-parent map for efficient lookup of which containers own which nodes.
  * Uses dependency edges where from → to means "from contains/owns to" in the hierarchy.
+ * Prefers the most strategic parent (lowest hierarchy level) when multiple parents exist.
+ * @param nodes - All nodes in the graph
  * @param edges - All edges in the graph
+ * @param hierarchy - Hierarchy level mapping
  * @returns Map of node ID → parent container ID
  */
-function buildContainerMap(edges: GraphEdge[]): Map<string, string> {
+function buildContainerMap(
+  nodes: GraphNode[],
+  edges: GraphEdge[],
+  hierarchy: HierarchyLevelMap
+): Map<string, string> {
   const containerMap = new Map<string, string>();
+  const nodeMap = new Map(nodes.map(n => [n.id, n]));
+  const nodeIds = new Set(nodes.map(n => n.id));
   
   // In a dependency graph, edge from→to means "from depends on to"
   // For containment, we want the REVERSE: if epic→story, then story's parent is epic
   edges.forEach(edge => {
-    // Only set parent if not already set (use first parent found)
-    if (!containerMap.has(edge.to)) {
+    // Only process edges where BOTH nodes exist (ignore external dependencies)
+    if (!nodeIds.has(edge.from) || !nodeIds.has(edge.to)) {
+      return;
+    }
+    
+    const currentParent = containerMap.get(edge.to);
+    
+    if (!currentParent) {
+      // No parent yet, use this one
       containerMap.set(edge.to, edge.from);
+    } else {
+      // Compare hierarchy levels - keep the more strategic parent (lower level number)
+      const currentParentNode = nodeMap.get(currentParent);
+      const newParentNode = nodeMap.get(edge.from);
+      
+      if (currentParentNode && newParentNode) {
+        const currentLevel = getNodeLevel(currentParentNode, hierarchy);
+        const newLevel = getNodeLevel(newParentNode, hierarchy);
+        
+        if (newLevel < currentLevel) {
+          // New parent is more strategic, use it
+          containerMap.set(edge.to, edge.from);
+        }
+      }
     }
   });
   
@@ -212,10 +253,11 @@ function buildContainerMap(edges: GraphEdge[]): Map<string, string> {
 export function aggregateEdgesForCollapsed(
   nodes: GraphNode[],
   edges: GraphEdge[],
-  expansionState: ExpansionState
+  expansionState: ExpansionState,
+  hierarchy: HierarchyLevelMap
 ): VirtualEdge[] {
   // Build map of which nodes are children of which containers
-  const containerMap = buildContainerMap(edges);
+  const containerMap = buildContainerMap(nodes, edges, hierarchy);
   
   // Helper: Find which nodes are hidden by collapsed containers
   const isVisible = (nodeId: string): boolean => {
@@ -236,20 +278,19 @@ export function aggregateEdgesForCollapsed(
   
   // Helper: Get the visible representative for a node
   const getVisibleRepresentative = (nodeId: string): string => {
-    // Traverse up the container hierarchy until we find a visible node
+    // Traverse up the container hierarchy to find the topmost collapsed ancestor
     let current = nodeId;
     let parent = containerMap.get(current);
     
+    // Keep going up until we find no more parents
     while (parent) {
       if (expansionState[parent] === false) {
-        // Parent is collapsed, so current is hidden
-        // Continue up to find the collapsed ancestor
+        // Parent is collapsed, so everything inside it is hidden
+        // The collapsed parent becomes the representative
         current = parent;
-        parent = containerMap.get(current);
-      } else {
-        // Parent is expanded (or doesn't exist), so current is visible
-        break;
       }
+      // Continue up to the next level
+      parent = containerMap.get(parent);
     }
     
     return current;

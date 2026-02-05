@@ -115,7 +115,7 @@ export function prepareClusteredGraphForReactFlow(
   );
   
   // Step 4: Generate virtual edges for collapsed containers
-  const virtualEdges = aggregateEdgesForCollapsed(nodes, edges, expansionState);
+  const virtualEdges = aggregateEdgesForCollapsed(nodes, edges, expansionState, hierarchy);
   
   // Step 5: Filter virtual edges to only those with visible endpoints
   const filteredVirtualEdges = virtualEdges.filter(
