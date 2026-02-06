@@ -1,0 +1,14 @@
+.cluster-node-toggle-button-compact {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--text-muted);
+  transition: color 0.2s;
+}
+
+.cluster-node-toggle-button-compact:hover {
+  color: var(--primary-color);
+}

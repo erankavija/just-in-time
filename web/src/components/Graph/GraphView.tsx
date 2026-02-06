@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import ReactFlow, {
   Controls,
   Background,
@@ -8,6 +8,7 @@ import ReactFlow, {
   Position,
   type Node,
   type Edge,
+  type NodeTypes,
 } from 'reactflow';
 import dagre from 'dagre';
 import 'reactflow/dist/style.css';
@@ -19,6 +20,7 @@ import { applyFiltersToNode, applyFiltersToEdge, createStrategicFilter, createLa
 import type { HierarchyLevelMap, ExpansionState } from '../../types/subgraphCluster';
 import { prepareClusteredGraphForReactFlow } from '../../utils/clusteredGraphLayout';
 import { createClusterAwareLayout } from '../../utils/clusterAwareLayout';
+import ClusterNode from './nodes/ClusterNode';
 
 // State colors using CSS variables
 const stateColors: Record<State, string> = {
@@ -47,6 +49,11 @@ const priorityColors: Record<Priority, string> = {
 
 // Layout algorithm types
 export type LayoutAlgorithm = 'dagre' | 'compact';
+
+// Custom node types for ReactFlow
+const nodeTypes: NodeTypes = {
+  cluster: ClusterNode,
+};
 
 // ReactFlow options (defined outside component to avoid recreating on each render)
 const proOptions = { hideAttribution: true };
@@ -104,7 +111,8 @@ const getClusterAwareLayout = (
   nodes: Node[],
   edges: Edge[],
   clusterData: ReturnType<typeof prepareClusteredGraphForReactFlow>,
-  allOriginalEdges: GraphEdge[]
+  allOriginalEdges: GraphEdge[],
+  expansionState: ExpansionState
 ) => {
   // Use the new cluster-aware layout algorithm with ALL original edges
   // This ensures orphan nodes are positioned correctly based on all dependencies
@@ -117,36 +125,41 @@ const getClusterAwareLayout = (
   
   const finalNodes: Node[] = [];
   
-  // Add cluster container boxes (rendered behind nodes)
+  // Add cluster container boxes ONLY for expanded clusters
   layoutResult.clusters.forEach((clusterPos, clusterId) => {
     const cluster = clusterData.clusters.find(c => c.containerId === clusterId);
     if (!cluster) return;
     
-    const containerNode = nodes.find(n => n.id === clusterId);
-    const clusterTitle = containerNode?.data?.label || clusterId.substring(0, 8);
+    const isExpanded = expansionState[clusterId] ?? false; // Default to collapsed
     
-    finalNodes.push({
-      id: `cluster-${clusterId}`,
-      type: 'group', // ReactFlow group node type
-      position: {
-        x: clusterPos.x,
-        y: clusterPos.y,
-      },
-      style: {
-        width: clusterPos.width,
-        height: clusterPos.height,
-        backgroundColor: 'rgba(200, 200, 200, 0.1)',
-        border: '2px solid rgba(150, 150, 150, 0.3)',
-        borderRadius: '8px',
-        padding: '40px 20px 20px 20px',
-        zIndex: -1,
-      },
-      data: {
-        label: clusterTitle,
-      },
-      draggable: false,
-      selectable: false,
-    });
+    // Only render the visual container box if expanded
+    if (isExpanded) {
+      const containerNode = nodes.find(n => n.id === clusterId);
+      const clusterTitle = containerNode?.data?.label || clusterId.substring(0, 8);
+      
+      finalNodes.push({
+        id: `cluster-${clusterId}`,
+        type: 'group', // ReactFlow group node type
+        position: {
+          x: clusterPos.x,
+          y: clusterPos.y,
+        },
+        style: {
+          width: clusterPos.width,
+          height: clusterPos.height,
+          backgroundColor: 'rgba(200, 200, 200, 0.1)',
+          border: '2px solid rgba(150, 150, 150, 0.3)',
+          borderRadius: '8px',
+          padding: '40px 20px 20px 20px',
+          zIndex: -1,
+        },
+        data: {
+          label: clusterTitle,
+        },
+        draggable: false,
+        selectable: false,
+      });
+    }
   });
   
   // Convert layout result to ReactFlow nodes
@@ -174,7 +187,8 @@ const getCompactLayout = (
   nodes: Node[], 
   edges: Edge[],
   clusterData?: ReturnType<typeof prepareClusteredGraphForReactFlow> | null,
-  allOriginalEdges?: GraphEdge[]
+  allOriginalEdges?: GraphEdge[],
+  expansionState?: ExpansionState
 ) => {
   if (nodes.length === 0) {
     return { nodes: [], edges };
@@ -182,7 +196,7 @@ const getCompactLayout = (
 
   // If we have cluster data, use cluster-aware layout
   if (clusterData && clusterData.clusters.length > 0) {
-    return getClusterAwareLayout(nodes, edges, clusterData, allOriginalEdges || []);
+    return getClusterAwareLayout(nodes, edges, clusterData, allOriginalEdges || [], expansionState || {});
   }
 
   // Otherwise fall back to basic rank-based layout
@@ -327,11 +341,12 @@ const getLayoutedElements = (
   edges: Edge[], 
   algorithm: LayoutAlgorithm = 'dagre',
   clusterData?: ReturnType<typeof prepareClusteredGraphForReactFlow> | null,
-  allOriginalEdges?: GraphEdge[]
+  allOriginalEdges?: GraphEdge[],
+  expansionState?: ExpansionState
 ) => {
   switch (algorithm) {
     case 'compact':
-      return getCompactLayout(nodes, edges, clusterData, allOriginalEdges);
+      return getCompactLayout(nodes, edges, clusterData, allOriginalEdges, expansionState);
     case 'dagre':
     default:
       return getDagreLayout(nodes, edges);
@@ -362,7 +377,37 @@ export function GraphView({
   const [nodeStats, setNodeStats] = useState<Map<string, DownstreamStats>>(new Map());
   const [strategicTypes, setStrategicTypes] = useState<string[]>(['milestone', 'epic']); // Default fallback
   const [hierarchyConfig, setHierarchyConfig] = useState<HierarchyLevelMap | null>(null);
-  const [expansionState] = useState<ExpansionState>({});
+  const [expansionState, setExpansionState] = useState<ExpansionState>({});
+  const [hasInitialFit, setHasInitialFit] = useState(false);
+  const reactFlowInstanceRef = useRef<any>(null);
+  const savedViewportRef = useRef<any>(null);
+
+  /**
+   * Toggle expansion state for a container node (cluster or hierarchical parent).
+   * Hierarchy-agnostic - works with any configured node types.
+   */
+  const toggleExpansion = useCallback((nodeId: string) => {
+    // Save current viewport before toggling
+    savedViewportRef.current = reactFlowInstanceRef.current?.getViewport();
+    
+    setExpansionState(prev => ({
+      ...prev,
+      [nodeId]: !(prev[nodeId] ?? false), // Default to collapsed (false)
+    }));
+  }, []);
+
+  // Restore viewport after nodes change (when expanding/collapsing)
+  useEffect(() => {
+    if (savedViewportRef.current && reactFlowInstanceRef.current && !loading && nodes.length > 0) {
+      // Use double requestAnimationFrame to ensure DOM has updated
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          reactFlowInstanceRef.current?.setViewport(savedViewportRef.current, { duration: 0 });
+          savedViewportRef.current = null;
+        });
+      });
+    }
+  }, [nodes.length, loading]);
 
   // Fetch strategic types from API on mount
   useEffect(() => {
@@ -444,7 +489,9 @@ export function GraphView({
           expansionState
         );
         
-        nodesToRender = clustered.visibleNodes;
+        // Keep nodesToRender as visibleNodes for flowNode creation
+        // The expansion filtering will happen during rendering
+        nodesToRender = visibleNodes; // Use ALL visible nodes, not filtered ones
         clusterData = clustered; // Pass to layout function
         
         // Collect all edges that should be visible:
@@ -483,6 +530,38 @@ export function GraphView({
         const filterResult = nodeFilterResults.get(node.id)!;
         const isDimmed = filterResult.dimmed;
         
+        // Check if this node is a cluster container
+        const cluster = clusterData?.clusters.find(c => c.containerId === node.id);
+        const isClusterContainer = !!cluster;
+        
+        // For cluster containers when using compact layout, add collapse/expand functionality
+        if (isClusterContainer && cluster && layoutAlgorithm === 'compact') {
+          const isExpanded = expansionState[node.id] ?? false; // Default to collapsed
+          const hiddenNodeCount = isExpanded ? 0 : cluster.nodes.length - 1; // -1 for container itself
+          
+          return {
+            id: node.id,
+            type: 'cluster',
+            position: { x: 0, y: 0 },
+            sourcePosition: Position.Right,
+            targetPosition: Position.Left,
+            data: {
+              label: node.label,
+              isExpanded,
+              hiddenNodeCount,
+              onToggleExpansion: () => toggleExpansion(node.id),
+              state: node.state,
+              priority: node.priority,
+              labels: node.labels,
+              nodeId: node.id, // For reference
+            },
+            style: {
+              opacity: isDimmed ? 0.4 : 1,
+            },
+          };
+        }
+        
+        // Regular node (not a cluster container)
         return {
           id: node.id,
           type: 'default',
@@ -626,9 +705,31 @@ export function GraphView({
         .filter((edge): edge is Edge => edge !== null);
 
       // Apply layout algorithm
-      const layouted = getLayoutedElements(flowNodes, flowEdges, layoutAlgorithm, clusterData, data.edges);
-      setNodes(layouted.nodes);
+      const layouted = getLayoutedElements(flowNodes, flowEdges, layoutAlgorithm, clusterData, data.edges, expansionState);
+      
+      // Filter nodes to only show visible ones (respecting expansion state)
+      const visibleNodeIds = clusterData 
+        ? new Set(clusterData.visibleNodes.map(n => n.id))
+        : new Set(nodesToRender.map(n => n.id));
+      
+      const finalNodes = layouted.nodes.filter(node => {
+        // Always show visual cluster boxes (for expanded clusters only, created in layout)
+        if (node.id.startsWith('cluster-')) return true;
+        
+        // Show nodes that are visible according to expansion state
+        return visibleNodeIds.has(node.id);
+      });
+      
+      setNodes(finalNodes);
       setEdges(layouted.edges);
+      
+      // Fit view only on first load
+      if (!hasInitialFit && finalNodes.length > 0) {
+        setHasInitialFit(true);
+        setTimeout(() => {
+          reactFlowInstanceRef.current?.fitView({ duration: 200 });
+        }, 50);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load graph');
       console.error('Failed to load graph:', err);
@@ -701,7 +802,8 @@ export function GraphView({
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeClick={handleNodeClick}
-        fitView
+        nodeTypes={nodeTypes}
+        onInit={(instance) => { reactFlowInstanceRef.current = instance; }}
         attributionPosition="bottom-right"
         proOptions={proOptions}
       >

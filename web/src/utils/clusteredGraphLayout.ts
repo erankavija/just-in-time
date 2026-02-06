@@ -5,7 +5,7 @@ import type {
   ExpansionState,
   VirtualEdge 
 } from '../types/subgraphCluster';
-import { assignNodesToSubgraphs, aggregateEdgesForCollapsed, getNodeLevel } from './subgraphClustering';
+import { assignNodesToSubgraphs } from './subgraphClustering';
 
 /**
  * Result of preparing clustered graph for ReactFlow rendering.
@@ -58,46 +58,37 @@ export function prepareClusteredGraphForReactFlow(
   // Step 2: Determine visible nodes based on expansion state
   const visibleNodeIds = new Set<string>();
   
-  // Build container map for visibility checks
-  // A node's container is the edge source with the LOWEST hierarchy level (most strategic)
-  const containerMap = new Map<string, string>();
-  const nodeMap = new Map(nodes.map(n => [n.id, n]));
+  // Identify cluster container nodes (nodes that have clusters)
+  const clusterContainerIds = new Set(
+    Array.from(clusteredGraph.clusters.values()).map(c => c.containerId)
+  );
   
-  edges.forEach(edge => {
-    const currentParent = containerMap.get(edge.to);
-    if (!currentParent) {
-      // No parent yet, use this one
-      containerMap.set(edge.to, edge.from);
-    } else {
-      // Compare hierarchy levels - keep the more strategic parent (lower level number)
-      const currentParentNode = nodeMap.get(currentParent);
-      const newParentNode = nodeMap.get(edge.from);
-      
-      if (currentParentNode && newParentNode) {
-        const currentLevel = getNodeLevel(currentParentNode, hierarchy);
-        const newLevel = getNodeLevel(newParentNode, hierarchy);
-        
-        if (newLevel < currentLevel) {
-          // New parent is more strategic, use it
-          containerMap.set(edge.to, edge.from);
-        }
-      }
-    }
+  // Build map: nodeId -> clusterId (which cluster is this node a member of?)
+  const nodeToClusterMap = new Map<string, string>();
+  clusteredGraph.clusters.forEach((cluster, clusterId) => {
+    cluster.nodes.forEach(node => {
+      nodeToClusterMap.set(node.id, clusterId);
+    });
   });
   
   // Helper: check if node is visible
   const isNodeVisible = (nodeId: string): boolean => {
-    // Node is visible if no parent is collapsed
-    let parent = containerMap.get(nodeId);
-    
-    while (parent) {
-      if (expansionState[parent] === false) {
-        return false; // Hidden by collapsed parent
-      }
-      parent = containerMap.get(parent);
+    // Cluster containers are ALWAYS visible (they are the top-level collapsible units)
+    if (clusterContainerIds.has(nodeId)) {
+      return true;
     }
     
-    return true; // No collapsed parents
+    // Check if this node is a member of a cluster
+    const clusterId = nodeToClusterMap.get(nodeId);
+    
+    if (clusterId) {
+      // Node is inside a cluster - visible only if cluster is expanded
+      const isExpanded = expansionState[clusterId] ?? false; // Default to collapsed
+      return isExpanded;
+    }
+    
+    // Not in any cluster (orphan node) - always visible
+    return true;
   };
   
   // Determine visible nodes
@@ -109,25 +100,53 @@ export function prepareClusteredGraphForReactFlow(
   
   const visibleNodes = nodes.filter(n => visibleNodeIds.has(n.id));
   
-  // Step 3: Filter edges to only those between visible nodes
-  const visibleEdges = edges.filter(
-    e => visibleNodeIds.has(e.from) && visibleNodeIds.has(e.to)
-  );
+  // Step 3: Filter edges and create virtual edges for collapsed clusters
+  const visibleEdges: GraphEdge[] = [];
+  const virtualEdgeMap = new Map<string, VirtualEdge>();
   
-  // Step 4: Generate virtual edges for collapsed containers
-  const virtualEdges = aggregateEdgesForCollapsed(nodes, edges, expansionState, hierarchy);
+  edges.forEach(edge => {
+    const fromVisible = visibleNodeIds.has(edge.from);
+    const toVisible = visibleNodeIds.has(edge.to);
+    
+    if (fromVisible && toVisible) {
+      // Both endpoints visible - show edge as-is
+      visibleEdges.push(edge);
+    } else {
+      // At least one endpoint is hidden - create virtual edge to/from cluster container
+      const fromClusterId = nodeToClusterMap.get(edge.from);
+      const toClusterId = nodeToClusterMap.get(edge.to);
+      
+      // Determine virtual edge endpoints
+      const virtualFrom = fromVisible ? edge.from : fromClusterId || edge.from;
+      const virtualTo = toVisible ? edge.to : toClusterId || edge.to;
+      
+      // Skip if both endpoints end up being the same (internal edge within collapsed cluster)
+      if (virtualFrom === virtualTo) return;
+      
+      // Create/update virtual edge
+      const key = `${virtualFrom}→${virtualTo}`;
+      if (!virtualEdgeMap.has(key)) {
+        virtualEdgeMap.set(key, {
+          from: virtualFrom,
+          to: virtualTo,
+          count: 0,
+          sourceEdgeIds: [],
+        });
+      }
+      const virtualEdge = virtualEdgeMap.get(key)!;
+      virtualEdge.count++;
+      virtualEdge.sourceEdgeIds.push(`${edge.from}→${edge.to}`);
+    }
+  });
   
-  // Step 5: Filter virtual edges to only those with visible endpoints
-  const filteredVirtualEdges = virtualEdges.filter(
-    ve => visibleNodeIds.has(ve.from) && visibleNodeIds.has(ve.to)
-  );
+  const virtualEdges = Array.from(virtualEdgeMap.values());
   
   return {
     clusters: Array.from(clusteredGraph.clusters.values()),
     crossClusterEdges: clusteredGraph.crossClusterEdges,
     visibleNodes,
     visibleEdges,
-    virtualEdges: filteredVirtualEdges,
+    virtualEdges,
     orphanNodes: clusteredGraph.orphanNodes,
   };
 }
