@@ -262,23 +262,6 @@ export function aggregateEdgesForCollapsed(
   // Build map of which nodes are children of which containers
   const containerMap = buildContainerMap(nodes, edges, hierarchy);
   
-  // Helper: Find which nodes are hidden by collapsed containers
-  const isVisible = (nodeId: string): boolean => {
-    // Check if this node itself is collapsed (it's still visible, just its children are hidden)
-    // A node is hidden if it's INSIDE a collapsed parent
-    let parent = containerMap.get(nodeId);
-    
-    while (parent) {
-      if (expansionState[parent] === false) {
-        // This node is inside a collapsed parent
-        return false;
-      }
-      parent = containerMap.get(parent);
-    }
-    
-    return true;  // No collapsed parents, so visible
-  };
-  
   // Helper: Get the visible representative for a node
   const getVisibleRepresentative = (nodeId: string): string => {
     // Traverse up the container hierarchy to find the topmost collapsed ancestor

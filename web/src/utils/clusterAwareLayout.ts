@@ -1,6 +1,6 @@
 import dagre from 'dagre';
 import type { SubgraphCluster } from '../types/subgraphCluster';
-import type { GraphNode, GraphEdge } from '../types/graph';
+import type { GraphNode, GraphEdge } from '../types/models';
 
 interface ClusterPosition {
   x: number;
@@ -27,32 +27,25 @@ interface ClusterAwareLayoutResult {
 const CLUSTER_SPACING = 100; // Spacing between clusters (horizontal and vertical)
 const NODE_WIDTH = 180;
 const NODE_HEIGHT = 60;
-const NODE_SPACING_Y = 20;
 const CLUSTER_PADDING = 40;
 
 /**
- * Compute horizontal positions for clusters AND orphan nodes based on topological sort.
- * Uses Kahn's algorithm for topological ordering of cross-cluster dependencies.
- * 
- * In jit: A→B means "A depends on B" (B must complete first)
- * So B should be positioned LEFT of A (dependencies on left, dependents on right)
+ * Build edge maps and node-to-cluster mapping for layout positioning.
+ * Maps task IDs to their parent cluster IDs and collects all relevant edges.
  */
-export function computeClusterPositions(
+function buildEdgeMaps(
   clusters: SubgraphCluster[],
   crossClusterEdges: GraphEdge[],
-  orphanNodes: GraphNode[] = [],
-  allEdges: GraphEdge[] = []
-): Map<string, ClusterPosition> {
-  // Build adjacency map: who depends on whom
-  // edge from→to means "from depends on to", so to must come before from
+  orphanNodes: GraphNode[],
+  allEdges: GraphEdge[],
+  allNodeIds: string[]
+): {
+  incomingEdges: Map<string, Set<string>>;
+  outgoingEdges: Map<string, Set<string>>;
+  nodeToCluster: Map<string, string>;
+} {
   const incomingEdges = new Map<string, Set<string>>();
   const outgoingEdges = new Map<string, Set<string>>();
-  
-  // Include both clusters and orphan nodes
-  const allNodeIds = [
-    ...clusters.map(c => c.containerId),
-    ...orphanNodes.map(n => n.id)
-  ].sort(); // Sort for deterministic order
   
   allNodeIds.forEach(id => {
     incomingEdges.set(id, new Set());
@@ -62,29 +55,23 @@ export function computeClusterPositions(
   // Build a map from node ID to cluster ID
   const nodeToCluster = new Map<string, string>();
   clusters.forEach(cluster => {
-    nodeToCluster.set(cluster.containerId, cluster.containerId); // Container maps to itself
+    nodeToCluster.set(cluster.containerId, cluster.containerId);
     cluster.nodes.forEach(node => {
-      nodeToCluster.set(node.id, cluster.containerId); // Tasks map to their cluster
+      nodeToCluster.set(node.id, cluster.containerId);
     });
   });
   orphanNodes.forEach(orphan => {
-    nodeToCluster.set(orphan.id, orphan.id); // Orphans map to themselves
+    nodeToCluster.set(orphan.id, orphan.id);
   });
   
-  // Build edge maps from ALL edges (cross-cluster + edges involving orphans + cluster boundary edges)
+  // Collect all relevant edges
   const relevantEdges = [...crossClusterEdges];
   
-  // Add cluster incoming/outgoing edges for proper positioning (sorted by cluster ID for stability)
   [...clusters].sort((a, b) => a.containerId.localeCompare(b.containerId)).forEach(cluster => {
-    if (cluster.incomingEdges) {
-      relevantEdges.push(...cluster.incomingEdges);
-    }
-    if (cluster.outgoingEdges) {
-      relevantEdges.push(...cluster.outgoingEdges);
-    }
+    if (cluster.incomingEdges) relevantEdges.push(...cluster.incomingEdges);
+    if (cluster.outgoingEdges) relevantEdges.push(...cluster.outgoingEdges);
   });
   
-  // Add edges involving orphan nodes (sorted for stability)
   [...orphanNodes].sort((a, b) => a.id.localeCompare(b.id)).forEach(orphan => {
     allEdges.forEach(edge => {
       if (edge.from === orphan.id && allNodeIds.includes(edge.to)) {
@@ -96,45 +83,34 @@ export function computeClusterPositions(
     });
   });
   
+  // Map task IDs to cluster IDs and build edge maps
   relevantEdges.forEach(edge => {
-    // Map task IDs to cluster IDs
     const fromCluster = nodeToCluster.get(edge.from);
     const toCluster = nodeToCluster.get(edge.to);
     
     if (fromCluster && toCluster && allNodeIds.includes(fromCluster) && allNodeIds.includes(toCluster)) {
-      // from depends on to, so to has an outgoing edge to from
       outgoingEdges.get(toCluster)?.add(fromCluster);
       incomingEdges.get(fromCluster)?.add(toCluster);
     }
   });
   
-  // Kahn's algorithm: start with nodes that have no incoming edges (roots)
-  const queue: string[] = [];
-  const sorted: string[] = [];
-  const inDegree = new Map<string, number>();
-  
-  allNodeIds.forEach(id => {
-    const degree = incomingEdges.get(id)!.size;
-    inDegree.set(id, degree);
-    if (degree === 0) {
-      queue.push(id);
-    }
-  });
-  
-  // Assign ranks (columns) using longest path from root
-  // Nodes with no dependencies get rank 0
-  // Each node's rank = max(dependency ranks) + 1
+  return { incomingEdges, outgoingEdges, nodeToCluster };
+}
+
+/**
+ * Calculate rank (column) for each node using longest-path algorithm.
+ */
+function calculateRanks(
+  allNodeIds: string[],
+  incomingEdges: Map<string, Set<string>>
+): Map<string, number> {
   const ranks = new Map<string, number>();
-  const visiting = new Set<string>(); // Track nodes being visited (cycle detection)
+  const visiting = new Set<string>();
   
   const calculateRank = (nodeId: string): number => {
-    if (ranks.has(nodeId)) {
-      return ranks.get(nodeId)!;
-    }
-    
-    // Cycle detection: if we're already visiting this node, there's a cycle
+    if (ranks.has(nodeId)) return ranks.get(nodeId)!;
     if (visiting.has(nodeId)) {
-      ranks.set(nodeId, 0); // Treat as root to break cycle
+      ranks.set(nodeId, 0);
       return 0;
     }
     
@@ -154,8 +130,91 @@ export function computeClusterPositions(
     return rank;
   };
   
-  // Calculate rank for all nodes (in sorted order for determinism)
   [...allNodeIds].sort().forEach(id => calculateRank(id));
+  return ranks;
+}
+
+/**
+ * Adjust grid column positions based on actual cluster widths.
+ * Returns the total width of the grid.
+ */
+function adjustGridColumns(
+  items: Array<{id: string, pos: ClusterPosition}>,
+  clusterLayouts: Map<string, ClusterLayout>
+): number {
+  const byColumn = new Map<number, Array<{id: string, pos: ClusterPosition}>>();
+  items.forEach(item => {
+    const col = Math.round(item.pos.x / 1000);
+    if (!byColumn.has(col)) byColumn.set(col, []);
+    byColumn.get(col)!.push(item);
+  });
+  
+  // Calculate max width per column
+  const columnWidths = new Map<number, number>();
+  byColumn.forEach((colItems, col) => {
+    const maxWidth = Math.max(...colItems.map(({id, pos}) => {
+      return clusterLayouts.has(id) 
+        ? clusterLayouts.get(id)!.width 
+        : (pos.width || NODE_WIDTH + 2 * CLUSTER_PADDING);
+    }));
+    columnWidths.set(col, maxWidth);
+  });
+  
+  // Position columns with proper spacing
+  let colX = 0;
+  const sortedCols = Array.from(columnWidths.keys()).sort((a, b) => a - b);
+  const colPositions = new Map<number, number>();
+  
+  sortedCols.forEach(col => {
+    colPositions.set(col, colX);
+    colX += columnWidths.get(col)! + CLUSTER_SPACING;
+  });
+  
+  // Apply column positions and adjust Y spacing
+  byColumn.forEach((colItems, col) => {
+    colItems.sort((a, b) => a.id.localeCompare(b.id));
+    const x = colPositions.get(col)!;
+    let currentY = 0;
+    
+    colItems.forEach(({id, pos}) => {
+      pos.x = x;
+      pos.y = currentY;
+      const height = clusterLayouts.has(id)
+        ? clusterLayouts.get(id)!.height
+        : (NODE_HEIGHT + 2 * CLUSTER_PADDING);
+      currentY += height + CLUSTER_SPACING;
+    });
+  });
+  
+  return colX; // Total grid width
+}
+
+/**
+ * Compute horizontal positions for clusters AND orphan nodes based on topological sort.
+ * Uses Kahn's algorithm for topological ordering of cross-cluster dependencies.
+ * 
+ * In jit: A→B means "A depends on B" (B must complete first)
+ * So B should be positioned LEFT of A (dependencies on left, dependents on right)
+ */
+export function computeClusterPositions(
+  clusters: SubgraphCluster[],
+  crossClusterEdges: GraphEdge[],
+  orphanNodes: GraphNode[] = [],
+  allEdges: GraphEdge[] = []
+): Map<string, ClusterPosition> {
+  // Include both clusters and orphan nodes
+  const allNodeIds = [
+    ...clusters.map(c => c.containerId),
+    ...orphanNodes.map(n => n.id)
+  ].sort();
+  
+  // Build edge maps and node-to-cluster mapping
+  const { incomingEdges, outgoingEdges } = buildEdgeMaps(
+    clusters, crossClusterEdges, orphanNodes, allEdges, allNodeIds
+  );
+  
+  // Calculate ranks using longest-path algorithm
+  const ranks = calculateRanks(allNodeIds, incomingEdges);
   
   // Group nodes by rank
   const nodesByRank = new Map<number, string[]>();
@@ -388,55 +447,7 @@ export function createClusterAwareLayout(
     
     if (rank === -1) {
       // Grid nodes: adjust column positions based on actual widths
-      const byColumn = new Map<number, Array<{id: string, pos: ClusterPosition}>>();
-      items.forEach(item => {
-        const col = Math.round(item.pos.x / 1000);
-        if (!byColumn.has(col)) {
-          byColumn.set(col, []);
-        }
-        byColumn.get(col)!.push(item);
-      });
-      
-      // Calculate max width per column
-      const columnWidths = new Map<number, number>();
-      byColumn.forEach((colItems, col) => {
-        const maxWidth = Math.max(...colItems.map(({id, pos}) => {
-          // Use cluster layout width if available, otherwise use pos.width (for orphans)
-          return clusterLayouts.has(id) 
-            ? clusterLayouts.get(id)!.width 
-            : (pos.width || NODE_WIDTH + 2 * CLUSTER_PADDING);
-        }));
-        columnWidths.set(col, maxWidth);
-      });
-      
-      // Position columns with proper spacing
-      let colX = 0;
-      const sortedCols = Array.from(columnWidths.keys()).sort((a, b) => a - b);
-      const colPositions = new Map<number, number>();
-      
-      sortedCols.forEach(col => {
-        colPositions.set(col, colX);
-        colX += columnWidths.get(col)! + CLUSTER_SPACING;
-      });
-      
-      // Apply column positions and adjust Y spacing
-      byColumn.forEach((colItems, col) => {
-        // Sort by ID for stable ordering
-        colItems.sort((a, b) => a.id.localeCompare(b.id));
-        const x = colPositions.get(col)!;
-        let currentY = 0;
-        
-        colItems.forEach(({id, pos}) => {
-          pos.x = x;
-          pos.y = currentY;
-          const height = clusterLayouts.has(id)
-            ? clusterLayouts.get(id)!.height
-            : (NODE_HEIGHT + 2 * CLUSTER_PADDING);
-          currentY += height + CLUSTER_SPACING;
-        });
-      });
-      
-      cumulativeX = colX; // Start ranked nodes after grid
+      cumulativeX = adjustGridColumns(items, clusterLayouts);
     } else {
       // Ranked nodes: position horizontally after grid
       items.forEach(({pos}) => {

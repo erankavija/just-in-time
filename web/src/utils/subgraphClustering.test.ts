@@ -24,6 +24,7 @@ describe('subgraphClustering', () => {
         label: 'Version 1.0',
         state: 'backlog',
         priority: 'critical',
+        blocked: false,
         labels: ['type:milestone', 'milestone:v1.0'],
       };
       
@@ -36,6 +37,7 @@ describe('subgraphClustering', () => {
         label: 'Feature Epic',
         state: 'in_progress',
         priority: 'high',
+        blocked: false,
         labels: ['type:epic', 'epic:feature-x'],
       };
       
@@ -70,6 +72,7 @@ describe('subgraphClustering', () => {
         label: 'Bug',
         state: 'ready',
         priority: 'high',
+        blocked: false,
         labels: ['type:bug'],
       };
       
@@ -159,6 +162,7 @@ describe('subgraphClustering', () => {
         label: 'Epic 1',
         state: 'in_progress',
         priority: 'high',
+        blocked: false,
         labels: ['type:epic'],
       };
 
@@ -205,6 +209,7 @@ describe('subgraphClustering', () => {
         label: 'Epic 1',
         state: 'in_progress',
         priority: 'high',
+        blocked: false,
         labels: ['type:epic'],
       };
 
@@ -261,6 +266,7 @@ describe('subgraphClustering', () => {
         label: 'Epic 1',
         state: 'in_progress',
         priority: 'high',
+        blocked: false,
         labels: ['type:epic'],
       };
 
@@ -310,6 +316,7 @@ describe('subgraphClustering', () => {
         label: 'Epic 1',
         state: 'in_progress',
         priority: 'high',
+        blocked: false,
         labels: ['type:epic'],
       };
 
@@ -354,6 +361,7 @@ describe('subgraphClustering', () => {
         label: 'Epic 1',
         state: 'in_progress',
         priority: 'high',
+        blocked: false,
         labels: ['type:epic'],
       };
 
@@ -591,6 +599,7 @@ describe('subgraphClustering', () => {
         label: 'Epic 1',
         state: 'in_progress',
         priority: 'high',
+        blocked: false,
         labels: ['type:epic'],
       };
 

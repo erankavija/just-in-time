@@ -12,7 +12,7 @@ import ReactFlow, {
 import dagre from 'dagre';
 import 'reactflow/dist/style.css';
 import { apiClient } from '../../api/client';
-import type { State, Priority, GraphNode as ApiGraphNode } from '../../types/models';
+import type { State, Priority, GraphNode as ApiGraphNode, GraphEdge } from '../../types/models';
 import { LabelBadge } from '../Labels/LabelBadge';
 import { calculateDownstreamStats, type DownstreamStats } from '../../utils/strategicView';
 import { applyFiltersToNode, applyFiltersToEdge, createStrategicFilter, createLabelFilter, type GraphFilter } from '../../utils/graphFilter';
@@ -51,8 +51,6 @@ export type LayoutAlgorithm = 'dagre' | 'compact';
 // ReactFlow options (defined outside component to avoid recreating on each render)
 const proOptions = { hideAttribution: true };
 const backgroundStyle = { backgroundColor: 'var(--bg-primary)' };
-const nodeTypes = {}; // Empty object for default node types
-const edgeTypes = {}; // Empty object for default edge types
 
 // Layout configuration
 const LAYOUT_CONFIG = {
@@ -364,7 +362,7 @@ export function GraphView({
   const [nodeStats, setNodeStats] = useState<Map<string, DownstreamStats>>(new Map());
   const [strategicTypes, setStrategicTypes] = useState<string[]>(['milestone', 'epic']); // Default fallback
   const [hierarchyConfig, setHierarchyConfig] = useState<HierarchyLevelMap | null>(null);
-  const [expansionState, setExpansionState] = useState<ExpansionState>({});
+  const [expansionState] = useState<ExpansionState>({});
 
   // Fetch strategic types from API on mount
   useEffect(() => {

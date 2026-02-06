@@ -5,7 +5,7 @@ import {
   createClusterAwareLayout,
 } from './clusterAwareLayout';
 import type { SubgraphCluster } from '../types/subgraphCluster';
-import type { GraphNode, GraphEdge } from '../types/graph';
+import type { GraphNode, GraphEdge } from '../types/models';
 
 describe('computeClusterPositions', () => {
   it('should order clusters by topological sort of cross-cluster dependencies', () => {
@@ -15,18 +15,22 @@ describe('computeClusterPositions', () => {
         containerLevel: 2,
         nodes: [{ id: 'epic1', labels: ['type:epic'] } as GraphNode],
         internalEdges: [],
+        outgoingEdges: [],
+        incomingEdges: [],
       },
       {
         containerId: 'epic2',
         containerLevel: 2,
         nodes: [{ id: 'epic2', labels: ['type:epic'] } as GraphNode],
         internalEdges: [],
+        outgoingEdges: [],
+        incomingEdges: [],
       },
     ];
     
     // epic1 depends on epic2 (epic2 should be left, epic1 right)
     const crossClusterEdges: GraphEdge[] = [
-      { from: 'epic1', to: 'epic2', type: 'depends_on' },
+      { from: 'epic1', to: 'epic2' },
     ];
     
     const positions = computeClusterPositions(clusters, crossClusterEdges);
@@ -41,12 +45,16 @@ describe('computeClusterPositions', () => {
         containerLevel: 2,
         nodes: [{ id: 'epic1', labels: ['type:epic'] } as GraphNode],
         internalEdges: [],
+        outgoingEdges: [],
+        incomingEdges: [],
       },
       {
         containerId: 'epic2',
         containerLevel: 2,
         nodes: [{ id: 'epic2', labels: ['type:epic'] } as GraphNode],
         internalEdges: [],
+        outgoingEdges: [],
+        incomingEdges: [],
       },
     ];
     
@@ -59,14 +67,14 @@ describe('computeClusterPositions', () => {
 
   it('should handle transitive dependencies (A→B→C should order C,B,A)', () => {
     const clusters: SubgraphCluster[] = [
-      { containerId: 'A', containerLevel: 2, nodes: [{ id: 'A', labels: ['type:epic'] } as GraphNode], internalEdges: [] },
-      { containerId: 'B', containerLevel: 2, nodes: [{ id: 'B', labels: ['type:epic'] } as GraphNode], internalEdges: [] },
-      { containerId: 'C', containerLevel: 2, nodes: [{ id: 'C', labels: ['type:epic'] } as GraphNode], internalEdges: [] },
+      { containerId: 'A', containerLevel: 2, nodes: [{ id: 'A', labels: ['type:epic'] } as GraphNode], internalEdges: [], outgoingEdges: [], incomingEdges: [] },
+      { containerId: 'B', containerLevel: 2, nodes: [{ id: 'B', labels: ['type:epic'] } as GraphNode], internalEdges: [], outgoingEdges: [], incomingEdges: [] },
+      { containerId: 'C', containerLevel: 2, nodes: [{ id: 'C', labels: ['type:epic'] } as GraphNode], internalEdges: [], outgoingEdges: [], incomingEdges: [] },
     ];
     
     const crossClusterEdges: GraphEdge[] = [
-      { from: 'A', to: 'B', type: 'depends_on' },
-      { from: 'B', to: 'C', type: 'depends_on' },
+      { from: 'A', to: 'B' },
+      { from: 'B', to: 'C' },
     ];
     
     const positions = computeClusterPositions(clusters, crossClusterEdges);
@@ -124,8 +132,10 @@ describe('createClusterAwareLayout', () => {
           { id: 'task1', labels: ['type:task'] } as GraphNode,
         ],
         internalEdges: [
-          { from: 'epic1', to: 'task1', type: 'depends_on' },
+          { from: 'epic1', to: 'task1' },
         ],
+        outgoingEdges: [],
+        incomingEdges: [],
       },
     ];
     

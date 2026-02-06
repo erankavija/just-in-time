@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { prepareClusteredGraphForReactFlow } from './clusteredGraphLayout';
 import type { GraphNode, GraphEdge } from '../types/models';
 import type { HierarchyLevelMap, ExpansionState } from '../types/subgraphCluster';
@@ -18,6 +18,7 @@ describe('clusteredGraphLayout', () => {
           label: 'Epic 1',
           state: 'in_progress',
           priority: 'high',
+          blocked: false,
           labels: ['type:epic'],
         },
         {
@@ -25,7 +26,7 @@ describe('clusteredGraphLayout', () => {
           label: 'Task 1',
           state: 'done',
           priority: "normal",
-        blocked: false,
+          blocked: false,
           labels: ['type:task'],
         },
       ];
@@ -53,6 +54,7 @@ describe('clusteredGraphLayout', () => {
           label: 'Epic 1',
           state: 'in_progress',
           priority: 'high',
+          blocked: false,
           labels: ['type:epic'],
         },
         {
@@ -60,7 +62,7 @@ describe('clusteredGraphLayout', () => {
           label: 'Task 1',
           state: 'done',
           priority: "normal",
-        blocked: false,
+          blocked: false,
           labels: ['type:task'],
         },
         {
@@ -68,7 +70,7 @@ describe('clusteredGraphLayout', () => {
           label: 'Task 2',
           state: 'ready',
           priority: "normal",
-        blocked: false,
+          blocked: false,
           labels: ['type:task'],
         },
       ];
@@ -97,6 +99,7 @@ describe('clusteredGraphLayout', () => {
           label: 'Epic 1',
           state: 'in_progress',
           priority: 'high',
+          blocked: false,
           labels: ['type:epic'],
         },
         {
@@ -104,7 +107,7 @@ describe('clusteredGraphLayout', () => {
           label: 'Epic 2',
           state: 'done',
           priority: "normal",
-        blocked: false,
+          blocked: false,
           labels: ['type:epic'],
         },
         {
@@ -112,7 +115,7 @@ describe('clusteredGraphLayout', () => {
           label: 'Task 1',
           state: 'done',
           priority: "normal",
-        blocked: false,
+          blocked: false,
           labels: ['type:task'],
         },
         {
@@ -120,7 +123,7 @@ describe('clusteredGraphLayout', () => {
           label: 'Task 2',
           state: 'done',
           priority: "normal",
-        blocked: false,
+          blocked: false,
           labels: ['type:task'],
         },
       ];
@@ -157,6 +160,7 @@ describe('clusteredGraphLayout', () => {
           label: 'Epic 1',
           state: 'in_progress',
           priority: 'high',
+          blocked: false,
           labels: ['type:epic'],
         },
         {
@@ -164,7 +168,7 @@ describe('clusteredGraphLayout', () => {
           label: 'Epic 2',
           state: 'ready',
           priority: "normal",
-        blocked: false,
+          blocked: false,
           labels: ['type:epic'],
         },
         {
@@ -172,7 +176,7 @@ describe('clusteredGraphLayout', () => {
           label: 'Task 1',
           state: 'done',
           priority: "normal",
-        blocked: false,
+          blocked: false,
           labels: ['type:task'],
         },
         {
@@ -180,7 +184,7 @@ describe('clusteredGraphLayout', () => {
           label: 'Task 2',
           state: 'ready',
           priority: "normal",
-        blocked: false,
+          blocked: false,
           labels: ['type:task'],
         },
       ];
@@ -215,6 +219,7 @@ describe('clusteredGraphLayout', () => {
           label: 'Epic 1',
           state: 'in_progress',
           priority: 'high',
+          blocked: false,
           labels: ['type:epic'],
         },
         {
@@ -222,7 +227,7 @@ describe('clusteredGraphLayout', () => {
           label: 'Story 1',
           state: 'in_progress',
           priority: "normal",
-        blocked: false,
+          blocked: false,
           labels: ['type:story'],
         },
         {
@@ -230,7 +235,7 @@ describe('clusteredGraphLayout', () => {
           label: 'Task 1',
           state: 'done',
           priority: "normal",
-        blocked: false,
+          blocked: false,
           labels: ['type:task'],
         },
         {
@@ -238,7 +243,7 @@ describe('clusteredGraphLayout', () => {
           label: 'Task 2',
           state: 'ready',
           priority: "normal",
-        blocked: false,
+          blocked: false,
           labels: ['type:task'],
         },
       ];
@@ -272,6 +277,7 @@ describe('clusteredGraphLayout', () => {
           label: 'Epic 1',
           state: 'in_progress',
           priority: 'high',
+          blocked: false,
           labels: ['type:epic'],
         },
         {
@@ -279,7 +285,7 @@ describe('clusteredGraphLayout', () => {
           label: 'Task 1',
           state: 'done',
           priority: "normal",
-        blocked: false,
+          blocked: false,
           labels: ['type:task'],
         },
       ];
