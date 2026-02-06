@@ -24,7 +24,7 @@ interface ClusterAwareLayoutResult {
   clusters: Map<string, ClusterPosition>;
 }
 
-const CLUSTER_SPACING = 200;
+const CLUSTER_SPACING = 100; // Spacing between clusters (horizontal and vertical)
 const NODE_WIDTH = 180;
 const NODE_HEIGHT = 60;
 const NODE_SPACING_Y = 20;
@@ -95,38 +95,96 @@ export function computeClusterPositions(
     }
   });
   
-  while (queue.length > 0) {
-    const current = queue.shift()!;
-    sorted.push(current);
+  // Assign ranks (columns) using longest path from root
+  // Nodes with no dependencies get rank 0
+  // Each node's rank = max(dependency ranks) + 1
+  const ranks = new Map<string, number>();
+  const visiting = new Set<string>(); // Track nodes being visited (cycle detection)
+  
+  const calculateRank = (nodeId: string): number => {
+    if (ranks.has(nodeId)) {
+      return ranks.get(nodeId)!;
+    }
     
-    // Process outgoing edges
-    outgoingEdges.get(current)?.forEach(dependent => {
-      const newDegree = inDegree.get(dependent)! - 1;
-      inDegree.set(dependent, newDegree);
-      if (newDegree === 0) {
-        queue.push(dependent);
-      }
-    });
-  }
+    // Cycle detection: if we're already visiting this node, there's a cycle
+    if (visiting.has(nodeId)) {
+      ranks.set(nodeId, 0); // Treat as root to break cycle
+      return 0;
+    }
+    
+    const deps = incomingEdges.get(nodeId)!;
+    if (deps.size === 0) {
+      ranks.set(nodeId, 0);
+      return 0;
+    }
+    
+    visiting.add(nodeId);
+    const depRanks = Array.from(deps).map(d => calculateRank(d)).filter(r => !isNaN(r));
+    visiting.delete(nodeId);
+    
+    const maxDepRank = depRanks.length > 0 ? Math.max(...depRanks) : -1;
+    const rank = maxDepRank + 1;
+    ranks.set(nodeId, rank);
+    return rank;
+  };
   
-  // If not all nodes were sorted, we have a cycle - fall back to original order
-  if (sorted.length !== allNodeIds.length) {
-    sorted.length = 0;
-    sorted.push(...allNodeIds);
-  }
+  // Calculate rank for all nodes
+  allNodeIds.forEach(id => calculateRank(id));
   
-  // Assign X positions based on sorted order
+  // Group nodes by rank
+  const nodesByRank = new Map<number, string[]>();
+  ranks.forEach((rank, nodeId) => {
+    if (!nodesByRank.has(rank)) {
+      nodesByRank.set(rank, []);
+    }
+    nodesByRank.get(rank)!.push(nodeId);
+  });
+  
+  // Sort nodes within each rank by ID for stable layout
+  nodesByRank.forEach((nodes) => {
+    nodes.sort();
+  });
+  
+  // Assign positions based on ranks
+  // Rank 0 (independent nodes): use grid layout to spread horizontally
+  // Other ranks: position to the right, ensuring dependency flow
   const positions = new Map<string, ClusterPosition>();
-  let currentX = 0;
   
-  sorted.forEach(nodeId => {
-    positions.set(nodeId, {
-      x: currentX,
-      y: 0, // Will be set later if needed
-      width: 0, // Will be calculated after node layout
-      height: 0,
+  const rank0Nodes = nodesByRank.get(0) || [];
+  let gridWidth = 0;
+  
+  if (rank0Nodes.length > 0) {
+    // Simple initial grid layout - will be adjusted in Phase 3 with actual widths
+    const cols = Math.min(5, Math.ceil(Math.sqrt(rank0Nodes.length)));
+    
+    rank0Nodes.forEach((nodeId, index) => {
+      const col = index % cols;
+      const row = Math.floor(index / cols);
+      positions.set(nodeId, {
+        x: col * 1000, // Initial spacing - will be adjusted
+        y: row * 500,  // Initial spacing - will be adjusted
+        width: 0,
+        height: 0,
+      });
     });
-    currentX += CLUSTER_SPACING; // Placeholder, will adjust after calculating cluster width
+    
+    gridWidth = cols * 1000; // Estimate - will be refined in Phase 3
+  }
+  
+  // Position other ranks AFTER the grid (initial positions, refined in Phase 3)
+  nodesByRank.forEach((nodesInRank, rank) => {
+    if (rank === 0) return; // Already handled
+    
+    const x = gridWidth + rank * 1000;
+    
+    nodesInRank.forEach((nodeId, index) => {
+      positions.set(nodeId, {
+        x,
+        y: index * 500,
+        width: 0,
+        height: 0,
+      });
+    });
   });
   
   return positions;
@@ -240,16 +298,125 @@ export function createClusterAwareLayout(
     }
   });
   
-  // Phase 3: Adjust X positions based on actual widths
-  const sortedNodeIds = Array.from(clusterPositions.keys());
-  let currentX = 0;
-  sortedNodeIds.forEach(nodeId => {
-    const pos = clusterPositions.get(nodeId)!;
-    pos.x = currentX;
-    const width = clusterLayouts.has(nodeId) 
-      ? clusterLayouts.get(nodeId)!.width 
-      : (NODE_WIDTH + 2 * CLUSTER_PADDING);
-    currentX += width + CLUSTER_SPACING;
+  // Phase 3: Adjust positions based on actual widths and heights
+  // The grid layout for rank 0 needs column widths adjusted based on actual cluster sizes
+  const positionsByRank = new Map<number, Array<{id: string, pos: ClusterPosition}>>();
+  
+  clusterPositions.forEach((pos, id) => {
+    // Nodes in grid (x < 5000) stay in grid, others are grouped by rank
+    if (pos.x < 5000) { // Grid area (5 cols * 1000 max)
+      const gridRank = -1; // Special marker for grid nodes
+      if (!positionsByRank.has(gridRank)) {
+        positionsByRank.set(gridRank, []);
+      }
+      positionsByRank.get(gridRank)!.push({id, pos});
+    } else {
+      // Ranked nodes beyond the grid
+      const rank = Math.round(pos.x / 1000);
+      if (!positionsByRank.has(rank)) {
+        positionsByRank.set(rank, []);
+      }
+      positionsByRank.get(rank)!.push({id, pos});
+    }
+  });
+  
+  // For each rank, calculate max width and adjust X position
+  const rankWidths = new Map<number, number>();
+  positionsByRank.forEach((items, rank) => {
+    if (rank === -1) {
+      // Grid: width spans multiple columns, calculate overall grid width
+      const maxX = Math.max(...items.map(({pos}) => pos.x));
+      const maxWidth = Math.max(...items.map(({id}) => {
+        return clusterLayouts.has(id) 
+          ? clusterLayouts.get(id)!.width 
+          : (NODE_WIDTH + 2 * CLUSTER_PADDING);
+      }));
+      rankWidths.set(rank, maxX + maxWidth); // Total grid width
+    } else {
+      const maxWidth = Math.max(...items.map(({id}) => {
+        return clusterLayouts.has(id) 
+          ? clusterLayouts.get(id)!.width 
+          : (NODE_WIDTH + 2 * CLUSTER_PADDING);
+      }));
+      rankWidths.set(rank, maxWidth);
+    }
+  });
+  
+  // Adjust X positions: grid stays in place, ranked nodes positioned after grid
+  let cumulativeX = 0;
+  const sortedRanks = Array.from(rankWidths.keys()).sort((a, b) => a - b);
+  
+  sortedRanks.forEach(rank => {
+    const items = positionsByRank.get(rank)!;
+    
+    if (rank === -1) {
+      // Grid nodes: adjust column positions based on actual widths
+      const byColumn = new Map<number, Array<{id: string, pos: ClusterPosition}>>();
+      items.forEach(item => {
+        const col = Math.round(item.pos.x / 1000);
+        if (!byColumn.has(col)) {
+          byColumn.set(col, []);
+        }
+        byColumn.get(col)!.push(item);
+      });
+      
+      // Calculate max width per column
+      const columnWidths = new Map<number, number>();
+      byColumn.forEach((colItems, col) => {
+        const maxWidth = Math.max(...colItems.map(({id, pos}) => {
+          // Use cluster layout width if available, otherwise use pos.width (for orphans)
+          return clusterLayouts.has(id) 
+            ? clusterLayouts.get(id)!.width 
+            : (pos.width || NODE_WIDTH + 2 * CLUSTER_PADDING);
+        }));
+        columnWidths.set(col, maxWidth);
+      });
+      
+      // Position columns with proper spacing
+      let colX = 0;
+      const sortedCols = Array.from(columnWidths.keys()).sort((a, b) => a - b);
+      const colPositions = new Map<number, number>();
+      
+      sortedCols.forEach(col => {
+        colPositions.set(col, colX);
+        colX += columnWidths.get(col)! + CLUSTER_SPACING;
+      });
+      
+      // Apply column positions and adjust Y spacing
+      byColumn.forEach((colItems, col) => {
+        colItems.sort((a, b) => a.pos.y - b.pos.y);
+        const x = colPositions.get(col)!;
+        let currentY = 0;
+        
+        colItems.forEach(({id, pos}) => {
+          pos.x = x;
+          pos.y = currentY;
+          const height = clusterLayouts.has(id)
+            ? clusterLayouts.get(id)!.height
+            : (NODE_HEIGHT + 2 * CLUSTER_PADDING);
+          currentY += height + CLUSTER_SPACING;
+        });
+      });
+      
+      cumulativeX = colX; // Start ranked nodes after grid
+    } else {
+      // Ranked nodes: position horizontally after grid
+      items.forEach(({pos}) => {
+        pos.x = cumulativeX;
+      });
+      cumulativeX += rankWidths.get(rank)! + CLUSTER_SPACING;
+      
+      // Adjust Y positions within rank
+      items.sort((a, b) => a.pos.y - b.pos.y);
+      let currentY = 0;
+      items.forEach(({id, pos}) => {
+        pos.y = currentY;
+        const height = clusterLayouts.has(id)
+          ? clusterLayouts.get(id)!.height
+          : (NODE_HEIGHT + 2 * CLUSTER_PADDING);
+        currentY += height + CLUSTER_SPACING;
+      });
+    }
   });
   
   // Phase 4: Combine all nodes with absolute positions
