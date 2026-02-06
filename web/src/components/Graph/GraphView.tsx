@@ -15,7 +15,6 @@ import 'reactflow/dist/style.css';
 import { apiClient } from '../../api/client';
 import type { State, Priority, GraphNode as ApiGraphNode, GraphEdge } from '../../types/models';
 import type { SubgraphCluster } from '../../types/subgraphCluster';
-import { LabelBadge } from '../Labels/LabelBadge';
 import { calculateDownstreamStats, type DownstreamStats } from '../../utils/strategicView';
 import { applyFiltersToNode, applyFiltersToEdge, createStrategicFilter, createLabelFilter, type GraphFilter } from '../../utils/graphFilter';
 import type { HierarchyLevelMap, ExpansionState } from '../../types/subgraphCluster';
@@ -626,6 +625,15 @@ export function GraphView({
         const filterResult = nodeFilterResults.get(node.id)!;
         const isDimmed = filterResult.dimmed;
         
+        // Check if this is a strategic node (based on configured strategic types)
+        const isStrategic = node.labels.some(label => {
+          if (label.startsWith('type:')) {
+            const typeValue = label.substring(5);
+            return strategicTypes.includes(typeValue);
+          }
+          return false;
+        });
+        
         // Check if this node is a cluster container
         const cluster = clusterData?.clusters.find(c => c.containerId === node.id);
         const isClusterContainer = !!cluster;
@@ -704,28 +712,7 @@ export function GraphView({
                     | {node.state}
                   </span>
                 </div>
-                {node.labels && node.labels.length > 0 && (
-                  <div style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: '4px',
-                    marginTop: '6px',
-                  }}>
-                    {node.labels.slice(0, 2).map((label) => (
-                      <LabelBadge key={label} label={label} size="small" />
-                    ))}
-                    {node.labels.length > 2 && (
-                      <span style={{
-                        fontSize: '9px',
-                        color: 'var(--text-muted)',
-                        fontFamily: 'var(--font-mono)',
-                      }}>
-                        +{node.labels.length - 2}
-                      </span>
-                    )}
-                  </div>
-                )}
-                {hasDownstream && (
+                {hasDownstream && isStrategic && (
                   <div 
                     style={{
                       fontSize: '10px',
