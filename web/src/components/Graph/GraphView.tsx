@@ -99,16 +99,16 @@ const getDagreLayout = (nodes: Node[], edges: Edge[]) => {
 const getClusterAwareLayout = (
   nodes: Node[],
   edges: Edge[],
-  clusterData: ReturnType<typeof prepareClusteredGraphForReactFlow>
+  clusterData: ReturnType<typeof prepareClusteredGraphForReactFlow>,
+  allOriginalEdges: GraphEdge[]
 ) => {
-  // Use the new cluster-aware layout algorithm
-  // Note: edges here have swapped source/target for ReactFlow display
-  // We need to swap back to get original from→to semantics
+  // Use the new cluster-aware layout algorithm with ALL original edges
+  // This ensures orphan nodes are positioned correctly based on all dependencies
   const layoutResult = createClusterAwareLayout(
     clusterData.clusters,
     clusterData.crossClusterEdges,
     clusterData.orphanNodes,
-    edges.map(e => ({ from: e.target, to: e.source, type: 'depends_on' })) // Swap back: target→source
+    allOriginalEdges
   );
   
   const finalNodes: Node[] = [];
@@ -169,7 +169,8 @@ const getClusterAwareLayout = (
 const getCompactLayout = (
   nodes: Node[], 
   edges: Edge[],
-  clusterData?: ReturnType<typeof prepareClusteredGraphForReactFlow> | null
+  clusterData?: ReturnType<typeof prepareClusteredGraphForReactFlow> | null,
+  allOriginalEdges?: GraphEdge[]
 ) => {
   if (nodes.length === 0) {
     return { nodes: [], edges };
@@ -177,7 +178,7 @@ const getCompactLayout = (
 
   // If we have cluster data, use cluster-aware layout
   if (clusterData && clusterData.clusters.length > 0) {
-    return getClusterAwareLayout(nodes, edges, clusterData);
+    return getClusterAwareLayout(nodes, edges, clusterData, allOriginalEdges || []);
   }
 
   // Otherwise fall back to basic rank-based layout
@@ -321,11 +322,12 @@ const getLayoutedElements = (
   nodes: Node[], 
   edges: Edge[], 
   algorithm: LayoutAlgorithm = 'dagre',
-  clusterData?: ReturnType<typeof prepareClusteredGraphForReactFlow> | null
+  clusterData?: ReturnType<typeof prepareClusteredGraphForReactFlow> | null,
+  allOriginalEdges?: GraphEdge[]
 ) => {
   switch (algorithm) {
     case 'compact':
-      return getCompactLayout(nodes, edges, clusterData);
+      return getCompactLayout(nodes, edges, clusterData, allOriginalEdges);
     case 'dagre':
     default:
       return getDagreLayout(nodes, edges);
@@ -620,7 +622,7 @@ export function GraphView({
         .filter((edge): edge is Edge => edge !== null);
 
       // Apply layout algorithm
-      const layouted = getLayoutedElements(flowNodes, flowEdges, layoutAlgorithm, clusterData);
+      const layouted = getLayoutedElements(flowNodes, flowEdges, layoutAlgorithm, clusterData, data.edges);
       setNodes(layouted.nodes);
       setEdges(layouted.edges);
     } catch (err) {
