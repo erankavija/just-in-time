@@ -6,7 +6,8 @@
   "priority": "normal",
   "assignee": "agent:copilot",
   "dependencies": [
-    "7b7df884-8335-4c2a-8555-a7d5a541a0f0"
+    "7b7df884-8335-4c2a-8555-a7d5a541a0f0",
+    "0cce1a44-34d5-47e1-b1bb-8da3679f894a"
   ],
   "gates_required": [
     "tests",

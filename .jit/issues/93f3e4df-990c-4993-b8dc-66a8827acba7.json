@@ -6,10 +6,11 @@
   "priority": "high",
   "assignee": "agent:copilot",
   "dependencies": [
-    "b336446d-e2fe-46d7-8652-e574bb114e3e",
+    "4051ee7d-24e7-4b02-9238-b4fb2a6aa0d4",
     "90575086-fcfe-4b0d-82b5-fc00c4daace7",
     "7ff7b349-15fe-45dc-a7d1-8f2fd208884c",
-    "4051ee7d-24e7-4b02-9238-b4fb2a6aa0d4",
+    "df0b551f-c60e-4c6f-951c-5a796a1c5635",
+    "b336446d-e2fe-46d7-8652-e574bb114e3e",
     "c4738097-cdfd-4fe8-a279-a6ee7f2e1ce9"
   ],
   "gates_required": [
