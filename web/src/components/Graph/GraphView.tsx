@@ -400,8 +400,8 @@ export function GraphView({
   onNodeClick, 
   viewMode = 'tactical', 
   labelFilters = [],
-  layoutAlgorithm = 'dagre',
-  onLayoutChange,
+  layoutAlgorithm = 'compact',
+  onLayoutChange: _onLayoutChange,
 }: GraphViewProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -410,11 +410,29 @@ export function GraphView({
   const [nodeStats, setNodeStats] = useState<Map<string, DownstreamStats>>(new Map());
   const [strategicTypes, setStrategicTypes] = useState<string[]>(['milestone', 'epic']); // Default fallback
   const [hierarchyConfig, setHierarchyConfig] = useState<HierarchyLevelMap | null>(null);
-  const [expansionState, setExpansionState] = useState<ExpansionState>({});
+  const [expansionState, setExpansionState] = useState<ExpansionState>(() => {
+    // Load initial state from localStorage
+    try {
+      const saved = localStorage.getItem('jit.graph.expansionState');
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      console.warn('Failed to load expansion state from localStorage:', e);
+      return {};
+    }
+  });
   const [hasInitialFit, setHasInitialFit] = useState(false);
   const reactFlowInstanceRef = useRef<any>(null);
   const savedViewportRef = useRef<any>(null);
   const [isRenderable, setIsRenderable] = useState(true); // Control rendering during viewport restoration
+
+  // Save expansion state to localStorage whenever it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('jit.graph.expansionState', JSON.stringify(expansionState));
+    } catch (e) {
+      console.warn('Failed to save expansion state to localStorage:', e);
+    }
+  }, [expansionState]);
 
   /**
    * Toggle expansion state for a container node (cluster or hierarchical parent).
@@ -856,7 +874,7 @@ export function GraphView({
         />
       </ReactFlow>
       
-      {/* Layout Algorithm Toggle */}
+      {/* Expand/Collapse All Controls */}
       <div style={{
         position: 'absolute',
         top: '16px',
@@ -871,36 +889,50 @@ export function GraphView({
         gap: '8px',
         alignItems: 'center',
       }}>
-        <span style={{ color: 'var(--text-secondary)' }}>Layout:</span>
         <button
-          onClick={() => onLayoutChange?.('dagre')}
+          onClick={() => {
+            setExpansionState({});
+            // Fit view after collapse to see full graph
+            setTimeout(() => {
+              reactFlowInstanceRef.current?.fitView({ padding: 0.1, duration: 300 });
+            }, 100);
+          }}
           style={{
             padding: '4px 8px',
-            backgroundColor: layoutAlgorithm === 'dagre' ? 'var(--accent)' : 'var(--bg-secondary)',
+            backgroundColor: 'var(--bg-secondary)',
             border: '1px solid var(--border)',
             borderRadius: '4px',
-            color: layoutAlgorithm === 'dagre' ? 'var(--bg-primary)' : 'var(--text-primary)',
+            color: 'var(--text-primary)',
             fontFamily: 'var(--font-mono)',
             fontSize: '10px',
             cursor: 'pointer',
           }}
         >
-          Dagre
+          Collapse All
         </button>
         <button
-          onClick={() => onLayoutChange?.('compact')}
+          onClick={() => {
+            // Expand all clusters by setting all to true
+            const allExpanded: ExpansionState = {};
+            nodes.forEach(node => {
+              if (node.type === 'cluster') {
+                allExpanded[node.id] = true;
+              }
+            });
+            setExpansionState(allExpanded);
+          }}
           style={{
             padding: '4px 8px',
-            backgroundColor: layoutAlgorithm === 'compact' ? 'var(--accent)' : 'var(--bg-secondary)',
+            backgroundColor: 'var(--bg-secondary)',
             border: '1px solid var(--border)',
             borderRadius: '4px',
-            color: layoutAlgorithm === 'compact' ? 'var(--bg-primary)' : 'var(--text-primary)',
+            color: 'var(--text-primary)',
             fontFamily: 'var(--font-mono)',
             fontSize: '10px',
             cursor: 'pointer',
           }}
         >
-          Compact
+          Expand All
         </button>
       </div>
 

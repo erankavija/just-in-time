@@ -18,7 +18,7 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [allIssues, setAllIssues] = useState<Issue[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('tactical');
-  const [layoutAlgorithm, setLayoutAlgorithm] = useState<LayoutAlgorithm>('dagre');
+  const [layoutAlgorithm, setLayoutAlgorithm] = useState<LayoutAlgorithm>('compact');
   const [labelFilters, setLabelFilters] = useState<string[]>([]);
   const [documentViewerState, setDocumentViewerState] = useState<{
     path: string;
