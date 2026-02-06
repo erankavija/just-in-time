@@ -48,6 +48,12 @@ const priorityColors: Record<Priority, string> = {
 // Layout algorithm types
 export type LayoutAlgorithm = 'dagre' | 'compact';
 
+// ReactFlow options (defined outside component to avoid recreating on each render)
+const proOptions = { hideAttribution: true };
+const backgroundStyle = { backgroundColor: 'var(--bg-primary)' };
+const nodeTypes = {}; // Empty object for default node types
+const edgeTypes = {}; // Empty object for default edge types
+
 // Layout configuration
 const LAYOUT_CONFIG = {
   nodeWidth: 220,
@@ -699,13 +705,13 @@ export function GraphView({
         onNodeClick={handleNodeClick}
         fitView
         attributionPosition="bottom-right"
-        proOptions={{ hideAttribution: true }}
+        proOptions={proOptions}
       >
         <Controls />
         <Background 
           color="var(--border)" 
           gap={16}
-          style={{ backgroundColor: 'var(--bg-primary)' }}
+          style={backgroundStyle}
         />
       </ReactFlow>
       

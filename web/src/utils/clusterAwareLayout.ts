@@ -52,18 +52,40 @@ export function computeClusterPositions(
   const allNodeIds = [
     ...clusters.map(c => c.containerId),
     ...orphanNodes.map(n => n.id)
-  ];
+  ].sort(); // Sort for deterministic order
   
   allNodeIds.forEach(id => {
     incomingEdges.set(id, new Set());
     outgoingEdges.set(id, new Set());
   });
   
-  // Build edge maps from ALL edges (cross-cluster + edges involving orphans)
+  // Build a map from node ID to cluster ID
+  const nodeToCluster = new Map<string, string>();
+  clusters.forEach(cluster => {
+    nodeToCluster.set(cluster.containerId, cluster.containerId); // Container maps to itself
+    cluster.nodes.forEach(node => {
+      nodeToCluster.set(node.id, cluster.containerId); // Tasks map to their cluster
+    });
+  });
+  orphanNodes.forEach(orphan => {
+    nodeToCluster.set(orphan.id, orphan.id); // Orphans map to themselves
+  });
+  
+  // Build edge maps from ALL edges (cross-cluster + edges involving orphans + cluster boundary edges)
   const relevantEdges = [...crossClusterEdges];
   
-  // Add edges involving orphan nodes
-  orphanNodes.forEach(orphan => {
+  // Add cluster incoming/outgoing edges for proper positioning (sorted by cluster ID for stability)
+  [...clusters].sort((a, b) => a.containerId.localeCompare(b.containerId)).forEach(cluster => {
+    if (cluster.incomingEdges) {
+      relevantEdges.push(...cluster.incomingEdges);
+    }
+    if (cluster.outgoingEdges) {
+      relevantEdges.push(...cluster.outgoingEdges);
+    }
+  });
+  
+  // Add edges involving orphan nodes (sorted for stability)
+  [...orphanNodes].sort((a, b) => a.id.localeCompare(b.id)).forEach(orphan => {
     allEdges.forEach(edge => {
       if (edge.from === orphan.id && allNodeIds.includes(edge.to)) {
         relevantEdges.push(edge);
@@ -75,10 +97,14 @@ export function computeClusterPositions(
   });
   
   relevantEdges.forEach(edge => {
-    if (allNodeIds.includes(edge.from) && allNodeIds.includes(edge.to)) {
+    // Map task IDs to cluster IDs
+    const fromCluster = nodeToCluster.get(edge.from);
+    const toCluster = nodeToCluster.get(edge.to);
+    
+    if (fromCluster && toCluster && allNodeIds.includes(fromCluster) && allNodeIds.includes(toCluster)) {
       // from depends on to, so to has an outgoing edge to from
-      outgoingEdges.get(edge.to)?.add(edge.from);
-      incomingEdges.get(edge.from)?.add(edge.to);
+      outgoingEdges.get(toCluster)?.add(fromCluster);
+      incomingEdges.get(fromCluster)?.add(toCluster);
     }
   });
   
@@ -119,7 +145,7 @@ export function computeClusterPositions(
     }
     
     visiting.add(nodeId);
-    const depRanks = Array.from(deps).map(d => calculateRank(d)).filter(r => !isNaN(r));
+    const depRanks = Array.from(deps).sort().map(d => calculateRank(d)).filter(r => !isNaN(r));
     visiting.delete(nodeId);
     
     const maxDepRank = depRanks.length > 0 ? Math.max(...depRanks) : -1;
@@ -128,8 +154,8 @@ export function computeClusterPositions(
     return rank;
   };
   
-  // Calculate rank for all nodes
-  allNodeIds.forEach(id => calculateRank(id));
+  // Calculate rank for all nodes (in sorted order for determinism)
+  [...allNodeIds].sort().forEach(id => calculateRank(id));
   
   // Group nodes by rank
   const nodesByRank = new Map<number, string[]>();
@@ -140,9 +166,20 @@ export function computeClusterPositions(
     nodesByRank.get(rank)!.push(nodeId);
   });
   
-  // Sort nodes within each rank by ID for stable layout
-  nodesByRank.forEach((nodes) => {
-    nodes.sort();
+  // Sort nodes within each rank
+  nodesByRank.forEach((nodes, rank) => {
+    if (rank === 0) {
+      // Rank 0: sort by number of dependents (most dependents = leftmost in grid)
+      nodes.sort((a, b) => {
+        const aDeps = outgoingEdges.get(a)!.size;
+        const bDeps = outgoingEdges.get(b)!.size;
+        if (aDeps !== bDeps) return bDeps - aDeps; // More dependents first
+        return a.localeCompare(b); // Stable sort by ID
+      });
+    } else {
+      // Other ranks: sort by ID for stability
+      nodes.sort();
+    }
   });
   
   // Assign positions based on ranks
@@ -384,7 +421,8 @@ export function createClusterAwareLayout(
       
       // Apply column positions and adjust Y spacing
       byColumn.forEach((colItems, col) => {
-        colItems.sort((a, b) => a.pos.y - b.pos.y);
+        // Sort by ID for stable ordering
+        colItems.sort((a, b) => a.id.localeCompare(b.id));
         const x = colPositions.get(col)!;
         let currentY = 0;
         
@@ -407,7 +445,7 @@ export function createClusterAwareLayout(
       cumulativeX += rankWidths.get(rank)! + CLUSTER_SPACING;
       
       // Adjust Y positions within rank
-      items.sort((a, b) => a.pos.y - b.pos.y);
+      items.sort((a, b) => a.id.localeCompare(b.id)); // Sort by ID for stability
       let currentY = 0;
       items.forEach(({id, pos}) => {
         pos.y = currentY;
