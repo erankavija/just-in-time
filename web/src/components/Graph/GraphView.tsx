@@ -381,6 +381,7 @@ export function GraphView({
   const [hasInitialFit, setHasInitialFit] = useState(false);
   const reactFlowInstanceRef = useRef<any>(null);
   const savedViewportRef = useRef<any>(null);
+  const [isRenderable, setIsRenderable] = useState(true); // Control rendering during viewport restoration
 
   /**
    * Toggle expansion state for a container node (cluster or hierarchical parent).
@@ -389,6 +390,7 @@ export function GraphView({
   const toggleExpansion = useCallback((nodeId: string) => {
     // Save current viewport before toggling
     savedViewportRef.current = reactFlowInstanceRef.current?.getViewport();
+    setIsRenderable(false); // Hide during transition
     
     setExpansionState(prev => ({
       ...prev,
@@ -404,6 +406,7 @@ export function GraphView({
         requestAnimationFrame(() => {
           reactFlowInstanceRef.current?.setViewport(savedViewportRef.current, { duration: 0 });
           savedViewportRef.current = null;
+          setIsRenderable(true); // Show after viewport restored
         });
       });
     }
@@ -806,6 +809,11 @@ export function GraphView({
         onInit={(instance) => { reactFlowInstanceRef.current = instance; }}
         attributionPosition="bottom-right"
         proOptions={proOptions}
+        style={{
+          opacity: isRenderable ? 1 : 0,
+          transition: 'opacity 0.1s ease-in-out',
+          pointerEvents: isRenderable ? 'auto' : 'none',
+        }}
       >
         <Controls />
         <Background 
