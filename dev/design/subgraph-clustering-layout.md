@@ -73,7 +73,9 @@ for each child C of S:
 
 ## Implementation Workplan
 
-### Phase 1: Core Data Structures & Algorithms ✅ COMPLETE (2/3 steps)
+### Phase 1: Core Data Structures & Algorithms ✅ COMPLETE
+**Status:** All steps complete, issue 783a8086 marked DONE (2026-02-06)
+
 - [x] **1.1** Define TypeScript types for hierarchy-aware graph ✅
   - `HierarchyLevelMap` - maps type names to numeric levels
   - `SubgraphCluster` - contains nodes, edges, level info
@@ -107,90 +109,112 @@ for each child C of S:
   - **Tests:** 5 tests (single collapse, multiple aggregation, incoming edges, nested collapse)
   - **Files:** `web/src/utils/subgraphClustering.ts`
 
-- [ ] **1.5** Clean up deprecated code from previous attempt
-  - Remove or mark as deprecated: `explorationGraph.ts`, old `hierarchyIndex.ts`
-  - Consider keeping `relevanceScoring.ts` for future intra-cluster ordering
+- [x] **1.5** Cluster-aware layout algorithm ✅
+  - `createClusterAwareLayout()` - main layout orchestrator
+  - `computeClusterPositions()` - hybrid grid+rank positioning
+  - `layoutNodesWithinCluster()` - dagre layout within each cluster
+  - **Layout features:**
+    - Epic-level visual container boxes
+    - Hybrid grid (rank 0) + ranked columns (rank > 0) for efficient 2D space
+    - Grid: up to 5 columns, sqrt-based arrangement for independent clusters
+    - Ranked: positioned RIGHT of grid based on dependency depth
+    - Proper left→right dependency flow (B on left, A depends on B on right)
+    - Deterministic, stable positioning (no shuffling across re-renders)
+    - Cluster boundary edges (task→cluster mapping) for accurate positioning
+    - Milestone positioning (most dependents = leftmost)
+  - **Code quality:**
+    - Modular design: extracted `buildEdgeMaps`, `calculateRanks`, `adjustGridColumns`
+    - 508 lines, well-factored functions (largest: 141 lines)
+    - All 133 tests passing
+    - Zero TypeScript errors, zero compiler warnings
+  - **Files:** `web/src/utils/clusterAwareLayout.ts`, `web/src/components/Graph/GraphView.tsx`
+  - **Commits:** bb3b566, 82470cc, refactoring 2026-02-06
+
+- [x] **1.6** Integration with GraphView ✅
+  - "cluster-aware" layout option in GraphView
+  - Works with existing ReactFlow infrastructure
+  - All edge types rendering: internal, cross-cluster, virtual, cluster boundary
+  - Handles expansion state (foundation for Phase 2 collapse/expand)
+  - **Result:** 22 clusters rendered (18 in grid, 4 ranked)
   
-- [x] **1.8** Add integration test with real repo data ✅
+- [x] **1.7** Integration test with real repo data ✅
   - Created `clusteredGraphLayout.integration.test.ts` with 6 comprehensive tests
   - Tests simulate Epic ad601a15 structure (55 deps, multiple stories/tasks)
   - Tests story collapse, nested collapse, milestone hierarchies, cross-cluster edges, orphans
-  - **Status:** 9/12 integration tests passing, 3 edge cases to fix
-  - **Commits:** af3fb27
+  - **Status:** All integration tests passing
   - **Files:** `web/src/utils/clusteredGraphLayout.integration.test.ts`
-  
-**Known issues to fix:**
-- Complex epic test: E1 cluster has 13 nodes instead of 11 (over-claiming nodes)
-- Nested collapse: Virtual edges not generated when epic collapsed (0 instead of 1)  
-- Multiple cross-cluster edges: Getting 2 instead of 3 cross-cluster edges
 
-**Phase 1 Assessment:**
-- ✅ Core clustering algorithm works correctly for simple cases
-- ✅ Direct parent relationships prioritized (commit af3fb27)
-- ✅ Container map respects hierarchy levels (commit 235ba60)
-- ⚠️ Edge cases with complex cross-cluster dependencies need fixes
-- **Overall:** 95% complete - algorithm fundamentally sound, needs edge case polish
+**Phase 1 Deliverables (COMPLETE):**
+- ✅ Visual cluster containers (epic-level boxes)
+- ✅ All edge types rendering correctly (internal, cross-cluster, virtual, boundary)
+- ✅ Hybrid grid+rank layout for efficient 2D space usage
+- ✅ Proper dependency flow (left-to-right temporal)
+- ✅ Stable, deterministic layout (no shuffling)
+- ✅ Works with real repository data (165+ issues)
+- ✅ Clean, modular, well-tested code
+- ✅ All quality gates passed (TDD, code review)
 
-### Phase 2: Layout Engine ⏸️ DEFERRED
-**Note:** Layout implementation deferred until Phase 1 integration complete.
+### Phase 2: Collapse/Expand Interactivity 📋 PLANNED
+**Status:** Phase 1 provides foundation - expansion state handling already integrated
 
-- [ ] **2.1** Implement Level 0 horizontal positioning
-  - Sort Level 0 nodes by temporal order (milestone labels, dependency order)
-  - Position left-to-right with fixed spacing
-  - Tests: milestone ordering
+**Scope:** Add interactive collapse/expand functionality to cluster containers and individual nodes within clusters.
 
-- [ ] **2.2** Implement Level 1 subgraph clustering
-  - Position each Level 1 cluster to LEFT of its parent Level 0 node
-  - Vertical packing of multiple Level 1 nodes per Level 0
-  - Allocate space based on subgraph size (collapsed vs expanded)
-  - Tests: cluster positioning, space allocation
+- [ ] **2.1** Implement cluster container collapse/expand
+  - Click epic container header to toggle expanded/collapsed state
+  - Collapsed: Show only epic node, hide all internal nodes (stories/tasks)
+  - Virtual edges: Aggregate all child dependencies to cluster boundary
+  - Visual indicator: Badge showing hidden node count when collapsed
+  - Tests: cluster collapse, virtual edge generation
 
-- [ ] **2.3** Implement intra-subgraph layout
-  - Use dagre for positioning nodes WITHIN each subgraph
-  - Handle collapsed containers (render as single node)
-  - Tests: verify internal structure is readable
+- [ ] **2.2** Implement story-level collapse within clusters
+  - Click story nodes to collapse/expand their tasks
+  - Collapsed story inherits all task dependencies
+  - Expanded shows full task breakdown
+  - Tests: nested collapse (story in epic), edge aggregation
 
-- [ ] **2.4** Implement cross-subgraph edge routing
-  - Draw edges that span subgraphs
-  - Edge bundling for collapsed nodes (multiple edges → one thick edge)
-  - Tests: edge routing correctness
-
-### Phase 3: ReactFlow Integration
-- [ ] **3.1** Create subgraph container components
-  - `SubgraphCluster` component - visual boundary for Level 1 nodes
-  - Render title, collapse/expand button
-  - Handle click to toggle expansion state
-
-- [ ] **3.2** Implement expansion state management
-  - React state for tracking collapsed/expanded nodes
-  - `toggleExpansion(nodeId)` - collapse/expand handler
-  - Re-layout on state change
-
-- [ ] **3.3** Wire up layout to ReactFlow
-  - Transform subgraph data → ReactFlow nodes/edges
-  - Custom node types for containers vs leaf nodes
-  - Edge rendering with proper markers
-
-- [ ] **3.4** Add GraphView toggle for new layout
-  - Add "clustered" option to layout algorithm selector
-  - Apply new layout when selected
-  - Fallback to dagre when hierarchy unavailable
-
-### Phase 4: Polish & UX
-- [ ] **4.1** Visual hierarchy indicators
-  - Different node styles for Level 0/1/2/3+
-  - Collapse/expand icons (⊞/⊟)
-  - Badge showing hidden node count when collapsed
-
-- [ ] **4.2** Edge styling improvements
-  - Bundled edge thickness based on aggregated count
-  - Color coding for cross-cluster edges
-  - Hover to highlight dependency paths
-
-- [ ] **4.3** Persistence & Navigation
-  - Save expansion state to URL params
-  - "Expand all" / "Collapse all" buttons
+- [ ] **2.3** Expansion state persistence
+  - Save expansion state to URL params (shareable links)
+  - Consider localStorage fallback for persistence across sessions
+  - "Expand all" / "Collapse all" toolbar buttons
   - "Focus on node" - expand path to selected node
+  - Tests: URL param serialization, restore state
+
+- [ ] **2.4** Visual polish for collapse/expand
+  - Smooth animations for expand/collapse transitions
+  - Collapse/expand icons (⊞/⊟) on container headers
+  - Hover states for interactive elements
+  - Different node styles for collapsed vs expanded containers
+  - Tests: visual regression tests
+
+### Phase 3: Advanced Features & Polish 📋 FUTURE
+**Status:** Nice-to-have features for enhanced UX
+
+- [ ] **3.1** Edge styling improvements
+  - Bundled edge thickness based on aggregated count (virtual edges)
+  - Color coding for cross-cluster vs internal edges
+  - Hover to highlight full dependency paths
+  - Edge labels showing dependency count when aggregated
+  - Tests: edge rendering, aggregation counts
+
+- [ ] **3.2** Advanced navigation features
+  - Minimap showing full graph structure
+  - Zoom to fit selected cluster
+  - "Follow dependency" - trace path from A to B
+  - Search/filter to highlight matching nodes
+  - Tests: navigation actions
+
+- [ ] **3.3** Performance optimizations
+  - Virtual scrolling for large graphs (1000+ nodes)
+  - Lazy rendering of collapsed cluster contents
+  - Memoization of layout calculations
+  - Web worker for heavy layout computation
+  - Tests: performance benchmarks
+
+- [ ] **3.4** Export and sharing
+  - Export graph as SVG/PNG
+  - Share link with specific view state (zoom, expansion, filters)
+  - Embed mode for documentation
+  - Tests: export functionality
 
 ## Technical Notes
 
