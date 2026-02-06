@@ -420,6 +420,18 @@ export function GraphView({
       return {};
     }
   });
+  
+  const [defaultViewport] = useState(() => {
+    // Load viewport from localStorage on mount
+    try {
+      const saved = localStorage.getItem('jit.graph.viewport');
+      return saved ? JSON.parse(saved) : { x: 0, y: 0, zoom: 1 };
+    } catch (e) {
+      console.warn('Failed to load viewport from localStorage:', e);
+      return { x: 0, y: 0, zoom: 1 };
+    }
+  });
+  
   const [hasInitialFit, setHasInitialFit] = useState(false);
   const reactFlowInstanceRef = useRef<any>(null);
   const savedViewportRef = useRef<any>(null);
@@ -433,6 +445,36 @@ export function GraphView({
       console.warn('Failed to save expansion state to localStorage:', e);
     }
   }, [expansionState]);
+
+  // Save viewport to localStorage whenever it changes (debounced)
+  const saveViewportTimeoutRef = useRef<number | null>(null);
+  
+  const handleViewportChange = useCallback(() => {
+    // Debounce viewport saves to avoid excessive localStorage writes
+    if (saveViewportTimeoutRef.current) {
+      clearTimeout(saveViewportTimeoutRef.current);
+    }
+    
+    saveViewportTimeoutRef.current = window.setTimeout(() => {
+      if (reactFlowInstanceRef.current) {
+        try {
+          const viewport = reactFlowInstanceRef.current.getViewport();
+          localStorage.setItem('jit.graph.viewport', JSON.stringify(viewport));
+        } catch (e) {
+          console.warn('Failed to save viewport to localStorage:', e);
+        }
+      }
+    }, 300);
+  }, []);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveViewportTimeoutRef.current) {
+        clearTimeout(saveViewportTimeoutRef.current);
+      }
+    };
+  }, []);
 
   /**
    * Toggle expansion state for a container node (cluster or hierarchical parent).
@@ -777,12 +819,17 @@ export function GraphView({
       setNodes(finalNodes);
       setEdges(layouted.edges);
       
-      // Fit view only on first load
+      // Only fit view on first load if no saved viewport exists
       if (!hasInitialFit && finalNodes.length > 0) {
         setHasInitialFit(true);
-        setTimeout(() => {
-          reactFlowInstanceRef.current?.fitView({ duration: 200 });
-        }, 50);
+        const savedViewport = localStorage.getItem('jit.graph.viewport');
+        if (!savedViewport) {
+          // No saved viewport, fit to view
+          setTimeout(() => {
+            reactFlowInstanceRef.current?.fitView({ duration: 200 });
+          }, 50);
+        }
+        // Otherwise defaultViewport prop handles restoration
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load graph');
@@ -856,6 +903,8 @@ export function GraphView({
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeClick={handleNodeClick}
+        onMoveEnd={handleViewportChange}
+        defaultViewport={defaultViewport}
         nodeTypes={nodeTypes}
         onInit={(instance) => { reactFlowInstanceRef.current = instance; }}
         attributionPosition="bottom-right"
