@@ -11,19 +11,27 @@
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-02-04T14:07:22.850664527Z"
-    },
     "tdd-reminder": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-02-04T14:07:22.850645537Z"
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-02-04T14:07:22.850664527Z"
     }
   },
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "dev/design/phase3-advanced-features.md",
+      "commit": null,
+      "label": "Phase 3 Implementation Plan",
+      "doc_type": "design",
+      "format": "markdown"
+    }
+  ],
   "labels": [
     "epic:production-polish",
     "component:web",
