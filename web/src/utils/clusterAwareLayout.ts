@@ -38,7 +38,8 @@ function buildEdgeMaps(
   crossClusterEdges: GraphEdge[],
   orphanNodes: GraphNode[],
   allEdges: GraphEdge[],
-  allNodeIds: string[]
+  allNodeIds: string[],
+  collapsedClusters: SubgraphCluster[] = []
 ): {
   incomingEdges: Map<string, Set<string>>;
   outgoingEdges: Map<string, Set<string>>;
@@ -60,6 +61,15 @@ function buildEdgeMaps(
       nodeToCluster.set(node.id, cluster.containerId);
     });
   });
+  
+  // Map collapsed cluster children to their container IDs
+  collapsedClusters.forEach(cluster => {
+    nodeToCluster.set(cluster.containerId, cluster.containerId);
+    cluster.nodes.forEach(node => {
+      nodeToCluster.set(node.id, cluster.containerId);
+    });
+  });
+  
   orphanNodes.forEach(orphan => {
     nodeToCluster.set(orphan.id, orphan.id);
   });
@@ -72,15 +82,16 @@ function buildEdgeMaps(
     if (cluster.outgoingEdges) relevantEdges.push(...cluster.outgoingEdges);
   });
   
-  [...orphanNodes].sort((a, b) => a.id.localeCompare(b.id)).forEach(orphan => {
-    allEdges.forEach(edge => {
-      if (edge.from === orphan.id && allNodeIds.includes(edge.to)) {
-        relevantEdges.push(edge);
-      }
-      if (edge.to === orphan.id && allNodeIds.includes(edge.from)) {
-        relevantEdges.push(edge);
-      }
-    });
+  // Collect ALL edges from allEdges that involve any node in allNodeIds
+  // This ensures edges between collapsed clusters are included
+  allEdges.forEach(edge => {
+    // Check if either endpoint is in our node set (clusters or orphans)
+    const fromInSet = allNodeIds.includes(edge.from);
+    const toInSet = allNodeIds.includes(edge.to);
+    
+    if (fromInSet || toInSet) {
+      relevantEdges.push(edge);
+    }
   });
   
   // Map task IDs to cluster IDs and build edge maps
@@ -200,7 +211,8 @@ export function computeClusterPositions(
   clusters: SubgraphCluster[],
   crossClusterEdges: GraphEdge[],
   orphanNodes: GraphNode[] = [],
-  allEdges: GraphEdge[] = []
+  allEdges: GraphEdge[] = [],
+  collapsedClusters: SubgraphCluster[] = []
 ): Map<string, ClusterPosition> {
   // Include both clusters and orphan nodes
   const allNodeIds = [
@@ -210,7 +222,7 @@ export function computeClusterPositions(
   
   // Build edge maps and node-to-cluster mapping
   const { incomingEdges, outgoingEdges } = buildEdgeMaps(
-    clusters, crossClusterEdges, orphanNodes, allEdges, allNodeIds
+    clusters, crossClusterEdges, orphanNodes, allEdges, allNodeIds, collapsedClusters
   );
   
   // Calculate ranks using longest-path algorithm
@@ -250,33 +262,38 @@ export function computeClusterPositions(
   let gridWidth = 0;
   
   if (rank0Nodes.length > 0) {
-    // Simple initial grid layout - will be adjusted in Phase 3 with actual widths
-    const cols = Math.min(5, Math.ceil(Math.sqrt(rank0Nodes.length)));
+    // Wider grid layout for better visual spread
+    // More columns = less vertical stacking
+    const cols = rank0Nodes.length <= 2 ? rank0Nodes.length :
+                 rank0Nodes.length <= 9 ? 3 :
+                 rank0Nodes.length <= 16 ? 4 :
+                 rank0Nodes.length <= 25 ? 5 :
+                 Math.min(8, Math.ceil(Math.sqrt(rank0Nodes.length)));
     
     rank0Nodes.forEach((nodeId, index) => {
       const col = index % cols;
       const row = Math.floor(index / cols);
       positions.set(nodeId, {
-        x: col * 1000, // Initial spacing - will be adjusted
-        y: row * 500,  // Initial spacing - will be adjusted
+        x: col * 600,  // Wider horizontal spacing
+        y: row * 300,  // Reasonable vertical spacing
         width: 0,
         height: 0,
       });
     });
     
-    gridWidth = cols * 1000; // Estimate - will be refined in Phase 3
+    gridWidth = cols * 600;
   }
   
-  // Position other ranks AFTER the grid (initial positions, refined in Phase 3)
+  // Position other ranks AFTER the grid
   nodesByRank.forEach((nodesInRank, rank) => {
     if (rank === 0) return; // Already handled
     
-    const x = gridWidth + rank * 1000;
+    const x = gridWidth + rank * 600;  // Match horizontal spacing
     
     nodesInRank.forEach((nodeId, index) => {
       positions.set(nodeId, {
         x,
-        y: index * 500,
+        y: index * 300,  // Match vertical spacing
         width: 0,
         height: 0,
       });
@@ -368,10 +385,17 @@ export function createClusterAwareLayout(
   clusters: SubgraphCluster[],
   crossClusterEdges: GraphEdge[],
   orphanNodes: GraphNode[] = [],
-  allEdges: GraphEdge[] = []
+  allEdges: GraphEdge[] = [],
+  collapsedClusters: SubgraphCluster[] = []
 ): ClusterAwareLayoutResult {
   // Phase 1: Compute cluster and orphan positions
-  const clusterPositions = computeClusterPositions(clusters, crossClusterEdges, orphanNodes, allEdges);
+  const clusterPositions = computeClusterPositions(
+    clusters, 
+    crossClusterEdges, 
+    orphanNodes, 
+    allEdges, 
+    collapsedClusters
+  );
   
   // Phase 2: Layout nodes within clusters
   const clusterLayouts = new Map<string, ClusterLayout>();

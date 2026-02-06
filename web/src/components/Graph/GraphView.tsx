@@ -14,6 +14,7 @@ import dagre from 'dagre';
 import 'reactflow/dist/style.css';
 import { apiClient } from '../../api/client';
 import type { State, Priority, GraphNode as ApiGraphNode, GraphEdge } from '../../types/models';
+import type { SubgraphCluster } from '../../types/subgraphCluster';
 import { LabelBadge } from '../Labels/LabelBadge';
 import { calculateDownstreamStats, type DownstreamStats } from '../../utils/strategicView';
 import { applyFiltersToNode, applyFiltersToEdge, createStrategicFilter, createLabelFilter, type GraphFilter } from '../../utils/graphFilter';
@@ -114,13 +115,45 @@ const getClusterAwareLayout = (
   allOriginalEdges: GraphEdge[],
   expansionState: ExpansionState
 ) => {
+  // Separate collapsed and expanded clusters
+  const expandedClusters: SubgraphCluster[] = [];
+  const collapsedClusters: SubgraphCluster[] = [];
+  const collapsedAsOrphans: ApiGraphNode[] = [];
+  
+  clusterData.clusters.forEach(cluster => {
+    const isExpanded = expansionState[cluster.containerId] ?? false;
+    if (isExpanded) {
+      expandedClusters.push(cluster);
+    } else {
+      // Keep cluster info for child→container mapping
+      collapsedClusters.push(cluster);
+      
+      // Treat collapsed cluster container as an orphan node
+      const containerNode = nodes.find(n => n.id === cluster.containerId);
+      if (containerNode) {
+        collapsedAsOrphans.push({
+          id: cluster.containerId,
+          label: containerNode.data?.label || cluster.containerId,
+          state: containerNode.data?.state || 'backlog',
+          priority: containerNode.data?.priority || 'normal',
+          labels: containerNode.data?.labels || [],
+          blocked: false, // Collapsed clusters are never blocked (the container itself is shown)
+        });
+      }
+    }
+  });
+  
+  // Combine with actual orphan nodes
+  const allOrphans = [...clusterData.orphanNodes, ...collapsedAsOrphans];
+  
   // Use the new cluster-aware layout algorithm with ALL original edges
-  // This ensures orphan nodes are positioned correctly based on all dependencies
+  // Pass EXPANDED clusters for layout, COLLAPSED clusters for child mapping
   const layoutResult = createClusterAwareLayout(
-    clusterData.clusters,
+    expandedClusters,
     clusterData.crossClusterEdges,
-    clusterData.orphanNodes,
-    allOriginalEdges
+    allOrphans,
+    allOriginalEdges,
+    collapsedClusters
   );
   
   const finalNodes: Node[] = [];
