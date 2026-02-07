@@ -7,6 +7,7 @@ interface ClusterPosition {
   y: number;
   width: number;
   height: number;
+  rank?: number; // Store the rank for later use
 }
 
 interface NodeWithPosition extends GraphNode {
@@ -278,6 +279,7 @@ export function computeClusterPositions(
         y: row * 300,  // Reasonable vertical spacing
         width: 0,
         height: 0,
+        rank: 0, // Store rank
       });
     });
     
@@ -296,6 +298,7 @@ export function computeClusterPositions(
         y: index * 300,  // Match vertical spacing
         width: 0,
         height: 0,
+        rank, // Store rank
       });
     });
   });
@@ -423,21 +426,12 @@ export function createClusterAwareLayout(
   const positionsByRank = new Map<number, Array<{id: string, pos: ClusterPosition}>>();
   
   clusterPositions.forEach((pos, id) => {
-    // Nodes in grid (x < 5000) stay in grid, others are grouped by rank
-    if (pos.x < 5000) { // Grid area (5 cols * 1000 max)
-      const gridRank = -1; // Special marker for grid nodes
-      if (!positionsByRank.has(gridRank)) {
-        positionsByRank.set(gridRank, []);
-      }
-      positionsByRank.get(gridRank)!.push({id, pos});
-    } else {
-      // Ranked nodes beyond the grid
-      const rank = Math.round(pos.x / 1000);
-      if (!positionsByRank.has(rank)) {
-        positionsByRank.set(rank, []);
-      }
-      positionsByRank.get(rank)!.push({id, pos});
+    // Use stored rank instead of calculating from x-position
+    const rank = pos.rank ?? -1; // Default to grid if no rank stored
+    if (!positionsByRank.has(rank)) {
+      positionsByRank.set(rank, []);
     }
+    positionsByRank.get(rank)!.push({id, pos});
   });
   
   // For each rank, calculate max width and adjust X position
