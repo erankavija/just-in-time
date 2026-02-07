@@ -14,6 +14,9 @@ export interface ClusterNodeData {
   /** Icon for this type (optional) */
   icon?: string;
   
+  /** Type name (e.g., "epic", "story") */
+  typeName?: string;
+  
   /** Whether this cluster is expanded (true) or collapsed (false) */
   isExpanded: boolean;
   
@@ -63,6 +66,7 @@ const ClusterNode = memo(({ data }: NodeProps<ClusterNodeData>) => {
   const {
     label,
     icon,
+    typeName,
     isExpanded,
     hiddenNodeCount,
     onToggleExpansion,
@@ -105,7 +109,9 @@ const ClusterNode = memo(({ data }: NodeProps<ClusterNodeData>) => {
         borderTopRightRadius: '6px',
       }}>
         <span style={{ opacity: 0.85 }}>
-          {icon && `${icon} `}#{nodeId.substring(0, 8)}
+          {icon && `${icon} `}
+          {typeName && `${typeName.charAt(0).toUpperCase() + typeName.slice(1)} `}
+          #{nodeId.substring(0, 8)}
         </span>
         <button
           className="cluster-node-toggle-button-compact"

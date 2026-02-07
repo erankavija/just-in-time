@@ -788,6 +788,7 @@ export function GraphView({
             data: {
               label: node.label,
               icon: typeIcon, // Pass icon to ClusterNode
+              typeName: nodeType, // Pass type name
               isExpanded,
               hiddenNodeCount,
               onToggleExpansion: () => toggleExpansion(node.id),
@@ -828,7 +829,11 @@ export function GraphView({
                   justifyContent: 'space-between',
                   alignItems: 'center',
                 }}>
-                  <span>{typeIcon && `${typeIcon} `}#{node.id.substring(0, 8)}</span>
+                  <span>
+                    {typeIcon && `${typeIcon} `}
+                    {nodeType && `${nodeType.charAt(0).toUpperCase() + nodeType.slice(1)} `}
+                    #{node.id.substring(0, 8)}
+                  </span>
                 </div>
                 <div style={{ 
                   fontWeight: 600,
