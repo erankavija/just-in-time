@@ -24,7 +24,7 @@ interface ClusterAwareLayoutResult {
   clusters: Map<string, ClusterPosition>;
 }
 
-const CLUSTER_SPACING = 100; // Spacing between clusters (horizontal and vertical)
+const CLUSTER_SPACING = 40; // Spacing between clusters (horizontal and vertical)
 const NODE_WIDTH = 180;
 const NODE_HEIGHT = 60;
 const CLUSTER_PADDING = 40;
