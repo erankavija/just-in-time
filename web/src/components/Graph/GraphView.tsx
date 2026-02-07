@@ -422,6 +422,22 @@ export function GraphView({
       return {};
     }
   });
+  const [isInteractive, setIsInteractive] = useState(true); // Start unlocked (will be toggled to locked on init)
+  
+  // Listen to interactive button clicks to update our state
+  useEffect(() => {
+    const button = document.querySelector('.react-flow__controls-interactive');
+    if (!button) return;
+    
+    const observer = new MutationObserver(() => {
+      // Check if the button's aria-label indicates locked/unlocked state
+      const isLocked = button.getAttribute('title')?.includes('unlock');
+      setIsInteractive(!isLocked);
+    });
+    
+    observer.observe(button, { attributes: true });
+    return () => observer.disconnect();
+  }, []);
   
   const [defaultViewport] = useState(() => {
     // Load viewport from localStorage on mount
@@ -926,11 +942,27 @@ export function GraphView({
         onMoveEnd={handleViewportChange}
         defaultViewport={defaultViewport}
         nodeTypes={nodeTypes}
-        onInit={(instance) => { reactFlowInstanceRef.current = instance; }}
+        onInit={(instance) => { 
+          reactFlowInstanceRef.current = instance;
+          // Set to locked mode initially by toggling interactivity off
+          setTimeout(() => {
+            const button = document.querySelector('.react-flow__controls-interactive') as HTMLButtonElement;
+            if (button) button.click();
+          }, 100);
+        }}
         attributionPosition="bottom-right"
         proOptions={proOptions}
         minZoom={0.1}  // Allow zooming out much further
         maxZoom={2}    // Allow zooming in a bit more
+        nodesDraggable={isInteractive}
+        nodesConnectable={false}  // Never allow connecting nodes
+        nodesFocusable={isInteractive}
+        edgesFocusable={isInteractive}
+        elementsSelectable={true}  // Allow selection for clicks
+        panOnDrag={true}  // Allow panning
+        panOnScroll={false}  // Zoom with scroll, not pan
+        zoomOnScroll={true}  // Zoom with scroll
+        zoomOnDoubleClick={false}  // Disable zoom on double click
         style={{
           opacity: isRenderable ? 1 : 0,
           transition: 'opacity 0.1s ease-in-out',
