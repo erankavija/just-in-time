@@ -149,6 +149,7 @@ export function assignNodesToClusters(
     const clusterNodes: GraphNode[] = [container];
     const visited = new Set<string>();
     const queue: string[] = [container.id];
+    // directChildren used below for assignment priority
     const directChildren = directChildrenMap.get(container.id) || new Set();
     
     while (queue.length > 0) {

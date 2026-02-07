@@ -172,11 +172,12 @@ export function prepareClusteredGraphForReactFlow(
       const toAncestors = nodeToAncestorClusters.get(edge.to) || [];
       
       // Find the first visible ancestor (or the node itself if visible)
+      // Walk ancestors in REVERSE order (closest ancestor first: sub-cluster before parent)
       const getVisibleRep = (nodeId: string, ancestors: string[]): string => {
         if (visibleNodeIds.has(nodeId)) return nodeId;
-        // Walk up ancestor chain to find first visible ancestor
-        for (const ancestorId of ancestors) {
-          if (visibleNodeIds.has(ancestorId)) return ancestorId;
+        // Walk up ancestor chain from closest to furthest
+        for (let i = ancestors.length - 1; i >= 0; i--) {
+          if (visibleNodeIds.has(ancestors[i])) return ancestors[i];
         }
         return nodeId; // Fallback (shouldn't happen)
       };

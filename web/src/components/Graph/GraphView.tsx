@@ -149,18 +149,45 @@ const getClusterAwareLayout = (
   const allOrphans = [...clusterData.orphanNodes, ...collapsedAsOrphans];
   
   // Filter cluster nodes to only include visible nodes (respects sub-cluster expansion)
-  // Filter internal edges to match visible nodes
+  // Include both visible edges AND virtual edges for correct intra-cluster layout
   const visibleNodeIds = new Set(clusterData.visibleNodes.map(n => n.id));
-  const expandedClustersWithVisibleNodes = expandedClusters.map(cluster => ({
-    ...cluster,
-    nodes: cluster.nodes.filter(n => visibleNodeIds.has(n.id)),
-    internalEdges: cluster.internalEdges.filter(e => 
+  
+  // Build map of virtual edges for each cluster
+  const virtualEdgesByCluster = new Map<string, GraphEdge[]>();
+  clusterData.virtualEdges.forEach(ve => {
+    // Find which top-level cluster(s) these nodes belong to
+    const fromTopCluster = clusterData.clusters.find(c => 
+      c.parentClusterId === null && c.nodes.some(n => n.id === ve.from)
+    );
+    const toTopCluster = clusterData.clusters.find(c => 
+      c.parentClusterId === null && c.nodes.some(n => n.id === ve.to)
+    );
+    
+    // If both endpoints are in the same TOP-LEVEL cluster, it's an internal virtual edge
+    if (fromTopCluster && toTopCluster && fromTopCluster.containerId === toTopCluster.containerId) {
+      const clusterId = fromTopCluster.containerId;
+      if (!virtualEdgesByCluster.has(clusterId)) {
+        virtualEdgesByCluster.set(clusterId, []);
+      }
+      virtualEdgesByCluster.get(clusterId)!.push({ from: ve.from, to: ve.to });
+    }
+  });
+  
+  const expandedClustersWithVisibleNodes = expandedClusters.map(cluster => {
+    const visibleNodes = cluster.nodes.filter(n => visibleNodeIds.has(n.id));
+    const visibleInternalEdges = cluster.internalEdges.filter(e => 
       visibleNodeIds.has(e.from) && visibleNodeIds.has(e.to)
-    ),
-  }));
+    );
+    const virtualInternalEdges = virtualEdgesByCluster.get(cluster.containerId) || [];
+    
+    return {
+      ...cluster,
+      nodes: visibleNodes,
+      internalEdges: [...visibleInternalEdges, ...virtualInternalEdges],
+    };
+  });
   
   // Use the new cluster-aware layout algorithm
-  // Pass ALL original edges - the layout algorithm will compute ranks correctly
   const layoutResult = createClusterAwareLayout(
     expandedClustersWithVisibleNodes,
     clusterData.crossClusterEdges,
