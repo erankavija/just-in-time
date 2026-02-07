@@ -42,11 +42,13 @@ export function filterStrategicEdges(
 /**
  * Calculate downstream dependency statistics for a node
  * Uses DFS to traverse all transitive dependencies
+ * Only counts nodes that are LOWER in the hierarchy (higher level number)
  */
 export function calculateDownstreamStats(
   nodeId: string,
   nodes: GraphNode[],
-  edges: GraphEdge[]
+  edges: GraphEdge[],
+  hierarchyConfig?: { [typeName: string]: number }
 ): DownstreamStats {
   const stats: DownstreamStats = {
     total: 0,
@@ -70,6 +72,23 @@ export function calculateDownstreamStats(
   for (const node of nodes) {
     nodeMap.set(node.id, node);
   }
+  
+  // Determine hierarchy level of the source node
+  const sourceNode = nodeMap.get(nodeId);
+  let sourceLevel: number | null = null;
+  
+  if (hierarchyConfig && sourceNode) {
+    // Find the type label for the source node
+    for (const label of sourceNode.labels) {
+      if (label.startsWith('type:')) {
+        const typeName = label.substring(5);
+        if (hierarchyConfig[typeName] !== undefined) {
+          sourceLevel = hierarchyConfig[typeName];
+          break;
+        }
+      }
+    }
+  }
 
   // DFS to find all downstream nodes
   const visited = new Set<string>();
@@ -84,33 +103,63 @@ export function calculateDownstreamStats(
     }
     visited.add(currentId);
 
-    // Don't count the root node itself
+    // Determine if we should count and traverse this node
+    let shouldCountAndTraverse = true;
+    
+    // Don't count the root node itself, but DO traverse it
     if (currentId !== nodeId) {
       const node = nodeMap.get(currentId);
       if (node) {
-        stats.total++;
-        
-        // Count by state
-        if (node.state === 'done') {
-          stats.done++;
-        } else if (node.state === 'in_progress') {
-          stats.inProgress++;
-        } else if (node.state === 'ready') {
-          stats.ready++;
+        // Check hierarchy level
+        if (hierarchyConfig && sourceLevel !== null) {
+          let nodeLevel: number | null = null;
+          
+          // Find the type label for this node
+          for (const label of node.labels) {
+            if (label.startsWith('type:')) {
+              const typeName = label.substring(5);
+              if (hierarchyConfig[typeName] !== undefined) {
+                nodeLevel = hierarchyConfig[typeName];
+                break;
+              }
+            }
+          }
+          
+          // Only count/traverse if this node is LOWER in hierarchy (higher level number)
+          // If node has no type label, count it (might be an orphan/bug/etc)
+          if (nodeLevel !== null && nodeLevel <= sourceLevel) {
+            shouldCountAndTraverse = false;
+          }
         }
         
-        // Count blocked
-        if (node.blocked) {
-          stats.blocked++;
+        if (shouldCountAndTraverse) {
+          stats.total++;
+          
+          // Count by state
+          if (node.state === 'done') {
+            stats.done++;
+          } else if (node.state === 'in_progress') {
+            stats.inProgress++;
+          } else if (node.state === 'ready') {
+            stats.ready++;
+          }
+          
+          // Count blocked
+          if (node.blocked) {
+            stats.blocked++;
+          }
         }
       }
     }
 
-    // Add dependencies to stack
-    const dependencies = adjacencyList.get(currentId) || [];
-    for (const depId of dependencies) {
-      if (!visited.has(depId)) {
-        stack.push(depId);
+    // Only add dependencies to stack if we're traversing this node
+    // (either it's the root, or it's lower in hierarchy)
+    if (currentId === nodeId || shouldCountAndTraverse) {
+      const dependencies = adjacencyList.get(currentId) || [];
+      for (const depId of dependencies) {
+        if (!visited.has(depId)) {
+          stack.push(depId);
+        }
       }
     }
   }

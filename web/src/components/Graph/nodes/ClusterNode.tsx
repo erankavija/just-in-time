@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
+import type { DownstreamStats } from '../../../utils/strategicView';
 import './ClusterNode.css';
 
 /**
@@ -24,6 +25,12 @@ export interface ClusterNodeData {
   priority?: string;
   labels?: string[];
   nodeId?: string;
+  
+  /** Whether this is a strategic node */
+  isStrategic?: boolean;
+  
+  /** Downstream task statistics (only for strategic nodes) */
+  downstreamStats?: DownstreamStats;
 }
 
 const stateColors: Record<string, string> = {
@@ -58,6 +65,8 @@ const ClusterNode = memo(({ data }: NodeProps<ClusterNodeData>) => {
     state = 'backlog',
     priority = 'normal',
     nodeId = '',
+    isStrategic = false,
+    downstreamStats,
   } = data;
 
   const icon = isExpanded ? '⊟' : '⊞';
@@ -133,6 +142,23 @@ const ClusterNode = memo(({ data }: NodeProps<ClusterNodeData>) => {
           </span>
         )}
       </div>
+      {isStrategic && downstreamStats && (
+        <div 
+          style={{
+            fontSize: '10px',
+            color: 'var(--text-secondary)',
+            fontFamily: 'var(--font-mono)',
+            borderTop: '1px solid var(--border)',
+            paddingTop: '4px',
+            marginTop: '6px',
+          }}
+          title={`Downstream: ${downstreamStats.total} tasks (${downstreamStats.done} done, ${downstreamStats.inProgress} in progress, ${downstreamStats.blocked} blocked)`}
+        >
+          ↓ {downstreamStats.total} task{downstreamStats.total !== 1 ? 's' : ''}
+          {downstreamStats.done > 0 && ` • ✓ ${downstreamStats.done}`}
+          {downstreamStats.blocked > 0 && ` • ⚠ ${downstreamStats.blocked}`}
+        </div>
+      )}
       <Handle type="target" position={Position.Left} />
       <Handle type="source" position={Position.Right} />
     </div>

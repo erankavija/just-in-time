@@ -182,7 +182,6 @@ const getClusterAwareLayout = (
           backgroundColor: 'rgba(200, 200, 200, 0.1)',
           border: '2px solid rgba(150, 150, 150, 0.3)',
           borderRadius: '8px',
-          padding: '40px 20px 20px 20px',
           zIndex: -1,
         },
         data: {
@@ -406,7 +405,7 @@ export function GraphView({
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [nodeStats, setNodeStats] = useState<Map<string, DownstreamStats>>(new Map());
+  const [_nodeStats, setNodeStats] = useState<Map<string, DownstreamStats>>(new Map());
   const [strategicTypes, setStrategicTypes] = useState<string[]>(['milestone', 'epic']); // Default fallback
   const [hierarchyConfig, setHierarchyConfig] = useState<HierarchyLevelMap | null>(null);
   const [expansionState, setExpansionState] = useState<ExpansionState>(() => {
@@ -567,9 +566,8 @@ export function GraphView({
       // Calculate downstream stats for visible nodes (using full graph)
       const stats = new Map<string, DownstreamStats>();
       for (const node of visibleNodes) {
-        stats.set(node.id, calculateDownstreamStats(node.id, data.nodes, data.edges));
+        stats.set(node.id, calculateDownstreamStats(node.id, data.nodes, data.edges, hierarchyConfig || undefined));
       }
-      setNodeStats(stats);
       
       // Apply clustering if using compact layout and hierarchy config is available
       let nodesToRender = visibleNodes;
@@ -588,6 +586,32 @@ export function GraphView({
         // The expansion filtering will happen during rendering
         nodesToRender = visibleNodes; // Use ALL visible nodes, not filtered ones
         clusterData = clustered; // Pass to layout function
+        
+        // Recalculate stats for cluster containers based on their actual members
+        // (not dependency traversal which may include cross-cluster nodes)
+        for (const cluster of clustered.clusters) {
+          const clusterStats: DownstreamStats = {
+            total: 0,
+            done: 0,
+            inProgress: 0,
+            blocked: 0,
+            ready: 0,
+          };
+          
+          // Count cluster members (excluding the container itself)
+          for (const member of cluster.nodes) {
+            if (member.id !== cluster.containerId) {
+              clusterStats.total++;
+              if (member.state === 'done') clusterStats.done++;
+              else if (member.state === 'in_progress') clusterStats.inProgress++;
+              else if (member.state === 'ready') clusterStats.ready++;
+              if (member.blocked) clusterStats.blocked++;
+            }
+          }
+          
+          // Override the dependency-based stats with cluster-based stats
+          stats.set(cluster.containerId, clusterStats);
+        }
         
         // Collect all edges that should be visible:
         // 1. visibleEdges (edges between visible nodes)
@@ -619,9 +643,12 @@ export function GraphView({
         edgesToRender = Array.from(edgeMap.values());
       }
       
+      // Set node stats AFTER clustering has updated them
+      setNodeStats(stats);
+      
       const flowNodes: Node[] = nodesToRender.map((node: ApiGraphNode) => {
-        const stats = nodeStats.get(node.id);
-        const hasDownstream = stats && stats.total > 0;
+        const nodeStats = stats.get(node.id); // Use local stats, not state
+        const hasDownstream = nodeStats && nodeStats.total > 0;
         const filterResult = nodeFilterResults.get(node.id)!;
         const isDimmed = filterResult.dimmed;
         
@@ -658,6 +685,8 @@ export function GraphView({
               priority: node.priority,
               labels: node.labels,
               nodeId: node.id, // For reference
+              isStrategic, // Pass strategic flag
+              downstreamStats: hasDownstream ? nodeStats : undefined, // Pass stats if available
             },
             style: {
               opacity: isDimmed ? 0.4 : 1,
@@ -722,11 +751,11 @@ export function GraphView({
                       paddingTop: '4px',
                       marginTop: '6px',
                     }}
-                    title={`Downstream: ${stats.total} tasks (${stats.done} done, ${stats.inProgress} in progress, ${stats.blocked} blocked)`}
+                    title={`Downstream: ${nodeStats.total} tasks (${nodeStats.done} done, ${nodeStats.inProgress} in progress, ${nodeStats.blocked} blocked)`}
                   >
-                    ↓ {stats.total} task{stats.total !== 1 ? 's' : ''}
-                    {stats.done > 0 && ` • ✓ ${stats.done}`}
-                    {stats.blocked > 0 && ` • ⚠ ${stats.blocked}`}
+                    ↓ {nodeStats.total} task{nodeStats.total !== 1 ? 's' : ''}
+                    {nodeStats.done > 0 && ` • ✓ ${nodeStats.done}`}
+                    {nodeStats.blocked > 0 && ` • ⚠ ${nodeStats.blocked}`}
                   </div>
                 )}
               </div>
