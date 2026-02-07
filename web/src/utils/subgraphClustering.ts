@@ -34,13 +34,10 @@ export function getNodeLevel(node: GraphNode, hierarchy: HierarchyLevelMap): num
 
 /**
  * Assign nodes to subgraph clusters based on hierarchy boundaries.
- * Each Level 1 node (e.g., epic) becomes a cluster containing all lower-level nodes it depends on.
+ * This is a convenience wrapper that automatically determines the container level
+ * using the strategy: prefer level 2 (epic) if it exists, otherwise use lowest level.
  * 
- * Algorithm:
- * 1. Find all Level 1 nodes (lowest numeric level, e.g., epic = level 2)
- * 2. For each Level 1 node, recursively follow dependencies
- * 3. Include all nodes with HIGHER level numbers (more tactical)
- * 4. Stop when encountering SAME or LOWER level (another strategic node)
+ * For explicit control over container level, use assignNodesToClusters() directly.
  * 
  * @param nodes - All nodes in the graph
  * @param edges - All edges in the graph
@@ -68,141 +65,27 @@ export function assignNodesToSubgraphs(
   // - This allows milestones (level 1) to be visible nodes, not containers
   const containerLevel = uniqueLevels.includes(2) ? 2 : uniqueLevels[0];
   
-  // Find all container nodes
-  const containerNodes = nodes.filter(n => getNodeLevel(n, hierarchy) === containerLevel);
-  
-  if (containerNodes.length === 0) {
-    return { clusters: new Map(), crossClusterEdges: [], orphanNodes: nodes };
-  }
-  
-  // Build adjacency map for efficient traversal
-  const nodeMap = new Map<string, GraphNode>();
-  nodes.forEach(n => nodeMap.set(n.id, n));
-  
-  const edgesByNode = new Map<string, GraphEdge[]>();
-  edges.forEach(edge => {
-    if (!edgesByNode.has(edge.from)) {
-      edgesByNode.set(edge.from, []);
-    }
-    edgesByNode.get(edge.from)!.push(edge);
-  });
-  
-  // Assign nodes to clusters
-  const clusters = new Map<string, SubgraphCluster>();
-  const assignedNodes = new Set<string>();
-  
-  // FIRST PASS: Mark ALL direct children of ALL containers
-  // This prevents transitive dependencies from stealing direct children
-  const directChildrenMap = new Map<string, Set<string>>();
-  for (const container of containerNodes) {
-    const directChildren = new Set<string>();
-    const containerEdges = edgesByNode.get(container.id) || [];
-    
-    for (const edge of containerEdges) {
-      const targetNode = nodeMap.get(edge.to);
-      if (targetNode) {
-        const targetLevel = getNodeLevel(targetNode, hierarchy);
-        if (targetLevel > containerLevel) {
-          directChildren.add(targetNode.id);
-          assignedNodes.add(targetNode.id); // Reserve globally
-        }
-      }
-    }
-    
-    directChildrenMap.set(container.id, directChildren);
-  }
-  
-  // SECOND PASS: Build clusters with BFS
-  for (const container of containerNodes) {
-    const clusterNodes: GraphNode[] = [container];
-    const visited = new Set<string>([container.id]);
-    const queue = [container.id];
-    const myDirectChildren = directChildrenMap.get(container.id) || new Set();
-    
-    // BFS to find all transitive lower-level dependents
-    while (queue.length > 0) {
-      const currentId = queue.shift()!;
-      const outgoingEdges = edgesByNode.get(currentId) || [];
-      
-      for (const edge of outgoingEdges) {
-        const targetNode = nodeMap.get(edge.to);
-        if (!targetNode || visited.has(targetNode.id)) continue;
-        
-        const targetLevel = getNodeLevel(targetNode, hierarchy);
-        
-        // Include if: higher level AND (my direct child OR not assigned to another cluster)
-        const isMyDirectChild = myDirectChildren.has(targetNode.id);
-        const isAvailable = !assignedNodes.has(targetNode.id);
-        
-        if (targetLevel > containerLevel && (isMyDirectChild || isAvailable)) {
-          clusterNodes.push(targetNode);
-          visited.add(targetNode.id);
-          if (!isMyDirectChild) {
-            assignedNodes.add(targetNode.id); // Claim if not already claimed
-          }
-          queue.push(targetNode.id);
-        }
-        // Note: If targetLevel <= containerLevel, this is a cross-cluster edge (boundary)
-      }
-    }
-    
-    // Create cluster
-    const clusterNodeIds = new Set(clusterNodes.map(n => n.id));
-    const internalEdges = edges.filter(e => clusterNodeIds.has(e.from) && clusterNodeIds.has(e.to));
-    const outgoingEdges = edges.filter(e => clusterNodeIds.has(e.from) && !clusterNodeIds.has(e.to));
-    const incomingEdges = edges.filter(e => !clusterNodeIds.has(e.from) && clusterNodeIds.has(e.to));
-    
-    clusters.set(container.id, {
-      containerId: container.id,
-      containerLevel,
-      nodes: clusterNodes,
-      internalEdges,
-      outgoingEdges,
-      incomingEdges,
-    });
-    
-    assignedNodes.add(container.id);
-  }
-  
-  // Find cross-cluster edges
-  const crossClusterEdges = edges.filter(edge => {
-    const fromCluster = [...clusters.values()].find(c => 
-      c.nodes.some(n => n.id === edge.from)
-    );
-    const toCluster = [...clusters.values()].find(c => 
-      c.nodes.some(n => n.id === edge.to)
-    );
-    
-    // Edge crosses clusters if nodes are in different clusters (or one is not in any cluster)
-    return fromCluster !== toCluster && fromCluster && toCluster;
-  });
-  
-  // Find orphan nodes (not assigned to any cluster)
-  // This includes:
-  // 1. Nodes with level > containerLevel (more tactical, no parent)
-  // 2. Nodes with level < containerLevel (more strategic, shown as regular nodes)
-  const orphanNodes = nodes.filter(n => 
-    !assignedNodes.has(n.id) && !containerNodes.some(c => c.id === n.id)
-  );
-  
-  return {
-    clusters,
-    crossClusterEdges,
-    orphanNodes,
-  };
+  // Delegate to generic clustering function
+  return assignNodesToClusters(nodes, edges, hierarchy, containerLevel);
 }
 
 /**
- * Assign nodes to nested sub-clusters at a specific hierarchy level.
- * Similar to assignNodesToSubgraphs but works for N+1 level (e.g., stories containing tasks).
+ * Assign nodes to clusters at a specific hierarchy level.
+ * Generic clustering algorithm that works for any hierarchy level.
  * 
- * @param nodes - Nodes to cluster (e.g., stories and tasks within an epic)
+ * Algorithm:
+ * 1. Find all nodes at containerLevel to use as cluster containers
+ * 2. For each container, recursively follow dependencies
+ * 3. Include all nodes with HIGHER level numbers (more tactical)
+ * 4. Stop when encountering SAME or LOWER level (cluster boundaries)
+ * 
+ * @param nodes - Nodes to cluster
  * @param edges - Edges between these nodes
  * @param hierarchy - Hierarchy level mapping
- * @param containerLevel - The hierarchy level to use as containers (e.g., 3 for stories)
- * @returns Clustered graph with N+1 containers and N+2 children
+ * @param containerLevel - The hierarchy level to use as containers (e.g., 2 for epic, 3 for story)
+ * @returns Clustered graph with containers and their children
  */
-export function assignNodesToNestedClusters(
+export function assignNodesToClusters(
   nodes: GraphNode[],
   edges: GraphEdge[],
   hierarchy: HierarchyLevelMap,
@@ -297,24 +180,22 @@ export function assignNodesToNestedClusters(
       }
     }
     
-    // Only create cluster if it has children beyond the container itself
-    if (clusterNodes.length > 1) {
-      const clusterNodeIds = new Set(clusterNodes.map(n => n.id));
-      const internalEdges = edges.filter(e => clusterNodeIds.has(e.from) && clusterNodeIds.has(e.to));
-      const outgoingEdges = edges.filter(e => clusterNodeIds.has(e.from) && !clusterNodeIds.has(e.to));
-      const incomingEdges = edges.filter(e => !clusterNodeIds.has(e.from) && clusterNodeIds.has(e.to));
-      
-      clusters.set(container.id, {
-        containerId: container.id,
-        containerLevel,
-        nodes: clusterNodes,
-        internalEdges,
-        outgoingEdges,
-        incomingEdges,
-      });
-      
-      assignedNodes.add(container.id);
-    }
+    // Create cluster (even if only contains the container itself)
+    const clusterNodeIds = new Set(clusterNodes.map(n => n.id));
+    const internalEdges = edges.filter(e => clusterNodeIds.has(e.from) && clusterNodeIds.has(e.to));
+    const outgoingEdges = edges.filter(e => clusterNodeIds.has(e.from) && !clusterNodeIds.has(e.to));
+    const incomingEdges = edges.filter(e => !clusterNodeIds.has(e.from) && clusterNodeIds.has(e.to));
+    
+    clusters.set(container.id, {
+      containerId: container.id,
+      containerLevel,
+      nodes: clusterNodes,
+      internalEdges,
+      outgoingEdges,
+      incomingEdges,
+    });
+    
+    assignedNodes.add(container.id);
   }
   
   // Find cross-cluster edges

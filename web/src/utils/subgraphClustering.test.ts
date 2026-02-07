@@ -4,7 +4,7 @@ import {
   extractNodeType, 
   assignNodesToSubgraphs,
   aggregateEdgesForCollapsed,
-  assignNodesToNestedClusters 
+  assignNodesToClusters 
 } from './subgraphClustering';
 import type { GraphNode, GraphEdge } from '../types/models';
 import type { HierarchyLevelMap, ExpansionState } from '../types/subgraphCluster';
@@ -643,7 +643,7 @@ describe('subgraphClustering', () => {
     });
   });
 
-  describe('assignNodesToNestedClusters (N+1 level)', () => {
+  describe('assignNodesToClusters (generic clustering)', () => {
     const hierarchy: HierarchyLevelMap = {
       milestone: 1,
       epic: 2,
@@ -651,7 +651,7 @@ describe('subgraphClustering', () => {
       task: 4,
     };
 
-    it('should assign tasks to story sub-clusters', () => {
+    it('should assign tasks to story sub-clusters at level 3', () => {
       // Epic contains Story1 (with Task1, Task2) and Story2 (with Task3)
       const nodes: GraphNode[] = [
         { id: 'epic-1', label: 'Epic 1', state: 'in_progress', priority: 'high', blocked: false, labels: ['type:epic'] },
@@ -670,7 +670,7 @@ describe('subgraphClustering', () => {
         { from: 'story-2', to: 'task-3' },
       ];
 
-      const result = assignNodesToNestedClusters(nodes, edges, hierarchy, 3); // Level 3 = story
+      const result = assignNodesToClusters(nodes, edges, hierarchy, 3); // Level 3 = story
 
       expect(result.clusters.size).toBe(2);
       
@@ -701,7 +701,7 @@ describe('subgraphClustering', () => {
         { from: 'story-2', to: 'task-3' },
       ];
 
-      const result = assignNodesToNestedClusters(nodes, edges, hierarchy, 3);
+      const result = assignNodesToClusters(nodes, edges, hierarchy, 3);
 
       expect(result.clusters.size).toBe(2);
       
@@ -715,7 +715,7 @@ describe('subgraphClustering', () => {
       expect(result.crossClusterEdges.some(e => e.from === 'task-2' && e.to === 'story-2')).toBe(true);
     });
 
-    it('should handle stories without tasks (orphan stories)', () => {
+    it('should handle containers without children (childless clusters)', () => {
       const nodes: GraphNode[] = [
         { id: 'story-1', label: 'Story 1', state: 'ready', priority: 'normal', blocked: false, labels: ['type:story'] },
         { id: 'story-2', label: 'Story 2', state: 'ready', priority: 'normal', blocked: false, labels: ['type:story'] },
@@ -726,14 +726,46 @@ describe('subgraphClustering', () => {
         { from: 'story-2', to: 'task-1' },
       ];
 
-      const result = assignNodesToNestedClusters(nodes, edges, hierarchy, 3);
+      const result = assignNodesToClusters(nodes, edges, hierarchy, 3);
 
-      // Only story-2 should be a cluster (has children)
-      expect(result.clusters.size).toBe(1);
+      // Both stories should be clusters (even story-1 without children)
+      expect(result.clusters.size).toBe(2);
+      expect(result.clusters.has('story-1')).toBe(true);
       expect(result.clusters.has('story-2')).toBe(true);
       
-      // Story-1 should be an orphan (no children)
-      expect(result.orphanNodes.some(n => n.id === 'story-1')).toBe(true);
+      // Story-1 cluster contains only itself
+      const story1Cluster = result.clusters.get('story-1');
+      expect(story1Cluster!.nodes.map(n => n.id)).toEqual(['story-1']);
+      
+      // Story-2 cluster contains story and task
+      const story2Cluster = result.clusters.get('story-2');
+      expect(story2Cluster!.nodes.map(n => n.id).sort()).toEqual(['story-2', 'task-1']);
+    });
+
+    it('should work for epic-level clustering (level 2)', () => {
+      const nodes: GraphNode[] = [
+        { id: 'milestone-1', label: 'M1', state: 'in_progress', priority: 'critical', blocked: false, labels: ['type:milestone'] },
+        { id: 'epic-1', label: 'Epic 1', state: 'in_progress', priority: 'high', blocked: false, labels: ['type:epic'] },
+        { id: 'story-1', label: 'Story 1', state: 'ready', priority: 'normal', blocked: false, labels: ['type:story'] },
+        { id: 'task-1', label: 'Task 1', state: 'ready', priority: 'normal', blocked: false, labels: ['type:task'] },
+      ];
+
+      const edges: GraphEdge[] = [
+        { from: 'milestone-1', to: 'epic-1' },
+        { from: 'epic-1', to: 'story-1' },
+        { from: 'story-1', to: 'task-1' },
+      ];
+
+      const result = assignNodesToClusters(nodes, edges, hierarchy, 2); // Level 2 = epic
+
+      expect(result.clusters.size).toBe(1);
+      
+      const epicCluster = result.clusters.get('epic-1');
+      expect(epicCluster).toBeDefined();
+      expect(epicCluster!.nodes.map(n => n.id).sort()).toEqual(['epic-1', 'story-1', 'task-1']);
+      
+      // Milestone should be an orphan (more strategic, not clustered)
+      expect(result.orphanNodes.some(n => n.id === 'milestone-1')).toBe(true);
     });
   });
 });

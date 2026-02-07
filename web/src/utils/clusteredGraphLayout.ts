@@ -83,7 +83,7 @@ export function prepareClusteredGraphForReactFlow(
     
     if (clusterId) {
       // Node is inside a cluster - visible only if cluster is expanded
-      const isExpanded = expansionState[clusterId] ?? false; // Default to collapsed
+      const isExpanded = expansionState[clusterId] ?? true; // Default to expanded
       return isExpanded;
     }
     
