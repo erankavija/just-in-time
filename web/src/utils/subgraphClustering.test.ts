@@ -3,7 +3,8 @@ import {
   getNodeLevel, 
   extractNodeType, 
   assignNodesToSubgraphs,
-  aggregateEdgesForCollapsed 
+  aggregateEdgesForCollapsed,
+  assignNodesToNestedClusters 
 } from './subgraphClustering';
 import type { GraphNode, GraphEdge } from '../types/models';
 import type { HierarchyLevelMap, ExpansionState } from '../types/subgraphCluster';
@@ -639,6 +640,100 @@ describe('subgraphClustering', () => {
       const epicEdge = virtualEdges.find(e => e.from === 'epic-1' && e.to === 'external-1');
       expect(epicEdge).toBeDefined();
       expect(epicEdge!.count).toBe(1);
+    });
+  });
+
+  describe('assignNodesToNestedClusters (N+1 level)', () => {
+    const hierarchy: HierarchyLevelMap = {
+      milestone: 1,
+      epic: 2,
+      story: 3,
+      task: 4,
+    };
+
+    it('should assign tasks to story sub-clusters', () => {
+      // Epic contains Story1 (with Task1, Task2) and Story2 (with Task3)
+      const nodes: GraphNode[] = [
+        { id: 'epic-1', label: 'Epic 1', state: 'in_progress', priority: 'high', blocked: false, labels: ['type:epic'] },
+        { id: 'story-1', label: 'Story 1', state: 'in_progress', priority: 'normal', blocked: false, labels: ['type:story'] },
+        { id: 'task-1', label: 'Task 1', state: 'ready', priority: 'normal', blocked: false, labels: ['type:task'] },
+        { id: 'task-2', label: 'Task 2', state: 'ready', priority: 'normal', blocked: false, labels: ['type:task'] },
+        { id: 'story-2', label: 'Story 2', state: 'ready', priority: 'normal', blocked: false, labels: ['type:story'] },
+        { id: 'task-3', label: 'Task 3', state: 'ready', priority: 'normal', blocked: false, labels: ['type:task'] },
+      ];
+
+      const edges: GraphEdge[] = [
+        { from: 'epic-1', to: 'story-1' },
+        { from: 'story-1', to: 'task-1' },
+        { from: 'story-1', to: 'task-2' },
+        { from: 'epic-1', to: 'story-2' },
+        { from: 'story-2', to: 'task-3' },
+      ];
+
+      const result = assignNodesToNestedClusters(nodes, edges, hierarchy, 3); // Level 3 = story
+
+      expect(result.clusters.size).toBe(2);
+      
+      const story1Cluster = result.clusters.get('story-1');
+      expect(story1Cluster).toBeDefined();
+      expect(story1Cluster!.nodes.map(n => n.id).sort()).toEqual(['story-1', 'task-1', 'task-2']);
+      
+      const story2Cluster = result.clusters.get('story-2');
+      expect(story2Cluster).toBeDefined();
+      expect(story2Cluster!.nodes.map(n => n.id).sort()).toEqual(['story-2', 'task-3']);
+    });
+
+    it('should handle story-to-story dependencies via task chains', () => {
+      // Story1 → Task1 → Task2, Task2 → Story2 → Task3
+      // Task2 depends on Story2's task → Story1's cluster still owns Task1 & Task2
+      const nodes: GraphNode[] = [
+        { id: 'story-1', label: 'Story 1', state: 'in_progress', priority: 'normal', blocked: false, labels: ['type:story'] },
+        { id: 'task-1', label: 'Task 1', state: 'ready', priority: 'normal', blocked: false, labels: ['type:task'] },
+        { id: 'task-2', label: 'Task 2', state: 'ready', priority: 'normal', blocked: false, labels: ['type:task'] },
+        { id: 'story-2', label: 'Story 2', state: 'ready', priority: 'normal', blocked: false, labels: ['type:story'] },
+        { id: 'task-3', label: 'Task 3', state: 'ready', priority: 'normal', blocked: false, labels: ['type:task'] },
+      ];
+
+      const edges: GraphEdge[] = [
+        { from: 'story-1', to: 'task-1' },
+        { from: 'task-1', to: 'task-2' },
+        { from: 'task-2', to: 'story-2' }, // Cross-cluster dependency
+        { from: 'story-2', to: 'task-3' },
+      ];
+
+      const result = assignNodesToNestedClusters(nodes, edges, hierarchy, 3);
+
+      expect(result.clusters.size).toBe(2);
+      
+      const story1Cluster = result.clusters.get('story-1');
+      expect(story1Cluster!.nodes.map(n => n.id).sort()).toEqual(['story-1', 'task-1', 'task-2']);
+      
+      const story2Cluster = result.clusters.get('story-2');
+      expect(story2Cluster!.nodes.map(n => n.id).sort()).toEqual(['story-2', 'task-3']);
+      
+      // Should have cross-cluster edge
+      expect(result.crossClusterEdges.some(e => e.from === 'task-2' && e.to === 'story-2')).toBe(true);
+    });
+
+    it('should handle stories without tasks (orphan stories)', () => {
+      const nodes: GraphNode[] = [
+        { id: 'story-1', label: 'Story 1', state: 'ready', priority: 'normal', blocked: false, labels: ['type:story'] },
+        { id: 'story-2', label: 'Story 2', state: 'ready', priority: 'normal', blocked: false, labels: ['type:story'] },
+        { id: 'task-1', label: 'Task 1', state: 'ready', priority: 'normal', blocked: false, labels: ['type:task'] },
+      ];
+
+      const edges: GraphEdge[] = [
+        { from: 'story-2', to: 'task-1' },
+      ];
+
+      const result = assignNodesToNestedClusters(nodes, edges, hierarchy, 3);
+
+      // Only story-2 should be a cluster (has children)
+      expect(result.clusters.size).toBe(1);
+      expect(result.clusters.has('story-2')).toBe(true);
+      
+      // Story-1 should be an orphan (no children)
+      expect(result.orphanNodes.some(n => n.id === 'story-1')).toBe(true);
     });
   });
 });

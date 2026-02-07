@@ -50,19 +50,24 @@ Phase 1 already provides the infrastructure we'll build on:
 - [ ] Virtual edges generated for collapsed cluster dependencies
 - [ ] Re-expanding cluster shows original layout
 
-### 2.2 Story-Level Collapse Within Clusters
+### 2.2 Hierarchy-Aware Child Collapse (N+1 Level)
 
-**Goal:** Click story nodes to collapse/expand their child tasks
+**Goal:** Click N+1 level nodes to collapse/expand their N+2 children
+
+**Important:** Not hard-coded to "stories" - works generically for hierarchy levels:
+- Container level = N (e.g., epic at level 2)
+- Child level = N+1 (e.g., story at level 3) - gets collapse button if has children
+- Grandchild level = N+2 (e.g., task at level 4) - hidden when parent collapsed
 
 **UI Component Changes:**
-- Story nodes get collapse/expand icon when they have tasks
+- N+1 nodes get collapse/expand icon when they have N+2 children
 - Similar visual treatment to cluster headers (but smaller scale)
-- Show task count badge when collapsed
+- Show child count badge when collapsed
 
 **Implementation Strategy:**
 - Reuse same `expansionState` mechanism
-- Story collapse works independently within expanded clusters
-- Use `aggregateEdgesForCollapsed()` for story→task edge aggregation
+- N+1 collapse works independently within expanded clusters
+- Use `aggregateEdgesForCollapsed()` for N+1→N+2 edge aggregation
 - Nested collapse handled by existing algorithm (tested in Phase 1)
 
 **Tests:**
@@ -72,7 +77,7 @@ Phase 1 already provides the infrastructure we'll build on:
 - [ ] Story collapse works when cluster is expanded
 - [ ] Nested collapse: collapsing cluster with collapsed stories works
 
-### 2.3 Expansion State Persistence
+### 2.3 Expansion State Persistence (DEFERRED to Phase 3)
 
 **Goal:** Share links with specific view state, persist across sessions
 
@@ -113,7 +118,7 @@ Phase 1 already provides the infrastructure we'll build on:
 - [ ] Shareable links work (copy/paste to new tab)
 - [ ] Invalid node IDs in URL handled gracefully
 
-### 2.4 Visual Polish for Collapse/Expand
+### 2.4 Visual Polish for Collapse/Expand (DEFERRED to Phase 3)
 
 **Goal:** Smooth, polished UX for expand/collapse interactions
 
