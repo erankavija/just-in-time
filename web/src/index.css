@@ -69,3 +69,25 @@ body {
   font-size: 13px;
   line-height: 1.6;
 }
+
+/* ReactFlow Controls Theme Override */
+.react-flow__controls {
+  background: var(--bg-secondary) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: 0 0 2px 1px rgba(0, 0, 0, 0.08) !important;
+}
+
+.react-flow__controls-button {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  border-bottom: 1px solid var(--border) !important;
+}
+
+.react-flow__controls-button:hover {
+  background: var(--bg-tertiary) !important;
+}
+
+.react-flow__controls-button svg {
+  fill: var(--text-primary) !important;
+}
+

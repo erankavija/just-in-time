@@ -937,7 +937,7 @@ export function GraphView({
           pointerEvents: isRenderable ? 'auto' : 'none',
         }}
       >
-        <Controls />
+        <Controls position="top-left" />
         <Background 
           color="var(--border)" 
           gap={16}
