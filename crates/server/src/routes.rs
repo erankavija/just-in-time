@@ -495,6 +495,7 @@ async fn get_strategic_types<S: IssueStore>(
 struct HierarchyResponse {
     types: std::collections::HashMap<String, u8>,
     strategic_types: Vec<String>,
+    icons: std::collections::HashMap<String, String>,
 }
 
 /// Get type hierarchy configuration
@@ -508,10 +509,17 @@ async fn get_hierarchy<S: IssueStore>(
 
     let types = namespaces.type_hierarchy.unwrap_or_default();
     let strategic_types = namespaces.strategic_types.unwrap_or_default();
+    
+    // Get resolved icons
+    let icons = executor.config_manager.get_hierarchy_icons().map_err(|e| {
+        tracing::error!("Failed to load hierarchy icons: {:?}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     Ok(Json(HierarchyResponse {
         types,
         strategic_types,
+        icons,
     }))
 }
 

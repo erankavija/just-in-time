@@ -49,6 +49,17 @@ pub struct HierarchyConfigToml {
     pub label_associations: Option<HashMap<String, String>>,
     /// List of type names considered strategic (optional).
     pub strategic_types: Option<Vec<String>>,
+    /// Icon configuration (optional).
+    pub icons: Option<IconConfigToml>,
+}
+
+/// Icon configuration from TOML.
+#[derive(Debug, Clone, Deserialize)]
+pub struct IconConfigToml {
+    /// Icon preset name: "simple", "navigation", "minimal", "construction" (optional).
+    pub preset: Option<String>,
+    /// Custom type name to icon mapping (optional, partial overrides allowed).
+    pub custom: Option<HashMap<String, String>>,
 }
 
 /// Validation behavior configuration.

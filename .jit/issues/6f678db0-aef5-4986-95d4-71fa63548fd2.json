@@ -30,6 +30,12 @@
       "label": "Phase 2 Implementation Plan",
       "doc_type": "design",
       "format": "markdown"
+    },
+    {
+      "path": "dev/design/hierarchy-icons-config.md",
+      "commit": null,
+      "label": "Hierarchy Type Icons Configuration Plan",
+      "doc_type": "design"
     }
   ],
   "labels": [

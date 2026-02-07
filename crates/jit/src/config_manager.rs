@@ -7,6 +7,7 @@
 
 use crate::config::{JitConfig, NamespaceConfig};
 use crate::domain::{LabelNamespace, LabelNamespaces};
+use crate::type_icons::{IconConfig, resolve_icons_for_hierarchy};
 use anyhow::Result;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -109,6 +110,47 @@ impl ConfigManager {
             // No worktree section - default to Off for single-agent development
             Ok(crate::config::EnforcementMode::Off)
         }
+    }
+
+    /// Get resolved icons for the current hierarchy.
+    ///
+    /// Returns a map of type name to icon string. Icons are resolved using the
+    /// hierarchy configuration (levels) and icon configuration (preset + custom).
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use jit::config_manager::ConfigManager;
+    ///
+    /// let config_mgr = ConfigManager::new(".jit");
+    /// let icons = config_mgr.get_hierarchy_icons().unwrap();
+    /// assert!(icons.contains_key("epic"));
+    /// ```
+    pub fn get_hierarchy_icons(&self) -> Result<HashMap<String, String>> {
+        let config = self.load()?;
+
+        // Get type hierarchy (levels)
+        let types = config
+            .type_hierarchy
+            .as_ref()
+            .map(|h| h.types.clone())
+            .unwrap_or_default();
+
+        // Get icon configuration
+        let icon_config = config
+            .type_hierarchy
+            .as_ref()
+            .and_then(|h| h.icons.as_ref())
+            .map(|icons_toml| {
+                IconConfig::new(
+                    icons_toml.preset.clone(),
+                    icons_toml.custom.clone(),
+                )
+            })
+            .unwrap_or_default();
+
+        // Resolve icons for all types
+        Ok(resolve_icons_for_hierarchy(&types, &icon_config))
     }
 
     /// Build LabelNamespaces from configuration.

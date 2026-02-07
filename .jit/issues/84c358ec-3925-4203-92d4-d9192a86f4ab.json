@@ -11,7 +11,7 @@
   "context": {},
   "documents": [],
   "labels": [
-    "type:task",
-    "epic:docs"
+    "epic:docs",
+    "type:story"
   ]
 }
