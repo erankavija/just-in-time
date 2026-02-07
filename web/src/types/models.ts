@@ -122,6 +122,7 @@ export interface ConfigStrategicTypes {
 export interface ConfigHierarchy {
   types: Record<string, number>;
   strategic_types: string[];
+  icons?: Record<string, string>;
 }
 
 export interface ConfigNamespaces {

@@ -39,9 +39,9 @@ pub fn create_routes<S: IssueStore + Send + Sync + 'static>(
             get(get_document_history),
         )
         .route("/issues/:id/documents/:path/diff", get(get_document_diff))
-        .route("/api/config/strategic-types", get(get_strategic_types))
-        .route("/api/config/hierarchy", get(get_hierarchy))
-        .route("/api/config/namespaces", get(get_namespaces))
+        .route("/config/strategic-types", get(get_strategic_types))
+        .route("/config/hierarchy", get(get_hierarchy))
+        .route("/config/namespaces", get(get_namespaces))
         .with_state(executor)
 }
 
@@ -509,7 +509,7 @@ async fn get_hierarchy<S: IssueStore>(
 
     let types = namespaces.type_hierarchy.unwrap_or_default();
     let strategic_types = namespaces.strategic_types.unwrap_or_default();
-    
+
     // Get resolved icons
     let icons = executor.config_manager.get_hierarchy_icons().map_err(|e| {
         tracing::error!("Failed to load hierarchy icons: {:?}", e);
@@ -760,7 +760,7 @@ enforce_leases = "off"
     #[tokio::test]
     async fn test_get_strategic_types() {
         let server = create_test_app();
-        let response = server.get("/api/config/strategic-types").await;
+        let response = server.get("/config/strategic-types").await;
         response.assert_status_ok();
         let data: StrategicTypesResponse = response.json();
         // Should return default or configured strategic types
@@ -770,7 +770,7 @@ enforce_leases = "off"
     #[tokio::test]
     async fn test_get_hierarchy() {
         let server = create_test_app();
-        let response = server.get("/api/config/hierarchy").await;
+        let response = server.get("/config/hierarchy").await;
         response.assert_status_ok();
         let data: HierarchyResponse = response.json();
         // Should return hierarchy data (may be empty defaults)
@@ -781,7 +781,7 @@ enforce_leases = "off"
     #[tokio::test]
     async fn test_get_namespaces() {
         let server = create_test_app();
-        let response = server.get("/api/config/namespaces").await;
+        let response = server.get("/config/namespaces").await;
         response.assert_status_ok();
         let data: NamespacesResponse = response.json();
         // Should return namespaces (at least defaults)

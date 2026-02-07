@@ -23,38 +23,21 @@ use std::collections::HashMap;
 
 /// Icon preset definitions.
 const PRESETS: &[(&str, &[(u8, &str)])] = &[
-    ("simple", &[
-        (1, "⭐"),
-        (2, "📦"),
-        (3, "📝"),
-        (4, "☑️"),
-    ]),
-    ("navigation", &[
-        (1, "🏔️"),
-        (2, "🗺️"),
-        (3, "🧭"),
-        (4, "📍"),
-    ]),
-    ("minimal", &[
-        (1, "◆"),
-        (2, "▣"),
-        (3, "▢"),
-        (4, "□"),
-    ]),
-    ("construction", &[
-        (1, "🏁"),
-        (2, "🏗️"),
-        (3, "🧱"),
-        (4, "🔨"),
-    ]),
+    ("simple", &[(1, "⭐"), (2, "📦"), (3, "📝"), (4, "☑️")]),
+    ("navigation", &[(1, "🏔️"), (2, "🗺️"), (3, "🧭"), (4, "📍")]),
+    ("minimal", &[(1, "◆"), (2, "▣"), (3, "▢"), (4, "□")]),
+    (
+        "construction",
+        &[(1, "🏁"), (2, "🏗️"), (3, "🧱"), (4, "🔨")],
+    ),
 ];
 
 /// Default icons by hierarchy level (domain-agnostic).
 const DEFAULT_ICONS_BY_LEVEL: &[(u8, &str)] = &[
-    (1, "⭐"),  // Level 1: Strategic/goal
-    (2, "📦"),  // Level 2: Container/grouping
-    (3, "📝"),  // Level 3: Work unit
-    (4, "☑️"),  // Level 4+: Atomic action
+    (1, "⭐"), // Level 1: Strategic/goal
+    (2, "📦"), // Level 2: Container/grouping
+    (3, "📝"), // Level 3: Work unit
+    (4, "☑️"), // Level 4+: Atomic action
 ];
 
 /// Fallback icon for levels >= 4.
@@ -163,8 +146,7 @@ pub fn resolve_icons_for_hierarchy(
     types
         .iter()
         .filter_map(|(type_name, level)| {
-            get_icon_for_type(type_name, *level, config)
-                .map(|icon| (type_name.clone(), icon))
+            get_icon_for_type(type_name, *level, config).map(|icon| (type_name.clone(), icon))
         })
         .collect()
 }
@@ -177,10 +159,22 @@ mod tests {
     fn test_get_icon_default_level_mapping() {
         let config = IconConfig::default();
 
-        assert_eq!(get_icon_for_type("milestone", 1, &config), Some("⭐".to_string()));
-        assert_eq!(get_icon_for_type("epic", 2, &config), Some("📦".to_string()));
-        assert_eq!(get_icon_for_type("story", 3, &config), Some("📝".to_string()));
-        assert_eq!(get_icon_for_type("task", 4, &config), Some("☑️".to_string()));
+        assert_eq!(
+            get_icon_for_type("milestone", 1, &config),
+            Some("⭐".to_string())
+        );
+        assert_eq!(
+            get_icon_for_type("epic", 2, &config),
+            Some("📦".to_string())
+        );
+        assert_eq!(
+            get_icon_for_type("story", 3, &config),
+            Some("📝".to_string())
+        );
+        assert_eq!(
+            get_icon_for_type("task", 4, &config),
+            Some("☑️".to_string())
+        );
     }
 
     #[test]
@@ -188,18 +182,36 @@ mod tests {
         let config = IconConfig::default();
 
         // Levels >= 4 should get leaf icon
-        assert_eq!(get_icon_for_type("subtask", 5, &config), Some("☑️".to_string()));
-        assert_eq!(get_icon_for_type("action", 10, &config), Some("☑️".to_string()));
+        assert_eq!(
+            get_icon_for_type("subtask", 5, &config),
+            Some("☑️".to_string())
+        );
+        assert_eq!(
+            get_icon_for_type("action", 10, &config),
+            Some("☑️".to_string())
+        );
     }
 
     #[test]
     fn test_get_icon_from_preset() {
         let config = IconConfig::new(Some("navigation".to_string()), None);
 
-        assert_eq!(get_icon_for_type("milestone", 1, &config), Some("🏔️".to_string()));
-        assert_eq!(get_icon_for_type("epic", 2, &config), Some("🗺️".to_string()));
-        assert_eq!(get_icon_for_type("story", 3, &config), Some("🧭".to_string()));
-        assert_eq!(get_icon_for_type("task", 4, &config), Some("📍".to_string()));
+        assert_eq!(
+            get_icon_for_type("milestone", 1, &config),
+            Some("🏔️".to_string())
+        );
+        assert_eq!(
+            get_icon_for_type("epic", 2, &config),
+            Some("🗺️".to_string())
+        );
+        assert_eq!(
+            get_icon_for_type("story", 3, &config),
+            Some("🧭".to_string())
+        );
+        assert_eq!(
+            get_icon_for_type("task", 4, &config),
+            Some("📍".to_string())
+        );
     }
 
     #[test]
@@ -211,11 +223,17 @@ mod tests {
         let config = IconConfig::new(None, Some(custom));
 
         // Custom overrides
-        assert_eq!(get_icon_for_type("epic", 2, &config), Some("🚀".to_string()));
+        assert_eq!(
+            get_icon_for_type("epic", 2, &config),
+            Some("🚀".to_string())
+        );
         assert_eq!(get_icon_for_type("bug", 4, &config), Some("🐛".to_string()));
 
         // Falls back to default for non-custom types
-        assert_eq!(get_icon_for_type("task", 4, &config), Some("☑️".to_string()));
+        assert_eq!(
+            get_icon_for_type("task", 4, &config),
+            Some("☑️".to_string())
+        );
     }
 
     #[test]
@@ -229,8 +247,14 @@ mod tests {
         assert_eq!(get_icon_for_type("bug", 4, &config), Some("🐛".to_string()));
 
         // Preset used for others
-        assert_eq!(get_icon_for_type("epic", 2, &config), Some("🗺️".to_string()));
-        assert_eq!(get_icon_for_type("task", 4, &config), Some("📍".to_string()));
+        assert_eq!(
+            get_icon_for_type("epic", 2, &config),
+            Some("🗺️".to_string())
+        );
+        assert_eq!(
+            get_icon_for_type("task", 4, &config),
+            Some("📍".to_string())
+        );
     }
 
     #[test]

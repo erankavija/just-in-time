@@ -9,6 +9,22 @@ export interface HierarchyLevelMap {
 }
 
 /**
+ * Maps issue type names to their display icons.
+ * Icons are domain-agnostic and assigned by hierarchy level.
+ */
+export interface HierarchyIconMap {
+  [typeName: string]: string;
+}
+
+/**
+ * Complete hierarchy configuration including levels and icons.
+ */
+export interface HierarchyConfig {
+  levels: HierarchyLevelMap;
+  icons?: HierarchyIconMap;
+}
+
+/**
  * A cluster of nodes organized around a container node (e.g., epic).
  * Contains all lower-level nodes that depend on or are depended by the container.
  */

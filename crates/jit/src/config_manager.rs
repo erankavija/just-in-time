@@ -7,7 +7,7 @@
 
 use crate::config::{JitConfig, NamespaceConfig};
 use crate::domain::{LabelNamespace, LabelNamespaces};
-use crate::type_icons::{IconConfig, resolve_icons_for_hierarchy};
+use crate::type_icons::{resolve_icons_for_hierarchy, IconConfig};
 use anyhow::Result;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -141,12 +141,7 @@ impl ConfigManager {
             .type_hierarchy
             .as_ref()
             .and_then(|h| h.icons.as_ref())
-            .map(|icons_toml| {
-                IconConfig::new(
-                    icons_toml.preset.clone(),
-                    icons_toml.custom.clone(),
-                )
-            })
+            .map(|icons_toml| IconConfig::new(icons_toml.preset.clone(), icons_toml.custom.clone()))
             .unwrap_or_default();
 
         // Resolve icons for all types

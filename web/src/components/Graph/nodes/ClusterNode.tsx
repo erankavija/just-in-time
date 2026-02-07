@@ -11,6 +11,9 @@ export interface ClusterNodeData {
   /** Container node label/title */
   label: string;
   
+  /** Icon for this type (optional) */
+  icon?: string;
+  
   /** Whether this cluster is expanded (true) or collapsed (false) */
   isExpanded: boolean;
   
@@ -59,6 +62,7 @@ const priorityColors: Record<string, string> = {
 const ClusterNode = memo(({ data }: NodeProps<ClusterNodeData>) => {
   const {
     label,
+    icon,
     isExpanded,
     hiddenNodeCount,
     onToggleExpansion,
@@ -69,7 +73,7 @@ const ClusterNode = memo(({ data }: NodeProps<ClusterNodeData>) => {
     downstreamStats,
   } = data;
 
-  const icon = isExpanded ? '⊟' : '⊞';
+  const collapseIcon = isExpanded ? '⊟' : '⊞';
   const title = isExpanded
     ? 'Click to collapse cluster'
     : `Click to expand cluster (${hiddenNodeCount} hidden)`;
@@ -100,8 +104,24 @@ const ClusterNode = memo(({ data }: NodeProps<ClusterNodeData>) => {
         borderTopLeftRadius: '6px',
         borderTopRightRadius: '6px',
       }}>
-        <span style={{ opacity: 0.85 }}>#{nodeId.substring(0, 8)}</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <span style={{ opacity: 0.85 }}>
+          {icon && `${icon} `}#{nodeId.substring(0, 8)}
+        </span>
+        <button
+          className="cluster-node-toggle-button-compact"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleExpansion();
+          }}
+          title={title}
+          aria-label={title}
+          style={{ 
+            color: 'rgba(255, 255, 255, 0.85)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+          }}
+        >
           {!isExpanded && hiddenNodeCount > 0 && (
             <span style={{ 
               fontSize: '10px',
@@ -111,19 +131,15 @@ const ClusterNode = memo(({ data }: NodeProps<ClusterNodeData>) => {
               {hiddenNodeCount}
             </span>
           )}
-          <button
-            className="cluster-node-toggle-button-compact"
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleExpansion();
-            }}
-            title={title}
-            aria-label={title}
-            style={{ color: 'rgba(255, 255, 255, 0.85)' }}
-          >
-            {icon}
-          </button>
-        </div>
+          <span style={{ 
+            lineHeight: '1', 
+            display: 'inline-block',
+            verticalAlign: 'middle',
+            transform: 'translateY(-1px)'
+          }}>
+            {collapseIcon}
+          </span>
+        </button>
       </div>
       {/* Content */}
       <div style={{ padding: '10px 12px' }}>

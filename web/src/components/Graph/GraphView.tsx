@@ -17,7 +17,7 @@ import type { State, Priority, GraphNode as ApiGraphNode, GraphEdge } from '../.
 import type { SubgraphCluster } from '../../types/subgraphCluster';
 import { calculateDownstreamStats, type DownstreamStats } from '../../utils/strategicView';
 import { applyFiltersToNode, applyFiltersToEdge, createStrategicFilter, createLabelFilter, type GraphFilter } from '../../utils/graphFilter';
-import type { HierarchyLevelMap, ExpansionState } from '../../types/subgraphCluster';
+import type { HierarchyConfig, ExpansionState } from '../../types/subgraphCluster';
 import { prepareClusteredGraphForReactFlow } from '../../utils/clusteredGraphLayout';
 import { createClusterAwareLayout } from '../../utils/clusterAwareLayout';
 import ClusterNode from './nodes/ClusterNode';
@@ -452,7 +452,7 @@ export function GraphView({
   const [error, setError] = useState<string | null>(null);
   const [_nodeStats, setNodeStats] = useState<Map<string, DownstreamStats>>(new Map());
   const [strategicTypes, setStrategicTypes] = useState<string[]>(['milestone', 'epic']); // Default fallback
-  const [hierarchyConfig, setHierarchyConfig] = useState<HierarchyLevelMap | null>(null);
+  const [hierarchyConfig, setHierarchyConfig] = useState<HierarchyConfig | null>(null);
   const [expansionState, setExpansionState] = useState<ExpansionState>(() => {
     // Load initial state from localStorage
     try {
@@ -621,17 +621,23 @@ export function GraphView({
     const fetchHierarchyConfig = async () => {
       try {
         const config = await apiClient.getHierarchy();
-        // Extract just the types mapping
-        setHierarchyConfig(config.types);
+        // Store full config (types + icons)
+        setHierarchyConfig({
+          levels: config.types,
+          icons: config.icons || {},
+        });
       } catch (err) {
         console.warn('Failed to fetch hierarchy config:', err);
-        // Fallback config based on strategic types
-        const fallback: HierarchyLevelMap = {
-          milestone: 1,
-          epic: 2,
-          story: 3,
-          task: 4,
-          bug: 4,
+        // Fallback config - just use levels, icons optional
+        const fallback: HierarchyConfig = {
+          levels: {
+            milestone: 1,
+            epic: 2,
+            story: 3,
+            task: 4,
+            bug: 4,
+          },
+          icons: {}, // No icons in fallback - will just show #nodeId
         };
         setHierarchyConfig(fallback);
       }
@@ -665,7 +671,7 @@ export function GraphView({
       // Calculate downstream stats for visible nodes (using full graph)
       const stats = new Map<string, DownstreamStats>();
       for (const node of visibleNodes) {
-        stats.set(node.id, calculateDownstreamStats(node.id, data.nodes, data.edges, hierarchyConfig || undefined));
+        stats.set(node.id, calculateDownstreamStats(node.id, data.nodes, data.edges, hierarchyConfig?.levels));
       }
       
       // Apply clustering if using compact layout and hierarchy config is available
@@ -677,7 +683,7 @@ export function GraphView({
         const clustered = prepareClusteredGraphForReactFlow(
           visibleNodes,
           data.edges,
-          hierarchyConfig,
+          hierarchyConfig.levels,
           expansionState
         );
         
@@ -760,6 +766,10 @@ export function GraphView({
           return false;
         });
         
+        // Get icon for this node's type
+        const nodeType = node.labels.find(l => l.startsWith('type:'))?.substring(5);
+        const typeIcon = nodeType && hierarchyConfig?.icons?.[nodeType];
+        
         // Check if this node is a cluster container
         const cluster = clusterData?.clusters.find(c => c.containerId === node.id);
         const isClusterContainer = !!cluster;
@@ -777,6 +787,7 @@ export function GraphView({
             targetPosition: Position.Left,
             data: {
               label: node.label,
+              icon: typeIcon, // Pass icon to ClusterNode
               isExpanded,
               hiddenNodeCount,
               onToggleExpansion: () => toggleExpansion(node.id),
@@ -813,8 +824,11 @@ export function GraphView({
                   fontSize: '10px', 
                   color: 'var(--text-muted)',
                   marginBottom: '4px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
                 }}>
-                  #{node.id.substring(0, 8)}
+                  <span>{typeIcon && `${typeIcon} `}#{node.id.substring(0, 8)}</span>
                 </div>
                 <div style={{ 
                   fontWeight: 600,
