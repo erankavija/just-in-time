@@ -1,0 +1,30 @@
+{
+  "id": "91e3a165-7e3f-443a-ab4f-2c8282a42681",
+  "title": "Story: Web UI Visual Enhancements",
+  "description": "Improve web UI readability and visual design with hierarchy type icons, capitalized type names, and improved node header formatting. Builds on state transition buttons foundation to create a polished, production-ready graph visualization experience.\n\nCompleted improvements:\n- Hierarchy type icons (⭐📦📝☑️) configurable via config.toml\n- Capitalized type names in node headers (Epic, Story, Task)\n- Improved header format: (icon) (Type) #shortid\n- Better visual alignment and spacing\n\nFuture improvements tracked separately.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "f527996e-3073-4c31-9f19-dba1e05f3909",
+    "13c69884-dfe9-4a62-b2ef-59fa4d2f76f3"
+  ],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [
+    {
+      "path": "dev/design/hierarchy-icons-config.md",
+      "commit": null,
+      "label": "Hierarchy Icons Configuration Plan",
+      "doc_type": "design",
+      "format": "markdown"
+    }
+  ],
+  "labels": [
+    "type:story",
+    "epic:production-polish",
+    "milestone:v1.0",
+    "component:web"
+  ]
+}
