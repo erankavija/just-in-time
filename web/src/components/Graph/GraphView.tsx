@@ -929,6 +929,8 @@ export function GraphView({
         onInit={(instance) => { reactFlowInstanceRef.current = instance; }}
         attributionPosition="bottom-right"
         proOptions={proOptions}
+        minZoom={0.1}  // Allow zooming out much further
+        maxZoom={2}    // Allow zooming in a bit more
         style={{
           opacity: isRenderable ? 1 : 0,
           transition: 'opacity 0.1s ease-in-out',
