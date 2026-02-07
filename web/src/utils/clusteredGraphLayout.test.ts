@@ -41,6 +41,7 @@ describe('clusteredGraphLayout', () => {
 
       const result = prepareClusteredGraphForReactFlow(nodes, edges, hierarchy, expansionState);
 
+      // Should only have epic cluster, not task sub-cluster
       expect(result.clusters.length).toBe(1);
       expect(result.visibleNodes).toHaveLength(2); // Epic + Task both visible
       expect(result.visibleEdges).toHaveLength(1); // Internal edge
@@ -296,8 +297,10 @@ describe('clusteredGraphLayout', () => {
 
       const result = prepareClusteredGraphForReactFlow(nodes, edges, hierarchy, {});
 
-      // Empty expansion state means everything visible
-      expect(result.visibleNodes).toHaveLength(2);
+      // Empty expansion state means everything collapsed (default: false)
+      // Only epic-1 visible, task-1 hidden
+      expect(result.visibleNodes).toHaveLength(1);
+      expect(result.visibleNodes[0].id).toBe('epic-1');
     });
   });
 });

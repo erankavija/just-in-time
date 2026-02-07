@@ -95,7 +95,7 @@ describe('clusteredGraphLayout - Integration Tests', () => {
       nodes,
       edges,
       hierarchy,
-      {} // All expanded
+      { E1: true, E2: true, S1: true, S2: true, S3: true } // Expand all to see sub-clusters
     );
 
     // Should create 2 primary clusters + 3 sub-clusters (one per story)
@@ -164,7 +164,7 @@ describe('clusteredGraphLayout - Integration Tests', () => {
       nodes,
       edges,
       hierarchy,
-      { S1: false } // Story S1 collapsed
+      { S1: false, E1: true, E2: true } // E1 and E2 expanded, S1 collapsed
     );
 
     // T1 and T2 should be hidden
@@ -215,7 +215,7 @@ describe('clusteredGraphLayout - Integration Tests', () => {
       nodes,
       edges,
       hierarchy,
-      { E1: false } // Epic E1 collapsed
+      { E1: false, E2: true } // E1 collapsed, E2 expanded
     );
 
     // Only E1, E2, T9 should be visible (S1 and T1 hidden)
@@ -267,11 +267,13 @@ describe('clusteredGraphLayout - Integration Tests', () => {
       nodes,
       edges,
       hierarchy,
-      {} // All expanded
+      { E1: true, E2: true, S1: true, S2: true } // Expand epics and stories
     );
 
-    // Should create clusters at epic level (level 2) when milestones present
-    expect(result.clusters.length).toBe(2); // E1 and E2
+    // Should create 2 primary clusters + 2 sub-clusters (S1, S2)
+    // Primary: E1, E2
+    // Sub: S1 (in E1), S2 (in E2)
+    expect(result.clusters.length).toBe(4);
 
     // Epic E1 cluster should contain its stories and tasks
     const e1Cluster = result.clusters.find(c => c.containerId === 'E1');

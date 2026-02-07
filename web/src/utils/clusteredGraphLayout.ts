@@ -62,7 +62,12 @@ export function prepareClusteredGraphForReactFlow(
   const primaryContainerLevel = primaryClustered.clusters.size > 0
     ? Array.from(primaryClustered.clusters.values())[0].containerLevel
     : levels[0];
-  const subContainerLevel = levels.find(l => l > primaryContainerLevel);
+  
+  // Sub-container level must be exactly primaryLevel + 1 (N+1), not any higher level
+  // This ensures we only cluster at N and N+1, not N+2 or beyond
+  const nextLevel = primaryContainerLevel + 1;
+  const hierarchyLevels = Array.from(new Set(Object.values(hierarchy))).sort((a, b) => a - b);
+  const subContainerLevel = hierarchyLevels.includes(nextLevel) ? nextLevel : undefined;
   
   // Build comprehensive cluster map (includes both primary and sub-clusters)
   const allClusters = new Map<string, SubgraphCluster>();
