@@ -5,7 +5,7 @@ import type {
   ExpansionState,
   VirtualEdge 
 } from '../types/subgraphCluster';
-import { assignNodesToSubgraphs } from './subgraphClustering';
+import { assignNodesToSubgraphs, assignNodesToClusters, getHierarchyLevels, getNodeLevel } from './subgraphClustering';
 
 /**
  * Result of preparing clustered graph for ReactFlow rendering.
@@ -32,18 +32,19 @@ export interface ClusteredGraphForReactFlow {
 }
 
 /**
- * Prepare a clustered graph for ReactFlow rendering.
+ * Prepare a clustered graph for ReactFlow rendering with multi-level clustering support.
  * 
  * This function:
- * 1. Assigns nodes to subgraph clusters based on hierarchy
- * 2. Determines which nodes are visible based on expansion state
- * 3. Creates virtual edges for collapsed containers
- * 4. Returns only the data needed for rendering
+ * 1. Applies clustering at primary hierarchy level (N)
+ * 2. Within expanded clusters, applies sub-clustering at next level (N+1)
+ * 3. Determines visible nodes based on hierarchical expansion state
+ * 4. Creates virtual edges for collapsed containers at any level
+ * 5. Returns only the data needed for rendering
  * 
  * @param nodes - All graph nodes
  * @param edges - All graph edges
  * @param hierarchy - Hierarchy level mapping from config
- * @param expansionState - Which containers are expanded/collapsed
+ * @param expansionState - Which containers are expanded/collapsed (at any level)
  * @returns Data ready for ReactFlow rendering
  */
 export function prepareClusteredGraphForReactFlow(
@@ -52,46 +53,100 @@ export function prepareClusteredGraphForReactFlow(
   hierarchy: HierarchyLevelMap,
   expansionState: ExpansionState
 ): ClusteredGraphForReactFlow {
-  // Step 1: Assign nodes to clusters
-  const clusteredGraph = assignNodesToSubgraphs(nodes, edges, hierarchy);
+  // Step 1: Apply primary clustering (container level selection happens in assignNodesToSubgraphs)
+  const primaryClustered = assignNodesToSubgraphs(nodes, edges, hierarchy);
   
-  // Step 2: Determine visible nodes based on expansion state
-  const visibleNodeIds = new Set<string>();
+  // Step 2: Apply nested clustering within expanded primary clusters
+  // Find the primary container level and next level for sub-clustering
+  const levels = getHierarchyLevels(nodes, hierarchy);
+  const primaryContainerLevel = primaryClustered.clusters.size > 0
+    ? Array.from(primaryClustered.clusters.values())[0].containerLevel
+    : levels[0];
+  const subContainerLevel = levels.find(l => l > primaryContainerLevel);
   
-  // Identify cluster container nodes (nodes that have clusters)
-  const clusterContainerIds = new Set(
-    Array.from(clusteredGraph.clusters.values()).map(c => c.containerId)
-  );
+  // Build comprehensive cluster map (includes both primary and sub-clusters)
+  const allClusters = new Map<string, SubgraphCluster>();
+  const nodeToClusterMap = new Map<string, string>(); // node -> immediate parent cluster
+  const nodeToAncestorClusters = new Map<string, string[]>(); // node -> all ancestor clusters (hierarchical)
   
-  // Build map: nodeId -> clusterId (which cluster is this node a member of?)
-  const nodeToClusterMap = new Map<string, string>();
-  clusteredGraph.clusters.forEach((cluster, clusterId) => {
+  // Add primary clusters
+  primaryClustered.clusters.forEach((cluster, clusterId) => {
+    allClusters.set(clusterId, cluster);
     cluster.nodes.forEach(node => {
       nodeToClusterMap.set(node.id, clusterId);
+      nodeToAncestorClusters.set(node.id, [clusterId]);
     });
   });
   
-  // Helper: check if node is visible
+  // Apply sub-clustering within expanded primary clusters
+  if (subContainerLevel) {
+    primaryClustered.clusters.forEach((primaryCluster) => {
+      const isPrimaryExpanded = expansionState[primaryCluster.containerId] ?? false; // Default to collapsed
+      
+      if (isPrimaryExpanded) {
+        // Check if there are any nodes at the sub-container level
+        const hasSubContainers = primaryCluster.nodes.some(n => 
+          getNodeLevel(n, hierarchy) === subContainerLevel
+        );
+        
+        if (!hasSubContainers) return; // Skip if no sub-containers exist
+        
+        // Apply sub-clustering to nodes within this primary cluster
+        const subClustered = assignNodesToClusters(
+          primaryCluster.nodes,
+          primaryCluster.internalEdges,
+          hierarchy,
+          subContainerLevel
+        );
+        
+        // Add sub-clusters to the comprehensive map
+        subClustered.clusters.forEach((subCluster, subClusterId) => {
+          // Mark sub-cluster with parent cluster ID
+          const enrichedSubCluster: SubgraphCluster = {
+            ...subCluster,
+            parentClusterId: primaryCluster.containerId,
+          };
+          allClusters.set(subClusterId, enrichedSubCluster);
+          
+          // Update node mappings for sub-cluster members
+          subCluster.nodes.forEach(node => {
+            // Update immediate parent (overrides primary cluster for children)
+            if (node.id !== subCluster.containerId) {
+              nodeToClusterMap.set(node.id, subClusterId);
+            }
+            
+            // Build ancestor chain: [primaryCluster, subCluster]
+            const ancestors = [primaryCluster.containerId];
+            if (node.id !== subCluster.containerId) {
+              ancestors.push(subClusterId);
+            }
+            nodeToAncestorClusters.set(node.id, ancestors);
+          });
+        });
+      }
+    });
+  }
+  
+  // Step 3: Determine visible nodes based on hierarchical expansion state
+  const allClusterContainerIds = new Set(
+    Array.from(allClusters.values()).map(c => c.containerId)
+  );
+  
   const isNodeVisible = (nodeId: string): boolean => {
-    // Cluster containers are ALWAYS visible (they are the top-level collapsible units)
-    if (clusterContainerIds.has(nodeId)) {
-      return true;
+    // Cluster containers are visible if their parent cluster is expanded (or no parent)
+    if (allClusterContainerIds.has(nodeId)) {
+      const ancestors = nodeToAncestorClusters.get(nodeId) || [];
+      // Check all ancestors are expanded (skip the node itself if it's in the list)
+      const parentAncestors = ancestors.filter(a => a !== nodeId);
+      return parentAncestors.every(ancestorId => expansionState[ancestorId] ?? false); // Default to collapsed
     }
     
-    // Check if this node is a member of a cluster
-    const clusterId = nodeToClusterMap.get(nodeId);
-    
-    if (clusterId) {
-      // Node is inside a cluster - visible only if cluster is expanded
-      const isExpanded = expansionState[clusterId] ?? true; // Default to expanded
-      return isExpanded;
-    }
-    
-    // Not in any cluster (orphan node) - always visible
-    return true;
+    // Regular nodes: visible only if ALL ancestor clusters are expanded
+    const ancestors = nodeToAncestorClusters.get(nodeId) || [];
+    return ancestors.every(ancestorId => expansionState[ancestorId] ?? false); // Default to collapsed
   };
   
-  // Determine visible nodes
+  const visibleNodeIds = new Set<string>();
   nodes.forEach(node => {
     if (isNodeVisible(node.id)) {
       visibleNodeIds.add(node.id);
@@ -100,7 +155,7 @@ export function prepareClusteredGraphForReactFlow(
   
   const visibleNodes = nodes.filter(n => visibleNodeIds.has(n.id));
   
-  // Step 3: Filter edges and create virtual edges for collapsed clusters
+  // Step 4: Filter edges and create virtual edges for collapsed containers
   const visibleEdges: GraphEdge[] = [];
   const virtualEdgeMap = new Map<string, VirtualEdge>();
   
@@ -112,18 +167,26 @@ export function prepareClusteredGraphForReactFlow(
       // Both endpoints visible - show edge as-is
       visibleEdges.push(edge);
     } else {
-      // At least one endpoint is hidden - create virtual edge to/from cluster container
-      const fromClusterId = nodeToClusterMap.get(edge.from);
-      const toClusterId = nodeToClusterMap.get(edge.to);
+      // At least one endpoint hidden - create virtual edge to closest visible ancestor
+      const fromAncestors = nodeToAncestorClusters.get(edge.from) || [];
+      const toAncestors = nodeToAncestorClusters.get(edge.to) || [];
       
-      // Determine virtual edge endpoints
-      const virtualFrom = fromVisible ? edge.from : fromClusterId || edge.from;
-      const virtualTo = toVisible ? edge.to : toClusterId || edge.to;
+      // Find the first visible ancestor (or the node itself if visible)
+      const getVisibleRep = (nodeId: string, ancestors: string[]): string => {
+        if (visibleNodeIds.has(nodeId)) return nodeId;
+        // Walk up ancestor chain to find first visible ancestor
+        for (const ancestorId of ancestors) {
+          if (visibleNodeIds.has(ancestorId)) return ancestorId;
+        }
+        return nodeId; // Fallback (shouldn't happen)
+      };
       
-      // Skip if both endpoints end up being the same (internal edge within collapsed cluster)
+      const virtualFrom = getVisibleRep(edge.from, fromAncestors);
+      const virtualTo = getVisibleRep(edge.to, toAncestors);
+      
+      // Skip if both endpoints are the same (internal edge within collapsed cluster)
       if (virtualFrom === virtualTo) return;
       
-      // Create/update virtual edge
       const key = `${virtualFrom}→${virtualTo}`;
       if (!virtualEdgeMap.has(key)) {
         virtualEdgeMap.set(key, {
@@ -133,6 +196,7 @@ export function prepareClusteredGraphForReactFlow(
           sourceEdgeIds: [],
         });
       }
+      
       const virtualEdge = virtualEdgeMap.get(key)!;
       virtualEdge.count++;
       virtualEdge.sourceEdgeIds.push(`${edge.from}→${edge.to}`);
@@ -141,12 +205,13 @@ export function prepareClusteredGraphForReactFlow(
   
   const virtualEdges = Array.from(virtualEdgeMap.values());
   
+  // Step 5: Package results
   return {
-    clusters: Array.from(clusteredGraph.clusters.values()),
-    crossClusterEdges: clusteredGraph.crossClusterEdges,
+    clusters: Array.from(allClusters.values()),
     visibleNodes,
     visibleEdges,
     virtualEdges,
-    orphanNodes: clusteredGraph.orphanNodes,
+    crossClusterEdges: primaryClustered.crossClusterEdges,
+    orphanNodes: primaryClustered.orphanNodes,
   };
 }

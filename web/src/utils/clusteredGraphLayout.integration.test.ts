@@ -98,15 +98,21 @@ describe('clusteredGraphLayout - Integration Tests', () => {
       {} // All expanded
     );
 
-    // Should create 2 clusters (one per epic)
-    expect(result.clusters).toHaveLength(2);
+    // Should create 2 primary clusters + 3 sub-clusters (one per story)
+    // Primary: E1, E2
+    // Sub: S1, S2, S3 (stories within E1)
+    expect(result.clusters).toHaveLength(5);
+    
+    // Check we have the expected cluster container IDs
+    const clusterIds = result.clusters.map(c => c.containerId).sort();
+    expect(clusterIds).toEqual(['E1', 'E2', 'S1', 'S2', 'S3']);
 
-    // Epic E1 cluster should contain all its stories and tasks
+    // Epic E1 cluster should contain all its children
     const e1Cluster = result.clusters.find(c => c.containerId === 'E1');
     expect(e1Cluster).toBeDefined();
     expect(e1Cluster!.nodes).toHaveLength(12); // E1 + 3 stories + 8 tasks
 
-    // Epic E2 cluster should contain only T9
+    // Epic E2 cluster should contain only T9 (no stories)
     const e2Cluster = result.clusters.find(c => c.containerId === 'E2');
     expect(e2Cluster).toBeDefined();
     expect(e2Cluster!.nodes).toHaveLength(2); // E2 + T9

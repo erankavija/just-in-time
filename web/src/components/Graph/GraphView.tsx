@@ -114,41 +114,55 @@ const getClusterAwareLayout = (
   allOriginalEdges: GraphEdge[],
   expansionState: ExpansionState
 ) => {
-  // Separate collapsed and expanded clusters
+  // Separate top-level clusters only (parentClusterId === null)
+  // Nested sub-clusters are handled within their parent's layout
   const expandedClusters: SubgraphCluster[] = [];
   const collapsedClusters: SubgraphCluster[] = [];
   const collapsedAsOrphans: ApiGraphNode[] = [];
   
-  clusterData.clusters.forEach(cluster => {
-    const isExpanded = expansionState[cluster.containerId] ?? false;
-    if (isExpanded) {
-      expandedClusters.push(cluster);
-    } else {
-      // Keep cluster info for child→container mapping
-      collapsedClusters.push(cluster);
-      
-      // Treat collapsed cluster container as an orphan node
-      const containerNode = nodes.find(n => n.id === cluster.containerId);
-      if (containerNode) {
-        collapsedAsOrphans.push({
-          id: cluster.containerId,
-          label: containerNode.data?.label || cluster.containerId,
-          state: containerNode.data?.state || 'backlog',
-          priority: containerNode.data?.priority || 'normal',
-          labels: containerNode.data?.labels || [],
-          blocked: false, // Collapsed clusters are never blocked (the container itself is shown)
-        });
+  clusterData.clusters
+    .filter(cluster => cluster.parentClusterId === null) // Only top-level clusters
+    .forEach(cluster => {
+      const isExpanded = expansionState[cluster.containerId] ?? false; // Default to collapsed
+      if (isExpanded) {
+        expandedClusters.push(cluster);
+      } else {
+        // Keep cluster info for child→container mapping
+        collapsedClusters.push(cluster);
+        
+        // Treat collapsed cluster container as an orphan node
+        const containerNode = nodes.find(n => n.id === cluster.containerId);
+        if (containerNode) {
+          collapsedAsOrphans.push({
+            id: cluster.containerId,
+            label: containerNode.data?.label || cluster.containerId,
+            state: containerNode.data?.state || 'backlog',
+            priority: containerNode.data?.priority || 'normal',
+            labels: containerNode.data?.labels || [],
+            blocked: false, // Collapsed clusters are never blocked (the container itself is shown)
+          });
+        }
       }
-    }
-  });
+    });
   
   // Combine with actual orphan nodes
   const allOrphans = [...clusterData.orphanNodes, ...collapsedAsOrphans];
   
-  // Use the new cluster-aware layout algorithm with ALL original edges
-  // Pass EXPANDED clusters for layout, COLLAPSED clusters for child mapping
+  // Filter cluster nodes to only include visible nodes (respects sub-cluster expansion)
+  // Filter internal edges to match visible nodes
+  const visibleNodeIds = new Set(clusterData.visibleNodes.map(n => n.id));
+  const expandedClustersWithVisibleNodes = expandedClusters.map(cluster => ({
+    ...cluster,
+    nodes: cluster.nodes.filter(n => visibleNodeIds.has(n.id)),
+    internalEdges: cluster.internalEdges.filter(e => 
+      visibleNodeIds.has(e.from) && visibleNodeIds.has(e.to)
+    ),
+  }));
+  
+  // Use the new cluster-aware layout algorithm
+  // Pass ALL original edges - the layout algorithm will compute ranks correctly
   const layoutResult = createClusterAwareLayout(
-    expandedClusters,
+    expandedClustersWithVisibleNodes,
     clusterData.crossClusterEdges,
     allOrphans,
     allOriginalEdges,

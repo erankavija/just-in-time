@@ -67,9 +67,9 @@ describe('computeClusterPositions', () => {
 
   it('should handle transitive dependencies (A→B→C should order C,B,A)', () => {
     const clusters: SubgraphCluster[] = [
-      { containerId: 'A', containerLevel: 2, nodes: [{ id: 'A', labels: ['type:epic'] } as GraphNode], internalEdges: [], outgoingEdges: [], incomingEdges: [] },
-      { containerId: 'B', containerLevel: 2, nodes: [{ id: 'B', labels: ['type:epic'] } as GraphNode], internalEdges: [], outgoingEdges: [], incomingEdges: [] },
-      { containerId: 'C', containerLevel: 2, nodes: [{ id: 'C', labels: ['type:epic'] } as GraphNode], internalEdges: [], outgoingEdges: [], incomingEdges: [] },
+      { containerId: 'A', containerLevel: 2, parentClusterId: null, nodes: [{ id: 'A', labels: ['type:epic'] } as GraphNode], internalEdges: [], outgoingEdges: [], incomingEdges: [] },
+      { containerId: 'B', containerLevel: 2, parentClusterId: null, nodes: [{ id: 'B', labels: ['type:epic'] } as GraphNode], internalEdges: [], outgoingEdges: [], incomingEdges: [] },
+      { containerId: 'C', containerLevel: 2, parentClusterId: null, nodes: [{ id: 'C', labels: ['type:epic'] } as GraphNode], internalEdges: [], outgoingEdges: [], incomingEdges: [] },
     ];
     
     const crossClusterEdges: GraphEdge[] = [

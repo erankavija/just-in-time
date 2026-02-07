@@ -19,6 +19,9 @@ export interface SubgraphCluster {
   /** Hierarchy level of the container (e.g., 2 for epic) */
   containerLevel: number;
   
+  /** Parent cluster ID if this is a nested sub-cluster, null for top-level */
+  parentClusterId: string | null;
+  
   /** All nodes in this cluster (including the container) */
   nodes: GraphNode[];
   

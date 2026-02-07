@@ -8,6 +8,20 @@ import type {
 } from '../types/subgraphCluster';
 
 /**
+ * Get all unique hierarchy levels present in the graph, sorted from strategic to tactical.
+ * @param nodes - Graph nodes
+ * @param hierarchy - Hierarchy level mapping
+ * @returns Array of levels sorted ascending (e.g., [1, 2, 3, 4])
+ */
+export function getHierarchyLevels(nodes: GraphNode[], hierarchy: HierarchyLevelMap): number[] {
+  const levels = nodes
+    .map(n => getNodeLevel(n, hierarchy))
+    .filter(level => level !== Infinity);
+  
+  return [...new Set(levels)].sort((a, b) => a - b);
+}
+
+/**
  * Extract the node type from type:X label.
  * @param node - The node to extract type from
  * @returns The type name (e.g., 'task', 'epic') or null if no type label
@@ -189,6 +203,7 @@ export function assignNodesToClusters(
     clusters.set(container.id, {
       containerId: container.id,
       containerLevel,
+      parentClusterId: null, // Top-level cluster, no parent
       nodes: clusterNodes,
       internalEdges,
       outgoingEdges,
