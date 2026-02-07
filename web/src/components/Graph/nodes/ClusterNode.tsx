@@ -82,83 +82,93 @@ const ClusterNode = memo(({ data }: NodeProps<ClusterNodeData>) => {
       background: 'var(--bg-tertiary)',
       border: `2px solid ${borderColor}`,
       borderRadius: '8px',
-      padding: '10px 12px',
+      padding: 0,
       fontFamily: 'var(--font-mono)',
       fontSize: '12px',
       position: 'relative',
       boxShadow: '0 0 0 1px rgb(0 0 0 / 10%), 0 4px 6px -2px rgb(0 0 0 / 10%)',
     }}>
+      {/* Header with state color background */}
       <div style={{ 
         fontSize: '10px', 
-        color: 'var(--text-muted)',
-        marginBottom: '4px',
+        color: 'rgba(255, 255, 255, 0.9)',
+        padding: '6px 10px',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
+        background: borderColor,
+        borderTopLeftRadius: '6px',
+        borderTopRightRadius: '6px',
       }}>
-        <span>#{nodeId.substring(0, 8)}</span>
-        <button
-          className="cluster-node-toggle-button-compact"
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleExpansion();
-          }}
-          title={title}
-          aria-label={title}
-        >
-          {icon}
-        </button>
+        <span style={{ opacity: 0.85 }}>#{nodeId.substring(0, 8)}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {!isExpanded && hiddenNodeCount > 0 && (
+            <span style={{ 
+              fontSize: '10px',
+              fontWeight: 600,
+              opacity: 0.95,
+            }}>
+              {hiddenNodeCount}
+            </span>
+          )}
+          <button
+            className="cluster-node-toggle-button-compact"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleExpansion();
+            }}
+            title={title}
+            aria-label={title}
+            style={{ color: 'rgba(255, 255, 255, 0.85)' }}
+          >
+            {icon}
+          </button>
+        </div>
       </div>
-      <div style={{ 
-        fontWeight: 600,
-        marginBottom: '6px',
-        color: 'var(--text-primary)',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap',
-        maxWidth: '180px',
-      }}>
-        {label}
-      </div>
-      <div style={{ 
-        fontSize: '11px',
-        display: 'flex',
-        gap: '8px',
-        alignItems: 'center',
-      }}>
-        <span style={{ color: priorityColors[priority] }}>
-          ● {priority}
-        </span>
-        <span style={{ color: 'var(--text-secondary)' }}>
-          | {state}
-        </span>
-        {!isExpanded && hiddenNodeCount > 0 && (
-          <span style={{ 
-            fontSize: '10px',
-            color: 'var(--primary-color)',
-            fontWeight: 600,
-          }}>
-            ({hiddenNodeCount})
+      {/* Content */}
+      <div style={{ padding: '10px 12px' }}>
+        <div style={{ 
+          fontWeight: 600,
+          marginBottom: '6px',
+          color: 'var(--text-primary)',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+          maxWidth: '180px',
+        }}>
+          {label}
+        </div>
+        <div style={{ 
+          fontSize: '11px',
+          display: 'flex',
+          gap: '8px',
+          alignItems: 'center',
+        }}>
+          <span style={{ color: priorityColors[priority] }}>
+            ● {priority}
           </span>
+          <span style={{ color: 'var(--text-secondary)' }}>
+            | {state}
+          </span>
+        </div>
+        {isStrategic && downstreamStats && (
+          <div 
+            style={{
+              fontSize: '10px',
+              color: 'var(--text-secondary)',
+              fontFamily: 'var(--font-mono)',
+              borderTop: '1px solid var(--border)',
+              paddingTop: '4px',
+              marginTop: '6px',
+            }}
+            title={`Downstream: ${downstreamStats.total} tasks (${downstreamStats.done} done, ${downstreamStats.inProgress} in progress, ${downstreamStats.blocked} blocked)`}
+          >
+            ↓ {downstreamStats.total} task{downstreamStats.total !== 1 ? 's' : ''}
+            {downstreamStats.done > 0 && ` • ✓ ${downstreamStats.done}`}
+            {downstreamStats.blocked > 0 && ` • ⚠ ${downstreamStats.blocked}`}
+          </div>
         )}
       </div>
-      {isStrategic && downstreamStats && (
-        <div 
-          style={{
-            fontSize: '10px',
-            color: 'var(--text-secondary)',
-            fontFamily: 'var(--font-mono)',
-            borderTop: '1px solid var(--border)',
-            paddingTop: '4px',
-            marginTop: '6px',
-          }}
-          title={`Downstream: ${downstreamStats.total} tasks (${downstreamStats.done} done, ${downstreamStats.inProgress} in progress, ${downstreamStats.blocked} blocked)`}
-        >
-          ↓ {downstreamStats.total} task{downstreamStats.total !== 1 ? 's' : ''}
-          {downstreamStats.done > 0 && ` • ✓ ${downstreamStats.done}`}
-          {downstreamStats.blocked > 0 && ` • ⚠ ${downstreamStats.blocked}`}
-        </div>
-      )}
       <Handle type="target" position={Position.Left} />
       <Handle type="source" position={Position.Right} />
     </div>
