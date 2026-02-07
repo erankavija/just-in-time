@@ -499,8 +499,27 @@ export function GraphView({
    * Hierarchy-agnostic - works with any configured node types.
    */
   const toggleExpansion = useCallback((nodeId: string) => {
-    // Save current viewport before toggling
-    savedViewportRef.current = reactFlowInstanceRef.current?.getViewport();
+    if (!reactFlowInstanceRef.current) return;
+    
+    const rfInstance = reactFlowInstanceRef.current;
+    const viewport = rfInstance.getViewport();
+    
+    // Find the node being toggled (could be cluster container or regular node)
+    const node = rfInstance.getNode(nodeId);
+    if (!node) return;
+    
+    // Calculate screen position of node
+    const nodeScreenX = node.position.x * viewport.zoom + viewport.x;
+    const nodeScreenY = node.position.y * viewport.zoom + viewport.y;
+    
+    // Store for adjustment after layout
+    savedViewportRef.current = {
+      nodeId,
+      zoom: viewport.zoom,
+      screenX: nodeScreenX,
+      screenY: nodeScreenY,
+    };
+    
     setIsRenderable(false); // Hide during transition
     
     setExpansionState(prev => ({
@@ -512,16 +531,35 @@ export function GraphView({
   // Restore viewport after nodes change (when expanding/collapsing)
   useEffect(() => {
     if (savedViewportRef.current && reactFlowInstanceRef.current && !loading && nodes.length > 0) {
-      // Use double requestAnimationFrame to ensure DOM has updated
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          reactFlowInstanceRef.current?.setViewport(savedViewportRef.current, { duration: 0 });
-          savedViewportRef.current = null;
-          setIsRenderable(true); // Show after viewport restored
-        });
-      });
+      const savedData = savedViewportRef.current;
+      
+      // Use setTimeout to ensure nodes state has fully propagated
+      setTimeout(() => {
+        if (!reactFlowInstanceRef.current) return;
+        
+        // Find the node in the new nodes array directly (not via rfInstance which might be stale)
+        const node = nodes.find(n => n.id === savedData.nodeId);
+        
+        if (node) {
+          // Calculate viewport offset to keep node at same screen position
+          const newViewportX = savedData.screenX - node.position.x * savedData.zoom;
+          const newViewportY = savedData.screenY - node.position.y * savedData.zoom;
+          
+          reactFlowInstanceRef.current.setViewport(
+            { 
+              x: newViewportX, 
+              y: newViewportY, 
+              zoom: savedData.zoom 
+            }, 
+            { duration: 0 }
+          );
+        }
+        
+        savedViewportRef.current = null;
+        setIsRenderable(true);
+      }, 50);
     }
-  }, [nodes.length, loading]);
+  }, [nodes, loading]);
 
   // Fetch strategic types from API on mount
   useEffect(() => {
