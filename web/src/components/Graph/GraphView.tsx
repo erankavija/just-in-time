@@ -169,12 +169,16 @@ const getClusterAwareLayout = (
       const containerNode = nodes.find(n => n.id === clusterId);
       const clusterTitle = containerNode?.data?.label || clusterId.substring(0, 8);
       
+      const CLUSTER_PADDING = 40;
+      const NODE_PADDING = 10; // Vertical padding from ClusterNode style
+      const offset = (CLUSTER_PADDING - NODE_PADDING) / 2;
+      
       finalNodes.push({
         id: `cluster-${clusterId}`,
         type: 'group', // ReactFlow group node type
         position: {
-          x: clusterPos.x,
-          y: clusterPos.y,
+          x: clusterPos.x + offset,
+          y: clusterPos.y + offset,
         },
         style: {
           width: clusterPos.width,
