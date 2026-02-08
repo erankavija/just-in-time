@@ -9,6 +9,8 @@ import ReactFlow, {
   type Node,
   type Edge,
   type NodeTypes,
+  type ReactFlowInstance,
+  type Viewport,
 } from 'reactflow';
 import dagre from 'dagre';
 import 'reactflow/dist/style.css';
@@ -450,7 +452,7 @@ export function GraphView({
   viewMode = 'tactical', 
   labelFilters = [],
   layoutAlgorithm = 'compact',
-  onLayoutChange: _onLayoutChange,
+  // onLayoutChange is received but not used in current implementation
   focusNodeId,
   onFocusComplete,
 }: GraphViewProps) {
@@ -458,7 +460,8 @@ export function GraphView({
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [_nodeStats, setNodeStats] = useState<Map<string, DownstreamStats>>(new Map());
+  // nodeStats maintained for future use (e.g., showing stats in UI)
+  const [, setNodeStats] = useState<Map<string, DownstreamStats>>(new Map());
   const [strategicTypes, setStrategicTypes] = useState<string[]>(['milestone', 'epic']); // Default fallback
   const [hierarchyConfig, setHierarchyConfig] = useState<HierarchyConfig | null>(null);
   const [expansionState, setExpansionState] = useState<ExpansionState>(() => {
@@ -500,8 +503,8 @@ export function GraphView({
   });
   
   const [hasInitialFit, setHasInitialFit] = useState(false);
-  const reactFlowInstanceRef = useRef<any>(null);
-  const savedViewportRef = useRef<any>(null);
+  const reactFlowInstanceRef = useRef<ReactFlowInstance | null>(null);
+  const savedViewportRef = useRef<Viewport | null>(null);
   const clusterDataRef = useRef<ReturnType<typeof prepareClusteredGraphForReactFlow> | null>(null);
   const [isRenderable, setIsRenderable] = useState(true); // Control rendering during viewport restoration
 
