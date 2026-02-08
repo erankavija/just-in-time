@@ -51,6 +51,7 @@ use anyhow::{anyhow, Context, Result};
 use chrono::Utc;
 use serde::Serialize;
 use std::collections::HashMap;
+use std::str::FromStr;
 
 /// Information about a git commit
 #[derive(Debug, Clone, Serialize)]
@@ -231,27 +232,11 @@ impl<S: IssueStore> CommandExecutor<S> {
 
 // Helper functions for parsing command-line arguments
 pub fn parse_priority(s: &str) -> Result<Priority> {
-    match s.to_lowercase().as_str() {
-        "low" => Ok(Priority::Low),
-        "normal" => Ok(Priority::Normal),
-        "high" => Ok(Priority::High),
-        "critical" => Ok(Priority::Critical),
-        _ => Err(anyhow!("Invalid priority: {}", s)),
-    }
+    Priority::from_str(s)
 }
 
 pub fn parse_state(s: &str) -> Result<State> {
-    match s.to_lowercase().as_str() {
-        "backlog" => Ok(State::Backlog),
-        "open" => Ok(State::Backlog), // Backward compatibility alias
-        "ready" => Ok(State::Ready),
-        "in_progress" | "inprogress" => Ok(State::InProgress),
-        "gated" => Ok(State::Gated),
-        "done" => Ok(State::Done),
-        "rejected" => Ok(State::Rejected),
-        "archived" => Ok(State::Archived),
-        _ => Err(anyhow!("Invalid state: {}", s)),
-    }
+    State::from_str(s)
 }
 
 #[cfg(test)]

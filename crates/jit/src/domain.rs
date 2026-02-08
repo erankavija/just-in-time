@@ -3,10 +3,12 @@
 //! This module defines the fundamental data structures used throughout the system:
 //! issues, gates, events, and their associated states and priorities.
 
+use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::str::FromStr;
 use uuid::Uuid;
 
 /// Issue lifecycle state
@@ -46,6 +48,24 @@ impl State {
     }
 }
 
+impl FromStr for State {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        match s.to_lowercase().as_str() {
+            "backlog" => Ok(State::Backlog),
+            "open" => Ok(State::Backlog), // Backward compatibility alias
+            "ready" => Ok(State::Ready),
+            "in_progress" | "inprogress" => Ok(State::InProgress),
+            "gated" => Ok(State::Gated),
+            "done" => Ok(State::Done),
+            "rejected" => Ok(State::Rejected),
+            "archived" => Ok(State::Archived),
+            _ => Err(anyhow!("Invalid state: {}", s)),
+        }
+    }
+}
+
 /// Issue priority level
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -58,6 +78,20 @@ pub enum Priority {
     High,
     /// Critical priority
     Critical,
+}
+
+impl FromStr for Priority {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        match s.to_lowercase().as_str() {
+            "low" => Ok(Priority::Low),
+            "normal" => Ok(Priority::Normal),
+            "high" => Ok(Priority::High),
+            "critical" => Ok(Priority::Critical),
+            _ => Err(anyhow!("Invalid priority: {}", s)),
+        }
+    }
 }
 
 /// Quality gate status
@@ -1284,6 +1318,94 @@ mod tests {
 
         assert_eq!(doc, deserialized);
         assert_eq!(deserialized.assets.len(), 0);
+    }
+
+    // FromStr trait tests
+    mod fromstr_tests {
+        use super::*;
+        use std::str::FromStr;
+
+        #[test]
+        fn test_state_from_str_valid_lowercase() {
+            assert_eq!(State::from_str("backlog").unwrap(), State::Backlog);
+            assert_eq!(State::from_str("ready").unwrap(), State::Ready);
+            assert_eq!(State::from_str("in_progress").unwrap(), State::InProgress);
+            assert_eq!(State::from_str("gated").unwrap(), State::Gated);
+            assert_eq!(State::from_str("done").unwrap(), State::Done);
+            assert_eq!(State::from_str("rejected").unwrap(), State::Rejected);
+            assert_eq!(State::from_str("archived").unwrap(), State::Archived);
+        }
+
+        #[test]
+        fn test_state_from_str_valid_uppercase() {
+            assert_eq!(State::from_str("BACKLOG").unwrap(), State::Backlog);
+            assert_eq!(State::from_str("READY").unwrap(), State::Ready);
+            assert_eq!(State::from_str("IN_PROGRESS").unwrap(), State::InProgress);
+        }
+
+        #[test]
+        fn test_state_from_str_valid_mixedcase() {
+            assert_eq!(State::from_str("Backlog").unwrap(), State::Backlog);
+            assert_eq!(State::from_str("Ready").unwrap(), State::Ready);
+        }
+
+        #[test]
+        fn test_state_from_str_aliases() {
+            // Backward compatibility alias
+            assert_eq!(State::from_str("open").unwrap(), State::Backlog);
+            // Alternative in_progress format
+            assert_eq!(State::from_str("inprogress").unwrap(), State::InProgress);
+        }
+
+        #[test]
+        fn test_state_from_str_invalid() {
+            assert!(State::from_str("invalid").is_err());
+            assert!(State::from_str("").is_err());
+            assert!(State::from_str("pending").is_err());
+        }
+
+        #[test]
+        fn test_priority_from_str_valid_lowercase() {
+            assert_eq!(Priority::from_str("low").unwrap(), Priority::Low);
+            assert_eq!(Priority::from_str("normal").unwrap(), Priority::Normal);
+            assert_eq!(Priority::from_str("high").unwrap(), Priority::High);
+            assert_eq!(Priority::from_str("critical").unwrap(), Priority::Critical);
+        }
+
+        #[test]
+        fn test_priority_from_str_valid_uppercase() {
+            assert_eq!(Priority::from_str("LOW").unwrap(), Priority::Low);
+            assert_eq!(Priority::from_str("NORMAL").unwrap(), Priority::Normal);
+            assert_eq!(Priority::from_str("HIGH").unwrap(), Priority::High);
+            assert_eq!(Priority::from_str("CRITICAL").unwrap(), Priority::Critical);
+        }
+
+        #[test]
+        fn test_priority_from_str_valid_mixedcase() {
+            assert_eq!(Priority::from_str("Low").unwrap(), Priority::Low);
+            assert_eq!(Priority::from_str("Normal").unwrap(), Priority::Normal);
+        }
+
+        #[test]
+        fn test_priority_from_str_invalid() {
+            assert!(Priority::from_str("invalid").is_err());
+            assert!(Priority::from_str("").is_err());
+            assert!(Priority::from_str("medium").is_err());
+        }
+
+        #[test]
+        fn test_state_parse_method() {
+            // Test using str::parse() method
+            let state: State = "ready".parse().unwrap();
+            assert_eq!(state, State::Ready);
+        }
+
+        #[test]
+        fn test_priority_parse_method() {
+            // Test using str::parse() method
+            let priority: Priority = "high".parse().unwrap();
+            assert_eq!(priority, Priority::High);
+        }
     }
 }
 

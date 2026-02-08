@@ -1666,3 +1666,5 @@
 {"type":"issue_state_changed","id":"523d30e2-0cd0-4797-a75c-14f10d105b94","issue_id":"d4290046-9f21-430e-b7e3-3c13d7ff51fe","timestamp":"2026-02-08T19:43:31.269743341Z","from":"ready","to":"done"}
 {"type":"issue_completed","id":"28e5557d-9e2c-4682-ab01-be5dd8e1a911","issue_id":"d4290046-9f21-430e-b7e3-3c13d7ff51fe","timestamp":"2026-02-08T19:43:31.269777841Z"}
 {"type":"issue_created","id":"41f0fa00-6187-44ff-83e7-a5a00037f674","issue_id":"d8de0f33-c5e3-4231-8474-98846f588e7b","timestamp":"2026-02-08T21:57:00.921707930Z","title":"Add created_at and updated_at timestamps to Issue model","priority":"normal"}
+{"type":"issue_state_changed","id":"e4da448f-670c-4c28-aa84-2cdf0f3afcc0","issue_id":"cbf75d46-2bea-46ce-8b70-80ae2f8e003d","timestamp":"2026-02-08T22:01:31.213725281Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"0de179ca-c6ba-4ae5-94c5-c02fa7d16522","issue_id":"cbf75d46-2bea-46ce-8b70-80ae2f8e003d","timestamp":"2026-02-08T22:01:31.216551532Z","assignee":"agent:copilot-session"}
