@@ -23,6 +23,7 @@ pub mod snapshot;
 pub mod storage;
 pub mod test_utils;
 pub mod type_hierarchy;
+pub mod type_icons;
 pub mod validation;
 pub mod visualization;
 

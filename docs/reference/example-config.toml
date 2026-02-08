@@ -53,6 +53,32 @@ milestone = "milestone"
 epic = "epic"
 story = "story"
 
+# Hierarchy type icons for visual identification (web UI)
+# Icons are assigned by hierarchy level (domain-agnostic)
+[type_hierarchy.icons]
+# Choose a preset: simple, navigation, minimal, construction
+preset = "simple"  # Optional, defaults to "simple"
+
+# Custom icon overrides (optional)
+# These override the preset for specific types
+# Use this for domain-specific icons or to customize selected types
+[type_hierarchy.icons.custom]
+bug = "🐛"  # Override bug icon, other types use preset
+
+# Available presets:
+# - simple:       ⭐ (1) → 📦 (2) → 📝 (3) → ☑️ (4+)
+# - navigation:   🏔️ (1) → 🗺️ (2) → 🧭 (3) → 📍 (4+)
+# - minimal:      ◆ (1) → ▣ (2) → ▢ (3) → □ (4+)
+# - construction: 🏁 (1) → 🏗️ (2) → 🧱 (3) → 🔨 (4+)
+
+# Example: Full custom icons (no preset)
+# [type_hierarchy.icons.custom]
+# milestone = "🎯"
+# epic = "📚"
+# story = "📄"
+# task = "✓"
+# bug = "🐛"
+
 # =============================================================================
 # VALIDATION
 # =============================================================================

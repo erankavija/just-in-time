@@ -1,0 +1,41 @@
+{
+  "id": "402d1a8f-3eec-42ef-aecc-a5c1c783405b",
+  "title": "Phase 3: Advanced Features & Polish",
+  "description": "Advanced features and UX polish for enhanced graph navigation and usability.\n\n## Scope\n\nNice-to-have enhancements that build on Phase 1 (clustering) and Phase 2 (collapse/expand) to provide a production-quality DAG visualization experience.\n\n## Key Features\n\n### 3.1 Edge Styling Improvements\n- Bundled edge thickness based on aggregated count (virtual edges)\n- Color coding for cross-cluster vs internal edges\n- Hover to highlight full dependency paths\n- Edge labels showing dependency count when aggregated\n- Tests: edge rendering, aggregation counts\n\n### 3.2 Advanced Navigation Features\n- Minimap showing full graph structure\n- Zoom to fit selected cluster\n- \"Follow dependency\" - trace path from A to B\n- Search/filter to highlight matching nodes\n- Tests: navigation actions\n\n### 3.3 Performance Optimizations\n- Virtual scrolling for large graphs (1000+ nodes)\n- Lazy rendering of collapsed cluster contents\n- Memoization of layout calculations\n- Web worker for heavy layout computation\n- Tests: performance benchmarks\n\n### 3.4 Export and Sharing\n- Export graph as SVG/PNG\n- Share link with specific view state (zoom, expansion, filters)\n- Embed mode for documentation\n- Tests: export functionality\n\n## Success Criteria\n\n- [ ] Aggregated edges show count badges\n- [ ] Cross-cluster edges visually distinct from internal edges\n- [ ] Minimap provides overview navigation\n- [ ] Search highlights matching nodes across clusters\n- [ ] Graph renders smoothly with 500+ nodes\n- [ ] Can export current view as image\n- [ ] All tests passing (TDD)\n- [ ] Code review passed\n\n## Priority\n\nThis phase is OPTIONAL - Phase 1 and 2 already provide a functional, usable cluster visualization. Implement Phase 3 features as needed based on user feedback.",
+  "state": "rejected",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "tdd-reminder",
+    "code-review"
+  ],
+  "gates_status": {
+    "tdd-reminder": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-02-04T14:07:22.850645537Z"
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-02-04T14:07:22.850664527Z"
+    }
+  },
+  "context": {},
+  "documents": [
+    {
+      "path": "dev/design/phase3-advanced-features.md",
+      "commit": null,
+      "label": "Phase 3 Implementation Plan",
+      "doc_type": "design",
+      "format": "markdown"
+    }
+  ],
+  "labels": [
+    "epic:production-polish",
+    "component:web",
+    "type:task",
+    "resolution:not-needed"
+  ]
+}

@@ -11,13 +11,15 @@ import { apiClient } from './api/client';
 import type { Issue } from './types/models';
 import './App.css';
 
-import type { ViewMode } from './components/Graph/GraphView';
+import type { ViewMode, LayoutAlgorithm } from './components/Graph/GraphView';
 
 function App() {
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
+  const [focusIssueId, setFocusIssueId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [allIssues, setAllIssues] = useState<Issue[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('tactical');
+  const [layoutAlgorithm, setLayoutAlgorithm] = useState<LayoutAlgorithm>('compact');
   const [labelFilters, setLabelFilters] = useState<string[]>([]);
   const [documentViewerState, setDocumentViewerState] = useState<{
     path: string;
@@ -84,6 +86,7 @@ function App() {
                   onClick={() => {
                     if (result.issue) {
                       setSelectedIssueId(result.issue.id);
+                      setFocusIssueId(result.issue.id); // Also focus in graph
                       setSearchQuery(''); // Clear search after selection
                     } else if (result.serverResult) {
                       // Open document viewer for document matches
@@ -178,6 +181,18 @@ function App() {
               onNodeClick={setSelectedIssueId} 
               viewMode={viewMode}
               labelFilters={labelFilters}
+              layoutAlgorithm={layoutAlgorithm}
+              onLayoutChange={setLayoutAlgorithm}
+              focusNodeId={focusIssueId}
+              onFocusComplete={(success) => {
+                if (success) {
+                  // Clear focus request after successful focus
+                  setFocusIssueId(null);
+                } else {
+                  // Focus failed (node not found), clear anyway
+                  setFocusIssueId(null);
+                }
+              }}
             />
           </div>
           
@@ -190,6 +205,7 @@ function App() {
               issueId={selectedIssueId}
               allIssues={allIssues}
               onNavigate={setSelectedIssueId}
+              onFocusInGraph={setFocusIssueId}
             />
           </div>
         </Split>

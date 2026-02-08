@@ -5,7 +5,9 @@
   "state": "done",
   "priority": "normal",
   "assignee": "agent:copilot",
-  "dependencies": [],
+  "dependencies": [
+    "40f594a7-1a1a-4ff2-88cb-b91008c04c89"
+  ],
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -14,20 +16,10 @@
     "code-review"
   ],
   "gates_status": {
-    "tests": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-29T23:46:12.299225645Z"
-    },
     "clippy": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2025-12-29T23:46:12.300458105Z"
-    },
-    "code-review": {
-      "status": "passed",
-      "updated_by": "agent:copilot",
-      "updated_at": "2025-12-29T23:46:12.303134436Z"
     },
     "tdd-reminder": {
       "status": "passed",
@@ -38,6 +30,16 @@
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2025-12-29T23:46:12.302272366Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "agent:copilot",
+      "updated_at": "2025-12-29T23:46:12.303134436Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-29T23:46:12.299225645Z"
     }
   },
   "context": {},

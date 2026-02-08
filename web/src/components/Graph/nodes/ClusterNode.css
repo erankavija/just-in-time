@@ -1,0 +1,13 @@
+.cluster-node-toggle-button-compact {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  transition: opacity 0.2s;
+}
+
+.cluster-node-toggle-button-compact:hover {
+  opacity: 1 !important;
+}

@@ -5,9 +5,7 @@
   "state": "done",
   "priority": "high",
   "assignee": "copilot:session-1",
-  "dependencies": [
-    "9112af40-3d32-4b21-8eda-51d65f5ce405"
-  ],
+  "dependencies": [],
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -16,30 +14,30 @@
     "code-review"
   ],
   "gates_status": {
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-23T22:33:30.769666890Z"
+    },
     "fmt": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2025-12-23T22:33:33.074000270Z"
-    },
-    "tests": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-23T22:33:29.560734835Z"
     },
     "tdd-reminder": {
       "status": "passed",
       "updated_by": "copilot:session-1",
       "updated_at": "2025-12-23T22:22:06.210091206Z"
     },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-23T22:33:29.560734835Z"
+    },
     "code-review": {
       "status": "passed",
       "updated_by": "copilot:session-1",
       "updated_at": "2025-12-23T22:33:39.353329396Z"
-    },
-    "clippy": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-23T22:33:30.769666890Z"
     }
   },
   "context": {},

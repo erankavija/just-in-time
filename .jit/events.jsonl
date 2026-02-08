@@ -1625,3 +1625,43 @@
 {"type":"gate_passed","id":"3b1b2431-b5d2-47d8-a406-7a3d3ea1e314","issue_id":"cfb3ba94-7406-4bc3-9f36-cecdcebacf0e","timestamp":"2026-02-04T12:05:12.458183266Z","gate_key":"code-review","updated_by":"agent:copilot-cli"}
 {"type":"issue_state_changed","id":"fb4fd5d7-1f8a-4a20-b9ec-83866d2fae88","issue_id":"cfb3ba94-7406-4bc3-9f36-cecdcebacf0e","timestamp":"2026-02-04T12:05:13.124989066Z","from":"ready","to":"done"}
 {"type":"issue_completed","id":"1f5f0986-4ee5-4fdf-8e6c-08d63ce5a83a","issue_id":"cfb3ba94-7406-4bc3-9f36-cecdcebacf0e","timestamp":"2026-02-04T12:05:13.125016336Z"}
+{"type":"issue_created","id":"0b73a440-b4c2-4531-abfb-5c180a69c501","issue_id":"d4290046-9f21-430e-b7e3-3c13d7ff51fe","timestamp":"2026-02-04T12:38:23.007932176Z","title":"Improve DAG layout for large graphs in web UI","priority":"normal"}
+{"type":"issue_created","id":"7ff82103-0591-46a8-9028-74e7fc708414","issue_id":"783a8086-2933-4b6a-9d4a-b5c5f1d3ddc0","timestamp":"2026-02-04T13:58:40.640344492Z","title":"Phase 1: Milestone windowing + exploration DAG","priority":"normal"}
+{"type":"issue_created","id":"2675308f-a470-4352-b564-3d6c0e50e1d9","issue_id":"6f678db0-aef5-4986-95d4-71fa63548fd2","timestamp":"2026-02-04T13:58:40.640771402Z","title":"Phase 2: Custom layout engine (anchored columns)","priority":"normal"}
+{"type":"issue_created","id":"a7ccf80f-b269-4ecf-b545-858f49a47e0d","issue_id":"402d1a8f-3eec-42ef-aecc-a5c1c783405b","timestamp":"2026-02-04T13:58:40.641177992Z","title":"Phase 3: Edge bundling and zoom tiers","priority":"normal"}
+{"type":"issue_created","id":"95b0e4c5-325e-4b84-9edb-bedd2775a546","issue_id":"1f10fe7c-7a8e-4962-b4e4-639a65834876","timestamp":"2026-02-04T13:58:40.641525062Z","title":"Phase 4: Performance optimization","priority":"normal"}
+{"type":"issue_created","id":"0d07eb3a-bda7-4bc1-9f8f-5a669d8536c6","issue_id":"7ef1d3d9-0afa-40cc-91c3-167f2b4dc7a4","timestamp":"2026-02-04T13:58:40.642278372Z","title":"Phase 5: UX polish for high-density","priority":"normal"}
+{"type":"issue_state_changed","id":"ddd35661-c76b-4cb9-b27c-9cb3618b3a4c","issue_id":"d4290046-9f21-430e-b7e3-3c13d7ff51fe","timestamp":"2026-02-04T13:58:40.648467154Z","from":"ready","to":"backlog"}
+{"type":"gate_added","id":"9d85cdcb-7329-44e2-b441-40f1fcd1e506","issue_id":"1f10fe7c-7a8e-4962-b4e4-639a65834876","timestamp":"2026-02-04T14:07:22.850127257Z","gate_key":"tdd-reminder"}
+{"type":"gate_added","id":"d3debfcf-0ee0-451b-b448-f2c52f5d4a83","issue_id":"1f10fe7c-7a8e-4962-b4e4-639a65834876","timestamp":"2026-02-04T14:07:22.850154397Z","gate_key":"code-review"}
+{"type":"gate_added","id":"9c006ba7-7a85-4078-9129-e3e56d066ee6","issue_id":"7ef1d3d9-0afa-40cc-91c3-167f2b4dc7a4","timestamp":"2026-02-04T14:07:22.850302097Z","gate_key":"tdd-reminder"}
+{"type":"gate_added","id":"f11938cd-8975-40dc-9a5c-b2827228f1ab","issue_id":"7ef1d3d9-0afa-40cc-91c3-167f2b4dc7a4","timestamp":"2026-02-04T14:07:22.850320897Z","gate_key":"code-review"}
+{"type":"gate_added","id":"d7dbe53c-f1f9-44e8-929d-e3f1f3936ed8","issue_id":"783a8086-2933-4b6a-9d4a-b5c5f1d3ddc0","timestamp":"2026-02-04T14:07:22.850563277Z","gate_key":"tdd-reminder"}
+{"type":"gate_added","id":"4edb9acf-eb32-40c0-95ce-d2954c4d4d9b","issue_id":"783a8086-2933-4b6a-9d4a-b5c5f1d3ddc0","timestamp":"2026-02-04T14:07:22.850580637Z","gate_key":"code-review"}
+{"type":"gate_added","id":"bcdb789d-90ac-4c2b-8e67-21106b53727c","issue_id":"6f678db0-aef5-4986-95d4-71fa63548fd2","timestamp":"2026-02-04T14:07:22.850614977Z","gate_key":"tdd-reminder"}
+{"type":"gate_added","id":"3c70a727-22ac-48d3-b6cf-6d611e1341b0","issue_id":"6f678db0-aef5-4986-95d4-71fa63548fd2","timestamp":"2026-02-04T14:07:22.850633687Z","gate_key":"code-review"}
+{"type":"gate_added","id":"4ac0b345-212d-4c0e-b469-82e75b579a0e","issue_id":"402d1a8f-3eec-42ef-aecc-a5c1c783405b","timestamp":"2026-02-04T14:07:22.850650747Z","gate_key":"tdd-reminder"}
+{"type":"gate_added","id":"fc48e5d9-f834-4125-abf0-341ee03edc89","issue_id":"402d1a8f-3eec-42ef-aecc-a5c1c783405b","timestamp":"2026-02-04T14:07:22.850664917Z","gate_key":"code-review"}
+{"type":"gate_passed","id":"99ed5e24-054f-4ec5-baf0-cdf325197a8c","issue_id":"783a8086-2933-4b6a-9d4a-b5c5f1d3ddc0","timestamp":"2026-02-04T17:51:01.770505030Z","gate_key":"tdd-reminder","updated_by":"agent:copilot-session"}
+{"type":"issue_state_changed","id":"27f67509-3029-49bc-afee-89859f845142","issue_id":"783a8086-2933-4b6a-9d4a-b5c5f1d3ddc0","timestamp":"2026-02-04T17:51:10.565717276Z","from":"ready","to":"in_progress"}
+{"type":"issue_state_changed","id":"2497e57c-f96c-47a5-9eca-a14d1ff85e38","issue_id":"783a8086-2933-4b6a-9d4a-b5c5f1d3ddc0","timestamp":"2026-02-06T19:26:49.931055898Z","from":"in_progress","to":"gated"}
+{"type":"gate_passed","id":"6e933165-c2fa-4154-8884-67a393669b95","issue_id":"783a8086-2933-4b6a-9d4a-b5c5f1d3ddc0","timestamp":"2026-02-06T19:40:29.277672905Z","gate_key":"code-review","updated_by":"agent:copilot-session"}
+{"type":"issue_state_changed","id":"435e4bd2-c09a-4c3f-8a83-4ea7d9b604c0","issue_id":"783a8086-2933-4b6a-9d4a-b5c5f1d3ddc0","timestamp":"2026-02-06T19:40:29.280684206Z","from":"gated","to":"done"}
+{"type":"issue_completed","id":"4d0d345e-521c-4430-83d5-a0ff592c9c34","issue_id":"783a8086-2933-4b6a-9d4a-b5c5f1d3ddc0","timestamp":"2026-02-06T19:40:29.280707706Z"}
+{"type":"gate_passed","id":"e1a0b2b6-62e7-4ad0-b891-ca79c94196d2","issue_id":"6f678db0-aef5-4986-95d4-71fa63548fd2","timestamp":"2026-02-06T19:50:31.405225965Z","gate_key":"tdd-reminder","updated_by":"agent:copilot-session"}
+{"type":"issue_state_changed","id":"0c78b8c9-ab3b-41aa-b37f-016757aaf53d","issue_id":"6f678db0-aef5-4986-95d4-71fa63548fd2","timestamp":"2026-02-06T19:50:36.119013284Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"61abb59a-3073-48da-b402-5b70deabe3eb","issue_id":"6f678db0-aef5-4986-95d4-71fa63548fd2","timestamp":"2026-02-06T19:50:36.121960114Z","assignee":"agent:copilot-session"}
+{"type":"issue_created","id":"5c615418-7be7-4860-99ec-bd444910b916","issue_id":"91e3a165-7e3f-443a-ab4f-2c8282a42681","timestamp":"2026-02-07T22:54:44.903922532Z","title":"Story: Web UI Visual Enhancements","priority":"normal"}
+{"type":"issue_state_changed","id":"b71377f6-6870-45a1-87a9-ec5da47b675e","issue_id":"91e3a165-7e3f-443a-ab4f-2c8282a42681","timestamp":"2026-02-07T22:54:52.233199749Z","from":"ready","to":"backlog"}
+{"type":"issue_created","id":"fa25cdfa-cf1e-4903-a372-0ffe9ce56a08","issue_id":"f527996e-3073-4c31-9f19-dba1e05f3909","timestamp":"2026-02-07T22:59:02.366947033Z","title":"Add search result focus navigation to DAG","priority":"normal"}
+{"type":"gate_passed","id":"263c3c4c-24fd-4789-a154-966d31ea6a43","issue_id":"6f678db0-aef5-4986-95d4-71fa63548fd2","timestamp":"2026-02-08T18:23:39.016395156Z","gate_key":"code-review","updated_by":"agent:copilot-session"}
+{"type":"issue_state_changed","id":"20ae8884-4f8f-4592-871d-6cfb2d14626a","issue_id":"6f678db0-aef5-4986-95d4-71fa63548fd2","timestamp":"2026-02-08T18:23:39.867393530Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"f1fd3a7a-2d7b-4a16-acf9-2469ab3c486c","issue_id":"6f678db0-aef5-4986-95d4-71fa63548fd2","timestamp":"2026-02-08T18:23:39.867437060Z"}
+{"type":"issue_state_changed","id":"69b49ed0-a1cd-4ae8-8861-4b6d59a2117d","issue_id":"f527996e-3073-4c31-9f19-dba1e05f3909","timestamp":"2026-02-08T18:28:44.360720256Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"4962a53b-90f7-40b3-874b-a86aeb08d451","issue_id":"f527996e-3073-4c31-9f19-dba1e05f3909","timestamp":"2026-02-08T18:28:44.363571017Z","assignee":"agent:copilot-session"}
+{"type":"issue_state_changed","id":"1f1ec37f-4b4c-4f11-b00a-aa4846dc2320","issue_id":"f527996e-3073-4c31-9f19-dba1e05f3909","timestamp":"2026-02-08T19:26:31.881750541Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"60e82d68-177d-4deb-af4c-915378a774f0","issue_id":"f527996e-3073-4c31-9f19-dba1e05f3909","timestamp":"2026-02-08T19:26:31.881779901Z"}
+{"type":"issue_state_changed","id":"a6955e39-d0ec-43c2-ad2b-1319346d4b84","issue_id":"402d1a8f-3eec-42ef-aecc-a5c1c783405b","timestamp":"2026-02-08T19:39:51.964369547Z","from":"ready","to":"rejected"}
+{"type":"issue_state_changed","id":"a6b49595-166f-4472-9ecd-3d036f45719c","issue_id":"d4290046-9f21-430e-b7e3-3c13d7ff51fe","timestamp":"2026-02-08T19:41:28.688220670Z","from":"backlog","to":"ready"}
+{"type":"issue_state_changed","id":"523d30e2-0cd0-4797-a75c-14f10d105b94","issue_id":"d4290046-9f21-430e-b7e3-3c13d7ff51fe","timestamp":"2026-02-08T19:43:31.269743341Z","from":"ready","to":"done"}
+{"type":"issue_completed","id":"28e5557d-9e2c-4682-ab01-be5dd8e1a911","issue_id":"d4290046-9f21-430e-b7e3-3c13d7ff51fe","timestamp":"2026-02-08T19:43:31.269777841Z"}
