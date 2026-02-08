@@ -1654,3 +1654,6 @@
 {"type":"issue_created","id":"5c615418-7be7-4860-99ec-bd444910b916","issue_id":"91e3a165-7e3f-443a-ab4f-2c8282a42681","timestamp":"2026-02-07T22:54:44.903922532Z","title":"Story: Web UI Visual Enhancements","priority":"normal"}
 {"type":"issue_state_changed","id":"b71377f6-6870-45a1-87a9-ec5da47b675e","issue_id":"91e3a165-7e3f-443a-ab4f-2c8282a42681","timestamp":"2026-02-07T22:54:52.233199749Z","from":"ready","to":"backlog"}
 {"type":"issue_created","id":"fa25cdfa-cf1e-4903-a372-0ffe9ce56a08","issue_id":"f527996e-3073-4c31-9f19-dba1e05f3909","timestamp":"2026-02-07T22:59:02.366947033Z","title":"Add search result focus navigation to DAG","priority":"normal"}
+{"type":"gate_passed","id":"263c3c4c-24fd-4789-a154-966d31ea6a43","issue_id":"6f678db0-aef5-4986-95d4-71fa63548fd2","timestamp":"2026-02-08T18:23:39.016395156Z","gate_key":"code-review","updated_by":"agent:copilot-session"}
+{"type":"issue_state_changed","id":"20ae8884-4f8f-4592-871d-6cfb2d14626a","issue_id":"6f678db0-aef5-4986-95d4-71fa63548fd2","timestamp":"2026-02-08T18:23:39.867393530Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"f1fd3a7a-2d7b-4a16-acf9-2469ab3c486c","issue_id":"6f678db0-aef5-4986-95d4-71fa63548fd2","timestamp":"2026-02-08T18:23:39.867437060Z"}
