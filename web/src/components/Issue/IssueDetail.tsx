@@ -16,9 +16,10 @@ interface IssueDetailProps {
   issueId: string | null;
   allIssues?: Issue[];
   onNavigate?: (issueId: string) => void;
+  onFocusInGraph?: (issueId: string) => void;
 }
 
-export function IssueDetail({ issueId, allIssues = [], onNavigate }: IssueDetailProps) {
+export function IssueDetail({ issueId, allIssues = [], onNavigate, onFocusInGraph }: IssueDetailProps) {
   const [issue, setIssue] = useState<Issue | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -124,8 +125,39 @@ export function IssueDetail({ issueId, allIssues = [], onNavigate }: IssueDetail
           fontSize: '11px',
           color: 'var(--text-muted)',
           marginBottom: '6px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
         }}>
-          $ issue #{issue.id.substring(0, 8)}
+          <span>$ issue #{issue.id.substring(0, 8)}</span>
+          {onFocusInGraph && (
+            <button
+              onClick={() => onFocusInGraph(issue.id)}
+              style={{
+                fontSize: '11px',
+                color: 'var(--text-secondary)',
+                backgroundColor: 'var(--bg-secondary)',
+                border: '1px solid var(--border)',
+                borderRadius: '4px',
+                padding: '4px 8px',
+                cursor: 'pointer',
+                fontFamily: 'var(--font-mono)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)';
+                e.currentTarget.style.borderColor = 'var(--accent)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--bg-secondary)';
+                e.currentTarget.style.borderColor = 'var(--border)';
+              }}
+            >
+              📍 Focus in Graph
+            </button>
+          )}
         </div>
         <h1 style={{ 
           fontSize: '18px',

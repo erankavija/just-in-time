@@ -205,6 +205,7 @@ function App() {
               issueId={selectedIssueId}
               allIssues={allIssues}
               onNavigate={setSelectedIssueId}
+              onFocusInGraph={setFocusIssueId}
             />
           </div>
         </Split>
