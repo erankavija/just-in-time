@@ -21,6 +21,7 @@ function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('tactical');
   const [layoutAlgorithm, setLayoutAlgorithm] = useState<LayoutAlgorithm>('compact');
   const [labelFilters, setLabelFilters] = useState<string[]>([]);
+  const [isDetailPaneMinimized, setIsDetailPaneMinimized] = useState(false);
   const [documentViewerState, setDocumentViewerState] = useState<{
     path: string;
     searchQuery?: string;
@@ -170,8 +171,8 @@ function App() {
       <div style={{ flex: 1, overflow: 'hidden' }}>
         <Split
           className="split"
-          sizes={[65, 35]}
-          minSize={[300, 300]}
+          sizes={isDetailPaneMinimized ? [100, 0] : [65, 35]}
+          minSize={isDetailPaneMinimized ? [0, 0] : [300, 300]}
           gutterSize={8}
           direction="horizontal"
           cursor="col-resize"
@@ -194,12 +195,66 @@ function App() {
                 }
               }}
             />
+            
+            {/* Minimize button */}
+            {!isDetailPaneMinimized && (
+              <button
+                onClick={() => setIsDetailPaneMinimized(true)}
+                style={{
+                  position: 'absolute',
+                  right: 0,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  backgroundColor: 'var(--bg-secondary)',
+                  border: '1px solid var(--border)',
+                  borderRight: 'none',
+                  borderRadius: '4px 0 0 4px',
+                  padding: '8px 6px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  color: 'var(--text-secondary)',
+                  zIndex: 10,
+                  fontFamily: 'var(--font-mono)',
+                }}
+                title="Minimize detail pane"
+              >
+                ▶
+              </button>
+            )}
+            
+            {/* Maximize button */}
+            {isDetailPaneMinimized && (
+              <button
+                onClick={() => setIsDetailPaneMinimized(false)}
+                style={{
+                  position: 'absolute',
+                  right: 0,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  backgroundColor: 'var(--bg-secondary)',
+                  border: '1px solid var(--border)',
+                  borderRight: 'none',
+                  borderRadius: '4px 0 0 4px',
+                  padding: '8px 6px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  color: 'var(--text-secondary)',
+                  zIndex: 10,
+                  fontFamily: 'var(--font-mono)',
+                }}
+                title="Expand detail pane"
+              >
+                ◀
+              </button>
+            )}
           </div>
           
           <div style={{ 
             height: '100%',
             overflow: 'auto',
             backgroundColor: 'var(--bg-secondary)',
+            position: 'relative',
+            display: isDetailPaneMinimized ? 'none' : 'block',
           }}>
             <IssueDetail 
               issueId={selectedIssueId}
