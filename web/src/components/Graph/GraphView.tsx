@@ -20,7 +20,9 @@ import { applyFiltersToNode, applyFiltersToEdge, createStrategicFilter, createLa
 import type { HierarchyConfig, ExpansionState } from '../../types/subgraphCluster';
 import { prepareClusteredGraphForReactFlow } from '../../utils/clusteredGraphLayout';
 import { createClusterAwareLayout } from '../../utils/clusterAwareLayout';
+import { findParentClusters } from '../../utils/graphFocus';
 import ClusterNode from './nodes/ClusterNode';
+
 
 // State colors using CSS variables
 const stateColors: Record<State, string> = {
@@ -437,6 +439,10 @@ interface GraphViewProps {
   labelFilters?: string[]; // e.g., ["milestone:v1.0", "epic:*"]
   layoutAlgorithm?: LayoutAlgorithm;
   onLayoutChange?: (algorithm: LayoutAlgorithm) => void;
+  /** Node ID to focus on (centers viewport and expands parent clusters) */
+  focusNodeId?: string | null;
+  /** Callback when focus operation completes (or fails) */
+  onFocusComplete?: (success: boolean) => void;
 }
 
 export function GraphView({ 
@@ -445,6 +451,8 @@ export function GraphView({
   labelFilters = [],
   layoutAlgorithm = 'compact',
   onLayoutChange: _onLayoutChange,
+  focusNodeId,
+  onFocusComplete,
 }: GraphViewProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -494,6 +502,7 @@ export function GraphView({
   const [hasInitialFit, setHasInitialFit] = useState(false);
   const reactFlowInstanceRef = useRef<any>(null);
   const savedViewportRef = useRef<any>(null);
+  const clusterDataRef = useRef<ReturnType<typeof prepareClusteredGraphForReactFlow> | null>(null);
   const [isRenderable, setIsRenderable] = useState(true); // Control rendering during viewport restoration
 
   // Save expansion state to localStorage whenever it changes
@@ -691,6 +700,7 @@ export function GraphView({
         // The expansion filtering will happen during rendering
         nodesToRender = visibleNodes; // Use ALL visible nodes, not filtered ones
         clusterData = clustered; // Pass to layout function
+        clusterDataRef.current = clustered; // Store in ref for focus effect
         
         // Recalculate stats for cluster containers based on their actual members
         // (not dependency traversal which may include cross-cluster nodes)
@@ -977,6 +987,81 @@ export function GraphView({
   useEffect(() => {
     loadGraph();
   }, [loadGraph]);
+
+  // Handle focus requests
+  useEffect(() => {
+    if (!focusNodeId || loading) {
+      return;
+    }
+
+    // If using compact layout with clusters, check cluster data and expand parents
+    if (layoutAlgorithm === 'compact' && clusterDataRef.current) {
+      // Check if node exists in ANY cluster (even if collapsed)
+      const nodeExistsInClusters = clusterDataRef.current.clusters.some(cluster =>
+        cluster.nodes.some(n => n.id === focusNodeId)
+      );
+      
+      if (!nodeExistsInClusters) {
+        // Check if it's an orphan node
+        const isOrphan = clusterDataRef.current.orphanNodes.some(n => n.id === focusNodeId);
+        
+        if (!isOrphan) {
+          console.warn('[Focus] Node not found in cluster data:', focusNodeId);
+          onFocusComplete?.(false);
+          return;
+        }
+      }
+      
+      // Find parent clusters
+      const parentClusterIds = findParentClusters(focusNodeId, clusterDataRef.current.clusters);
+      
+      if (parentClusterIds.length > 0) {
+        // Expand all parent clusters
+        const newExpansionState = { ...expansionState };
+        parentClusterIds.forEach(clusterId => {
+          newExpansionState[clusterId] = true; // true = expanded
+        });
+        setExpansionState(newExpansionState);
+        
+        // Wait for re-render with expanded clusters, then center
+        setTimeout(() => {
+          reactFlowInstanceRef.current?.fitView({
+            nodes: [{ id: focusNodeId }],
+            duration: 300,
+            padding: 0.2,
+          });
+          onFocusComplete?.(true);
+        }, 150); // Slightly longer delay to ensure re-render completes
+      } else {
+        // No parent clusters, node is already visible - just center
+        console.log('[Focus] No parent clusters, centering on visible node');
+        reactFlowInstanceRef.current?.fitView({
+          nodes: [{ id: focusNodeId }],
+          duration: 300,
+          padding: 0.2,
+        });
+        onFocusComplete?.(true);
+      }
+    } else {
+      // No clustering, just center on the node
+      console.log('[Focus] No clustering, centering on node');
+      
+      // Verify node exists in nodes array
+      const targetNode = nodes.find(n => n.id === focusNodeId);
+      if (!targetNode) {
+        console.warn('[Focus] Node not found:', focusNodeId);
+        onFocusComplete?.(false);
+        return;
+      }
+      
+      reactFlowInstanceRef.current?.fitView({
+        nodes: [{ id: focusNodeId }],
+        duration: 300,
+        padding: 0.2,
+      });
+      onFocusComplete?.(true);
+    }
+  }, [focusNodeId, nodes, loading, layoutAlgorithm, expansionState, onFocusComplete]);
 
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {

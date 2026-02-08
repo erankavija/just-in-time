@@ -15,6 +15,7 @@ import type { ViewMode, LayoutAlgorithm } from './components/Graph/GraphView';
 
 function App() {
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
+  const [focusIssueId, setFocusIssueId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [allIssues, setAllIssues] = useState<Issue[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('tactical');
@@ -85,6 +86,7 @@ function App() {
                   onClick={() => {
                     if (result.issue) {
                       setSelectedIssueId(result.issue.id);
+                      setFocusIssueId(result.issue.id); // Also focus in graph
                       setSearchQuery(''); // Clear search after selection
                     } else if (result.serverResult) {
                       // Open document viewer for document matches
@@ -181,6 +183,16 @@ function App() {
               labelFilters={labelFilters}
               layoutAlgorithm={layoutAlgorithm}
               onLayoutChange={setLayoutAlgorithm}
+              focusNodeId={focusIssueId}
+              onFocusComplete={(success) => {
+                if (success) {
+                  // Clear focus request after successful focus
+                  setFocusIssueId(null);
+                } else {
+                  // Focus failed (node not found), clear anyway
+                  setFocusIssueId(null);
+                }
+              }}
             />
           </div>
           

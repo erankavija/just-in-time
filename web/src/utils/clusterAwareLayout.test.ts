@@ -17,6 +17,7 @@ describe('computeClusterPositions', () => {
         internalEdges: [],
         outgoingEdges: [],
         incomingEdges: [],
+        parentClusterId: null,
       },
       {
         containerId: 'epic2',
@@ -25,6 +26,7 @@ describe('computeClusterPositions', () => {
         internalEdges: [],
         outgoingEdges: [],
         incomingEdges: [],
+        parentClusterId: null,
       },
     ];
     
@@ -47,6 +49,7 @@ describe('computeClusterPositions', () => {
         internalEdges: [],
         outgoingEdges: [],
         incomingEdges: [],
+        parentClusterId: null,
       },
       {
         containerId: 'epic2',
@@ -55,6 +58,7 @@ describe('computeClusterPositions', () => {
         internalEdges: [],
         outgoingEdges: [],
         incomingEdges: [],
+        parentClusterId: null,
       },
     ];
     
@@ -136,6 +140,7 @@ describe('createClusterAwareLayout', () => {
         ],
         outgoingEdges: [],
         incomingEdges: [],
+        parentClusterId: null,
       },
     ];
     
