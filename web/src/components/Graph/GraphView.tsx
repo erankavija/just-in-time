@@ -10,7 +10,6 @@ import ReactFlow, {
   type Edge,
   type NodeTypes,
   type ReactFlowInstance,
-  type Viewport,
 } from 'reactflow';
 import dagre from 'dagre';
 import 'reactflow/dist/style.css';
@@ -25,6 +24,13 @@ import { createClusterAwareLayout } from '../../utils/clusterAwareLayout';
 import { findParentClusters } from '../../utils/graphFocus';
 import ClusterNode from './nodes/ClusterNode';
 
+// Type for storing viewport state during cluster expansion/collapse
+type SavedViewportData = {
+  nodeId: string;
+  zoom: number;
+  screenX: number;
+  screenY: number;
+};
 
 // State colors using CSS variables
 const stateColors: Record<State, string> = {
@@ -504,7 +510,7 @@ export function GraphView({
   
   const [hasInitialFit, setHasInitialFit] = useState(false);
   const reactFlowInstanceRef = useRef<ReactFlowInstance | null>(null);
-  const savedViewportRef = useRef<Viewport | null>(null);
+  const savedViewportRef = useRef<SavedViewportData | null>(null);
   const clusterDataRef = useRef<ReturnType<typeof prepareClusteredGraphForReactFlow> | null>(null);
   const [isRenderable, setIsRenderable] = useState(true); // Control rendering during viewport restoration
 
