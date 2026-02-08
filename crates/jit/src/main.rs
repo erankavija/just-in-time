@@ -20,10 +20,12 @@ use jit::cli::{
     ClaimCommands, Cli, Commands, DepCommands, DocCommands, EventCommands, GateCommands,
     GraphCommands, IssueCommands, RegistryCommands,
 };
-use jit::commands::{parse_priority, parse_state, CommandExecutor};
+use jit::commands::CommandExecutor;
+use jit::domain::{Priority, State};
 use jit::output::{ExitCode, JsonOutput, OutputContext};
 use jit::storage::{IssueStore, JsonFileStorage};
 use std::env;
+use std::str::FromStr;
 
 /// Helper to determine exit code from error message
 fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
@@ -224,7 +226,7 @@ strategic_types = {}
                     orphan,
                     json,
                 } => {
-                    let prio = parse_priority(&priority)?;
+                    let prio = Priority::from_str(&priority)?;
                     let id = executor.create_issue(title, description, prio, gate, label)?;
                     let output_ctx = OutputContext::new(quiet, json);
 
@@ -286,8 +288,8 @@ strategic_types = {}
                     json,
                 } => {
                     let output_ctx = OutputContext::new(quiet, json);
-                    let state_filter = state.map(|s| parse_state(&s)).transpose()?;
-                    let priority_filter = priority.map(|p| parse_priority(&p)).transpose()?;
+                    let state_filter = state.map(|s| State::from_str(&s)).transpose()?;
+                    let priority_filter = priority.map(|p| Priority::from_str(&p)).transpose()?;
                     let issues = executor.search_issues_with_filters(
                         &query,
                         priority_filter,
@@ -389,8 +391,8 @@ strategic_types = {}
                         // Resolve short hash to full UUID first
                         let full_id = storage.resolve_issue_id(&id_str)?;
 
-                        let prio = priority.map(|p| parse_priority(&p)).transpose()?;
-                        let st = state.map(|s| parse_state(&s)).transpose()?;
+                        let prio = priority.map(|p| Priority::from_str(&p)).transpose()?;
+                        let st = state.map(|s| State::from_str(&s)).transpose()?;
 
                         // Handle gate modifications first (before other updates)
                         if !add_gate.is_empty() {
@@ -459,12 +461,12 @@ strategic_types = {}
 
                         // Build update operations
                         let operations = UpdateOperations {
-                            state: state.map(|s| parse_state(&s)).transpose()?,
+                            state: state.map(|s| State::from_str(&s)).transpose()?,
                             add_labels: label,
                             remove_labels: remove_label,
                             assignee,
                             unassign,
-                            priority: priority.map(|p| parse_priority(&p)).transpose()?,
+                            priority: priority.map(|p| Priority::from_str(&p)).transpose()?,
                             add_gates: add_gate,
                             remove_gates: remove_gate,
                         };
@@ -1554,8 +1556,11 @@ strategic_types = {}
                 json,
             } => {
                 let output_ctx = OutputContext::new(quiet, json);
-                let state_filter = state.as_ref().map(|s| parse_state(s)).transpose()?;
-                let priority_filter = priority.as_ref().map(|p| parse_priority(p)).transpose()?;
+                let state_filter = state.as_ref().map(|s| State::from_str(s)).transpose()?;
+                let priority_filter = priority
+                    .as_ref()
+                    .map(|p| Priority::from_str(p))
+                    .transpose()?;
                 let issues = executor.query_all(
                     state_filter,
                     assignee.as_deref(),
@@ -1618,7 +1623,10 @@ strategic_types = {}
                 json,
             } => {
                 let output_ctx = OutputContext::new(quiet, json);
-                let priority_filter = priority.as_ref().map(|p| parse_priority(p)).transpose()?;
+                let priority_filter = priority
+                    .as_ref()
+                    .map(|p| Priority::from_str(p))
+                    .transpose()?;
                 let issues = executor.query_available(priority_filter, label.as_deref())?;
 
                 if json {
@@ -1661,7 +1669,10 @@ strategic_types = {}
                 json,
             } => {
                 let output_ctx = OutputContext::new(quiet, json);
-                let priority_filter = priority.as_ref().map(|p| parse_priority(p)).transpose()?;
+                let priority_filter = priority
+                    .as_ref()
+                    .map(|p| Priority::from_str(p))
+                    .transpose()?;
                 let blocked = executor.query_blocked_filtered(priority_filter, label.as_deref())?;
 
                 if json {
@@ -1742,7 +1753,10 @@ strategic_types = {}
                 json,
             } => {
                 let output_ctx = OutputContext::new(quiet, json);
-                let priority_filter = priority.as_ref().map(|p| parse_priority(p)).transpose()?;
+                let priority_filter = priority
+                    .as_ref()
+                    .map(|p| Priority::from_str(p))
+                    .transpose()?;
                 let issues =
                     executor.query_strategic_filtered(priority_filter, label.as_deref())?;
 
@@ -1786,7 +1800,10 @@ strategic_types = {}
                 json,
             } => {
                 let output_ctx = OutputContext::new(quiet, json);
-                let priority_filter = priority.as_ref().map(|p| parse_priority(p)).transpose()?;
+                let priority_filter = priority
+                    .as_ref()
+                    .map(|p| Priority::from_str(p))
+                    .transpose()?;
                 let issues = executor.query_closed_filtered(priority_filter, label.as_deref())?;
 
                 if json {

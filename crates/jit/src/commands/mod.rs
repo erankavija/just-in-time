@@ -51,7 +51,6 @@ use anyhow::{anyhow, Context, Result};
 use chrono::Utc;
 use serde::Serialize;
 use std::collections::HashMap;
-use std::str::FromStr;
 
 /// Information about a git commit
 #[derive(Debug, Clone, Serialize)]
@@ -231,73 +230,9 @@ impl<S: IssueStore> CommandExecutor<S> {
 }
 
 // Helper functions for parsing command-line arguments
-pub fn parse_priority(s: &str) -> Result<Priority> {
-    Priority::from_str(s)
-}
-
-pub fn parse_state(s: &str) -> Result<State> {
-    State::from_str(s)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_parse_state_valid_lowercase() {
-        assert_eq!(parse_state("backlog").unwrap(), State::Backlog);
-        assert_eq!(parse_state("ready").unwrap(), State::Ready);
-        assert_eq!(parse_state("in_progress").unwrap(), State::InProgress);
-        assert_eq!(parse_state("gated").unwrap(), State::Gated);
-        assert_eq!(parse_state("done").unwrap(), State::Done);
-        assert_eq!(parse_state("rejected").unwrap(), State::Rejected);
-        assert_eq!(parse_state("archived").unwrap(), State::Archived);
-    }
-
-    #[test]
-    fn test_parse_state_case_insensitive() {
-        assert_eq!(parse_state("BACKLOG").unwrap(), State::Backlog);
-        assert_eq!(parse_state("Ready").unwrap(), State::Ready);
-        assert_eq!(parse_state("IN_PROGRESS").unwrap(), State::InProgress);
-        assert_eq!(parse_state("Rejected").unwrap(), State::Rejected);
-    }
-
-    #[test]
-    fn test_parse_state_aliases() {
-        assert_eq!(parse_state("open").unwrap(), State::Backlog);
-        assert_eq!(parse_state("inprogress").unwrap(), State::InProgress);
-        assert_eq!(parse_state("OPEN").unwrap(), State::Backlog);
-    }
-
-    #[test]
-    fn test_parse_state_invalid() {
-        assert!(parse_state("invalid").is_err());
-        assert!(parse_state("").is_err());
-        assert!(parse_state("pending").is_err());
-    }
-
-    #[test]
-    fn test_parse_priority_valid_lowercase() {
-        assert_eq!(parse_priority("low").unwrap(), Priority::Low);
-        assert_eq!(parse_priority("normal").unwrap(), Priority::Normal);
-        assert_eq!(parse_priority("high").unwrap(), Priority::High);
-        assert_eq!(parse_priority("critical").unwrap(), Priority::Critical);
-    }
-
-    #[test]
-    fn test_parse_priority_case_insensitive() {
-        assert_eq!(parse_priority("LOW").unwrap(), Priority::Low);
-        assert_eq!(parse_priority("Normal").unwrap(), Priority::Normal);
-        assert_eq!(parse_priority("HIGH").unwrap(), Priority::High);
-        assert_eq!(parse_priority("CriTiCal").unwrap(), Priority::Critical);
-    }
-
-    #[test]
-    fn test_parse_priority_invalid() {
-        assert!(parse_priority("invalid").is_err());
-        assert!(parse_priority("").is_err());
-        assert!(parse_priority("medium").is_err());
-    }
 
     // Enforcement tests
     #[test]

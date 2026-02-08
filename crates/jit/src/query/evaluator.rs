@@ -3,10 +3,10 @@
 //! This layer contains all domain knowledge and reuses existing Issue methods.
 
 use super::parser::{QueryCondition, QueryExpr};
-use crate::commands::{parse_priority, parse_state};
-use crate::domain::Issue;
+use crate::domain::{Issue, Priority, State};
 use crate::labels;
 use std::collections::HashMap;
+use std::str::FromStr;
 
 /// Context needed for evaluating queries
 ///
@@ -44,8 +44,8 @@ impl QueryEvaluator {
     fn eval_condition(cond: &QueryCondition, issue: &Issue, ctx: &QueryContext) -> bool {
         match cond {
             QueryCondition::State(s) => {
-                // Reuse parse_state for parsing
-                parse_state(s)
+                // Use FromStr trait for parsing
+                State::from_str(s)
                     .map(|state| issue.state == state)
                     .unwrap_or(false)
             }
@@ -67,8 +67,8 @@ impl QueryEvaluator {
             }
 
             QueryCondition::Priority(p) => {
-                // Reuse parse_priority for parsing
-                parse_priority(p)
+                // Use FromStr trait for parsing
+                Priority::from_str(p)
                     .map(|priority| issue.priority == priority)
                     .unwrap_or(false)
             }
