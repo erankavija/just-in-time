@@ -322,19 +322,49 @@ strategic_types = {}
                 }
                 IssueCommands::Show { id, json } => match executor.show_issue(&id) {
                     Ok(issue) => {
-                        output_data!(quiet, json, "issue show", issue, {
-                            println!("ID: {}", issue.id);
-                            println!("Title: {}", issue.title);
-                            println!("Description: {}", issue.description);
-                            println!("State: {:?}", issue.state);
-                            println!("Priority: {:?}", issue.priority);
-                            println!("Assignee: {:?}", issue.assignee);
-                            println!("Dependencies: {:?}", issue.dependencies);
-                            println!("Gates Required: {:?}", issue.gates_required);
-                            println!("Gates Status: {:?}", issue.gates_status);
-                            if !issue.documents.is_empty() {
+                        let enriched_deps = executor.get_dependencies_enriched(&issue);
+                        let response = jit::output::IssueShowResponse::from_issue(
+                            issue,
+                            enriched_deps.clone(),
+                        );
+
+                        output_data!(quiet, json, "issue show", response, {
+                            println!("ID: {}", response.id);
+                            println!("Title: {}", response.title);
+                            println!("Description: {}", response.description);
+                            println!("State: {:?}", response.state);
+                            println!("Priority: {:?}", response.priority);
+                            println!("Assignee: {:?}", response.assignee);
+
+                            // Enhanced dependency display
+                            if enriched_deps.is_empty() {
+                                println!("Dependencies: None");
+                            } else {
+                                let done_count = enriched_deps
+                                    .iter()
+                                    .filter(|d| d.state.is_terminal())
+                                    .count();
+                                println!(
+                                    "Dependencies ({}/{} complete):",
+                                    done_count,
+                                    enriched_deps.len()
+                                );
+                                for dep in &enriched_deps {
+                                    println!(
+                                        "  {} {} - {} [{}]",
+                                        dep.state_symbol(),
+                                        dep.short_id(),
+                                        dep.title,
+                                        format!("{:?}", dep.state).to_lowercase()
+                                    );
+                                }
+                            }
+
+                            println!("Gates Required: {:?}", response.gates_required);
+                            println!("Gates Status: {:?}", response.gates_status);
+                            if !response.documents.is_empty() {
                                 println!("Documents:");
-                                for doc in &issue.documents {
+                                for doc in &response.documents {
                                     print!("  - {}", doc.path);
                                     if let Some(ref label) = doc.label {
                                         print!(" ({})", label);

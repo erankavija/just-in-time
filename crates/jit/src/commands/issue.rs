@@ -116,6 +116,20 @@ impl<S: IssueStore> CommandExecutor<S> {
         self.storage.load_issue(&full_id)
     }
 
+    /// Get enriched dependency information for an issue
+    pub fn get_dependencies_enriched(&self, issue: &Issue) -> Vec<crate::domain::MinimalIssue> {
+        issue
+            .dependencies
+            .iter()
+            .filter_map(|dep_id| {
+                self.storage
+                    .load_issue(dep_id)
+                    .ok()
+                    .map(|dep| crate::domain::MinimalIssue::from(&dep))
+            })
+            .collect()
+    }
+
     /// Update issue fields.
     ///
     /// Note: This function has 8 parameters (exceeds clippy's 7-parameter guideline).

@@ -263,6 +263,24 @@ impl From<&Issue> for MinimalIssue {
     }
 }
 
+impl MinimalIssue {
+    /// Get short ID (first 8 characters of UUID)
+    pub fn short_id(&self) -> String {
+        self.id.chars().take(8).collect()
+    }
+
+    /// Get state symbol for human-readable output
+    /// - ✓ for terminal states (done/rejected)
+    /// - ○ for active states
+    pub fn state_symbol(&self) -> &str {
+        if self.state.is_terminal() {
+            "✓"
+        } else {
+            "○"
+        }
+    }
+}
+
 /// Minimal blocked issue for queries - includes blocking reasons
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct MinimalBlockedIssue {

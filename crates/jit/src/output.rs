@@ -636,6 +636,48 @@ pub struct GraphRootsResponse {
 }
 
 // ============================================================================
+// Issue Show Response
+// ============================================================================
+
+/// Response for `issue show` command with enriched dependencies
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct IssueShowResponse {
+    pub id: String,
+    pub title: String,
+    pub description: String,
+    pub state: State,
+    pub priority: Priority,
+    pub assignee: Option<String>,
+    /// Enriched dependency list with full metadata
+    pub dependencies: Vec<MinimalIssue>,
+    pub gates_required: Vec<String>,
+    pub gates_status: std::collections::HashMap<String, crate::domain::GateState>,
+    pub context: std::collections::HashMap<String, String>,
+    pub documents: Vec<crate::domain::DocumentReference>,
+    pub labels: Vec<String>,
+}
+
+impl IssueShowResponse {
+    /// Create from Issue with enriched dependencies
+    pub fn from_issue(issue: crate::domain::Issue, enriched_deps: Vec<MinimalIssue>) -> Self {
+        Self {
+            id: issue.id,
+            title: issue.title,
+            description: issue.description,
+            state: issue.state,
+            priority: issue.priority,
+            assignee: issue.assignee,
+            dependencies: enriched_deps,
+            gates_required: issue.gates_required,
+            gates_status: issue.gates_status,
+            context: issue.context,
+            documents: issue.documents,
+            labels: issue.labels,
+        }
+    }
+}
+
+// ============================================================================
 // Registry Response Types
 // ============================================================================
 
