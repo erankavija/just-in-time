@@ -1310,13 +1310,10 @@ strategic_types = {}
                     }
                 }
             }
-            GraphCommands::Deps {
-                id,
-                transitive,
-                json,
-            } => {
+            GraphCommands::Deps { id, depth, json } => {
                 let output_ctx = OutputContext::new(quiet, json);
-                let issues = executor.show_dependencies(&id, transitive)?;
+
+                let issues = executor.show_dependencies_with_depth(&id, depth)?;
                 if json {
                     use jit::domain::MinimalIssue;
                     use jit::output::{GraphDepsResponse, JsonOutput};
@@ -1327,19 +1324,20 @@ strategic_types = {}
                         issue_id: id.clone(),
                         dependencies: minimal_issues,
                         count: issues.len(),
-                        transitive,
+                        depth,
                         truncated: false,
                     };
                     let output = JsonOutput::success(response, "graph deps");
                     println!("{}", output.to_json_string()?);
                 } else {
-                    if transitive {
-                        let _ = output_ctx
-                            .print_info(format!("All dependencies of {} (transitive):", id));
-                    } else {
-                        let _ =
-                            output_ctx.print_info(format!("Dependencies of {} (immediate):", id));
-                    }
+                    let depth_str = match depth {
+                        0 => "all transitive".to_string(),
+                        1 => "immediate".to_string(),
+                        n => format!("depth {}", n),
+                    };
+                    let _ =
+                        output_ctx.print_info(format!("Dependencies of {} ({}):", id, depth_str));
+
                     if issues.is_empty() {
                         println!("  (none)");
                     } else {

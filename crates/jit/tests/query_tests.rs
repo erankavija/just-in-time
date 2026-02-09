@@ -532,3 +532,118 @@ fn test_query_closed_returns_done_and_rejected() {
     assert!(issue_ids.contains(&id1));
     assert!(issue_ids.contains(&id2));
 }
+
+#[test]
+fn test_query_available_sorts_by_priority() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    // Create issues with different priorities (in reverse order)
+    let output_low = Command::new(&jit)
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Low Priority Task",
+            "-d",
+            "Should be last",
+            "--priority",
+            "low",
+        ])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let id_low = String::from_utf8_lossy(&output_low.stdout)
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+
+    let output_normal = Command::new(&jit)
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Normal Priority Task",
+            "-d",
+            "Should be third",
+            "--priority",
+            "normal",
+        ])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let id_normal = String::from_utf8_lossy(&output_normal.stdout)
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+
+    let output_high = Command::new(&jit)
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "High Priority Task",
+            "-d",
+            "Should be second",
+            "--priority",
+            "high",
+        ])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let id_high = String::from_utf8_lossy(&output_high.stdout)
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+
+    let output_critical = Command::new(&jit)
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Critical Priority Task",
+            "-d",
+            "Should be first",
+            "--priority",
+            "critical",
+        ])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let id_critical = String::from_utf8_lossy(&output_critical.stdout)
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+
+    // Query available issues with JSON output
+    let output = Command::new(&jit)
+        .args(["query", "available", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+
+    // Should return all 4 issues
+    assert_eq!(json["data"]["count"], 4);
+    let issues = json["data"]["issues"].as_array().unwrap();
+
+    // Verify they are sorted by priority: Critical > High > Normal > Low
+    assert_eq!(issues[0]["id"], id_critical);
+    assert_eq!(issues[0]["priority"], "critical");
+
+    assert_eq!(issues[1]["id"], id_high);
+    assert_eq!(issues[1]["priority"], "high");
+
+    assert_eq!(issues[2]["id"], id_normal);
+    assert_eq!(issues[2]["priority"], "normal");
+
+    assert_eq!(issues[3]["id"], id_low);
+    assert_eq!(issues[3]["priority"], "low");
+}

@@ -3,18 +3,18 @@
 use super::*;
 
 impl<S: IssueStore> CommandExecutor<S> {
-    /// Show what an issue depends on (immediate or transitive dependencies).
+    /// Show what an issue depends on with depth control.
     ///
     /// # Arguments
     ///
     /// * `issue_id` - Issue ID to show dependencies for
-    /// * `transitive` - If true, show all transitive dependencies; if false, only immediate
-    pub fn show_dependencies(&self, issue_id: &str, transitive: bool) -> Result<Vec<Issue>> {
+    /// * `depth` - Maximum depth to traverse (1 = immediate, 0 = unlimited)
+    pub fn show_dependencies_with_depth(&self, issue_id: &str, depth: u32) -> Result<Vec<Issue>> {
         let full_id = self.storage.resolve_issue_id(issue_id)?;
         let issue = self.storage.load_issue(&full_id)?;
 
-        if !transitive {
-            // Immediate dependencies only (depth 1)
+        if depth == 1 {
+            // Immediate dependencies only
             let deps: Vec<Issue> = issue
                 .dependencies
                 .iter()
@@ -23,20 +23,30 @@ impl<S: IssueStore> CommandExecutor<S> {
             return Ok(deps);
         }
 
-        // Transitive dependencies (all levels)
+        // Depth-limited or unlimited traversal
         let mut result = Vec::new();
-        let mut to_process = issue.dependencies.clone();
+        let mut to_process: Vec<(String, u32)> = issue
+            .dependencies
+            .iter()
+            .map(|id| (id.clone(), 1))
+            .collect();
         let mut processed = std::collections::HashSet::new();
 
-        while let Some(dep_id) = to_process.pop() {
+        while let Some((dep_id, current_depth)) = to_process.pop() {
             if processed.contains(&dep_id) {
                 continue;
             }
             processed.insert(dep_id.clone());
 
             if let Ok(dep_issue) = self.storage.load_issue(&dep_id) {
-                to_process.extend(dep_issue.dependencies.clone());
-                result.push(dep_issue);
+                result.push(dep_issue.clone());
+
+                // Add children if we haven't reached max depth
+                if depth == 0 || current_depth < depth {
+                    for child_id in &dep_issue.dependencies {
+                        to_process.push((child_id.clone(), current_depth + 1));
+                    }
+                }
             }
         }
 

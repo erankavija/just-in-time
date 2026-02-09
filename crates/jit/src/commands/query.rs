@@ -246,6 +246,14 @@ impl<S: IssueStore> CommandExecutor<S> {
             issues.retain(|i| label_ids.contains(i.id.as_str()));
         }
 
+        // Sort by priority (Critical > High > Normal > Low)
+        issues.sort_by_key(|i| match i.priority {
+            Priority::Critical => 0,
+            Priority::High => 1,
+            Priority::Normal => 2,
+            Priority::Low => 3,
+        });
+
         Ok(issues)
     }
 

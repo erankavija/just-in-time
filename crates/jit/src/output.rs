@@ -622,7 +622,8 @@ pub struct GraphDepsResponse {
     pub issue_id: String,
     pub dependencies: Vec<MinimalIssue>,
     pub count: usize,
-    pub transitive: bool,
+    /// Depth of traversal (1 = immediate, 0 = unlimited)
+    pub depth: u32,
     /// Whether the list was truncated due to size limits
     #[serde(default)]
     pub truncated: bool,

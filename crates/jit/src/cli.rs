@@ -734,9 +734,10 @@ pub enum GraphCommands {
     /// Shows the issues that must be completed before this issue can proceed.
     /// By default shows immediate dependencies only (depth 1).
     ///
-    /// Example:
-    ///   jit graph deps epic-123
-    ///   Shows: task-456, task-789 (epic depends on these)
+    /// Examples:
+    ///   jit graph deps epic-123              # immediate dependencies (default)
+    ///   jit graph deps epic-123 --depth 2    # two levels deep
+    ///   jit graph deps epic-123 --depth 0    # all transitive (unlimited)
     ///
     /// "Dependencies" = what this issue needs (upstream in work flow).
     /// "Dependents" = what needs this issue (downstream in work flow).
@@ -745,9 +746,9 @@ pub enum GraphCommands {
         /// Issue ID
         id: String,
 
-        /// Show transitive dependencies (all levels)
-        #[arg(long)]
-        transitive: bool,
+        /// Depth of dependency traversal (1 = immediate, 0 = unlimited)
+        #[arg(long, default_value = "1")]
+        depth: u32,
 
         #[arg(long)]
         json: bool,
