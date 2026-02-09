@@ -175,7 +175,7 @@ jit gate add <run-migration> change-approval rollback-plan
 
 **Dependency-driven coordination:**
 - Express "B needs A done first" with automatic blocking
-- Visualize work order with `jit graph show`
+- Visualize work order with `jit graph deps --depth 0`
 - Query what's ready with `jit query available`
 
 **Quality gating:**

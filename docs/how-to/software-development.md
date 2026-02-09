@@ -83,7 +83,7 @@ jit query available --filter "labels.epic:auth"
 
 ```bash
 # View the epic's dependency tree
-jit graph show $EPIC_ID
+jit graph deps $EPIC_ID --depth 0
 
 # Check overall epic progress
 jit query all --filter "labels.epic:auth" | grep -E "(ready|in_progress|done)"

@@ -122,25 +122,23 @@ jit dep add product-launch marketing-campaign product-qa
 
 **Show dependency tree:**
 ```bash
-# View what this issue depends on
+# View immediate dependencies (default)
 jit graph deps <issue-id>
 
-# Include transitive dependencies (entire chain)
-jit graph deps <issue-id> --transitive
+# View dependencies 2 levels deep
+jit graph deps <issue-id> --depth 2
 
-# Example output:
-# Issue abc123 depends on:
-#   → def456 (direct)
-#   → xyz789 (via def456, transitive)
-```
+# View all transitive dependencies (entire chain)
+jit graph deps <issue-id> --depth 0
 
-**Show complete graph:**
-```bash
-# View all dependencies
-jit graph show
-
-# View tree for specific issue
-jit graph show <issue-id>
+# Example output with tree structure:
+# Dependencies of abc123 (depth 2):
+#   Summary: 2/5 complete
+#
+#   ○ def456 - Implement feature X [ready]
+#   ├─ ○ ghi789 - Add tests [ready]
+#   └─ ✓ jkl012 - Update docs [done]
+#   ✓ mno345 - Fix bug Y [done]
 ```
 
 ## Avoid Circular Dependencies
@@ -361,8 +359,8 @@ FROM ──→ TO
 
 **Filter by scope:**
 ```bash
-# Export only specific subgraph
-jit graph show <issue-id> | grep -A 20 "Dependencies"
+# View dependencies for specific issue with depth control
+jit graph deps <issue-id> --depth 0
 
 # Focus on specific label
 jit query all --label "epic:auth" --json | process_graph
@@ -406,15 +404,15 @@ Issue: Feature Integration [blocked]
 jit graph deps <issue-id>
 
 # Full dependency chain
-jit graph deps <issue-id> --transitive
+jit graph deps <issue-id> --depth 0
 
 # Example output:
-# Issue abc123 depends on (2 dependencies):
-#   ✓ def456 [done] - Database migration
-#   ✗ xyz789 [in_progress] - API implementation
-# 
-# Transitive dependencies (1):
-#   ✗ qrs012 [ready] - Schema definition (via xyz789)
+# Dependencies of abc123 (all transitive):
+#   Summary: 1/3 complete
+#
+#   ✓ def456 - Database migration [done]
+#   ○ xyz789 - API implementation [in_progress]
+#   └─ ○ qrs012 - Schema definition [ready]
 ```
 
 ### Identify Downstream Dependents
@@ -479,7 +477,7 @@ jit graph export --format dot --output deps.dot
 ```bash
 # Start from leaf (no dependencies)
 # Walk backwards counting depth
-jit graph deps <leaf-id> --transitive | wc -l
+jit graph deps <leaf-id> --depth 0 | wc -l
 ```
 
 ### Prioritize Work to Unblock Others
@@ -556,7 +554,7 @@ jit dep add $TESTING $DESIGN  # Redundant but allowed
 **Manual detection:**
 ```bash
 # Check transitive deps
-jit graph deps $TESTING --transitive
+jit graph deps $TESTING --depth 0
 
 # If Design appears in transitive list,
 # AND you have direct edge to Design,
@@ -584,7 +582,7 @@ jit graph deps $TESTING --transitive
 **Strategy 1: Remove redundant edges manually**
 ```bash
 # Identify redundancy
-jit graph deps $ISSUE --transitive
+jit graph deps $ISSUE --depth 0
 
 # Remove redundant direct edge
 jit dep rm $ISSUE $REDUNDANT_DEP

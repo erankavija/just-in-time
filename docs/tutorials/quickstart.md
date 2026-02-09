@@ -115,8 +115,8 @@ jit query all
 # Make dark mode depend on login fix
 jit dep add $TASK2 $TASK1
 
-# View the dependency graph
-jit graph show
+# View the dependency tree for TASK2
+jit graph deps $TASK2
 
 # Check what's ready to work on
 jit query available

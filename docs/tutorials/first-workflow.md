@@ -143,7 +143,7 @@ jit dep add $EPIC $TASK2
 jit dep add $EPIC $TASK3
 
 # Visualize the dependency tree
-jit graph show $EPIC
+jit graph deps $EPIC --depth 0
 
 # Query what's blocked
 jit query blocked
@@ -307,8 +307,8 @@ jit status
 Examine what we built:
 
 ```bash
-# View complete dependency graph
-jit graph show $EPIC
+# View complete dependency tree
+jit graph deps $EPIC --depth 0
 
 # View all auth work
 jit query all --label "epic:auth"
@@ -342,7 +342,7 @@ jit status
 - `jit issue claim` - Atomic agent assignment
 - `jit gate pass` - Mark gates as passed
 - `jit query available/blocked` - Find available work
-- `jit graph show` - Visualize relationships
+- `jit graph deps` - Visualize dependency trees
 
 ## Next Steps
 

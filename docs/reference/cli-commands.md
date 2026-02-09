@@ -1050,7 +1050,7 @@ All gate commands use standard exit codes:
 
 ## Graph Commands
 
-<!-- jit graph show/export/roots/downstream -->
+<!-- jit graph deps/export/roots/downstream -->
 
 ## Status and Validation
 

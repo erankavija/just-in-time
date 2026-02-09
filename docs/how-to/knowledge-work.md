@@ -175,7 +175,7 @@ jit issue update <venue-id> --label "deadline:2026-03-15"
 
 ```bash
 # What's blocking the event?
-jit graph deps <event-epic-id> --transitive
+jit graph deps <event-epic-id> --depth 0
 
 # What can be done now?
 jit query available --label "event:retreat"

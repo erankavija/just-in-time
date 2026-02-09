@@ -230,11 +230,11 @@ jit claim renew <lease-id> --extension 600
 Dependencies work across worktrees:
 
 ```bash
-# See what blocks an issue
+# See what blocks an issue (immediate deps)
 jit graph deps <issue-id>
 
 # See the full dependency tree
-jit graph show
+jit graph deps <issue-id> --depth 0
 ```
 
 ## What's Next?

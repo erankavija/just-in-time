@@ -531,7 +531,7 @@ Error: .jit directory not found
 Error: Adding dependency would create a cycle
 ```
 
-**Solution:** Check your dependency graph with `jit graph show` and remove circular references. Dependencies must form a directed acyclic graph (DAG).
+**Solution:** Check your dependency graph with `jit graph export --format dot` or `jit graph deps --depth 0` and remove circular references. Dependencies must form a directed acyclic graph (DAG).
 
 #### "Invalid label format"
 
