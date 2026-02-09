@@ -161,51 +161,87 @@ let subtask_id = self.create_issue(
 
 **Breaking change?** Yes, but acceptable pre-1.0
 
-### Solution 2: Transform Type Labels Based on Hierarchy
+### Solution 2: Require Explicit Child Type (Recommended)
 
-**Approach A: Simple downgrade (story → task)**
-```rust
-let mut inherited_labels = parent.labels.clone();
+**Problem with automatic transformation:**
+- Type hierarchy is fully configurable (can have custom types)
+- Multiple types can exist at same hierarchy level (bug, enhancement, task all at level 4)
+- Breakdown doesn't always go to next level (could be same level, or skip levels)
+- No way to know user's intent without explicit input
 
-// If parent has type:story, replace with type:task for subtasks
-if inherited_labels.iter().any(|l| l == "type:story") {
-    inherited_labels.retain(|l| !l.starts_with("type:"));
-    inherited_labels.push("type:task".to_string());
-}
-```
-
-**Approach B: Hierarchical transformation (config-driven)**
-```rust
-// Use hierarchy config to determine child type
-let child_type = match get_type_label(&parent.labels) {
-    Some("type:epic") => "type:story",
-    Some("type:story") => "type:task",
-    Some("type:milestone") => "type:epic",
-    _ => None,  // No transformation
-};
-
-if let Some(child_type) = child_type {
-    inherited_labels.retain(|l| !l.starts_with("type:"));
-    inherited_labels.push(child_type.to_string());
-}
-```
-
-**Recommendation:** Start with Approach A (simple), consider Approach B later
-
-### Solution 3: Add CLI Flags for Control (Future)
+**Better approach: Make --child-type a required argument**
 
 ```bash
-# Opt-out of gate inheritance
-jit issue breakdown $PARENT --no-inherit-gates ...
+# Explicit and clear
+jit issue breakdown $STORY --child-type task \
+  --subtask "Login endpoint" \
+  --subtask "Password hashing"
 
-# Override type transformation
-jit issue breakdown $PARENT --child-type task ...
+# Works with any hierarchy
+jit issue breakdown $EPIC --child-type story ...
+jit issue breakdown $MILESTONE --child-type epic ...
 
-# Selective label inheritance
-jit issue breakdown $PARENT --inherit-label epic:* --inherit-label milestone:* ...
+# Works for same-level breakdown
+jit issue breakdown $BUG --child-type bug ...  # Break bug into sub-bugs
+
+# Works with custom types
+jit issue breakdown $FEATURE --child-type requirement ...
 ```
 
-**Recommendation:** Not for initial fix, but consider for v1.0+
+**Implementation:**
+```rust
+pub fn breakdown_issue(
+    &self,
+    parent_id: &str,
+    child_type: &str,  // ← New required parameter
+    subtasks: Vec<(String, String)>,
+) -> Result<Vec<String>> {
+    let parent = self.storage.load_issue(&full_parent_id)?;
+    
+    for (title, desc) in subtasks {
+        // Replace type: label with user-specified type
+        let mut child_labels = parent.labels.clone();
+        child_labels.retain(|l| !l.starts_with("type:"));
+        child_labels.push(format!("type:{}", child_type));
+        
+        let subtask_id = self.create_issue(
+            title,
+            desc,
+            parent.priority,
+            parent.gates_required.clone(),
+            child_labels,
+        )?;
+        subtask_ids.push(subtask_id);
+    }
+    // ... rest unchanged
+}
+```
+
+**CLI change:**
+```rust
+Breakdown {
+    parent_id: String,
+    
+    /// Type for child issues (e.g., 'task', 'story', 'bug')
+    #[arg(long, required = true)]
+    child_type: String,
+    
+    #[arg(long)]
+    subtask: Vec<String>,
+    
+    // ... rest unchanged
+}
+```
+
+**Advantages:**
+- ✅ Works with any hierarchy configuration
+- ✅ Clear and explicit (no magic)
+- ✅ Supports same-level breakdown
+- ✅ Supports custom type hierarchies
+- ✅ No complex transformation logic needed
+- ✅ User retains full control
+
+**Breaking change?** Yes - new required argument, but acceptable pre-1.0
 
 ## Implementation Plan
 
@@ -217,32 +253,43 @@ jit issue breakdown $PARENT --inherit-label epic:* --inherit-label milestone:* .
 3. Add test for gate inheritance
 4. Update documentation
 
-**Effort:** ~1 hour
+**Effort:** ~30 minutes
 **Risk:** Low (purely additive functionality)
 **Breaking:** Yes, but pre-1.0
 
-### Phase 2: Fix Type Label Transformation
+### Phase 2: Add Required --child-type Argument
 
 **Changes:**
-1. Add helper function `transform_type_label()`
-2. Apply transformation in `breakdown_issue()`
-3. Add tests for story→task, epic→story
-4. Update documentation
+1. Add `--child-type` as required CLI argument
+2. Update `breakdown_issue()` signature to accept `child_type: &str`
+3. Replace parent's `type:` label with `type:{child_type}`
+4. Preserve all other labels
+5. Add tests for type replacement
+6. Update documentation and error messages
 
-**Effort:** ~2 hours
-**Risk:** Low (well-defined transformation)
-**Breaking:** Yes, but pre-1.0
+**Effort:** ~1.5 hours
+**Risk:** Low (simple string replacement)
+**Breaking:** Yes - new required argument, but pre-1.0
 
-### Phase 3: Fix Label Display (Nice-to-have)
+### Phase 3: Update Documentation
 
 **Changes:**
-1. Update `jit issue show` human output to include labels
-2. Decide on format (inline? separate section?)
-3. Update tests
+1. Update CLI help text with --child-type examples
+2. Update how-to guides that mention breakdown
+3. Add note about explicit type specification
+4. Document gate inheritance behavior
 
-**Effort:** ~1 hour
-**Risk:** Low
-**Breaking:** No (output-only change)
+**Effort:** ~30 minutes
+
+### Phase 4: Quality Gates
+
+**Changes:**
+1. All tests pass
+2. Clippy clean
+3. Format correct
+4. Update dev/active documents with final solution
+
+**Effort:** ~30 minutes
 
 ## Testing Strategy
 

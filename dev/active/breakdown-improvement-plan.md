@@ -16,25 +16,26 @@ Fix both issues in a single PR with TDD approach:
 
 - [ ] **Task 1: Write failing tests (TDD)**
   - [ ] Test: `test_breakdown_inherits_gates_from_parent`
-  - [ ] Test: `test_breakdown_transforms_story_type_to_task`
+  - [ ] Test: `test_breakdown_replaces_type_label_with_child_type`
   - [ ] Test: `test_breakdown_preserves_non_type_labels`
-  - [ ] Test: `test_breakdown_transforms_epic_type_to_story`
+  - [ ] Test: `test_breakdown_works_with_custom_types`
   
 - [ ] **Task 2: Implement gate inheritance**
   - [ ] Update `breakdown_issue()` to pass `parent.gates_required.clone()`
   - [ ] Verify tests pass
   
-- [ ] **Task 3: Implement type label transformation**
-  - [ ] Add helper function `transform_type_label(labels: &[String]) -> Vec<String>`
-  - [ ] Logic: `type:story` → `type:task`, `type:epic` → `type:story`
-  - [ ] Preserve all other labels unchanged
-  - [ ] Apply in `breakdown_issue()` before creating subtasks
+- [ ] **Task 3: Add required --child-type argument**
+  - [ ] Add `child_type: String` parameter to CLI Breakdown command
+  - [ ] Mark as required with `#[arg(long, required = true)]`
+  - [ ] Update `breakdown_issue()` signature: `child_type: &str`
+  - [ ] Implement type label replacement logic
   - [ ] Verify tests pass
   
 - [ ] **Task 4: Update documentation**
   - [ ] Update CLI help text for `jit issue breakdown`
+  - [ ] Add examples showing --child-type usage
   - [ ] Update any how-to guides that mention breakdown
-  - [ ] Add note about automatic inheritance/transformation
+  - [ ] Document gate inheritance and type replacement
   
 - [ ] **Task 5: Quality gates**
   - [ ] All tests pass
@@ -67,78 +68,124 @@ let subtask_id = self.create_issue(
 )?;
 ```
 
-### Type Label Transformation
+### Type Label Replacement (Required Argument)
+
+**File:** `crates/jit/src/cli.rs`
+
+```rust
+Breakdown {
+    /// Parent issue ID to break down
+    parent_id: String,
+    
+    /// Type for child issues (e.g., 'task', 'story', 'bug')
+    /// Must match a type: label value from your hierarchy
+    #[arg(long, required = true)]
+    child_type: String,
+    
+    /// Subtask titles (use multiple times)
+    #[arg(long)]
+    subtask: Vec<String>,
+    
+    // ... rest unchanged
+}
+```
 
 **File:** `crates/jit/src/commands/breakdown.rs`
 
 ```rust
-/// Transform type labels for child issues in breakdown
-fn transform_type_label(labels: &[String]) -> Vec<String> {
-    let mut result = Vec::new();
-    let mut found_type = false;
-    
-    for label in labels {
-        if label.starts_with("type:") {
-            found_type = true;
-            // Transform based on parent type
-            match label.as_str() {
-                "type:epic" => result.push("type:story".to_string()),
-                "type:story" => result.push("type:task".to_string()),
-                // Keep milestone, bug, task as-is
-                other => result.push(other.to_string()),
-            }
-        } else {
-            // Preserve all non-type labels
-            result.push(label.clone());
-        }
+pub fn breakdown_issue(
+    &self,
+    parent_id: &str,
+    child_type: &str,  // ← New required parameter
+    subtasks: Vec<(String, String)>,
+) -> Result<Vec<String>> {
+    let full_parent_id = self.storage.resolve_issue_id(parent_id)?;
+    let parent = self.storage.load_issue(&full_parent_id)?;
+    let original_deps = parent.dependencies.clone();
+
+    let mut subtask_ids = Vec::new();
+    for (title, desc) in subtasks {
+        // Replace parent's type: label with child type
+        let mut child_labels = parent.labels.clone();
+        child_labels.retain(|l| !l.starts_with("type:"));
+        child_labels.push(format!("type:{}", child_type));
+        
+        let subtask_id = self.create_issue(
+            title,
+            desc,
+            parent.priority,
+            parent.gates_required.clone(),  // ← Inherit gates
+            child_labels,                    // ← Type replaced
+        )?;
+        subtask_ids.push(subtask_id);
     }
     
-    // If no type label found, don't add one
-    result
+    // ... rest unchanged (dependency management)
+    
+    Ok(subtask_ids)
 }
 ```
 
 **Usage:**
-```rust
-for (title, desc) in subtasks {
-    let transformed_labels = transform_type_label(&parent.labels);
-    let subtask_id = self.create_issue(
-        title,
-        desc,
-        parent.priority,
-        parent.gates_required.clone(),
-        transformed_labels,
-    )?;
-    subtask_ids.push(subtask_id);
-}
+```bash
+# Break down story into tasks
+jit issue breakdown $STORY --child-type task \
+  --subtask "Implement login endpoint" \
+  --subtask "Add password hashing"
+
+# Break down epic into stories
+jit issue breakdown $EPIC --child-type story \
+  --subtask "User authentication" \
+  --subtask "Session management"
+
+# Break down bug into sub-bugs (same level)
+jit issue breakdown $BUG --child-type bug \
+  --subtask "Reproduce issue" \
+  --subtask "Fix root cause"
+
+# Works with custom types
+jit issue breakdown $FEATURE --child-type requirement \
+  --subtask "REQ-001" \
+  --subtask "REQ-002"
 ```
 
 ## Testing Strategy
 
 ### Test Scenarios
 
-**Scenario 1: Story breakdown with gates**
+**Scenario 1: Story breakdown with gates and explicit child type**
 ```rust
 // Parent: type:story with tests+review gates
+// Command: --child-type task
 // Expected: Subtasks have type:task with tests+review gates
 ```
 
 **Scenario 2: Epic breakdown**
 ```rust
 // Parent: type:epic
+// Command: --child-type story
 // Expected: Subtasks have type:story
 ```
 
 **Scenario 3: Preserve other labels**
 ```rust
 // Parent: type:story, epic:auth, milestone:v1, component:backend
+// Command: --child-type task
 // Expected: Subtasks have type:task, epic:auth, milestone:v1, component:backend
 ```
 
-**Scenario 4: No type label**
+**Scenario 4: Same-level breakdown**
 ```rust
-// Parent: No type label (just component:backend)
-// Expected: Subtasks have same labels (no type added)
+// Parent: type:bug with component:api
+// Command: --child-type bug
+// Expected: Subtasks have type:bug, component:api
+```
+
+**Scenario 5: Custom type**
+```rust
+// Parent: type:feature with custom labels
+// Command: --child-type requirement
+// Expected: Subtasks have type:requirement plus inherited labels
 ```
 
 ## Breaking Changes
