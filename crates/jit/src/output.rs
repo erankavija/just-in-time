@@ -629,6 +629,65 @@ pub struct GraphDepsResponse {
     pub truncated: bool,
 }
 
+/// Tree node for hierarchical dependency display
+#[derive(Debug, Serialize, JsonSchema, Clone)]
+pub struct DependencyTreeNode {
+    /// Issue ID
+    pub id: String,
+    /// Short ID (first 8 chars)
+    pub short_id: String,
+    /// Issue title
+    pub title: String,
+    /// Current state
+    pub state: State,
+    /// Priority
+    pub priority: Priority,
+    /// Depth level in tree (1 = immediate child, 2 = grandchild, etc.)
+    pub level: u32,
+    /// Whether this node appears multiple times in the tree (shared dependency)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub shared: Option<bool>,
+    /// Child dependencies
+    pub children: Vec<DependencyTreeNode>,
+}
+
+impl DependencyTreeNode {
+    /// Create from MinimalIssue
+    pub fn from_minimal(issue: &MinimalIssue, level: u32) -> Self {
+        Self {
+            short_id: issue.short_id(),
+            id: issue.id.clone(),
+            title: issue.title.clone(),
+            state: issue.state,
+            priority: issue.priority,
+            level,
+            shared: None,
+            children: Vec::new(),
+        }
+    }
+}
+
+/// Response for `graph deps` with tree structure
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct GraphDepsTreeResponse {
+    pub issue_id: String,
+    /// Depth of traversal (1 = immediate, 0 = unlimited)
+    pub depth: u32,
+    /// Tree of dependencies
+    pub tree: Vec<DependencyTreeNode>,
+    /// Summary statistics
+    pub summary: DependencySummary,
+}
+
+/// Summary statistics for dependencies
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct DependencySummary {
+    /// Total number of unique dependencies
+    pub total: usize,
+    /// Count by state
+    pub by_state: std::collections::HashMap<String, usize>,
+}
+
 /// Response for `graph roots` command
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct GraphRootsResponse {

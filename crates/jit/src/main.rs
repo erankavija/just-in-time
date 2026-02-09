@@ -1313,23 +1313,24 @@ strategic_types = {}
             GraphCommands::Deps { id, depth, json } => {
                 let output_ctx = OutputContext::new(quiet, json);
 
-                let issues = executor.show_dependencies_with_depth(&id, depth)?;
                 if json {
-                    use jit::domain::MinimalIssue;
-                    use jit::output::{GraphDepsResponse, JsonOutput};
+                    // For JSON output, use tree structure
+                    use jit::output::{GraphDepsTreeResponse, JsonOutput};
 
-                    let minimal_issues: Vec<MinimalIssue> =
-                        issues.iter().map(MinimalIssue::from).collect();
-                    let response = GraphDepsResponse {
+                    let tree = executor.build_dependency_tree(&id, depth)?;
+                    let summary = jit::commands::graph::compute_dependency_summary(&tree);
+
+                    let response = GraphDepsTreeResponse {
                         issue_id: id.clone(),
-                        dependencies: minimal_issues,
-                        count: issues.len(),
                         depth,
-                        truncated: false,
+                        tree,
+                        summary,
                     };
                     let output = JsonOutput::success(response, "graph deps");
                     println!("{}", output.to_json_string()?);
                 } else {
+                    // For human output, still use flat list for now
+                    let issues = executor.show_dependencies_with_depth(&id, depth)?;
                     let depth_str = match depth {
                         0 => "all transitive".to_string(),
                         1 => "immediate".to_string(),
