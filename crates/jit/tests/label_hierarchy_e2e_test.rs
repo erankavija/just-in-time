@@ -368,11 +368,11 @@ fn test_label_hierarchy_complete_workflow() {
     // PHASE 9: Graph Visualization with Labels
     // ========================================================================
 
-    // Show dependency graph
-    let output = run_jit(&temp, &["graph", "show"]);
+    // Show dependency graph for epic (graph show removed, use graph deps)
+    let output = run_jit(&temp, &["graph", "deps", &epic_id]);
     assert!(
         output.status.success(),
-        "graph show failed: {:?}",
+        "graph deps failed: {:?}",
         String::from_utf8_lossy(&output.stderr)
     );
 

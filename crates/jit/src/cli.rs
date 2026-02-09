@@ -720,15 +720,6 @@ pub enum AssetCommands {
 
 #[derive(Subcommand)]
 pub enum GraphCommands {
-    /// Show dependency tree for an issue
-    Show {
-        /// Issue ID (optional - shows all if omitted)
-        id: Option<String>,
-
-        #[arg(long)]
-        json: bool,
-    },
-
     /// Show what an issue depends on (upstream dependencies)
     ///
     /// Shows the issues that must be completed before this issue can proceed.

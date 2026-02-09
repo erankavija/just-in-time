@@ -399,15 +399,17 @@ fn test_dependencies() {
 
     assert!(output.status.success());
 
-    // Show graph
+    // Show dependencies (use graph deps instead of removed graph show)
     let output = Command::new(&jit)
-        .args(["graph", "show", &id2])
+        .args(["graph", "deps", &id2])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains(&id1));
+    // Output now shows short IDs (first 8 chars)
+    let id1_short = &id1[..8];
+    assert!(stdout.contains(id1_short));
 
     // Show downstream
     let output = Command::new(&jit)

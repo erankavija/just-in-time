@@ -1287,68 +1287,6 @@ strategic_types = {}
             }
         },
         Commands::Graph(graph_cmd) => match graph_cmd {
-            GraphCommands::Show { id, json } => {
-                let output_ctx = OutputContext::new(quiet, json);
-                if let Some(issue_id) = id {
-                    let issues = executor.show_graph(&issue_id)?;
-                    if json {
-                        use jit::domain::MinimalIssue;
-                        use jit::output::{GraphShowResponse, JsonOutput};
-
-                        let minimal_issues: Vec<MinimalIssue> =
-                            issues.iter().map(MinimalIssue::from).collect();
-                        let response = GraphShowResponse {
-                            issue_id: issue_id.clone(),
-                            dependencies: minimal_issues,
-                            count: issues.len(),
-                        };
-                        let output = JsonOutput::success(response, "graph show");
-                        println!("{}", output.to_json_string()?);
-                    } else {
-                        let _ = output_ctx.print_info(format!("Dependency tree for {}:", issue_id));
-                        for issue in issues {
-                            println!("  {} | {}", issue.id, issue.title);
-                        }
-                    }
-                } else {
-                    // Show all dependencies as a graph
-                    let all_issues = executor.list_issues(None, None, None)?;
-                    if json {
-                        use jit::output::{DependencyPair, GraphShowAllResponse, JsonOutput};
-
-                        let mut deps = Vec::new();
-                        for issue in &all_issues {
-                            for dep_id in &issue.dependencies {
-                                let dep_title = all_issues
-                                    .iter()
-                                    .find(|i| &i.id == dep_id)
-                                    .map(|i| i.title.clone())
-                                    .unwrap_or_else(|| "Unknown".to_string());
-                                deps.push(DependencyPair {
-                                    from_id: issue.id.clone(),
-                                    from_title: issue.title.clone(),
-                                    to_id: dep_id.clone(),
-                                    to_title: dep_title,
-                                });
-                            }
-                        }
-
-                        let response = GraphShowAllResponse {
-                            count: deps.len(),
-                            dependencies: deps,
-                        };
-                        let output = JsonOutput::success(response, "graph show");
-                        println!("{}", output.to_json_string()?);
-                    } else {
-                        let _ = output_ctx.print_info("All dependencies:");
-                        for issue in all_issues {
-                            if !issue.dependencies.is_empty() {
-                                println!("  {} depends on: {:?}", issue.id, issue.dependencies);
-                            }
-                        }
-                    }
-                }
-            }
             GraphCommands::Deps { id, depth, json } => {
                 let output_ctx = OutputContext::new(quiet, json);
 

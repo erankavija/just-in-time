@@ -584,30 +584,6 @@ pub struct ClosedQueryResponse {
 // Graph Response Types
 // ============================================================================
 
-/// Response for `graph show <id>` command
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct GraphShowResponse {
-    pub issue_id: String,
-    pub dependencies: Vec<MinimalIssue>,
-    pub count: usize,
-}
-
-/// Response for `graph show` (all) command
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct GraphShowAllResponse {
-    pub dependencies: Vec<DependencyPair>,
-    pub count: usize,
-}
-
-/// A pair of issues with a dependency relationship
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct DependencyPair {
-    pub from_id: String,
-    pub from_title: String,
-    pub to_id: String,
-    pub to_title: String,
-}
-
 /// Response for `graph downstream` command
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct GraphDownstreamResponse {
