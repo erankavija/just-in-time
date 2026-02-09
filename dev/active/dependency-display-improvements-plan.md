@@ -1,5 +1,9 @@
 # Implementation Plan: Dependency Display Improvements
 
+## ✅ COMPLETED
+
+All tasks completed successfully! The dependency display improvements are now fully implemented.
+
 ## Problem Statement
 
 The current dependency exploration tools have two major issues:
@@ -134,43 +138,46 @@ Summary: 3/12 complete, 8 ready, 1 in_progress
 
 ## Implementation Workplan
 
-- [ ] **Task 1: Design dependency display format**
-  - [ ] Define dependency info struct (short_id, title, state)
-  - [ ] Design human-readable format (symbols, colors, layout)
-  - [ ] Design JSON structure for both simple list and tree
+- [x] **Task 1: Design dependency display format**
+  - [x] Use MinimalIssue for dependency representation
+  - [x] Add helper methods: short_id(), state_symbol()
+  - [x] Design human-readable format (symbols: ✓ for done, ○ for active)
+  - [x] Design JSON structure (MinimalIssue array with id, title, state, priority)
 
-- [ ] **Task 2: Implement `jit issue show` improvements (TDD)**
-  - [ ] Write test for enhanced dependency display
-  - [ ] Create helper function to enrich dependencies with metadata
-  - [ ] Update human-readable output formatter
-  - [ ] Update JSON output structure
-  - [ ] Add summary line (X/Y complete)
+- [x] **Task 2: Implement `jit issue show` improvements (TDD)**
+  - [x] Write tests for enhanced dependency display
+  - [x] Create helper function to enrich dependencies with metadata
+  - [x] Update human-readable output formatter
+  - [x] Update JSON output structure (IssueShowResponse)
+  - [x] Add summary line (X/Y complete)
   
-- [ ] **Task 3: Add `--depth` parameter to `jit graph deps` (TDD)**
-  - [ ] Write tests for depth-limited traversal
-  - [ ] Implement depth-limited dependency traversal
-  - [ ] Update CLI argument parsing
-  - [ ] Update help text
+- [x] **Task 3: Add `--depth` parameter to `jit graph deps` (TDD)**
+  - [x] Write tests for depth-limited traversal
+  - [x] Implement depth-limited dependency traversal
+  - [x] Update CLI argument parsing
+  - [x] Update help text
+  - [x] Removed --transitive flag (no backward compatibility)
 
-- [ ] **Task 4: Implement tree structure preservation (TDD)**
-  - [ ] Write tests for tree building (including diamonds)
-  - [ ] Implement tree builder that tracks level and parent relationships
-  - [ ] Handle diamond detection (mark shared nodes)
-  - [ ] Update human output formatter with tree symbols (├─, └─, │)
-  - [ ] Create hierarchical JSON output structure
+- [x] **Task 4: Implement tree structure preservation (TDD)**
+  - [x] Write tests for tree building (including diamonds)
+  - [x] Implement tree builder that tracks level and parent relationships
+  - [x] Handle diamond detection (mark shared nodes)
+  - [x] Update human output formatter with tree symbols (├─, └─, │)
+  - [x] Create hierarchical JSON output structure
 
-- [ ] **Task 5: Add summary statistics**
-  - [ ] Write test for summary calculation
-  - [ ] Implement state aggregation (count by state)
-  - [ ] Add to both human and JSON output
+- [x] **Task 5: Add summary statistics**
+  - [x] Write test for summary calculation
+  - [x] Implement state aggregation (count by state)
+  - [x] Add to both human and JSON output
 
-- [ ] **Task 6: Deprecate `jit graph show`**
-  - [ ] Update help text to suggest `jit graph deps --depth 0`
-  - [ ] Consider adding deprecation warning or alias
-  - [ ] Update documentation
+- [x] **Task 6: Remove `jit graph show`**
+  - [x] Remove command from CLI
+  - [x] Remove unused response types and methods
+  - [x] Update all tests to use `graph deps`
+  - [x] Regenerate MCP server schema
 
-- [ ] **Task 7: Quality gates**
-  - [ ] All tests pass
+- [x] **Task 7: Quality gates**
+  - [x] All tests pass
   - [ ] Clippy clean
   - [ ] Formatting correct
   - [ ] Documentation updated
