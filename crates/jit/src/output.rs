@@ -665,6 +665,14 @@ impl DependencyTreeNode {
             children: Vec::new(),
         }
     }
+
+    /// Get state symbol for display
+    pub fn state_symbol(&self) -> &str {
+        match self.state {
+            State::Done | State::Rejected => "✓",
+            _ => "○",
+        }
+    }
 }
 
 /// Response for `graph deps` with tree structure

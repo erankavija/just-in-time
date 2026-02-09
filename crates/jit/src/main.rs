@@ -109,6 +109,45 @@ fn setup_gitattributes() -> Result<()> {
     Ok(())
 }
 
+/// Print a dependency tree with tree symbols (├─, └─, │)
+fn print_dependency_tree(nodes: &[jit::output::DependencyTreeNode], prefix: &str, is_root: bool) {
+    let count = nodes.len();
+    for (i, node) in nodes.iter().enumerate() {
+        let is_last = i == count - 1;
+
+        // Determine tree symbols
+        let (connector, child_prefix) = if is_root {
+            ("  ", "  ")
+        } else if is_last {
+            ("└─ ", "   ")
+        } else {
+            ("├─ ", "│  ")
+        };
+
+        // State symbol
+        let state_symbol = node.state_symbol();
+
+        // Shared indicator
+        let shared_marker = if node.shared.unwrap_or(false) {
+            " (shared)"
+        } else {
+            ""
+        };
+
+        // Print the node
+        println!(
+            "{}{}{} {} - {}{}",
+            prefix, connector, state_symbol, node.short_id, node.title, shared_marker
+        );
+
+        // Recursively print children
+        if !node.children.is_empty() {
+            let new_prefix = format!("{}{}", prefix, child_prefix);
+            print_dependency_tree(&node.children, &new_prefix, false);
+        }
+    }
+}
+
 fn main() {
     let exit_code = match run() {
         Ok(()) => ExitCode::Success,
@@ -1329,22 +1368,30 @@ strategic_types = {}
                     let output = JsonOutput::success(response, "graph deps");
                     println!("{}", output.to_json_string()?);
                 } else {
-                    // For human output, still use flat list for now
-                    let issues = executor.show_dependencies_with_depth(&id, depth)?;
+                    // For human output, use tree structure
+                    let tree = executor.build_dependency_tree(&id, depth)?;
                     let depth_str = match depth {
                         0 => "all transitive".to_string(),
                         1 => "immediate".to_string(),
                         n => format!("depth {}", n),
                     };
+
                     let _ =
                         output_ctx.print_info(format!("Dependencies of {} ({}):", id, depth_str));
 
-                    if issues.is_empty() {
+                    if tree.is_empty() {
                         println!("  (none)");
                     } else {
-                        for issue in issues {
-                            println!("  {} | {}", issue.short_id(), issue.title);
+                        // Print summary first
+                        let summary = jit::commands::graph::compute_dependency_summary(&tree);
+                        if summary.total > 0 {
+                            let done_count = summary.by_state.get("done").unwrap_or(&0);
+                            println!("  Summary: {}/{} complete", done_count, summary.total);
+                            println!();
                         }
+
+                        // Print tree with indentation
+                        print_dependency_tree(&tree, "", true);
                     }
                 }
             }
