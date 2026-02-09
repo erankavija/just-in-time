@@ -15,6 +15,20 @@
       "commit": null,
       "label": "Implementation Plan",
       "doc_type": "design"
+    },
+    {
+      "path": "dev/active/breakdown-analysis.md",
+      "commit": null,
+      "label": "Breakdown Analysis",
+      "doc_type": "design",
+      "format": "markdown"
+    },
+    {
+      "path": "dev/active/breakdown-improvement-plan.md",
+      "commit": null,
+      "label": "Breakdown Fix Plan",
+      "doc_type": "design",
+      "format": "markdown"
     }
   ],
   "labels": [
