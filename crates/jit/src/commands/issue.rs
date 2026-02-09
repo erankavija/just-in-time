@@ -394,8 +394,8 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Check for existing lease held by another agent
         // Use both short and full ID since leases may store either
-        let short_id = &full_id[..8];
-        let conflicting_lease = check_issue_lease(short_id, Some(&assignee))?
+        let short_id = issue.short_id();
+        let conflicting_lease = check_issue_lease(&short_id, Some(&assignee))?
             .or(check_issue_lease(&full_id, Some(&assignee))?);
 
         if let Some(lease) = conflicting_lease {

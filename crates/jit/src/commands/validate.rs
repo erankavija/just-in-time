@@ -1,6 +1,7 @@
 //! Validation and status operations
 
 use super::*;
+use crate::domain::SHORT_ID_LENGTH;
 use crate::type_hierarchy::{
     detect_validation_issues, generate_fixes, ValidationFix, ValidationIssue,
 };
@@ -641,8 +642,8 @@ impl<S: IssueStore> CommandExecutor<S> {
                     return Err(anyhow!(
                         "Transitive reduction violation: Issue {} has redundant dependency on {} \
                          (already reachable via: {}). Run 'jit validate --fix' to remove redundant edges.",
-                        &issue.id[..8],
-                        &dep_id[..8],
+                        issue.short_id(),
+                        dep_id.chars().take(SHORT_ID_LENGTH).collect::<String>(),
                         path_str
                     ));
                 }

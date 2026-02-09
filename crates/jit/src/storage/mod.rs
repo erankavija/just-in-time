@@ -97,7 +97,7 @@ pub trait IssueStore: Clone {
     /// storage.save_issue(&issue).unwrap();
     ///
     /// // Can use short prefix
-    /// let full_id = storage.resolve_issue_id(&issue.id[..8]).unwrap();
+    /// let full_id = storage.resolve_issue_id(&issue.short_id()).unwrap();
     /// assert_eq!(full_id, issue.id);
     ///
     /// // Or full UUID

@@ -1342,7 +1342,7 @@ strategic_types = {}
                         println!("  (none)");
                     } else {
                         for issue in issues {
-                            println!("  {} | {}", issue.id, issue.title);
+                            println!("  {} | {}", issue.short_id(), issue.title);
                         }
                     }
                 }

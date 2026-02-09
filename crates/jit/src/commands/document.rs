@@ -716,7 +716,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             );
             println!("{}", output.to_json_string()?);
         } else {
-            println!("Assets for document {} (issue {}):", path, &full_id[..8]);
+            println!("Assets for document {} (issue {}):", path, issue.short_id());
 
             if assets.is_empty() {
                 println!("  No assets found for this document");
@@ -1331,7 +1331,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .map(|issue| {
                 format!(
                     "  - {}: {} (state: {:?})",
-                    &issue.id[..8],
+                    issue.short_id(),
                     issue.title,
                     issue.state
                 )

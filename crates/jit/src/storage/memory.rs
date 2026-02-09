@@ -124,7 +124,7 @@ impl IssueStore for InMemoryStorage {
                     .filter_map(|id| {
                         issues
                             .get(id)
-                            .map(|issue| format!("{} | {}", &id[..8], issue.title))
+                            .map(|issue| format!("{} | {}", issue.short_id(), issue.title))
                     })
                     .collect();
                 Err(anyhow!(

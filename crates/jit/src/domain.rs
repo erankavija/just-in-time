@@ -11,6 +11,9 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use uuid::Uuid;
 
+/// Length of short issue ID (git-style short hash)
+pub const SHORT_ID_LENGTH: usize = 8;
+
 /// Issue lifecycle state
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -165,6 +168,14 @@ impl Issue {
         }
     }
 
+    /// Get short ID (first 8 characters of UUID)
+    ///
+    /// Returns a git-style short hash for human-readable output.
+    /// Minimum length is 8 characters for reasonable collision resistance.
+    pub fn short_id(&self) -> String {
+        self.id.chars().take(SHORT_ID_LENGTH).collect()
+    }
+
     /// Create a new issue with labels
     #[cfg(test)]
     pub fn new_with_labels(title: String, description: String, labels: Vec<String>) -> Self {
@@ -266,7 +277,7 @@ impl From<&Issue> for MinimalIssue {
 impl MinimalIssue {
     /// Get short ID (first 8 characters of UUID)
     pub fn short_id(&self) -> String {
-        self.id.chars().take(8).collect()
+        self.id.chars().take(SHORT_ID_LENGTH).collect()
     }
 
     /// Get state symbol for human-readable output

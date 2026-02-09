@@ -450,7 +450,7 @@ impl IssueStore for JsonFileStorage {
                     .filter_map(|id| {
                         self.load_issue(id)
                             .ok()
-                            .map(|issue| format!("{} | {}", &id[..8], issue.title))
+                            .map(|issue| format!("{} | {}", issue.short_id(), issue.title))
                     })
                     .collect();
                 Err(anyhow!(
