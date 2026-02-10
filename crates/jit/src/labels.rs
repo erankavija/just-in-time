@@ -67,7 +67,6 @@ pub fn validate_label(label: &str) -> Result<()> {
 /// assert_eq!(ns, "milestone");
 /// assert_eq!(val, "v1.0");
 /// ```
-#[allow(dead_code)] // Will be used in Phase 1.4 for query by label
 pub fn parse_label(label: &str) -> Result<(String, String)> {
     validate_label(label)?;
 
@@ -221,6 +220,23 @@ pub fn matches_pattern(issue_labels: &[String], pattern: &str) -> bool {
         // Exact match
         issue_labels.contains(&pattern.to_string())
     }
+}
+
+/// Check if a single label matches a pattern
+///
+/// Convenience wrapper around `matches_pattern` for single label checks.
+///
+/// # Examples
+///
+/// ```
+/// use jit::labels::label_matches;
+///
+/// assert!(label_matches("epic:auth", "epic:auth"));
+/// assert!(label_matches("epic:auth", "epic:*"));
+/// assert!(!label_matches("epic:auth", "milestone:*"));
+/// ```
+pub fn label_matches(label: &str, pattern: &str) -> bool {
+    matches_pattern(&[label.to_string()], pattern)
 }
 
 /// Validate assignee format
@@ -550,5 +566,30 @@ mod tests {
 
         // Pattern with multiple colons
         assert!(!matches_pattern(&labels, "ns:val:extra"));
+    }
+
+    // Tests for label_matches function
+    #[test]
+    fn test_label_matches_exact() {
+        assert!(label_matches("epic:auth", "epic:auth"));
+        assert!(label_matches("type:task", "type:task"));
+        assert!(!label_matches("epic:auth", "epic:other"));
+    }
+
+    #[test]
+    fn test_label_matches_wildcard() {
+        assert!(label_matches("epic:auth", "epic:*"));
+        assert!(label_matches("type:task", "type:*"));
+        assert!(!label_matches("epic:auth", "milestone:*"));
+    }
+
+    #[test]
+    fn test_label_matches_invalid_label() {
+        // Exact match works even for invalid labels (no validation in matching)
+        assert!(label_matches("invalid_no_colon", "invalid_no_colon"));
+
+        // Wildcard won't match invalid labels (parse_label fails)
+        assert!(!label_matches("invalid", "invalid:*"));
+        assert!(!label_matches("Invalid:value", "Invalid:*"));
     }
 }

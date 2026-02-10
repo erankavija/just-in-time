@@ -133,7 +133,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     pub fn query_strategic(&self) -> Result<Vec<Issue>> {
-        use crate::labels as label_utils;
+        use crate::labels;
 
         let namespaces = self.config_manager.get_namespaces()?;
 
@@ -159,12 +159,8 @@ impl<S: IssueStore> CommandExecutor<S> {
             .into_iter()
             .filter(|issue| {
                 // Check if issue has type:X label where X is a strategic type
-                issue.labels.iter().any(|label| {
-                    if let Ok((ns, value)) = label_utils::parse_label(label) {
-                        ns == "type" && strategic_types.contains(&value)
-                    } else {
-                        false
-                    }
+                strategic_types.iter().any(|type_value| {
+                    labels::matches_pattern(&issue.labels, &format!("type:{}", type_value))
                 })
             })
             .collect();
