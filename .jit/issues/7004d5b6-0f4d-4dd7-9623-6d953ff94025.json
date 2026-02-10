@@ -9,7 +9,15 @@
   "gates_required": [],
   "gates_status": {},
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "dev/plans/7004d5b6-reorganize-commands.md",
+      "commit": null,
+      "label": "Implementation Plan",
+      "doc_type": "design",
+      "format": "markdown"
+    }
+  ],
   "labels": [
     "type:task",
     "epic:production-polish",
