@@ -247,7 +247,7 @@ impl Issue {
 ///
 /// Returns only essential fields to reduce token usage. Use `jit issue show`
 /// for full details.
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct MinimalIssue {
     pub id: String,
     pub title: String,
@@ -259,6 +259,31 @@ pub struct MinimalIssue {
     /// Labels for categorization (optional for context)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub labels: Vec<String>,
+}
+
+// Custom serialization to add computed short_id
+impl Serialize for MinimalIssue {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut state = serializer.serialize_struct("MinimalIssue", 7)?;
+        state.serialize_field("id", &self.id)?;
+        state.serialize_field("short_id", &self.short_id())?;
+        state.serialize_field("title", &self.title)?;
+        state.serialize_field("state", &self.state)?;
+        state.serialize_field("priority", &self.priority)?;
+        if let Some(ref assignee) = self.assignee {
+            state.serialize_field("assignee", assignee)?;
+        } else {
+            state.serialize_field("assignee", &None::<String>)?;
+        }
+        if !self.labels.is_empty() {
+            state.serialize_field("labels", &self.labels)?;
+        }
+        state.end()
+    }
 }
 
 impl From<&Issue> for MinimalIssue {

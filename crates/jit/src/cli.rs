@@ -234,6 +234,10 @@ pub enum IssueCommands {
         #[arg(short, long)]
         priority: Option<String>,
 
+        /// Return full issue objects instead of minimal summaries
+        #[arg(long)]
+        full: bool,
+
         #[arg(long)]
         json: bool,
     },

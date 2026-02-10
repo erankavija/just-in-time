@@ -288,20 +288,6 @@ function generateUserSummary(toolName, result) {
 function compactForAssistant(toolName, result) {
   const MAX_ARRAY_ITEMS = 20;
   
-  // Helper to compact an issue object
-  const compactIssue = (issue) => {
-    if (!issue || typeof issue !== 'object') return issue;
-    return {
-      id: issue.id,
-      title: issue.title,
-      state: issue.state,
-      priority: issue.priority,
-      assignee: issue.assignee,
-      labels: issue.labels,
-      // Omit: full description, dependencies list, gates_status details
-    };
-  };
-  
   // Extract command parts
   const parts = toolName.replace('jit_', '').split('_');
   const command = parts[0];
@@ -318,56 +304,8 @@ function compactForAssistant(toolName, result) {
     }
   }
   
-  // For query commands, compact issues and limit count
-  if (command === 'query') {
-    if (result.issues && Array.isArray(result.issues)) {
-      return {
-        count: result.count,
-        filters: result.filters,
-        issues: result.issues.slice(0, MAX_ARRAY_ITEMS).map(compactIssue),
-        truncated: result.issues.length > MAX_ARRAY_ITEMS,
-      };
-    }
-    if (Array.isArray(result)) {
-      return {
-        count: result.length,
-        issues: result.slice(0, MAX_ARRAY_ITEMS).map(compactIssue),
-        truncated: result.length > MAX_ARRAY_ITEMS,
-      };
-    }
-  }
-  
-  // For issue search, compact results
-  if (command === 'issue' && subcommand === 'search') {
-    if (Array.isArray(result)) {
-      return {
-        count: result.length,
-        issues: result.slice(0, MAX_ARRAY_ITEMS).map(compactIssue),
-        truncated: result.length > MAX_ARRAY_ITEMS,
-      };
-    }
-  }
-  
-  // For graph commands, compact issue data
-  if (command === 'graph') {
-    if (result.dependencies && Array.isArray(result.dependencies)) {
-      return {
-        ...result,
-        dependencies: result.dependencies.slice(0, MAX_ARRAY_ITEMS).map(compactIssue),
-        truncated: result.dependencies.length > MAX_ARRAY_ITEMS,
-      };
-    }
-    if (Array.isArray(result)) {
-      return result.slice(0, MAX_ARRAY_ITEMS).map(compactIssue);
-    }
-  }
-  
-  // For issue show, return full description (no truncation needed)
-  if (command === 'issue' && subcommand === 'show') {
-    return result; // Return as-is, MCP can handle long descriptions
-  }
-  
-  // Default: return as-is for small results, truncate large arrays
+  // CLI now returns compact results by default for query and search commands
+  // We just need to truncate large arrays
   if (Array.isArray(result) && result.length > MAX_ARRAY_ITEMS) {
     return {
       count: result.length,
@@ -376,6 +314,16 @@ function compactForAssistant(toolName, result) {
     };
   }
   
+  // For results with .issues array, truncate if needed
+  if (result.issues && Array.isArray(result.issues) && result.issues.length > MAX_ARRAY_ITEMS) {
+    return {
+      ...result,
+      issues: result.issues.slice(0, MAX_ARRAY_ITEMS),
+      truncated: true,
+    };
+  }
+  
+  // Default: pass through as-is
   return result;
 }
 

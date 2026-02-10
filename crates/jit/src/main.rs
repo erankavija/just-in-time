@@ -324,6 +324,7 @@ strategic_types = {}
                     state,
                     assignee,
                     priority,
+                    full,
                     json,
                 } => {
                     let output_ctx = OutputContext::new(quiet, json);
@@ -340,14 +341,25 @@ strategic_types = {}
                         use jit::output::JsonOutput;
                         use serde_json::json;
 
-                        let output = JsonOutput::success(
+                        // Use MinimalIssue unless --full flag is provided
+                        let output_data = if full {
                             json!({
                                 "query": query,
                                 "issues": issues,
                                 "count": issues.len(),
-                            }),
-                            "issue search",
-                        );
+                            })
+                        } else {
+                            use jit::domain::MinimalIssue;
+                            let minimal_issues: Vec<MinimalIssue> =
+                                issues.iter().map(MinimalIssue::from).collect();
+                            json!({
+                                "query": query,
+                                "issues": minimal_issues,
+                                "count": minimal_issues.len(),
+                            })
+                        };
+
+                        let output = JsonOutput::success(output_data, "issue search");
                         println!("{}", output.to_json_string()?);
                     } else {
                         let _ = output_ctx.print_info(format!("Found {} issue(s):", issues.len()));
