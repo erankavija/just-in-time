@@ -304,9 +304,40 @@ pub enum IssueCommands {
     },
 
     /// Break down an issue into subtasks with automatic dependency inheritance
+    /// Break down an issue into subtasks
+    ///
+    /// Creates smaller work items from a larger issue. Subtasks inherit:
+    /// - Parent's non-type labels (epic, milestone, etc.)
+    /// - Parent's dependencies
+    /// - Parent becomes dependent on all subtasks
+    ///
+    /// Gate handling (choose one):
+    /// - Default: No gates (apply manually later)
+    /// - --gate-preset <name>: Apply preset to all subtasks
+    /// - --inherit-gates: Copy parent's gates
+    ///
+    /// Examples:
+    ///   # Break story into tasks (no gates)
+    ///   jit issue breakdown story-123 --child-type task \
+    ///     --subtask "Login" --subtask "Password"
+    ///
+    ///   # Apply rust-tdd preset to all subtasks
+    ///   jit issue breakdown story-123 --child-type task \
+    ///     --gate-preset rust-tdd \
+    ///     --subtask "Login" --subtask "Password"
+    ///
+    ///   # Inherit parent's gates
+    ///   jit issue breakdown story-123 --child-type task \
+    ///     --inherit-gates \
+    ///     --subtask "Login" --subtask "Password"
     Breakdown {
         /// Parent issue ID to break down
         parent_id: String,
+
+        /// Type for child issues (e.g., 'task', 'story', 'bug')
+        /// Must match a type: label value from your hierarchy
+        #[arg(long, required = true)]
+        child_type: String,
 
         /// Subtask titles (use multiple times)
         #[arg(long = "subtask", required = true)]
@@ -315,6 +346,14 @@ pub enum IssueCommands {
         /// Subtask descriptions (optional, must match number of subtasks)
         #[arg(long = "description")]
         subtask_descriptions: Vec<String>,
+
+        /// Apply gate preset to all subtasks
+        #[arg(long, conflicts_with = "inherit_gates")]
+        gate_preset: Option<String>,
+
+        /// Inherit parent's gates to all subtasks
+        #[arg(long, conflicts_with = "gate_preset")]
+        inherit_gates: bool,
 
         /// Output as JSON for machine consumption
         #[arg(long)]

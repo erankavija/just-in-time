@@ -242,17 +242,20 @@ fn test_breakdown_copies_labels_to_subtasks() {
         ("Implement logout".to_string(), "Logout flow".to_string()),
     ];
 
-    let subtask_ids = executor.breakdown_issue(&parent_id, subtasks).unwrap();
+    let subtask_ids = executor
+        .breakdown_issue(&parent_id, "task", subtasks, None)
+        .unwrap();
 
     assert_eq!(subtask_ids.len(), 2);
 
-    // Verify each subtask has parent's labels
+    // Verify each subtask has parent's non-type labels plus type:task
     for subtask_id in subtask_ids {
         let subtask = executor.get_issue(&subtask_id).unwrap();
-        assert_eq!(subtask.labels.len(), 3);
+        assert_eq!(subtask.labels.len(), 4); // milestone, epic, component, type:task
         assert!(subtask.labels.contains(&"milestone:v1.0".to_string()));
         assert!(subtask.labels.contains(&"epic:auth".to_string()));
         assert!(subtask.labels.contains(&"component:backend".to_string()));
+        assert!(subtask.labels.contains(&"type:task".to_string()));
     }
 }
 
@@ -273,7 +276,12 @@ fn test_breakdown_preserves_parent_labels() {
         .unwrap();
 
     executor
-        .breakdown_issue(&parent_id, vec![("Subtask".to_string(), "".to_string())])
+        .breakdown_issue(
+            &parent_id,
+            "task",
+            vec![("Subtask".to_string(), "".to_string())],
+            None,
+        )
         .unwrap();
 
     // Parent should still have its labels
@@ -299,12 +307,18 @@ fn test_breakdown_with_no_labels() {
         .unwrap();
 
     let subtask_ids = executor
-        .breakdown_issue(&parent_id, vec![("Subtask".to_string(), "".to_string())])
+        .breakdown_issue(
+            &parent_id,
+            "task",
+            vec![("Subtask".to_string(), "".to_string())],
+            None,
+        )
         .unwrap();
 
-    // Subtask should have no labels
+    // Subtask should have only type:task label
     let subtask = executor.get_issue(&subtask_ids[0]).unwrap();
-    assert_eq!(subtask.labels.len(), 0);
+    assert_eq!(subtask.labels.len(), 1);
+    assert!(subtask.labels.contains(&"type:task".to_string()));
 }
 
 #[test]
@@ -326,10 +340,12 @@ fn test_breakdown_updates_parent_state() {
     executor
         .breakdown_issue(
             &parent_id,
+            "task",
             vec![
                 ("Subtask 1".to_string(), "".to_string()),
                 ("Subtask 2".to_string(), "".to_string()),
             ],
+            None,
         )
         .unwrap();
 
@@ -358,10 +374,12 @@ fn test_breakdown_creates_dependency_edges() {
     let subtask_ids = executor
         .breakdown_issue(
             &parent_id,
+            "task",
             vec![
                 ("Sub1".to_string(), "".to_string()),
                 ("Sub2".to_string(), "".to_string()),
             ],
+            None,
         )
         .unwrap();
 

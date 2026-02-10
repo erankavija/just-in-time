@@ -601,8 +601,11 @@ strategic_types = {}
                 }
                 IssueCommands::Breakdown {
                     parent_id,
+                    child_type,
                     subtask_titles,
                     subtask_descriptions,
+                    gate_preset,
+                    inherit_gates,
                     json,
                 } => {
                     let output_ctx = OutputContext::new(quiet, json);
@@ -618,23 +621,41 @@ strategic_types = {}
                         .map(|(t, d)| (t.clone(), d.clone()))
                         .collect();
 
-                    let subtask_ids = executor.breakdown_issue(&parent_id, subtasks)?;
+                    let subtask_ids = if inherit_gates {
+                        executor.breakdown_issue_with_inherit(
+                            &parent_id,
+                            &child_type,
+                            subtasks,
+                            true,
+                        )?
+                    } else {
+                        executor.breakdown_issue(
+                            &parent_id,
+                            &child_type,
+                            subtasks,
+                            gate_preset.clone(),
+                        )?
+                    };
 
                     if json {
                         use jit::output::JsonOutput;
                         let response = serde_json::json!({
                             "parent_id": parent_id,
+                            "child_type": child_type,
                             "subtask_ids": subtask_ids,
                             "count": subtask_ids.len(),
-                            "message": format!("Broke down {} into {} subtasks", parent_id, subtask_ids.len())
+                            "gate_preset": gate_preset,
+                            "inherit_gates": inherit_gates,
+                            "message": format!("Broke down {} into {} subtasks of type {}", parent_id, subtask_ids.len(), child_type)
                         });
                         let output = JsonOutput::success(response, "issue breakdown");
                         println!("{}", output.to_json_string()?);
                     } else {
                         let _ = output_ctx.print_info(format!(
-                            "Broke down {} into {} subtasks:",
+                            "Broke down {} into {} subtasks of type {}:",
                             parent_id,
-                            subtask_ids.len()
+                            subtask_ids.len(),
+                            child_type
                         ));
                         for (i, id) in subtask_ids.iter().enumerate() {
                             println!("  {}. {}", i + 1, id);

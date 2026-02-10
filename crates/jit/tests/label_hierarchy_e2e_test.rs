@@ -511,6 +511,8 @@ fn test_breakdown_label_inheritance() {
             "issue",
             "breakdown",
             &epic_id,
+            "--child-type",
+            "task",
             "--subtask",
             "Subtask 1",
             "--subtask",
