@@ -287,15 +287,6 @@ function generateUserSummary(toolName, result) {
  */
 function compactForAssistant(toolName, result) {
   const MAX_ARRAY_ITEMS = 20;
-  const MAX_DESCRIPTION_LENGTH = 200;
-  
-  // Helper to truncate descriptions
-  const truncateDesc = (desc) => {
-    if (!desc || typeof desc !== 'string') return desc;
-    return desc.length > MAX_DESCRIPTION_LENGTH 
-      ? desc.substring(0, MAX_DESCRIPTION_LENGTH) + '...' 
-      : desc;
-  };
   
   // Helper to compact an issue object
   const compactIssue = (issue) => {
@@ -371,12 +362,9 @@ function compactForAssistant(toolName, result) {
     }
   }
   
-  // For issue show, truncate description
+  // For issue show, return full description (no truncation needed)
   if (command === 'issue' && subcommand === 'show') {
-    return {
-      ...result,
-      description: truncateDesc(result.description),
-    };
+    return result; // Return as-is, MCP can handle long descriptions
   }
   
   // Default: return as-is for small results, truncate large arrays
