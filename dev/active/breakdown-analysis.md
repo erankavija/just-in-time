@@ -141,27 +141,139 @@ This is a separate display issue but makes the type:story problem harder to noti
 
 ## Proposed Solutions
 
-### Solution 1: Inherit Gates by Default (Recommended)
+### Solution 1: Use Gate Presets Instead of Inheritance
 
-**Rationale:**
-- Quality standards apply to work at any level
-- Opt-out easier than opt-in (can remove gates if not needed)
-- Matches user expectations ("if story needs tests, tasks need tests")
+**Key insight:** Gate templates/presets are now available (issue 56b7e503 - completed)
+
+**Why not inherit gates by default:**
+- Parent gates may not apply to child work (different scope/granularity)
+- Epic with "security-audit" gate doesn't mean each task needs full security audit
+- Story with "stakeholder-review" gate may not need review on individual tasks
+- Different levels of work often need different quality standards
+
+**Better approach: Use gate presets**
+
+```bash
+# Break down with explicit child type
+jit issue breakdown $STORY --child-type task \
+  --subtask "Login endpoint" \
+  --subtask "Password hashing"
+
+# Apply appropriate gate preset to all subtasks
+jit gate preset apply rust-tdd $SUBTASK1 $SUBTASK2 ...
+
+# Or apply different presets per subtask
+jit gate preset apply rust-tdd $SUBTASK1
+jit gate preset apply minimal $SUBTASK2    # Simpler subtask
+```
+
+**Available presets:**
+- `rust-tdd`: TDD workflow (5 gates: tdd-reminder, tests, clippy, fmt, code-review)
+- `minimal`: Minimal workflow (1 gate: code-review)
+- Custom presets: Users can define in `.jit/config/gate-presets/`
+
+**Advantages:**
+- ✅ More flexible than simple inheritance
+- ✅ Better semantic match for different work types
+- ✅ Leverages existing gate preset infrastructure
+- ✅ User retains full control
+- ✅ Can mix presets for different subtasks
+- ✅ Can customize with --except, --no-precheck, etc.
+
+### Solution 2: Optional --gate-preset Flag
+
+**If we want to make it more ergonomic:**
+
+```bash
+# Break down and apply preset in one command
+jit issue breakdown $STORY --child-type task \
+  --gate-preset rust-tdd \
+  --subtask "Login endpoint" \
+  --subtask "Password hashing"
+
+# Or use parent's gates (opt-in)
+jit issue breakdown $STORY --child-type task \
+  --inherit-gates \
+  --subtask "Login endpoint"
+
+# Or no gates (default)
+jit issue breakdown $STORY --child-type task \
+  --subtask "Login endpoint"
+```
 
 **Implementation:**
 ```rust
-let subtask_id = self.create_issue(
-    title,
-    desc,
-    parent.priority,
-    parent.gates_required.clone(),  // ← Inherit gates
-    parent.labels.clone(),
-)?;
+pub fn breakdown_issue(
+    &self,
+    parent_id: &str,
+    child_type: &str,
+    subtasks: Vec<(String, String)>,
+    gate_option: GateOption,  // ← New parameter
+) -> Result<Vec<String>> {
+    // ... create subtasks with empty gates by default ...
+    
+    // Apply gate option after creation
+    match gate_option {
+        GateOption::None => {},  // Default - no gates
+        GateOption::Inherit => {
+            // Copy parent's gates to each subtask
+            for subtask_id in &subtask_ids {
+                for gate in &parent.gates_required {
+                    self.add_gate_to_issue(subtask_id, gate)?;
+                }
+            }
+        }
+        GateOption::Preset(preset_name) => {
+            // Apply preset to each subtask
+            let preset_manager = PresetManager::new(self.storage.root());
+            let preset = preset_manager.get_preset(&preset_name)?;
+            for subtask_id in &subtask_ids {
+                preset_manager.apply_preset_to_issue(subtask_id, preset)?;
+            }
+        }
+    }
+    
+    Ok(subtask_ids)
+}
 ```
 
-**Breaking change?** Yes, but acceptable pre-1.0
+**CLI flags:**
+```rust
+Breakdown {
+    parent_id: String,
+    
+    #[arg(long, required = true)]
+    child_type: String,
+    
+    #[arg(long)]
+    subtask: Vec<String>,
+    
+    // Gate options (mutually exclusive)
+    #[arg(long, conflicts_with_all = ["inherit_gates"])]
+    gate_preset: Option<String>,
+    
+    #[arg(long, conflicts_with_all = ["gate_preset"])]
+    inherit_gates: bool,
+    
+    // ... rest unchanged
+}
+```
 
-### Solution 2: Require Explicit Child Type (Recommended)
+**Default behavior:** No gates on subtasks (user applies separately)
+
+### Recommendation
+
+**Implement complete solution (not phased):**
+- Add required `--child-type` argument
+- Add optional `--gate-preset <name>` flag
+- Add optional `--inherit-gates` flag (conflicts with --gate-preset)
+- Default: no gates (user must choose explicitly)
+
+**This provides:**
+- ✅ Required explicit child type
+- ✅ Optional preset application for convenience
+- ✅ Optional inheritance for edge cases
+- ✅ Clear default (no gates = explicit choice required)
 
 **Problem with automatic transformation:**
 - Type hierarchy is fully configurable (can have custom types)
@@ -245,51 +357,39 @@ Breakdown {
 
 ## Implementation Plan
 
-### Phase 1: Fix Gate Inheritance (Quick Win)
-
-**Changes:**
-1. Update `breakdown_issue()` to pass `parent.gates_required.clone()`
-2. Update CLI help text to document inheritance behavior
-3. Add test for gate inheritance
-4. Update documentation
-
-**Effort:** ~30 minutes
-**Risk:** Low (purely additive functionality)
-**Breaking:** Yes, but pre-1.0
-
-### Phase 2: Add Required --child-type Argument
+### Complete Implementation (All Features)
 
 **Changes:**
 1. Add `--child-type` as required CLI argument
-2. Update `breakdown_issue()` signature to accept `child_type: &str`
-3. Replace parent's `type:` label with `type:{child_type}`
-4. Preserve all other labels
-5. Add tests for type replacement
-6. Update documentation and error messages
+2. Add `--gate-preset <name>` as optional CLI argument
+3. Add `--inherit-gates` as optional CLI flag
+4. Make --gate-preset and --inherit-gates mutually exclusive
+5. Update `breakdown_issue()` to handle gate options
+6. Replace parent's `type:` label with `type:{child_type}`
+7. Integrate with PresetManager for preset application
+8. Add comprehensive tests
+9. Update documentation
 
-**Effort:** ~1.5 hours
-**Risk:** Low (simple string replacement)
-**Breaking:** Yes - new required argument, but pre-1.0
+**Effort:** ~3 hours
+**Risk:** Medium (integration with preset system)
+**Breaking:** Yes - new required argument (--child-type), but pre-1.0
 
-### Phase 3: Update Documentation
+**Result - Three usage patterns:**
+```bash
+# 1. No gates (default) - apply manually later
+jit issue breakdown $STORY --child-type task \
+  --subtask "A" --subtask "B"
 
-**Changes:**
-1. Update CLI help text with --child-type examples
-2. Update how-to guides that mention breakdown
-3. Add note about explicit type specification
-4. Document gate inheritance behavior
+# 2. Apply preset to all subtasks
+jit issue breakdown $STORY --child-type task \
+  --gate-preset rust-tdd \
+  --subtask "A" --subtask "B"
 
-**Effort:** ~30 minutes
-
-### Phase 4: Quality Gates
-
-**Changes:**
-1. All tests pass
-2. Clippy clean
-3. Format correct
-4. Update dev/active documents with final solution
-
-**Effort:** ~30 minutes
+# 3. Inherit parent's gates
+jit issue breakdown $STORY --child-type task \
+  --inherit-gates \
+  --subtask "A" --subtask "B"
+```
 
 ## Testing Strategy
 
