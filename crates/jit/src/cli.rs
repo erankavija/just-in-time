@@ -205,7 +205,7 @@ pub enum IssueCommands {
         gate: Vec<String>,
 
         /// Labels (format: namespace:value, repeatable)
-        #[arg(short, long)]
+        #[arg(short, long, value_delimiter = ',')]
         label: Vec<String>,
 
         /// Bypass validation warnings
@@ -272,11 +272,11 @@ pub enum IssueCommands {
         state: Option<String>,
 
         /// Add label(s) (format: namespace:value, repeatable)
-        #[arg(short, long)]
+        #[arg(short, long, value_delimiter = ',')]
         label: Vec<String>,
 
         /// Remove label(s) (repeatable)
-        #[arg(long)]
+        #[arg(long, value_delimiter = ',')]
         remove_label: Vec<String>,
 
         /// Add gate(s) to issue (gate keys from registry, repeatable)
@@ -344,11 +344,11 @@ pub enum IssueCommands {
         child_type: String,
 
         /// Subtask titles (use multiple times)
-        #[arg(long = "subtask", required = true)]
+        #[arg(long = "subtask", required = true, value_delimiter = ',')]
         subtask_titles: Vec<String>,
 
         /// Subtask descriptions (optional, must match number of subtasks)
-        #[arg(long = "description")]
+        #[arg(long = "description", value_delimiter = ',')]
         subtask_descriptions: Vec<String>,
 
         /// Apply gate preset to all subtasks
@@ -665,7 +665,7 @@ pub enum PresetCommands {
         no_postcheck: bool,
 
         /// Exclude specific gates (repeatable)
-        #[arg(long)]
+        #[arg(long, value_delimiter = ',')]
         except: Vec<String>,
 
         #[arg(long)]
