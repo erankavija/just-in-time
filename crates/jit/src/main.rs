@@ -1285,6 +1285,217 @@ strategic_types = {}
                     }
                 }
             }
+            GateCommands::Preset(preset_cmd) => match preset_cmd {
+                jit::cli::PresetCommands::List { json } => {
+                    use jit::output::JsonOutput;
+                    match executor.list_gate_presets() {
+                        Ok(presets) => {
+                            if json {
+                                let output = JsonOutput::success(
+                                    serde_json::json!({ "presets": presets }),
+                                    "gate preset list",
+                                );
+                                println!("{}", output.to_json_string()?);
+                            } else if presets.is_empty() {
+                                println!("No gate presets available");
+                            } else {
+                                for preset in presets {
+                                    let source = if preset.builtin {
+                                        "[builtin]"
+                                    } else {
+                                        "[custom]"
+                                    };
+                                    let gate_word = if preset.gate_count == 1 {
+                                        "gate"
+                                    } else {
+                                        "gates"
+                                    };
+                                    println!(
+                                        "{} {} - {} ({} {})",
+                                        source,
+                                        preset.name,
+                                        preset.description,
+                                        preset.gate_count,
+                                        gate_word
+                                    );
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            if json {
+                                use jit::output::JsonError;
+                                let json_error = JsonError::new(
+                                    "PRESET_ERROR",
+                                    e.to_string(),
+                                    "gate preset list",
+                                );
+                                println!("{}", json_error.to_json_string()?);
+                                std::process::exit(json_error.exit_code().code());
+                            } else {
+                                return Err(e);
+                            }
+                        }
+                    }
+                }
+                jit::cli::PresetCommands::Show { name, json } => {
+                    use jit::output::JsonOutput;
+                    match executor.show_gate_preset(&name) {
+                        Ok(preset) => {
+                            if json {
+                                let output = JsonOutput::success(preset, "gate preset show");
+                                println!("{}", output.to_json_string()?);
+                            } else {
+                                println!("Preset: {}", preset.name);
+                                println!("Description: {}", preset.description);
+                                println!("\nGates:");
+                                for gate in &preset.gates {
+                                    let stage_str = match gate.stage {
+                                        jit::domain::GateStage::Precheck => "precheck",
+                                        jit::domain::GateStage::Postcheck => "postcheck",
+                                    };
+                                    let mode_str = match gate.mode {
+                                        jit::domain::GateMode::Manual => "manual",
+                                        jit::domain::GateMode::Auto => "auto",
+                                    };
+                                    println!(
+                                        "  {} - {} ({}:{})",
+                                        gate.key, gate.title, stage_str, mode_str
+                                    );
+                                    if let Some(checker) = &gate.checker {
+                                        match checker {
+                                            jit::domain::GateChecker::Exec {
+                                                command,
+                                                timeout_seconds,
+                                                ..
+                                            } => {
+                                                println!("    Command: {}", command);
+                                                println!("    Timeout: {}s", timeout_seconds);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            if json {
+                                use jit::output::JsonError;
+                                let json_error = JsonError::new(
+                                    "PRESET_ERROR",
+                                    e.to_string(),
+                                    "gate preset show",
+                                );
+                                println!("{}", json_error.to_json_string()?);
+                                std::process::exit(json_error.exit_code().code());
+                            } else {
+                                return Err(e);
+                            }
+                        }
+                    }
+                }
+                jit::cli::PresetCommands::Apply {
+                    name,
+                    ids,
+                    timeout,
+                    no_precheck,
+                    no_postcheck,
+                    except,
+                    json,
+                } => {
+                    use jit::output::JsonOutput;
+
+                    let mut results = Vec::new();
+                    let mut errors = Vec::new();
+
+                    for id in &ids {
+                        match executor.apply_gate_preset(
+                            id,
+                            &name,
+                            timeout,
+                            no_precheck,
+                            no_postcheck,
+                            &except,
+                        ) {
+                            Ok(result) => {
+                                results.push((id.clone(), result));
+                            }
+                            Err(e) => {
+                                errors.push((id.clone(), e.to_string()));
+                            }
+                        }
+                    }
+
+                    if json {
+                        let output = JsonOutput::success(
+                            serde_json::json!({
+                                "preset": name,
+                                "success": results.iter().map(|(id, r)| {
+                                    serde_json::json!({
+                                        "issue_id": id,
+                                        "gates_added": r.added,
+                                        "already_existed": r.already_exist
+                                    })
+                                }).collect::<Vec<_>>(),
+                                "errors": errors.iter().map(|(id, e)| {
+                                    serde_json::json!({
+                                        "issue_id": id,
+                                        "error": e
+                                    })
+                                }).collect::<Vec<_>>()
+                            }),
+                            "gate preset apply",
+                        );
+                        println!("{}", output.to_json_string()?);
+                    } else {
+                        if !results.is_empty() {
+                            println!("Applied preset '{}' to {} issue(s):", name, results.len());
+                            for (id, result) in &results {
+                                println!("  {} - gates added: {}", id, result.added.join(", "));
+                            }
+                        }
+                        if !errors.is_empty() {
+                            eprintln!("\nErrors ({}):", errors.len());
+                            for (id, error) in &errors {
+                                eprintln!("  {} - {}", id, error);
+                            }
+                            std::process::exit(1);
+                        }
+                    }
+                }
+                jit::cli::PresetCommands::Create {
+                    from_issue,
+                    name,
+                    json,
+                } => {
+                    use jit::output::JsonOutput;
+                    match executor.create_gate_preset(&name, &from_issue) {
+                        Ok(path) => {
+                            if json {
+                                let output = JsonOutput::success(
+                                    serde_json::json!({ "name": name, "path": path.display().to_string() }),
+                                    "gate preset create",
+                                );
+                                println!("{}", output.to_json_string()?);
+                            } else {
+                                println!("Created preset '{}' at {}", name, path.display());
+                            }
+                        }
+                        Err(e) => {
+                            if json {
+                                use jit::output::JsonError;
+                                let json_error = JsonError::new(
+                                    "PRESET_ERROR",
+                                    e.to_string(),
+                                    "gate preset create",
+                                );
+                                println!("{}", json_error.to_json_string()?);
+                                std::process::exit(json_error.exit_code().code());
+                            } else {
+                                return Err(e);
+                            }
+                        }
+                    }
+                }
+            },
         },
         Commands::Graph(graph_cmd) => match graph_cmd {
             GraphCommands::Deps { id, depth, json } => {

@@ -182,6 +182,30 @@ pub trait IssueStore: Clone {
     /// For file-based storage, this is the .jit directory.
     /// For in-memory storage, this returns a temporary path.
     fn root(&self) -> &std::path::Path;
+
+    /// List all available gate presets (builtin and custom).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if presets cannot be loaded.
+    fn list_gate_presets(&self) -> Result<Vec<crate::gate_presets::PresetInfo>>;
+
+    /// Get a specific gate preset by name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the preset is not found or cannot be loaded.
+    fn get_gate_preset(&self, name: &str) -> Result<crate::gate_presets::GatePresetDefinition>;
+
+    /// Save a custom gate preset.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the preset cannot be saved.
+    fn save_gate_preset(
+        &self,
+        preset: &crate::gate_presets::GatePresetDefinition,
+    ) -> Result<std::path::PathBuf>;
 }
 
 #[cfg(test)]

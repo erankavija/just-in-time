@@ -366,6 +366,148 @@ impl<S: IssueStore> CommandExecutor<S> {
             .cloned()
             .ok_or_else(|| anyhow!("Gate '{}' not found", key))
     }
+
+    // Preset management methods
+
+    pub fn list_gate_presets(&self) -> Result<Vec<crate::gate_presets::PresetInfo>> {
+        self.storage.list_gate_presets()
+    }
+
+    pub fn show_gate_preset(
+        &self,
+        name: &str,
+    ) -> Result<crate::gate_presets::GatePresetDefinition> {
+        self.storage.get_gate_preset(name)
+    }
+
+    pub fn apply_gate_preset(
+        &self,
+        issue_id: &str,
+        preset_name: &str,
+        timeout_override: Option<u64>,
+        skip_precheck: bool,
+        skip_postcheck: bool,
+        except_gates: &[String],
+    ) -> Result<GateAddResult> {
+        use crate::domain::{GateChecker, GateStage};
+
+        let full_id = self.storage.resolve_issue_id(issue_id)?;
+
+        // Require active lease for structural operations
+        self.require_active_lease(&full_id)?;
+
+        // Load preset
+        let preset = self.storage.get_gate_preset(preset_name)?;
+
+        // Filter gates based on options
+        let gates_to_apply: Vec<_> = preset
+            .gates
+            .iter()
+            .filter(|g| {
+                // Skip prechecks if requested
+                if skip_precheck && g.stage == GateStage::Precheck {
+                    return false;
+                }
+                // Skip postchecks if requested
+                if skip_postcheck && g.stage == GateStage::Postcheck {
+                    return false;
+                }
+                // Skip excepted gates
+                if except_gates.contains(&g.key) {
+                    return false;
+                }
+                true
+            })
+            .collect();
+
+        if gates_to_apply.is_empty() {
+            return Err(anyhow!("No gates to apply after filtering"));
+        }
+
+        // First, define gates in registry if they don't exist
+        let mut registry = self.storage.load_gate_registry()?;
+        for gate_template in &gates_to_apply {
+            let mut gate = gate_template.to_gate();
+
+            // Apply timeout override if specified
+            if let Some(timeout) = timeout_override {
+                if let Some(checker) = &mut gate.checker {
+                    match checker {
+                        GateChecker::Exec {
+                            timeout_seconds, ..
+                        } => {
+                            *timeout_seconds = timeout;
+                        }
+                    }
+                }
+            }
+
+            // Add to registry (update if exists and timeout override specified, or add if new)
+            if timeout_override.is_some() || !registry.gates.contains_key(&gate.key) {
+                registry.gates.insert(gate.key.clone(), gate);
+            }
+        }
+
+        // Save updated registry
+        self.storage.save_gate_registry(&registry)?;
+
+        // Now add gates to issue
+        let gate_keys: Vec<String> = gates_to_apply.iter().map(|g| g.key.clone()).collect();
+        self.add_gates(issue_id, &gate_keys)
+    }
+
+    pub fn create_gate_preset(
+        &self,
+        preset_name: &str,
+        from_issue_id: &str,
+    ) -> Result<std::path::PathBuf> {
+        use crate::gate_presets::{GatePresetDefinition, GateTemplate};
+
+        // Validate preset name
+        if preset_name.is_empty() {
+            return Err(anyhow!("Preset name cannot be empty"));
+        }
+        if crate::gate_presets::BuiltinPresets::names().contains(&preset_name.to_string()) {
+            return Err(anyhow!("Cannot override builtin preset: {}", preset_name));
+        }
+
+        let full_id = self.storage.resolve_issue_id(from_issue_id)?;
+        let issue = self.storage.load_issue(&full_id)?;
+
+        if issue.gates_required.is_empty() {
+            return Err(anyhow!("Issue has no gates to create preset from"));
+        }
+
+        // Load gate definitions from registry
+        let registry = self.storage.load_gate_registry()?;
+        let mut gates = Vec::new();
+
+        for gate_key in &issue.gates_required {
+            let gate = registry
+                .gates
+                .get(gate_key)
+                .ok_or_else(|| anyhow!("Gate not found in registry: {}", gate_key))?;
+
+            gates.push(GateTemplate {
+                key: gate.key.clone(),
+                title: gate.title.clone(),
+                description: gate.description.clone(),
+                stage: gate.stage,
+                mode: gate.mode,
+                checker: gate.checker.clone(),
+            });
+        }
+
+        // Create preset
+        let preset = GatePresetDefinition {
+            name: preset_name.to_string(),
+            description: format!("Custom preset created from issue {}", issue.short_id()),
+            gates,
+        };
+
+        // Save preset via storage
+        self.storage.save_gate_preset(&preset)
+    }
 }
 
 #[cfg(test)]

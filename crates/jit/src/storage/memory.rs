@@ -202,6 +202,40 @@ impl IssueStore for InMemoryStorage {
             .cloned()
             .collect())
     }
+
+    fn list_gate_presets(&self) -> Result<Vec<crate::gate_presets::PresetInfo>> {
+        // InMemoryStorage only supports builtin presets (no custom presets in tests)
+        let presets = crate::gate_presets::BuiltinPresets::load()?;
+        let builtin_names = crate::gate_presets::BuiltinPresets::names();
+
+        Ok(presets
+            .values()
+            .map(|preset| crate::gate_presets::PresetInfo {
+                name: preset.name.clone(),
+                description: preset.description.clone(),
+                gate_count: preset.gates.len(),
+                builtin: builtin_names.contains(&preset.name),
+            })
+            .collect())
+    }
+
+    fn get_gate_preset(&self, name: &str) -> Result<crate::gate_presets::GatePresetDefinition> {
+        let presets = crate::gate_presets::BuiltinPresets::load()?;
+        presets
+            .get(name)
+            .cloned()
+            .ok_or_else(|| anyhow!("Preset not found: {}", name))
+    }
+
+    fn save_gate_preset(
+        &self,
+        _preset: &crate::gate_presets::GatePresetDefinition,
+    ) -> Result<std::path::PathBuf> {
+        // InMemoryStorage doesn't support saving custom presets
+        Err(anyhow!(
+            "InMemoryStorage does not support saving custom presets"
+        ))
+    }
 }
 
 #[cfg(test)]

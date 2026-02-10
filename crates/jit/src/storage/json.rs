@@ -627,6 +627,38 @@ impl IssueStore for JsonFileStorage {
     fn root(&self) -> &Path {
         &self.root
     }
+
+    fn list_gate_presets(&self) -> Result<Vec<crate::gate_presets::PresetInfo>> {
+        let manager = crate::gate_presets::PresetManager::new(self.root.clone())?;
+        Ok(manager.list_presets())
+    }
+
+    fn get_gate_preset(&self, name: &str) -> Result<crate::gate_presets::GatePresetDefinition> {
+        let manager = crate::gate_presets::PresetManager::new(self.root.clone())?;
+        let preset = manager.get_preset(name)?;
+        Ok(preset.clone())
+    }
+
+    fn save_gate_preset(
+        &self,
+        preset: &crate::gate_presets::GatePresetDefinition,
+    ) -> Result<std::path::PathBuf> {
+        use std::fs;
+
+        // Validate preset
+        preset.validate()?;
+
+        // Create presets directory if needed
+        let presets_dir = self.root.join("config").join("gate-presets");
+        fs::create_dir_all(&presets_dir)?;
+
+        // Save preset
+        let preset_path = presets_dir.join(format!("{}.json", preset.name));
+        let json = serde_json::to_string_pretty(&preset)?;
+        fs::write(&preset_path, json)?;
+
+        Ok(preset_path)
+    }
 }
 
 #[cfg(test)]

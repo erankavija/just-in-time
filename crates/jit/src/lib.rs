@@ -12,6 +12,7 @@ pub mod document;
 pub mod domain;
 pub mod errors;
 pub mod gate_execution;
+pub mod gate_presets;
 pub mod graph;
 pub mod hierarchy_templates;
 pub mod labels;

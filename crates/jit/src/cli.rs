@@ -568,6 +568,86 @@ pub enum GateCommands {
         #[arg(long)]
         json: bool,
     },
+
+    /// Gate preset management
+    #[command(subcommand)]
+    Preset(PresetCommands),
+}
+
+#[derive(Subcommand)]
+pub enum PresetCommands {
+    /// List available gate presets
+    List {
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Show preset details
+    Show {
+        /// Preset name
+        name: String,
+
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Apply preset gates to issues
+    ///
+    /// Presets are pre-configured bundles of quality gates that can be quickly
+    /// applied to one or more issues. Gates from the preset are added to the issue's
+    /// required gates. Use 'jit gate preset list' to see available presets.
+    ///
+    /// Examples:
+    ///   jit gate preset apply rust-tdd abc123           # Single issue
+    ///   jit gate preset apply minimal abc123 def456     # Multiple issues  
+    ///   jit query all | xargs jit gate preset apply rust-tdd  # From query
+    ///   jit gate preset apply rust-tdd abc123 --except clippy # Skip specific gates
+    Apply {
+        /// Preset name
+        name: String,
+
+        /// Issue ID(s) - can specify multiple
+        ids: Vec<String>,
+
+        /// Override checker timeout (seconds)
+        #[arg(long)]
+        timeout: Option<u64>,
+
+        /// Skip precheck gates
+        #[arg(long, default_value_t = false)]
+        no_precheck: bool,
+
+        /// Skip postcheck gates
+        #[arg(long, default_value_t = false)]
+        no_postcheck: bool,
+
+        /// Exclude specific gates (repeatable)
+        #[arg(long)]
+        except: Vec<String>,
+
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Create custom preset from issue gates
+    ///
+    /// Captures all gates currently required by an issue and saves them as a
+    /// custom preset. The preset is stored in .jit/config/gate-presets/ and can
+    /// be applied to other issues.
+    ///
+    /// Examples:
+    ///   jit gate preset create abc123 my-workflow      # Create from issue
+    ///   jit gate preset create abc123 team-standard    # Reusable preset
+    Create {
+        /// Issue ID to copy gates from
+        from_issue: String,
+
+        /// Preset name
+        name: String,
+
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Subcommand)]
