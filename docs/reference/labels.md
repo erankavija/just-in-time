@@ -328,8 +328,10 @@ jit label suggest <id>
 jit issue update <id> --label "epic:auth"
 # If already present, no error (idempotent)
 
-# Add multiple labels atomically
-jit issue update <id> --labels "epic:auth,component:backend,type:feature"
+# Add multiple labels atomically (comma-separated)
+jit issue update <id> --label epic:auth,component:backend,type:feature
+# Or use repeated flags
+jit issue update <id> --label epic:auth --label component:backend --label type:feature
 # All or nothing - if any invalid, none added
 
 # Replace label in namespace

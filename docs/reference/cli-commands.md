@@ -645,6 +645,36 @@ npx @modelcontextprotocol/inspector
 
 ## Global Options
 
+### Multi-Value Arguments
+
+**Flagged arguments** (e.g., `--label`, `--gate`) support **both** comma-separated and repeated flags:
+
+```bash
+# Comma-separated (compact)
+jit issue create --title "Task" --label epic:auth,type:task,component:core
+
+# Repeated flags (explicit)
+jit issue create --title "Task" --label epic:auth --label type:task --label component:core
+
+# Mixed (also works)
+jit issue create --title "Task" --label epic:auth,type:task --label component:core
+```
+
+**Applies to:** `--label`, `--gate`, `--add-gate`, `--remove-label`, `--remove-gate`, `--subtask`, `--description`, `--except`
+
+**Positional arguments** (e.g., `jit gate add <id> <gates>...`, `jit dep add <from> <to>...`) are **space-separated only**:
+
+```bash
+# Correct: space-separated positional args
+jit gate add abc123 tests clippy fmt
+jit dep add epic123 task1 task2 task3
+
+# Incorrect: comma-separated positional args (will fail)
+jit gate add abc123 tests,clippy,fmt  ❌
+```
+
+This follows industry standard (cargo, kubectl, git).
+
 ### `--json`
 Output data in JSON format for machine consumption.
 
