@@ -298,21 +298,257 @@ jit issue update $ISSUE --state done
 
 ## Gate Presets and Templates
 
-Common gate configurations for typical workflows.
+Gate presets are pre-configured bundles of quality gates that dramatically reduce setup time. Instead of defining and adding gates individually, apply entire workflows in seconds.
 
-### Software Development (Rust)
+### Using Builtin Presets
+
+JIT includes two builtin presets for common workflows:
+
+**List available presets:**
+```bash
+jit gate preset list
+```
+
+**Output:**
+```
+[builtin] rust-tdd - Test-driven development workflow for Rust projects (5 gates)
+[builtin] minimal - Minimal workflow with just code review (1 gate)
+```
+
+**View preset details:**
+```bash
+jit gate preset show rust-tdd
+```
+
+**Output:**
+```
+Preset: rust-tdd
+Description: Test-driven development workflow for Rust projects
+
+Gates:
+  tdd-reminder - Write tests first (TDD) (precheck:manual)
+  tests - All tests pass (postcheck:auto)
+    Command: cargo test
+    Timeout: 300s
+  clippy - Clippy lints pass (postcheck:auto)
+    Command: cargo clippy --all-targets -- -D warnings
+    Timeout: 120s
+  fmt - Code formatted (postcheck:auto)
+    Command: cargo fmt --check
+    Timeout: 30s
+  code-review - Code review completed (postcheck:manual)
+```
+
+**Apply preset to issue:**
+```bash
+# Create issue
+jit issue create --title "Implement user authentication"
+
+# Apply rust-tdd preset (adds all 5 gates at once)
+jit gate preset apply rust-tdd abc123
+```
+
+**Done!** The issue now has:
+- TDD reminder (precheck)
+- Tests, clippy, fmt (automated postchecks)
+- Code review (manual postcheck)
+
+### Customizing Preset Application
+
+Filter which gates to apply using command options:
+
+**Skip precheck gates:**
+```bash
+# For hotfixes or situations where TDD isn't required
+jit gate preset apply rust-tdd abc123 --no-precheck
+# Adds: tests, clippy, fmt, code-review (skips tdd-reminder)
+```
+
+**Skip postcheck gates:**
+```bash
+# For planning or precheck-only workflows
+jit gate preset apply rust-tdd abc123 --no-postcheck
+# Adds: tdd-reminder only
+```
+
+**Exclude specific gates:**
+```bash
+# Skip clippy if not using linter
+jit gate preset apply rust-tdd abc123 --except clippy
+
+# Skip multiple gates
+jit gate preset apply rust-tdd abc123 --except clippy --except fmt
+# Adds: tdd-reminder, tests, code-review
+```
+
+**Override timeouts:**
+```bash
+# Increase timeout for slow CI
+jit gate preset apply rust-tdd abc123 --timeout 600
+# All automated gates get 600s timeout instead of defaults
+```
+
+**Combine filters:**
+```bash
+# Hotfix workflow: no precheck, no linter, fast timeout
+jit gate preset apply rust-tdd abc123 --no-precheck --except clippy --timeout 60
+# Adds: tests (60s), fmt (60s), code-review
+```
+
+### Batch Operations
+
+Apply presets to multiple issues at once:
+
+**Multiple issues directly:**
+```bash
+jit gate preset apply minimal abc123 def456 ghi789
+# Applies to all three issues
+```
+
+**From query results:**
+```bash
+# Apply to all issues in an epic
+jit query all --filter "label:epic:auth" | xargs jit gate preset apply rust-tdd
+
+# Apply to all ready issues
+jit query available | xargs jit gate preset apply minimal
+```
+
+### Creating Custom Presets
+
+Capture your team's workflow as a reusable preset:
+
+**Step 1: Configure one issue perfectly**
+```bash
+# Create issue and add desired gates
+jit issue create --title "Reference issue"
+jit gate add abc123 tests clippy code-review docs security-scan
+
+# Or apply builtin and customize
+jit gate preset apply rust-tdd abc123 --except fmt
+jit gate add abc123 security-scan
+```
+
+**Step 2: Save as custom preset**
+```bash
+jit gate preset create abc123 team-standard
+```
+
+**Output:**
+```
+Created preset 'team-standard' at .jit/config/gate-presets/team-standard.json
+```
+
+**Step 3: Use everywhere**
+```bash
+# List shows custom preset
+jit gate preset list
+# [custom] team-standard - Custom preset created from issue abc123 (5 gates)
+
+# Apply to any issue
+jit gate preset apply team-standard def456
+```
+
+### Custom Preset Storage
+
+Custom presets are stored as JSON files in `.jit/config/gate-presets/`:
 
 ```bash
-# Test suite
+# View custom preset file
+cat .jit/config/gate-presets/team-standard.json
+```
+
+```json
+{
+  "name": "team-standard",
+  "description": "Custom preset created from issue abc123",
+  "gates": [
+    {
+      "key": "tests",
+      "title": "All tests pass",
+      "description": "cargo test must pass",
+      "stage": "postcheck",
+      "mode": "auto",
+      "checker": {
+        "type": "exec",
+        "command": "cargo test",
+        "timeout_seconds": 300,
+        "working_dir": null,
+        "env": {}
+      }
+    },
+    ...
+  ]
+}
+```
+
+**Managing custom presets:**
+- Edit JSON files directly for fine-tuning
+- Delete files to remove presets
+- Share files with team via git
+- Custom presets override builtin with same name
+
+### Practical Workflows
+
+**Quick Start New Issue:**
+```bash
+jit issue create --title "New feature"
+jit gate preset apply rust-tdd $ISSUE_ID
+# Ready to work with full quality pipeline
+```
+
+**Team Onboarding:**
+```bash
+# Document team standards
+jit gate preset create reference-issue team-workflow
+
+# Team members apply to their issues
+jit gate preset apply team-workflow their-issue
+# Instant consistency across team
+```
+
+**Different Requirements by Type:**
+```bash
+# Full workflow for features
+jit gate preset apply rust-tdd feature-issue
+
+# Minimal for docs
+jit gate preset apply minimal doc-issue --except code-review
+jit gate add doc-issue spell-check
+
+# Custom for infrastructure
+jit gate preset apply team-infra infra-issue
+```
+
+**Migration from Manual Setup:**
+```bash
+# Old way (slow, error-prone):
+jit gate define tests --mode auto --checker-command "cargo test" ...
+jit gate define clippy --mode auto --checker-command "cargo clippy" ...
+jit gate define fmt --mode auto --checker-command "cargo fmt --check" ...
+jit gate add $ISSUE tests clippy fmt code-review
+# 4+ commands, easy to forget gates
+
+# New way (fast, consistent):
+jit gate preset apply rust-tdd $ISSUE
+# 1 command, guaranteed completeness
+```
+
+### Comparing with Manual Gate Definitions
+
+Below shows the manual approach for reference, but **use presets instead** for consistency and speed:
+
+**Manual approach (old):**
+```bash
+# Define each gate individually
 jit gate define tests \
-  --title "Tests Pass" \
-  --description "cargo test --lib must pass" \
+  --title "All Tests Pass" \
+  --description "cargo test must pass" \
   --stage postcheck \
   --mode auto \
   --checker-command "cargo test --lib" \
   --timeout 300
 
-# Linter
 jit gate define clippy \
   --title "Clippy Clean" \
   --description "No clippy warnings" \
@@ -321,156 +557,24 @@ jit gate define clippy \
   --checker-command "cargo clippy --all-targets -- -D warnings" \
   --timeout 120
 
-# Formatter
-jit gate define fmt \
-  --title "Code Formatted" \
-  --description "cargo fmt check" \
-  --stage postcheck \
-  --mode auto \
-  --checker-command "cargo fmt --check" \
-  --timeout 30
+# ... repeat for each gate
 
-# Code review
-jit gate define code-review \
-  --title "Code Review" \
-  --description "Another developer reviewed code" \
-  --stage postcheck \
-  --mode manual
+# Add to each issue
+jit gate add $ISSUE tests clippy fmt code-review
 ```
 
-### TDD Workflow
-
+**Preset approach (new):**
 ```bash
-# Precheck: Tests exist
-jit gate define tdd-precheck \
-  --title "Tests Written First" \
-  --description "Verify tests exist before implementation" \
-  --stage precheck \
-  --mode manual
-
-# Postcheck: Tests pass
-jit gate define tests \
-  --title "Tests Pass" \
-  --description "All tests must pass" \
-  --stage postcheck \
-  --mode auto \
-  --checker-command "cargo test" \
-  --timeout 300
+# One command
+jit gate preset apply rust-tdd $ISSUE
 ```
 
-### Documentation Requirements
-
-```bash
-jit gate define docs \
-  --title "Documentation Complete" \
-  --description "User docs and code comments updated" \
-  --stage postcheck \
-  --mode manual
-
-jit gate define doc-tests \
-  --title "Doc Tests Pass" \
-  --description "Documentation examples compile and run" \
-  --stage postcheck \
-  --mode auto \
-  --checker-command "cargo test --doc" \
-  --timeout 60
-```
-
-### CI/CD Integration
-
-```bash
-# Build verification
-jit gate define build \
-  --title "Build Succeeds" \
-  --description "Release build must succeed" \
-  --stage postcheck \
-  --mode auto \
-  --checker-command "cargo build --release" \
-  --timeout 600
-
-# Security audit
-jit gate define audit \
-  --title "Security Audit" \
-  --description "cargo audit finds no vulnerabilities" \
-  --stage postcheck \
-  --mode auto \
-  --checker-command "cargo audit" \
-  --timeout 60
-```
-
-### Beyond Software Development
-
-Gates are domain-agnostic. Examples for other workflows:
-
-**Research Projects:**
-```bash
-# Literature review gate
-jit gate define lit-review \
-  --title "Literature Review Complete" \
-  --description "Relevant papers reviewed and cited" \
-  --stage precheck \
-  --mode manual
-
-# Peer review
-jit gate define peer-review \
-  --title "Peer Review" \
-  --description "Research findings reviewed by colleague" \
-  --stage postcheck \
-  --mode manual
-
-# Data validation
-jit gate define data-check \
-  --title "Data Validated" \
-  --description "Check data quality and completeness" \
-  --stage postcheck \
-  --mode auto \
-  --checker-command "python scripts/validate_data.py"
-```
-
-**Writing Projects:**
-```bash
-# Outline approval
-jit gate define outline-approved \
-  --title "Outline Approved" \
-  --description "Editor approved chapter outline" \
-  --stage precheck \
-  --mode manual
-
-# Spell check
-jit gate define spellcheck \
-  --title "Spell Check" \
-  --description "No spelling errors found" \
-  --stage postcheck \
-  --mode auto \
-  --checker-command "aspell check manuscript.md"
-
-# Word count target
-jit gate define wordcount \
-  --title "Word Count Met" \
-  --description "Chapter meets minimum word count" \
-  --stage postcheck \
-  --mode auto \
-  --checker-command "test $(wc -w < chapter.md) -ge 2000"
-```
-
-**General Knowledge Work:**
-```bash
-# Fact-checking
-jit gate define factcheck \
-  --title "Facts Verified" \
-  --description "All claims verified against sources" \
-  --stage postcheck \
-  --mode manual
-
-# Feedback incorporated
-jit gate define feedback \
-  --title "Feedback Incorporated" \
-  --description "Stakeholder feedback addressed" \
-  --stage postcheck \
-  --mode manual
-```
-
-The gate system adapts to any workflow requiring quality checkpoints.
+**Benefits:**
+- **10x faster**: 1 command vs 10+ commands
+- **No mistakes**: Preset definitions are tested and proven
+- **Consistent**: Same gates on every issue
+- **Shareable**: Team uses identical workflows
+- **Customizable**: Filter options for special cases
 
 ## Common Workflows
 

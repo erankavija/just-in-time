@@ -1036,6 +1036,271 @@ All gate commands use standard exit codes:
 - `2` - Validation error (cannot add duplicate gate, etc.)
 - `4` - Gate check failed (for `jit gate check` when checker returns non-zero)
 
+## Gate Preset Commands
+
+Gate presets are pre-configured bundles of quality gates that can be quickly applied to issues. Presets encode best practices and reduce setup time from minutes to seconds.
+
+### `jit gate preset list`
+
+List all available gate presets (builtin and custom).
+
+**Usage:**
+```bash
+jit gate preset list [--json]
+```
+
+**Output:**
+```
+[builtin] rust-tdd - Test-driven development workflow for Rust projects (5 gates)
+[builtin] minimal - Minimal workflow with just code review (1 gate)
+[custom] my-workflow - Custom preset created from issue abc123 (3 gates)
+```
+
+**Example:**
+```bash
+# List all presets
+jit gate preset list
+
+# JSON output
+jit gate preset list --json
+```
+
+### `jit gate preset show`
+
+Display detailed information about a specific preset, including all gates and their configurations.
+
+**Usage:**
+```bash
+jit gate preset show <NAME> [--json]
+```
+
+**Arguments:**
+- `NAME` - Preset name (e.g., `rust-tdd`, `minimal`)
+
+**Output:**
+```
+Preset: rust-tdd
+Description: Test-driven development workflow for Rust projects
+
+Gates:
+  tdd-reminder - Write tests first (TDD) (precheck:manual)
+  tests - All tests pass (postcheck:auto)
+    Command: cargo test
+    Timeout: 300s
+  clippy - Clippy lints pass (postcheck:auto)
+    Command: cargo clippy --all-targets -- -D warnings
+    Timeout: 120s
+  fmt - Code formatted (postcheck:auto)
+    Command: cargo fmt --check
+    Timeout: 30s
+  code-review - Code review completed (postcheck:manual)
+```
+
+**Examples:**
+```bash
+# Show preset details
+jit gate preset show rust-tdd
+
+# Show custom preset
+jit gate preset show my-workflow
+
+# JSON output
+jit gate preset show rust-tdd --json
+```
+
+### `jit gate preset apply`
+
+Apply preset gates to one or more issues. Gates from the preset are added to the issue's required gates list. If a gate doesn't exist in the registry, it is automatically defined.
+
+**Usage:**
+```bash
+jit gate preset apply <NAME> <ISSUE_ID>... [OPTIONS]
+```
+
+**Arguments:**
+- `NAME` - Preset name to apply
+- `ISSUE_ID...` - One or more issue IDs (can specify multiple for batch operations)
+
+**Options:**
+- `--timeout <SECONDS>` - Override checker timeout for all automated gates
+- `--no-precheck` - Skip precheck gates from preset
+- `--no-postcheck` - Skip postcheck gates from preset
+- `--except <GATE>` - Exclude specific gates (repeatable)
+- `--json` - Output JSON format
+- `--quiet` - Suppress non-essential output
+
+**Examples:**
+```bash
+# Apply preset to single issue
+jit gate preset apply rust-tdd abc123
+
+# Apply to multiple issues (batch mode)
+jit gate preset apply minimal abc123 def456 ghi789
+
+# Apply from query results
+jit query all | xargs jit gate preset apply rust-tdd
+
+# Apply with filtering - skip precheck gates
+jit gate preset apply rust-tdd abc123 --no-precheck
+
+# Skip specific gates
+jit gate preset apply rust-tdd abc123 --except clippy --except fmt
+
+# Override timeout for all automated gates
+jit gate preset apply rust-tdd abc123 --timeout 600
+
+# Combine filters
+jit gate preset apply rust-tdd abc123 --no-precheck --except clippy --timeout 120
+```
+
+**Batch Output:**
+```
+Applied preset 'rust-tdd' to 2 issue(s):
+  abc123 - gates added: tdd-reminder, tests, clippy, fmt, code-review
+  def456 - gates added: tdd-reminder, tests, clippy, fmt, code-review
+
+Errors (1):
+  xyz999 - Issue not found: xyz999
+```
+
+**Notes:**
+- Gates are automatically added to registry if they don't exist
+- Timeout override applies to all automated gates in the preset
+- Exit code is 1 if any errors occur in batch mode
+- Use `--json` for machine-readable output
+
+### `jit gate preset create`
+
+Create a custom preset from an issue's current gates. Captures all gates required by the issue and saves them as a reusable preset.
+
+**Usage:**
+```bash
+jit gate preset create <ISSUE_ID> <NAME> [--json]
+```
+
+**Arguments:**
+- `ISSUE_ID` - Issue to copy gates from
+- `NAME` - Name for the new preset
+
+**Options:**
+- `--json` - Output JSON format
+- `--quiet` - Suppress non-essential output
+
+**Output:**
+```
+Created preset 'my-workflow' at /path/to/.jit/config/gate-presets/my-workflow.json
+```
+
+**Examples:**
+```bash
+# Create preset from issue
+jit gate preset create abc123 my-workflow
+
+# Create team standard
+jit gate preset create abc123 team-standard
+
+# JSON output
+jit gate preset create abc123 my-workflow --json
+```
+
+**Validation:**
+- Issue must have at least one gate
+- Cannot override builtin presets (rust-tdd, minimal)
+- Preset name must be valid (no special characters)
+
+**Storage:**
+Custom presets are stored in `.jit/config/gate-presets/<name>.json` and are automatically loaded alongside builtin presets.
+
+### Builtin Presets
+
+JIT includes two builtin presets embedded in the binary:
+
+**`rust-tdd`** - Test-driven development workflow for Rust (5 gates)
+- `tdd-reminder` - Manual reminder to write tests first (precheck)
+- `tests` - Automated test suite check (postcheck, 300s timeout)
+- `clippy` - Automated linter check (postcheck, 120s timeout)
+- `fmt` - Automated formatter check (postcheck, 30s timeout)
+- `code-review` - Manual code review requirement (postcheck)
+
+**`minimal`** - Minimal workflow with just code review (1 gate)
+- `code-review` - Manual code review requirement (postcheck)
+
+**Note:** Builtin presets cannot be overridden. To customize, create a new preset with `jit gate preset create` or apply with filtering options.
+
+### Custom Presets
+
+Custom presets are stored as JSON files in `.jit/config/gate-presets/`:
+
+**File Structure:**
+```json
+{
+  "name": "my-workflow",
+  "description": "Custom preset created from issue abc123",
+  "gates": [
+    {
+      "key": "tests",
+      "title": "All tests pass",
+      "description": "cargo test must pass",
+      "stage": "postcheck",
+      "mode": "auto",
+      "checker": {
+        "type": "exec",
+        "command": "cargo test",
+        "timeout_seconds": 300,
+        "working_dir": null,
+        "env": {}
+      }
+    }
+  ]
+}
+```
+
+**Management:**
+- Custom presets appear in `jit gate preset list` with `[custom]` indicator
+- Custom presets override builtin presets with the same name
+- Edit JSON files directly or recreate with `jit gate preset create`
+- Delete files to remove custom presets
+
+### Preset Workflow Examples
+
+**Quick Start with Builtin:**
+```bash
+# Apply standard workflow to new issue
+jit issue create --title "Add user login"
+jit gate preset apply rust-tdd abc123
+# Issue now has all 5 quality gates
+```
+
+**Create Team Standard:**
+```bash
+# Set up one issue with desired gates
+jit gate add abc123 tests clippy code-review docs
+
+# Save as team standard
+jit gate preset create abc123 team-standard
+
+# Apply to all issues in epic
+jit query all --filter "label:epic:v2.0" | xargs jit gate preset apply team-standard
+```
+
+**Customize for Special Cases:**
+```bash
+# Apply without precheck for hotfix
+jit gate preset apply rust-tdd hotfix-123 --no-precheck
+
+# Apply with faster timeout for CI
+jit gate preset apply rust-tdd abc123 --timeout 60
+
+# Apply subset of gates
+jit gate preset apply rust-tdd abc123 --except tdd-reminder --except clippy
+```
+
+### Exit Codes
+
+- `0` - Success
+- `1` - Error (preset not found, issue not found, validation failed)
+- Exit code 1 in batch mode if any issues fail
+
 ## Dependency Commands
 
 <!-- jit dep add/rm -->
