@@ -1,5 +1,16 @@
 {
   "gates": {
+    "code-review": {
+      "version": 1,
+      "key": "code-review",
+      "title": "Code Review",
+      "description": "Human review of changes",
+      "stage": "postcheck",
+      "mode": "manual",
+      "reserved": {},
+      "auto": false,
+      "example_integration": null
+    },
     "tdd-reminder": {
       "version": 1,
       "key": "tdd-reminder",
@@ -9,24 +20,6 @@
       "mode": "manual",
       "reserved": {},
       "auto": false,
-      "example_integration": null
-    },
-    "fmt": {
-      "version": 1,
-      "key": "fmt",
-      "title": "Code Formatted",
-      "description": "Code must be formatted with cargo fmt",
-      "stage": "postcheck",
-      "mode": "auto",
-      "checker": {
-        "type": "exec",
-        "command": "cargo fmt -- --check",
-        "timeout_seconds": 30,
-        "working_dir": null,
-        "env": {}
-      },
-      "reserved": {},
-      "auto": true,
       "example_integration": null
     },
     "tests": {
@@ -40,6 +33,24 @@
         "type": "exec",
         "command": "cargo test --lib",
         "timeout_seconds": 300,
+        "working_dir": null,
+        "env": {}
+      },
+      "reserved": {},
+      "auto": true,
+      "example_integration": null
+    },
+    "fmt": {
+      "version": 1,
+      "key": "fmt",
+      "title": "Code Formatted",
+      "description": "Code must be formatted with cargo fmt",
+      "stage": "postcheck",
+      "mode": "auto",
+      "checker": {
+        "type": "exec",
+        "command": "cargo fmt -- --check",
+        "timeout_seconds": 30,
         "working_dir": null,
         "env": {}
       },
@@ -63,17 +74,6 @@
       },
       "reserved": {},
       "auto": true,
-      "example_integration": null
-    },
-    "code-review": {
-      "version": 1,
-      "key": "code-review",
-      "title": "Code Review",
-      "description": "Human review of changes",
-      "stage": "postcheck",
-      "mode": "manual",
-      "reserved": {},
-      "auto": false,
       "example_integration": null
     }
   }

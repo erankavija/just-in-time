@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "d318a456-d632-4cae-8a30-755d8b1feec8",
+  "gate_key": "clippy",
+  "stage": "postcheck",
+  "issue_id": "56b7e503-c4c8-4509-96c5-ae40e37d3132",
+  "commit": "f0e7b3b7314e119b06040f9bef5a1b151154554a",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-02-10T20:30:23.560990253Z",
+  "completed_at": "2026-02-10T20:30:29.571344273Z",
+  "duration_ms": 6010,
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "    Checking getrandom v0.2.16\n    Checking futures-task v0.3.31\n    Checking getrandom v0.3.4\n    Checking num-traits v0.2.19\n    Checking hyper v1.8.1\n    Checking tower v0.4.13\n    Checking futures-util v0.3.31\n    Checking ring v0.17.14\n    Checking tempfile v3.23.0\n    Checking uuid v1.18.1\n    Checking chrono v0.4.42\n    Checking hyper-util v0.1.19\n    Checking rustls-webpki v0.103.8\n    Checking schemars v0.8.22\n    Checking tower v0.5.2\n    Checking axum-core v0.4.5\n    Checking rustls v0.23.35\n    Checking axum v0.7.9\n    Checking ureq v2.12.1\n    Checking jit v0.2.0 (/home/vkaskivuo/Projects/just-in-time/crates/jit)\n    Checking jit-server v0.1.0 (/home/vkaskivuo/Projects/just-in-time/crates/server)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.84s\n",
+  "command": "cargo clippy --lib -- -D warnings",
+  "by": "auto:executor",
+  "message": null
+}

@@ -2,9 +2,9 @@
   "id": "56b7e503-c4c8-4509-96c5-ae40e37d3132",
   "title": "Implement gate templates and presets",
   "description": "Implement gate templates and presets system to reduce setup time and encode best practices for common workflows. Add 'jit gate preset' commands: list (show available presets), show (display preset details), apply (create gates from preset on issue), and create (save custom presets). Include built-in presets for rust-tdd, python-tdd, js-tdd, security-audit, and minimal workflows, embedding proven gate configurations directly in binary. Support custom user-defined presets in .jit/config/gate-presets/. Enable customization via parameters when applying presets (timeout overrides, skip prechecks/postchecks, include/exclude specific gates). This feature dramatically improves onboarding and reduces boilerplate, enabling users and agents to set up quality gates in seconds rather than minutes by leveraging battle-tested configurations.",
-  "state": "ready",
+  "state": "done",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:copilot2",
   "dependencies": [],
   "gates_required": [
     "tdd-reminder",
@@ -13,9 +13,43 @@
     "fmt",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": "agent:copilot2",
+      "updated_at": "2026-02-10T18:10:22.809236279Z"
+    },
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-10T20:30:23.560990253Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-10T20:30:04.845198519Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-10T20:30:29.572256633Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "agent:copilot2",
+      "updated_at": "2026-02-10T20:30:35.365498730Z"
+    }
+  },
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "dev/active/gate-presets-implementation-plan.md",
+      "commit": null,
+      "label": "Implementation Plan",
+      "doc_type": "implementation",
+      "format": "markdown"
+    }
+  ],
   "labels": [
     "type:task",
     "epic:production-polish",
