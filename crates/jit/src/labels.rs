@@ -191,6 +191,38 @@ pub fn validate_label_operations(
     Ok(())
 }
 
+/// Check if a pattern matches any label in a collection
+///
+/// Supports:
+/// - Exact match: `"epic:auth"` matches only `"epic:auth"`
+/// - Wildcard: `"epic:*"` matches any label in epic namespace
+///
+/// Invalid labels in the collection are silently ignored during matching.
+///
+/// # Examples
+///
+/// ```
+/// use jit::labels::matches_pattern;
+///
+/// let labels = vec!["epic:auth".to_string(), "type:task".to_string()];
+/// assert!(matches_pattern(&labels, "epic:auth"));
+/// assert!(matches_pattern(&labels, "epic:*"));
+/// assert!(!matches_pattern(&labels, "milestone:*"));
+/// ```
+pub fn matches_pattern(issue_labels: &[String], pattern: &str) -> bool {
+    if let Some(namespace) = pattern.strip_suffix(":*") {
+        // Wildcard: match any label in namespace
+        issue_labels.iter().any(|label| {
+            parse_label(label)
+                .map(|(ns, _)| ns == namespace)
+                .unwrap_or(false)
+        })
+    } else {
+        // Exact match
+        issue_labels.contains(&pattern.to_string())
+    }
+}
+
 /// Validate assignee format
 ///
 /// Assignees must follow the format `type:identifier` (e.g., `agent:copilot`, `user:alice`)
@@ -418,5 +450,105 @@ mod tests {
 
         // Should succeed - removing old type before adding new one
         assert!(validate_label_operations(&existing, &add, &remove, &namespaces).is_ok());
+    }
+
+    // Tests for matches_pattern function
+    #[test]
+    fn test_matches_pattern_exact_match() {
+        let labels = vec!["epic:auth".to_string(), "type:task".to_string()];
+
+        assert!(matches_pattern(&labels, "epic:auth"));
+        assert!(matches_pattern(&labels, "type:task"));
+        assert!(!matches_pattern(&labels, "epic:other"));
+        assert!(!matches_pattern(&labels, "milestone:v1"));
+    }
+
+    #[test]
+    fn test_matches_pattern_wildcard() {
+        let labels = vec![
+            "epic:auth".to_string(),
+            "type:task".to_string(),
+            "component:backend".to_string(),
+        ];
+
+        // Should match any label in namespace
+        assert!(matches_pattern(&labels, "epic:*"));
+        assert!(matches_pattern(&labels, "type:*"));
+        assert!(matches_pattern(&labels, "component:*"));
+
+        // Should not match namespaces not present
+        assert!(!matches_pattern(&labels, "milestone:*"));
+        assert!(!matches_pattern(&labels, "priority:*"));
+    }
+
+    #[test]
+    fn test_matches_pattern_empty_labels() {
+        let labels: Vec<String> = vec![];
+
+        assert!(!matches_pattern(&labels, "epic:auth"));
+        assert!(!matches_pattern(&labels, "epic:*"));
+    }
+
+    #[test]
+    fn test_matches_pattern_invalid_label_in_collection() {
+        // Collection contains an invalid label
+        let labels = vec![
+            "epic:auth".to_string(),
+            "invalid_no_colon".to_string(),
+            "type:task".to_string(),
+        ];
+
+        // Should still match valid labels
+        assert!(matches_pattern(&labels, "epic:auth"));
+        assert!(matches_pattern(&labels, "type:task"));
+
+        // Wildcard should ignore invalid labels
+        assert!(matches_pattern(&labels, "epic:*"));
+    }
+
+    #[test]
+    fn test_matches_pattern_case_sensitive() {
+        let labels = vec!["epic:Auth".to_string()];
+
+        // Exact match is case-sensitive
+        assert!(matches_pattern(&labels, "epic:Auth"));
+        assert!(!matches_pattern(&labels, "epic:auth"));
+
+        // Wildcard matching namespace is case-sensitive
+        assert!(matches_pattern(&labels, "epic:*"));
+        assert!(!matches_pattern(&labels, "Epic:*"));
+    }
+
+    #[test]
+    fn test_matches_pattern_multiple_labels_same_namespace() {
+        let labels = vec![
+            "epic:auth".to_string(),
+            "epic:payments".to_string(),
+            "type:task".to_string(),
+        ];
+
+        // Exact matches
+        assert!(matches_pattern(&labels, "epic:auth"));
+        assert!(matches_pattern(&labels, "epic:payments"));
+
+        // Wildcard should match if any label in namespace
+        assert!(matches_pattern(&labels, "epic:*"));
+    }
+
+    #[test]
+    fn test_matches_pattern_edge_cases() {
+        let labels = vec!["ns:value".to_string()];
+
+        // Pattern without colon should not match
+        assert!(!matches_pattern(&labels, "ns"));
+
+        // Empty pattern should not match
+        assert!(!matches_pattern(&labels, ""));
+
+        // Just wildcard without namespace should not match
+        assert!(!matches_pattern(&labels, ":*"));
+
+        // Pattern with multiple colons
+        assert!(!matches_pattern(&labels, "ns:val:extra"));
     }
 }

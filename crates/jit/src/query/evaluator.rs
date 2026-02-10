@@ -51,19 +51,8 @@ impl QueryEvaluator {
             }
 
             QueryCondition::Label(pattern) => {
-                // Reuse label matching logic from query_by_label
-                if pattern.ends_with(":*") {
-                    // Wildcard: match all labels in namespace
-                    let namespace = &pattern[..pattern.len() - 2];
-                    issue.labels.iter().any(|label| {
-                        labels::parse_label(label)
-                            .map(|(ns, _)| ns == namespace)
-                            .unwrap_or(false)
-                    })
-                } else {
-                    // Exact match
-                    issue.labels.contains(&pattern.to_string())
-                }
+                // Use centralized label matching from labels module
+                labels::matches_pattern(&issue.labels, pattern)
             }
 
             QueryCondition::Priority(p) => {

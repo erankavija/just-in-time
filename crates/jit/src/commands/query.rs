@@ -92,7 +92,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     pub fn query_by_label(&self, pattern: &str) -> Result<Vec<Issue>> {
-        use crate::labels as label_utils;
+        use crate::labels;
 
         // Validate pattern format
         if !pattern.contains(':') {
@@ -111,7 +111,6 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         let namespace = parts[0];
-        let value = parts[1];
 
         // Validate namespace format
         if !namespace
@@ -125,27 +124,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         let issues = self.storage.list_issues()?;
-        let filtered: Vec<Issue> = if value == "*" {
-            // Wildcard: match all labels in this namespace
-            issues
-                .into_iter()
-                .filter(|issue| {
-                    issue.labels.iter().any(|label| {
-                        if let Ok((ns, _)) = label_utils::parse_label(label) {
-                            ns == namespace
-                        } else {
-                            false
-                        }
-                    })
-                })
-                .collect()
-        } else {
-            // Exact match
-            issues
-                .into_iter()
-                .filter(|issue| issue.labels.contains(&pattern.to_string()))
-                .collect()
-        };
+        let filtered: Vec<Issue> = issues
+            .into_iter()
+            .filter(|issue| labels::matches_pattern(&issue.labels, pattern))
+            .collect();
 
         Ok(filtered)
     }

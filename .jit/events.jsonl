@@ -1681,3 +1681,5 @@
 {"type":"gate_passed","id":"70a13035-585e-49e9-892f-3f1b0ab1a8d7","issue_id":"56b7e503-c4c8-4509-96c5-ae40e37d3132","timestamp":"2026-02-10T20:30:35.365821631Z","gate_key":"code-review","updated_by":"agent:copilot2"}
 {"type":"issue_state_changed","id":"0968e2ed-aa12-40b4-a808-cea0b51578b4","issue_id":"56b7e503-c4c8-4509-96c5-ae40e37d3132","timestamp":"2026-02-10T20:30:48.008001358Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"8a83d8d7-b022-48c2-b443-b0f1b8dc9437","issue_id":"56b7e503-c4c8-4509-96c5-ae40e37d3132","timestamp":"2026-02-10T20:30:48.008044978Z"}
+{"type":"issue_state_changed","id":"bb2b2c15-0521-4a46-af78-a9d6b259f173","issue_id":"12ef7efb-956e-4456-bd89-237ebfe22937","timestamp":"2026-02-10T22:43:17.273061800Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"7fa5d71a-defc-4dc4-be3a-fb6c1186b0be","issue_id":"12ef7efb-956e-4456-bd89-237ebfe22937","timestamp":"2026-02-10T22:43:17.279335092Z","assignee":"agent:copilot-cli"}
