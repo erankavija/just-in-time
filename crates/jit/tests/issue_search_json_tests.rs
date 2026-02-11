@@ -3,8 +3,8 @@
 //! Tests verify that search returns compact results by default (MinimalIssue)
 //! and full results only when --full flag is provided.
 
-use std::process::Command;
 use serde_json::Value;
+use std::process::Command;
 use tempfile::TempDir;
 
 fn jit_binary() -> String {
