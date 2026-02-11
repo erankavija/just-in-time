@@ -1,0 +1,18 @@
+{
+  "id": "8898b638-b5fe-4982-9d5f-8935dd5f793c",
+  "title": "jit init should regenerate worktree.json in new worktrees",
+  "description": "## Problem\n\nWhen creating a new git worktree with `git worktree add`, git copies the entire directory structure including `.jit/worktree.json`. This causes duplicate worktree IDs.\n\n**Current behavior:**\n```bash\n# In main worktree\ngit worktree add ../feature -b feature/my-work\ncd ../feature\njit init\njit worktree list\n# Shows both worktrees with SAME worktree ID (wt:abc12345)\n```\n\n**Why it happens:**\n1. `git worktree add` copies `.jit/worktree.json` from source worktree\n2. `jit init` doesn't touch `worktree.json`\n3. When jit commands run, `load_or_create_worktree_identity` sees the file exists\n4. It treats this as a \"relocation\" and updates the path but keeps the same ID\n\n## Expected Behavior\n\n`jit init` should detect when running in a git worktree and regenerate `worktree.json` with a new unique ID.\n\n## Solution\n\nModify `jit init` to:\n1. Detect if we're in a git worktree (not main worktree)\n2. Delete existing `.jit/worktree.json` if present\n3. Let `load_or_create_worktree_identity` generate fresh identity\n\nAlternatively, add a flag `--force-new-worktree-id` for explicit regeneration.\n\n## Acceptance Criteria\n\n- [ ] `jit init` in a new worktree generates unique worktree ID\n- [ ] `jit worktree list` shows distinct IDs for each worktree\n- [ ] Existing worktrees (relocated) still preserve their IDs\n- [ ] Documentation updated to reflect new behavior",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:bug",
+    "component:core",
+    "epic:production-polish"
+  ]
+}

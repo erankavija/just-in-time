@@ -1711,3 +1711,4 @@
 {"type":"issue_state_changed","id":"dd471875-71bc-4fc5-8e32-698952932e4e","issue_id":"7004d5b6-0f4d-4dd7-9623-6d953ff94025","timestamp":"2026-02-11T21:17:20.359995656Z","from":"done","to":"in_progress"}
 {"type":"issue_state_changed","id":"41b8abab-d294-48ed-b89f-eb3fe75e1547","issue_id":"7004d5b6-0f4d-4dd7-9623-6d953ff94025","timestamp":"2026-02-11T21:34:40.668972841Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"30e81d58-c467-4eb2-b2e5-9ea8b9e9620c","issue_id":"7004d5b6-0f4d-4dd7-9623-6d953ff94025","timestamp":"2026-02-11T21:34:40.669004251Z"}
+{"type":"issue_created","id":"676e908d-8083-4665-a807-255c0ae08292","issue_id":"8898b638-b5fe-4982-9d5f-8935dd5f793c","timestamp":"2026-02-11T21:51:13.330123803Z","title":"jit init should regenerate worktree.json in new worktrees","priority":"normal"}
