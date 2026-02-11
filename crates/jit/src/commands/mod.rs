@@ -193,15 +193,17 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// # Errors
     ///
     /// Returns an error in `strict` mode when no active lease exists.
-    /// In `warn` mode, prints a warning but returns Ok.
-    /// In `off` mode, always returns Ok.
-    pub fn require_active_lease(&self, issue_id: &str) -> Result<()> {
+    /// In `warn` mode, returns Ok with a warning message.
+    /// In `off` mode, always returns Ok with None.
+    ///
+    /// Returns: Result<Option<String>> where Some(warning) should be printed by the CLI layer.
+    pub fn require_active_lease(&self, issue_id: &str) -> Result<Option<String>> {
         use crate::config::EnforcementMode;
 
         let mode = self.config_manager.get_enforcement_mode()?;
 
         match mode {
-            EnforcementMode::Off => Ok(()),
+            EnforcementMode::Off => Ok(None),
             EnforcementMode::Warn | EnforcementMode::Strict => {
                 let has_lease = self.check_active_lease(issue_id)?;
 
@@ -212,17 +214,14 @@ impl<S: IssueStore> CommandExecutor<S> {
                     );
 
                     match mode {
-                        EnforcementMode::Warn => {
-                            eprintln!("⚠️  Warning: {}", msg);
-                            Ok(())
-                        }
+                        EnforcementMode::Warn => Ok(Some(msg)),
                         EnforcementMode::Strict => {
                             anyhow::bail!("{}", msg)
                         }
                         _ => unreachable!(),
                     }
                 } else {
-                    Ok(())
+                    Ok(None)
                 }
             }
         }
@@ -257,9 +256,10 @@ enforce_leases = "off"
 
         let executor = CommandExecutor::new(storage);
 
-        // Should always succeed in off mode, even without lease
+        // Should always succeed in off mode, even without lease, and return None
         let result = executor.require_active_lease(&issue_id);
         assert!(result.is_ok());
+        assert_eq!(result.unwrap(), None);
     }
 
     #[test]

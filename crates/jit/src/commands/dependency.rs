@@ -25,7 +25,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         let full_dep_id = self.storage.resolve_issue_id(dep_id)?;
 
         // Require active lease for structural operations
-        self.require_active_lease(&full_issue_id)?;
+        if let Some(warning) = self.require_active_lease(&full_issue_id)? {
+            eprintln!("⚠️  Warning: {}", warning);
+        }
 
         // Load all issues and build graph for analysis
         // Note: Storage layer handles locking internally
@@ -84,7 +86,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         let full_dep_id = self.storage.resolve_issue_id(dep_id)?;
 
         // Require active lease for structural operations
-        self.require_active_lease(&full_issue_id)?;
+        if let Some(warning) = self.require_active_lease(&full_issue_id)? {
+            eprintln!("⚠️  Warning: {}", warning);
+        }
 
         let mut issue = self.storage.load_issue(&full_issue_id)?;
         issue.dependencies.retain(|d| d != &full_dep_id);

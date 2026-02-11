@@ -22,7 +22,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         let full_id = self.storage.resolve_issue_id(issue_id)?;
 
         // Require active lease for structural operations
-        self.require_active_lease(&full_id)?;
+        if let Some(warning) = self.require_active_lease(&full_id)? {
+            eprintln!("⚠️  Warning: {}", warning);
+        }
 
         let mut issue = self.storage.load_issue(&full_id)?;
         if !issue.gates_required.contains(&gate_key) {
@@ -43,7 +45,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         let full_id = self.storage.resolve_issue_id(issue_id)?;
 
         // Require active lease for structural operations
-        self.require_active_lease(&full_id)?;
+        if let Some(warning) = self.require_active_lease(&full_id)? {
+            eprintln!("⚠️  Warning: {}", warning);
+        }
 
         let registry = self.storage.load_gate_registry()?;
         let mut issue = self.storage.load_issue(&full_id)?;
@@ -113,7 +117,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         let full_id = self.storage.resolve_issue_id(issue_id)?;
 
         // Require active lease for structural operations
-        self.require_active_lease(&full_id)?;
+        if let Some(warning) = self.require_active_lease(&full_id)? {
+            eprintln!("⚠️  Warning: {}", warning);
+        }
 
         let mut issue = self.storage.load_issue(&full_id)?;
 
@@ -144,7 +150,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         let full_id = self.storage.resolve_issue_id(issue_id)?;
 
         // Require active lease for structural operations
-        self.require_active_lease(&full_id)?;
+        if let Some(warning) = self.require_active_lease(&full_id)? {
+            eprintln!("⚠️  Warning: {}", warning);
+        }
 
         let mut issue = self.storage.load_issue(&full_id)?;
 
@@ -191,7 +199,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         let full_id = self.storage.resolve_issue_id(issue_id)?;
 
         // Require active lease for structural operations
-        self.require_active_lease(&full_id)?;
+        if let Some(warning) = self.require_active_lease(&full_id)? {
+            eprintln!("⚠️  Warning: {}", warning);
+        }
 
         let mut issue = self.storage.load_issue(&full_id)?;
 
@@ -394,7 +404,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         let full_id = self.storage.resolve_issue_id(issue_id)?;
 
         // Require active lease for structural operations
-        self.require_active_lease(&full_id)?;
+        if let Some(warning) = self.require_active_lease(&full_id)? {
+            eprintln!("⚠️  Warning: {}", warning);
+        }
 
         // Load preset
         let preset = self.storage.get_gate_preset(preset_name)?;

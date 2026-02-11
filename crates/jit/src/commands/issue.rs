@@ -149,7 +149,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         let full_id = self.storage.resolve_issue_id(id)?;
 
         // Require active lease for structural operations
-        self.require_active_lease(&full_id)?;
+        if let Some(warning) = self.require_active_lease(&full_id)? {
+            eprintln!("⚠️  Warning: {}", warning);
+        }
 
         let mut issue = self.storage.load_issue(&full_id)?;
 
@@ -258,7 +260,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         let full_id = self.storage.resolve_issue_id(id)?;
 
         // Require active lease for structural operations
-        self.require_active_lease(&full_id)?;
+        if let Some(warning) = self.require_active_lease(&full_id)? {
+            eprintln!("⚠️  Warning: {}", warning);
+        }
 
         self.storage.delete_issue(&full_id)
     }
@@ -271,7 +275,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         let full_id = self.storage.resolve_issue_id(id)?;
 
         // Require active lease for structural operations
-        self.require_active_lease(&full_id)?;
+        if let Some(warning) = self.require_active_lease(&full_id)? {
+            eprintln!("⚠️  Warning: {}", warning);
+        }
 
         let issue = self.storage.load_issue(&full_id)?;
         let old_state = issue.state;
@@ -369,7 +375,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         let full_id = self.storage.resolve_issue_id(id)?;
 
         // Require active lease for structural operations
-        self.require_active_lease(&full_id)?;
+        if let Some(warning) = self.require_active_lease(&full_id)? {
+            eprintln!("⚠️  Warning: {}", warning);
+        }
 
         let mut issue = self.storage.load_issue(&full_id)?;
         issue.assignee = Some(assignee);
@@ -431,7 +439,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         let full_id = self.storage.resolve_issue_id(id)?;
 
         // Require active lease for structural operations
-        self.require_active_lease(&full_id)?;
+        if let Some(warning) = self.require_active_lease(&full_id)? {
+            eprintln!("⚠️  Warning: {}", warning);
+        }
 
         let mut issue = self.storage.load_issue(&full_id)?;
         issue.assignee = None;
