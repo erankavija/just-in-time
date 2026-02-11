@@ -991,8 +991,14 @@ strategic_types = {}
                 match executor.list_gates() {
                     Ok(gates) => {
                         if json {
-                            use jit::output::JsonOutput;
-                            let output = JsonOutput::success(gates, "gate list");
+                            use jit::output::{GateDefinition, JsonOutput, RegistryListResponse};
+                            let gate_defs: Vec<GateDefinition> =
+                                gates.into_iter().map(GateDefinition::from).collect();
+                            let response = RegistryListResponse {
+                                count: gate_defs.len(),
+                                gates: gate_defs,
+                            };
+                            let output = JsonOutput::success(response, "gate list");
                             println!("{}", output.to_json_string()?);
                         } else if gates.is_empty() {
                             let _ = output_ctx.print_info("No gates defined");
@@ -1836,12 +1842,6 @@ strategic_types = {}
                             json!({
                                 "count": issues.len(),
                                 "issues": issues,
-                                "filters": {
-                                    "state": state,
-                                    "assignee": assignee,
-                                    "priority": priority,
-                                    "label": label,
-                                }
                             }),
                             "query all",
                         )
@@ -1852,12 +1852,6 @@ strategic_types = {}
                             json!({
                                 "count": minimal.len(),
                                 "issues": minimal,
-                                "filters": {
-                                    "state": state,
-                                    "assignee": assignee,
-                                    "priority": priority,
-                                    "label": label,
-                                }
                             }),
                             "query all",
                         )
@@ -2105,8 +2099,14 @@ strategic_types = {}
                 let config_mgr = ConfigManager::new(&jit_dir);
                 let namespaces = config_mgr.get_namespaces()?;
                 if json {
-                    use jit::output::JsonOutput;
-                    let output = JsonOutput::success(namespaces, "registry show");
+                    use jit::output::{JsonOutput, NamespacesResponse};
+                    let namespace_names: Vec<String> =
+                        namespaces.namespaces.keys().cloned().collect();
+                    let response = NamespacesResponse {
+                        count: namespace_names.len(),
+                        namespaces: namespace_names,
+                    };
+                    let output = JsonOutput::success(response, "label namespaces");
                     println!("{}", output.to_json_string()?);
                 } else {
                     let _ = output_ctx.print_info("Label Namespaces:\n");
@@ -2701,7 +2701,7 @@ strategic_types = {}
                         let output = JsonOutput::success(
                             json!({
                                 "query": query,
-                                "total": results.len(),
+                                "count": results.len(),
                                 "results": results
                             }),
                             "search",
@@ -3442,6 +3442,7 @@ strategic_types = {}
                         if json {
                             let response = serde_json::json!({
                                 "worktrees": worktrees,
+                                "count": worktrees.len(),
                             });
                             let output = JsonOutput::success(response, "worktree list");
                             println!("{}", output.to_json_string()?);

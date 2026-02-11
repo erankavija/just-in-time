@@ -1,486 +1,526 @@
-# Implementation Plan: Standardize JSON Output Format
+# Item 12: JSON Output Standardization - Implementation Plan
 
-## Problem Statement
+## Overview
 
-CLI commands return JSON in inconsistent formats, making scripting and MCP integration difficult:
+Standardize JSON output structures across all JIT commands to provide a consistent, predictable API for automation and agent consumption.
 
-**Format 1** (some commands):
+**Status:** Requires implementation + design decisions
+**Estimated effort:** 4-6 hours
+**Risk:** Low (mostly additive changes, some breaking for machine consumers)
+
+---
+
+## Design Principles
+
+All list/query commands should follow consistent patterns:
+
+### Pattern 1: Simple List Response
 ```json
 {
-  "id": "...",
-  "title": "...",
-  ...
+  "success": true,
+  "data": {
+    "<items_name>": [...],  // Named field (e.g., "issues", "gates", "namespaces")
+    "count": N              // Total count
+  },
+  "metadata": {...}
 }
 ```
 
-**Format 2** (other commands):
+### Pattern 2: Filtered/Contextual List Response
+```json
+{
+  "success": true,
+  "data": {
+    "<items_name>": [...],
+    "count": N,
+    "<context_field>": "..." // e.g., "assignee", "namespace", "issue_id"
+  },
+  "metadata": {...}
+}
+```
+
+### Pattern 3: Single Item Response
 ```json
 {
   "success": true,
   "data": {
     "id": "...",
-    "title": "..."
-  }
+    "title": "...",
+    // ... all item fields directly in data
+  },
+  "metadata": {...}
 }
 ```
 
-**Format 3** (errors - sometimes):
-```json
-{
-  "error": "...",
-  "code": "..."
-}
-```
-
-This inconsistency forces users to handle multiple formats and makes client libraries complex.
-
-## Current State
-
-### Commands Using Wrapped Format (success/data)
-- `jit issue create --json`
-- `jit issue update --json`
-- Most mutation commands
-
-### Commands Using Direct Format
-- `jit query all --json`
-- `jit query * --json`
-- Most read-only commands
-
-### Error Handling
-- Some commands use wrapped error format
-- Others write to stderr and exit with codes
-- Inconsistent between commands
-
-## Goal
-
-**Single, consistent JSON envelope format** for all commands with `--json` flag:
-
+### Pattern 4: Summary/Aggregate Response
 ```json
 {
   "success": true,
-  "data": <actual-result>,
-  "meta": {
-    "timestamp": "2025-12-21T20:00:00Z",
-    "version": "1.0.0",
-    "command": "issue show"
-  }
-}
-```
-
-**Error format:**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "ISSUE_NOT_FOUND",
-    "message": "Issue not found: abc123",
-    "details": {}
+  "data": {
+    "field1": N,
+    "field2": N,
+    // ... summary fields directly in data
   },
-  "meta": {
-    "timestamp": "2025-12-21T20:00:00Z",
-    "version": "1.0.0",
-    "command": "issue show"
-  }
+  "metadata": {...}
 }
 ```
 
-## Task Breakdown
+---
 
-### 1. Create Standard JSON Response Types
+## Detailed Changes
 
-**File**: `crates/jit/src/output.rs` (already exists)
+### 1. Fix `gate list` ❌ BREAKING CHANGE
 
-Add unified response types:
-
-```rust
-/// Standard JSON response envelope
-#[derive(Debug, Serialize)]
-pub struct JsonResponse<T> {
-    pub success: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub data: Option<T>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error: Option<JsonError>,
-    pub meta: ResponseMeta,
-}
-
-#[derive(Debug, Serialize)]
-pub struct JsonError {
-    pub code: String,
-    pub message: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub details: Option<serde_json::Value>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct ResponseMeta {
-    pub timestamp: String,
-    pub version: String,
-    pub command: String,
-}
-
-impl<T: Serialize> JsonResponse<T> {
-    pub fn success(data: T, command: &str) -> Self {
-        Self {
-            success: true,
-            data: Some(data),
-            error: None,
-            meta: ResponseMeta {
-                timestamp: chrono::Utc::now().to_rfc3339(),
-                version: env!("CARGO_PKG_VERSION").to_string(),
-                command: command.to_string(),
-            },
-        }
-    }
-    
-    pub fn error(code: &str, message: &str, command: &str) -> JsonResponse<()> {
-        JsonResponse {
-            success: false,
-            data: None,
-            error: Some(JsonError {
-                code: code.to_string(),
-                message: message.to_string(),
-                details: None,
-            }),
-            meta: ResponseMeta {
-                timestamp: chrono::Utc::now().to_rfc3339(),
-                version: env!("CARGO_PKG_VERSION").to_string(),
-                command: command.to_string(),
-            },
-        }
-    }
-}
-```
-
-### 2. Update All Commands to Use Standard Format
-
-**Pattern to apply**:
-
-```rust
-// OLD - inconsistent formats
-if json {
-    println!("{}", serde_json::to_string_pretty(&issue)?);
-}
-
-// NEW - standard envelope
-if json {
-    let response = JsonResponse::success(issue, "issue show");
-    println!("{}", serde_json::to_string_pretty(&response)?);
-}
-```
-
-**Commands to update** (in `crates/jit/src/main.rs`):
-
-#### Issue Commands
-- `issue create` ✅ (already uses wrapper, verify format)
-- `issue list` ❌ (direct format, needs wrapper)
-- `issue show` ❌ (direct format)
-- `issue update` ✅ (verify)
-- `issue delete` (check)
-- `issue search` ❌ (direct)
-- `issue claim` (check)
-- `issue assign` (check)
-- `issue unassign` (check)
-- `issue release` (check)
-- `issue reject` (check)
-- `issue breakdown` (check)
-
-#### Query Commands
-- `query state` ❌ (direct)
-- `query priority` ❌ (direct)
-- `query assignee` ❌ (direct)
-- `query label` ❌ (direct)
-- `query ready` ❌ (direct)
-- `query blocked` ❌ (direct)
-- `query strategic` ❌ (direct)
-- `query closed` ❌ (direct)
-
-#### Dependency Commands
-- `dep add` (check)
-- `dep rm` (check)
-
-#### Gate Commands
-- `gate define` (check)
-- `gate add` (check)
-- `gate pass` (check)
-- `gate fail` (check)
-- `gate check` (check)
-- `gate check-all` (check)
-- `gate list` ❌ (direct)
-- `gate show` ❌ (direct)
-
-#### Other Commands
-- `graph show` ❌ (direct)
-- `graph roots` ❌ (direct)
-- `graph downstream` ❌ (direct)
-- `doc add/remove/list/show` (check all)
-- `events query/tail` ❌ (direct)
-- `status` ❌ (direct)
-- `validate` (check)
-
-### 3. Update Error Handling
-
-**Location**: `crates/jit/src/main.rs` main error handler
-
-```rust
-fn main() -> ExitCode {
-    let cli = Cli::parse();
-    
-    match run(cli) {
-        Ok(code) => code,
-        Err(e) => {
-            // If --json was passed, output JSON error
-            if json_mode_active() {
-                let response = JsonResponse::<()>::error(
-                    error_code(&e),
-                    &e.to_string(),
-                    &current_command()
-                );
-                eprintln!("{}", serde_json::to_string_pretty(&response).unwrap());
-            } else {
-                eprintln!("Error: {:#}", e);
-            }
-            ExitCode::from(1)
-        }
-    }
-}
-```
-
-**Helper functions**:
-```rust
-fn json_mode_active() -> bool {
-    // Check if --json flag was passed
-    std::env::args().any(|arg| arg == "--json")
-}
-
-fn error_code(err: &anyhow::Error) -> &str {
-    // Map error types to codes
-    // Use downcast or error message parsing
-    "UNKNOWN_ERROR"
-}
-
-fn current_command() -> String {
-    // Parse from CLI args
-    std::env::args().nth(1).unwrap_or_default()
-}
-```
-
-### 4. Add Tests
-
-**File**: `crates/jit/tests/json_output_consistency_tests.rs`
-
-```rust
-#[test]
-fn test_all_commands_use_standard_json_format() {
-    let h = TestHarness::new();
-    
-    // Test issue commands
-    let output = h.run_command(&["issue", "list", "--json"]);
-    verify_json_envelope(&output);
-    
-    let output = h.run_command(&["issue", "show", &issue_id, "--json"]);
-    verify_json_envelope(&output);
-    
-    // Test query commands
-    let output = h.run_command(&["query", "ready", "--json"]);
-    verify_json_envelope(&output);
-    
-    // ... test all commands
-}
-
-fn verify_json_envelope(output: &str) -> serde_json::Value {
-    let json: serde_json::Value = serde_json::from_str(output)
-        .expect("Output should be valid JSON");
-    
-    // Verify envelope structure
-    assert!(json.get("success").is_some(), "Missing 'success' field");
-    assert!(json.get("meta").is_some(), "Missing 'meta' field");
-    
-    let success = json["success"].as_bool().unwrap();
-    if success {
-        assert!(json.get("data").is_some(), "Success response missing 'data'");
-    } else {
-        assert!(json.get("error").is_some(), "Error response missing 'error'");
-    }
-    
-    // Verify meta structure
-    let meta = &json["meta"];
-    assert!(meta.get("timestamp").is_some());
-    assert!(meta.get("version").is_some());
-    assert!(meta.get("command").is_some());
-    
-    json
-}
-
-#[test]
-fn test_error_responses_use_standard_format() {
-    let h = TestHarness::new();
-    
-    // Trigger error: non-existent issue
-    let output = h.run_command_expect_error(&["issue", "show", "nonexistent", "--json"]);
-    let json = verify_json_envelope(&output);
-    
-    assert_eq!(json["success"], false);
-    assert!(json["error"]["code"].is_string());
-    assert!(json["error"]["message"].is_string());
-}
-
-#[test]
-fn test_json_output_is_valid_and_parseable() {
-    let h = TestHarness::new();
-    let issue = h.create_issue("Test");
-    
-    // Every JSON command should produce valid, parseable JSON
-    let commands = vec![
-        vec!["issue", "show", &issue, "--json"],
-        vec!["issue", "list", "--json"],
-        vec!["query", "ready", "--json"],
-        vec!["status", "--json"],
-    ];
-    
-    for cmd in commands {
-        let output = h.run_command(&cmd);
-        serde_json::from_str::<serde_json::Value>(&output)
-            .expect(&format!("Command {:?} produced invalid JSON", cmd));
-    }
-}
-```
-
-### 5. Update MCP Server Integration
-
-**File**: `mcp-server/src/main.rs`
-
-Update to work with new consistent format:
-
-```rust
-// Now all responses have the same shape
-fn handle_jit_command(args: &[&str]) -> Result<serde_json::Value> {
-    let output = run_jit_cli(args)?;
-    let response: JsonResponse<serde_json::Value> = serde_json::from_str(&output)?;
-    
-    if response.success {
-        Ok(response.data.unwrap())
-    } else {
-        Err(anyhow!("{}", response.error.unwrap().message))
-    }
-}
-```
-
-### 6. Update Documentation
-
-**Files**:
-- `README.md` - Update JSON output examples
-- `docs/design.md` - Document JSON response format
-- `EXAMPLE.md` - Show JSON usage patterns
-
-**Content**:
-```markdown
-## JSON Output
-
-All commands support `--json` flag for machine-readable output with a consistent envelope format:
-
-### Success Response
-```json
-{
-  "success": true,
-  "data": { /* command-specific data */ },
-  "meta": {
-    "timestamp": "2025-12-21T20:00:00Z",
-    "version": "1.0.0",
-    "command": "issue show"
-  }
-}
-```
-
-### Error Response
-```json
-{
-  "success": false,
-  "error": {
-    "code": "ISSUE_NOT_FOUND",
-    "message": "Issue not found: abc123"
-  },
-  "meta": {
-    "timestamp": "2025-12-21T20:00:00Z",
-    "version": "1.0.0",
-    "command": "issue show"
-  }
-}
-```
-
-### Usage in Scripts
+**Current behavior:**
 ```bash
-# Check success
-if jq -e '.success' response.json; then
-  # Extract data
-  jq '.data' response.json
-else
-  # Handle error
-  jq '.error.message' response.json
-fi
-```
+$ jit gate list --json
+{
+  "data": [
+    {"key": "tests", "title": "Run tests", ...},
+    {"key": "clippy", "title": "Run clippy", ...}
+  ]
+}
 ```
 
-## Implementation Approach
+**Problem:** Data is an array, not an object with named field + count.
 
-1. **Create base types** in `output.rs` (1 hour)
-2. **Update 5-10 commands** as proof of concept (2 hours)
-3. **Run tests**, ensure backward compatibility for non-JSON mode (1 hour)
-4. **Systematically update** all remaining commands (4-5 hours)
-5. **Update error handling** in main (1 hour)
-6. **Add comprehensive tests** (2 hours)
-7. **Update MCP server** (1 hour)
-8. **Update documentation** (1 hour)
-9. **Full test suite** + clippy + fmt (1 hour)
+**Proposed fix:**
+```bash
+$ jit gate list --json
+{
+  "data": {
+    "gates": [
+      {"key": "tests", "title": "Run tests", ...},
+      {"key": "clippy", "title": "Run clippy", ...}
+    ],
+    "count": 2
+  }
+}
+```
 
-**Total: 14-16 hours**
+**Changes required:**
+- `crates/jit/src/output.rs`: Add `GateListResponse` type (already exists, just needs to be used)
+- `crates/jit/src/commands/gate.rs`: Wrap response in structured type
+- `crates/jit/tests/registry_json_tests.rs`: Update assertions
 
-## Migration Strategy
+**Breaking change:** Yes - any script parsing `jit gate list --json` will break
 
-### Backward Compatibility
-- Non-JSON mode (default) unchanged - no breaking changes
-- Only affects `--json` output
-- Existing scripts using `--json` may need updates
+---
 
-### Versioning
-- Bump version to indicate JSON format change
-- Document in CHANGELOG
-- Consider `--json-v1` flag for legacy format (optional)
+### 2. Fix `label namespaces` ❌ BREAKING CHANGE
 
-### Rollout
-1. Update core commands first (issue, query)
-2. Update peripheral commands
-3. Test MCP server integration
-4. Release with clear migration notes
+**Current behavior:**
+```bash
+$ jit label namespaces --json
+{
+  "data": {
+    "namespaces": ["epic", "milestone", "type", "component"],
+    "type_hierarchy": {"milestone": 1, "epic": 2, ...},
+    "label_associations": {...},
+    "strategic_types": ["milestone", "epic"],
+    "schema_version": 1
+  }
+}
+```
+
+**Problems:**
+1. Exposes internal configuration structure
+2. Returns more data than user requested
+3. Inconsistent with other list commands (no `count`)
+4. Mixes user data with metadata
+
+**Proposed fix:**
+```bash
+$ jit label namespaces --json
+{
+  "data": {
+    "namespaces": ["epic", "milestone", "type", "component"],
+    "count": 4
+  }
+}
+```
+
+**Changes required:**
+- `crates/jit/src/output.rs`: Add `NamespacesResponse` type
+- `crates/jit/src/commands/label.rs`: Create minimal response
+- Tests: Update any assertions checking namespace output
+
+**Breaking change:** Yes - structure completely changes
+
+---
+
+### 3. Fix `query all` - Remove filters field ❌ BREAKING CHANGE
+
+**Current behavior:**
+```bash
+$ jit query all --state ready --json
+{
+  "data": {
+    "issues": [...],
+    "count": 5,
+    "filters": {
+      "state": "ready"
+    }
+  }
+}
+```
+
+**Problem:** Other query commands don't have `filters` field
+
+**Proposed fix:**
+```bash
+$ jit query all --state ready --json
+{
+  "data": {
+    "issues": [...],
+    "count": 5
+  }
+}
+```
+
+**Changes required:**
+- `crates/jit/src/commands/query.rs`: Remove `filters` from response
+- `crates/jit/tests/query_json_tests.rs`: Update assertions
+
+**Breaking change:** Yes, but only for `query all`
+
+---
+
+### 4. Fix `search` - Rename "total" to "count" ❌ BREAKING CHANGE
+
+**Current behavior:**
+```bash
+$ jit search "query" --json
+{
+  "data": {
+    "results": [...],
+    "total": 5,
+    "query": "query"
+  }
+}
+```
+
+**Problem:** Uses "total" instead of "count" (all other commands use "count")
+
+**Proposed fix:**
+```bash
+$ jit search "query" --json
+{
+  "data": {
+    "results": [...],
+    "count": 5,
+    "query": "query"
+  }
+}
+```
+
+**Changes required:**
+- `crates/jit/src/commands/search.rs`: Rename field in response struct
+- Tests: Update assertions
+
+**Breaking change:** Yes - field name changes
+
+---
+
+### 5. Fix `worktree list` - Add count field ⚠️ ADDITIVE CHANGE
+
+**Current behavior:**
+```bash
+$ jit worktree list --json
+{
+  "data": {
+    "worktrees": [...]
+  }
+}
+```
+
+**Problem:** Missing `count` field that all other list commands have
+
+**Proposed fix:**
+```bash
+$ jit worktree list --json
+{
+  "data": {
+    "worktrees": [...],
+    "count": 3
+  }
+}
+```
+
+**Changes required:**
+- `crates/jit/src/commands/worktree.rs`: Add count to response
+- Tests: Add assertions for count field
+
+**Breaking change:** No - purely additive (adds field, doesn't change existing)
+
+---
+
+## Backward Compatibility Analysis
+
+### Breaking Changes Summary
+
+| Command | Change | Impact | Breaking? |
+|---------|--------|--------|-----------|
+| `gate list` | Wrap array in object | HIGH | ✅ Yes |
+| `label namespaces` | Remove internal fields | HIGH | ✅ Yes |
+| `query all` | Remove filters field | LOW | ✅ Yes |
+| `search` | Rename "total" to "count" | LOW | ✅ Yes |
+| `worktree list` | Add count field | NONE | ❌ No (additive) |
+
+**Total breaking changes:** 4 commands
+**Total fixes:** 5 commands
+
+### Migration Path
+
+**Version Strategy:**
+- Bump to 0.3.0 (minor version, breaking API changes)
+- Document all breaking changes in CHANGELOG
+- Provide migration examples
+
+**Changelog entry:**
+```markdown
+## [0.2.1] - 2026-02-11
+
+### Breaking Changes - JSON API Standardization
+
+**Goal:** Consistent JSON output structures across all commands for better automation.
+
+**`jit gate list --json`**
+- Response structure changed from array to object
+- Before: `{"data": [...]}`
+- After: `{"data": {"gates": [...], "count": N}}`
+- Migration: Access via `.data.gates` instead of `.data`
+
+**`jit label namespaces --json`**
+- Simplified response to requested data only (removed internal config fields)
+- Before: `{"data": {"namespaces": [...], "type_hierarchy": {...}, "strategic_types": [...], ...}}`
+- After: `{"data": {"namespaces": [...], "count": N}}`
+- Migration: Access `.data.namespaces` (same path), other fields removed
+
+**`jit query all --json`**
+- Removed redundant `filters` field for consistency with other query commands
+- Before: `{"data": {"issues": [...], "count": N, "filters": {...}}}`
+- After: `{"data": {"issues": [...], "count": N}}`
+- Migration: Remove any code accessing `.data.filters`
+
+**`jit search --json`**
+- Renamed `total` field to `count` for consistency
+- Before: `{"data": {"results": [...], "total": N, "query": "..."}}`
+- After: `{"data": {"results": [...], "count": N, "query": "..."}}`
+- Migration: Change `.data.total` to `.data.count`
+
+### Non-Breaking Changes
+
+**`jit worktree list --json`**
+- Added `count` field (additive change, backward compatible)
+- Before: `{"data": {"worktrees": [...]}}`
+- After: `{"data": {"worktrees": [...], "count": N}}`
+```
+
+---
+
+## Implementation Checklist
+
+### Phase 1: Add Response Types (30 min)
+- [ ] Add `GateListResponse` usage in output.rs (type exists, just use it)
+- [ ] Add `NamespacesResponse` struct in output.rs
+- [ ] Verify `IssueListResponse` used by query commands
+
+### Phase 2: Update Commands (1-2 hours)
+- [ ] `crates/jit/src/commands/gate.rs`
+  - [ ] Change `gate_list()` to return `GateListResponse`
+  - [ ] Wrap gates vector with count
+- [ ] `crates/jit/src/commands/label.rs`
+  - [ ] Change `list_namespaces()` to return `NamespacesResponse`
+  - [ ] Extract only namespaces array + count
+- [ ] `crates/jit/src/commands/query.rs`
+  - [ ] Remove `filters` field from `query_all()` response
+  - [ ] Update response construction
+- [ ] `crates/jit/src/commands/search.rs`
+  - [ ] Rename `total` field to `count` in response struct
+  - [ ] Update serialization
+- [ ] `crates/jit/src/commands/worktree.rs`
+  - [ ] Add `count` field to worktree list response
+  - [ ] Calculate and include count
+
+### Phase 3: Update Tests (1-2 hours)
+- [ ] `crates/jit/tests/registry_json_tests.rs`
+  - [ ] Update `test_gate_list_json()` assertions
+  - [ ] Change from `.data[0]` to `.data.gates[0]`
+  - [ ] Add assertion for `.data.count`
+- [ ] `crates/jit/tests/query_json_tests.rs`
+  - [ ] Update `test_query_all_json()` if filters removed
+  - [ ] Verify no other tests depend on filters field
+- [ ] Search for any other tests using `label namespaces --json`
+  - [ ] `rg "label namespaces.*json" crates/jit/tests/`
+  - [ ] Update assertions to expect new structure
+
+### Phase 4: Integration Testing (30 min)
+- [ ] Test all affected commands manually
+  - [ ] `jit gate list --json | jq .`
+  - [ ] `jit label namespaces --json | jq .`
+  - [ ] `jit query all --json | jq .`
+- [ ] Verify other commands still work
+  - [ ] `jit query available --json`
+  - [ ] `jit doc list <issue> --json`
+  - [ ] `jit graph deps <issue> --json`
+
+### Phase 5: Documentation (30 min)
+- [ ] Update CHANGELOG.md with breaking changes
+- [ ] Update docs/reference/cli-commands.md with new JSON examples
+- [ ] Add migration notes if needed
+
+### Phase 6: Version Bump (15 min)
+- [ ] Update version in `Cargo.toml` files to 0.2.1
+- [ ] Update `OUTPUT_VERSION` in `output.rs` to "0.2.1"
+- [ ] Run `cargo build` to update `Cargo.lock`
+- [ ] Update CHANGELOG.md with breaking changes section
+
+---
+
+## Testing Strategy
+
+### Unit Tests
+```rust
+#[test]
+fn test_gate_list_response_structure() {
+    let gates = vec![/* ... */];
+    let response = GateListResponse {
+        gates: gates.clone(),
+        count: gates.len(),
+    };
+    let output = JsonOutput::success(response, "gate list");
+    let json = output.to_json_string().unwrap();
+    
+    // Verify structure
+    let parsed: Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed["data"]["count"], gates.len());
+    assert!(parsed["data"]["gates"].is_array());
+}
+
+#[test]
+fn test_namespaces_response_structure() {
+    let namespaces = vec!["epic", "milestone", "type"];
+    let response = NamespacesResponse {
+        namespaces: namespaces.clone(),
+        count: namespaces.len(),
+    };
+    let output = JsonOutput::success(response, "label namespaces");
+    let json = output.to_json_string().unwrap();
+    
+    let parsed: Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed["data"]["count"], 3);
+    assert_eq!(parsed["data"]["namespaces"], json!(namespaces));
+    assert!(parsed["data"]["type_hierarchy"].is_null()); // Should NOT exist
+}
+```
+
+### Integration Tests
+```bash
+# Verify JSON structure matches pattern
+jit gate list --json | jq -e '.data | has("gates")' || echo "FAIL"
+jit gate list --json | jq -e '.data | has("count")' || echo "FAIL"
+
+jit label namespaces --json | jq -e '.data | has("namespaces")' || echo "FAIL"
+jit label namespaces --json | jq -e '.data | has("count")' || echo "FAIL"
+jit label namespaces --json | jq -e '.data | has("type_hierarchy") | not' || echo "FAIL"
+```
+
+---
+
+## Risk Assessment
+
+**Low Risk Areas:**
+- Top-level `JsonOutput` wrapper already consistent ✅
+- Most commands already follow correct patterns ✅
+- Changes are isolated to specific commands ✅
+
+**Medium Risk Areas:**
+- Breaking changes for automation/agents using affected commands
+- Need to coordinate version bump + changelog
+- Tests might be scattered across multiple files
+
+**Mitigation:**
+- Clear changelog with migration path
+- Version bump signals breaking change
+- Comprehensive test updates
+- Manual verification of all affected commands
+
+---
+
+## Open Questions / Design Decisions Needed
+
+### ✅ Decision 1: `label namespaces` response structure - DECIDED
+- **Choice:** Option A - Minimal format `{namespaces: [], count: N}`
+- **Rationale:** Simpler, matches `label values` pattern, strategic types available via config
+
+### ✅ Decision 2: `query all` filters field - DECIDED
+- **Choice:** Option A - Remove filters field for consistency
+- **Rationale:** Users know what filters they passed, consistency matters more
+
+### ✅ Decision 3: Version bump strategy - DECIDED
+- **Choice:** 0.2.1 - Patch bump to minimize version noise
+- **Rationale:** Pre-1.0, keep versions simple, note breaking changes in changelog
+
+### ✅ Investigation 4: Additional Inconsistencies Found
+
+**Commands checked:**
+- `jit issue search` ✅ - Has `{issues: [], count: N, query: "..."}` - CORRECT pattern
+- `jit search` ⚠️ - Has `{results: [], total: N, query: "..."}` - Uses "total" not "count"
+- `jit claim list` ✅ - Has `{leases: [], count: N}` - CORRECT pattern
+- `jit worktree list` ❌ - Has `{worktrees: []}` - MISSING count field
+- `jit events tail` ℹ️ - No JSON output (not implemented)
+- `jit events query` ℹ️ - No JSON output (not implemented)
+
+**Additional fixes needed:**
+1. `jit search` - Change "total" to "count" for consistency
+2. `jit worktree list` - Add "count" field
+
+---
 
 ## Success Criteria
 
-✅ All commands with `--json` use identical envelope format  
-✅ Success responses have `success: true, data: {}`  
-✅ Error responses have `success: false, error: {}`  
-✅ All responses include `meta` with timestamp, version, command  
-✅ Tests verify format consistency across all commands  
-✅ MCP server works with new format  
-✅ Documentation updated  
-✅ Zero clippy warnings  
-✅ All existing tests pass  
+- [ ] All list commands return `{<items>: [], count: N}` structure
+- [ ] No internal config exposed in API responses
+- [ ] Consistent patterns across similar commands
+- [ ] All tests pass
+- [ ] Documentation updated
+- [ ] Changelog includes migration guide
+- [ ] Version bumped appropriately
 
-## Benefits
+---
 
-- **Easier scripting**: Single parsing logic for all commands
-- **Better MCP integration**: Consistent response handling
-- **Error handling**: Structured error codes and messages
-- **Debugging**: Timestamp and version in every response
-- **Type safety**: Strongly typed response structures
-- **Future-proof**: Easy to add fields without breaking changes
+## Timeline Estimate
 
-## Dependencies
+- **Analysis & Planning:** 1 hour (DONE ✅)
+- **Implementation:** 2-3 hours
+- **Testing:** 1-2 hours
+- **Documentation:** 30-60 min
+- **Total:** 4.5-6.5 hours
 
-- No new crate dependencies
-- Uses existing: `serde`, `serde_json`, `chrono`
+---
 
-## Related Issues
+## Files to Modify
 
-- Improves agent-friendly CLI usability
-- Enables better MCP tooling
-- Supports scripting and automation use cases
+**Source:**
+- `crates/jit/src/output.rs` - Add response types
+- `crates/jit/src/commands/gate.rs` - Fix gate list
+- `crates/jit/src/commands/label.rs` - Fix label namespaces
+- `crates/jit/src/commands/query.rs` - Remove filters from query all
+- `crates/jit/src/commands/search.rs` - Rename total to count
+- `crates/jit/src/commands/worktree.rs` - Add count field
+
+**Tests:**
+- `crates/jit/tests/registry_json_tests.rs` - Gate list tests
+- `crates/jit/tests/query_json_tests.rs` - Query all tests
+- `crates/jit/tests/worktree_cli_tests.rs` - Worktree tests (if exists)
+- Any tests using label namespaces (search needed)
+- Any tests using search command (search needed)
+
+**Documentation:**
+- `CHANGELOG.md` - Breaking changes with migration guide
+- `docs/reference/cli-commands.md` - JSON examples (if exists)
+
+**Version:**
+- `Cargo.toml` (all packages) - Version bump to 0.2.1
+- `crates/jit/src/output.rs` - OUTPUT_VERSION constant to "0.2.1"

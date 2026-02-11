@@ -64,7 +64,6 @@ fn test_query_label_json_exact_match() {
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
     assert_eq!(json["success"], true);
-    assert_eq!(json["data"]["filters"]["label"], "milestone:v1.0");
     assert_eq!(json["data"]["count"], 1);
     assert!(json["data"]["issues"].is_array());
     assert_eq!(json["data"]["issues"].as_array().unwrap().len(), 1);
@@ -121,7 +120,6 @@ fn test_query_label_json_wildcard() {
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
     assert_eq!(json["success"], true);
-    assert_eq!(json["data"]["filters"]["label"], "milestone:*");
     assert_eq!(json["data"]["count"], 2);
     assert_eq!(json["data"]["issues"].as_array().unwrap().len(), 2);
 }
@@ -150,7 +148,6 @@ fn test_query_label_json_no_matches() {
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
     assert_eq!(json["success"], true);
-    assert_eq!(json["data"]["filters"]["label"], "epic:auth");
     assert_eq!(json["data"]["count"], 0);
     assert_eq!(json["data"]["issues"].as_array().unwrap().len(), 0);
 }

@@ -29,6 +29,13 @@
       "label": "Breakdown Fix Plan",
       "doc_type": "design",
       "format": "markdown"
+    },
+    {
+      "path": "dev/active/json-output-standardization-plan.md",
+      "commit": null,
+      "label": "Item 12 Implementation Plan",
+      "doc_type": "design",
+      "format": "markdown"
     }
   ],
   "labels": [

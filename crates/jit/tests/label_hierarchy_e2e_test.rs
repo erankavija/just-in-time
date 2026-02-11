@@ -257,11 +257,18 @@ fn test_label_hierarchy_complete_workflow() {
     let json: serde_json::Value =
         serde_json::from_str(&String::from_utf8_lossy(&output.stdout)).unwrap();
 
-    // Strategic classification is type-based, not namespace-based
-    // Namespaces no longer have a "strategic" field
-    assert!(json["data"]["namespaces"]["component"].is_object());
-    assert!(json["data"]["namespaces"]["milestone"].is_object());
-    assert!(json["data"]["namespaces"]["epic"].is_object());
+    // Check new structure: namespaces should be array of strings
+    assert!(json["data"]["namespaces"].is_array());
+    assert!(json["data"]["count"].is_number());
+    let namespaces = json["data"]["namespaces"].as_array().unwrap();
+    let namespace_names: Vec<String> = namespaces
+        .iter()
+        .map(|v| v.as_str().unwrap().to_string())
+        .collect();
+    assert!(namespace_names.contains(&"component".to_string()));
+    assert!(namespace_names.contains(&"milestone".to_string()));
+    assert!(namespace_names.contains(&"epic".to_string()));
+
 
     // ========================================================================
     // PHASE 5: Validation
@@ -615,8 +622,12 @@ fn test_label_operations_json_output() {
     let json: serde_json::Value =
         serde_json::from_str(&stdout).expect("Namespaces output should be valid JSON");
     assert!(
-        json["data"]["namespaces"].is_object(),
-        "Should have namespaces object"
+        json["data"]["namespaces"].is_array(),
+        "Should have namespaces array"
+    );
+    assert!(
+        json["data"]["count"].is_number(),
+        "Should have count field"
     );
 }
 

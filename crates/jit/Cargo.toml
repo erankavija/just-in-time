@@ -1,6 +1,6 @@
 [package]
 name = "jit"
-version = "0.2.0"
+version = "0.2.1"
 edition.workspace = true
 license.workspace = true
 description = "CLI-first issue tracker with dependency graphs and quality gates"

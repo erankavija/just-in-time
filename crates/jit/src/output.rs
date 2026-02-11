@@ -14,7 +14,7 @@ use std::io::{self, Write};
 use crate::domain::{MinimalBlockedIssue, MinimalIssue, Priority, State};
 
 /// Version of the JSON output format
-const OUTPUT_VERSION: &str = "0.2.0";
+const OUTPUT_VERSION: &str = "0.2.1";
 
 // ============================================================================
 // Output Context for Quiet Mode
@@ -743,6 +743,32 @@ pub struct GateDefinition {
     pub stage: String,
     pub mode: String,
 }
+
+impl From<crate::domain::Gate> for GateDefinition {
+    fn from(gate: crate::domain::Gate) -> Self {
+        Self {
+            key: gate.key,
+            title: gate.title,
+            description: gate.description,
+            auto: gate.auto,
+            example_integration: gate.example_integration,
+            stage: format!("{:?}", gate.stage).to_lowercase(),
+            mode: format!("{:?}", gate.mode).to_lowercase(),
+        }
+    }
+}
+
+// ============================================================================
+// Label Response Types
+// ============================================================================
+
+/// Response for `label namespaces` command
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct NamespacesResponse {
+    pub namespaces: Vec<String>,
+    pub count: usize,
+}
+
 
 #[cfg(test)]
 mod tests {

@@ -150,9 +150,8 @@ fn test_query_assignee_json_output() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
-    // Verify structure
+    // Verify structure (filters field removed)
     assert_eq!(json["success"], true);
-    assert_eq!(json["data"]["filters"]["assignee"], "copilot:test");
     assert!(json["data"]["issues"].is_array());
     assert_eq!(json["data"]["count"], 1);
 }
@@ -180,9 +179,8 @@ fn test_query_state_json_output() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
-    // Verify structure
+    // Verify structure (filters field removed)
     assert_eq!(json["success"], true);
-    assert_eq!(json["data"]["filters"]["state"], "ready");
     assert!(json["data"]["issues"].is_array());
     assert_eq!(json["data"]["count"], 1);
 }
@@ -212,9 +210,8 @@ fn test_query_priority_json_output() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
-    // Verify structure
+    // Verify structure (filters field removed)
     assert_eq!(json["success"], true);
-    assert_eq!(json["data"]["filters"]["priority"], "high");
     assert!(json["data"]["issues"].is_array());
     assert_eq!(json["data"]["count"], 1);
 }

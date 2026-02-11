@@ -142,7 +142,8 @@ fn test_gate_list_json() {
 
     let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
     assert_eq!(json["success"], true);
-    assert!(json["data"].is_array());
+    assert!(json["data"]["gates"].is_array());
+    assert!(json["data"]["count"].is_number());
 }
 
 #[test]

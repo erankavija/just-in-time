@@ -1697,3 +1697,8 @@
 {"type":"issue_state_changed","id":"e499924c-6574-4b53-8d94-460d11bd5270","issue_id":"20a895cc-020a-4d77-a825-c21bd6457f6b","timestamp":"2026-02-10T23:38:04.132364388Z","from":"ready","to":"backlog"}
 {"type":"issue_state_changed","id":"53454990-f635-4cc2-917f-94b9286b5805","issue_id":"20a895cc-020a-4d77-a825-c21bd6457f6b","timestamp":"2026-02-10T23:38:04.133986808Z","from":"ready","to":"backlog"}
 {"type":"issue_state_changed","id":"a8997063-ad03-4fb0-9a54-8573921fa467","issue_id":"20a895cc-020a-4d77-a825-c21bd6457f6b","timestamp":"2026-02-10T23:38:04.134237698Z","from":"ready","to":"backlog"}
+{"type":"issue_created","id":"beebd4d4-5af9-429d-adaa-b1db4068fa65","issue_id":"23b4336d-a18a-41e6-873f-d195586a7f54","timestamp":"2026-02-11T21:01:33.834365493Z","title":"JSON test","priority":"normal"}
+{"type":"issue_created","id":"941f69c7-bbbd-4e35-9a6a-477c9dc8f5f9","issue_id":"c7265555-a9b8-4c15-8796-75ab61f0dcd6","timestamp":"2026-02-11T21:01:33.844087956Z","title":"Another test","priority":"normal"}
+{"type":"issue_created","id":"ea2134cd-b1a4-4f64-8516-6ee4960ff5fe","issue_id":"de37eb56-1ec5-46dd-a012-28443a1e2609","timestamp":"2026-02-11T21:02:34.445978684Z","title":"Structure test","priority":"normal"}
+{"type":"issue_created","id":"b9b0e67a-4f61-4cdc-a5fa-ff7e2fc19138","issue_id":"962d71e6-d3c8-43ad-bf0a-2eb8e30df3ea","timestamp":"2026-02-11T21:02:34.449539295Z","title":"Test","priority":"normal"}
+{"type":"issue_created","id":"bb54b206-4736-4049-9713-242d03484ae7","issue_id":"14ce7a1d-999e-46e1-b133-7655dfd2066d","timestamp":"2026-02-11T21:11:37.463665903Z","title":"Searchable test item","priority":"normal"}
