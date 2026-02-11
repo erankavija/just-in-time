@@ -1697,3 +1697,4 @@
 {"type":"issue_state_changed","id":"e499924c-6574-4b53-8d94-460d11bd5270","issue_id":"20a895cc-020a-4d77-a825-c21bd6457f6b","timestamp":"2026-02-10T23:38:04.132364388Z","from":"ready","to":"backlog"}
 {"type":"issue_state_changed","id":"53454990-f635-4cc2-917f-94b9286b5805","issue_id":"20a895cc-020a-4d77-a825-c21bd6457f6b","timestamp":"2026-02-10T23:38:04.133986808Z","from":"ready","to":"backlog"}
 {"type":"issue_state_changed","id":"a8997063-ad03-4fb0-9a54-8573921fa467","issue_id":"20a895cc-020a-4d77-a825-c21bd6457f6b","timestamp":"2026-02-10T23:38:04.134237698Z","from":"ready","to":"backlog"}
+{"type":"issue_state_changed","id":"7aba5ab8-035d-4641-bb40-db31a7a2fe9a","issue_id":"7004d5b6-0f4d-4dd7-9623-6d953ff94025","timestamp":"2026-02-11T21:04:58.932220552Z","from":"ready","to":"in_progress"}

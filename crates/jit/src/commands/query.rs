@@ -1,99 +1,37 @@
 //! Issue query operations
+//!
+//! This module provides CLI orchestration wrappers around domain query functions.
+//! The wrappers handle storage access and delegate to pure domain functions.
 
 use super::*;
 
 impl<S: IssueStore> CommandExecutor<S> {
     pub fn query_ready(&self) -> Result<Vec<Issue>> {
         let issues = self.storage.list_issues()?;
-        let issue_refs: Vec<&Issue> = issues.iter().collect();
-        let resolved: HashMap<String, &Issue> =
-            issue_refs.iter().map(|i| (i.id.clone(), *i)).collect();
-
-        let ready: Vec<Issue> = issues
-            .iter()
-            .filter(|i| i.state == State::Ready && i.assignee.is_none() && !i.is_blocked(&resolved))
-            .cloned()
-            .collect();
-
-        Ok(ready)
+        Ok(crate::domain::queries::query_ready(&issues))
     }
 
     pub fn query_blocked(&self) -> Result<Vec<(Issue, Vec<String>)>> {
         let issues = self.storage.list_issues()?;
-        let issue_refs: Vec<&Issue> = issues.iter().collect();
-        let resolved: HashMap<String, &Issue> =
-            issue_refs.iter().map(|i| (i.id.clone(), *i)).collect();
-
-        let mut blocked = Vec::new();
-
-        for issue in &issues {
-            if issue.is_blocked(&resolved) {
-                let mut reasons = Vec::new();
-
-                // Check dependencies
-                for dep_id in &issue.dependencies {
-                    if let Some(dep) = resolved.get(dep_id) {
-                        if dep.state != State::Done {
-                            reasons.push(format!(
-                                "dependency:{} ({}:{:?})",
-                                dep_id, dep.title, dep.state
-                            ));
-                        }
-                    }
-                }
-
-                // Check gates
-                for gate_key in &issue.gates_required {
-                    let gate_state = issue.gates_status.get(gate_key);
-                    let is_passed = gate_state
-                        .map(|gs| gs.status == GateStatus::Passed)
-                        .unwrap_or(false);
-
-                    if !is_passed {
-                        let status_str = gate_state
-                            .map(|gs| format!("{:?}", gs.status))
-                            .unwrap_or_else(|| "Pending".to_string());
-                        reasons.push(format!("gate:{} ({})", gate_key, status_str));
-                    }
-                }
-
-                blocked.push((issue.clone(), reasons));
-            }
-        }
-
-        Ok(blocked)
+        Ok(crate::domain::queries::query_blocked(&issues))
     }
 
     pub fn query_by_assignee(&self, assignee: &str) -> Result<Vec<Issue>> {
         let issues = self.storage.list_issues()?;
-        let filtered: Vec<Issue> = issues
-            .into_iter()
-            .filter(|i| i.assignee.as_deref() == Some(assignee))
-            .collect();
-
-        Ok(filtered)
+        Ok(crate::domain::queries::query_by_assignee(&issues, assignee))
     }
 
     pub fn query_by_state(&self, state: State) -> Result<Vec<Issue>> {
         let issues = self.storage.list_issues()?;
-        let filtered: Vec<Issue> = issues.into_iter().filter(|i| i.state == state).collect();
-
-        Ok(filtered)
+        Ok(crate::domain::queries::query_by_state(&issues, state))
     }
 
     pub fn query_by_priority(&self, priority: Priority) -> Result<Vec<Issue>> {
         let issues = self.storage.list_issues()?;
-        let filtered: Vec<Issue> = issues
-            .into_iter()
-            .filter(|i| i.priority == priority)
-            .collect();
-
-        Ok(filtered)
+        Ok(crate::domain::queries::query_by_priority(&issues, priority))
     }
 
     pub fn query_by_label(&self, pattern: &str) -> Result<Vec<Issue>> {
-        use crate::labels;
-
         // Validate pattern format
         if !pattern.contains(':') {
             return Err(anyhow!(
@@ -124,17 +62,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         let issues = self.storage.list_issues()?;
-        let filtered: Vec<Issue> = issues
-            .into_iter()
-            .filter(|issue| labels::matches_pattern(&issue.labels, pattern))
-            .collect();
-
-        Ok(filtered)
+        Ok(crate::domain::queries::query_by_label(&issues, pattern))
     }
 
     pub fn query_strategic(&self) -> Result<Vec<Issue>> {
-        use crate::labels;
-
         let namespaces = self.config_manager.get_namespaces()?;
 
         // Get strategic types from config, or fall back to hierarchy-based approach
@@ -150,29 +81,16 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .collect()
         };
 
-        if strategic_types.is_empty() {
-            return Ok(Vec::new());
-        }
-
         let issues = self.storage.list_issues()?;
-        let filtered = issues
-            .into_iter()
-            .filter(|issue| {
-                // Check if issue has type:X label where X is a strategic type
-                strategic_types.iter().any(|type_value| {
-                    labels::matches_pattern(&issue.labels, &format!("type:{}", type_value))
-                })
-            })
-            .collect();
-
-        Ok(filtered)
+        Ok(crate::domain::queries::query_strategic(
+            &issues,
+            &strategic_types,
+        ))
     }
 
     pub fn query_closed(&self) -> Result<Vec<Issue>> {
         let issues = self.storage.list_issues()?;
-        let filtered: Vec<Issue> = issues.into_iter().filter(|i| i.state.is_closed()).collect();
-
-        Ok(filtered)
+        Ok(crate::domain::queries::query_closed(&issues))
     }
 
     /// Query all issues with optional filters
