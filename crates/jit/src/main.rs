@@ -266,7 +266,14 @@ strategic_types = {}
                     json,
                 } => {
                     let prio = Priority::from_str(&priority)?;
-                    let id = executor.create_issue(title, description, prio, gate, label)?;
+                    let (id, warnings) =
+                        executor.create_issue(title, description, prio, gate, label)?;
+
+                    // Print warnings to stderr
+                    for warning in &warnings {
+                        eprintln!("⚠️  Warning: {}", warning);
+                    }
+
                     let output_ctx = OutputContext::new(quiet, json);
 
                     if json {
@@ -493,7 +500,12 @@ strategic_types = {}
                             label,
                             remove_label,
                         ) {
-                            Ok(()) => {
+                            Ok(warnings) => {
+                                // Print warnings to stderr
+                                for warning in &warnings {
+                                    eprintln!("⚠️  Warning: {}", warning);
+                                }
+
                                 if json {
                                     let issue = storage.load_issue(&full_id)?;
                                     let output = JsonOutput::success(issue, "issue update");

@@ -2,7 +2,7 @@
   "id": "f766b092-5eec-4537-b391-ae7017965835",
   "title": "Remove direct printing from CommandExecutor methods",
   "description": "## Problem\n\nCommandExecutor has ~87 public methods across 12 files. Several methods print directly to stdout/stderr instead of returning data for the CLI layer to format:\n\n- `validate.rs`: `status()` has 7 `println!()` calls, prints `✓ Repository is valid`\n- `document.rs`: `document_history()` and `list_document_references()` print directly\n- `issue.rs`: `create_issue()` and `update_issue()` use `eprintln!` for warnings (2 sites)\n- `mod.rs`: `require_active_lease()` uses `eprintln!` in Warn mode (1 site)\n\n## Approach\n\n1. Change methods to return structured data (e.g., `StatusSummary`, `Vec<String>` warnings, `DocumentHistory`)\n2. Move all `println!`/`eprintln!` to the CLI layer in `main.rs`\n3. Methods that currently accept a `json: bool` parameter should instead always return data; the CLI layer decides the format\n\n## Acceptance Criteria\n\n- [ ] Zero `println!`/`eprintln!` in `commands/` module (excluding test code)\n- [ ] All affected methods return data structures instead of printing\n- [ ] CLI formatting in `main.rs` handles both human and JSON output\n- [ ] All existing tests pass",
-  "state": "backlog",
+  "state": "ready",
   "priority": "low",
   "assignee": null,
   "dependencies": [

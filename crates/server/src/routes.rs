@@ -609,7 +609,7 @@ mod tests {
         let executor = Arc::new(CommandExecutor::new(storage));
 
         // Create test issues
-        executor
+        let (_id1, _) = executor
             .create_issue(
                 "Issue 1".to_string(),
                 "Description".to_string(),
@@ -618,7 +618,7 @@ mod tests {
                 vec![],
             )
             .unwrap();
-        executor
+        let (_id2, _) = executor
             .create_issue(
                 "Issue 2".to_string(),
                 "Description".to_string(),
@@ -652,7 +652,7 @@ enforce_leases = "off"
         let executor = Arc::new(CommandExecutor::new(storage));
 
         // Create issues with dependencies
-        let id1 = executor
+        let (id1, _) = executor
             .create_issue(
                 "Issue 1".to_string(),
                 "Description".to_string(),
@@ -661,7 +661,7 @@ enforce_leases = "off"
                 vec![],
             )
             .unwrap();
-        let id2 = executor
+        let (id2, _) = executor
             .create_issue(
                 "Issue 2".to_string(),
                 "Description".to_string(),
@@ -690,7 +690,7 @@ enforce_leases = "off"
         let storage = InMemoryStorage::new();
         let executor = Arc::new(CommandExecutor::new(storage));
 
-        executor
+        let (_id, _) = executor
             .create_issue(
                 "Issue 1".to_string(),
                 "Description".to_string(),

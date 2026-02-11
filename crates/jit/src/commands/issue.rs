@@ -10,7 +10,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         priority: Priority,
         gates: Vec<String>,
         mut labels: Vec<String>,
-    ) -> Result<String> {
+    ) -> Result<(String, Vec<String>)> {
         // Get configuration for validation
         let config = self.config_manager.load()?;
         let namespaces = self.config_manager.get_namespaces()?;
@@ -51,18 +51,15 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue.labels = labels;
 
         // Validate the issue with configured rules
-        if let Some(ref validation_config) = config.validation {
+        let warnings = if let Some(ref validation_config) = config.validation {
             let validator = crate::validation::IssueValidator::new(
                 validation_config.clone(),
                 namespaces.clone(),
             );
-            let warnings = validator.validate(&issue)?;
-
-            // Log warnings if any
-            for warning in warnings {
-                eprintln!("⚠️  Warning: {}", warning);
-            }
-        }
+            validator.validate(&issue)?
+        } else {
+            Vec::new()
+        };
 
         // Auto-transition to Ready if no dependencies (gates don't block Ready)
         if issue.dependencies.is_empty() {
@@ -75,7 +72,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let event = Event::new_issue_created(&issue);
         self.storage.append_event(&event)?;
 
-        Ok(issue.id)
+        Ok((issue.id, warnings))
     }
 
     pub fn list_issues(
@@ -148,11 +145,13 @@ impl<S: IssueStore> CommandExecutor<S> {
         state: Option<State>,
         add_labels: Vec<String>,
         remove_labels: Vec<String>,
-    ) -> Result<()> {
+    ) -> Result<Vec<String>> {
         let full_id = self.storage.resolve_issue_id(id)?;
 
         // Require active lease for structural operations
-        self.require_active_lease(&full_id)?;
+        if let Some(warning) = self.require_active_lease(&full_id)? {
+            eprintln!("⚠️  Warning: {}", warning);
+        }
 
         let mut issue = self.storage.load_issue(&full_id)?;
 
@@ -181,16 +180,13 @@ impl<S: IssueStore> CommandExecutor<S> {
         let config = self.config_manager.load()?;
         let namespaces = self.config_manager.get_namespaces()?;
 
-        if let Some(ref validation_config) = config.validation {
+        let warnings = if let Some(ref validation_config) = config.validation {
             let validator =
                 crate::validation::IssueValidator::new(validation_config.clone(), namespaces);
-            let warnings = validator.validate(&issue)?;
-
-            // Log warnings if any
-            for warning in warnings {
-                eprintln!("⚠️  Warning: {}", warning);
-            }
-        }
+            validator.validate(&issue)?
+        } else {
+            Vec::new()
+        };
 
         let old_state = issue.state;
 
@@ -225,7 +221,8 @@ impl<S: IssueStore> CommandExecutor<S> {
 
                 // If gates not passed, transition to Gated and return error
                 if issue.has_unpassed_gates() {
-                    return self.handle_gate_blocking(&mut issue, old_state);
+                    self.handle_gate_blocking(&mut issue, old_state)?;
+                    return Ok(Vec::new());
                 } else {
                     issue.state = State::Done;
                 }
@@ -256,14 +253,16 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
-        Ok(())
+        Ok(warnings)
     }
 
     pub fn delete_issue(&self, id: &str) -> Result<()> {
         let full_id = self.storage.resolve_issue_id(id)?;
 
         // Require active lease for structural operations
-        self.require_active_lease(&full_id)?;
+        if let Some(warning) = self.require_active_lease(&full_id)? {
+            eprintln!("⚠️  Warning: {}", warning);
+        }
 
         self.storage.delete_issue(&full_id)
     }
@@ -276,7 +275,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         let full_id = self.storage.resolve_issue_id(id)?;
 
         // Require active lease for structural operations
-        self.require_active_lease(&full_id)?;
+        if let Some(warning) = self.require_active_lease(&full_id)? {
+            eprintln!("⚠️  Warning: {}", warning);
+        }
 
         let issue = self.storage.load_issue(&full_id)?;
         let old_state = issue.state;
@@ -374,7 +375,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         let full_id = self.storage.resolve_issue_id(id)?;
 
         // Require active lease for structural operations
-        self.require_active_lease(&full_id)?;
+        if let Some(warning) = self.require_active_lease(&full_id)? {
+            eprintln!("⚠️  Warning: {}", warning);
+        }
 
         let mut issue = self.storage.load_issue(&full_id)?;
         issue.assignee = Some(assignee);
@@ -436,7 +439,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         let full_id = self.storage.resolve_issue_id(id)?;
 
         // Require active lease for structural operations
-        self.require_active_lease(&full_id)?;
+        if let Some(warning) = self.require_active_lease(&full_id)? {
+            eprintln!("⚠️  Warning: {}", warning);
+        }
 
         let mut issue = self.storage.load_issue(&full_id)?;
         issue.assignee = None;

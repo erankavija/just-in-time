@@ -11,7 +11,7 @@ fn test_query_by_label_exact_match() {
     executor.init().unwrap();
 
     // Create issues with various labels
-    let milestone_id = executor
+    let (milestone_id, _) = executor
         .create_issue(
             "Release v1.0".to_string(),
             "".to_string(),
@@ -21,7 +21,7 @@ fn test_query_by_label_exact_match() {
         )
         .unwrap();
 
-    let epic_id = executor
+    let (epic_id, _) = executor
         .create_issue(
             "Auth System".to_string(),
             "".to_string(),
@@ -31,7 +31,7 @@ fn test_query_by_label_exact_match() {
         )
         .unwrap();
 
-    let _other_id = executor
+    let (_other_id, _) = executor
         .create_issue(
             "Other Task".to_string(),
             "".to_string(),
@@ -57,7 +57,7 @@ fn test_query_by_label_wildcard_namespace() {
     executor.init().unwrap();
 
     // Create issues with various milestones
-    let v1_id = executor
+    let (v1_id, _) = executor
         .create_issue(
             "Task v1".to_string(),
             "".to_string(),
@@ -67,7 +67,7 @@ fn test_query_by_label_wildcard_namespace() {
         )
         .unwrap();
 
-    let v2_id = executor
+    let (v2_id, _) = executor
         .create_issue(
             "Task v2".to_string(),
             "".to_string(),
@@ -77,7 +77,7 @@ fn test_query_by_label_wildcard_namespace() {
         )
         .unwrap();
 
-    let _no_milestone_id = executor
+    let (_no_milestone_id, _) = executor
         .create_issue(
             "No milestone".to_string(),
             "".to_string(),
@@ -103,7 +103,7 @@ fn test_query_by_label_no_matches() {
     executor.init().unwrap();
 
     // Create issue without the queried label
-    let _id = executor
+    let (_id, _) = executor
         .create_issue(
             "Task".to_string(),
             "".to_string(),
@@ -138,7 +138,7 @@ fn test_query_by_label_wildcard_matches_all_in_namespace() {
     executor.init().unwrap();
 
     // Create issues with multiple types
-    let task_id = executor
+    let (task_id, _) = executor
         .create_issue(
             "Task".to_string(),
             "".to_string(),
@@ -148,7 +148,7 @@ fn test_query_by_label_wildcard_matches_all_in_namespace() {
         )
         .unwrap();
 
-    let bug_id = executor
+    let (bug_id, _) = executor
         .create_issue(
             "Bug".to_string(),
             "".to_string(),
@@ -158,7 +158,7 @@ fn test_query_by_label_wildcard_matches_all_in_namespace() {
         )
         .unwrap();
 
-    let epic_id = executor
+    let (epic_id, _) = executor
         .create_issue(
             "Epic".to_string(),
             "".to_string(),
@@ -185,7 +185,7 @@ fn test_query_by_label_case_sensitive() {
     executor.init().unwrap();
 
     // Create issue with specific case
-    let _id = executor
+    let (_id, _) = executor
         .create_issue(
             "Task".to_string(),
             "".to_string(),
@@ -226,7 +226,7 @@ fn test_query_by_label_multiple_labels_per_issue() {
     executor.init().unwrap();
 
     // Create issue with multiple labels
-    let multi_id = executor
+    let (multi_id, _) = executor
         .create_issue(
             "Multi-labeled".to_string(),
             "".to_string(),
