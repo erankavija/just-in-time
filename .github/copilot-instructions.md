@@ -206,7 +206,7 @@ Before suggesting code, ensure:
 - [ ] Public APIs have comprehensive doc comments with examples
 - [ ] Property-based tests for non-trivial logic (especially graph operations)
 - [ ] Edge cases covered (empty deps, cycle detection, missing issues, concurrent claims)
-- [ ] Short ID of the current issue is included in the commit message for traceability
+- [ ] Short ID of the current issue with "jit:" is included in the commit message for traceability
 
 **Error Handling & UX:**
 - [ ] Errors use `Result` with descriptive messages (avoid panics in library code)

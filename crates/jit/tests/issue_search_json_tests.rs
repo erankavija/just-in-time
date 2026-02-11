@@ -3,24 +3,35 @@
 //! Tests verify that search returns compact results by default (MinimalIssue)
 //! and full results only when --full flag is provided.
 
-use assert_cmd::Command;
+use std::process::Command;
 use serde_json::Value;
 use tempfile::TempDir;
+
+fn jit_binary() -> String {
+    let manifest_dir = env!("CARGO_MANIFEST_DIR");
+    std::path::Path::new(manifest_dir)
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("target/debug/jit")
+        .to_string_lossy()
+        .to_string()
+}
 
 fn setup_test_repo() -> TempDir {
     let temp = TempDir::new().unwrap();
 
     // Initialize jit repo properly
-    Command::cargo_bin("jit")
-        .unwrap()
+    let jit = jit_binary();
+    Command::new(&jit)
         .current_dir(temp.path())
         .arg("init")
-        .assert()
-        .success();
+        .output()
+        .unwrap();
 
     // Create first test issue via CLI (ensures proper indexing)
-    Command::cargo_bin("jit")
-        .unwrap()
+    Command::new(&jit)
         .current_dir(temp.path())
         .args([
             "issue", "create",
@@ -31,12 +42,11 @@ fn setup_test_repo() -> TempDir {
             "--label", "epic:auth",
             "--label", "component:api",
         ])
-        .assert()
-        .success();
+        .output()
+        .unwrap();
 
     // Create second test issue
-    Command::cargo_bin("jit")
-        .unwrap()
+    Command::new(&jit)
         .current_dir(temp.path())
         .args([
             "issue",
@@ -50,8 +60,8 @@ fn setup_test_repo() -> TempDir {
             "--label",
             "epic:auth",
         ])
-        .assert()
-        .success();
+        .output()
+        .unwrap();
 
     temp
 }
@@ -59,9 +69,9 @@ fn setup_test_repo() -> TempDir {
 #[test]
 fn test_search_returns_compact_by_default() {
     let temp = setup_test_repo();
+    let jit = jit_binary();
 
-    let mut cmd = Command::cargo_bin("jit").unwrap();
-    let output = cmd
+    let output = Command::new(&jit)
         .current_dir(temp.path())
         .arg("issue")
         .arg("search")
@@ -120,9 +130,9 @@ fn test_search_returns_compact_by_default() {
 #[test]
 fn test_search_returns_full_with_flag() {
     let temp = setup_test_repo();
+    let jit = jit_binary();
 
-    let mut cmd = Command::cargo_bin("jit").unwrap();
-    let output = cmd
+    let output = Command::new(&jit)
         .current_dir(temp.path())
         .arg("issue")
         .arg("search")
@@ -179,9 +189,9 @@ fn test_search_returns_full_with_flag() {
 #[test]
 fn test_search_compact_has_short_id() {
     let temp = setup_test_repo();
+    let jit = jit_binary();
 
-    let mut cmd = Command::cargo_bin("jit").unwrap();
-    let output = cmd
+    let output = Command::new(&jit)
         .current_dir(temp.path())
         .arg("issue")
         .arg("search")
@@ -210,9 +220,9 @@ fn test_search_compact_has_short_id() {
 #[test]
 fn test_search_compact_preserves_count() {
     let temp = setup_test_repo();
+    let jit = jit_binary();
 
-    let mut cmd = Command::cargo_bin("jit").unwrap();
-    let output = cmd
+    let output = Command::new(&jit)
         .current_dir(temp.path())
         .arg("issue")
         .arg("search")
