@@ -4,7 +4,7 @@ use serde_json::Value;
 #[test]
 fn test_schema_has_version() {
     let schema = CommandSchema::generate();
-    assert_eq!(schema.version, "0.2.0");
+    assert_eq!(schema.version, "0.2.1");
 }
 
 #[test]

@@ -34,7 +34,7 @@ fn test_schema_is_valid_json() {
     let parsed: Value = serde_json::from_str(&json_str).unwrap();
 
     assert!(parsed.is_object());
-    assert_eq!(parsed["version"], "0.2.0");
+    assert_eq!(parsed["version"], "0.2.1");
 }
 
 #[test]

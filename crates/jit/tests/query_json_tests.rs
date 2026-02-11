@@ -52,7 +52,7 @@ fn test_query_ready_json_output() {
     assert!(json["data"]["issues"].is_array());
     assert_eq!(json["data"]["count"], 1);
     assert!(json["metadata"]["timestamp"].is_string());
-    assert_eq!(json["metadata"]["version"], "0.2.0");
+    assert_eq!(json["metadata"]["version"], "0.2.1");
 }
 
 #[test]

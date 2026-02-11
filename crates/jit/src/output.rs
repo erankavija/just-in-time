@@ -782,7 +782,7 @@ mod tests {
 
         assert!(output.success);
         assert_eq!(output.data["id"], "123");
-        assert_eq!(output.metadata.version, "0.2.0");
+        assert_eq!(output.metadata.version, "0.2.1");
         assert_eq!(output.metadata.command, "issue show");
     }
 
@@ -794,7 +794,7 @@ mod tests {
         let json_str = output.to_json_string().unwrap();
         assert!(json_str.contains("\"success\": true"));
         assert!(json_str.contains("\"id\": \"123\""));
-        assert!(json_str.contains("\"version\": \"0.2.0\""));
+        assert!(json_str.contains("\"version\": \"0.2.1\""));
         assert!(json_str.contains("\"timestamp\":"));
         assert!(json_str.contains("\"command\": \"issue list\""));
     }
@@ -849,7 +849,7 @@ mod tests {
     #[test]
     fn test_metadata_includes_timestamp() {
         let metadata = Metadata::new("test command");
-        assert_eq!(metadata.version, "0.2.0");
+        assert_eq!(metadata.version, "0.2.1");
         assert_eq!(metadata.command, "test command");
         // Timestamp should be recent (within last 5 seconds)
         let now = Utc::now();
