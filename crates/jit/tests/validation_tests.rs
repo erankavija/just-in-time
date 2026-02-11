@@ -12,7 +12,7 @@ fn test_validation_detects_broken_dependency() {
     let executor = CommandExecutor::new(storage.clone());
 
     // Create two issues
-    let issue1_id = executor
+    let (issue1_id, _) = executor
         .create_issue(
             "Task A".to_string(),
             "".to_string(),
@@ -22,7 +22,7 @@ fn test_validation_detects_broken_dependency() {
         )
         .unwrap();
 
-    let issue2_id = executor
+    let (issue2_id, _) = executor
         .create_issue(
             "Task B".to_string(),
             "".to_string(),
@@ -54,7 +54,7 @@ fn test_validation_detects_cycle() {
     let executor = CommandExecutor::new(storage.clone());
 
     // Create two issues
-    let issue1_id = executor
+    let (issue1_id, _) = executor
         .create_issue(
             "A".to_string(),
             "".to_string(),
@@ -63,7 +63,7 @@ fn test_validation_detects_cycle() {
             vec![],
         )
         .unwrap();
-    let issue2_id = executor
+    let (issue2_id, _) = executor
         .create_issue(
             "B".to_string(),
             "".to_string(),
@@ -94,7 +94,7 @@ fn test_validation_passes_with_valid_graph() {
     let executor = CommandExecutor::new(storage.clone());
 
     // Create a valid dependency graph: A -> B -> C
-    let issue_c_id = executor
+    let (issue_c_id, _) = executor
         .create_issue(
             "C".to_string(),
             "".to_string(),
@@ -103,7 +103,7 @@ fn test_validation_passes_with_valid_graph() {
             vec![],
         )
         .unwrap();
-    let issue_b_id = executor
+    let (issue_b_id, _) = executor
         .create_issue(
             "B".to_string(),
             "".to_string(),
@@ -112,7 +112,7 @@ fn test_validation_passes_with_valid_graph() {
             vec![],
         )
         .unwrap();
-    let issue_a_id = executor
+    let (issue_a_id, _) = executor
         .create_issue(
             "A".to_string(),
             "".to_string(),
@@ -134,7 +134,7 @@ fn test_validation_detects_multiple_broken_dependencies() {
     let storage = InMemoryStorage::new();
     let executor = CommandExecutor::new(storage.clone());
 
-    let issue1_id = executor
+    let (issue1_id, _) = executor
         .create_issue(
             "Task".to_string(),
             "".to_string(),
@@ -172,7 +172,7 @@ fn test_validation_detects_invalid_gate_reference() {
     let executor = CommandExecutor::new(storage.clone());
 
     // Create issue with gate requirement
-    let _issue = executor
+    let (_issue, _) = executor
         .create_issue(
             "Task".to_string(),
             "".to_string(),

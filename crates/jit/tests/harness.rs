@@ -29,7 +29,8 @@ impl TestHarness {
 
     /// Create an issue with minimal parameters
     pub fn create_issue(&self, title: &str) -> String {
-        self.executor
+        let (id, _) = self
+            .executor
             .create_issue(
                 title.to_string(),
                 String::new(),
@@ -37,13 +38,15 @@ impl TestHarness {
                 vec![],
                 vec![],
             )
-            .unwrap()
+            .unwrap();
+        id
     }
 
     /// Create an issue with description
     #[allow(dead_code)]
     pub fn create_issue_with_desc(&self, title: &str, desc: &str) -> String {
-        self.executor
+        let (id, _) = self
+            .executor
             .create_issue(
                 title.to_string(),
                 desc.to_string(),
@@ -51,22 +54,26 @@ impl TestHarness {
                 vec![],
                 vec![],
             )
-            .unwrap()
+            .unwrap();
+        id
     }
 
     /// Create an issue with priority
     #[allow(dead_code)]
     pub fn create_issue_with_priority(&self, title: &str, priority: Priority) -> String {
-        self.executor
+        let (id, _) = self
+            .executor
             .create_issue(title.to_string(), String::new(), priority, vec![], vec![])
-            .unwrap()
+            .unwrap();
+        id
     }
 
     /// Create an issue that's ready to work on
     #[allow(dead_code)]
     pub fn create_ready_issue(&self, title: &str) -> String {
         let id = self.create_issue(title);
-        self.executor
+        let _ = self
+            .executor
             .update_issue(&id, None, None, None, Some(State::Ready), vec![], vec![])
             .unwrap();
         id
@@ -75,7 +82,8 @@ impl TestHarness {
     /// Create an issue with gates
     #[allow(dead_code)]
     pub fn create_issue_with_gates(&self, title: &str, gates: Vec<String>) -> String {
-        self.executor
+        let (id, _) = self
+            .executor
             .create_issue(
                 title.to_string(),
                 String::new(),
@@ -83,7 +91,8 @@ impl TestHarness {
                 gates,
                 vec![],
             )
-            .unwrap()
+            .unwrap();
+        id
     }
 
     /// Add a gate definition to the registry

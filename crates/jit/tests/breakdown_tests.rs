@@ -8,7 +8,7 @@ fn test_breakdown_replaces_type_label_with_child_type() {
     let harness = TestHarness::new();
 
     // Create parent with type:story
-    let parent_id = harness
+    let (parent_id, _) = harness
         .executor
         .create_issue(
             "User Authentication Story".to_string(),
@@ -57,7 +57,7 @@ fn test_breakdown_preserves_non_type_labels() {
     let harness = TestHarness::new();
 
     // Create parent with multiple labels
-    let parent_id = harness
+    let (parent_id, _) = harness
         .executor
         .create_issue(
             "Feature Story".to_string(),
@@ -98,7 +98,7 @@ fn test_breakdown_works_with_custom_types() {
     let harness = TestHarness::new();
 
     // Create parent with custom type
-    let parent_id = harness
+    let (parent_id, _) = harness
         .executor
         .create_issue(
             "Feature Specification".to_string(),
@@ -130,7 +130,7 @@ fn test_breakdown_no_gates_by_default() {
     let harness = TestHarness::new();
 
     // Create parent with gates
-    let parent_id = harness
+    let (parent_id, _) = harness
         .executor
         .create_issue(
             "Story with Gates".to_string(),
@@ -168,7 +168,7 @@ fn test_breakdown_with_gate_preset() {
     // For now, we'll test that the method signature accepts the preset parameter
     let harness = TestHarness::new();
 
-    let parent_id = harness
+    let (parent_id, _) = harness
         .executor
         .create_issue(
             "Story".to_string(),
@@ -221,7 +221,7 @@ fn test_breakdown_with_inherit_gates() {
         .unwrap();
 
     // Create parent with gates
-    let parent_id = harness
+    let (parent_id, _) = harness
         .executor
         .create_issue(
             "Story with Gates".to_string(),

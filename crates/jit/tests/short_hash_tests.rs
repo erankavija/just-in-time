@@ -172,7 +172,8 @@ fn test_cli_update_with_short_hash() {
 
     // Use short hash in update command
     let prefix = &id[..8];
-    h.executor
+    let _ = h
+        .executor
         .update_issue(prefix, None, None, None, None, vec![], vec![])
         .unwrap();
 

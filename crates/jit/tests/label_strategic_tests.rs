@@ -11,7 +11,7 @@ fn test_query_strategic_returns_milestone_issues() {
     executor.init().unwrap();
 
     // Create issues with strategic types
-    let milestone_id = executor
+    let (milestone_id, _) = executor
         .create_issue(
             "Release v1.0".to_string(),
             "".to_string(),
@@ -21,7 +21,7 @@ fn test_query_strategic_returns_milestone_issues() {
         )
         .unwrap();
 
-    let _tactical_id = executor
+    let (_tactical_id, _) = executor
         .create_issue(
             "Fix bug".to_string(),
             "".to_string(),
@@ -44,7 +44,7 @@ fn test_query_strategic_returns_epic_issues() {
     let executor = CommandExecutor::new(storage);
     executor.init().unwrap();
 
-    let epic_id = executor
+    let (epic_id, _) = executor
         .create_issue(
             "Auth System".to_string(),
             "".to_string(),
@@ -66,7 +66,7 @@ fn test_query_strategic_returns_both_milestone_and_epic() {
     let executor = CommandExecutor::new(storage);
     executor.init().unwrap();
 
-    let milestone_id = executor
+    let (milestone_id, _) = executor
         .create_issue(
             "Release v1.0".to_string(),
             "".to_string(),
@@ -76,7 +76,7 @@ fn test_query_strategic_returns_both_milestone_and_epic() {
         )
         .unwrap();
 
-    let epic_id = executor
+    let (epic_id, _) = executor
         .create_issue(
             "Auth System".to_string(),
             "".to_string(),
@@ -86,7 +86,7 @@ fn test_query_strategic_returns_both_milestone_and_epic() {
         )
         .unwrap();
 
-    let _tactical_id = executor
+    let (_tactical_id, _) = executor
         .create_issue(
             "Fix typo".to_string(),
             "".to_string(),
@@ -143,7 +143,7 @@ fn test_query_strategic_includes_mixed_labels() {
     executor.init().unwrap();
 
     // Issue with both strategic type and tactical labels
-    let mixed_id = executor
+    let (mixed_id, _) = executor
         .create_issue(
             "Auth milestone".to_string(),
             "".to_string(),
@@ -173,7 +173,7 @@ fn test_query_strategic_with_custom_strategic_namespace() {
     // No need to add custom namespace - config handles this
 
     // Create issue with initiative label but no strategic type
-    let _initiative_id = executor
+    let (_initiative_id, _) = executor
         .create_issue(
             "Digital transformation".to_string(),
             "".to_string(),
@@ -187,7 +187,7 @@ fn test_query_strategic_with_custom_strategic_namespace() {
         .unwrap();
 
     // Create issue with strategic type
-    let milestone_id = executor
+    let (milestone_id, _) = executor
         .create_issue(
             "Launch".to_string(),
             "".to_string(),
@@ -222,7 +222,7 @@ fn test_breakdown_copies_labels_to_subtasks() {
     executor.init().unwrap();
 
     // Create parent with strategic labels
-    let parent_id = executor
+    let (parent_id, _) = executor
         .create_issue(
             "Auth System".to_string(),
             "".to_string(),
@@ -265,7 +265,7 @@ fn test_breakdown_preserves_parent_labels() {
     let executor = CommandExecutor::new(storage);
     executor.init().unwrap();
 
-    let parent_id = executor
+    let (parent_id, _) = executor
         .create_issue(
             "Parent".to_string(),
             "".to_string(),
@@ -296,7 +296,7 @@ fn test_breakdown_with_no_labels() {
     let executor = CommandExecutor::new(storage);
     executor.init().unwrap();
 
-    let parent_id = executor
+    let (parent_id, _) = executor
         .create_issue(
             "Parent".to_string(),
             "".to_string(),
@@ -327,7 +327,7 @@ fn test_breakdown_updates_parent_state() {
     let executor = CommandExecutor::new(storage);
     executor.init().unwrap();
 
-    let parent_id = executor
+    let (parent_id, _) = executor
         .create_issue(
             "Parent".to_string(),
             "".to_string(),
@@ -361,7 +361,7 @@ fn test_breakdown_creates_dependency_edges() {
     let executor = CommandExecutor::new(storage);
     executor.init().unwrap();
 
-    let parent_id = executor
+    let (parent_id, _) = executor
         .create_issue(
             "Parent".to_string(),
             "".to_string(),

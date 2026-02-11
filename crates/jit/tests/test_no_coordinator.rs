@@ -44,7 +44,7 @@ fn test_issue_lifecycle_works_without_coordinator() {
     let h = TestHarness::new();
 
     // Create issue
-    let id = h
+    let (id, _) = h
         .executor
         .create_issue(
             "Task".to_string(),
@@ -56,7 +56,8 @@ fn test_issue_lifecycle_works_without_coordinator() {
         .unwrap();
 
     // Update issue
-    h.executor
+    let _ = h
+        .executor
         .update_issue(
             &id,
             Some("Updated".to_string()),

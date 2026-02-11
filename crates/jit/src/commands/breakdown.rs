@@ -48,7 +48,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Create subtasks with transformed labels and no gates initially
         let mut subtask_ids = Vec::new();
         for (title, desc) in subtasks {
-            let subtask_id = self.create_issue(
+            let (subtask_id, _warnings) = self.create_issue(
                 title,
                 desc,
                 parent.priority,

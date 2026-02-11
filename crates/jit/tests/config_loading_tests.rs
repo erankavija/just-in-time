@@ -97,7 +97,7 @@ warn_strategic_consistency = false
     let executor = CommandExecutor::new(storage);
 
     // Create a task without parent labels (would normally warn)
-    let issue_id = executor
+    let (issue_id, _) = executor
         .create_issue(
             "Orphaned task".to_string(),
             "No parent labels".to_string(),

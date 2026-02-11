@@ -53,7 +53,8 @@ fn test_harness_issue_lifecycle() {
     assert_eq!(h.all_issues().len(), 1);
 
     // Update state
-    h.executor
+    let _ = h
+        .executor
         .update_issue(&id, None, None, None, Some(State::Ready), vec![], vec![])
         .unwrap();
     let issue = h.get_issue(&id);
@@ -96,7 +97,8 @@ fn test_harness_dependencies_block() {
     assert!(child_issue.is_blocked(&resolved));
 
     // Complete parent
-    h.executor
+    let _ = h
+        .executor
         .update_issue(&parent, None, None, None, Some(State::Done), vec![], vec![])
         .unwrap();
 
@@ -181,10 +183,12 @@ fn test_harness_complex_workflow() {
         .unwrap();
 
     // Complete dependencies
-    h.executor
+    let _ = h
+        .executor
         .update_issue(&dep1, None, None, None, Some(State::Done), vec![], vec![])
         .unwrap();
-    h.executor
+    let _ = h
+        .executor
         .update_issue(&dep2, None, None, None, Some(State::Done), vec![], vec![])
         .unwrap();
 
