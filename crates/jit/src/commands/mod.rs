@@ -40,6 +40,9 @@ pub mod test_helpers;
 
 pub use bulk_update::{BulkUpdatePreview, BulkUpdateResult, UpdateOperations};
 
+// Re-export WorktreeIdentity for init return type
+pub use crate::storage::worktree_identity::WorktreeIdentity;
+
 // Common imports used across modules
 use crate::config_manager::ConfigManager;
 use crate::domain::{Event, Gate, GateState, GateStatus, Issue, Priority, State};
@@ -109,11 +112,51 @@ impl<S: IssueStore> CommandExecutor<S> {
         &self.storage
     }
 
-    /// Initialize a new jit repository in the current directory
-    pub fn init(&self) -> Result<()> {
+    /// Initialize a new jit repository in the current directory.
+    /// Returns the worktree identity if in a git repository, None otherwise.
+    pub fn init(&self) -> Result<Option<WorktreeIdentity>> {
+        use crate::storage::worktree_identity::load_or_create_worktree_identity;
+        use crate::storage::worktree_paths::WorktreePaths;
+
         self.storage.init()?;
-        println!("Initialized jit repository");
-        Ok(())
+
+        // Check if we're actually in a git repository
+        let in_git_repo = std::process::Command::new("git")
+            .args(["rev-parse", "--is-inside-work-tree"])
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false);
+
+        if !in_git_repo {
+            return Ok(None);
+        }
+
+        // Create worktree identity
+        let paths = WorktreePaths::detect()?;
+
+        // Get git branch name
+        let branch = std::process::Command::new("git")
+            .args(["branch", "--show-current"])
+            .current_dir(&paths.worktree_root)
+            .output()
+            .ok()
+            .and_then(|output| {
+                if output.status.success() {
+                    String::from_utf8(output.stdout).ok()
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_else(|| "main".to_string())
+            .trim()
+            .to_string();
+
+        // Create or update worktree identity
+        // This handles copied files in git worktrees automatically
+        let identity =
+            load_or_create_worktree_identity(&paths.local_jit, &paths.worktree_root, &branch)?;
+
+        Ok(Some(identity))
     }
 
     /// Check if an active lease exists for the given issue by the current agent.

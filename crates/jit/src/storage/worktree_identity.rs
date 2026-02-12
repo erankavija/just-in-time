@@ -108,6 +108,8 @@ pub fn load_or_create_worktree_identity(
     worktree_root: &Path,
     branch: &str,
 ) -> Result<WorktreeIdentity> {
+    use crate::storage::worktree_paths::WorktreePaths;
+
     let wt_file = jit_dir.join("worktree.json");
 
     if wt_file.exists() {
@@ -116,45 +118,62 @@ pub fn load_or_create_worktree_identity(
         let mut identity: WorktreeIdentity =
             serde_json::from_str(&content).context("Failed to parse worktree.json")?;
 
-        // Check for relocation
+        // Check for path mismatch
         let current_root = worktree_root.to_string_lossy().to_string();
         if identity.root != current_root {
-            // Worktree was moved
-            eprintln!(
-                "⚠️  Worktree relocated: {} -> {}",
-                identity.root, current_root
-            );
+            // Path mismatch - could be relocation OR copied file from git worktree add
+            // Detect if we're in a git worktree (not main)
+            let is_secondary_worktree = WorktreePaths::detect()
+                .map(|paths| paths.is_worktree())
+                .unwrap_or(false);
 
-            identity.root = current_root;
-            identity.relocated_at = Some(Utc::now());
+            if is_secondary_worktree {
+                // In a git worktree with wrong path - this is a copied file
+                // Delete it and create a new identity with unique ID
+                fs::remove_file(&wt_file).context("Failed to remove copied worktree.json")?;
 
-            // Write updated identity atomically
-            write_identity_atomic(&wt_file, &identity)?;
+                // Fall through to create new identity
+            } else {
+                // Not in a git worktree - this is a genuine relocation
+                eprintln!(
+                    "⚠️  Worktree relocated: {} -> {}",
+                    identity.root, current_root
+                );
+
+                identity.root = current_root;
+                identity.relocated_at = Some(Utc::now());
+
+                // Write updated identity atomically
+                write_identity_atomic(&wt_file, &identity)?;
+
+                return Ok(identity);
+            }
+        } else {
+            // Paths match - use existing identity
+            return Ok(identity);
         }
-
-        Ok(identity)
-    } else {
-        // Create new identity
-        let now = Utc::now();
-        let worktree_id = generate_worktree_id(worktree_root, now);
-
-        let identity = WorktreeIdentity {
-            schema_version: 1,
-            worktree_id,
-            branch: branch.to_string(),
-            root: worktree_root.to_string_lossy().to_string(),
-            created_at: now,
-            relocated_at: None,
-        };
-
-        // Ensure .jit directory exists
-        fs::create_dir_all(jit_dir).context("Failed to create .jit directory")?;
-
-        // Write atomically
-        write_identity_atomic(&wt_file, &identity)?;
-
-        Ok(identity)
     }
+
+    // Create new identity (either no file existed, or we deleted a copied one)
+    let now = Utc::now();
+    let worktree_id = generate_worktree_id(worktree_root, now);
+
+    let identity = WorktreeIdentity {
+        schema_version: 1,
+        worktree_id,
+        branch: branch.to_string(),
+        root: worktree_root.to_string_lossy().to_string(),
+        created_at: now,
+        relocated_at: None,
+    };
+
+    // Ensure .jit directory exists
+    fs::create_dir_all(jit_dir).context("Failed to create .jit directory")?;
+
+    // Write atomically
+    write_identity_atomic(&wt_file, &identity)?;
+
+    Ok(identity)
 }
 
 /// Write worktree identity atomically using temp file + rename pattern.

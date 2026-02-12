@@ -195,7 +195,7 @@ fn run() -> Result<()> {
     match &command {
         Commands::Init { hierarchy_template } => {
             let output_ctx = OutputContext::new(quiet, false);
-            executor.init()?;
+            let worktree_identity = executor.init()?;
 
             // Set up .gitattributes for merge drivers (if in git repo)
             if let Err(e) = setup_gitattributes() {
@@ -241,6 +241,13 @@ strategic_types = {}
                     "Initialized with '{}' hierarchy template",
                     template_name
                 ));
+            } else if let Some(identity) = worktree_identity {
+                let _ = output_ctx.print_success(format!(
+                    "Initialized jit repository (worktree: {})",
+                    identity.worktree_id
+                ));
+            } else {
+                let _ = output_ctx.print_success("Initialized jit repository");
             }
         }
         _ => {

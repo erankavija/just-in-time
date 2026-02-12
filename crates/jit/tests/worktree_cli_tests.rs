@@ -355,3 +355,124 @@ fn test_recover_json_output() {
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(json["success"], true);
 }
+
+// === jit init in worktrees tests ===
+
+#[test]
+fn test_init_in_new_worktree_generates_unique_id() {
+    let temp = setup_repo();
+
+    // Create a worktree
+    let worktree_path = create_worktree(temp.path(), "test-worktree");
+
+    // Run jit init in the worktree
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(&worktree_path)
+        .arg("init")
+        .assert()
+        .success();
+
+    // Get worktree IDs from both locations
+    let main_wt_file = temp.path().join(".jit/worktree.json");
+    let worktree_wt_file = worktree_path.join(".jit/worktree.json");
+
+    let main_content = fs::read_to_string(&main_wt_file).unwrap();
+    let main_identity: Value = serde_json::from_str(&main_content).unwrap();
+
+    let worktree_content = fs::read_to_string(&worktree_wt_file).unwrap();
+    let worktree_identity: Value = serde_json::from_str(&worktree_content).unwrap();
+
+    // IDs should be different
+    assert_ne!(
+        main_identity["worktree_id"], worktree_identity["worktree_id"],
+        "Main and worktree should have different IDs"
+    );
+
+    // Worktree should have correct root path
+    assert_eq!(
+        worktree_identity["root"].as_str().unwrap(),
+        worktree_path.to_string_lossy().to_string()
+    );
+}
+
+#[test]
+fn test_init_is_idempotent_in_worktree() {
+    let temp = setup_repo();
+
+    // Create a worktree
+    let worktree_path = create_worktree(temp.path(), "test-worktree-idempotent");
+
+    // Run jit init first time
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(&worktree_path)
+        .arg("init")
+        .assert()
+        .success();
+
+    let worktree_wt_file = worktree_path.join(".jit/worktree.json");
+    let first_content = fs::read_to_string(&worktree_wt_file).unwrap();
+    let first_identity: Value = serde_json::from_str(&first_content).unwrap();
+    let first_id = first_identity["worktree_id"].as_str().unwrap();
+
+    // Run jit init second time
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(&worktree_path)
+        .arg("init")
+        .assert()
+        .success();
+
+    let second_content = fs::read_to_string(&worktree_wt_file).unwrap();
+    let second_identity: Value = serde_json::from_str(&second_content).unwrap();
+    let second_id = second_identity["worktree_id"].as_str().unwrap();
+
+    // ID should be unchanged
+    assert_eq!(first_id, second_id, "Init should be idempotent");
+}
+
+#[test]
+fn test_worktree_list_shows_distinct_ids() {
+    let temp = setup_repo();
+
+    // Create two worktrees
+    let worktree1_path = create_worktree(temp.path(), "test-worktree-1");
+    let worktree2_path = create_worktree(temp.path(), "test-worktree-2");
+
+    // Init both worktrees
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(&worktree1_path)
+        .arg("init")
+        .assert()
+        .success();
+
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(&worktree2_path)
+        .arg("init")
+        .assert()
+        .success();
+
+    // List worktrees from main repo
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["worktree", "list", "--json"])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+
+    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    let worktrees = json["data"]["worktrees"].as_array().unwrap();
+
+    // Collect all worktree IDs
+    let mut ids = std::collections::HashSet::new();
+    for wt in worktrees {
+        if let Some(id) = wt["worktree_id"].as_str() {
+            ids.insert(id.to_string());
+        }
+    }
+
+    // Should have at least 3 distinct IDs (main + 2 worktrees)
+    assert!(
+        ids.len() >= 3,
+        "Should have at least 3 distinct worktree IDs"
+    );
+}

@@ -269,7 +269,6 @@ fn test_label_hierarchy_complete_workflow() {
     assert!(namespace_names.contains(&"milestone".to_string()));
     assert!(namespace_names.contains(&"epic".to_string()));
 
-
     // ========================================================================
     // PHASE 5: Validation
     // ========================================================================
@@ -625,10 +624,7 @@ fn test_label_operations_json_output() {
         json["data"]["namespaces"].is_array(),
         "Should have namespaces array"
     );
-    assert!(
-        json["data"]["count"].is_number(),
-        "Should have count field"
-    );
+    assert!(json["data"]["count"].is_number(), "Should have count field");
 }
 
 // ============================================================================

@@ -769,7 +769,6 @@ pub struct NamespacesResponse {
     pub count: usize,
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
