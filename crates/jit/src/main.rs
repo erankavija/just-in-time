@@ -2790,14 +2790,20 @@ strategic_types = {}
             }
         }
         Commands::Status { json } => {
-            if json {
-                use jit::output::JsonOutput;
+            let output_ctx = OutputContext::new(quiet, json);
+            let summary = executor.get_status()?;
 
-                let summary = executor.get_status()?;
+            if json {
                 let output = JsonOutput::success(&summary, "status");
                 println!("{}", output.to_json_string()?);
             } else {
-                executor.status()?;
+                output_ctx.print_data("Status:")?;
+                output_ctx.print_data(format!("  Open: {}", summary.open))?;
+                output_ctx.print_data(format!("  Ready: {}", summary.ready))?;
+                output_ctx.print_data(format!("  In Progress: {}", summary.in_progress))?;
+                output_ctx.print_data(format!("  Done: {}", summary.done))?;
+                output_ctx.print_data(format!("  Rejected: {}", summary.rejected))?;
+                output_ctx.print_data(format!("  Blocked: {}", summary.blocked))?;
             }
         }
         Commands::Validate {

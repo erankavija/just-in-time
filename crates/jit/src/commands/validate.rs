@@ -462,20 +462,6 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(())
     }
 
-    pub fn status(&self) -> Result<()> {
-        let summary = self.get_status()?;
-
-        println!("Status:");
-        println!("  Open: {}", summary.open);
-        println!("  Ready: {}", summary.ready);
-        println!("  In Progress: {}", summary.in_progress);
-        println!("  Done: {}", summary.done);
-        println!("  Rejected: {}", summary.rejected);
-        println!("  Blocked: {}", summary.blocked);
-
-        Ok(())
-    }
-
     pub fn get_status(&self) -> Result<StatusSummary> {
         let issues = self.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
