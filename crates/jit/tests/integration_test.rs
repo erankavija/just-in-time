@@ -629,14 +629,31 @@ fn test_validate_repository() {
     let temp = setup_test_repo();
     let jit = jit_binary();
 
-    Command::new(&jit)
+    let output1 = Command::new(&jit)
         .args(["issue", "create", "-t", "Task 1", "-d", "Desc"])
         .current_dir(temp.path())
         .output()
         .unwrap();
+    let id1 = String::from_utf8_lossy(&output1.stdout)
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
 
-    Command::new(&jit)
+    let output2 = Command::new(&jit)
         .args(["issue", "create", "-t", "Task 2", "-d", "Desc"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let id2 = String::from_utf8_lossy(&output2.stdout)
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+
+    // Add dependency to connect the issues
+    Command::new(&jit)
+        .args(["dep", "add", &id2, &id1])
         .current_dir(temp.path())
         .output()
         .unwrap();

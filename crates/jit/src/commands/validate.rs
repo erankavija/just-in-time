@@ -247,6 +247,25 @@ impl<S: IssueStore> CommandExecutor<S> {
         let graph = DependencyGraph::new(&issue_refs);
         graph.validate_dag()?;
 
+        // Validate no isolated nodes (nodes outside the main DAG)
+        // Exception: A single issue in the repository is not considered isolated
+        if issues.len() > 1 {
+            let isolated = graph.get_isolated_nodes();
+            if !isolated.is_empty() {
+                let isolated_ids: Vec<String> = isolated
+                    .iter()
+                    .map(|i| format!("'{}' ({})", &i.id[..8.min(i.id.len())], i.title))
+                    .collect();
+                return Err(anyhow!(
+                    "Found {} isolated issue(s) not connected to the dependency graph:\n  {}\n\
+                     Isolated issues have no dependencies and are not dependencies of any other issue.\n\
+                     Either add dependencies with 'jit dep add' or delete these issues.",
+                    isolated.len(),
+                    isolated_ids.join("\n  ")
+                ));
+            }
+        }
+
         // Validate transitive reduction (no redundant dependencies)
         self.validate_transitive_reduction(&graph, &issues)?;
 

@@ -125,7 +125,7 @@ fn test_snapshot_export_label_scope() {
         .success();
 
     // Create issues with different labels
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+    let epic_output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
         .args([
             "issue",
@@ -135,10 +135,15 @@ fn test_snapshot_export_label_scope() {
             "--label",
             "epic:auth",
         ])
-        .assert()
-        .success();
+        .output()
+        .unwrap();
+    let epic_id = String::from_utf8_lossy(&epic_output.stdout)
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
 
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+    let auth_output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
         .args([
             "issue",
@@ -148,10 +153,15 @@ fn test_snapshot_export_label_scope() {
             "--label",
             "epic:auth",
         ])
-        .assert()
-        .success();
+        .output()
+        .unwrap();
+    let auth_id = String::from_utf8_lossy(&auth_output.stdout)
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
 
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+    let other_output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
         .args([
             "issue",
@@ -161,6 +171,24 @@ fn test_snapshot_export_label_scope() {
             "--label",
             "epic:billing",
         ])
+        .output()
+        .unwrap();
+    let other_id = String::from_utf8_lossy(&other_output.stdout)
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+
+    // Create dependencies to connect the issues
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["dep", "add", &auth_id, &epic_id])
+        .assert()
+        .success();
+
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["dep", "add", &other_id, &epic_id])
         .assert()
         .success();
 

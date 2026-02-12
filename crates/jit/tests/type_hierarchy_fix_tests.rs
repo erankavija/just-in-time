@@ -151,6 +151,7 @@ fn test_fix_multiple_issues() {
         ],
     );
     assert!(output.status.success());
+    let id1 = extract_id(&String::from_utf8_lossy(&output.stdout));
 
     let output = run_jit(
         &temp,
@@ -163,6 +164,11 @@ fn test_fix_multiple_issues() {
             "type:epik", // typo
         ],
     );
+    assert!(output.status.success());
+    let id2 = extract_id(&String::from_utf8_lossy(&output.stdout));
+
+    // Connect the issues to avoid isolated node error
+    let output = run_jit(&temp, &["dep", "add", &id2, &id1]);
     assert!(output.status.success());
 
     // Run validate with --fix

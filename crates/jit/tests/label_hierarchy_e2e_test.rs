@@ -424,7 +424,7 @@ fn test_label_validation_workflow() {
         ],
     );
     assert!(output.status.success());
-    let _task_id = extract_id(&String::from_utf8_lossy(&output.stdout));
+    let task_id = extract_id(&String::from_utf8_lossy(&output.stdout));
 
     // Create an actual epic issue that the task references
     let output = run_jit(
@@ -440,6 +440,11 @@ fn test_label_validation_workflow() {
             "epic:test",
         ],
     );
+    assert!(output.status.success());
+    let epic_id = extract_id(&String::from_utf8_lossy(&output.stdout));
+
+    // Connect the task to the epic via dependency
+    let output = run_jit(&temp, &["dep", "add", &task_id, &epic_id]);
     assert!(output.status.success());
 
     // Validation should pass (correct type, valid membership reference)
@@ -464,6 +469,11 @@ fn test_label_validation_workflow() {
             "epic:nonexistent",
         ],
     );
+    assert!(output.status.success());
+    let orphan_task_id = extract_id(&String::from_utf8_lossy(&output.stdout));
+
+    // Connect the orphan task to the epic to avoid isolated node validation error
+    let output = run_jit(&temp, &["dep", "add", &orphan_task_id, &epic_id]);
     assert!(output.status.success());
 
     // Note: Validation currently does NOT fail for orphaned membership references

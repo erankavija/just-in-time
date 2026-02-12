@@ -146,6 +146,24 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
             .collect()
     }
 
+    /// Get all isolated nodes (nodes with no dependencies and no dependents)
+    ///
+    /// An isolated node is one that has no incoming or outgoing edges in the
+    /// dependency graph. These nodes are not connected to any other node.
+    pub fn get_isolated_nodes(&self) -> Vec<&'a T> {
+        self.nodes
+            .values()
+            .filter(|node| {
+                // No dependencies (no outgoing edges)
+                let has_no_dependencies = node.dependencies().is_empty();
+                // No dependents (no incoming edges)
+                let has_no_dependents = self.get_dependents(node.id()).is_empty();
+                has_no_dependencies && has_no_dependents
+            })
+            .copied()
+            .collect()
+    }
+
     /// Validate that the graph is a DAG (no cycles)
     pub fn validate_dag(&self) -> Result<(), GraphError> {
         // Check for cycles using DFS
@@ -731,5 +749,82 @@ mod tests {
         assert!(reduced_deps.contains("B"));
         assert!(reduced_deps.contains("C"));
         assert!(!reduced_deps.contains("D"));
+    }
+
+    #[test]
+    fn test_get_isolated_nodes_empty_graph() {
+        let nodes: Vec<&TestNode> = vec![];
+        let graph = DependencyGraph::new(&nodes);
+
+        let isolated = graph.get_isolated_nodes();
+        assert_eq!(isolated.len(), 0);
+    }
+
+    #[test]
+    fn test_get_isolated_nodes_single_node() {
+        let node = TestNode::new("alone", vec![]);
+        let graph = DependencyGraph::new(&[&node]);
+
+        let isolated = graph.get_isolated_nodes();
+        assert_eq!(isolated.len(), 1);
+        assert_eq!(isolated[0].id(), "alone");
+    }
+
+    #[test]
+    fn test_get_isolated_nodes_connected_chain() {
+        // A→B→C - no isolated nodes
+        let a = TestNode::new("A", vec!["B"]);
+        let b = TestNode::new("B", vec!["C"]);
+        let c = TestNode::new("C", vec![]);
+
+        let graph = DependencyGraph::new(&[&a, &b, &c]);
+        let isolated = graph.get_isolated_nodes();
+        assert_eq!(isolated.len(), 0);
+    }
+
+    #[test]
+    fn test_get_isolated_nodes_with_isolated() {
+        // A→B and C is isolated
+        let a = TestNode::new("A", vec!["B"]);
+        let b = TestNode::new("B", vec![]);
+        let c = TestNode::new("C", vec![]);
+
+        let graph = DependencyGraph::new(&[&a, &b, &c]);
+        let isolated = graph.get_isolated_nodes();
+        assert_eq!(isolated.len(), 1);
+        assert_eq!(isolated[0].id(), "C");
+    }
+
+    #[test]
+    fn test_get_isolated_nodes_multiple_isolated() {
+        // A→B and C, D are isolated
+        let a = TestNode::new("A", vec!["B"]);
+        let b = TestNode::new("B", vec![]);
+        let c = TestNode::new("C", vec![]);
+        let d = TestNode::new("D", vec![]);
+
+        let graph = DependencyGraph::new(&[&a, &b, &c, &d]);
+        let isolated = graph.get_isolated_nodes();
+        assert_eq!(isolated.len(), 2);
+        let isolated_ids: Vec<&str> = isolated.iter().map(|n| n.id()).collect();
+        assert!(isolated_ids.contains(&"C"));
+        assert!(isolated_ids.contains(&"D"));
+    }
+
+    #[test]
+    fn test_get_isolated_nodes_with_issues() {
+        // Test with actual Issue type
+        let issue1 = Issue::new("Connected 1".to_string(), "Desc".to_string());
+        let mut issue2 = Issue::new("Connected 2".to_string(), "Desc".to_string());
+        let issue3 = Issue::new("Isolated".to_string(), "Desc".to_string());
+
+        issue2.dependencies.push(issue1.id.clone());
+
+        let issues = vec![&issue1, &issue2, &issue3];
+        let graph = DependencyGraph::new(&issues);
+
+        let isolated = graph.get_isolated_nodes();
+        assert_eq!(isolated.len(), 1);
+        assert_eq!(isolated[0].id, issue3.id);
     }
 }

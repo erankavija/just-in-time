@@ -190,3 +190,114 @@ fn test_validation_detects_invalid_gate_reference() {
         err_msg.contains("Gate") || err_msg.contains("not found") || err_msg.contains("undefined")
     );
 }
+
+#[test]
+fn test_validation_detects_isolated_issues() {
+    let storage = InMemoryStorage::new();
+    let executor = CommandExecutor::new(storage.clone());
+
+    // Create connected issues: A -> B
+    let (issue_a_id, _) = executor
+        .create_issue(
+            "Connected A".to_string(),
+            "".to_string(),
+            Priority::Normal,
+            vec![],
+            vec![],
+        )
+        .unwrap();
+
+    let (issue_b_id, _) = executor
+        .create_issue(
+            "Connected B".to_string(),
+            "".to_string(),
+            Priority::Normal,
+            vec![],
+            vec![],
+        )
+        .unwrap();
+
+    executor.add_dependency(&issue_b_id, &issue_a_id).unwrap();
+
+    // Create an isolated issue (no deps, not a dep of anything)
+    let (_isolated_id, _) = executor
+        .create_issue(
+            "Isolated Issue".to_string(),
+            "".to_string(),
+            Priority::Normal,
+            vec![],
+            vec![],
+        )
+        .unwrap();
+
+    // Validation should fail due to isolated issue
+    let result = executor.validate_silent();
+    assert!(result.is_err());
+    let err_msg = result.unwrap_err().to_string();
+    assert!(err_msg.contains("isolated") || err_msg.contains("Isolated"));
+}
+
+#[test]
+fn test_validation_passes_with_all_connected_issues() {
+    let storage = InMemoryStorage::new();
+    let executor = CommandExecutor::new(storage.clone());
+
+    // Create a connected graph: A -> B -> C
+    let (issue_a_id, _) = executor
+        .create_issue(
+            "Issue A".to_string(),
+            "".to_string(),
+            Priority::Normal,
+            vec![],
+            vec![],
+        )
+        .unwrap();
+
+    let (issue_b_id, _) = executor
+        .create_issue(
+            "Issue B".to_string(),
+            "".to_string(),
+            Priority::Normal,
+            vec![],
+            vec![],
+        )
+        .unwrap();
+
+    let (issue_c_id, _) = executor
+        .create_issue(
+            "Issue C".to_string(),
+            "".to_string(),
+            Priority::Normal,
+            vec![],
+            vec![],
+        )
+        .unwrap();
+
+    executor.add_dependency(&issue_b_id, &issue_a_id).unwrap();
+    executor.add_dependency(&issue_c_id, &issue_b_id).unwrap();
+
+    // All issues are connected - validation should pass
+    let result = executor.validate_silent();
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_validation_passes_with_single_issue() {
+    let storage = InMemoryStorage::new();
+    let executor = CommandExecutor::new(storage.clone());
+
+    // Create a single issue (edge case - should not be considered isolated)
+    let (_issue_id, _) = executor
+        .create_issue(
+            "Single Issue".to_string(),
+            "".to_string(),
+            Priority::Normal,
+            vec![],
+            vec![],
+        )
+        .unwrap();
+
+    // Single issue should not be considered isolated - validation should pass
+    let result = executor.validate_silent();
+    assert!(result.is_ok());
+}
