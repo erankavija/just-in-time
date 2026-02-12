@@ -240,12 +240,28 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
         println!("\n---\n");
 
-        // Try to read content from git
-        let repo = Repository::open(".").map_err(|e| anyhow!("Not a git repository: {}", e))?;
-
-        let content = self
-            .read_file_from_git(&repo, &doc.path, reference)
-            .map_err(|e| anyhow!("Error reading file from git: {}", e))?;
+        // Read content: try git first, fall back to filesystem if git unavailable
+        let content = if at_commit.is_some() || doc.commit.is_some() {
+            // Explicit version requested - require git
+            let repo = Repository::open(".")
+                .context("Git repository required when viewing specific commit version")?;
+            self.read_file_from_git(&repo, &doc.path, reference)
+                .with_context(|| format!("Failed to read {} from git at {}", doc.path, reference))?
+        } else {
+            // No specific version - try git, fall back to filesystem
+            match Repository::open(".") {
+                Ok(repo) => {
+                    // Git available - read from git
+                    self.read_file_from_git(&repo, &doc.path, "HEAD")
+                        .with_context(|| format!("Failed to read {} from git", doc.path))?
+                }
+                Err(_) => {
+                    // Git not available - read from filesystem
+                    std::fs::read_to_string(&doc.path)
+                        .with_context(|| format!("Failed to read {} from filesystem", doc.path))?
+                }
+            }
+        };
 
         println!("{}", content);
 

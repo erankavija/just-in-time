@@ -11,7 +11,6 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-
 /// Worktree identity persisted in `<worktree>/.jit/worktree.json`.
 ///
 /// The worktree ID is stable across relocations to support lease continuity.
@@ -133,11 +132,13 @@ pub fn load_or_create_worktree_identity(
                 // Check if old path still exists with the same ID
                 let old_path = PathBuf::from(&identity.root);
                 let old_wt_file = old_path.join(".jit").join("worktree.json");
-                
+
                 let is_copy = if old_wt_file.exists() {
                     // Old path exists - check if it has the same ID
                     if let Ok(old_content) = fs::read_to_string(&old_wt_file) {
-                        if let Ok(old_identity) = serde_json::from_str::<WorktreeIdentity>(&old_content) {
+                        if let Ok(old_identity) =
+                            serde_json::from_str::<WorktreeIdentity>(&old_content)
+                        {
                             // If IDs match, this is a copy (both have same ID)
                             old_identity.worktree_id == identity.worktree_id
                         } else {
