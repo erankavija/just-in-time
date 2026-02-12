@@ -11,7 +11,15 @@
   "gates_required": [],
   "gates_status": {},
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "dev/f766b092-remove-printing-plan.md",
+      "commit": null,
+      "label": "Implementation Plan",
+      "doc_type": "design",
+      "format": "markdown"
+    }
+  ],
   "labels": [
     "type:task",
     "epic:production-polish",
