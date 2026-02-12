@@ -177,7 +177,7 @@ impl Parser {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::query::lexer::Lexer;
+    use crate::query_engine::lexer::Lexer;
 
     #[test]
     fn test_parse_single_condition() {

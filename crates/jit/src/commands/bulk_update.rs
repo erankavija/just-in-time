@@ -5,7 +5,7 @@
 
 use super::*;
 use crate::domain::{Issue, Priority, State};
-use crate::query::QueryFilter;
+use crate::query_engine::QueryFilter;
 use serde::Serialize;
 
 /// Operations to apply to issues
@@ -445,7 +445,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             // Check if blocked by dependencies
             if matches!(new_state, State::Ready | State::Done) {
                 let all_issues = self.storage.list_issues()?;
-                let context = crate::query::QueryContext::from_issues(&all_issues);
+                let context = crate::query_engine::QueryContext::from_issues(&all_issues);
 
                 if issue.is_blocked(&context.all_issues) {
                     return Err(anyhow::anyhow!(
@@ -598,7 +598,7 @@ mod tests {
 
     #[test]
     fn test_apply_bulk_update_single_issue() {
-        use crate::query::QueryFilter;
+        use crate::query_engine::QueryFilter;
         use crate::storage::InMemoryStorage;
 
         let storage = InMemoryStorage::new();
@@ -629,7 +629,7 @@ mod tests {
 
     #[test]
     fn test_apply_bulk_update_multiple_issues() {
-        use crate::query::QueryFilter;
+        use crate::query_engine::QueryFilter;
         use crate::storage::InMemoryStorage;
 
         let storage = InMemoryStorage::new();
@@ -669,7 +669,7 @@ mod tests {
 
     #[test]
     fn test_apply_bulk_update_no_changes() {
-        use crate::query::QueryFilter;
+        use crate::query_engine::QueryFilter;
         use crate::storage::InMemoryStorage;
 
         let storage = InMemoryStorage::new();
@@ -695,7 +695,7 @@ mod tests {
 
     #[test]
     fn test_apply_bulk_update_with_errors() {
-        use crate::query::QueryFilter;
+        use crate::query_engine::QueryFilter;
         use crate::storage::InMemoryStorage;
 
         let storage = InMemoryStorage::new();
@@ -724,7 +724,7 @@ mod tests {
 
     #[test]
     fn test_apply_bulk_update_best_effort() {
-        use crate::query::QueryFilter;
+        use crate::query_engine::QueryFilter;
         use crate::storage::InMemoryStorage;
 
         let storage = InMemoryStorage::new();
@@ -766,7 +766,7 @@ mod tests {
 
     #[test]
     fn test_bulk_update_rejects_invalid_label_format() {
-        use crate::query::QueryFilter;
+        use crate::query_engine::QueryFilter;
         use crate::storage::InMemoryStorage;
 
         let storage = InMemoryStorage::new();
@@ -794,7 +794,7 @@ mod tests {
 
     #[test]
     fn test_bulk_update_rejects_duplicate_unique_namespace() {
-        use crate::query::QueryFilter;
+        use crate::query_engine::QueryFilter;
         use crate::storage::InMemoryStorage;
 
         let storage = InMemoryStorage::new();
@@ -824,7 +824,7 @@ mod tests {
 
     #[test]
     fn test_bulk_update_rejects_invalid_assignee_format() {
-        use crate::query::QueryFilter;
+        use crate::query_engine::QueryFilter;
         use crate::storage::InMemoryStorage;
 
         let storage = InMemoryStorage::new();
@@ -852,7 +852,7 @@ mod tests {
 
     #[test]
     fn test_bulk_update_accepts_valid_assignee_format() {
-        use crate::query::QueryFilter;
+        use crate::query_engine::QueryFilter;
         use crate::storage::InMemoryStorage;
 
         let storage = InMemoryStorage::new();
@@ -883,7 +883,7 @@ mod tests {
 
     #[test]
     fn test_bulk_update_accepts_valid_labels() {
-        use crate::query::QueryFilter;
+        use crate::query_engine::QueryFilter;
         use crate::storage::InMemoryStorage;
 
         let storage = InMemoryStorage::new();

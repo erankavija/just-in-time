@@ -2,9 +2,9 @@
   "id": "c41dab3d-8c3f-4b33-a8e5-45cae59d81f1",
   "title": "Rename query modules to resolve naming confusion",
   "description": "## Problem\n\nTwo completely different modules are both called \"query\":\n\n- **`commands/query.rs`** — Simple issue filter functions (`query_ready`, `query_by_state`, etc.)\n- **`query/`** — A full boolean query DSL with lexer, parser, and evaluator (`\"state:ready AND priority:high\"`)\n\nThis confuses contributors and makes code navigation harder.\n\n## Approach\n\nAfter 7004d5b6 moves query functions to `domain/queries.rs`, rename `query/` to `query_engine/` (or `query_dsl/`) to clearly distinguish it:\n\n1. Rename `crates/jit/src/query/` → `crates/jit/src/query_engine/`\n2. Update `lib.rs`: `pub mod query_engine;`\n3. Update all imports referencing `crate::query::` → `crate::query_engine::`\n4. Update `bulk_update.rs` and any other consumers of the query DSL\n\n## Acceptance Criteria\n\n- [ ] No two modules share the \"query\" name\n- [ ] All imports updated\n- [ ] All existing tests pass",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "low",
-  "assignee": null,
+  "assignee": "agent:copilot-session",
   "dependencies": [
     "7004d5b6-0f4d-4dd7-9623-6d953ff94025"
   ],

@@ -554,7 +554,7 @@ strategic_types = {}
                     // Batch mode
                     else if let Some(filter_str) = filter {
                         use jit::commands::bulk_update::UpdateOperations;
-                        use jit::query::QueryFilter;
+                        use jit::query_engine::QueryFilter;
 
                         // Parse query filter
                         let query_filter = QueryFilter::parse(&filter_str)?;
