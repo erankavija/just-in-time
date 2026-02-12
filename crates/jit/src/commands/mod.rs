@@ -77,6 +77,63 @@ pub struct StatusSummary {
     pub total: usize,
 }
 
+/// Result of listing document references for an issue
+#[derive(Debug, Serialize)]
+pub struct DocumentListResult {
+    pub issue_id: String,
+    pub documents: Vec<crate::domain::DocumentReference>,
+    pub count: usize,
+}
+
+/// Git history for a document
+#[derive(Debug, Serialize)]
+pub struct DocumentHistory {
+    pub path: String,
+    pub commits: Vec<CommitInfo>,
+}
+
+/// Result of listing assets for a document
+#[derive(Debug, Serialize)]
+pub struct AssetListResult {
+    pub issue_id: String,
+    pub document_path: String,
+    pub assets: Vec<crate::document::Asset>,
+    pub summary: AssetSummary,
+    pub warnings: Vec<String>,
+}
+
+/// Summary of asset counts by category
+#[derive(Debug, Serialize)]
+pub struct AssetSummary {
+    pub total: usize,
+    pub per_doc: usize,
+    pub shared: usize,
+    pub external: usize,
+    pub missing: usize,
+}
+
+/// Result of checking document links
+#[derive(Debug, Serialize)]
+pub struct LinkCheckResult {
+    pub valid: bool,
+    pub errors: Vec<serde_json::Value>,
+    pub warnings: Vec<serde_json::Value>,
+    #[serde(skip)]
+    pub exit_code: i32,
+    #[serde(skip)]
+    pub scope: String,
+    pub summary: LinkCheckSummary,
+}
+
+/// Summary of link check results
+#[derive(Debug, Serialize)]
+pub struct LinkCheckSummary {
+    pub total_documents: usize,
+    pub valid: usize,
+    pub errors: usize,
+    pub warnings: usize,
+}
+
 /// Result of adding a dependency
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DependencyAddResult {

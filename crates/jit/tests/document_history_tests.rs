@@ -129,11 +129,11 @@ fn test_doc_history_lists_commits() {
     repo.run_jit(&["doc", "add", issue_id, "docs/design.md"]);
 
     // Test: Get document history
-    let history = repo.run_jit_json(&["doc", "history", issue_id, "docs/design.md"]);
+    let history_output = repo.run_jit_json(&["doc", "history", issue_id, "docs/design.md"]);
 
-    // Should return array of commits
-    assert!(history.is_array(), "Expected array of commits");
-    let commits = history.as_array().unwrap();
+    // Should return wrapped result with commits array
+    assert!(history_output["success"].as_bool().unwrap());
+    let commits = history_output["data"]["commits"].as_array().unwrap();
     assert_eq!(commits.len(), 3, "Expected 3 commits");
 
     // Verify commit information (most recent first)
@@ -342,10 +342,10 @@ fn test_doc_history_json_output() {
     repo.run_jit(&["doc", "add", issue_id, "docs/doc.md"]);
 
     // JSON output for history
-    let history = repo.run_jit_json(&["doc", "history", issue_id, "docs/doc.md"]);
+    let history_output = repo.run_jit_json(&["doc", "history", issue_id, "docs/doc.md"]);
 
-    assert!(history.is_array());
-    let commits = history.as_array().unwrap();
+    assert!(history_output["success"].as_bool().unwrap());
+    let commits = history_output["data"]["commits"].as_array().unwrap();
     assert!(commits.len() >= 2);
 
     // Validate structure

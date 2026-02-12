@@ -1792,7 +1792,41 @@ strategic_types = {}
                 )?;
             }
             DocCommands::List { id, json } => {
-                executor.list_document_references(&id, json)?;
+                use jit::output::JsonOutput;
+
+                let output_ctx = OutputContext::new(quiet, json);
+                let result = executor.list_document_references(&id)?;
+
+                if json {
+                    let output = JsonOutput::success(&result, "doc list");
+                    println!("{}", output.to_json_string()?);
+                } else if result.documents.is_empty() {
+                    output_ctx.print_data(format!(
+                        "No document references for issue {}",
+                        result.issue_id
+                    ))?;
+                } else {
+                    output_ctx.print_data(format!(
+                        "Document references for issue {}:",
+                        result.issue_id
+                    ))?;
+                    for doc in &result.documents {
+                        let mut line = format!("  - {}", doc.path);
+                        if let Some(ref label) = doc.label {
+                            line.push_str(&format!(" ({})", label));
+                        }
+                        if let Some(ref commit) = doc.commit {
+                            line.push_str(&format!(" [{}]", &commit[..7.min(commit.len())]));
+                        } else {
+                            line.push_str(" [HEAD]");
+                        }
+                        if let Some(ref doc_type) = doc.doc_type {
+                            line.push_str(&format!(" <{}>", doc_type));
+                        }
+                        output_ctx.print_data(line)?;
+                    }
+                    output_ctx.print_data(format!("\nTotal: {}", result.count))?;
+                }
             }
             DocCommands::Remove { id, path, json } => {
                 executor.remove_document_reference(&id, &path, json)?;
@@ -1801,7 +1835,25 @@ strategic_types = {}
                 executor.show_document_content(&id, &path, at.as_deref())?;
             }
             DocCommands::History { id, path, json } => {
-                executor.document_history(&id, &path, json)?;
+                use jit::output::JsonOutput;
+
+                let output_ctx = OutputContext::new(quiet, json);
+                let result = executor.document_history(&id, &path)?;
+
+                if json {
+                    let output = JsonOutput::success(&result, "doc history");
+                    println!("{}", output.to_json_string()?);
+                } else {
+                    output_ctx.print_data(format!("History for {}:\n", result.path))?;
+                    for commit in &result.commits {
+                        output_ctx.print_data(format!("commit {}", commit.sha))?;
+                        output_ctx.print_data(format!("Author: {}", commit.author))?;
+                        output_ctx.print_data(format!("Date:   {}", commit.date))?;
+                        output_ctx.print_data("")?;
+                        output_ctx.print_data(format!("    {}", commit.message))?;
+                        output_ctx.print_data("")?;
+                    }
+                }
             }
             DocCommands::Diff { id, path, from, to } => {
                 executor.document_diff(&id, &path, &from, to.as_deref())?;
@@ -1813,12 +1865,198 @@ strategic_types = {}
                     rescan,
                     json,
                 } => {
-                    executor.list_document_assets(&id, &path, rescan, json)?;
+                    use jit::document::AssetType;
+                    use jit::output::JsonOutput;
+
+                    let output_ctx = OutputContext::new(quiet, json);
+                    let result = executor.list_document_assets(&id, &path, rescan)?;
+
+                    // Print warnings first if any
+                    for warning in &result.warnings {
+                        output_ctx.print_warning(warning)?;
+                    }
+
+                    if json {
+                        let output = JsonOutput::success(&result, "doc assets");
+                        println!("{}", output.to_json_string()?);
+                    } else {
+                        // Get repository root to check if assets exist
+                        let repo_root = executor
+                            .storage()
+                            .root()
+                            .parent()
+                            .ok_or_else(|| anyhow::anyhow!("Invalid storage path"))?;
+
+                        output_ctx.print_data(format!(
+                            "Assets for document {} (issue {}):",
+                            result.document_path,
+                            &result.issue_id[..8.min(result.issue_id.len())]
+                        ))?;
+
+                        if result.assets.is_empty() {
+                            output_ctx.print_data("  No assets found for this document")?;
+                        } else {
+                            // Categorize and check existence
+                            let per_doc: Vec<_> = result
+                                .assets
+                                .iter()
+                                .filter(|a| !a.is_shared && a.asset_type == AssetType::Local)
+                                .map(|a| {
+                                    let exists = a
+                                        .resolved_path
+                                        .as_ref()
+                                        .map(|p| repo_root.join(p).exists())
+                                        .unwrap_or(false);
+                                    (a, exists)
+                                })
+                                .collect();
+                            let shared: Vec<_> = result
+                                .assets
+                                .iter()
+                                .filter(|a| a.is_shared && a.asset_type == AssetType::Local)
+                                .map(|a| {
+                                    let exists = a
+                                        .resolved_path
+                                        .as_ref()
+                                        .map(|p| repo_root.join(p).exists())
+                                        .unwrap_or(false);
+                                    (a, exists)
+                                })
+                                .collect();
+                            let external: Vec<_> = result
+                                .assets
+                                .iter()
+                                .filter(|a| a.asset_type == AssetType::External)
+                                .collect();
+                            let missing: Vec<_> = result
+                                .assets
+                                .iter()
+                                .filter(|a| a.asset_type == AssetType::Missing)
+                                .collect();
+
+                            if !per_doc.is_empty() {
+                                output_ctx.print_data("\nPer-document assets:")?;
+                                for (asset, exists) in &per_doc {
+                                    let status = if *exists { "✓" } else { "✗" };
+                                    output_ctx.print_data(format!(
+                                        "  {} {}",
+                                        status, asset.original_path
+                                    ))?;
+                                    if let Some(ref resolved) = asset.resolved_path {
+                                        output_ctx
+                                            .print_data(format!("     → {}", resolved.display()))?;
+                                    }
+                                    if let Some(ref mime) = asset.mime_type {
+                                        output_ctx.print_data(format!("     MIME: {}", mime))?;
+                                    }
+                                }
+                            }
+
+                            if !shared.is_empty() {
+                                output_ctx.print_data("\nShared assets:")?;
+                                for (asset, exists) in &shared {
+                                    let status = if *exists { "✓" } else { "✗" };
+                                    output_ctx.print_data(format!(
+                                        "  {} {}",
+                                        status, asset.original_path
+                                    ))?;
+                                    if let Some(ref resolved) = asset.resolved_path {
+                                        output_ctx
+                                            .print_data(format!("     → {}", resolved.display()))?;
+                                    }
+                                }
+                            }
+
+                            if !external.is_empty() {
+                                output_ctx.print_data("\nExternal URLs:")?;
+                                for asset in &external {
+                                    output_ctx
+                                        .print_data(format!("  🌐 {}", asset.original_path))?;
+                                }
+                            }
+
+                            if !missing.is_empty() {
+                                output_ctx.print_data("\n⚠ Missing assets:")?;
+                                for asset in &missing {
+                                    output_ctx
+                                        .print_data(format!("  ✗ {}", asset.original_path))?;
+                                    if let Some(ref resolved) = asset.resolved_path {
+                                        output_ctx.print_data(format!(
+                                            "     Expected at: {}",
+                                            resolved.display()
+                                        ))?;
+                                    }
+                                }
+                            }
+
+                            output_ctx.print_data(format!(
+                                "\nSummary: {} total ({} per-doc, {} shared, {} external, {} missing)",
+                                result.summary.total,
+                                result.summary.per_doc,
+                                result.summary.shared,
+                                result.summary.external,
+                                result.summary.missing
+                            ))?;
+                        }
+                    }
                 }
             },
             DocCommands::CheckLinks { scope, json } => {
-                let exit_code = executor.check_document_links(&scope, json)?;
-                std::process::exit(exit_code);
+                use jit::output::JsonOutput;
+
+                let output_ctx = OutputContext::new(quiet, json);
+                let result = executor.check_document_links(&scope)?;
+
+                if json {
+                    let output = JsonOutput::success(&result, "doc check-links");
+                    println!("{}", output.to_json_string()?);
+                } else {
+                    output_ctx.print_data(format!(
+                        "Checking {} document(s) in scope '{}'...\n",
+                        result.summary.total_documents, result.scope
+                    ))?;
+
+                    if !result.errors.is_empty() {
+                        output_ctx
+                            .print_data(format!("❌ Errors found ({}):", result.errors.len()))?;
+                        for error in &result.errors {
+                            output_ctx.print_data(format!(
+                                "  {} ({}): {}",
+                                error["document"].as_str().unwrap_or(""),
+                                error["type"].as_str().unwrap_or(""),
+                                error["message"].as_str().unwrap_or("")
+                            ))?;
+                        }
+                        output_ctx.print_data("")?;
+                    }
+
+                    if !result.warnings.is_empty() {
+                        output_ctx
+                            .print_data(format!("⚠️  Warnings ({}):", result.warnings.len()))?;
+                        for warning in &result.warnings {
+                            output_ctx.print_data(format!(
+                                "  {} ({}): {}",
+                                warning["document"].as_str().unwrap_or(""),
+                                warning["type"].as_str().unwrap_or(""),
+                                warning["message"].as_str().unwrap_or("")
+                            ))?;
+                        }
+                        output_ctx.print_data("")?;
+                    }
+
+                    if result.errors.is_empty() && result.warnings.is_empty() {
+                        output_ctx.print_data("✅ All documents valid!")?;
+                    }
+
+                    output_ctx.print_data(format!(
+                        "Summary: {} document(s) checked, {} error(s), {} warning(s)",
+                        result.summary.total_documents,
+                        result.summary.errors,
+                        result.summary.warnings
+                    ))?;
+                }
+
+                std::process::exit(result.exit_code);
             }
             DocCommands::Archive {
                 path,

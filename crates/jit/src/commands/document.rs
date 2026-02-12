@@ -115,50 +115,18 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(())
     }
 
-    pub fn list_document_references(&self, issue_id: &str, json: bool) -> Result<()> {
-        use crate::output::{JsonError, JsonOutput};
-
+    pub fn list_document_references(
+        &self,
+        issue_id: &str,
+    ) -> Result<crate::commands::DocumentListResult> {
         let full_id = self.storage.resolve_issue_id(issue_id)?;
-        let issue = self.storage.load_issue(&full_id).inspect_err(|_| {
-            if json {
-                let err = JsonError::issue_not_found(issue_id, "doc list");
-                println!("{}", err.to_json_string().unwrap());
-            }
-        })?;
+        let issue = self.storage.load_issue(&full_id)?;
 
-        if json {
-            let output = JsonOutput::success(
-                serde_json::json!({
-                    "issue_id": full_id,
-                    "documents": issue.documents,
-                    "count": issue.documents.len(),
-                }),
-                "doc list",
-            );
-            println!("{}", output.to_json_string()?);
-        } else if issue.documents.is_empty() {
-            println!("No document references for issue {}", full_id);
-        } else {
-            println!("Document references for issue {}:", full_id);
-            for doc in &issue.documents {
-                print!("  - {}", doc.path);
-                if let Some(ref label) = doc.label {
-                    print!(" ({})", label);
-                }
-                if let Some(ref commit) = doc.commit {
-                    print!(" [{}]", &commit[..7.min(commit.len())]);
-                } else {
-                    print!(" [HEAD]");
-                }
-                if let Some(ref doc_type) = doc.doc_type {
-                    print!(" <{}>", doc_type);
-                }
-                println!();
-            }
-            println!("\nTotal: {}", issue.documents.len());
-        }
-
-        Ok(())
+        Ok(crate::commands::DocumentListResult {
+            issue_id: full_id,
+            documents: issue.documents.clone(),
+            count: issue.documents.len(),
+        })
     }
 
     pub fn remove_document_reference(&self, issue_id: &str, path: &str, json: bool) -> Result<()> {
@@ -268,7 +236,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(())
     }
 
-    pub fn document_history(&self, issue_id: &str, path: &str, json: bool) -> Result<()> {
+    pub fn document_history(
+        &self,
+        issue_id: &str,
+        path: &str,
+    ) -> Result<crate::commands::DocumentHistory> {
         use git2::Repository;
 
         let full_id = self.storage.resolve_issue_id(issue_id)?;
@@ -285,23 +257,10 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let commits = self.get_file_history(&repo, path)?;
 
-        if json {
-            let json_output = serde_json::to_string_pretty(&commits)?;
-            println!("{}", json_output);
-        } else {
-            println!("History for {}:", path);
-            println!();
-            for commit in commits {
-                println!("commit {}", commit.sha);
-                println!("Author: {}", commit.author);
-                println!("Date:   {}", commit.date);
-                println!();
-                println!("    {}", commit.message);
-                println!();
-            }
-        }
-
-        Ok(())
+        Ok(crate::commands::DocumentHistory {
+            path: path.to_string(),
+            commits,
+        })
     }
 
     pub fn document_diff(
@@ -627,21 +586,16 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue_id: &str,
         path: &str,
         rescan: bool,
-        json: bool,
-    ) -> Result<()> {
+    ) -> Result<crate::commands::AssetListResult> {
         use crate::document::{AdapterRegistry, AssetScanner, AssetType};
-        use crate::output::{JsonError, JsonOutput};
         use anyhow::anyhow;
         use std::fs;
         use std::path::Path;
 
+        let mut warnings = Vec::new();
+
         let full_id = self.storage.resolve_issue_id(issue_id)?;
-        let mut issue = self.storage.load_issue(&full_id).inspect_err(|_| {
-            if json {
-                let err = JsonError::issue_not_found(issue_id, "doc history");
-                println!("{}", err.to_json_string().unwrap());
-            }
-        })?;
+        let mut issue = self.storage.load_issue(&full_id)?;
 
         // Find the document in the issue
         let doc_index = issue
@@ -667,7 +621,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 let scanned_assets = scanner
                     .scan_document(Path::new(path), &content)
                     .unwrap_or_else(|e| {
-                        eprintln!("Warning: Failed to scan assets: {}", e);
+                        warnings.push(format!("Failed to scan assets: {}", e));
                         Vec::new()
                     });
 
@@ -677,121 +631,45 @@ impl<S: IssueStore> CommandExecutor<S> {
 
                 scanned_assets
             } else {
-                eprintln!("Warning: Could not read document at {}", path);
+                warnings.push(format!("Could not read document at {}", path));
                 issue.documents[doc_index].assets.clone()
             }
         } else {
             issue.documents[doc_index].assets.clone()
         };
 
-        // Check if assets actually exist
-        let assets_with_status: Vec<_> = assets
-            .iter()
-            .map(|asset| {
-                let exists = match &asset.resolved_path {
-                    Some(p) => repo_root.join(p).exists(),
-                    None => false,
-                };
-                (asset, exists)
-            })
-            .collect();
-
         // Categorize assets
-        let per_doc: Vec<_> = assets_with_status
+        let total = assets.len();
+        let per_doc_count = assets
             .iter()
-            .filter(|(a, _)| !a.is_shared && a.asset_type == AssetType::Local)
-            .collect();
-        let shared: Vec<_> = assets_with_status
+            .filter(|a| !a.is_shared && a.asset_type == AssetType::Local)
+            .count();
+        let shared_count = assets
             .iter()
-            .filter(|(a, _)| a.is_shared && a.asset_type == AssetType::Local)
-            .collect();
-        let external: Vec<_> = assets_with_status
+            .filter(|a| a.is_shared && a.asset_type == AssetType::Local)
+            .count();
+        let external_count = assets
             .iter()
-            .filter(|(a, _)| a.asset_type == AssetType::External)
-            .collect();
-        let missing: Vec<_> = assets_with_status
+            .filter(|a| a.asset_type == AssetType::External)
+            .count();
+        let missing_count = assets
             .iter()
-            .filter(|(a, _)| a.asset_type == AssetType::Missing)
-            .collect();
+            .filter(|a| a.asset_type == AssetType::Missing)
+            .count();
 
-        if json {
-            let output = JsonOutput::success(
-                serde_json::json!({
-                    "issue_id": full_id,
-                    "document_path": path,
-                    "assets": assets,
-                    "summary": {
-                        "total": assets.len(),
-                        "per_doc": per_doc.len(),
-                        "shared": shared.len(),
-                        "external": external.len(),
-                        "missing": missing.len(),
-                    },
-                }),
-                "doc assets",
-            );
-            println!("{}", output.to_json_string()?);
-        } else {
-            println!("Assets for document {} (issue {}):", path, issue.short_id());
-
-            if assets.is_empty() {
-                println!("  No assets found for this document");
-                return Ok(());
-            }
-
-            if !per_doc.is_empty() {
-                println!("\nPer-document assets:");
-                for (asset, exists) in &per_doc {
-                    let status = if *exists { "✓" } else { "✗" };
-                    println!("  {} {}", status, asset.original_path);
-                    if let Some(ref resolved) = asset.resolved_path {
-                        println!("     → {}", resolved.display());
-                    }
-                    if let Some(ref mime) = asset.mime_type {
-                        println!("     MIME: {}", mime);
-                    }
-                }
-            }
-
-            if !shared.is_empty() {
-                println!("\nShared assets:");
-                for (asset, exists) in &shared {
-                    let status = if *exists { "✓" } else { "✗" };
-                    println!("  {} {}", status, asset.original_path);
-                    if let Some(ref resolved) = asset.resolved_path {
-                        println!("     → {}", resolved.display());
-                    }
-                }
-            }
-
-            if !external.is_empty() {
-                println!("\nExternal URLs:");
-                for (asset, _) in &external {
-                    println!("  🌐 {}", asset.original_path);
-                }
-            }
-
-            if !missing.is_empty() {
-                println!("\n⚠ Missing assets:");
-                for (asset, _) in &missing {
-                    println!("  ✗ {}", asset.original_path);
-                    if let Some(ref resolved) = asset.resolved_path {
-                        println!("     Expected at: {}", resolved.display());
-                    }
-                }
-            }
-
-            println!(
-                "\nSummary: {} total ({} per-doc, {} shared, {} external, {} missing)",
-                assets.len(),
-                per_doc.len(),
-                shared.len(),
-                external.len(),
-                missing.len()
-            );
-        }
-
-        Ok(())
+        Ok(crate::commands::AssetListResult {
+            issue_id: full_id,
+            document_path: path.to_string(),
+            assets,
+            summary: crate::commands::AssetSummary {
+                total,
+                per_doc: per_doc_count,
+                shared: shared_count,
+                external: external_count,
+                missing: missing_count,
+            },
+            warnings,
+        })
     }
 
     /// Validate that an external URL is reachable
@@ -821,11 +699,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     /// Check document links and assets for validity
-    ///
-    /// Returns exit code: 0 (all valid), 1 (errors), 2 (warnings only)
-    pub fn check_document_links(&self, scope: &str, json: bool) -> Result<i32> {
+    pub fn check_document_links(&self, scope: &str) -> Result<crate::commands::LinkCheckResult> {
         use crate::document::{AssetType, LinkValidationResult, LinkValidator};
-        use crate::output::{JsonError, JsonOutput};
         use anyhow::anyhow;
         use std::path::PathBuf;
 
@@ -841,12 +716,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             self.storage.list_issues()?
         } else if let Some(issue_id) = scope.strip_prefix("issue:") {
             let full_id = self.storage.resolve_issue_id(issue_id)?;
-            let issue = self.storage.load_issue(&full_id).inspect_err(|_| {
-                if json {
-                    let err = JsonError::issue_not_found(issue_id, "doc check-links");
-                    println!("{}", err.to_json_string().unwrap());
-                }
-            })?;
+            let issue = self.storage.load_issue(&full_id)?;
             vec![issue]
         } else {
             return Err(anyhow!(
@@ -866,26 +736,19 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         if all_documents.is_empty() {
-            if json {
-                let output = JsonOutput::success(
-                    serde_json::json!({
-                        "valid": true,
-                        "errors": [],
-                        "warnings": [],
-                        "summary": {
-                            "total_documents": 0,
-                            "valid": 0,
-                            "errors": 0,
-                            "warnings": 0,
-                        }
-                    }),
-                    "doc check-links",
-                );
-                println!("{}", output.to_json_string()?);
-            } else {
-                println!("No documents found to check");
-            }
-            return Ok(0);
+            return Ok(crate::commands::LinkCheckResult {
+                valid: true,
+                errors: Vec::new(),
+                warnings: Vec::new(),
+                exit_code: 0,
+                scope: scope.to_string(),
+                summary: crate::commands::LinkCheckSummary {
+                    total_documents: 0,
+                    valid: 0,
+                    errors: 0,
+                    warnings: 0,
+                },
+            });
         }
 
         // Create link validator
@@ -1037,6 +900,17 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
+        // Count unique documents with errors (a document might have multiple errors)
+        let mut error_docs = std::collections::HashSet::new();
+        for error in &errors {
+            if let Some(doc) = error["document"].as_str() {
+                error_docs.insert(doc);
+            }
+        }
+
+        let error_count = error_docs.len();
+        let warning_count = warnings.len();
+
         // Determine exit code
         let exit_code = if !errors.is_empty() {
             1 // Errors found
@@ -1046,69 +920,19 @@ impl<S: IssueStore> CommandExecutor<S> {
             0 // All valid
         };
 
-        // Output results
-        if json {
-            let output = JsonOutput::success(
-                serde_json::json!({
-                    "valid": errors.is_empty(),
-                    "errors": errors,
-                    "warnings": warnings,
-                    "summary": {
-                        "total_documents": all_documents.len(),
-                        "valid": all_documents.len() - errors.len(),
-                        "errors": errors.len(),
-                        "warnings": warnings.len(),
-                    }
-                }),
-                "doc check-links",
-            );
-            println!("{}", output.to_json_string()?);
-        } else {
-            println!(
-                "Checking {} document(s) in scope '{}'...\n",
-                all_documents.len(),
-                scope
-            );
-
-            if !errors.is_empty() {
-                println!("❌ Errors found ({}):", errors.len());
-                for error in &errors {
-                    println!(
-                        "  {} ({}): {}",
-                        error["document"].as_str().unwrap_or(""),
-                        error["type"].as_str().unwrap_or(""),
-                        error["message"].as_str().unwrap_or("")
-                    );
-                }
-                println!();
-            }
-
-            if !warnings.is_empty() {
-                println!("⚠️  Warnings ({}):", warnings.len());
-                for warning in &warnings {
-                    println!(
-                        "  {} ({}): {}",
-                        warning["document"].as_str().unwrap_or(""),
-                        warning["type"].as_str().unwrap_or(""),
-                        warning["message"].as_str().unwrap_or("")
-                    );
-                }
-                println!();
-            }
-
-            if errors.is_empty() && warnings.is_empty() {
-                println!("✅ All documents valid!");
-            }
-
-            println!(
-                "Summary: {} document(s) checked, {} error(s), {} warning(s)",
-                all_documents.len(),
-                errors.len(),
-                warnings.len()
-            );
-        }
-
-        Ok(exit_code)
+        Ok(crate::commands::LinkCheckResult {
+            valid: errors.is_empty(),
+            errors,
+            warnings,
+            exit_code,
+            scope: scope.to_string(),
+            summary: crate::commands::LinkCheckSummary {
+                total_documents: all_documents.len(),
+                valid: all_documents.len() - error_count,
+                errors: error_count,
+                warnings: warning_count,
+            },
+        })
     }
 }
 

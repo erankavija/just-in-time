@@ -1,6 +1,6 @@
 # Remove direct printing from CommandExecutor (f766b092)
 
-## Status: In Progress (Phase 1 of 5+ complete)
+## Status: In Progress (Phase 2 of 5+ complete)
 
 ## Current Progress
 
@@ -11,14 +11,23 @@
 - Tested: both 'jit status' and 'jit status --json' work correctly
 - Committed in: 5b87ef6
 
-### 🔄 Next: Phase 2 - document.rs list operations
-Focus on document_history() and list_document_references() which print directly.
+### ✅ Phase 2 Complete: document.rs list operations
+- Removed printing from list_document_references(), document_history(), list_document_assets(), check_document_links()
+- Created return structs: DocumentListResult, DocumentHistory, AssetListResult, LinkCheckResult, LinkCheckSummary
+- Updated main.rs to format output using OutputContext and JsonOutput patterns
+- Updated tests to expect wrapped JSON output (data["commits"] instead of raw array)
+- Fixed pre-existing broken doctests in query_engine (jit::query -> jit::query_engine)
+- All tests pass, zero clippy warnings
+
+### 🔄 Next: Phase 3 - Warnings pattern
+Focus on methods that use eprintln! for warnings (issue.rs, gate.rs, etc.)
 
 ## Audit of Remaining println!/eprintln! in commands/
 
 ### High Priority (mentioned in issue):
-- [x] validate.rs: status() - DONE
-- [ ] document.rs: document_history() and list_document_references()
+- [x] validate.rs: status() - DONE (Phase 1)
+- [x] document.rs: document_history() and list_document_references() - DONE (Phase 2)
+- [x] document.rs: list_document_assets() and check_document_links() - DONE (Phase 2)
 - [ ] issue.rs: create_issue() and update_issue() use eprintln! for warnings
 - [ ] mod.rs: require_active_lease() uses eprintln!
 

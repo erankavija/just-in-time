@@ -17,7 +17,7 @@
 //!
 //! ```
 //! use jit::domain::{Issue, State};
-//! use jit::query::QueryFilter;
+//! use jit::query_engine::QueryFilter;
 //!
 //! # fn example() -> anyhow::Result<()> {
 //! let filter = QueryFilter::parse("state:ready AND priority:high")?;
@@ -47,7 +47,7 @@ impl QueryFilter {
     /// # Examples
     ///
     /// ```
-    /// use jit::query::QueryFilter;
+    /// use jit::query_engine::QueryFilter;
     ///
     /// # fn example() -> anyhow::Result<()> {
     /// let filter = QueryFilter::parse("state:ready")?;
