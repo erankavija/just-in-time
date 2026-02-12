@@ -1714,3 +1714,5 @@
 {"type":"issue_created","id":"676e908d-8083-4665-a807-255c0ae08292","issue_id":"8898b638-b5fe-4982-9d5f-8935dd5f793c","timestamp":"2026-02-11T21:51:13.330123803Z","title":"jit init should regenerate worktree.json in new worktrees","priority":"normal"}
 {"type":"issue_state_changed","id":"ec61bbbe-b604-4107-a5cd-b67393b65927","issue_id":"8898b638-b5fe-4982-9d5f-8935dd5f793c","timestamp":"2026-02-12T21:19:19.687303354Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"46f26c9f-b66a-423d-8314-fc00e132f0b2","issue_id":"8898b638-b5fe-4982-9d5f-8935dd5f793c","timestamp":"2026-02-12T21:19:19.690167274Z","assignee":"agent:copilot-session"}
+{"type":"issue_state_changed","id":"6a8b027b-509a-489f-8984-a52727697b48","issue_id":"8898b638-b5fe-4982-9d5f-8935dd5f793c","timestamp":"2026-02-12T21:48:16.731248926Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"c39551f0-e069-4759-b372-84ba75a6576c","issue_id":"8898b638-b5fe-4982-9d5f-8935dd5f793c","timestamp":"2026-02-12T21:48:16.731273326Z"}

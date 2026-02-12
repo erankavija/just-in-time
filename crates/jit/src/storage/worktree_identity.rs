@@ -9,7 +9,8 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
 
 /// Worktree identity persisted in `<worktree>/.jit/worktree.json`.
 ///
@@ -128,11 +129,50 @@ pub fn load_or_create_worktree_identity(
                 .unwrap_or(false);
 
             if is_secondary_worktree {
-                // In a git worktree with wrong path - this is a copied file
-                // Delete it and create a new identity with unique ID
-                fs::remove_file(&wt_file).context("Failed to remove copied worktree.json")?;
+                // In a git worktree with wrong path - could be copied OR moved
+                // Check if old path still exists with the same ID
+                let old_path = PathBuf::from(&identity.root);
+                let old_wt_file = old_path.join(".jit").join("worktree.json");
+                
+                let is_copy = if old_wt_file.exists() {
+                    // Old path exists - check if it has the same ID
+                    if let Ok(old_content) = fs::read_to_string(&old_wt_file) {
+                        if let Ok(old_identity) = serde_json::from_str::<WorktreeIdentity>(&old_content) {
+                            // If IDs match, this is a copy (both have same ID)
+                            old_identity.worktree_id == identity.worktree_id
+                        } else {
+                            // Can't parse old file - treat as copy to be safe
+                            true
+                        }
+                    } else {
+                        // Can't read old file - treat as copy to be safe
+                        true
+                    }
+                } else {
+                    // Old path doesn't exist - this is a move
+                    false
+                };
 
-                // Fall through to create new identity
+                if is_copy {
+                    // This is a copied file from git worktree add
+                    // Delete it and create a new identity with unique ID
+                    fs::remove_file(&wt_file).context("Failed to remove copied worktree.json")?;
+                    // Fall through to create new identity
+                } else {
+                    // This is a moved worktree (e.g., git worktree move)
+                    eprintln!(
+                        "⚠️  Worktree relocated: {} -> {}",
+                        identity.root, current_root
+                    );
+
+                    identity.root = current_root;
+                    identity.relocated_at = Some(Utc::now());
+
+                    // Write updated identity atomically
+                    write_identity_atomic(&wt_file, &identity)?;
+
+                    return Ok(identity);
+                }
             } else {
                 // Not in a git worktree - this is a genuine relocation
                 eprintln!(

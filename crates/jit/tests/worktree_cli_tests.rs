@@ -476,3 +476,95 @@ fn test_worktree_list_shows_distinct_ids() {
         "Should have at least 3 distinct worktree IDs"
     );
 }
+
+#[test]
+fn test_git_worktree_move_preserves_id() {
+    let temp = tempfile::tempdir().unwrap();
+    let main_path = temp.path();
+
+    // Initialize a git repo
+    Command::new("git")
+        .current_dir(main_path)
+        .args(["init"])
+        .assert()
+        .success();
+
+    Command::new("git")
+        .current_dir(main_path)
+        .args(["commit", "--allow-empty", "-m", "initial"])
+        .assert()
+        .success();
+
+    // Initialize jit in main worktree and commit the .jit directory
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(main_path)
+        .arg("init")
+        .assert()
+        .success();
+
+    Command::new("git")
+        .current_dir(main_path)
+        .args(["add", ".jit"])
+        .assert()
+        .success();
+
+    Command::new("git")
+        .current_dir(main_path)
+        .args(["commit", "-m", "Add jit tracking"])
+        .assert()
+        .success();
+
+    // Create a new worktree (this will copy .jit/worktree.json)
+    let worktree_path = temp.path().join("feature");
+    Command::new("git")
+        .current_dir(main_path)
+        .args(["worktree", "add", worktree_path.to_str().unwrap()])
+        .assert()
+        .success();
+
+    // Initialize jit in the worktree (should get unique ID)
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(&worktree_path)
+        .arg("init")
+        .assert()
+        .success();
+
+    // Get the worktree ID before move
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(&worktree_path)
+        .args(["worktree", "info", "--json"])
+        .output()
+        .unwrap();
+
+    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    let id_before = json["data"]["worktree_id"].as_str().unwrap().to_string();
+
+    // Move the worktree using git worktree move
+    let moved_path = temp.path().join("feature-moved");
+    Command::new("git")
+        .current_dir(main_path)
+        .args([
+            "worktree",
+            "move",
+            worktree_path.to_str().unwrap(),
+            moved_path.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    // Get the worktree ID after move
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(&moved_path)
+        .args(["worktree", "info", "--json"])
+        .output()
+        .unwrap();
+
+    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    let id_after = json["data"]["worktree_id"].as_str().unwrap().to_string();
+
+    // The ID should be preserved after git worktree move
+    assert_eq!(
+        id_before, id_after,
+        "Worktree ID should be preserved after git worktree move"
+    );
+}
