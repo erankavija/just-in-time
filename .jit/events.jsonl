@@ -1726,3 +1726,7 @@
 {"type":"issue_completed","id":"1ab8dcaa-a54c-4c5a-b607-0f6abb263e76","issue_id":"c41dab3d-8c3f-4b33-a8e5-45cae59d81f1","timestamp":"2026-02-12T22:51:09.537755164Z"}
 {"type":"issue_state_changed","id":"738663b6-0d44-4bc7-bc0b-25a8c73ca6b7","issue_id":"f766b092-5eec-4537-b391-ae7017965835","timestamp":"2026-02-12T22:52:11.015994033Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"11d592c2-d05a-447f-93f9-f700aaae73e4","issue_id":"f766b092-5eec-4537-b391-ae7017965835","timestamp":"2026-02-12T22:52:11.016161903Z","assignee":"agent:copilot-session"}
+{"type":"issue_created","id":"27184a03-6634-4759-a6c5-a7c6c05b601b","issue_id":"14b9ff76-aa00-4796-84ec-7d095137b225","timestamp":"2026-02-12T23:40:23.404576162Z","title":"Bug: Issue deletions not immediately reflected in query/validate operations","priority":"high"}
+{"type":"issue_created","id":"bacc3da4-1612-4ba1-83fb-6939f2b44748","issue_id":"5dbc3548-3ab8-45cf-ade7-131102681253","timestamp":"2026-02-12T23:40:34.514647Z","title":"Bug: Issue deletions not immediately reflected in query/validate operations","priority":"high"}
+{"type":"issue_state_changed","id":"c4e78baf-dadd-4744-aff8-f0c959ef581b","issue_id":"5dbc3548-3ab8-45cf-ade7-131102681253","timestamp":"2026-02-12T23:40:42.061995530Z","from":"ready","to":"backlog"}
+{"type":"issue_state_changed","id":"0d08cdd1-dc6b-4c5e-afc3-3985b749523c","issue_id":"5dbc3548-3ab8-45cf-ade7-131102681253","timestamp":"2026-02-12T23:42:14.243163703Z","from":"backlog","to":"ready"}
