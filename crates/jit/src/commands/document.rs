@@ -677,22 +677,21 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Returns Ok(true) if URL is reachable, Ok(false) if not reachable,
     /// or Err if validation failed (network error, timeout, etc.)
     fn validate_external_url(url: &str) -> Result<bool> {
-        use std::time::Duration;
-
-        // Quick HEAD request with short timeout
-        let response = ureq::head(url).timeout(Duration::from_secs(5)).call();
+        // Quick HEAD request
+        // In ureq 3.x, use Agent for configuration
+        let agent = ureq::Agent::new_with_defaults();
+        let response = agent.head(url).call();
 
         match response {
             Ok(resp) => {
-                // Any 2xx or 3xx status is considered valid
-                Ok(resp.status() < 400)
+                // Check if status is success or redirection (2xx or 3xx)
+                let status = resp.status();
+                Ok(status.is_success() || status.is_redirection())
             }
-            Err(ureq::Error::Status(code, _)) => {
-                // Got a response but with error status (4xx, 5xx)
-                Ok(code < 500) // 4xx means URL exists but access denied/not found
-            }
-            Err(ureq::Error::Transport(_)) => {
-                // Network error, DNS failure, timeout, etc.
+            Err(_e) => {
+                // Any error (IO, DNS, SSL, HTTP 4xx/5xx, etc.) means unreachable
+                // Note: ureq 3.x doesn't distinguish between error types easily
+                // We consider all errors as "unreachable"
                 Ok(false)
             }
         }

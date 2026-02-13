@@ -335,7 +335,7 @@ fn test_external_urls_are_validated() {
     fs::create_dir_all(ctx.repo_path().join("docs")).unwrap();
     fs::write(
         ctx.repo_path().join("docs/external.md"),
-        "# External\n\n![Remote](https://example.com/image.png)\n",
+        "# External\n\n![Remote](https://httpbin.org/status/200)\n",
     )
     .unwrap();
 
@@ -350,7 +350,7 @@ fn test_external_urls_are_validated() {
     .success();
 
     // Reachable external URLs should validate successfully (no warnings/errors)
-    // Note: This assumes example.com is reachable during tests
+    // Note: Using httpbin.org which has valid SSL certificates
     ctx.run_jit(&["doc", "check-links", "--scope", "all"])
         .code(0)
         .stdout(predicate::str::contains("valid"));
