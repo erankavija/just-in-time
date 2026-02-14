@@ -1730,3 +1730,5 @@
 {"type":"issue_created","id":"bacc3da4-1612-4ba1-83fb-6939f2b44748","issue_id":"5dbc3548-3ab8-45cf-ade7-131102681253","timestamp":"2026-02-12T23:40:34.514647Z","title":"Bug: Issue deletions not immediately reflected in query/validate operations","priority":"high"}
 {"type":"issue_state_changed","id":"c4e78baf-dadd-4744-aff8-f0c959ef581b","issue_id":"5dbc3548-3ab8-45cf-ade7-131102681253","timestamp":"2026-02-12T23:40:42.061995530Z","from":"ready","to":"backlog"}
 {"type":"issue_state_changed","id":"0d08cdd1-dc6b-4c5e-afc3-3985b749523c","issue_id":"5dbc3548-3ab8-45cf-ade7-131102681253","timestamp":"2026-02-12T23:42:14.243163703Z","from":"backlog","to":"ready"}
+{"type":"issue_state_changed","id":"d11bd5a9-0568-4194-9187-a0f59590f873","issue_id":"5dbc3548-3ab8-45cf-ade7-131102681253","timestamp":"2026-02-14T19:21:53.196433823Z","from":"ready","to":"done"}
+{"type":"issue_completed","id":"d037b8c9-ea85-4541-ac16-c6d125b13d38","issue_id":"5dbc3548-3ab8-45cf-ade7-131102681253","timestamp":"2026-02-14T19:21:53.196463013Z"}
