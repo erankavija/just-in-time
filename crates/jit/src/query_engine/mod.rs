@@ -100,6 +100,8 @@ mod tests {
             context: Default::default(),
             documents: vec![],
             labels: labels.iter().map(|s| s.to_string()).collect(),
+            created_at: "2024-01-01T00:00:00Z".to_string(),
+            updated_at: "2024-01-01T00:00:00Z".to_string(),
         }
     }
 

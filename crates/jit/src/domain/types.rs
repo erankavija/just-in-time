@@ -186,6 +186,7 @@ impl Issue {
     /// Create a new issue with labels
     #[cfg(test)]
     pub fn new_with_labels(title: String, description: String, labels: Vec<String>) -> Self {
+        let now = chrono::Utc::now().to_rfc3339();
         Self {
             id: Uuid::new_v4().to_string(),
             title,
@@ -199,6 +200,8 @@ impl Issue {
             context: HashMap::new(),
             documents: Vec::new(),
             labels,
+            created_at: now.clone(),
+            updated_at: now,
         }
     }
 

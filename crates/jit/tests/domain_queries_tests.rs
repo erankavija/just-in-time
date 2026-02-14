@@ -20,6 +20,8 @@ fn make_issue(id: &str, title: &str, state: State) -> Issue {
         context: HashMap::new(),
         documents: Vec::new(),
         labels: Vec::new(),
+        created_at: "2024-01-01T00:00:00Z".to_string(),
+        updated_at: "2024-01-01T00:00:00Z".to_string(),
     }
 }
 
@@ -37,6 +39,8 @@ fn make_issue_with_deps(id: &str, title: &str, state: State, deps: Vec<String>) 
         context: HashMap::new(),
         documents: Vec::new(),
         labels: Vec::new(),
+        created_at: "2024-01-01T00:00:00Z".to_string(),
+        updated_at: "2024-01-01T00:00:00Z".to_string(),
     }
 }
 
