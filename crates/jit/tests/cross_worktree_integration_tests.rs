@@ -5,7 +5,7 @@
 
 use anyhow::Result;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use tempfile::TempDir;
 
@@ -486,21 +486,27 @@ fn test_deletion_blocked_in_secondary_worktree() {
         .current_dir(&repo_path)
         .output()
         .unwrap();
-    
+
     // Create secondary worktree in a subdirectory of the test's temp directory
     let secondary_path = repo_path.join("secondary");
     create_secondary_worktree(&repo_path, &secondary_path);
-    
+
     run_jit(&secondary_path, &["init"]).unwrap();
 
     // Verify issue is visible in secondary
     let query_output = run_jit(&secondary_path, &["query", "all"]).unwrap();
-    assert!(query_output.contains(&issue_id), "Issue should be visible in secondary worktree");
+    assert!(
+        query_output.contains(&issue_id),
+        "Issue should be visible in secondary worktree"
+    );
 
     // Try to delete from secondary - should be blocked
     let result = run_jit(&secondary_path, &["issue", "delete", &issue_id]);
 
-    assert!(result.is_err(), "Deletion should be blocked in secondary worktree");
+    assert!(
+        result.is_err(),
+        "Deletion should be blocked in secondary worktree"
+    );
     let error = result.unwrap_err().to_string();
     assert!(
         error.contains("secondary worktree") || error.contains("not allowed"),
@@ -509,29 +515,80 @@ fn test_deletion_blocked_in_secondary_worktree() {
     );
 }
 
+#[test]
+fn test_deletion_requires_env_var() {
+    // Phase 3: Deletion in main worktree requires JIT_ALLOW_DELETION=1 to discourage deletion
+    let (_temp_dir, repo_path) = setup_git_repo();
+
+    // Initialize jit and create issue
+    run_jit(&repo_path, &["init"]).unwrap();
+    let output = run_jit(&repo_path, &["issue", "create", "-t", "Test", "-d", "desc"]).unwrap();
+    let issue_id = extract_issue_id(&output);
+
+    // Try to delete WITHOUT env var - should be blocked
+    let result = run_jit(&repo_path, &["issue", "delete", &issue_id]);
+    assert!(
+        result.is_err(),
+        "Deletion should require JIT_ALLOW_DELETION=1"
+    );
+    let error = result.unwrap_err().to_string();
+    assert!(
+        error.contains("JIT_ALLOW_DELETION") || error.contains("discouraged"),
+        "Error should mention JIT_ALLOW_DELETION: {}",
+        error
+    );
+
+    // Verify issue still exists
+    let query_output = run_jit(&repo_path, &["query", "all"]).unwrap();
+    assert!(
+        query_output.contains(&issue_id),
+        "Issue should still exist after blocked deletion"
+    );
+
+    // Delete WITH env var - should succeed
+    let result = run_jit_with_env(
+        &repo_path,
+        &["issue", "delete", &issue_id],
+        &[("JIT_ALLOW_DELETION", "1")],
+    );
+    assert!(result.is_ok(), "Deletion should succeed with env var");
+
+    // Verify issue is gone
+    let query_output = run_jit(&repo_path, &["query", "all"]).unwrap();
+    assert!(
+        !query_output.contains(&issue_id),
+        "Issue should be deleted after env var check passed"
+    );
+}
+
 // Helper functions
 fn extract_issue_id(output: &str) -> String {
-    output
-        .split_whitespace()
-        .last()
-        .unwrap()
-        .to_string()
+    output.split_whitespace().last().unwrap().to_string()
 }
 
-fn commit_all(repo_path: &PathBuf, message: &str) {
-    Command::new("git")
-        .args(["add", "."])
-        .current_dir(repo_path)
-        .output()
-        .unwrap();
-    Command::new("git")
-        .args(["commit", "-m", message])
-        .current_dir(repo_path)
-        .output()
-        .unwrap();
+fn run_jit_with_env(dir: &PathBuf, args: &[&str], env_vars: &[(&str, &str)]) -> Result<String> {
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_jit"));
+    cmd.args(args).current_dir(dir);
+
+    for (key, value) in env_vars {
+        cmd.env(key, value);
+    }
+
+    let output = cmd.output()?;
+
+    if !output.status.success() {
+        anyhow::bail!(
+            "Command failed: jit {:?}\nStdout: {}\nStderr: {}",
+            args,
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
 
-fn create_secondary_worktree(main_path: &PathBuf, secondary_path: &PathBuf) {
+fn create_secondary_worktree(main_path: &Path, secondary_path: &Path) {
     Command::new("git")
         .args([
             "worktree",

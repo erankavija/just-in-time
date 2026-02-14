@@ -1582,16 +1582,16 @@ mod tests {
             // Main worktree: .git is a directory
             let main_temp = TempDir::new().unwrap();
             let main_storage = JsonFileStorage::new(main_temp.path());
-            
+
             // Initialize git
             Command::new("git")
                 .arg("init")
                 .current_dir(main_temp.path().parent().unwrap())
                 .output()
                 .unwrap();
-            
+
             main_storage.init().unwrap();
-            
+
             // Should detect as main worktree
             assert!(!main_storage.is_secondary_worktree());
         }

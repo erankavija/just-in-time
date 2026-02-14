@@ -617,12 +617,24 @@ strategic_types = {}
                 }
                 IssueCommands::Delete { id, json } => {
                     let output_ctx = OutputContext::new(quiet, json);
-                    
+
                     // Phase 3 safety check: Block deletion in secondary worktrees
                     if storage.is_secondary_worktree() {
                         anyhow::bail!("Deletion is not allowed in secondary worktrees. Deletions must be performed from the main worktree to maintain consistency across all worktrees.");
                     }
-                    
+
+                    // Phase 3 safety check: Require JIT_ALLOW_DELETION=1 to discourage deletion
+                    if std::env::var("JIT_ALLOW_DELETION").unwrap_or_default() != "1" {
+                        anyhow::bail!(
+                            "Issue deletion is discouraged and requires explicit confirmation.\n\
+                             Set JIT_ALLOW_DELETION=1 environment variable to proceed.\n\
+                             Example: JIT_ALLOW_DELETION=1 jit issue delete {}\n\
+                             \n\
+                             Note: Deletion is a destructive operation. Consider closing issues instead of deleting them.",
+                            id
+                        );
+                    }
+
                     executor.delete_issue(&id)?;
 
                     if json {
