@@ -12,6 +12,7 @@ RUN apk add --no-cache musl-dev pkgconfig openssl-dev openssl-libs-static
 # Copy Cargo workspace files
 COPY Cargo.toml Cargo.lock ./
 COPY crates/ ./crates/
+COPY scripts/ ./scripts/
 
 # Build all Rust binaries (CLI, server, dispatch)
 RUN cargo build --release --workspace
