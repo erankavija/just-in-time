@@ -25,13 +25,17 @@ struct Index {
     schema_version: u32,
     /// List of all issue IDs
     all_ids: Vec<String>,
+    /// List of deleted issue IDs (schema v2+)
+    #[serde(default)]
+    deleted_ids: Vec<String>,
 }
 
 impl Default for Index {
     fn default() -> Self {
         Self {
-            schema_version: 1,
+            schema_version: 2,
             all_ids: Vec::new(),
+            deleted_ids: Vec::new(),
         }
     }
 }
@@ -140,25 +144,33 @@ impl JsonFileStorage {
         use std::collections::HashSet;
 
         let mut all_ids = HashSet::new();
+        let mut deleted_ids = HashSet::new();
 
         // 1. Load local index
         if let Ok(local_index) = self.load_index() {
             all_ids.extend(local_index.all_ids);
+            deleted_ids.extend(local_index.deleted_ids);
         }
 
         // 2. Try loading index from git
         if let Ok(git_index) = self.load_index_from_git() {
             all_ids.extend(git_index.all_ids);
+            deleted_ids.extend(git_index.deleted_ids);
         }
 
         // 3. Try loading index from main worktree
         if let Ok(main_index) = self.load_index_from_main_worktree() {
             all_ids.extend(main_index.all_ids);
+            deleted_ids.extend(main_index.deleted_ids);
         }
 
+        // Filter out deleted IDs from the aggregated set
+        all_ids.retain(|id| !deleted_ids.contains(id));
+
         Ok(Index {
-            schema_version: 1,
+            schema_version: 2,
             all_ids: all_ids.into_iter().collect(),
+            deleted_ids: vec![], // Don't propagate deleted_ids in aggregated index
         })
     }
 
@@ -475,9 +487,15 @@ impl IssueStore for JsonFileStorage {
         // Clean up lock file too
         let _ = fs::remove_file(&issue_lock_path);
 
-        // Update index
+        // Update index: remove from all_ids and add to deleted_ids
         let mut index = self.load_index()?;
         index.all_ids.retain(|i| i != id);
+
+        // Add to deleted_ids if not already there (idempotent)
+        if !index.deleted_ids.contains(&id.to_string()) {
+            index.deleted_ids.push(id.to_string());
+        }
+
         self.save_index(&index)?;
 
         Ok(())
@@ -1177,8 +1195,9 @@ mod tests {
 
             // Update index to not include the issue
             let index = Index {
-                schema_version: 1,
+                schema_version: 2,
                 all_ids: vec![],
+                deleted_ids: vec![],
             };
             storage
                 .write_json(&jit_dir.join(INDEX_FILE), &index)
@@ -1263,8 +1282,9 @@ mod tests {
             fs::remove_file(&issue_path).unwrap();
 
             let index = Index {
-                schema_version: 1,
+                schema_version: 2,
                 all_ids: vec![],
+                deleted_ids: vec![],
             };
             storage
                 .write_json(&jit_dir.join(INDEX_FILE), &index)
@@ -1435,6 +1455,101 @@ mod tests {
             // Should fail gracefully with parse error (not panic)
             let result = storage.load_issue(issue_id);
             assert!(result.is_err());
+        }
+    }
+
+    // Tests for schema v2 with deletion tracking
+    mod schema_v2_tests {
+        use super::*;
+
+        #[test]
+        fn test_index_v2_has_deleted_ids_field() {
+            // Create a new index - should be v2
+            let index = Index::default();
+
+            assert_eq!(index.schema_version, 2);
+            assert_eq!(index.all_ids, Vec::<String>::new());
+            assert_eq!(index.deleted_ids, Vec::<String>::new());
+        }
+
+        #[test]
+        fn test_index_v2_save_and_load() {
+            let temp_dir = TempDir::new().unwrap();
+            let storage = JsonFileStorage::new(temp_dir.path());
+            storage.init().unwrap();
+
+            // Create index with deleted IDs
+            let index = Index {
+                schema_version: 2,
+                all_ids: vec!["issue-1".to_string(), "issue-2".to_string()],
+                deleted_ids: vec!["issue-3".to_string()],
+            };
+
+            // Save index
+            storage.save_index(&index).unwrap();
+
+            // Load it back
+            let loaded = storage.load_index().unwrap();
+
+            assert_eq!(loaded.schema_version, 2);
+            assert_eq!(loaded.all_ids.len(), 2);
+            assert!(loaded.all_ids.contains(&"issue-1".to_string()));
+            assert!(loaded.all_ids.contains(&"issue-2".to_string()));
+            assert_eq!(loaded.deleted_ids.len(), 1);
+            assert!(loaded.deleted_ids.contains(&"issue-3".to_string()));
+        }
+
+        #[test]
+        fn test_init_creates_v2_index() {
+            let temp_dir = TempDir::new().unwrap();
+            let storage = JsonFileStorage::new(temp_dir.path());
+            storage.init().unwrap();
+
+            let index = storage.load_index().unwrap();
+            assert_eq!(index.schema_version, 2);
+            assert!(index.deleted_ids.is_empty());
+        }
+
+        #[test]
+        fn test_delete_issue_adds_to_deleted_ids() {
+            let temp_dir = TempDir::new().unwrap();
+            let storage = JsonFileStorage::new(temp_dir.path());
+            storage.init().unwrap();
+
+            // Create an issue
+            let issue = Issue::new("Test".to_string(), "Description".to_string());
+            let issue_id = issue.id.clone();
+            storage.save_issue(&issue).unwrap();
+
+            // Verify it's in all_ids
+            let index_before = storage.load_index().unwrap();
+            assert!(index_before.all_ids.contains(&issue_id));
+            assert!(!index_before.deleted_ids.contains(&issue_id));
+
+            // Delete the issue
+            storage.delete_issue(&issue_id).unwrap();
+
+            // Verify it's now in deleted_ids and removed from all_ids
+            let index_after = storage.load_index().unwrap();
+            assert!(!index_after.all_ids.contains(&issue_id));
+            assert!(index_after.deleted_ids.contains(&issue_id));
+        }
+
+        #[test]
+        fn test_aggregated_index_filters_deleted_ids() {
+            let temp_dir = TempDir::new().unwrap();
+            let storage = JsonFileStorage::new(temp_dir.path());
+            storage.init().unwrap();
+
+            // Create and delete an issue
+            let issue = Issue::new("Test".to_string(), "Description".to_string());
+            let issue_id = issue.id.clone();
+            storage.save_issue(&issue).unwrap();
+            storage.delete_issue(&issue_id).unwrap();
+
+            // Aggregated index should NOT include the deleted issue
+            let aggregated = storage.load_aggregated_index().unwrap();
+            assert!(!aggregated.all_ids.contains(&issue_id));
         }
     }
 }

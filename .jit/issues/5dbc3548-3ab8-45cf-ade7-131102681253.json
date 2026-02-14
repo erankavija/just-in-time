@@ -9,7 +9,15 @@
   "gates_required": [],
   "gates_status": {},
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "dev/plans/5dbc3548-deletion-tracking.md",
+      "commit": null,
+      "label": "Implementation plan",
+      "doc_type": "plan",
+      "format": "markdown"
+    }
+  ],
   "labels": [
     "type:bug",
     "epic:prod-stability"

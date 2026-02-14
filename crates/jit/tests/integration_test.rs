@@ -713,3 +713,91 @@ fn test_graph_roots() {
     assert!(stdout.contains(&id1));
     assert!(!stdout.contains(&id2));
 }
+
+#[test]
+fn test_bug_5dbc3548_deleted_issue_not_in_query() {
+    // Bug 5dbc3548: Deleted issues reappear in queries until committed to git
+    // This test verifies the fix using deletion tracking in index.json
+
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    // Initialize git (issue was committed)
+    Command::new("git")
+        .arg("init")
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    Command::new("git")
+        .args(["config", "user.email", "test@test.com"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    Command::new("git")
+        .args(["config", "user.name", "Test"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    // Create an issue
+    let output = Command::new(&jit)
+        .args(["issue", "create", "-t", "Test Issue", "-d", "desc"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+
+    let id = String::from_utf8_lossy(&output.stdout)
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+
+    // Commit to git
+    Command::new("git")
+        .args(["add", ".jit/"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    Command::new("git")
+        .args(["commit", "-m", "Add issue"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    // Verify issue is visible
+    let output = Command::new(&jit)
+        .args(["query", "all"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("Test Issue"),
+        "Issue should be visible before deletion"
+    );
+
+    // Delete the issue
+    let output = Command::new(&jit)
+        .args(["issue", "delete", &id])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "Deletion should succeed");
+
+    // THE BUG TEST: Issue should NOT appear in queries
+    // Before fix: it would reappear because it's still in git
+    // After fix: it's filtered out via deleted_ids in index
+    let output = Command::new(&jit)
+        .args(["query", "all"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(
+        !stdout.contains("Test Issue"),
+        "Bug 5dbc3548: Deleted issue should NOT reappear in queries. Stdout: {}",
+        stdout
+    );
+}
