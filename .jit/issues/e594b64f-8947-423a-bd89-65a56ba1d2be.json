@@ -1,7 +1,7 @@
 {
   "id": "e594b64f-8947-423a-bd89-65a56ba1d2be",
   "title": "Smart 'jit gate pass' command - auto-detect and run automated gates",
-  "description": "Current UX confusion: Users must know if a gate is 'auto' or 'manual' before using it. 'jit gate pass' only works for manual gates and gives cryptic errors for automated gates, forcing users to use 'jit gate check' instead.\n\nProposed solution: Make 'jit gate pass <issue> <gate>' intelligent:\n- If gate is manual → mark as passed (current behavior)  \n- If gate is auto → run checker automatically, then mark based on result\n- Display helpful message indicating what's happening\n\nBenefits:\n- Single command for most workflows\n- No leaky abstraction - users don't need to know implementation details\n- Keep 'jit gate check' for debugging/testing without updating status\n\nExample workflow after fix:\n  jit gate pass <issue> tests      # Runs cargo test, updates status\n  jit gate pass <issue> code-review # Marks manual gate as passed\n  \nBoth work intuitively without errors.",
+  "description": "Current UX confusion: Users must know if a gate is 'auto' or 'manual' before using it. 'jit gate pass' only works for manual gates and gives cryptic errors for automated gates, forcing users to use 'jit gate check' instead.\n\nProposed solution: Make 'jit gate pass <issue> <gate>' intelligent:\n- If gate is manual \u2192 mark as passed (current behavior)  \n- If gate is auto \u2192 run checker automatically, then mark based on result\n- Display helpful message indicating what's happening\n\nBenefits:\n- Single command for most workflows\n- No leaky abstraction - users don't need to know implementation details\n- Keep 'jit gate check' for debugging/testing without updating status\n\nExample workflow after fix:\n  jit gate pass <issue> tests      # Runs cargo test, updates status\n  jit gate pass <issue> code-review # Marks manual gate as passed\n  \nBoth work intuitively without errors.",
   "state": "done",
   "priority": "critical",
   "assignee": "agent:copilot-session-1",
@@ -40,5 +40,7 @@
     "type:task",
     "epic:phase-5.2",
     "component:cli"
-  ]
+  ],
+  "created_at": "2025-12-22T22:55:26.220459+02:00",
+  "updated_at": "2025-12-20T20:12:00.360229344Z"
 }

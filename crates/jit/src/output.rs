@@ -699,6 +699,8 @@ pub struct IssueShowResponse {
     pub context: std::collections::HashMap<String, String>,
     pub documents: Vec<crate::domain::DocumentReference>,
     pub labels: Vec<String>,
+    pub created_at: String,
+    pub updated_at: String,
 }
 
 impl IssueShowResponse {
@@ -717,6 +719,8 @@ impl IssueShowResponse {
             context: issue.context,
             documents: issue.documents,
             labels: issue.labels,
+            created_at: issue.created_at,
+            updated_at: issue.updated_at,
         }
     }
 }

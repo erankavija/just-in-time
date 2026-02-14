@@ -427,6 +427,12 @@ strategic_types = {}
 
                             println!("Gates Required: {:?}", response.gates_required);
                             println!("Gates Status: {:?}", response.gates_status);
+                            if !response.created_at.is_empty() {
+                                println!("Created: {}", response.created_at);
+                            }
+                            if !response.updated_at.is_empty() {
+                                println!("Updated: {}", response.updated_at);
+                            }
                             if !response.documents.is_empty() {
                                 println!("Documents:");
                                 for doc in &response.documents {

@@ -1,7 +1,7 @@
 {
   "id": "0af646d5-1adc-4518-8697-b36eefdeba40",
   "title": "Consolidate domain logic from graph, validation, and labels modules",
-  "description": "## Problem\n\nSignificant domain logic is scattered across top-level modules that should be part of (or clearly connected to) the domain layer:\n\n- **`graph.rs`**: `DependencyGraph` with cycle detection, topological sort, transitive reduction, path finding — core domain algorithms\n- **`validation.rs`**: `IssueValidator` with type label enforcement, namespace registry rules — domain invariants\n- **`labels.rs`**: `matches_pattern()`, `validate_label_operations()` — domain constraint logic\n\nMeanwhile `domain.rs` (or `domain/` after 7004d5b6) is an anemic domain model with only data structures.\n\n## Approach\n\nAfter 7004d5b6 promotes `domain.rs` to `domain/`, re-export or relocate key domain operations so they're discoverable from the domain layer:\n\n1. Re-export `DependencyGraph` from `domain/` module (or move if feasible)\n2. Re-export `IssueValidator` from `domain/`\n3. Re-export key label functions from `domain/`\n4. Update `lib.rs` exports so library consumers find domain operations in one place\n\nNote: Full relocation may not be practical in one step. Re-exports from `domain/mod.rs` are an acceptable intermediate step.\n\n## Acceptance Criteria\n\n- [ ] `use jit::domain::*` gives access to types AND key operations (graph, validation, labels)\n- [ ] No breaking changes to existing imports\n- [ ] All existing tests pass",
+  "description": "## Problem\n\nSignificant domain logic is scattered across top-level modules that should be part of (or clearly connected to) the domain layer:\n\n- **`graph.rs`**: `DependencyGraph` with cycle detection, topological sort, transitive reduction, path finding \u2014 core domain algorithms\n- **`validation.rs`**: `IssueValidator` with type label enforcement, namespace registry rules \u2014 domain invariants\n- **`labels.rs`**: `matches_pattern()`, `validate_label_operations()` \u2014 domain constraint logic\n\nMeanwhile `domain.rs` (or `domain/` after 7004d5b6) is an anemic domain model with only data structures.\n\n## Approach\n\nAfter 7004d5b6 promotes `domain.rs` to `domain/`, re-export or relocate key domain operations so they're discoverable from the domain layer:\n\n1. Re-export `DependencyGraph` from `domain/` module (or move if feasible)\n2. Re-export `IssueValidator` from `domain/`\n3. Re-export key label functions from `domain/`\n4. Update `lib.rs` exports so library consumers find domain operations in one place\n\nNote: Full relocation may not be practical in one step. Re-exports from `domain/mod.rs` are an acceptable intermediate step.\n\n## Acceptance Criteria\n\n- [ ] `use jit::domain::*` gives access to types AND key operations (graph, validation, labels)\n- [ ] No breaking changes to existing imports\n- [ ] All existing tests pass",
   "state": "ready",
   "priority": "low",
   "assignee": null,
@@ -16,5 +16,7 @@
     "type:task",
     "epic:production-polish",
     "component:core"
-  ]
+  ],
+  "created_at": "2026-02-11T23:41:20.872508+02:00",
+  "updated_at": "2026-02-11T21:16:26.443910180Z"
 }

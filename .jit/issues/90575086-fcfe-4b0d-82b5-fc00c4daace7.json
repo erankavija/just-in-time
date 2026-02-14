@@ -1,7 +1,7 @@
 {
   "id": "90575086-fcfe-4b0d-82b5-fc00c4daace7",
   "title": "Add Rejected state to web UI",
-  "description": "Update web UI to support the new Rejected state:\n- Add 'rejected' to State type in models.ts  \n- Add rejected emoji in IssueDetail.tsx (e.g., ❌ or 🚫)\n- Add rejected color in GraphView.tsx using --state-rejected CSS variable\n- Update state emoji tests (expect 7 states instead of 6)\n- Update state colors tests (expect 7 states instead of 6)\n- Add --state-rejected CSS variable definition",
+  "description": "Update web UI to support the new Rejected state:\n- Add 'rejected' to State type in models.ts  \n- Add rejected emoji in IssueDetail.tsx (e.g., \u274c or \ud83d\udeab)\n- Add rejected color in GraphView.tsx using --state-rejected CSS variable\n- Update state emoji tests (expect 7 states instead of 6)\n- Update state colors tests (expect 7 states instead of 6)\n- Add --state-rejected CSS variable definition",
   "state": "done",
   "priority": "high",
   "assignee": "agent:copilot-current-session",
@@ -29,5 +29,7 @@
     "epic:rejection-state",
     "milestone:v1.0",
     "component:web"
-  ]
+  ],
+  "created_at": "2025-12-22T22:55:26.218840+02:00",
+  "updated_at": "2025-12-20T20:53:09.120946222Z"
 }

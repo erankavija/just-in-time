@@ -1,7 +1,7 @@
 {
   "id": "20a895cc-020a-4d77-a825-c21bd6457f6b",
   "title": "Story: Consolidate domain logic and clean up architectural debt",
-  "description": "## Problem\n\nDuring analysis of issue 7004d5b6 (reorganize commands module), several broader architectural concerns were identified that go beyond that task's scope. Domain logic is scattered across multiple top-level modules, `CommandExecutor` has grown into a god object (~87 public methods), and naming inconsistencies create confusion for contributors.\n\n## Goals\n\n1. **Reduce CommandExecutor to a thin CLI orchestration layer** — it currently mixes domain operations with output formatting\n2. **Consolidate scattered domain logic** — graph algorithms, validation rules, and label constraints should live near the domain model\n3. **Resolve naming confusion** — `query/` (boolean DSL engine) vs `commands/query.rs` (issue filters) is confusing\n4. **Fill test coverage gaps** — three query functions lack dedicated tests\n\n## Relationship to 7004d5b6\n\nIssue 7004d5b6 handles the first step (moving query functions out of commands/). This story covers the remaining architectural improvements identified during that analysis. Tasks in this story should be done after 7004d5b6 to build on its foundation.\n\n## Acceptance Criteria\n\n- [ ] CommandExecutor methods that print directly are refactored to return data\n- [ ] Domain logic in graph.rs, validation.rs, labels.rs is accessible from the domain layer\n- [ ] No naming confusion between query modules\n- [ ] All query functions have test coverage\n- [ ] All existing tests pass, clippy clean, fmt clean",
+  "description": "## Problem\n\nDuring analysis of issue 7004d5b6 (reorganize commands module), several broader architectural concerns were identified that go beyond that task's scope. Domain logic is scattered across multiple top-level modules, `CommandExecutor` has grown into a god object (~87 public methods), and naming inconsistencies create confusion for contributors.\n\n## Goals\n\n1. **Reduce CommandExecutor to a thin CLI orchestration layer** \u2014 it currently mixes domain operations with output formatting\n2. **Consolidate scattered domain logic** \u2014 graph algorithms, validation rules, and label constraints should live near the domain model\n3. **Resolve naming confusion** \u2014 `query/` (boolean DSL engine) vs `commands/query.rs` (issue filters) is confusing\n4. **Fill test coverage gaps** \u2014 three query functions lack dedicated tests\n\n## Relationship to 7004d5b6\n\nIssue 7004d5b6 handles the first step (moving query functions out of commands/). This story covers the remaining architectural improvements identified during that analysis. Tasks in this story should be done after 7004d5b6 to build on its foundation.\n\n## Acceptance Criteria\n\n- [ ] CommandExecutor methods that print directly are refactored to return data\n- [ ] Domain logic in graph.rs, validation.rs, labels.rs is accessible from the domain layer\n- [ ] No naming confusion between query modules\n- [ ] All query functions have test coverage\n- [ ] All existing tests pass, clippy clean, fmt clean",
   "state": "backlog",
   "priority": "low",
   "assignee": null,
@@ -19,5 +19,7 @@
     "type:story",
     "epic:production-polish",
     "component:core"
-  ]
+  ],
+  "created_at": "2026-02-13T01:29:16.972276+02:00",
+  "updated_at": "2026-02-10T23:38:04.134237698Z"
 }

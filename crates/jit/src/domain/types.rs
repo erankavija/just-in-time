@@ -147,11 +147,16 @@ pub struct Issue {
     pub documents: Vec<DocumentReference>,
     /// Labels for categorization and hierarchy (format: "namespace:value")
     pub labels: Vec<String>,
+    /// RFC 3339 timestamp when issue was created
+    pub created_at: String,
+    /// RFC 3339 timestamp when issue was last updated
+    pub updated_at: String,
 }
 
 impl Issue {
     /// Create a new issue with default values
     pub fn new(title: String, description: String) -> Self {
+        let now = chrono::Utc::now().to_rfc3339();
         Self {
             id: Uuid::new_v4().to_string(),
             title,
@@ -165,6 +170,8 @@ impl Issue {
             context: HashMap::new(),
             documents: Vec::new(),
             labels: Vec::new(),
+            created_at: now.clone(),
+            updated_at: now,
         }
     }
 

@@ -1,7 +1,7 @@
 {
   "id": "b6aeb05b-dc02-435f-9ae1-ba0a1c6c63f4",
   "title": "Bug: issue update with --json flag fails silently",
-  "description": "## Resolution\n\nThis bug was **fixed as a side effect** of resolving issue b45ba79e (shell command injection).\n\n### Investigation Results\n\nCannot reproduce the bug with current code:\n- `jit issue update <id> --state done --json` works correctly\n- Both argument orders work: `--json --state` and `--state --json`  \n- JSON output is properly formatted\n- State transitions complete successfully\n\n### Root Cause (Retrospective)\n\nThe original MCP server code built shell command strings with improper quoting:\n```javascript\n// Old vulnerable code\nflagArgs.push(`--${key} \"${value}\"`);\ncliArgs = `jit ${args}`;\nawait exec(cliArgs);\n```\n\nThis likely caused shell parsing errors when --json flag was combined with other arguments, resulting in silent failures.\n\n### Fix\n\nIssue b45ba79e changed MCP server to use execFile with argument arrays:\n```javascript\n// New safe code  \ncliArgs.push('--${key}', value);\nawait execFileAsync('jit', cliArgs);\n```\n\nNo shell interpretation, no quoting issues, no parsing errors.\n\n### Testing\n\nTested extensively:\n- Short hash resolution: ✓ Works\n- --json flag positioning: ✓ Works (before/after --state)\n- State transitions: ✓ Complete successfully\n- JSON output: ✓ Properly formatted\n\n### Conclusion\n\nBug fixed by dependency b45ba79e. No additional changes needed.",
+  "description": "## Resolution\n\nThis bug was **fixed as a side effect** of resolving issue b45ba79e (shell command injection).\n\n### Investigation Results\n\nCannot reproduce the bug with current code:\n- `jit issue update <id> --state done --json` works correctly\n- Both argument orders work: `--json --state` and `--state --json`  \n- JSON output is properly formatted\n- State transitions complete successfully\n\n### Root Cause (Retrospective)\n\nThe original MCP server code built shell command strings with improper quoting:\n```javascript\n// Old vulnerable code\nflagArgs.push(`--${key} \"${value}\"`);\ncliArgs = `jit ${args}`;\nawait exec(cliArgs);\n```\n\nThis likely caused shell parsing errors when --json flag was combined with other arguments, resulting in silent failures.\n\n### Fix\n\nIssue b45ba79e changed MCP server to use execFile with argument arrays:\n```javascript\n// New safe code  \ncliArgs.push('--${key}', value);\nawait execFileAsync('jit', cliArgs);\n```\n\nNo shell interpretation, no quoting issues, no parsing errors.\n\n### Testing\n\nTested extensively:\n- Short hash resolution: \u2713 Works\n- --json flag positioning: \u2713 Works (before/after --state)\n- State transitions: \u2713 Complete successfully\n- JSON output: \u2713 Properly formatted\n\n### Conclusion\n\nBug fixed by dependency b45ba79e. No additional changes needed.",
   "state": "done",
   "priority": "high",
   "assignee": "copilot:session-1",
@@ -16,5 +16,7 @@
   "labels": [
     "type:bug",
     "component:cli"
-  ]
+  ],
+  "created_at": "2025-12-29T21:45:19.885095+02:00",
+  "updated_at": "2025-12-22T23:39:47.667520316Z"
 }

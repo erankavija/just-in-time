@@ -1,7 +1,7 @@
 {
   "id": "991c8a17-aca1-4acb-a084-2b95369f16c4",
   "title": "Add tests for query_all, query_by_assignee, and query_by_priority",
-  "description": "## Problem\n\nThree query functions in `commands/query.rs` have no dedicated test coverage:\n\n- `query_all(state, assignee, priority, label)` — multi-filter composition\n- `query_by_assignee(assignee)` — filter by assignee string\n- `query_by_priority(priority)` — filter by priority level\n\nOther query functions (query_ready, query_blocked, query_by_state, query_by_label, query_strategic, query_closed, query_available) all have tests.\n\n## Approach\n\nAdd integration tests in `crates/jit/tests/` following the existing pattern in `query_tests.rs`:\n\n1. `query_all` — test each filter individually and in combination, test empty results\n2. `query_by_assignee` — test exact match, no match, multiple issues same assignee\n3. `query_by_priority` — test each priority level, empty results\n\n## Acceptance Criteria\n\n- [ ] All three functions have dedicated tests\n- [ ] Tests cover basic cases, empty results, and filter combinations\n- [ ] All existing tests still pass",
+  "description": "## Problem\n\nThree query functions in `commands/query.rs` have no dedicated test coverage:\n\n- `query_all(state, assignee, priority, label)` \u2014 multi-filter composition\n- `query_by_assignee(assignee)` \u2014 filter by assignee string\n- `query_by_priority(priority)` \u2014 filter by priority level\n\nOther query functions (query_ready, query_blocked, query_by_state, query_by_label, query_strategic, query_closed, query_available) all have tests.\n\n## Approach\n\nAdd integration tests in `crates/jit/tests/` following the existing pattern in `query_tests.rs`:\n\n1. `query_all` \u2014 test each filter individually and in combination, test empty results\n2. `query_by_assignee` \u2014 test exact match, no match, multiple issues same assignee\n3. `query_by_priority` \u2014 test each priority level, empty results\n\n## Acceptance Criteria\n\n- [ ] All three functions have dedicated tests\n- [ ] Tests cover basic cases, empty results, and filter combinations\n- [ ] All existing tests still pass",
   "state": "ready",
   "priority": "low",
   "assignee": null,
@@ -14,5 +14,7 @@
     "type:task",
     "epic:production-polish",
     "component:core"
-  ]
+  ],
+  "created_at": "2026-02-11T01:37:51.894696+02:00",
+  "updated_at": "2026-02-10T23:37:51.894829006Z"
 }

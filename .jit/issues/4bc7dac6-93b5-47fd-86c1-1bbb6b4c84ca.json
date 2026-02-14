@@ -1,7 +1,7 @@
 {
   "id": "4bc7dac6-93b5-47fd-86c1-1bbb6b4c84ca",
   "title": "Add validation for transitive reduction in dependency DAG",
-  "description": "Ensure dependency DAG maintains transitive reduction invariant - no redundant edges that are already reachable via other paths. Found actual redundancy in Epic 4a00b2b0 with edge to 241b7002 (also reachable via 4cb2682e→14303b30). Implement validation check in 'jit validate', add --fix flag to auto-clean, and add comprehensive tests.",
+  "description": "Ensure dependency DAG maintains transitive reduction invariant - no redundant edges that are already reachable via other paths. Found actual redundancy in Epic 4a00b2b0 with edge to 241b7002 (also reachable via 4cb2682e\u219214303b30). Implement validation check in 'jit validate', add --fix flag to auto-clean, and add comprehensive tests.",
   "state": "done",
   "priority": "critical",
   "assignee": "agent:copilot-cli",
@@ -53,5 +53,7 @@
     "type:task",
     "epic:production-stability",
     "milestone:v1.0"
-  ]
+  ],
+  "created_at": "2025-12-22T22:55:26.217679+02:00",
+  "updated_at": "2025-12-21T22:04:13.136582188Z"
 }

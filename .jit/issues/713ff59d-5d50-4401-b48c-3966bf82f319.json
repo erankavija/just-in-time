@@ -1,7 +1,7 @@
 {
   "id": "713ff59d-5d50-4401-b48c-3966bf82f319",
   "title": "Implement metrics reporting system",
-  "description": "Implement comprehensive metrics reporting system providing actionable insights into issue tracker state and workflow performance. Add 'jit metrics' command with support for multiple categories: issue state distribution, workflow velocity (throughput, cycle time, lead time, WIP), gate performance (pass rates, execution times), and dependency graph health. Support time range filtering (since date, last N days) and multiple output formats (JSON, Prometheus, CSV). Parse event logs for historical data and calculate key metrics like average cycle time from ready→done, gate pass rates by gate type, and blocking time distributions. Include Prometheus export format for integration with monitoring infrastructure. This feature provides essential observability for production deployments, enabling data-driven decisions and early detection of workflow issues.",
+  "description": "Implement comprehensive metrics reporting system providing actionable insights into issue tracker state and workflow performance. Add 'jit metrics' command with support for multiple categories: issue state distribution, workflow velocity (throughput, cycle time, lead time, WIP), gate performance (pass rates, execution times), and dependency graph health. Support time range filtering (since date, last N days) and multiple output formats (JSON, Prometheus, CSV). Parse event logs for historical data and calculate key metrics like average cycle time from ready\u2192done, gate pass rates by gate type, and blocking time distributions. Include Prometheus export format for integration with monitoring infrastructure. This feature provides essential observability for production deployments, enabling data-driven decisions and early detection of workflow issues.",
   "state": "ready",
   "priority": "normal",
   "assignee": null,
@@ -21,5 +21,7 @@
     "epic:observability",
     "milestone:v1.0",
     "component:cli"
-  ]
+  ],
+  "created_at": "2025-12-22T22:55:26.218241+02:00",
+  "updated_at": "2025-12-19T23:03:47.850902133Z"
 }
