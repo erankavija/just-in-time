@@ -57,7 +57,7 @@ def find_timestamps_from_events(issue_id: str, events: list) -> Tuple[Optional[s
     
     # Find issue_created event for created_at
     for event in issue_events:
-        if event.get('event_type') == 'issue_created':
+        if event.get('type') == 'issue_created':
             created_at = event.get('timestamp')
             break
     
@@ -91,8 +91,7 @@ def migrate_issue(issue_file: Path, events: list, dry_run: bool = False) -> bool
         return False
     
     # Check if already has timestamps
-    if 'created_at' in issue and 'updated_at' in issue:
-        return False
+    has_timestamps = 'created_at' in issue and 'updated_at' in issue
     
     # Try to get timestamps from events
     created_at, updated_at = find_timestamps_from_events(issue_id, events)
@@ -106,6 +105,16 @@ def migrate_issue(issue_file: Path, events: list, dry_run: bool = False) -> bool
     
     if not updated_at:
         updated_at = file_timestamp
+    
+    # Ensure created_at <= updated_at (use earlier for created, later for updated)
+    from datetime import datetime
+    created_dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+    updated_dt = datetime.fromisoformat(updated_at.replace('Z', '+00:00'))
+    
+    if created_dt > updated_dt:
+        # Swap: use min for created, max for updated
+        created_at, updated_at = min(created_at, updated_at), max(created_at, updated_at)
+        print(f"  {issue['id'][:8]}: Fixed timestamp order (swapped to maintain chronology)")
     
     # Add timestamps
     issue['created_at'] = created_at
