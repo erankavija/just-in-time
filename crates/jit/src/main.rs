@@ -617,6 +617,12 @@ strategic_types = {}
                 }
                 IssueCommands::Delete { id, json } => {
                     let output_ctx = OutputContext::new(quiet, json);
+                    
+                    // Phase 3 safety check: Block deletion in secondary worktrees
+                    if storage.is_secondary_worktree() {
+                        anyhow::bail!("Deletion is not allowed in secondary worktrees. Deletions must be performed from the main worktree to maintain consistency across all worktrees.");
+                    }
+                    
                     executor.delete_issue(&id)?;
 
                     if json {

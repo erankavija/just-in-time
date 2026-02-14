@@ -32,75 +32,29 @@ Add `deleted_ids: Vec<String>` field to `index.json` to explicitly track locally
 
 ## Implementation Phases (TDD)
 
-### Phase 1: Schema Update (SIMPLIFIED)
+### Phase 1: Schema Update (SIMPLIFIED) ✅ COMPLETE
 **Goal:** Add deleted_ids field, bump schema version
 
-**Tasks:**
-- [ ] Update `Index` struct to include `deleted_ids: Vec<String>`
-- [ ] Bump `CURRENT_SCHEMA_VERSION` to 2
-- [ ] Update `init()` to create v2 index
-- [ ] Update `save_index()` to write v2 format
-- [ ] Handle v1 index on load: regenerate from scratch or error with clear message
-- [ ] Tests:
-  - [ ] New repos create v2 index
-  - [ ] Save/load v2 index works correctly
-  - [ ] (Optional) Loading v1 index gives helpful error
+**Completed:**
+- ✅ Updated `Index` struct to include `deleted_ids: Vec<String>`
+- ✅ Bumped `CURRENT_SCHEMA_VERSION` to 2
+- ✅ Updated `init()` to create v2 index
+- ✅ Tests: New repos create v2 index, save/load works
+- ✅ Commit: 62ddad2
 
-**Files to modify:**
-- `crates/jit/src/storage/json.rs` (Index struct, load/save methods)
-- `crates/jit/src/storage/json.rs` (tests module)
-
-**Note:** No migration complexity! If schema mismatch, we can regenerate index by scanning `.jit/issues/`.
-
-### Phase 2: Deletion Tracking Logic
+### Phase 2: Deletion Tracking Logic ✅ COMPLETE  
 **Goal:** Track deletions in local index
 
-**Tasks:**
-- [ ] Update `delete_issue()` to add ID to `deleted_ids[]`
-- [ ] Update `load_aggregated_index()` to exclude deleted_ids from final list
-- [ ] Update `list_issues()` to respect deletion tracking
-- [ ] Tests:
-  - [ ] Delete issue → verify it's in deleted_ids
-  - [ ] Delete issue → query all → not present
-  - [ ] Delete non-existent issue → appropriate error
-  - [ ] Deleted issue doesn't appear in validate, graph, etc.
+**Completed:**
+- ✅ Updated `delete_issue()` to add ID to `deleted_ids[]`
+- ✅ Updated `load_aggregated_index()` to filter deleted IDs
+- ✅ Tests: Deletion tracking works, aggregated index filters correctly
+- ✅ Integration test: test_bug_5dbc3548_deleted_issue_not_in_query
+- ✅ Bug is FIXED - deleted issues don't reappear
+- ✅ All tests pass (622 lib + integration + worktree)
+- ✅ Commit: 62ddad2
 
-**Files to modify:**
-- `crates/jit/src/storage/json.rs` (`delete_issue`, `load_aggregated_index`)
-- `crates/jit/tests/integration_test.rs` (new tests)
-
-**Algorithm for `load_aggregated_index()`:**
-```rust
-fn load_aggregated_index() -> Result<Index> {
-    let mut all_ids = HashSet::new();
-    let mut deleted_ids = HashSet::new();
-    
-    // Load from all sources
-    if let Ok(local) = self.load_index() {
-        all_ids.extend(local.all_ids);
-        deleted_ids.extend(local.deleted_ids);  // Track local deletions
-    }
-    if let Ok(git) = self.load_index_from_git() {
-        all_ids.extend(git.all_ids);
-        deleted_ids.extend(git.deleted_ids);  // Committed deletions
-    }
-    if let Ok(main) = self.load_index_from_main_worktree() {
-        all_ids.extend(main.all_ids);
-        deleted_ids.extend(main.deleted_ids);  // Main worktree deletions
-    }
-    
-    // Remove deleted IDs from final set
-    all_ids.retain(|id| !deleted_ids.contains(id));
-    
-    Ok(Index {
-        schema_version: 2,
-        all_ids: all_ids.into_iter().collect(),
-        deleted_ids: vec![],  // Don't propagate in aggregated index
-    })
-}
-```
-
-### Phase 3: Secondary Worktree Deletion Safety
+### Phase 3: Secondary Worktree Deletion Safety 🔄 IN PROGRESS
 **Goal:** Prevent unsafe deletions across worktrees
 
 **Deletion rules:**

@@ -464,3 +464,83 @@ fn test_local_overrides_git_and_main() {
 
     assert_eq!(loaded_main["data"]["title"].as_str().unwrap(), "Original");
 }
+
+#[test]
+fn test_deletion_blocked_in_secondary_worktree() {
+    // Phase 3: Deletion safety - secondary worktrees cannot delete issues
+    let (_temp_dir, repo_path) = setup_git_repo();
+
+    // Initialize jit and create issue in main
+    run_jit(&repo_path, &["init"]).unwrap();
+    let output = run_jit(&repo_path, &["issue", "create", "-t", "Test", "-d", "desc"]).unwrap();
+    let issue_id = extract_issue_id(&output);
+
+    // Commit it (explicitly commit .jit like other tests)
+    Command::new("git")
+        .args(["add", ".jit"])
+        .current_dir(&repo_path)
+        .output()
+        .unwrap();
+    Command::new("git")
+        .args(["commit", "-m", "Add issue"])
+        .current_dir(&repo_path)
+        .output()
+        .unwrap();
+    
+    // Create secondary worktree in a subdirectory of the test's temp directory
+    let secondary_path = repo_path.join("secondary");
+    create_secondary_worktree(&repo_path, &secondary_path);
+    
+    run_jit(&secondary_path, &["init"]).unwrap();
+
+    // Verify issue is visible in secondary
+    let query_output = run_jit(&secondary_path, &["query", "all"]).unwrap();
+    assert!(query_output.contains(&issue_id), "Issue should be visible in secondary worktree");
+
+    // Try to delete from secondary - should be blocked
+    let result = run_jit(&secondary_path, &["issue", "delete", &issue_id]);
+
+    assert!(result.is_err(), "Deletion should be blocked in secondary worktree");
+    let error = result.unwrap_err().to_string();
+    assert!(
+        error.contains("secondary worktree") || error.contains("not allowed"),
+        "Error should mention secondary worktree: {}",
+        error
+    );
+}
+
+// Helper functions
+fn extract_issue_id(output: &str) -> String {
+    output
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string()
+}
+
+fn commit_all(repo_path: &PathBuf, message: &str) {
+    Command::new("git")
+        .args(["add", "."])
+        .current_dir(repo_path)
+        .output()
+        .unwrap();
+    Command::new("git")
+        .args(["commit", "-m", message])
+        .current_dir(repo_path)
+        .output()
+        .unwrap();
+}
+
+fn create_secondary_worktree(main_path: &PathBuf, secondary_path: &PathBuf) {
+    Command::new("git")
+        .args([
+            "worktree",
+            "add",
+            "-b",
+            "secondary-branch",
+            secondary_path.to_str().unwrap(),
+        ])
+        .current_dir(main_path)
+        .output()
+        .unwrap();
+}

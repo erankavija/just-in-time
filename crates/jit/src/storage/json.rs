@@ -341,6 +341,26 @@ impl JsonFileStorage {
         // Read directly from main worktree (no lock needed for read-only access)
         self.read_json(&main_issue_path)
     }
+
+    /// Check if the current worktree is a secondary git worktree.
+    ///
+    /// Returns true if this is a secondary worktree, false if main worktree or not in git.
+    pub fn is_secondary_worktree(&self) -> bool {
+        let repo_root = match self.root.parent() {
+            Some(root) => root,
+            None => return false,
+        };
+
+        // Check if .git exists
+        let git_path = repo_root.join(".git");
+        if !git_path.exists() {
+            return false;
+        }
+
+        // Secondary worktrees have .git as a file (pointing to worktree metadata)
+        // Main worktree has .git as a directory
+        git_path.is_file()
+    }
 }
 
 impl IssueStore for JsonFileStorage {
@@ -1550,6 +1570,30 @@ mod tests {
             // Aggregated index should NOT include the deleted issue
             let aggregated = storage.load_aggregated_index().unwrap();
             assert!(!aggregated.all_ids.contains(&issue_id));
+        }
+    }
+
+    // Tests for worktree deletion safety (Phase 3)
+    mod deletion_safety_tests {
+        use super::*;
+
+        #[test]
+        fn test_is_secondary_worktree_detection() {
+            // Main worktree: .git is a directory
+            let main_temp = TempDir::new().unwrap();
+            let main_storage = JsonFileStorage::new(main_temp.path());
+            
+            // Initialize git
+            Command::new("git")
+                .arg("init")
+                .current_dir(main_temp.path().parent().unwrap())
+                .output()
+                .unwrap();
+            
+            main_storage.init().unwrap();
+            
+            // Should detect as main worktree
+            assert!(!main_storage.is_secondary_worktree());
         }
     }
 }
