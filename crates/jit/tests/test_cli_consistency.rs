@@ -203,6 +203,7 @@ fn test_issue_delete_supports_json() {
 
     let output = Command::new(jit_binary())
         .args(["issue", "delete", id, "--json"])
+        .env("JIT_ALLOW_DELETION", "1")
         .current_dir(repo.path())
         .output()
         .unwrap();

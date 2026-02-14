@@ -346,9 +346,10 @@ fn test_issue_update_and_delete() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("Title: New Title"));
 
-    // Delete issue
+    // Delete issue (requires env var)
     Command::new(&jit)
         .args(["issue", "delete", &id])
+        .env("JIT_ALLOW_DELETION", "1")
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -777,9 +778,10 @@ fn test_bug_5dbc3548_deleted_issue_not_in_query() {
         "Issue should be visible before deletion"
     );
 
-    // Delete the issue
+    // Delete the issue (requires JIT_ALLOW_DELETION=1)
     let output = Command::new(&jit)
         .args(["issue", "delete", &id])
+        .env("JIT_ALLOW_DELETION", "1")
         .current_dir(temp.path())
         .output()
         .unwrap();
