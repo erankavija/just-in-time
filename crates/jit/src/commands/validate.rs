@@ -192,7 +192,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue.labels.retain(|l| l != &old_label);
         issue.labels.push(new_label);
 
-        self.storage.save_issue(&issue)?;
+        self.storage.save_issue(issue)?;
         Ok(())
     }
 
@@ -687,7 +687,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         if !dry_run {
             // Actually apply the fix
             issue.dependencies = reduced.into_iter().collect();
-            self.storage.save_issue(&issue)?;
+            self.storage.save_issue(issue)?;
         }
 
         // Note: Event logging for transitive reduction fixes could be added

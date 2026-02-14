@@ -79,7 +79,7 @@ fn test_validation_detects_cycle() {
     // Manually create cycle by adding B -> A directly in storage
     let mut issue2_updated = storage.load_issue(&issue2_id).unwrap();
     issue2_updated.dependencies.push(issue1_id.clone());
-    storage.save_issue(&issue2_updated).unwrap();
+    storage.save_issue(issue2_updated.clone()).unwrap();
 
     // Validation should detect the cycle
     let result = executor.validate_silent();
@@ -148,7 +148,7 @@ fn test_validation_detects_multiple_broken_dependencies() {
     let mut issue = storage.load_issue(&issue1_id).unwrap();
     issue.dependencies.push("nonexistent1".to_string());
     issue.dependencies.push("nonexistent2".to_string());
-    storage.save_issue(&issue).unwrap();
+    storage.save_issue(issue).unwrap();
 
     // Validation should fail
     let result = executor.validate_silent();

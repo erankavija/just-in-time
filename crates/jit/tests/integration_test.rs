@@ -886,7 +886,7 @@ fn test_issue_timestamps_persist() {
 
     // Update the issue (this will change updated_at)
     std::thread::sleep(std::time::Duration::from_millis(10)); // Ensure timestamp difference
-    
+
     let output = Command::new(&jit)
         .args(["issue", "update", id, "--state", "ready"])
         .current_dir(temp.path())
@@ -925,4 +925,3 @@ fn test_issue_timestamps_persist() {
         );
     }
 }
-

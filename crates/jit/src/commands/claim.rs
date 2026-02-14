@@ -97,7 +97,7 @@ pub fn execute_claim_acquire<S: IssueStore>(
     let mut issue = storage.load_issue(&full_id)?;
     if issue.assignee.is_none() || issue.assignee.as_ref() != Some(&agent) {
         issue.assignee = Some(agent);
-        storage.save_issue(&issue)?;
+        storage.save_issue(issue)?;
     }
 
     Ok(lease.lease_id)
@@ -564,7 +564,7 @@ mod tests {
     fn create_test_issue(storage: &JsonFileStorage, title: &str) -> Result<String> {
         let issue = Issue::new(title.to_string(), "Test description".to_string());
         let issue_id = issue.id.clone();
-        storage.save_issue(&issue)?;
+        storage.save_issue(issue)?;
         Ok(issue_id)
     }
 

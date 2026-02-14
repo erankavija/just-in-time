@@ -66,13 +66,24 @@ impl<S: IssueStore> CommandExecutor<S> {
             issue.state = State::Ready;
         }
 
-        self.storage.save_issue(&issue)?;
+        // Clone fields needed for event and return value before moving issue
+        let issue_id = issue.id.clone();
+        let title = issue.title.clone();
+        let priority = issue.priority;
+
+        self.storage.save_issue(issue)?;
 
         // Log event
-        let event = Event::new_issue_created(&issue);
+        let event = Event::IssueCreated {
+            id: uuid::Uuid::new_v4().to_string(),
+            issue_id: issue_id.clone(),
+            timestamp: chrono::Utc::now(),
+            title,
+            priority,
+        };
         self.storage.append_event(&event)?;
 
-        Ok((issue.id, warnings))
+        Ok((issue_id, warnings))
     }
 
     pub fn list_issues(
@@ -244,7 +255,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
-        self.storage.save_issue(&issue)?;
+        self.storage.save_issue(issue)?;
 
         // Check if any dependent issues can now transition to ready (after save!)
         if let Some(s) = state {
@@ -336,11 +347,13 @@ impl<S: IssueStore> CommandExecutor<S> {
             State::Gated => {
                 // Run postchecks when moving to Gated
                 issue.state = State::Gated;
-                self.storage.save_issue(&issue)?;
+
+                let issue_id = issue.id.clone();
+                self.storage.save_issue(issue)?;
 
                 // Log state change event
                 let event =
-                    Event::new_issue_state_changed(issue.id.clone(), old_state, State::Gated);
+                    Event::new_issue_state_changed(issue_id.clone(), old_state, State::Gated);
                 self.storage.append_event(&event)?;
 
                 // Run postchecks (which may auto-transition to Done)
@@ -354,18 +367,21 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Save and log
         if old_state != issue.state {
-            self.storage.save_issue(&issue)?;
+            let issue_id = issue.id.clone();
+            let new_state = issue.state;
 
-            let event = Event::new_issue_state_changed(issue.id.clone(), old_state, issue.state);
+            self.storage.save_issue(issue)?;
+
+            let event = Event::new_issue_state_changed(issue_id.clone(), old_state, new_state);
             self.storage.append_event(&event)?;
 
             // Log completion event if transitioning to Done
-            if issue.state == State::Done {
-                let event = Event::new_issue_completed(issue.id.clone());
+            if new_state == State::Done {
+                let event = Event::new_issue_completed(issue_id);
                 self.storage.append_event(&event)?;
             }
         } else {
-            self.storage.save_issue(&issue)?;
+            self.storage.save_issue(issue)?;
         }
 
         Ok(())
@@ -381,7 +397,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let mut issue = self.storage.load_issue(&full_id)?;
         issue.assignee = Some(assignee);
-        self.storage.save_issue(&issue)?;
+        self.storage.save_issue(issue)?;
         Ok(())
     }
 
@@ -426,10 +442,12 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Now assign the issue
         let mut issue = self.storage.load_issue(&full_id)?;
         issue.assignee = Some(assignee.clone());
-        self.storage.save_issue(&issue)?;
+
+        let issue_id = issue.id.clone();
+        self.storage.save_issue(issue)?;
 
         // Log assignment event
-        let event = Event::new_issue_claimed(issue.id.clone(), assignee);
+        let event = Event::new_issue_claimed(issue_id, assignee);
         self.storage.append_event(&event)?;
 
         Ok(())
@@ -445,7 +463,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let mut issue = self.storage.load_issue(&full_id)?;
         issue.assignee = None;
-        self.storage.save_issue(&issue)?;
+        self.storage.save_issue(issue)?;
         Ok(())
     }
 
@@ -462,7 +480,8 @@ impl<S: IssueStore> CommandExecutor<S> {
             issue.state = State::Ready;
         }
 
-        self.storage.save_issue(&issue)?;
+        let new_state = issue.state;
+        self.storage.save_issue(issue)?;
 
         // Log event
         let event = Event::new_issue_released(
@@ -473,8 +492,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         self.storage.append_event(&event)?;
 
         // Log state change if it occurred
-        if old_state != issue.state {
-            let event = Event::new_issue_state_changed(full_id, old_state, issue.state);
+        if old_state != new_state {
+            let event = Event::new_issue_state_changed(full_id, old_state, new_state);
             self.storage.append_event(&event)?;
         }
 
@@ -519,10 +538,12 @@ impl<S: IssueStore> CommandExecutor<S> {
         if issue.should_auto_transition_to_ready(&resolved) {
             let old_state = issue.state;
             issue.state = State::Ready;
-            self.storage.save_issue(&issue)?;
+
+            let issue_id = issue.id.clone();
+            self.storage.save_issue(issue)?;
 
             // Log state change event
-            let event = Event::new_issue_state_changed(issue.id.clone(), old_state, State::Ready);
+            let event = Event::new_issue_state_changed(issue_id, old_state, State::Ready);
             self.storage.append_event(&event)?;
 
             Ok(true)
@@ -538,14 +559,16 @@ impl<S: IssueStore> CommandExecutor<S> {
         if issue.should_auto_transition_to_done() {
             let old_state = issue.state;
             issue.state = State::Done;
-            self.storage.save_issue(&issue)?;
+
+            let issue_id = issue.id.clone();
+            self.storage.save_issue(issue)?;
 
             // Log state change event
-            let event = Event::new_issue_state_changed(issue.id.clone(), old_state, State::Done);
+            let event = Event::new_issue_state_changed(issue_id.clone(), old_state, State::Done);
             self.storage.append_event(&event)?;
 
             // Log completion event
-            let event = Event::new_issue_completed(issue.id.clone());
+            let event = Event::new_issue_completed(issue_id);
             self.storage.append_event(&event)?;
 
             // Check if any dependent issues can now transition to ready
@@ -579,11 +602,15 @@ impl<S: IssueStore> CommandExecutor<S> {
         let unpassed = issue.get_unpassed_gates();
         issue.state = State::Gated;
 
+        // Clone issue before moving it to save
+        let issue_id = issue.id.clone();
+        let issue_to_save = issue.clone();
+
         // Save the state change before returning error
-        self.storage.save_issue(issue)?;
+        self.storage.save_issue(issue_to_save)?;
 
         // Log state change event
-        let event = Event::new_issue_state_changed(issue.id.clone(), old_state, State::Gated);
+        let event = Event::new_issue_state_changed(issue_id, old_state, State::Gated);
         self.storage.append_event(&event)?;
 
         Err(anyhow!(
@@ -645,7 +672,7 @@ enforce_leases = "off"
         let mut issue = crate::domain::Issue::new("Test task".to_string(), "Test".to_string());
         issue.state = State::Ready;
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(&issue).unwrap();
+        executor.storage.save_issue(issue).unwrap();
         executor
             .add_gate(&issue_id, "tdd-reminder".to_string())
             .unwrap();
@@ -701,7 +728,7 @@ enforce_leases = "off"
         let mut issue = crate::domain::Issue::new("Test task".to_string(), "Test".to_string());
         issue.state = State::Ready;
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(&issue).unwrap();
+        executor.storage.save_issue(issue).unwrap();
         executor
             .add_gate(&issue_id, "tdd-reminder".to_string())
             .unwrap();
@@ -736,7 +763,7 @@ enforce_leases = "off"
         let mut issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(&issue).unwrap();
+        executor.storage.save_issue(issue).unwrap();
 
         // Add gates that haven't been passed
         executor.add_gate(&issue_id, "tests".to_string()).unwrap();
@@ -764,14 +791,14 @@ enforce_leases = "off"
         let mut dep = crate::domain::Issue::new("Dependency".to_string(), "Dep".to_string());
         dep.state = State::InProgress; // Not done
         let dep_id = dep.id.clone();
-        executor.storage.save_issue(&dep).unwrap();
+        executor.storage.save_issue(dep).unwrap();
 
         // Create issue that depends on it
         let mut issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
         issue.dependencies.push(dep_id.clone());
         issue.state = State::Backlog; // Blocked
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(&issue).unwrap();
+        executor.storage.save_issue(issue).unwrap();
 
         // Transition to Rejected should succeed even with incomplete dependencies
         let result = executor.update_issue_state(&issue_id, State::Rejected);
@@ -793,7 +820,7 @@ enforce_leases = "off"
         let mut issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(&issue).unwrap();
+        executor.storage.save_issue(issue).unwrap();
         executor.add_gate(&issue_id, "tests".to_string()).unwrap();
 
         // Transition to Done should fail (gates not passed)
@@ -816,14 +843,14 @@ enforce_leases = "off"
         let mut dep = crate::domain::Issue::new("Dependency".to_string(), "Dep".to_string());
         dep.state = State::Done;
         let dep_id = dep.id.clone();
-        executor.storage.save_issue(&dep).unwrap();
+        executor.storage.save_issue(dep).unwrap();
 
         // Create issue in Backlog that depends on the Done dependency
         let mut issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
         issue.state = State::Backlog;
         issue.dependencies.push(dep_id.clone());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(&issue).unwrap();
+        executor.storage.save_issue(issue).unwrap();
 
         // Manually transition to Ready should succeed (dependency is done)
         let result = executor.update_issue(

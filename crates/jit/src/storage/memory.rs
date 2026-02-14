@@ -24,7 +24,7 @@ use std::sync::{Arc, Mutex};
 /// storage.init().unwrap();
 ///
 /// let issue = Issue::new("Test".to_string(), "Description".to_string());
-/// storage.save_issue(&issue).unwrap();
+/// storage.save_issue(issue.clone()).unwrap();
 ///
 /// let loaded = storage.load_issue(&issue.id).unwrap();
 /// assert_eq!(loaded.title, "Test");
@@ -71,11 +71,11 @@ impl IssueStore for InMemoryStorage {
         Ok(())
     }
 
-    fn save_issue(&self, issue: &Issue) -> Result<()> {
-        self.issues
-            .lock()
-            .unwrap()
-            .insert(issue.id.clone(), issue.clone());
+    fn save_issue(&self, mut issue: Issue) -> Result<()> {
+        // Update the updated_at timestamp (storage responsibility)
+        issue.updated_at = chrono::Utc::now().to_rfc3339();
+
+        self.issues.lock().unwrap().insert(issue.id.clone(), issue);
         Ok(())
     }
 
@@ -256,7 +256,7 @@ mod tests {
         storage.init().unwrap();
 
         let issue = Issue::new("Test".to_string(), "Description".to_string());
-        storage.save_issue(&issue).unwrap();
+        storage.save_issue(issue.clone()).unwrap();
 
         let loaded = storage.load_issue(&issue.id).unwrap();
         assert_eq!(loaded.id, issue.id);
@@ -270,10 +270,10 @@ mod tests {
         storage.init().unwrap();
 
         let mut issue = Issue::new("Original".to_string(), "Desc".to_string());
-        storage.save_issue(&issue).unwrap();
+        storage.save_issue(issue.clone()).unwrap();
 
         issue.title = "Updated".to_string();
-        storage.save_issue(&issue).unwrap();
+        storage.save_issue(issue.clone()).unwrap();
 
         let loaded = storage.load_issue(&issue.id).unwrap();
         assert_eq!(loaded.title, "Updated");
@@ -299,7 +299,7 @@ mod tests {
         storage.init().unwrap();
 
         let issue = Issue::new("Delete me".to_string(), "Test".to_string());
-        storage.save_issue(&issue).unwrap();
+        storage.save_issue(issue.clone()).unwrap();
 
         storage.delete_issue(&issue.id).unwrap();
 
@@ -324,8 +324,8 @@ mod tests {
         let issue1 = Issue::new("Issue 1".to_string(), "First".to_string());
         let issue2 = Issue::new("Issue 2".to_string(), "Second".to_string());
 
-        storage.save_issue(&issue1).unwrap();
-        storage.save_issue(&issue2).unwrap();
+        storage.save_issue(issue1.clone()).unwrap();
+        storage.save_issue(issue2.clone()).unwrap();
 
         let issues = storage.list_issues().unwrap();
         assert_eq!(issues.len(), 2);
@@ -414,7 +414,7 @@ mod tests {
         storage1.init().unwrap();
 
         let issue1 = Issue::new("Issue 1".to_string(), "In storage 1".to_string());
-        storage1.save_issue(&issue1).unwrap();
+        storage1.save_issue(issue1.clone()).unwrap();
 
         // Clone shares the same underlying storage (via RefCell)
         let storage2 = storage1.clone();
@@ -423,7 +423,7 @@ mod tests {
 
         // Verify they share the same underlying storage
         let issue2 = Issue::new("Issue 2".to_string(), "In storage 2".to_string());
-        storage2.save_issue(&issue2).unwrap();
+        storage2.save_issue(issue2.clone()).unwrap();
 
         // Both see the same data because they share the RefCell
         let issues1 = storage1.list_issues().unwrap();
@@ -445,7 +445,7 @@ mod tests {
         issue.gates_required = vec!["gate1".to_string()];
         issue.context.insert("key".to_string(), "value".to_string());
 
-        storage.save_issue(&issue).unwrap();
+        storage.save_issue(issue.clone()).unwrap();
 
         let loaded = storage.load_issue(&issue.id).unwrap();
         assert_eq!(loaded.priority, Priority::Critical);

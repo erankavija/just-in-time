@@ -344,7 +344,7 @@ mod tests {
         // Create a test issue
         let issue = Issue::new("test-issue".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
-        storage.save_issue(&issue).unwrap();
+        storage.save_issue(issue).unwrap();
 
         // Create the root directory and config with enforcement off
         std::fs::create_dir_all(storage.root()).unwrap();
@@ -372,7 +372,7 @@ enforce_leases = "off"
         // Create a test issue
         let issue = Issue::new("test-issue".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
-        storage.save_issue(&issue).unwrap();
+        storage.save_issue(issue).unwrap();
 
         let executor = CommandExecutor::new(storage);
 
@@ -392,7 +392,7 @@ enforce_leases = "off"
         // Create a test issue
         let issue = Issue::new("test-issue".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
-        storage.save_issue(&issue).unwrap();
+        storage.save_issue(issue).unwrap();
 
         // Create the root directory and config with enforcement strict
         std::fs::create_dir_all(storage.root()).unwrap();
@@ -422,7 +422,7 @@ enforce_leases = "strict"
         // Create a test issue
         let issue = Issue::new("test-issue".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
-        storage.save_issue(&issue).unwrap();
+        storage.save_issue(issue).unwrap();
 
         // No config file - should default to off mode (single-agent development)
         let executor = CommandExecutor::new(storage);

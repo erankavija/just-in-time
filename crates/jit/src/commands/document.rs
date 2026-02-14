@@ -81,7 +81,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         };
 
         issue.documents.push(doc_ref.clone());
-        self.storage.save_issue(&issue)?;
+        self.storage.save_issue(issue)?;
 
         if json {
             let output = JsonOutput::success(
@@ -153,7 +153,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             return Err(anyhow!(err_msg));
         }
 
-        self.storage.save_issue(&issue)?;
+        self.storage.save_issue(issue)?;
 
         if json {
             let output = JsonOutput::success(
@@ -627,7 +627,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
                 // Update the document with rescanned assets
                 issue.documents[doc_index].assets = scanned_assets.clone();
-                self.storage.save_issue(&issue)?;
+                self.storage.save_issue(issue)?;
 
                 scanned_assets
             } else {
@@ -1195,8 +1195,9 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
 
             if changed {
-                self.storage.save_issue(issue)?;
-                updated.push(issue.id.clone());
+                let issue_id = issue.id.clone();
+                self.storage.save_issue(issue.clone())?;
+                updated.push(issue_id);
             }
         }
 

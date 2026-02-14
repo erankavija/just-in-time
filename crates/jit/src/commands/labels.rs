@@ -60,7 +60,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
-        self.storage.save_issue(&issue)?;
+        self.storage.save_issue(issue)?;
         Ok(())
     }
 

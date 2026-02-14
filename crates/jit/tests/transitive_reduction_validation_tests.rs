@@ -22,7 +22,7 @@ fn test_detect_transitive_redundancy() {
     // Manually add redundant edge (bypassing reduction logic)
     let mut issue_a = h.storage.load_issue(&a).unwrap();
     issue_a.dependencies.push(c.clone());
-    h.storage.save_issue(&issue_a).unwrap();
+    h.storage.save_issue(issue_a).unwrap();
 
     // Validate should detect it
     let result = h.executor.validate_silent();
@@ -50,7 +50,7 @@ fn test_fix_transitive_redundancy() {
     // Add redundant edge
     let mut issue_a = h.storage.load_issue(&a).unwrap();
     issue_a.dependencies.push(c.clone());
-    h.storage.save_issue(&issue_a).unwrap();
+    h.storage.save_issue(issue_a).unwrap();
 
     // Fix with validate --fix
     let mut executor = h.executor;
@@ -88,7 +88,7 @@ fn test_validate_reports_all_redundancies() {
     let mut issue_a = h.storage.load_issue(&a).unwrap();
     issue_a.dependencies.push(c.clone());
     issue_a.dependencies.push(d.clone());
-    h.storage.save_issue(&issue_a).unwrap();
+    h.storage.save_issue(issue_a).unwrap();
 
     // Validate should detect both
     let result = h.executor.validate_silent();
@@ -156,7 +156,7 @@ fn test_dry_run_does_not_modify() {
 
     let mut issue_a = h.storage.load_issue(&a).unwrap();
     issue_a.dependencies.push(c.clone());
-    h.storage.save_issue(&issue_a).unwrap();
+    h.storage.save_issue(issue_a).unwrap();
 
     // Dry run
     let mut executor = h.executor;
@@ -189,7 +189,7 @@ fn test_complex_chain_reduction() {
     // Add redundant edge (A can reach D via B→C→D)
     let mut issue_a = h.storage.load_issue(&a).unwrap();
     issue_a.dependencies.push(d.clone());
-    h.storage.save_issue(&issue_a).unwrap();
+    h.storage.save_issue(issue_a).unwrap();
 
     // Fix
     let mut executor = h.executor;
@@ -224,11 +224,11 @@ fn test_multiple_issues_with_redundancies() {
     // Add redundant edges
     let mut issue_a = h.storage.load_issue(&a).unwrap();
     issue_a.dependencies.push(c.clone());
-    h.storage.save_issue(&issue_a).unwrap();
+    h.storage.save_issue(issue_a).unwrap();
 
     let mut issue_d = h.storage.load_issue(&d).unwrap();
     issue_d.dependencies.push(f.clone());
-    h.storage.save_issue(&issue_d).unwrap();
+    h.storage.save_issue(issue_d).unwrap();
 
     // Fix both
     let mut executor = h.executor;

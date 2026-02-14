@@ -89,7 +89,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 updated_at: result.started_at,
             },
         );
-        self.storage.save_issue(&issue)?;
+        self.storage.save_issue(issue)?;
 
         // Log event
         let event = match result.status {
@@ -273,7 +273,7 @@ enforce_leases = "off"
         // Create issue with gate
         let issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(&issue).unwrap();
+        executor.storage.save_issue(issue).unwrap();
         executor
             .add_gate(&issue_id, "test-gate".to_string())
             .unwrap();
@@ -321,7 +321,7 @@ enforce_leases = "off"
         // Create issue with gate
         let issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(&issue).unwrap();
+        executor.storage.save_issue(issue).unwrap();
         executor
             .add_gate(&issue_id, "failing-gate".to_string())
             .unwrap();
@@ -364,7 +364,7 @@ enforce_leases = "off"
         // Create issue with gate
         let issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(&issue).unwrap();
+        executor.storage.save_issue(issue).unwrap();
         executor
             .add_gate(&issue_id, "manual-gate".to_string())
             .unwrap();
@@ -408,7 +408,7 @@ enforce_leases = "off"
         // Create issue with both gates
         let issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(&issue).unwrap();
+        executor.storage.save_issue(issue).unwrap();
         executor.add_gate(&issue_id, "gate-1".to_string()).unwrap();
         executor.add_gate(&issue_id, "gate-2".to_string()).unwrap();
 
@@ -451,7 +451,7 @@ enforce_leases = "off"
         let mut issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
         issue.state = State::Ready;
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(&issue).unwrap();
+        executor.storage.save_issue(issue).unwrap();
         executor
             .add_gate(&issue_id, "precheck".to_string())
             .unwrap();
@@ -501,7 +501,7 @@ enforce_leases = "off"
         let mut issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
         issue.state = State::Ready;
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(&issue).unwrap();
+        executor.storage.save_issue(issue).unwrap();
         executor
             .add_gate(&issue_id, "precheck-fail".to_string())
             .unwrap();
@@ -548,7 +548,7 @@ enforce_leases = "off"
         let mut issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(&issue).unwrap();
+        executor.storage.save_issue(issue).unwrap();
         executor
             .add_gate(&issue_id, "postcheck".to_string())
             .unwrap();
@@ -598,7 +598,7 @@ enforce_leases = "off"
         let mut issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(&issue).unwrap();
+        executor.storage.save_issue(issue).unwrap();
         executor
             .add_gate(&issue_id, "postcheck-fail".to_string())
             .unwrap();

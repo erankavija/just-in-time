@@ -25,7 +25,7 @@ fn test_validate_fix_transitions_backlog_to_ready() {
     // Complete the task (simulating worktree merge - state changes without transition)
     let mut task_issue = h.storage.load_issue(&task).unwrap();
     task_issue.state = State::Done;
-    h.storage.save_issue(&task_issue).unwrap();
+    h.storage.save_issue(task_issue).unwrap();
 
     // Story is still in backlog (auto-transition didn't run)
     let story_issue = h.storage.load_issue(&story).unwrap();
@@ -58,7 +58,7 @@ fn test_validate_fix_ignores_incomplete_dependencies() {
     // Complete only one task
     let mut task1_issue = h.storage.load_issue(&task1).unwrap();
     task1_issue.state = State::Done;
-    h.storage.save_issue(&task1_issue).unwrap();
+    h.storage.save_issue(task1_issue.clone()).unwrap();
 
     // Run validate --fix
     let fixes = h.executor.validate_with_fix(true, false, true).unwrap();
@@ -85,11 +85,11 @@ fn test_validate_fix_transitions_multiple_issues() {
     // Complete both tasks
     let mut task1_issue = h.storage.load_issue(&task1).unwrap();
     task1_issue.state = State::Done;
-    h.storage.save_issue(&task1_issue).unwrap();
+    h.storage.save_issue(task1_issue.clone()).unwrap();
 
     let mut task2_issue = h.storage.load_issue(&task2).unwrap();
     task2_issue.state = State::Done;
-    h.storage.save_issue(&task2_issue).unwrap();
+    h.storage.save_issue(task2_issue.clone()).unwrap();
 
     // Run validate --fix
     let fixes = h.executor.validate_with_fix(true, false, true).unwrap();
@@ -114,7 +114,7 @@ fn test_validate_fix_dry_run_no_changes() {
 
     let mut task_issue = h.storage.load_issue(&task).unwrap();
     task_issue.state = State::Done;
-    h.storage.save_issue(&task_issue).unwrap();
+    h.storage.save_issue(task_issue).unwrap();
 
     // Run validate --fix with dry-run
     let fixes = h.executor.validate_with_fix(true, true, true).unwrap();
@@ -140,11 +140,11 @@ fn test_validate_fix_ignores_ready_issues() {
     // Manually set to ready
     let mut issue1_loaded = h.storage.load_issue(&issue1).unwrap();
     issue1_loaded.state = State::Ready;
-    h.storage.save_issue(&issue1_loaded).unwrap();
+    h.storage.save_issue(issue1_loaded.clone()).unwrap();
 
     let mut issue2_loaded = h.storage.load_issue(&issue2).unwrap();
     issue2_loaded.state = State::Ready;
-    h.storage.save_issue(&issue2_loaded).unwrap();
+    h.storage.save_issue(issue2_loaded.clone()).unwrap();
 
     // Run validate --fix
     let fixes = h.executor.validate_with_fix(true, false, true).unwrap();
@@ -163,11 +163,11 @@ fn test_validate_fix_ignores_done_issues() {
     // Both done
     let mut task_issue = h.storage.load_issue(&task).unwrap();
     task_issue.state = State::Done;
-    h.storage.save_issue(&task_issue).unwrap();
+    h.storage.save_issue(task_issue).unwrap();
 
     let mut story_issue = h.storage.load_issue(&story).unwrap();
     story_issue.state = State::Done;
-    h.storage.save_issue(&story_issue).unwrap();
+    h.storage.save_issue(story_issue).unwrap();
 
     // Run validate --fix
     let fixes = h.executor.validate_with_fix(true, false, true).unwrap();
@@ -196,7 +196,7 @@ fn test_validate_fix_complex_dependency_chain() {
     for task_id in [&task1, &task2, &task3] {
         let mut task = h.storage.load_issue(task_id).unwrap();
         task.state = State::Done;
-        h.storage.save_issue(&task).unwrap();
+        h.storage.save_issue(task).unwrap();
     }
 
     // Run validate --fix
@@ -217,11 +217,11 @@ fn test_validate_fix_complex_dependency_chain() {
     // Now mark stories as done
     let mut story1_loaded = h.storage.load_issue(&story1).unwrap();
     story1_loaded.state = State::Done;
-    h.storage.save_issue(&story1_loaded).unwrap();
+    h.storage.save_issue(story1_loaded.clone()).unwrap();
 
     let mut story2_loaded = h.storage.load_issue(&story2).unwrap();
     story2_loaded.state = State::Done;
-    h.storage.save_issue(&story2_loaded).unwrap();
+    h.storage.save_issue(story2_loaded.clone()).unwrap();
 
     // Run validate --fix again
     let more_fixes = h.executor.validate_with_fix(true, false, true).unwrap();

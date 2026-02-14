@@ -27,12 +27,12 @@ fn test_valid_epic_membership() {
     // Create an epic
     let mut epic = Issue::new("Authentication System".to_string(), String::new());
     epic.labels = vec!["type:epic".to_string(), "epic:auth".to_string()];
-    executor.storage().save_issue(&epic).unwrap();
+    executor.storage().save_issue(epic.clone()).unwrap();
 
     // Create a task that references the epic
     let mut task = Issue::new("Implement login".to_string(), String::new());
     task.labels = vec!["type:task".to_string(), "epic:auth".to_string()];
-    executor.storage().save_issue(&task).unwrap();
+    executor.storage().save_issue(task.clone()).unwrap();
 
     // Load all issues for validation
     let all_issues = executor.storage().list_issues().unwrap();
@@ -53,7 +53,7 @@ fn test_invalid_epic_reference_not_found() {
     // Create a task that references a non-existent epic
     let mut task = Issue::new("Implement login".to_string(), String::new());
     task.labels = vec!["type:task".to_string(), "epic:nonexistent".to_string()];
-    executor.storage().save_issue(&task).unwrap();
+    executor.storage().save_issue(task.clone()).unwrap();
 
     let all_issues = executor.storage().list_issues().unwrap();
 
@@ -92,12 +92,12 @@ fn test_invalid_epic_reference_wrong_type() {
     // Create an issue with type:task but epic:backend label
     let mut backend = Issue::new("Backend Service".to_string(), String::new());
     backend.labels = vec!["type:task".to_string(), "epic:backend".to_string()];
-    executor.storage().save_issue(&backend).unwrap();
+    executor.storage().save_issue(backend.clone()).unwrap();
 
     // Create a task that references it as an epic (wrong!)
     let mut task = Issue::new("Add endpoint".to_string(), String::new());
     task.labels = vec!["type:task".to_string(), "epic:backend".to_string()];
-    executor.storage().save_issue(&task).unwrap();
+    executor.storage().save_issue(task.clone()).unwrap();
 
     let all_issues = executor.storage().list_issues().unwrap();
 
@@ -124,12 +124,12 @@ fn test_valid_milestone_membership() {
     // Create milestone
     let mut milestone = Issue::new("v1.0 Release".to_string(), String::new());
     milestone.labels = vec!["type:milestone".to_string(), "milestone:v1.0".to_string()];
-    executor.storage().save_issue(&milestone).unwrap();
+    executor.storage().save_issue(milestone.clone()).unwrap();
 
     // Create task under milestone
     let mut task = Issue::new("Fix critical bug".to_string(), String::new());
     task.labels = vec!["type:task".to_string(), "milestone:v1.0".to_string()];
-    executor.storage().save_issue(&task).unwrap();
+    executor.storage().save_issue(task.clone()).unwrap();
 
     let all_issues = executor.storage().list_issues().unwrap();
 
@@ -145,7 +145,7 @@ fn test_multiple_membership_labels() {
     // Create milestone and epic
     let mut milestone = Issue::new("v1.0".to_string(), String::new());
     milestone.labels = vec!["type:milestone".to_string(), "milestone:v1.0".to_string()];
-    executor.storage().save_issue(&milestone).unwrap();
+    executor.storage().save_issue(milestone.clone()).unwrap();
 
     let mut epic = Issue::new("Auth".to_string(), String::new());
     epic.labels = vec![
@@ -153,7 +153,7 @@ fn test_multiple_membership_labels() {
         "epic:auth".to_string(),
         "milestone:v1.0".to_string(), // Epic belongs to milestone
     ];
-    executor.storage().save_issue(&epic).unwrap();
+    executor.storage().save_issue(epic.clone()).unwrap();
 
     // Task belongs to both
     let mut task = Issue::new("Login".to_string(), String::new());
@@ -162,7 +162,7 @@ fn test_multiple_membership_labels() {
         "epic:auth".to_string(),
         "milestone:v1.0".to_string(),
     ];
-    executor.storage().save_issue(&task).unwrap();
+    executor.storage().save_issue(task.clone()).unwrap();
 
     let all_issues = executor.storage().list_issues().unwrap();
 
@@ -181,7 +181,7 @@ fn test_no_membership_labels_is_ok() {
     // Task with no membership labels (orphan)
     let mut task = Issue::new("Standalone task".to_string(), String::new());
     task.labels = vec!["type:task".to_string()];
-    executor.storage().save_issue(&task).unwrap();
+    executor.storage().save_issue(task.clone()).unwrap();
 
     let all_issues = executor.storage().list_issues().unwrap();
 
@@ -200,7 +200,7 @@ fn test_epic_referencing_itself() {
     // Epic that references itself (valid but maybe weird)
     let mut epic = Issue::new("Auth".to_string(), String::new());
     epic.labels = vec!["type:epic".to_string(), "epic:auth".to_string()];
-    executor.storage().save_issue(&epic).unwrap();
+    executor.storage().save_issue(epic.clone()).unwrap();
 
     let all_issues = executor.storage().list_issues().unwrap();
 
@@ -220,7 +220,7 @@ fn test_mixed_valid_and_invalid_references() {
     // Create one valid epic
     let mut epic = Issue::new("Auth".to_string(), String::new());
     epic.labels = vec!["type:epic".to_string(), "epic:auth".to_string()];
-    executor.storage().save_issue(&epic).unwrap();
+    executor.storage().save_issue(epic.clone()).unwrap();
 
     // Task references one valid, one invalid
     let mut task = Issue::new("Login".to_string(), String::new());
@@ -229,7 +229,7 @@ fn test_mixed_valid_and_invalid_references() {
         "epic:auth".to_string(),      // Valid
         "milestone:v2.0".to_string(), // Invalid - doesn't exist
     ];
-    executor.storage().save_issue(&task).unwrap();
+    executor.storage().save_issue(task.clone()).unwrap();
 
     let all_issues = executor.storage().list_issues().unwrap();
 
@@ -262,12 +262,12 @@ fn test_custom_type_names_and_namespaces() {
     // Create a theme
     let mut theme = Issue::new("Dark Mode".to_string(), String::new());
     theme.labels = vec!["type:theme".to_string(), "theme:ui".to_string()];
-    executor.storage().save_issue(&theme).unwrap();
+    executor.storage().save_issue(theme.clone()).unwrap();
 
     // Create a feature that references the theme
     let mut feature = Issue::new("Dark sidebar".to_string(), String::new());
     feature.labels = vec!["type:feature".to_string(), "theme:ui".to_string()];
-    executor.storage().save_issue(&feature).unwrap();
+    executor.storage().save_issue(feature.clone()).unwrap();
 
     let all_issues = executor.storage().list_issues().unwrap();
 
@@ -298,12 +298,12 @@ fn test_type_alias_same_namespace() {
     // Create a release (uses milestone namespace)
     let mut release = Issue::new("v2.0".to_string(), String::new());
     release.labels = vec!["type:release".to_string(), "milestone:v2.0".to_string()];
-    executor.storage().save_issue(&release).unwrap();
+    executor.storage().save_issue(release.clone()).unwrap();
 
     // Task references it via milestone:v2.0 label
     let mut task = Issue::new("Prepare release notes".to_string(), String::new());
     task.labels = vec!["type:task".to_string(), "milestone:v2.0".to_string()];
-    executor.storage().save_issue(&task).unwrap();
+    executor.storage().save_issue(task.clone()).unwrap();
 
     let all_issues = executor.storage().list_issues().unwrap();
 

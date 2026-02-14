@@ -301,7 +301,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Save if modified
         if !modified_fields.is_empty() {
-            self.storage.save_issue(&updated)?;
+            self.storage.save_issue(updated)?;
 
             // Log update event
             self.storage.append_event(&Event::new_issue_updated(
@@ -607,7 +607,7 @@ mod tests {
 
         // Create test issue
         let issue = create_test_issue("test-1", State::Ready, vec!["type:task"]);
-        storage.save_issue(&issue).unwrap();
+        storage.save_issue(issue).unwrap();
 
         let mut executor = crate::commands::CommandExecutor::new(storage);
 
@@ -638,13 +638,13 @@ mod tests {
 
         // Create test issues
         storage
-            .save_issue(&create_test_issue("1", State::Ready, vec![]))
+            .save_issue(create_test_issue("1", State::Ready, vec![]))
             .unwrap();
         storage
-            .save_issue(&create_test_issue("2", State::Ready, vec![]))
+            .save_issue(create_test_issue("2", State::Ready, vec![]))
             .unwrap();
         storage
-            .save_issue(&create_test_issue("3", State::InProgress, vec![]))
+            .save_issue(create_test_issue("3", State::InProgress, vec![]))
             .unwrap();
 
         let mut executor = crate::commands::CommandExecutor::new(storage);
@@ -676,7 +676,7 @@ mod tests {
 
         let storage = InMemoryStorage::new();
         storage
-            .save_issue(&create_test_issue("1", State::Done, vec![]))
+            .save_issue(create_test_issue("1", State::Done, vec![]))
             .unwrap();
 
         let mut executor = crate::commands::CommandExecutor::new(storage);
@@ -705,7 +705,7 @@ mod tests {
         // Create issue with unpassed gates
         let mut issue = create_test_issue("1", State::Gated, vec![]);
         issue.gates_required = vec!["tests".to_string()];
-        storage.save_issue(&issue).unwrap();
+        storage.save_issue(issue).unwrap();
 
         let mut executor = crate::commands::CommandExecutor::new(storage);
 
@@ -733,15 +733,15 @@ mod tests {
 
         // Create mix of valid and invalid issues
         storage
-            .save_issue(&create_test_issue("1", State::Ready, vec![]))
+            .save_issue(create_test_issue("1", State::Ready, vec![]))
             .unwrap();
 
         let mut blocked = create_test_issue("2", State::Ready, vec![]);
         blocked.gates_required = vec!["tests".to_string()];
-        storage.save_issue(&blocked).unwrap();
+        storage.save_issue(blocked).unwrap();
 
         storage
-            .save_issue(&create_test_issue("3", State::Ready, vec![]))
+            .save_issue(create_test_issue("3", State::Ready, vec![]))
             .unwrap();
 
         let mut executor = crate::commands::CommandExecutor::new(storage);
@@ -773,7 +773,7 @@ mod tests {
 
         let storage = InMemoryStorage::new();
         storage
-            .save_issue(&create_test_issue("1", State::Ready, vec!["type:task"]))
+            .save_issue(create_test_issue("1", State::Ready, vec!["type:task"]))
             .unwrap();
 
         let mut executor = crate::commands::CommandExecutor::new(storage);
@@ -803,7 +803,7 @@ mod tests {
 
         // Issue already has type:task label
         storage
-            .save_issue(&create_test_issue("1", State::Ready, vec!["type:task"]))
+            .save_issue(create_test_issue("1", State::Ready, vec!["type:task"]))
             .unwrap();
 
         let mut executor = crate::commands::CommandExecutor::new(storage);
@@ -831,7 +831,7 @@ mod tests {
 
         let storage = InMemoryStorage::new();
         storage
-            .save_issue(&create_test_issue("1", State::Ready, vec![]))
+            .save_issue(create_test_issue("1", State::Ready, vec![]))
             .unwrap();
 
         let mut executor = crate::commands::CommandExecutor::new(storage);
@@ -859,7 +859,7 @@ mod tests {
 
         let storage = InMemoryStorage::new();
         storage
-            .save_issue(&create_test_issue("1", State::Ready, vec![]))
+            .save_issue(create_test_issue("1", State::Ready, vec![]))
             .unwrap();
 
         let mut executor = crate::commands::CommandExecutor::new(storage);
@@ -890,7 +890,7 @@ mod tests {
 
         let storage = InMemoryStorage::new();
         storage
-            .save_issue(&create_test_issue("1", State::Ready, vec!["type:task"]))
+            .save_issue(create_test_issue("1", State::Ready, vec!["type:task"]))
             .unwrap();
 
         let mut executor = crate::commands::CommandExecutor::new(storage);

@@ -68,14 +68,15 @@ impl<S: IssueStore> CommandExecutor<S> {
         if from_issue.state == State::Ready && dep_issue.state != State::Done {
             let old_state = from_issue.state;
             from_issue.state = State::Backlog;
-            self.storage.save_issue(&from_issue)?;
+
+            let issue_id = from_issue.id.clone();
+            self.storage.save_issue(from_issue)?;
 
             // Log state change
-            let event =
-                Event::new_issue_state_changed(from_issue.id.clone(), old_state, State::Backlog);
+            let event = Event::new_issue_state_changed(issue_id, old_state, State::Backlog);
             self.storage.append_event(&event)?;
         } else {
-            self.storage.save_issue(&from_issue)?;
+            self.storage.save_issue(from_issue)?;
         }
 
         Ok(DependencyAddResult::Added)
@@ -92,7 +93,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let mut issue = self.storage.load_issue(&full_issue_id)?;
         issue.dependencies.retain(|d| d != &full_dep_id);
-        self.storage.save_issue(&issue)?;
+        self.storage.save_issue(issue)?;
 
         // Check if this issue can now transition to ready
         self.auto_transition_to_ready(&full_issue_id)?;
@@ -174,7 +175,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         // Save issue once with all removals
-        self.storage.save_issue(&issue)?;
+        self.storage.save_issue(issue)?;
 
         // Check if this issue can now transition to ready
         self.auto_transition_to_ready(&full_issue_id)?;

@@ -395,7 +395,10 @@ impl IssueStore for JsonFileStorage {
         Ok(())
     }
 
-    fn save_issue(&self, issue: &Issue) -> Result<()> {
+    fn save_issue(&self, mut issue: Issue) -> Result<()> {
+        // Update the updated_at timestamp (storage responsibility)
+        issue.updated_at = chrono::Utc::now().to_rfc3339();
+
         let issue_path = self.issue_path(&issue.id);
         let index_lock_path = self.root.join(".index.lock");
         let issue_lock_path = issue_path.with_extension("lock");
@@ -408,7 +411,7 @@ impl IssueStore for JsonFileStorage {
 
         // Lock the issue (exclusive) and write
         let _issue_lock = self.locker.lock_exclusive(&issue_lock_path)?;
-        self.write_json(&issue_path, issue)?;
+        self.write_json(&issue_path, &issue)?;
 
         // Update index if this is a new issue
         if needs_index_update {
@@ -741,7 +744,7 @@ mod tests {
         let issue = Issue::new("Test Issue".to_string(), "Description".to_string());
         let issue_id = issue.id.clone();
 
-        storage.save_issue(&issue).unwrap();
+        storage.save_issue(issue.clone()).unwrap();
         let loaded = storage.load_issue(&issue_id).unwrap();
 
         assert_eq!(loaded.id, issue.id);
@@ -755,7 +758,7 @@ mod tests {
         storage.init().unwrap();
 
         let issue = Issue::new("Test".to_string(), "Desc".to_string());
-        storage.save_issue(&issue).unwrap();
+        storage.save_issue(issue.clone()).unwrap();
 
         let index = storage.load_index().unwrap();
         assert!(index.all_ids.contains(&issue.id));
@@ -767,10 +770,10 @@ mod tests {
         storage.init().unwrap();
 
         let mut issue = Issue::new("Test".to_string(), "Desc".to_string());
-        storage.save_issue(&issue).unwrap();
+        storage.save_issue(issue.clone()).unwrap();
 
         issue.title = "Updated".to_string();
-        storage.save_issue(&issue).unwrap();
+        storage.save_issue(issue.clone()).unwrap();
 
         let index = storage.load_index().unwrap();
         assert_eq!(
@@ -787,8 +790,8 @@ mod tests {
         let issue1 = Issue::new("Issue 1".to_string(), "Desc 1".to_string());
         let issue2 = Issue::new("Issue 2".to_string(), "Desc 2".to_string());
 
-        storage.save_issue(&issue1).unwrap();
-        storage.save_issue(&issue2).unwrap();
+        storage.save_issue(issue1.clone()).unwrap();
+        storage.save_issue(issue2.clone()).unwrap();
 
         let issues = storage.list_issues().unwrap();
         assert_eq!(issues.len(), 2);
@@ -804,7 +807,7 @@ mod tests {
         let issue = Issue::new("Test".to_string(), "Desc".to_string());
         let issue_id = issue.id.clone();
 
-        storage.save_issue(&issue).unwrap();
+        storage.save_issue(issue.clone()).unwrap();
         assert!(storage.issue_path(&issue_id).exists());
 
         storage.delete_issue(&issue_id).unwrap();
@@ -875,7 +878,7 @@ mod tests {
                             format!("Thread {} Issue {}", thread_id, i),
                             format!("Description {}-{}", thread_id, i),
                         );
-                        storage.save_issue(&issue).unwrap();
+                        storage.save_issue(issue.clone()).unwrap();
                     }
                 })
             })
@@ -914,8 +917,8 @@ mod tests {
         let id1 = issue1.id.clone();
         let id2 = issue2.id.clone();
 
-        storage.save_issue(&issue1).unwrap();
-        storage.save_issue(&issue2).unwrap();
+        storage.save_issue(issue1.clone()).unwrap();
+        storage.save_issue(issue2.clone()).unwrap();
 
         // Update them concurrently
         let storage1 = Arc::clone(&storage);
@@ -927,7 +930,7 @@ mod tests {
             for i in 0..10 {
                 let mut issue = storage1.load_issue(&id1_clone).unwrap();
                 issue.title = format!("Updated 1 - {}", i);
-                storage1.save_issue(&issue).unwrap();
+                storage1.save_issue(issue.clone()).unwrap();
             }
         });
 
@@ -935,7 +938,7 @@ mod tests {
             for i in 0..10 {
                 let mut issue = storage2.load_issue(&id2_clone).unwrap();
                 issue.title = format!("Updated 2 - {}", i);
-                storage2.save_issue(&issue).unwrap();
+                storage2.save_issue(issue.clone()).unwrap();
             }
         });
 
@@ -960,7 +963,7 @@ mod tests {
 
         let issue = Issue::new("Test Issue".to_string(), "Description".to_string());
         let issue_id = issue.id.clone();
-        storage.save_issue(&issue).unwrap();
+        storage.save_issue(issue.clone()).unwrap();
 
         let num_threads = 5;
         let updates_per_thread = 3;
@@ -973,7 +976,7 @@ mod tests {
                     for i in 0..updates_per_thread {
                         let mut issue = storage.load_issue(&id).unwrap();
                         issue.title = format!("Thread {} Update {}", thread_id, i);
-                        storage.save_issue(&issue).unwrap();
+                        storage.save_issue(issue.clone()).unwrap();
                     }
                 })
             })
@@ -1000,7 +1003,7 @@ mod tests {
 
         let issue = Issue::new("Test".to_string(), "Desc".to_string());
         let issue_id = issue.id.clone();
-        storage.save_issue(&issue).unwrap();
+        storage.save_issue(issue.clone()).unwrap();
 
         let barrier = Arc::new(Barrier::new(6)); // 1 writer + 5 readers
 
@@ -1013,7 +1016,7 @@ mod tests {
             for i in 0..5 {
                 let mut issue = storage_writer.load_issue(&id_writer).unwrap();
                 issue.title = format!("Updated {}", i);
-                storage_writer.save_issue(&issue).unwrap();
+                storage_writer.save_issue(issue.clone()).unwrap();
                 thread::sleep(std::time::Duration::from_millis(10));
             }
         });
@@ -1053,7 +1056,7 @@ mod tests {
         // Create base issue
         let base = Issue::new("Base".to_string(), "Desc".to_string());
         let base_id = base.id.clone();
-        storage.save_issue(&base).unwrap();
+        storage.save_issue(base.clone()).unwrap();
 
         // Add dependencies concurrently
         let handles: Vec<_> = (0..5)
@@ -1063,11 +1066,11 @@ mod tests {
                 thread::spawn(move || {
                     let dep = Issue::new(format!("Dep {}", i), "Desc".to_string());
                     let dep_id = dep.id.clone();
-                    storage.save_issue(&dep).unwrap();
+                    storage.save_issue(dep.clone()).unwrap();
 
                     let mut base = storage.load_issue(&base_id).unwrap();
                     base.dependencies.push(dep_id);
-                    storage.save_issue(&base).unwrap();
+                    storage.save_issue(base.clone()).unwrap();
                 })
             })
             .collect();
@@ -1098,7 +1101,7 @@ mod tests {
         // Create some initial issues
         for i in 0..3 {
             let issue = Issue::new(format!("Initial {}", i), "Desc".to_string());
-            storage.save_issue(&issue).unwrap();
+            storage.save_issue(issue.clone()).unwrap();
         }
 
         // Concurrent readers
@@ -1122,7 +1125,7 @@ mod tests {
             barrier_writer.wait();
             for i in 0..5 {
                 let issue = Issue::new(format!("New {}", i), "Desc".to_string());
-                storage_writer.save_issue(&issue).unwrap();
+                storage_writer.save_issue(issue.clone()).unwrap();
             }
         }));
 
@@ -1176,7 +1179,7 @@ mod tests {
             // Create and save an issue locally
             let issue = Issue::new("Local Issue".to_string(), "Description".to_string());
             let issue_id = issue.id.clone();
-            storage.save_issue(&issue).unwrap();
+            storage.save_issue(issue.clone()).unwrap();
 
             // Should read from local storage
             let loaded = storage.load_issue(&issue_id).unwrap();
@@ -1194,7 +1197,7 @@ mod tests {
             // Create an issue and commit it
             let issue = Issue::new("Committed Issue".to_string(), "From git".to_string());
             let issue_id = issue.id.clone();
-            storage.save_issue(&issue).unwrap();
+            storage.save_issue(issue.clone()).unwrap();
 
             // Commit to git
             Command::new("git")
@@ -1240,7 +1243,7 @@ mod tests {
             // Create an issue in main worktree (not committed)
             let issue = Issue::new("Main WT Issue".to_string(), "Uncommitted".to_string());
             let issue_id = issue.id.clone();
-            main_storage.save_issue(&issue).unwrap();
+            main_storage.save_issue(issue.clone()).unwrap();
 
             // Create secondary worktree with unique name
             use std::time::SystemTime;
@@ -1283,7 +1286,7 @@ mod tests {
             // Create and commit issue
             let issue = Issue::new("Committed Issue".to_string(), "In git".to_string());
             let issue_id = issue.id.clone();
-            storage.save_issue(&issue).unwrap();
+            storage.save_issue(issue.clone()).unwrap();
 
             Command::new("git")
                 .args(["add", ".jit"])
@@ -1326,7 +1329,7 @@ mod tests {
             // Create issue in main worktree (not committed)
             let issue = Issue::new("Main WT Issue".to_string(), "Uncommitted".to_string());
             let issue_id = issue.id.clone();
-            main_storage.save_issue(&issue).unwrap();
+            main_storage.save_issue(issue.clone()).unwrap();
 
             // Create secondary worktree
             use std::time::SystemTime;
@@ -1367,7 +1370,7 @@ mod tests {
             // Create and commit issue
             let issue = Issue::new("Duplicate Issue".to_string(), "Test".to_string());
             let issue_id = issue.id.clone();
-            storage.save_issue(&issue).unwrap();
+            storage.save_issue(issue.clone()).unwrap();
 
             Command::new("git")
                 .args(["add", ".jit"])
@@ -1403,7 +1406,7 @@ mod tests {
             // Create and commit an issue
             let mut issue = Issue::new("Original".to_string(), "Old version".to_string());
             let issue_id = issue.id.clone();
-            storage.save_issue(&issue).unwrap();
+            storage.save_issue(issue.clone()).unwrap();
 
             Command::new("git")
                 .args(["add", ".jit"])
@@ -1420,7 +1423,7 @@ mod tests {
             // Update issue locally (not committed)
             issue.title = "Updated Locally".to_string();
             issue.description = "New version".to_string();
-            storage.save_issue(&issue).unwrap();
+            storage.save_issue(issue.clone()).unwrap();
 
             // Should prefer local version over git version
             let loaded = storage.load_issue(&issue_id).unwrap();
@@ -1539,7 +1542,7 @@ mod tests {
             // Create an issue
             let issue = Issue::new("Test".to_string(), "Description".to_string());
             let issue_id = issue.id.clone();
-            storage.save_issue(&issue).unwrap();
+            storage.save_issue(issue.clone()).unwrap();
 
             // Verify it's in all_ids
             let index_before = storage.load_index().unwrap();
@@ -1564,7 +1567,7 @@ mod tests {
             // Create and delete an issue
             let issue = Issue::new("Test".to_string(), "Description".to_string());
             let issue_id = issue.id.clone();
-            storage.save_issue(&issue).unwrap();
+            storage.save_issue(issue.clone()).unwrap();
             storage.delete_issue(&issue_id).unwrap();
 
             // Aggregated index should NOT include the deleted issue

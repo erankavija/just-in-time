@@ -30,7 +30,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         if !issue.gates_required.contains(&gate_key) {
             issue.gates_required.push(gate_key.clone());
             // Note: Gates don't block Ready state, only Done state
-            self.storage.save_issue(&issue)?;
+            self.storage.save_issue(issue)?;
         }
         Ok(())
     }
@@ -99,7 +99,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         // Save issue
-        self.storage.save_issue(&issue)?;
+        self.storage.save_issue(issue)?;
 
         Ok(GateAddResult {
             added,
@@ -141,7 +141,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         // Save issue
-        self.storage.save_issue(&issue)?;
+        self.storage.save_issue(issue)?;
 
         Ok(GateRemoveResult { removed, not_found })
     }
@@ -183,10 +183,11 @@ impl<S: IssueStore> CommandExecutor<S> {
             },
         );
 
-        self.storage.save_issue(&issue)?;
+        let issue_id = issue.id.clone();
+        self.storage.save_issue(issue)?;
 
         // Log event
-        let event = Event::new_gate_passed(issue.id.clone(), gate_key, by);
+        let event = Event::new_gate_passed(issue_id, gate_key, by);
         self.storage.append_event(&event)?;
 
         // Check if Gated issue can now transition to Done
@@ -232,10 +233,11 @@ impl<S: IssueStore> CommandExecutor<S> {
             },
         );
 
-        self.storage.save_issue(&issue)?;
+        let issue_id = issue.id.clone();
+        self.storage.save_issue(issue)?;
 
         // Log event
-        let event = Event::new_gate_failed(issue.id.clone(), gate_key, by);
+        let event = Event::new_gate_failed(issue_id, gate_key, by);
         self.storage.append_event(&event)?;
 
         Ok(())
@@ -575,7 +577,7 @@ enforce_leases = "off"
         // Create issue with the gate
         let issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(&issue).unwrap();
+        executor.storage.save_issue(issue).unwrap();
         executor
             .add_gate(&issue_id, "auto-gate".to_string())
             .unwrap();
@@ -631,7 +633,7 @@ enforce_leases = "off"
         // Create issue with the gate
         let issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(&issue).unwrap();
+        executor.storage.save_issue(issue).unwrap();
         executor
             .add_gate(&issue_id, "auto-gate".to_string())
             .unwrap();
@@ -679,7 +681,7 @@ enforce_leases = "off"
         // Create issue with the gate
         let issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(&issue).unwrap();
+        executor.storage.save_issue(issue).unwrap();
         executor
             .add_gate(&issue_id, "manual-gate".to_string())
             .unwrap();

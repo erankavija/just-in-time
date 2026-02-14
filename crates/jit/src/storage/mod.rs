@@ -54,7 +54,7 @@ pub struct GateRegistry {
 /// storage.init().unwrap();
 ///
 /// let issue = Issue::new("Fix bug".to_string(), "Details".to_string());
-/// storage.save_issue(&issue).unwrap();
+/// storage.save_issue(issue.clone()).unwrap();
 ///
 /// let loaded = storage.load_issue(&issue.id).unwrap();
 /// assert_eq!(loaded.title, "Fix bug");
@@ -67,10 +67,14 @@ pub trait IssueStore: Clone {
 
     /// Save an issue (create or update).
     ///
+    /// Takes ownership of the issue and automatically updates the `updated_at`
+    /// timestamp before persisting. This ensures timestamps are always current
+    /// without requiring callers to remember to update them.
+    ///
     /// # Errors
     ///
     /// Returns an error if the issue cannot be serialized or persisted.
-    fn save_issue(&self, issue: &Issue) -> Result<()>;
+    fn save_issue(&self, issue: Issue) -> Result<()>;
 
     /// Load an issue by ID.
     ///
@@ -94,7 +98,7 @@ pub trait IssueStore: Clone {
     /// storage.init().unwrap();
     ///
     /// let issue = Issue::new("Fix bug".to_string(), "Details".to_string());
-    /// storage.save_issue(&issue).unwrap();
+    /// storage.save_issue(issue.clone()).unwrap();
     ///
     /// // Can use short prefix
     /// let full_id = storage.resolve_issue_id(&issue.short_id()).unwrap();
@@ -222,7 +226,7 @@ mod tests {
         storage.init().unwrap();
 
         let issue = Issue::new("Test".to_string(), "Description".to_string());
-        storage.save_issue(&issue).unwrap();
+        storage.save_issue(issue.clone()).unwrap();
 
         let loaded = storage.load_issue(&issue.id).unwrap();
         assert_eq!(loaded.title, "Test");
@@ -238,7 +242,7 @@ mod tests {
             issue.priority = Priority::High;
             issue.state = State::Ready;
 
-            storage.save_issue(&issue).unwrap();
+            storage.save_issue(issue.clone()).unwrap();
             let loaded = storage.load_issue(&issue.id).unwrap();
 
             assert_eq!(loaded.title, issue.title);
@@ -260,8 +264,8 @@ mod tests {
             let issue1 = Issue::new("Issue 1".to_string(), "First".to_string());
             let issue2 = Issue::new("Issue 2".to_string(), "Second".to_string());
 
-            storage.save_issue(&issue1).unwrap();
-            storage.save_issue(&issue2).unwrap();
+            storage.save_issue(issue1.clone()).unwrap();
+            storage.save_issue(issue2.clone()).unwrap();
 
             let issues = storage.list_issues().unwrap();
             assert_eq!(issues.len(), 2);
@@ -283,7 +287,7 @@ mod tests {
             storage.init().unwrap();
 
             let issue = Issue::new("Delete me".to_string(), "Test".to_string());
-            storage.save_issue(&issue).unwrap();
+            storage.save_issue(issue.clone()).unwrap();
 
             storage.delete_issue(&issue.id).unwrap();
 

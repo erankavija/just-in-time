@@ -711,8 +711,8 @@ mod tests {
         // Create a couple of issues
         let issue1 = Issue::new("Issue 1".to_string(), String::new());
         let issue2 = Issue::new("Issue 2".to_string(), String::new());
-        storage.save_issue(&issue1).unwrap();
-        storage.save_issue(&issue2).unwrap();
+        storage.save_issue(issue1.clone()).unwrap();
+        storage.save_issue(issue2.clone()).unwrap();
 
         let exporter = SnapshotExporter::new(storage.clone());
         let issues = exporter.enumerate_issues(&SnapshotScope::All).unwrap();
@@ -727,7 +727,7 @@ mod tests {
 
         let issue = Issue::new("Test Issue".to_string(), String::new());
         let issue_id = issue.id.clone();
-        storage.save_issue(&issue).unwrap();
+        storage.save_issue(issue).unwrap();
 
         let exporter = SnapshotExporter::new(storage.clone());
         let issues = exporter
@@ -746,20 +746,20 @@ mod tests {
         // Create issues with epic labels
         let mut issue1 = Issue::new("Issue 1".to_string(), String::new());
         issue1.labels.push("epic:auth".to_string());
-        storage.save_issue(&issue1).unwrap();
+        storage.save_issue(issue1.clone()).unwrap();
 
         let mut issue2 = Issue::new("Issue 2".to_string(), String::new());
         issue2.labels.push("epic:auth".to_string());
-        storage.save_issue(&issue2).unwrap();
+        storage.save_issue(issue2.clone()).unwrap();
 
         // Create issue with different epic
         let mut issue3 = Issue::new("Issue 3".to_string(), String::new());
         issue3.labels.push("epic:billing".to_string());
-        storage.save_issue(&issue3).unwrap();
+        storage.save_issue(issue3.clone()).unwrap();
 
         // Create unrelated issue
         let issue4 = Issue::new("Issue 4".to_string(), String::new());
-        storage.save_issue(&issue4).unwrap();
+        storage.save_issue(issue4.clone()).unwrap();
 
         let exporter = SnapshotExporter::new(storage.clone());
         let issues = exporter
@@ -782,11 +782,11 @@ mod tests {
 
         let mut issue1 = Issue::new("Issue 1".to_string(), String::new());
         issue1.labels.push("milestone:v1.0".to_string());
-        storage.save_issue(&issue1).unwrap();
+        storage.save_issue(issue1.clone()).unwrap();
 
         let mut issue2 = Issue::new("Issue 2".to_string(), String::new());
         issue2.labels.push("milestone:v2.0".to_string());
-        storage.save_issue(&issue2).unwrap();
+        storage.save_issue(issue2.clone()).unwrap();
 
         let exporter = SnapshotExporter::new(storage.clone());
         let issues = exporter
@@ -806,7 +806,7 @@ mod tests {
         storage.init().unwrap();
 
         let issue = Issue::new("Issue".to_string(), String::new());
-        storage.save_issue(&issue).unwrap();
+        storage.save_issue(issue).unwrap();
 
         let exporter = SnapshotExporter::new(storage.clone());
         let issues = exporter
@@ -833,7 +833,7 @@ mod tests {
             format: None,
             assets: vec![],
         });
-        storage.save_issue(&issue1).unwrap();
+        storage.save_issue(issue1.clone()).unwrap();
 
         let mut issue2 = Issue::new("Issue 2".to_string(), String::new());
         issue2.documents.push(DocumentReference {
@@ -853,7 +853,7 @@ mod tests {
             format: None,
             assets: vec![],
         });
-        storage.save_issue(&issue2).unwrap();
+        storage.save_issue(issue2.clone()).unwrap();
 
         let exporter = SnapshotExporter::new(storage.clone());
         let issues = vec![issue1, issue2];

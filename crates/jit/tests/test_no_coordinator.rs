@@ -114,7 +114,7 @@ fn test_gates_work_without_coordinator() {
     let id = h.create_ready_issue("Task");
     let mut issue = h.storage.load_issue(&id).unwrap();
     issue.gates_required.push("test-gate".to_string());
-    h.storage.save_issue(&issue).unwrap();
+    h.storage.save_issue(issue).unwrap();
 
     // Issue should NOT be blocked by pending gate (gates don't block Ready state)
     let blocked = h.executor.query_blocked().unwrap();
