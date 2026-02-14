@@ -2,7 +2,7 @@
   "id": "d8de0f33-c5e3-4231-8474-98846f588e7b",
   "title": "Add created_at and updated_at timestamps to Issue model",
   "description": "## Problem\n\nThe Issue model doesn't track creation and update timestamps, causing 'Invalid Date' to display in the web UI.\n\n## Solution Implemented\n\nAdded timestamp tracking to all issues:\n\n1. **Added fields to Issue struct** (domain/types.rs):\n   - `created_at: String` (RFC 3339 timestamp, required)\n   - `updated_at: String` (RFC 3339 timestamp, required)\n   - Issue::new() sets both to current time\n\n2. **Migrated all existing issues**:\n   - Created Python migration script (scripts/migrate_timestamps.py)\n   - Extracts timestamps from event log (events.jsonl)\n   - created_at: first event timestamp\n   - updated_at: last event timestamp\n   - All 173 production issues migrated\n\n3. **Display integration**:\n   - Updated IssueShowResponse to include timestamps\n   - CLI displays timestamps in `jit issue show`\n   - Web UI displays with toLocaleString() (respects user locale)\n\n## Implementation Details\n\n- No backward compatibility needed (all issues migrated)\n- Timestamps required fields (not Option)\n- Event log is source of truth\n- Scripts: migrate_timestamps.py (initial), fix_timestamps.py (bug fix)\n\n## Commits\n\n- 44d5cfb: Migration script\n- 12bd4bd: Rust implementation\n- 49ee186: Fixed event field name bug ('type' not 'event_type')",
-  "state": "in_progress",
+  "state": "done",
   "priority": "normal",
   "assignee": "agent:copilot-session",
   "dependencies": [],
