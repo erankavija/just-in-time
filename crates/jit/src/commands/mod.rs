@@ -53,7 +53,6 @@ use crate::storage::IssueStore;
 use anyhow::{anyhow, Context, Result};
 use chrono::Utc;
 use serde::Serialize;
-use std::collections::HashMap;
 
 /// Information about a git commit
 #[derive(Debug, Clone, Serialize)]

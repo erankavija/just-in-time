@@ -1,14 +1,13 @@
 {
   "id": "91e3a165-7e3f-443a-ab4f-2c8282a42681",
   "title": "Story: Web UI Visual Enhancements",
-  "description": "Improve web UI readability and visual design with hierarchy type icons, capitalized type names, and improved node header formatting. Builds on state transition buttons foundation to create a polished, production-ready graph visualization experience.\n\nCompleted improvements:\n- Hierarchy type icons (\u2b50\ud83d\udce6\ud83d\udcdd\u2611\ufe0f) configurable via config.toml\n- Capitalized type names in node headers (Epic, Story, Task)\n- Improved header format: (icon) (Type) #shortid\n- Better visual alignment and spacing\n\nFuture improvements tracked separately.",
-  "state": "backlog",
+  "description": "Improve web UI readability and visual design with hierarchy type icons, capitalized type names, and improved node header formatting. Builds on state transition buttons foundation to create a polished, production-ready graph visualization experience.\n\nCompleted improvements:\n- Hierarchy type icons (⭐📦📝☑️) configurable via config.toml\n- Capitalized type names in node headers (Epic, Story, Task)\n- Improved header format: (icon) (Type) #shortid\n- Better visual alignment and spacing\n\nFuture improvements tracked separately.",
+  "state": "done",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
     "d8de0f33-c5e3-4231-8474-98846f588e7b",
-    "f527996e-3073-4c31-9f19-dba1e05f3909",
-    "13c69884-dfe9-4a62-b2ef-59fa4d2f76f3"
+    "f527996e-3073-4c31-9f19-dba1e05f3909"
   ],
   "gates_required": [],
   "gates_status": {},

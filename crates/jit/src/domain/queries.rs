@@ -7,6 +7,29 @@
 use crate::domain::{GateStatus, Issue, Priority, State};
 use std::collections::HashMap;
 
+/// Build a HashMap of issue ID to issue reference for dependency resolution.
+///
+/// This is a common pattern used throughout query and validation code to enable
+/// efficient lookups when checking if issues are blocked by dependencies.
+///
+/// # Example
+///
+/// ```rust
+/// use jit::domain::queries::build_issue_map;
+/// use jit::domain::Issue;
+///
+/// let issues = vec![
+///     Issue::new("Task 1".to_string(), String::new()),
+///     Issue::new("Task 2".to_string(), String::new()),
+/// ];
+///
+/// let map = build_issue_map(&issues);
+/// assert_eq!(map.len(), 2);
+/// ```
+pub fn build_issue_map(issues: &[Issue]) -> HashMap<String, &Issue> {
+    issues.iter().map(|i| (i.id.clone(), i)).collect()
+}
+
 /// Query issues that are ready to be worked on.
 ///
 /// Returns issues that are:
@@ -14,8 +37,7 @@ use std::collections::HashMap;
 /// - Unassigned
 /// - Not blocked by dependencies or gates
 pub fn query_ready(issues: &[Issue]) -> Vec<Issue> {
-    let issue_refs: Vec<&Issue> = issues.iter().collect();
-    let resolved: HashMap<String, &Issue> = issue_refs.iter().map(|i| (i.id.clone(), *i)).collect();
+    let resolved = build_issue_map(issues);
 
     issues
         .iter()
@@ -29,8 +51,7 @@ pub fn query_ready(issues: &[Issue]) -> Vec<Issue> {
 /// Returns issues that have incomplete dependencies or unfulfilled gates,
 /// along with a list of reasons explaining why each issue is blocked.
 pub fn query_blocked(issues: &[Issue]) -> Vec<(Issue, Vec<String>)> {
-    let issue_refs: Vec<&Issue> = issues.iter().collect();
-    let resolved: HashMap<String, &Issue> = issue_refs.iter().map(|i| (i.id.clone(), *i)).collect();
+    let resolved = build_issue_map(issues);
 
     let mut blocked = Vec::new();
 
@@ -141,4 +162,50 @@ pub fn query_closed(issues: &[Issue]) -> Vec<Issue> {
         .filter(|i| i.state.is_closed())
         .cloned()
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_build_issue_map() {
+        // Create test issues
+        let issue1 = Issue::new("Task 1".to_string(), String::new());
+        let issue2 = Issue::new("Task 2".to_string(), String::new());
+        let issue3 = Issue::new("Task 3".to_string(), String::new());
+
+        let issues = vec![issue1.clone(), issue2.clone(), issue3.clone()];
+
+        // Build the map
+        let map = build_issue_map(&issues);
+
+        // Verify all issues are in the map
+        assert_eq!(map.len(), 3);
+        assert_eq!(map.get(&issue1.id).unwrap().id, issue1.id);
+        assert_eq!(map.get(&issue2.id).unwrap().id, issue2.id);
+        assert_eq!(map.get(&issue3.id).unwrap().id, issue3.id);
+
+        // Verify we can look up by ID
+        assert_eq!(map.get(&issue1.id).unwrap().title, "Task 1");
+        assert_eq!(map.get(&issue2.id).unwrap().title, "Task 2");
+        assert_eq!(map.get(&issue3.id).unwrap().title, "Task 3");
+    }
+
+    #[test]
+    fn test_build_issue_map_empty() {
+        let issues: Vec<Issue> = vec![];
+        let map = build_issue_map(&issues);
+        assert_eq!(map.len(), 0);
+    }
+
+    #[test]
+    fn test_build_issue_map_single() {
+        let issue = Issue::new("Single task".to_string(), String::new());
+        let issues = vec![issue.clone()];
+        let map = build_issue_map(&issues);
+
+        assert_eq!(map.len(), 1);
+        assert_eq!(map.get(&issue.id).unwrap().title, "Single task");
+    }
 }

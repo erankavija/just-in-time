@@ -2,7 +2,7 @@
   "id": "c097f2a7-a393-49eb-b796-bb836500915d",
   "title": "Add convenience query methods for issue IDs and short hashes",
   "description": "## Problem\n\nQuery functions return full `Issue` objects, but callers often just need IDs or short hashes. This leads to repetitive mapping code throughout the codebase:\n\n```rust\n// Common patterns\nlet ready_ids: Vec<String> = executor.query_ready()?.iter()\n    .map(|i| i.id.clone())\n    .collect();\n\nlet ready_short: Vec<String> = executor.query_ready()?.iter()\n    .map(|i| i.id[..8].to_string())\n    .collect();\n```\n\n**Minor inconvenience but adds up:**\n- Repetitive boilerplate in CLI code\n- Allocates full Issue structs when only ID needed\n- Less readable (ceremony obscures intent)\n\n## Proposed API\n\nAdd convenience methods to `CommandExecutor`:\n\n```rust\nimpl<S: IssueStore> CommandExecutor<S> {\n    /// Get IDs of ready issues (unassigned, state=ready, unblocked)\n    pub fn query_ready_ids(&self) -> Result<Vec<String>> {\n        let issues = self.storage.list_issues()?;\n        let resolved = build_issue_map(&issues);\n        \n        Ok(issues.iter()\n            .filter(|i| i.state == State::Ready && i.assignee.is_none() && !i.is_blocked(&resolved))\n            .map(|i| i.id.clone())\n            .collect())\n    }\n    \n    /// Get short hashes (first 8 chars) of ready issues\n    pub fn query_ready_short_hashes(&self) -> Result<Vec<String>> {\n        Ok(self.query_ready_ids()?\n            .iter()\n            .map(|id| id[..8].to_string())\n            .collect())\n    }\n    \n    // Similar for other common queries\n    pub fn query_blocked_ids(&self) -> Result<Vec<String>> { ... }\n    pub fn query_by_state_ids(&self, state: State) -> Result<Vec<String>> { ... }\n    pub fn query_by_label_ids(&self, pattern: &str) -> Result<Vec<String>> { ... }\n}\n```\n\n## Alternative: Generic Helper\n\nOr add a generic helper:\n\n```rust\npub fn extract_ids(issues: &[Issue]) -> Vec<String> {\n    issues.iter().map(|i| i.id.clone()).collect()\n}\n\npub fn extract_short_hashes(issues: &[Issue]) -> Vec<String> {\n    issues.iter().map(|i| i.id[..8].to_string()).collect()\n}\n\n// Usage\nlet ids = extract_ids(&executor.query_ready()?);\n```\n\n## Benefits\n\n- Less boilerplate in calling code\n- More readable (intent is clearer)\n- Potentially more efficient (don't clone full Issues)\n- Consistent API across query methods\n\n## Drawbacks\n\n- Adds more methods to API surface\n- Could encourage returning IDs when full Issues would be better\n- May not be worth the complexity\n\n## Decision Needed\n\n1. Add dedicated `*_ids()` methods? (More methods but clearer)\n2. Add generic helpers? (Fewer methods but requires import)\n3. Do nothing? (Maybe boilerplate is acceptable)\n\n## Acceptance Criteria (if proceeding)\n\n- [ ] Decide on approach (dedicated methods vs helpers)\n- [ ] Implement chosen approach\n- [ ] Add tests for new methods/helpers\n- [ ] Update CLI code to use new convenience methods where applicable\n- [ ] Document usage in examples\n- [ ] All existing tests pass",
-  "state": "ready",
+  "state": "rejected",
   "priority": "low",
   "assignee": null,
   "dependencies": [],
@@ -13,7 +13,8 @@
   "labels": [
     "type:task",
     "epic:production-polish",
-    "component:core"
+    "component:core",
+    "resolution:no-longer-valid"
   ],
   "created_at": "2025-12-30T22:32:59.467465065Z",
   "updated_at": "2025-12-30T22:32:59.467465065Z"

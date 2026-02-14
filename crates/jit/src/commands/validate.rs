@@ -483,9 +483,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     pub fn get_status(&self) -> Result<StatusSummary> {
         let issues = self.storage.list_issues()?;
-        let issue_refs: Vec<&Issue> = issues.iter().collect();
-        let resolved: HashMap<String, &Issue> =
-            issue_refs.iter().map(|i| (i.id.clone(), *i)).collect();
+        let resolved = crate::domain::queries::build_issue_map(&issues);
 
         let backlog = issues.iter().filter(|i| i.state == State::Backlog).count();
         let ready = issues.iter().filter(|i| i.state == State::Ready).count();
@@ -750,8 +748,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// Count of issues transitioned (or that would be transitioned if dry_run)
     fn check_pending_transitions(&mut self, dry_run: bool, quiet: bool) -> Result<usize> {
-        use std::collections::HashMap;
-
         let mut total_fixed = 0;
         let max_passes = 10; // Safety limit to prevent infinite loops
 
@@ -761,8 +757,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         for _pass in 0..num_passes {
             let issues = self.storage.list_issues()?;
-            let resolved: HashMap<String, &Issue> =
-                issues.iter().map(|i| (i.id.clone(), i)).collect();
+            let resolved = crate::domain::queries::build_issue_map(&issues);
 
             // Find backlog issues that should transition to ready
             let backlog_issues: Vec<_> = issues

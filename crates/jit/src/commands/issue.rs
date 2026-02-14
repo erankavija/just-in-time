@@ -206,9 +206,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             if s == State::Ready {
                 // Check dependencies only (gates don't block Ready)
                 let issues = self.storage.list_issues()?;
-                let issue_refs: Vec<&Issue> = issues.iter().collect();
-                let resolved: HashMap<String, &Issue> =
-                    issue_refs.iter().map(|i| (i.id.clone(), *i)).collect();
+                let resolved = crate::domain::queries::build_issue_map(&issues);
 
                 if issue.is_blocked(&resolved) {
                     return Err(anyhow!(
@@ -220,9 +218,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             } else if s == State::Done {
                 // Check both dependencies and gates
                 let issues = self.storage.list_issues()?;
-                let issue_refs: Vec<&Issue> = issues.iter().collect();
-                let resolved: HashMap<String, &Issue> =
-                    issue_refs.iter().map(|i| (i.id.clone(), *i)).collect();
+                let resolved = crate::domain::queries::build_issue_map(&issues);
 
                 if issue.is_blocked(&resolved) {
                     return Err(anyhow!(
@@ -306,9 +302,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             State::Ready => {
                 // Check dependencies only (gates don't block Ready)
                 let issues = self.storage.list_issues()?;
-                let issue_refs: Vec<&Issue> = issues.iter().collect();
-                let resolved: HashMap<String, &Issue> =
-                    issue_refs.iter().map(|i| (i.id.clone(), *i)).collect();
+                let resolved = crate::domain::queries::build_issue_map(&issues);
 
                 if issue.is_blocked(&resolved) {
                     return Err(anyhow!(
@@ -321,9 +315,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             State::Done => {
                 // Check both dependencies and gates
                 let issues = self.storage.list_issues()?;
-                let issue_refs: Vec<&Issue> = issues.iter().collect();
-                let resolved: HashMap<String, &Issue> =
-                    issue_refs.iter().map(|i| (i.id.clone(), *i)).collect();
+                let resolved = crate::domain::queries::build_issue_map(&issues);
 
                 if issue.is_blocked(&resolved) {
                     return Err(anyhow!(
@@ -502,9 +494,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     pub fn claim_next(&self, assignee: String, _filter: Option<String>) -> Result<String> {
         let issues = self.storage.list_issues()?;
-        let issue_refs: Vec<&Issue> = issues.iter().collect();
-        let resolved: HashMap<String, &Issue> =
-            issue_refs.iter().map(|i| (i.id.clone(), *i)).collect();
+        let resolved = crate::domain::queries::build_issue_map(&issues);
 
         // Find first ready, unassigned issue with highest priority
         let mut candidates: Vec<&Issue> = issues
@@ -531,7 +521,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     pub(super) fn auto_transition_to_ready(&self, issue_id: &str) -> Result<bool> {
         let full_id = self.storage.resolve_issue_id(issue_id)?;
         let issues = self.storage.list_issues()?;
-        let resolved: HashMap<String, &Issue> = issues.iter().map(|i| (i.id.clone(), i)).collect();
+        let resolved = crate::domain::queries::build_issue_map(&issues);
 
         let mut issue = self.storage.load_issue(&full_id)?;
 

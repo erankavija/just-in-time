@@ -18,7 +18,7 @@ pub struct QueryContext<'a> {
 impl<'a> QueryContext<'a> {
     /// Create context from issue collection
     pub fn from_issues(issues: &'a [Issue]) -> Self {
-        let all_issues = issues.iter().map(|i| (i.id.clone(), i)).collect();
+        let all_issues = crate::domain::queries::build_issue_map(issues);
         QueryContext { all_issues }
     }
 }
