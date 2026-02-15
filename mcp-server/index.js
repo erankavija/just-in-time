@@ -293,6 +293,33 @@ function compactForAssistant(toolName, result) {
   const command = parts[0];
   const subcommand = parts.slice(1).join('-');
   
+  // For gate check, truncate stdout/stderr and include output path
+  if (command === 'gate' && subcommand === 'check') {
+    const MAX_OUTPUT_CHARS = 500;
+    const compacted = {
+      run_id: result.run_id,
+      gate_key: result.gate_key,
+      status: result.status,
+      duration_ms: result.duration_ms,
+      exit_code: result.exit_code,
+      output_file: `.jit/gate-runs/${result.run_id}/result.json`,
+    };
+    
+    // Truncate stdout if present
+    if (result.stdout) {
+      const truncated = result.stdout.substring(0, MAX_OUTPUT_CHARS);
+      compacted.stdout = truncated + (result.stdout.length > MAX_OUTPUT_CHARS ? '... (truncated)' : '');
+    }
+    
+    // Truncate stderr if present
+    if (result.stderr) {
+      const truncated = result.stderr.substring(0, MAX_OUTPUT_CHARS);
+      compacted.stderr = truncated + (result.stderr.length > MAX_OUTPUT_CHARS ? '... (truncated)' : '');
+    }
+    
+    return compacted;
+  }
+  
   // For gate check-all, return summary only (omit huge stdout/stderr)
   if (command === 'gate' && subcommand === 'check-all') {
     if (Array.isArray(result)) {
@@ -300,6 +327,7 @@ function compactForAssistant(toolName, result) {
         gate_key: g.gate_key,
         status: g.status,
         duration_ms: g.duration_ms,
+        output_file: g.run_id ? `.jit/gate-runs/${g.run_id}/result.json` : undefined,
       }));
     }
   }
@@ -459,7 +487,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       content: [
         {
           type: "text",
-          text: userSummary,
+          text: userSummary + "\n",
           annotations: {
             audience: ["user"],
           },
