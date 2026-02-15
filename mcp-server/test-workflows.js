@@ -184,6 +184,8 @@ async function runTest(name, fn) {
 // Tests
 async function testEndToEndWorkflow(tester) {
   await tester.callTool('jit_init', {});
+
+  await tester.callTool('jit_init', {});
   
   // Define a gate
   await tester.callTool('jit_gate_define', {
@@ -243,6 +245,8 @@ async function testEndToEndWorkflow(tester) {
 }
 
 async function testBatchUpdate(tester) {
+  await tester.callTool('jit_init', {});
+
   // Create multiple issues
   const issue1 = await tester.callTool('jit_issue_create', {
     title: 'Batch 1',
@@ -276,6 +280,8 @@ async function testBatchUpdate(tester) {
 }
 
 async function testAssignmentOperations(tester) {
+  await tester.callTool('jit_init', {});
+
   // Create issue
   const issue = await tester.callTool('jit_issue_create', {
     title: 'Assignment test'
@@ -315,6 +321,8 @@ async function testAssignmentOperations(tester) {
 }
 
 async function testClaimOperations(tester) {
+  await tester.callTool('jit_init', {});
+
   // Create issue in ready state
   const issue = await tester.callTool('jit_issue_create', {
     title: 'Claim test'
@@ -339,6 +347,8 @@ async function testClaimOperations(tester) {
 }
 
 async function testClaimNext(tester) {
+  await tester.callTool('jit_init', {});
+
   // Create multiple ready issues
   await tester.callTool('jit_issue_create', {
     title: 'Ready 1',
@@ -366,6 +376,8 @@ async function testClaimNext(tester) {
 }
 
 async function testIssueBreakdown(tester) {
+  await tester.callTool('jit_init', {});
+
   // Create parent issue
   const parent = await tester.callTool('jit_issue_create', {
     title: 'Parent task',
@@ -393,6 +405,8 @@ async function testIssueBreakdown(tester) {
 }
 
 async function testQueryAvailable(tester) {
+  await tester.callTool('jit_init', {});
+
   // Create mix of issues
   await tester.callTool('jit_issue_create', {
     title: 'Available 1',
@@ -428,6 +442,8 @@ async function testQueryAvailable(tester) {
 }
 
 async function testQueryBlocked(tester) {
+  await tester.callTool('jit_init', {});
+
   // Create blocked issue
   const blocker = await tester.callTool('jit_issue_create', {
     title: 'Blocker issue'
@@ -450,6 +466,8 @@ async function testQueryBlocked(tester) {
 }
 
 async function testIssueSearch(tester) {
+  await tester.callTool('jit_init', {});
+
   // Create issues with searchable content
   await tester.callTool('jit_issue_create', {
     title: 'Implement authentication'
@@ -469,6 +487,8 @@ async function testIssueSearch(tester) {
 }
 
 async function testStatusCommand(tester) {
+  await tester.callTool('jit_init', {});
+
   // Create issues in different states
   await tester.callTool('jit_issue_create', {
     title: 'Backlog issue',
@@ -497,6 +517,8 @@ async function testStatusCommand(tester) {
 }
 
 async function testDocumentOperations(tester) {
+  await tester.callTool('jit_init', {});
+
   // Create issue
   const issue = await tester.callTool('jit_issue_create', {
     title: 'Issue with docs'
@@ -526,6 +548,8 @@ async function testDocumentOperations(tester) {
 }
 
 async function testReleaseOperation(tester) {
+  await tester.callTool('jit_init', {});
+
   // Create and claim issue
   const issue = await tester.callTool('jit_issue_create', {
     title: 'Release test'
@@ -549,6 +573,8 @@ async function testReleaseOperation(tester) {
 }
 
 async function testRejectOperation(tester) {
+  await tester.callTool('jit_init', {});
+
   const issue = await tester.callTool('jit_issue_create', {
     title: 'Issue to reject'
   });

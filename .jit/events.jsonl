@@ -1760,3 +1760,4 @@
 {"type":"gate_passed","id":"e0bdc6c7-79cf-40c1-b23e-665e998cdab4","issue_id":"f3af98cd-9cb8-47a6-bff7-461af5c7e238","timestamp":"2026-02-15T01:26:29.527967940Z","gate_key":"tests","updated_by":"auto:executor"}
 {"type":"gate_passed","id":"f870aa58-79a3-46fc-9d1f-ed3d61b69554","issue_id":"f3af98cd-9cb8-47a6-bff7-461af5c7e238","timestamp":"2026-02-15T01:31:27.705736690Z","gate_key":"tests","updated_by":"auto:executor"}
 {"type":"gate_passed","id":"57ce642a-7d05-4d18-8f36-6dc993f6fe63","issue_id":"f3af98cd-9cb8-47a6-bff7-461af5c7e238","timestamp":"2026-02-15T01:32:55.989754868Z","gate_key":"tests","updated_by":"auto:executor"}
+{"type":"issue_created","id":"51119b7d-4a0f-4f8a-9e7e-b2cd5c9f3297","issue_id":"5e819f23-f3a6-4156-bb99-c6a859b4165f","timestamp":"2026-02-15T01:40:52.150228008Z","title":"Assignee test","priority":"normal"}

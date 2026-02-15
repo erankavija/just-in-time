@@ -204,10 +204,12 @@ async function testDepAddBasic(tester) {
   const shown = await tester.callTool('jit_issue_show', {
     id: issueB.id
   });
-  assert(shown.dependencies?.includes(issueA.id), 'B should depend on A');
+  assert(shown.dependencies?.some(d => d.id === issueA.id), 'B should depend on A');
 }
 
 async function testDepAddMultiple(tester) {
+  await tester.callTool('jit_init', {});
+  
   // Create issues
   const issueA = await tester.callTool('jit_issue_create', {
     title: 'Dep A'
@@ -230,11 +232,13 @@ async function testDepAddMultiple(tester) {
   const shown = await tester.callTool('jit_issue_show', {
     id: issueC.id
   });
-  assert(shown.dependencies?.includes(issueA.id), 'C should depend on A');
-  assert(shown.dependencies?.includes(issueB.id), 'C should depend on B');
+  assert(shown.dependencies?.some(d => d.id === issueA.id), 'C should depend on A');
+  assert(shown.dependencies?.some(d => d.id === issueB.id), 'C should depend on B');
 }
 
 async function testDepRemove(tester) {
+  await tester.callTool('jit_init', {});
+  
   // Create issues with dependency
   const issueA = await tester.callTool('jit_issue_create', {
     title: 'Remove dep A'
@@ -258,10 +262,12 @@ async function testDepRemove(tester) {
   const shown = await tester.callTool('jit_issue_show', {
     id: issueB.id
   });
-  assert(!shown.dependencies?.includes(issueA.id), 'B should not depend on A');
+  assert(!shown.dependencies?.some(d => d.id === issueA.id), 'B should not depend on A');
 }
 
 async function testCycleDetection(tester) {
+  await tester.callTool('jit_init', {});
+  
   // Create issues
   const issueA = await tester.callTool('jit_issue_create', {
     title: 'Cycle A'
@@ -304,6 +310,8 @@ async function testCycleDetection(tester) {
 }
 
 async function testGraphDeps(tester) {
+  await tester.callTool('jit_init', {});
+  
   // Create dependency chain
   const issueA = await tester.callTool('jit_issue_create', {
     title: 'Graph A'
@@ -337,6 +345,8 @@ async function testGraphDeps(tester) {
 }
 
 async function testGraphDownstream(tester) {
+  await tester.callTool('jit_init', {});
+  
   // Create dependency chain
   const issueA = await tester.callTool('jit_issue_create', {
     title: 'Downstream A'
@@ -360,6 +370,8 @@ async function testGraphDownstream(tester) {
 }
 
 async function testGraphRoots(tester) {
+  await tester.callTool('jit_init', {});
+  
   // Root issues are those with no dependencies
   const root = await tester.callTool('jit_issue_create', {
     title: 'Root issue'
@@ -367,8 +379,8 @@ async function testGraphRoots(tester) {
   
   const result = await tester.callTool('jit_graph_roots', {});
   
-  assert(result.issues, 'Should have issues array');
-  const rootIds = result.issues.map(i => i.id);
+  assert(result.roots, 'Should have roots array');
+  const rootIds = result.roots.map(i => i.id);
   assert(rootIds.includes(root.id), 'Should include root issue');
 }
 
@@ -397,6 +409,8 @@ async function testDependencyBlocking(tester) {
 }
 
 async function testDependencyUnblocking(tester) {
+  await tester.callTool('jit_init', {});
+  
   // Create issues with dependency
   const issueA = await tester.callTool('jit_issue_create', {
     title: 'Will be done'
@@ -426,6 +440,8 @@ async function testDependencyUnblocking(tester) {
 }
 
 async function testTransitiveDependencies(tester) {
+  await tester.callTool('jit_init', {});
+  
   // Create chain: C depends on B, B depends on A
   const issueA = await tester.callTool('jit_issue_create', {
     title: 'Transitive A'
@@ -459,6 +475,8 @@ async function testTransitiveDependencies(tester) {
 }
 
 async function testStateTransitionWithDeps(tester) {
+  await tester.callTool('jit_init', {});
+  
   // Create dependency
   const issueA = await tester.callTool('jit_issue_create', {
     title: 'State dep A'

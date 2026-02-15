@@ -176,6 +176,8 @@ async function runTest(name, fn) {
 
 // Tests
 async function testQueryByLabel(tester) {
+  await tester.callTool('jit_init', {});
+
   // Create issues with labels
   await tester.callTool('jit_issue_create', {
     title: 'Milestone task',
@@ -216,6 +218,8 @@ async function testQueryByLabel(tester) {
 }
 
 async function testQueryStrategic(tester) {
+  await tester.callTool('jit_init', {});
+
   // Create mix of strategic and tactical issues
   const milestone = await tester.callTool('jit_issue_create', {
     title: 'Release v1.0',
@@ -244,6 +248,8 @@ async function testQueryStrategic(tester) {
 }
 
 async function testListLabelNamespaces(tester) {
+  await tester.callTool('jit_init', {});
+
   const result = await tester.callTool('jit_label_namespaces', {});
   
   assert(result.namespaces, 'Should have namespaces object');
@@ -258,6 +264,8 @@ async function testListLabelNamespaces(tester) {
 }
 
 async function testListLabelValues(tester) {
+  await tester.callTool('jit_init', {});
+
   // Create issues with various milestones
   await tester.callTool('jit_issue_create', {
     title: 'Task 1',
@@ -285,6 +293,8 @@ async function testListLabelValues(tester) {
 }
 
 async function testAddCustomNamespace(tester) {
+  await tester.callTool('jit_init', {});
+
   // Add custom strategic namespace
   await tester.callTool('jit_label_add_namespace', {
     name: 'initiative',

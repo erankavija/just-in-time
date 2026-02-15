@@ -263,6 +263,8 @@ async function testGateShow(tester) {
 }
 
 async function testGateAddToIssue(tester) {
+  await tester.callTool('jit_init', {});
+
   // Define gate
   await tester.callTool('jit_gate_define', {
     key: 'add-gate-test',
@@ -289,6 +291,8 @@ async function testGateAddToIssue(tester) {
 }
 
 async function testGateAddMultipleToIssue(tester) {
+  await tester.callTool('jit_init', {});
+
   // Define gates
   await tester.callTool('jit_gate_define', {
     key: 'multi1',
@@ -321,6 +325,8 @@ async function testGateAddMultipleToIssue(tester) {
 }
 
 async function testGateRemoveFromIssue(tester) {
+  await tester.callTool('jit_init', {});
+
   // Create issue with gate
   const issue = await tester.callTool('jit_issue_create', {
     title: 'Issue for gate remove',
@@ -340,6 +346,8 @@ async function testGateRemoveFromIssue(tester) {
 }
 
 async function testGatePass(tester) {
+  await tester.callTool('jit_init', {});
+
   // Create issue with gate
   const issue = await tester.callTool('jit_issue_create', {
     title: 'Gate pass test',
@@ -359,6 +367,8 @@ async function testGatePass(tester) {
 }
 
 async function testGateFail(tester) {
+  await tester.callTool('jit_init', {});
+
   // Define a gate
   await tester.callTool('jit_gate_define', {
     key: 'fail-gate',
@@ -385,6 +395,10 @@ async function testGateFail(tester) {
 }
 
 async function testGatePassWithActor(tester) {
+  await tester.callTool('jit_init', {});
+
+  await tester.callTool('jit_init', {});
+
   // Define a gate
   await tester.callTool('jit_gate_define', {
     key: 'actor-gate',
@@ -412,6 +426,8 @@ async function testGatePassWithActor(tester) {
 }
 
 async function testGateBlocksStateTransition(tester) {
+  await tester.callTool('jit_init', {});
+
   // Create issue with gate
   const issue = await tester.callTool('jit_issue_create', {
     title: 'Blocking test',
@@ -432,6 +448,8 @@ async function testGateBlocksStateTransition(tester) {
 }
 
 async function testGateAllowsTransitionWhenPassed(tester) {
+  await tester.callTool('jit_init', {});
+
   // Create issue with gate
   const issue = await tester.callTool('jit_issue_create', {
     title: 'Allow transition test',
@@ -457,6 +475,8 @@ async function testGateAllowsTransitionWhenPassed(tester) {
 }
 
 async function testGateCheckManual(tester) {
+  await tester.callTool('jit_init', {});
+
   // Manual gates can't be checked automatically, should indicate that
   const issue = await tester.callTool('jit_issue_create', {
     title: 'Check manual',

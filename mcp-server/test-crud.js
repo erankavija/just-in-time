@@ -185,6 +185,8 @@ async function runTest(name, fn) {
 
 // Tests
 async function testIssueCreateBasic(tester) {
+  await tester.callTool('jit_init', {});
+
   // Initialize first
   await tester.callTool('jit_init', {});
   
@@ -198,6 +200,8 @@ async function testIssueCreateBasic(tester) {
 }
 
 async function testIssueCreateWithDescription(tester) {
+  await tester.callTool('jit_init', {});
+
   const result = await tester.callTool('jit_issue_create', {
     title: 'Issue with description',
     description: 'This is a detailed description\nwith multiple lines'
@@ -208,6 +212,8 @@ async function testIssueCreateWithDescription(tester) {
 }
 
 async function testIssueCreateWithPriority(tester) {
+  await tester.callTool('jit_init', {});
+
   const result = await tester.callTool('jit_issue_create', {
     title: 'High priority issue',
     priority: 'critical'
@@ -217,6 +223,8 @@ async function testIssueCreateWithPriority(tester) {
 }
 
 async function testIssueCreateWithLabels(tester) {
+  await tester.callTool('jit_init', {});
+
   const result = await tester.callTool('jit_issue_create', {
     title: 'Issue with labels',
     label: ['type:task', 'component:backend', 'milestone:v1.0']
@@ -229,6 +237,8 @@ async function testIssueCreateWithLabels(tester) {
 }
 
 async function testIssueCreateWithGates(tester) {
+  await tester.callTool('jit_init', {});
+
   // First define some gates
   await tester.callTool('jit_gate_define', {
     key: 'test-gate',
@@ -246,6 +256,8 @@ async function testIssueCreateWithGates(tester) {
 }
 
 async function testIssueShow(tester) {
+  await tester.callTool('jit_init', {});
+
   // Create an issue first
   const created = await tester.callTool('jit_issue_create', {
     title: 'Issue to show',
@@ -267,6 +279,8 @@ async function testIssueShow(tester) {
 }
 
 async function testIssueUpdateTitle(tester) {
+  await tester.callTool('jit_init', {});
+
   const created = await tester.callTool('jit_issue_create', {
     title: 'Original title'
   });
@@ -286,6 +300,8 @@ async function testIssueUpdateTitle(tester) {
 }
 
 async function testIssueUpdateDescription(tester) {
+  await tester.callTool('jit_init', {});
+
   const created = await tester.callTool('jit_issue_create', {
     title: 'Test issue'
   });
@@ -302,6 +318,8 @@ async function testIssueUpdateDescription(tester) {
 }
 
 async function testIssueUpdateState(tester) {
+  await tester.callTool('jit_init', {});
+
   const created = await tester.callTool('jit_issue_create', {
     title: 'State test issue'
   });
@@ -319,6 +337,8 @@ async function testIssueUpdateState(tester) {
 }
 
 async function testIssueUpdatePriority(tester) {
+  await tester.callTool('jit_init', {});
+
   const created = await tester.callTool('jit_issue_create', {
     title: 'Priority test',
     priority: 'low'
@@ -336,6 +356,8 @@ async function testIssueUpdatePriority(tester) {
 }
 
 async function testIssueUpdateAddLabel(tester) {
+  await tester.callTool('jit_init', {});
+
   const created = await tester.callTool('jit_issue_create', {
     title: 'Label test',
     label: ['type:task']
@@ -354,6 +376,8 @@ async function testIssueUpdateAddLabel(tester) {
 }
 
 async function testIssueUpdateRemoveLabel(tester) {
+  await tester.callTool('jit_init', {});
+
   const created = await tester.callTool('jit_issue_create', {
     title: 'Remove label test',
     label: ['type:task', 'component:backend']
@@ -372,6 +396,8 @@ async function testIssueUpdateRemoveLabel(tester) {
 }
 
 async function testIssueUpdateAddGate(tester) {
+  await tester.callTool('jit_init', {});
+
   // Define a gate
   await tester.callTool('jit_gate_define', {
     key: 'add-test-gate',
@@ -395,6 +421,8 @@ async function testIssueUpdateAddGate(tester) {
 }
 
 async function testIssueUpdateRemoveGate(tester) {
+  await tester.callTool('jit_init', {});
+
   // Define a gate
   await tester.callTool('jit_gate_define', {
     key: 'remove-test-gate',
@@ -419,6 +447,8 @@ async function testIssueUpdateRemoveGate(tester) {
 }
 
 async function testIssueUpdateAssignee(tester) {
+  await tester.callTool('jit_init', {});
+
   const created = await tester.callTool('jit_issue_create', {
     title: 'Assignee test'
   });
@@ -435,6 +465,8 @@ async function testIssueUpdateAssignee(tester) {
 }
 
 async function testIssueUpdateUnassign(tester) {
+  await tester.callTool('jit_init', {});
+
   const created = await tester.callTool('jit_issue_create', {
     title: 'Unassign test'
   });
@@ -458,6 +490,8 @@ async function testIssueUpdateUnassign(tester) {
 }
 
 async function testIssueDelete(tester) {
+  await tester.callTool('jit_init', {});
+
   const created = await tester.callTool('jit_issue_create', {
     title: 'Issue to delete'
   });
@@ -480,6 +514,8 @@ async function testIssueDelete(tester) {
 }
 
 async function testStateTransitionsPersist(tester) {
+  await tester.callTool('jit_init', {});
+
   const created = await tester.callTool('jit_issue_create', {
     title: 'State persistence test'
   });
@@ -500,6 +536,8 @@ async function testStateTransitionsPersist(tester) {
 }
 
 async function testMultipleFieldsUpdate(tester) {
+  await tester.callTool('jit_init', {});
+
   const created = await tester.callTool('jit_issue_create', {
     title: 'Multi-update test',
     priority: 'low'
