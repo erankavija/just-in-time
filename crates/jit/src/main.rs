@@ -504,6 +504,13 @@ strategic_types = {}
                             executor.remove_gates(&full_id, &remove_gate)?;
                         }
 
+                        // Handle assignee changes
+                        if unassign {
+                            executor.unassign_issue(&full_id)?;
+                        } else if let Some(assignee_str) = assignee {
+                            executor.assign_issue(&full_id, assignee_str)?;
+                        }
+
                         match executor.update_issue(
                             &full_id,
                             title,
