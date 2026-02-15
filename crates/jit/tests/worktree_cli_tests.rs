@@ -489,6 +489,19 @@ fn test_git_worktree_move_preserves_id() {
         .assert()
         .success();
 
+    // Configure git user identity (required for commits)
+    Command::new("git")
+        .current_dir(main_path)
+        .args(["config", "user.email", "test@example.com"])
+        .assert()
+        .success();
+
+    Command::new("git")
+        .current_dir(main_path)
+        .args(["config", "user.name", "Test User"])
+        .assert()
+        .success();
+
     Command::new("git")
         .current_dir(main_path)
         .args(["commit", "--allow-empty", "-m", "initial"])
