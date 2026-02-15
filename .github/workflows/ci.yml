@@ -59,6 +59,9 @@ jobs:
       - name: Install ripgrep (for search tests)
         run: sudo apt-get update && sudo apt-get install -y ripgrep
       
+      - name: Configure git default branch
+        run: git config --global init.defaultBranch main
+      
       - name: Check formatting
         run: cargo fmt -- --check
       
@@ -112,6 +115,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ripgrep
+      
+      - name: Configure git default branch
+        run: git config --global init.defaultBranch main
       
       - name: Build Rust CLI (needed for MCP tests)
         run: cargo build --release --bin jit
