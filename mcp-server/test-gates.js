@@ -36,7 +36,8 @@ class MCPTester {
     return new Promise((resolve, reject) => {
       this.server = spawn('node', [serverPath], {
         stdio: ['pipe', 'pipe', 'pipe'],
-        cwd: this.testDir
+        cwd: this.testDir,
+        env: { ...process.env, JIT_ALLOW_DELETION: '1' }
       });
 
       this.server.stdout.on('data', (data) => {
@@ -123,8 +124,15 @@ class MCPTester {
     
     if (assistantContent?.text) {
       try {
-        return JSON.parse(assistantContent.text);
+        const parsed = JSON.parse(assistantContent.text);
+        if (parsed.success === false) {
+          throw new Error(parsed.error?.message || 'Command failed');
+        }
+        return parsed;
       } catch (err) {
+        if (err.message && (err.message.includes('not found') || err.message.includes('Command failed'))) {
+          throw err;
+        }
         return { message: assistantContent.text };
       }
     }
@@ -133,9 +141,15 @@ class MCPTester {
     for (let i = content.length - 1; i >= 0; i--) {
       if (content[i].type === 'text') {
         try {
-          return JSON.parse(content[i].text);
-        } catch {
-          // Not JSON, try next
+          const parsed = JSON.parse(content[i].text);
+          if (parsed.success === false) {
+            throw new Error(parsed.error?.message || 'Command failed');
+          }
+          return parsed;
+        } catch (err) {
+          if (err.message && (err.message.includes('not found') || err.message.includes('Command failed'))) {
+            throw err;
+          }
         }
       }
     }
@@ -293,15 +307,15 @@ async function testGateAddToIssue(tester) {
 async function testGateAddMultipleToIssue(tester) {
   await tester.callTool('jit_init', {});
 
-  // Define gates
+  // Define gates with unique names
   await tester.callTool('jit_gate_define', {
-    key: 'test-multi1',
+    key: 'add-multi-test-1',
     title: 'Multi 1',
     description: 'First multi gate'
   });
   
   await tester.callTool('jit_gate_define', {
-    key: 'test-multi2',
+    key: 'add-multi-test-2',
     title: 'Multi 2',
     description: 'Second multi gate'
   });
@@ -314,14 +328,14 @@ async function testGateAddMultipleToIssue(tester) {
   // Add multiple gates
   await tester.callTool('jit_gate_add', {
     id: issue.id,
-    gate_keys: ['test-multi1', 'test-multi2']
+    gate_keys: ['add-multi-test-1', 'add-multi-test-2']
   });
   
   const shown = await tester.callTool('jit_issue_show', {
     id: issue.id
   });
-  assert(shown.gates_required?.includes('test-multi1'), 'Should have multi1');
-  assert(shown.gates_required?.includes('test-multi2'), 'Should have multi2');
+  assert(shown.gates_required?.includes('add-multi-test-1'), 'Should have multi1');
+  assert(shown.gates_required?.includes('add-multi-test-2'), 'Should have multi2');
 }
 
 async function testGateRemoveFromIssue(tester) {

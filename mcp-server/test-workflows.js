@@ -36,7 +36,8 @@ class MCPTester {
     return new Promise((resolve, reject) => {
       this.server = spawn('node', [serverPath], {
         stdio: ['pipe', 'pipe', 'pipe'],
-        cwd: this.testDir
+        cwd: this.testDir,
+        env: { ...process.env, JIT_ALLOW_DELETION: '1' }
       });
 
       this.server.stdout.on('data', (data) => {
@@ -123,8 +124,15 @@ class MCPTester {
     
     if (assistantContent?.text) {
       try {
-        return JSON.parse(assistantContent.text);
+        const parsed = JSON.parse(assistantContent.text);
+        if (parsed.success === false) {
+          throw new Error(parsed.error?.message || 'Command failed');
+        }
+        return parsed;
       } catch (err) {
+        if (err.message && (err.message.includes('not found') || err.message.includes('Command failed'))) {
+          throw err;
+        }
         return { message: assistantContent.text };
       }
     }
@@ -133,9 +141,15 @@ class MCPTester {
     for (let i = content.length - 1; i >= 0; i--) {
       if (content[i].type === 'text') {
         try {
-          return JSON.parse(content[i].text);
-        } catch {
-          // Not JSON, try next
+          const parsed = JSON.parse(content[i].text);
+          if (parsed.success === false) {
+            throw new Error(parsed.error?.message || 'Command failed');
+          }
+          return parsed;
+        } catch (err) {
+          if (err.message && (err.message.includes('not found') || err.message.includes('Command failed'))) {
+            throw err;
+          }
         }
       }
     }
