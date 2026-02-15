@@ -27,7 +27,12 @@ fn setup_test_repo() -> TempDir {
         .output()
         .expect("Failed to run jit init");
 
-    assert!(output.status.success(), "jit init failed");
+    assert!(
+        output.status.success(),
+        "jit init failed:\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
     temp
 }
 
