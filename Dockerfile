@@ -9,6 +9,9 @@ WORKDIR /build
 # Install build dependencies
 RUN apk add --no-cache musl-dev pkgconfig openssl-dev openssl-libs-static
 
+# Cache buster for scripts/ directory fix (2026-02-15)
+ARG CACHE_BUST=2026-02-15
+
 # Copy Cargo workspace files
 COPY Cargo.toml Cargo.lock ./
 COPY crates/ ./crates/

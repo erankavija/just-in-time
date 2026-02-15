@@ -10,6 +10,7 @@ RUN apk add --no-cache musl-dev pkgconfig openssl-dev openssl-libs-static
 # Copy workspace files
 COPY Cargo.toml Cargo.lock ./
 COPY crates/ ./crates/
+COPY scripts/ ./scripts/
 
 # Build only the CLI
 RUN cargo build --release --bin jit
