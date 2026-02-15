@@ -1,18 +1,40 @@
 {
   "id": "f3af98cd-9cb8-47a6-bff7-461af5c7e238",
   "title": "Enhance gate error messages",
-  "description": "Show relevant output excerpts on failure, suggest fixes based on common patterns, link to full logs in .jit/gate-runs/",
-  "state": "ready",
+  "description": "When an automated gate check fails, show the path to the full output file.\n\n## Current Behavior\n\nWhen `jit gate check <issue> <gate>` fails, the output shows:\n```\n✗ Gate 'fmt' failed for issue 5863c67c\n  Error: Diff in /home/user/project/src/file.rs:123:\n```\n\nOnly the first line of stderr is displayed. Users don't know where to find the full output.\n\n## Proposed Behavior\n\nWhen a gate fails, include the path to the result file:\n```\n✗ Gate 'fmt' failed for issue 5863c67c\n  Error: Diff in /home/user/project/src/file.rs:123:\n  Full output: .jit/gate-runs/2aa8649a-d747-4326-8b9a-f76dac94a6d7/result.json\n```\n\n## Implementation\n\nThe `GateRunResult` already contains `run_id`. The file path is:\n`.jit/gate-runs/<run_id>/result.json`\n\nUpdate the gate check output in `main.rs` (around line 1157-1164) to print the file path after showing the error preview.\n\n## Scope\n\n- Only for automated gates (manual gates don't produce result files)\n- Human-readable output only (JSON output already contains full result)\n- Both `gate check` and `gate check-all` commands",
+  "state": "in_progress",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:copilot-session",
   "dependencies": [],
   "gates_required": [
     "tests",
     "clippy",
     "fmt",
-    "code-review"
+    "code-review",
+    "tdd-reminder"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-15T01:13:55.654163795Z"
+    },
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-15T01:14:15.068448580Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-15T01:14:19.274188583Z"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-02-15T01:10:54.797573142Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [

@@ -1161,10 +1161,18 @@ strategic_types = {}
                                             result.stderr.lines().next().unwrap_or("")
                                         );
                                     }
+                                    eprintln!(
+                                        "  Full output: .jit/gate-runs/{}/result.json",
+                                        result.run_id
+                                    );
                                 }
                                 jit::domain::GateRunStatus::Error => {
                                     println!("✗ Gate '{}' error for issue {}", gate_key, id);
                                     eprintln!("  {}", result.stderr);
+                                    eprintln!(
+                                        "  Full output: .jit/gate-runs/{}/result.json",
+                                        result.run_id
+                                    );
                                 }
                                 _ => {
                                     println!("Gate '{}' status: {:?}", gate_key, result.status);
@@ -1208,6 +1216,10 @@ strategic_types = {}
                                     }
                                     jit::domain::GateRunStatus::Failed => {
                                         println!("  ✗ {} failed", result.gate_key);
+                                        println!(
+                                            "    Full output: .jit/gate-runs/{}/result.json",
+                                            result.run_id
+                                        );
                                     }
                                     _ => {
                                         println!("  {} - {:?}", result.gate_key, result.status);

@@ -1,8 +1,8 @@
 {
   "id": "aa54c441-f9ae-414f-b244-21e5fcdd1977",
   "title": "Implement gate history command",
-  "description": "Add 'jit gate history <issue>' to show all gate runs with filtering by status and time range",
-  "state": "ready",
+  "description": "Add 'jit gate history <issue>' to show all gate runs with filtering by status and time range\n\n---\n\n## Rejection Rationale\n\nIssue rejected as no-longer-valid.\n\nThe proposed `jit gate history <issue>` command is redundant. Gate history is already fully accessible through existing event query commands:\n\n**Query all gate events:**\n```bash\njit events query --event-type gate_passed\njit events query --event-type gate_failed\n```\n\n**Query gate events for specific issue:**\n```bash\njit events query --issue-id <issue-id>\n# Returns all events including gate_passed/gate_failed with timestamps and updated_by\n```\n\n**Filtering capabilities already exist:**\n- By event type (gate_passed, gate_failed)\n- By issue ID\n- By limit (--limit N)\n\n**What was proposed but isn't needed:**\n- Status filtering: Already handled by --event-type\n- Gate-specific view: Already handled by --event-type gate_*\n- Time range filtering: Not implemented anywhere yet, but if needed should be added to general event queries, not gate-specific commands\n\nThe only potentially valuable feature mentioned (time range filtering) should be a general enhancement to `jit events query`, not a separate gate-specific command.\n\n**Conclusion:** Core functionality exists, no new command needed.",
+  "state": "rejected",
   "priority": "high",
   "assignee": null,
   "dependencies": [],
@@ -20,7 +20,8 @@
     "type:task",
     "epic:phase5.2",
     "milestone:v1.0",
-    "component:cli"
+    "component:cli",
+    "resolution:no-longer-valid"
   ],
   "created_at": "2025-12-18T20:37:08.839831800Z",
   "updated_at": "2025-12-18T20:37:08.839831800Z"

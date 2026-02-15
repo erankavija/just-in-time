@@ -1745,3 +1745,12 @@
 {"type":"issue_claimed","id":"7bf18a8b-cf42-4e3c-be7b-a681e85513d7","issue_id":"f65b5b9c-521c-4aab-bb36-0fc99a0efecf","timestamp":"2026-02-14T23:47:02.808603809Z","assignee":"agent:copilot-session"}
 {"type":"issue_state_changed","id":"6cc351cc-ee6a-4284-93a1-d6e6ca74c542","issue_id":"f65b5b9c-521c-4aab-bb36-0fc99a0efecf","timestamp":"2026-02-14T23:55:01.928945176Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"682d330c-9377-440a-b6ed-0bb68cdde9fd","issue_id":"f65b5b9c-521c-4aab-bb36-0fc99a0efecf","timestamp":"2026-02-14T23:55:01.928976086Z"}
+{"type":"issue_state_changed","id":"dbbb78d7-1db6-497c-9240-60042fa5dac7","issue_id":"aa54c441-f9ae-414f-b244-21e5fcdd1977","timestamp":"2026-02-15T00:59:28.535187931Z","from":"ready","to":"rejected"}
+{"type":"issue_created","id":"abbc71ae-321a-449b-9cd6-5ec21d8a8e68","issue_id":"5863c67c-da55-4b10-8ac6-ca4e6a5f559f","timestamp":"2026-02-15T01:03:42.090109293Z","title":"Test gate error","priority":"normal"}
+{"type":"gate_added","id":"7f964295-6995-4dac-b425-333405181fc9","issue_id":"f3af98cd-9cb8-47a6-bff7-461af5c7e238","timestamp":"2026-02-15T01:10:33.367209171Z","gate_key":"tdd-reminder"}
+{"type":"gate_passed","id":"3f01ce3e-529a-484f-970d-beae50ec0ed5","issue_id":"f3af98cd-9cb8-47a6-bff7-461af5c7e238","timestamp":"2026-02-15T01:10:54.797743462Z","gate_key":"tdd-reminder","updated_by":null}
+{"type":"issue_state_changed","id":"8e9c2295-7cf5-4a77-a93b-9fabb649571e","issue_id":"f3af98cd-9cb8-47a6-bff7-461af5c7e238","timestamp":"2026-02-15T01:10:54.806221444Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"fda2f6ee-cf98-4395-b5e8-fb518e3b4535","issue_id":"f3af98cd-9cb8-47a6-bff7-461af5c7e238","timestamp":"2026-02-15T01:10:54.806379994Z","assignee":"agent:copilot-session"}
+{"type":"gate_passed","id":"b26625bb-74fe-4008-9271-c5ccd330d91e","issue_id":"f3af98cd-9cb8-47a6-bff7-461af5c7e238","timestamp":"2026-02-15T01:14:15.068345660Z","gate_key":"tests","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"dfa5f6a2-d4e4-439a-b0ab-7fa0727a0930","issue_id":"f3af98cd-9cb8-47a6-bff7-461af5c7e238","timestamp":"2026-02-15T01:14:19.274091543Z","gate_key":"clippy","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"95c57dc2-9e84-4310-813b-93de7b4811cd","issue_id":"f3af98cd-9cb8-47a6-bff7-461af5c7e238","timestamp":"2026-02-15T01:14:19.777225047Z","gate_key":"fmt","updated_by":"auto:executor"}
