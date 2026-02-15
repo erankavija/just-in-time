@@ -295,13 +295,13 @@ async function testGateAddMultipleToIssue(tester) {
 
   // Define gates
   await tester.callTool('jit_gate_define', {
-    key: 'multi1',
+    key: 'test-multi1',
     title: 'Multi 1',
     description: 'First multi gate'
   });
   
   await tester.callTool('jit_gate_define', {
-    key: 'multi2',
+    key: 'test-multi2',
     title: 'Multi 2',
     description: 'Second multi gate'
   });
@@ -314,14 +314,14 @@ async function testGateAddMultipleToIssue(tester) {
   // Add multiple gates
   await tester.callTool('jit_gate_add', {
     id: issue.id,
-    gate_keys: ['multi1', 'multi2']
+    gate_keys: ['test-multi1', 'test-multi2']
   });
   
   const shown = await tester.callTool('jit_issue_show', {
     id: issue.id
   });
-  assert(shown.gates_required?.includes('multi1'), 'Should have multi1');
-  assert(shown.gates_required?.includes('multi2'), 'Should have multi2');
+  assert(shown.gates_required?.includes('test-multi1'), 'Should have multi1');
+  assert(shown.gates_required?.includes('test-multi2'), 'Should have multi2');
 }
 
 async function testGateRemoveFromIssue(tester) {
@@ -333,10 +333,10 @@ async function testGateRemoveFromIssue(tester) {
     gate: ['test-basic']
   });
   
-  // Remove gate
-  await tester.callTool('jit_gate_remove', {
+  // Remove gate using issue update
+  await tester.callTool('jit_issue_update', {
     id: issue.id,
-    gate_keys: ['test-basic']
+    'remove-gate': ['test-basic']
   });
   
   const shown = await tester.callTool('jit_issue_show', {
@@ -422,7 +422,7 @@ async function testGatePassWithActor(tester) {
   });
   const gateStatus = shown.gates_status?.['actor-gate'];
   assert(gateStatus?.status === 'passed', 'Gate should be passed');
-  assert(gateStatus?.by === 'agent:test-worker', 'Should record actor');
+  assert(gateStatus?.updated_by === 'agent:test-worker', 'Should record actor');
 }
 
 async function testGateBlocksStateTransition(tester) {
