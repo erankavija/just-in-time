@@ -222,27 +222,33 @@ pub fn load_or_create_worktree_identity(
 /// This ensures the file is never in a partially written state, even if
 /// the process crashes mid-write.
 fn write_identity_atomic(path: &Path, identity: &WorktreeIdentity) -> Result<()> {
-    let temp_path = path.with_extension("tmp");
+    use tempfile::NamedTempFile;
 
-    // Write to temp file
+    // Serialize to JSON
     let json =
         serde_json::to_string_pretty(identity).context("Failed to serialize worktree identity")?;
 
-    let mut file = fs::File::create(&temp_path).context("Failed to create temp file")?;
+    // Create temp file in the same directory as target (required for atomic rename)
+    let parent = path.parent().context("No parent directory")?;
+    let mut temp_file = NamedTempFile::new_in(parent).context("Failed to create temp file")?;
 
-    file.write_all(json.as_bytes())
+    // Write content
+    temp_file
+        .write_all(json.as_bytes())
         .context("Failed to write to temp file")?;
 
     // Fsync to ensure data is on disk
-    file.sync_all().context("Failed to fsync temp file")?;
+    temp_file
+        .as_file()
+        .sync_all()
+        .context("Failed to fsync temp file")?;
 
-    drop(file);
-
-    // Atomic rename
-    fs::rename(&temp_path, path).context("Failed to rename temp file")?;
+    // Atomic rename (persist handles cross-filesystem moves if needed)
+    temp_file
+        .persist(path)
+        .context("Failed to persist temp file")?;
 
     // Fsync parent directory to ensure rename is durable
-    let parent = path.parent().context("No parent directory")?;
     let parent_file = fs::File::open(parent).context("Failed to open parent directory")?;
     parent_file
         .sync_all()
