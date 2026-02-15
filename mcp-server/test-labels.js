@@ -116,17 +116,29 @@ class MCPTester {
       throw new Error(response.error.message);
     }
 
-    const content = response.result?.content?.[0]?.text;
-    if (!content) {
+    // Extract assistant-targeted content (dual-audience response)
+    const contents = response.result?.content || [];
+    if (contents.length === 0) {
       throw new Error('No content in response');
     }
-
-    try {
-      return JSON.parse(content);
-    } catch (err) {
-      console.error('Failed to parse tool response:',content);
-      throw err;
+    
+    // Find content for assistant (or last JSON-parseable content)
+    let jsonContent = null;
+    for (const item of contents.reverse()) {
+      try {
+        const parsed = JSON.parse(item.text);
+        jsonContent = parsed;
+        break;
+      } catch {
+        // Try next item
+      }
     }
+    
+    if (!jsonContent) {
+      throw new Error('No parseable JSON content found');
+    }
+    
+    return jsonContent;
   }
 
   async stop() {
