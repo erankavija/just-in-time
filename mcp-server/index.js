@@ -30,6 +30,15 @@ const { schema: jitSchema, warnings: schemaWarnings } = await loadSchema(schemaP
 // Create concurrency limiter (max 10 concurrent commands)
 const concurrencyLimiter = new ConcurrencyLimiter(10);
 
+// Response mode: controls how tool results are returned.
+//   "content"    — Summary + JSON in a single text content block (default).
+//                   Works with all MCP clients including Claude Code.
+//   "structured" — Summary in content, typed data in structuredContent with
+//                   outputSchema. Requires client support (MCP 2025-06-18+).
+//                   As of Feb 2026 most clients ignore content when
+//                   structuredContent is present, so the summary is lost.
+const RESPONSE_MODE = process.env.JIT_MCP_RESPONSE_MODE || "content";
+
 // Server instructions for AI agents
 const SERVER_INSTRUCTIONS = `JIT (Just-In-Time) is a repository-local issue tracker designed for AI agents.
 
@@ -355,6 +364,33 @@ function compactForAssistant(toolName, result) {
   return result;
 }
 
+/**
+ * Format a successful tool result based on the configured response mode.
+ * @param {string} summary - Human-readable summary
+ * @param {object} data - Compacted result data
+ * @returns {object} MCP CallToolResult
+ */
+function formatSuccessResult(summary, data) {
+  if (RESPONSE_MODE === "structured") {
+    return {
+      content: [
+        { type: "text", text: summary },
+      ],
+      structuredContent: data,
+    };
+  }
+
+  // Default "content" mode: summary + JSON in a single text block
+  return {
+    content: [
+      {
+        type: "text",
+        text: summary + "\n" + JSON.stringify(data, null, 2),
+      },
+    ],
+  };
+}
+
 // Create MCP server
 const server = new Server(
   {
@@ -377,7 +413,8 @@ let cachedTools = null;
  */
 function getTools() {
   if (!cachedTools) {
-    cachedTools = generateTools(jitSchema);
+    const includeOutputSchema = RESPONSE_MODE === "structured";
+    cachedTools = generateTools(jitSchema, includeOutputSchema);
   }
   return cachedTools;
 }
@@ -481,26 +518,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     // Generate user-friendly summary and compact data for assistant
     const userSummary = generateUserSummary(name, result.data);
     const compactData = compactForAssistant(name, result.data);
-    
-    // Return success with dual-audience content
-    return {
-      content: [
-        {
-          type: "text",
-          text: userSummary + "\n",
-          annotations: {
-            audience: ["user"],
-          },
-        },
-        {
-          type: "text",
-          text: JSON.stringify(compactData, null, 2),
-          annotations: {
-            audience: ["assistant"],
-          },
-        },
-      ],
-    };
+
+    return formatSuccessResult(userSummary, compactData);
   } catch (error) {
     return {
       content: [

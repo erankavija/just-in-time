@@ -90,7 +90,7 @@ export async function executeCommand(cmdPath, args, cmdDef, timeout = DEFAULT_TI
  * @param {Object} cmdDef - Command definition from schema
  * @returns {string[]} CLI arguments array
  */
-function buildCliArgs(cmdPath, args, cmdDef) {
+export function buildCliArgs(cmdPath, args, cmdDef) {
   const cliArgs = [...cmdPath]; // Start with command path
   
   // Get positional argument names from schema
