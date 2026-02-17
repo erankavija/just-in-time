@@ -959,14 +959,15 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Archive a document with its assets
     /// Archive a document and its per-doc assets to a configured archive directory.
     ///
-    /// Returns warnings (e.g., file removal failures) if any.
+    /// Returns (result, warnings) tuple where result contains archival details and
+    /// warnings contains any non-fatal issues encountered.
     pub fn archive_document(
         &self,
         path: &str,
         category: &str,
         dry_run: bool,
         force: bool,
-    ) -> Result<Vec<String>> {
+    ) -> Result<(ArchiveResult, Vec<String>)> {
         use crate::config::JitConfig;
         use anyhow::anyhow;
         use std::path::Path;
@@ -1014,29 +1015,16 @@ impl<S: IssueStore> CommandExecutor<S> {
         )?;
 
         if dry_run {
-            println!("✓ Archival plan (--dry-run)\n");
-            println!("  Document:");
-            println!("    📄 {}", path);
-            println!("       → {}", dest_path.display());
-            println!("\n  Category: {}", category);
-
-            if !per_doc_assets.is_empty() {
-                println!("\n  Assets to move ({}):", per_doc_assets.len());
-                for asset in &per_doc_assets {
-                    // Compute destination for asset
-                    let asset_rel = asset
-                        .strip_prefix(doc_path.parent().unwrap_or(Path::new("")))
-                        .unwrap_or(asset);
-                    let asset_dest = dest_path.parent().unwrap().join(asset_rel);
-                    println!("    🖼️  {}", asset.display());
-                    println!("       → {}", asset_dest.display());
-                }
-            } else {
-                println!("\n  No per-doc assets found");
-            }
-
-            println!("\n  Run without --dry-run to execute.");
-            return Ok(Vec::new());
+            // Return dry-run result without printing
+            let result = ArchiveResult {
+                source_path: path.to_string(),
+                dest_path: dest_path.to_str().unwrap().to_string(),
+                category: category.to_string(),
+                assets_moved: per_doc_assets.len(),
+                updated_issues: Vec::new(), // No updates in dry-run
+                dry_run: true,
+            };
+            return Ok((result, Vec::new()));
         }
 
         // 6. Check for active issue links (unless --force)
@@ -1071,16 +1059,17 @@ impl<S: IssueStore> CommandExecutor<S> {
         );
         self.storage.append_event(&event)?;
 
-        println!("✓ Archived successfully");
-        println!("  {} → {}", path, dest_path.display());
-        if assets_moved > 0 {
-            println!("  Moved {} asset(s)", assets_moved);
-        }
-        if !updated_issues.is_empty() {
-            println!("  Updated {} issue(s)", updated_issues.len());
-        }
+        // Return result with warnings (instead of printing)
+        let result = ArchiveResult {
+            source_path: path.to_string(),
+            dest_path: dest_path.to_str().unwrap().to_string(),
+            category: category.to_string(),
+            assets_moved,
+            updated_issues,
+            dry_run: false,
+        };
 
-        Ok(warnings)
+        Ok((result, warnings))
     }
 
     /// Validate that a document can be archived
@@ -1387,6 +1376,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// 2. Move from temp to final destinations (atomic renames)
     /// 3. On error: rollback (delete any partial destinations)
     /// 4. Delete sources only after all destinations verified
+    ///
     /// Perform atomic move of document and assets using temp directory pattern.
     ///
     /// Returns warnings if any source files couldn't be removed (non-fatal).

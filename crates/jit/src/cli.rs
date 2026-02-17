@@ -819,6 +819,10 @@ pub enum DocCommands {
         /// Override safety checks (allow archival of docs linked to active issues)
         #[arg(long)]
         force: bool,
+
+        /// Output in JSON format
+        #[arg(long)]
+        json: bool,
     },
 }
 

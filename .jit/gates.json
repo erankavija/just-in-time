@@ -1,27 +1,5 @@
 {
   "gates": {
-    "code-review": {
-      "version": 1,
-      "key": "code-review",
-      "title": "Code Review",
-      "description": "Human review of changes",
-      "stage": "postcheck",
-      "mode": "manual",
-      "reserved": {},
-      "auto": false,
-      "example_integration": null
-    },
-    "tdd-reminder": {
-      "version": 1,
-      "key": "tdd-reminder",
-      "title": "TDD Reminder",
-      "description": "Write tests first",
-      "stage": "precheck",
-      "mode": "manual",
-      "reserved": {},
-      "auto": false,
-      "example_integration": null
-    },
     "tests": {
       "version": 1,
       "key": "tests",
@@ -40,6 +18,17 @@
       "auto": true,
       "example_integration": null
     },
+    "tdd-reminder": {
+      "version": 1,
+      "key": "tdd-reminder",
+      "title": "TDD Reminder",
+      "description": "Write tests first",
+      "stage": "precheck",
+      "mode": "manual",
+      "reserved": {},
+      "auto": false,
+      "example_integration": null
+    },
     "fmt": {
       "version": 1,
       "key": "fmt",
@@ -56,6 +45,17 @@
       },
       "reserved": {},
       "auto": true,
+      "example_integration": null
+    },
+    "code-review": {
+      "version": 1,
+      "key": "code-review",
+      "title": "Code Review",
+      "description": "Human review of changes",
+      "stage": "postcheck",
+      "mode": "manual",
+      "reserved": {},
+      "auto": false,
       "example_integration": null
     },
     "clippy": {

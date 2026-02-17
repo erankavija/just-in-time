@@ -60,41 +60,49 @@ This design separates data-plane (versioned issue data) from control-plane (ephe
 
 ### Directory Layout
 
+Worktrees must be placed **outside** the main repository directory. Placing them inside (e.g., `project-root/worktrees/`) causes agents to see each other's files during searches and glob operations, breaking isolation.
+
 ```
-project-root/
-├── .git/
-│   └── jit/                      # Shared control plane (local only)
-│       ├── locks/
-│       │   ├── claims.lock       # Global claim coordination lock
-│       │   └── scope.lock        # Global operation lock (config, gates)
-│       ├── claims.jsonl          # Append-only claim audit log
-│       ├── claims.index.json     # Derived active leases view
-│       ├── heartbeat/
-│       │   ├── agent:copilot-1.json
-│       │   └── agent:copilot-2.json
+~/Projects/
+├── project-root/                 # Main worktree
+│   ├── .git/
+│   │   └── jit/                  # Shared control plane (local only)
+│   │       ├── locks/
+│   │       │   ├── claims.lock   # Global claim coordination lock
+│   │       │   └── scope.lock    # Global operation lock (config, gates)
+│   │       ├── claims.jsonl      # Append-only claim audit log
+│   │       ├── claims.index.json # Derived active leases view
+│   │       ├── heartbeat/
+│   │       │   ├── agent:copilot-1.json
+│   │       │   └── agent:copilot-2.json
+│   │       └── events/
+│   │           └── control.jsonl # Control-plane events (claims)
+│   │
+│   └── .jit/                     # Main worktree data plane
+│       ├── worktree.json         # Worktree identity
+│       ├── issues/
+│       ├── gates/
 │       └── events/
-│           └── control.jsonl     # Control-plane events (claims)
 │
-├── .jit/                         # Main worktree data plane
-│   ├── worktree.json             # Worktree identity
-│   ├── issues/
-│   ├── gates/
-│   └── events/
+├── project-root-feature-a/       # Agent worktree (sibling directory)
+│   └── .jit/                     # Isolated worktree data plane
+│       ├── worktree.json         # wt:abc123
+│       ├── issues/               # Only issues claimed by this worktree
+│       ├── gates/
+│       └── events/
 │
-└── worktrees/
-    ├── feature-a/
-    │   └── .jit/                 # Isolated worktree data plane
-    │       ├── worktree.json     # wt:abc123
-    │       ├── issues/           # Only issues claimed by this worktree
-    │       ├── gates/
-    │       └── events/
-    │
-    └── feature-b/
-        └── .jit/                 # Isolated worktree data plane
-            ├── worktree.json     # wt:def456
-            ├── issues/
-            ├── gates/
-            └── events/
+└── project-root-feature-b/       # Agent worktree (sibling directory)
+    └── .jit/                     # Isolated worktree data plane
+        ├── worktree.json         # wt:def456
+        ├── issues/
+        ├── gates/
+        └── events/
+```
+
+**Creating a worktree:**
+```bash
+# From the main repo, add worktree as a sibling directory
+git worktree add ../project-root-agent-name -b agents/agent-name
 ```
 
 **Design rationale:**

@@ -101,6 +101,17 @@ pub struct AssetListResult {
     pub warnings: Vec<String>,
 }
 
+/// Result of archiving a document
+#[derive(Debug, Serialize)]
+pub struct ArchiveResult {
+    pub source_path: String,
+    pub dest_path: String,
+    pub category: String,
+    pub assets_moved: usize,
+    pub updated_issues: Vec<String>,
+    pub dry_run: bool,
+}
+
 /// Summary of asset counts by category
 #[derive(Debug, Serialize)]
 pub struct AssetSummary {

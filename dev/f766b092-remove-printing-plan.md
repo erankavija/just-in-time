@@ -1,6 +1,6 @@
 # Remove direct printing from CommandExecutor (f766b092)
 
-## Status: In Progress (Phase 2 of 5+ complete)
+## Status: In Progress (Phase 3a of 5+ complete)
 
 ## Current Progress
 
@@ -18,9 +18,22 @@
 - Updated tests to expect wrapped JSON output (data["commits"] instead of raw array)
 - Fixed pre-existing broken doctests in query_engine (jit::query -> jit::query_engine)
 - All tests pass, zero clippy warnings
+- Committed in: 9c030ac
 
-### 🔄 Next: Phase 3 - Warnings pattern
-Focus on methods that use eprintln! for warnings (issue.rs, gate.rs, etc.)
+### ✅ Phase 3a Complete: Warnings pattern (labels, dependency, document, issue)
+- **labels.rs**: add_label() now returns Vec<String> (1 site)
+- **dependency.rs**: add_dependency(), remove_dependency() return warnings (2 sites)
+- **document.rs**: add_document_reference(), archive_document() return warnings (3 sites)
+- **issue.rs**: update_issue(), delete_issue(), update_issue_state(), assign_issue(), unassign_issue() return warnings (5 sites)
+- Updated main.rs to display warnings using OutputContext
+- Created follow-up issue d0b85bff for archive JSON support (added as dependency)
+- All tests pass, zero new clippy warnings
+- Committed in: edf0d7d
+
+**Progress: 11/17 warning sites refactored**
+
+### 🔄 Next: Phase 3b - gate.rs warnings (6 sites)
+Focus on gate.rs which has the most warning sites remaining.
 
 ## Audit of Remaining println!/eprintln! in commands/
 

@@ -1764,3 +1764,21 @@
 {"type":"issue_state_changed","id":"0ef77889-a99b-4220-866b-dea9d41565ba","issue_id":"32f804f1-9c96-40d4-b9aa-94e3fbf1cd7d","timestamp":"2026-02-17T19:10:35.401877273Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"f96c5923-7599-411a-b60a-835331177771","issue_id":"32f804f1-9c96-40d4-b9aa-94e3fbf1cd7d","timestamp":"2026-02-17T19:10:35.402210123Z"}
 {"type":"issue_created","id":"a2e390d8-d09c-4b43-ac1b-ea5c5bdc6d4f","issue_id":"d0b85bff-68a3-49c1-bdfb-31a7a5b6a890","timestamp":"2026-02-17T19:20:27.369477588Z","title":"Add JSON output support to doc archive command","priority":"low"}
+{"type":"issue_state_changed","id":"987bfa55-c4b3-4dc3-9e0a-a9917ae8b9b2","issue_id":"d0b85bff-68a3-49c1-bdfb-31a7a5b6a890","timestamp":"2026-02-17T19:35:29.498557305Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"17938f24-f475-42bc-aec6-b38d4499fd7d","issue_id":"d0b85bff-68a3-49c1-bdfb-31a7a5b6a890","timestamp":"2026-02-17T19:35:29.498716155Z","assignee":"agent:copilot-session"}
+{"type":"gate_added","id":"a62dbe17-f948-497c-9a82-02f3ab7f6b13","issue_id":"d0b85bff-68a3-49c1-bdfb-31a7a5b6a890","timestamp":"2026-02-17T19:43:06.690721704Z","gate_key":"tdd-reminder"}
+{"type":"gate_added","id":"e914da92-b54a-4f41-bc30-6d3ee00f6875","issue_id":"d0b85bff-68a3-49c1-bdfb-31a7a5b6a890","timestamp":"2026-02-17T19:43:06.690756074Z","gate_key":"tests"}
+{"type":"gate_added","id":"014a865a-b0c9-493c-bdb0-4d38632e9fdf","issue_id":"d0b85bff-68a3-49c1-bdfb-31a7a5b6a890","timestamp":"2026-02-17T19:43:06.690770404Z","gate_key":"clippy"}
+{"type":"gate_added","id":"8e0179bb-172f-49f6-a146-f3564eb7b89d","issue_id":"d0b85bff-68a3-49c1-bdfb-31a7a5b6a890","timestamp":"2026-02-17T19:43:06.690784744Z","gate_key":"fmt"}
+{"type":"gate_added","id":"9aa8184a-1dcd-497a-a73d-e825a35a529e","issue_id":"d0b85bff-68a3-49c1-bdfb-31a7a5b6a890","timestamp":"2026-02-17T19:43:06.690799264Z","gate_key":"code-review"}
+{"type":"gate_passed","id":"75fcb517-c7cd-4173-b7aa-a239fe9dfaf8","issue_id":"d0b85bff-68a3-49c1-bdfb-31a7a5b6a890","timestamp":"2026-02-17T19:45:43.491665596Z","gate_key":"tdd-reminder","updated_by":"agent:copilot-session"}
+{"type":"gate_passed","id":"8a7f77f6-89be-4080-a3f1-05ebd707cb2b","issue_id":"d0b85bff-68a3-49c1-bdfb-31a7a5b6a890","timestamp":"2026-02-17T19:49:59.391126770Z","gate_key":"tests","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"1c44b8ab-2d00-4621-9e7f-bbbdd460b092","issue_id":"d0b85bff-68a3-49c1-bdfb-31a7a5b6a890","timestamp":"2026-02-17T19:50:02.796629636Z","gate_key":"clippy","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"8fc76d10-c9a6-4f65-bce7-eef0ba646710","issue_id":"d0b85bff-68a3-49c1-bdfb-31a7a5b6a890","timestamp":"2026-02-17T19:50:03.299545502Z","gate_key":"fmt","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"f3acfeb4-674f-4bff-974d-20f4ab745071","issue_id":"d0b85bff-68a3-49c1-bdfb-31a7a5b6a890","timestamp":"2026-02-17T19:51:03.373458626Z","gate_key":"tests","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"13daa2f8-eb90-4718-a92f-0ac1fe28bb76","issue_id":"d0b85bff-68a3-49c1-bdfb-31a7a5b6a890","timestamp":"2026-02-17T19:51:06.579050197Z","gate_key":"clippy","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"14491769-7e51-4c71-974f-c9ed4fd7494a","issue_id":"d0b85bff-68a3-49c1-bdfb-31a7a5b6a890","timestamp":"2026-02-17T19:51:07.082042513Z","gate_key":"fmt","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"3dde2733-2580-405e-a60b-75e15326ee9d","issue_id":"d0b85bff-68a3-49c1-bdfb-31a7a5b6a890","timestamp":"2026-02-17T19:51:18.573775759Z","gate_key":"clippy","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"fc139972-892b-47a1-b991-44bf62e1b98a","issue_id":"d0b85bff-68a3-49c1-bdfb-31a7a5b6a890","timestamp":"2026-02-17T19:54:13.082613218Z","gate_key":"tests","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"a6cf86f8-4a4f-459d-b827-f3a3ba899a3d","issue_id":"d0b85bff-68a3-49c1-bdfb-31a7a5b6a890","timestamp":"2026-02-17T19:54:16.888324736Z","gate_key":"clippy","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"10f39f41-766a-4220-b84b-b1c0e6b2cd04","issue_id":"d0b85bff-68a3-49c1-bdfb-31a7a5b6a890","timestamp":"2026-02-17T19:54:17.391377651Z","gate_key":"fmt","updated_by":"auto:executor"}

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "07caa480-f7b8-4b5c-9585-a8cefb266b19",
+  "gate_key": "fmt",
+  "stage": "postcheck",
+  "issue_id": "d0b85bff-68a3-49c1-bdfb-31a7a5b6a890",
+  "commit": "edf0d7d6160137634fd7822715fc65057e8c15fa",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-02-17T19:50:02.796730046Z",
+  "completed_at": "2026-02-17T19:50:03.299272782Z",
+  "duration_ms": 502,
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "",
+  "command": "cargo fmt -- --check",
+  "by": "auto:executor",
+  "message": null
+}

@@ -2131,12 +2131,45 @@ strategic_types = {}
                 category,
                 dry_run,
                 force,
+                json,
             } => {
-                let warnings = executor.archive_document(&path, &category, dry_run, force)?;
-                // TODO(d0b85bff): Archive command needs --json flag to properly handle warnings
-                // For now, print warnings to stderr as archive still prints directly
+                use jit::output::JsonOutput;
+
+                let output_ctx = OutputContext::new(quiet, json);
+                let (result, warnings) =
+                    executor.archive_document(&path, &category, dry_run, force)?;
+
+                // Print warnings
                 for warning in warnings {
-                    eprintln!("⚠️  Warning: {}", warning);
+                    output_ctx.print_warning(&warning)?;
+                }
+
+                if json {
+                    let output = JsonOutput::success(result, "doc archive");
+                    println!("{}", output.to_json_string()?);
+                } else if result.dry_run {
+                    println!("✓ Archival plan (--dry-run)\n");
+                    println!("  Document:");
+                    println!("    📄 {}", result.source_path);
+                    println!("       → {}", result.dest_path);
+                    println!("\n  Category: {}", result.category);
+
+                    if result.assets_moved > 0 {
+                        println!("\n  Assets to move: {}", result.assets_moved);
+                    } else {
+                        println!("\n  No per-doc assets found");
+                    }
+
+                    println!("\n  Run without --dry-run to execute.");
+                } else {
+                    println!("✓ Archived successfully");
+                    println!("  {} → {}", result.source_path, result.dest_path);
+                    if result.assets_moved > 0 {
+                        println!("  Moved {} asset(s)", result.assets_moved);
+                    }
+                    if !result.updated_issues.is_empty() {
+                        println!("  Updated {} issue(s)", result.updated_issues.len());
+                    }
                 }
             }
         },

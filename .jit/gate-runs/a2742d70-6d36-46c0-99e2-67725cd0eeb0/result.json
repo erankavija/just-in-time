@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "a2742d70-6d36-46c0-99e2-67725cd0eeb0",
+  "gate_key": "clippy",
+  "stage": "postcheck",
+  "issue_id": "d0b85bff-68a3-49c1-bdfb-31a7a5b6a890",
+  "commit": "edf0d7d6160137634fd7822715fc65057e8c15fa",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-02-17T19:51:15.367979058Z",
+  "completed_at": "2026-02-17T19:51:18.573447869Z",
+  "duration_ms": 3205,
+  "exit_code": 101,
+  "stdout": "",
+  "stderr": "    Checking jit v0.2.1 (/home/vkaskivuo/Projects/just-in-time/crates/jit)\nerror: doc list item without indentation\n    --> crates/jit/src/commands/document.rs:1379:9\n     |\n1379 |     /// Perform atomic move of document and assets using temp directory pattern.\n     |         ^\n     |\n     = help: if this is supposed to be its own paragraph, add a blank line\n     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.91.0/index.html#doc_lazy_continuation\n     = note: `-D clippy::doc-lazy-continuation` implied by `-D warnings`\n     = help: to override `-D warnings` add `#[allow(clippy::doc_lazy_continuation)]`\nhelp: indent this line\n     |\n1379 |     ///    Perform atomic move of document and assets using temp directory pattern.\n     |         +++\n\nerror: could not compile `jit` (lib) due to 1 previous error\n",
+  "command": "cargo clippy --lib -- -D warnings",
+  "by": "auto:executor",
+  "message": null
+}
