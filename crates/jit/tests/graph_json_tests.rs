@@ -71,10 +71,10 @@ fn test_graph_downstream_json_output() {
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
     // Verify structure
-    assert_eq!(json["success"], true);
-    assert_eq!(json["data"]["issue_id"], id1);
-    assert!(json["data"]["dependents"].is_array());
-    assert_eq!(json["data"]["count"], 1);
+    // success field removed
+    assert_eq!(json["issue_id"], id1);
+    assert!(json["dependents"].is_array());
+    assert_eq!(json["count"], 1);
 }
 
 #[test]
@@ -124,8 +124,8 @@ fn test_graph_roots_json_output() {
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
     // Verify structure
-    assert_eq!(json["success"], true);
-    assert!(json["data"]["roots"].is_array());
-    assert_eq!(json["data"]["count"], 1);
-    assert_eq!(json["data"]["roots"][0]["id"], id1);
+    // success field removed
+    assert!(json["roots"].is_array());
+    assert_eq!(json["count"], 1);
+    assert_eq!(json["roots"][0]["id"], id1);
 }

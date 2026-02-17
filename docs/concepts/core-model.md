@@ -582,7 +582,7 @@ Each gate on an issue tracks:
 
 **Query gate status:**
 ```bash
-jit issue show $ISSUE --json | jq '.data.gates_status'
+jit issue show $ISSUE --json | jq 'gates_status'
 ```
 
 ### Gate Enforcement and Auto-Transitions
@@ -1182,7 +1182,7 @@ Equivalent to `assign` with no assignee value.
 # Each agent independently polls and claims
 while true; do
   # Claim next ready work atomically
-  ISSUE=$(jit issue claim-next agent:worker-$ID --json | jq -r '.data.id')
+  ISSUE=$(jit issue claim-next agent:worker-$ID --json | jq -r 'id')
   
   if [ -n "$ISSUE" ]; then
     # Do work...

@@ -63,12 +63,12 @@ fn test_query_label_json_exact_match() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
-    assert_eq!(json["success"], true);
-    assert_eq!(json["data"]["count"], 1);
-    assert!(json["data"]["issues"].is_array());
-    assert_eq!(json["data"]["issues"].as_array().unwrap().len(), 1);
+    // success field removed
+    assert_eq!(json["count"], 1);
+    assert!(json["issues"].is_array());
+    assert_eq!(json["issues"].as_array().unwrap().len(), 1);
 
-    let issue = &json["data"]["issues"][0];
+    let issue = &json["issues"][0];
     assert_eq!(issue["title"], "Milestone Task");
     assert!(issue["labels"]
         .as_array()
@@ -119,9 +119,9 @@ fn test_query_label_json_wildcard() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
-    assert_eq!(json["success"], true);
-    assert_eq!(json["data"]["count"], 2);
-    assert_eq!(json["data"]["issues"].as_array().unwrap().len(), 2);
+    // success field removed
+    assert_eq!(json["count"], 2);
+    assert_eq!(json["issues"].as_array().unwrap().len(), 2);
 }
 
 #[test]
@@ -147,9 +147,9 @@ fn test_query_label_json_no_matches() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
-    assert_eq!(json["success"], true);
-    assert_eq!(json["data"]["count"], 0);
-    assert_eq!(json["data"]["issues"].as_array().unwrap().len(), 0);
+    // success field removed
+    assert_eq!(json["count"], 0);
+    assert_eq!(json["issues"].as_array().unwrap().len(), 0);
 }
 
 #[test]
@@ -171,7 +171,7 @@ fn test_query_label_json_invalid_pattern() {
     // Error might be in JSON or plain text depending on where validation happens
     if !stdout.is_empty() && stdout.starts_with("{") {
         let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
-        assert_eq!(json["success"], false);
+        // Check error via exit code or error field
         assert_eq!(json["error"]["code"], "INVALID_LABEL_PATTERN");
         assert!(json["error"]["message"]
             .as_str()
@@ -239,7 +239,7 @@ fn test_query_label_with_uppercase_namespace() {
     // Error might be in JSON or plain text
     if !stdout.is_empty() && stdout.starts_with("{") {
         let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
-        assert_eq!(json["success"], false);
+        // Check error via exit code or error field
         assert_eq!(json["error"]["code"], "INVALID_LABEL_PATTERN");
     } else {
         assert!(stderr.contains("Invalid") || stderr.contains("invalid"));
@@ -269,6 +269,6 @@ fn test_query_label_wildcard_with_no_matches() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
-    assert_eq!(json["success"], true);
-    assert_eq!(json["data"]["count"], 0);
+    // success field removed
+    assert_eq!(json["count"], 0);
 }

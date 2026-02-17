@@ -490,7 +490,7 @@ const created = await jit_issue_create({
   priority: "high",
   json: true
 });
-const issueId = created.data.id;
+const issueId = createdid;
 
 // Add dependencies
 await jit_dep_add({
@@ -500,7 +500,7 @@ await jit_dep_add({
 
 // Query ready work
 const ready = await jit_query_ready({ json: true });
-console.log(`${ready.data.count} issues ready`);
+console.log(`${readycount} issues ready`);
 
 // Claim atomically
 await jit_issue_claim({
@@ -537,7 +537,7 @@ async function agentLoop(agentId: string) {
     });
     
     if (claimed.success) {
-      const issueId = claimed.data.id;
+      const issueId = claimedid;
       console.log(`Agent ${agentId} claimed ${issueId}`);
       
       // Do work
@@ -573,7 +573,7 @@ const created = await Promise.all(
   )
 );
 
-const issueIds = created.map(r => r.data.id);
+const issueIds = created.map(r => rid);
 console.log(`Created ${issueIds.length} issues`);
 ```
 
@@ -603,7 +603,7 @@ await jit_gate_check({ id, gate_key: "fmt" });
 ```typescript
 // Structured JSON responses are easy to chain
 const ready = await jit_query_ready({ json: true });
-const firstIssue = ready.data.issues[0];
+const firstIssue = readyissues[0];
 await jit_issue_claim({ id: firstIssue.id, assignee: agentId });
 ```
 
@@ -1031,7 +1031,7 @@ jit issue update abc123 --remove-gate tests --remove-gate clippy
 **View gate status:**
 ```bash
 # Show all gate information for issue
-jit issue show abc123 --json | jq '.data.gates_status'
+jit issue show abc123 --json | jq 'gates_status'
 
 # Example output:
 {
@@ -1383,19 +1383,19 @@ Combine `--quiet` with `--json` for machine-readable output:
 
 ```bash
 # Parse with jq
-ISSUE_ID=$(jit issue create --title "Add feature" --orphan --quiet --json | jq -r '.data.id')
+ISSUE_ID=$(jit issue create --title "Add feature" --orphan --quiet --json | jq -r 'id')
 
 # Extract specific fields
-jit issue show $ISSUE_ID --json --quiet | jq -r '.data.title'
+jit issue show $ISSUE_ID --json --quiet | jq -r 'title'
 
 # Process lists
-jit query all --json --quiet | jq -r '.data.issues[] | select(.priority == "High") | .id'
+jit query all --json --quiet | jq -r 'issues[] | select(.priority == "High") | .id'
 
 # Query and filter
-jit query available --json --quiet | jq -r '.data.issues[0].id'
+jit query available --json --quiet | jq -r 'issues[0].id'
 
 # Get status counts
-jit status --json --quiet | jq -r '.data.summary.by_state'
+jit status --json --quiet | jq -r 'summary.by_state'
 ```
 
 ### Graceful Pipe Handling
@@ -1492,9 +1492,9 @@ echo "Date: $(date)"
 echo ""
 
 # Get counts
-READY=$(jit query available --json --quiet | jq -r '.data.count')
-IN_PROGRESS=$(jit query all --state in_progress --json --quiet | jq -r '.data.count')
-BLOCKED=$(jit query blocked --json --quiet | jq -r '.data.count')
+READY=$(jit query available --json --quiet | jq -r 'count')
+IN_PROGRESS=$(jit query all --state in_progress --json --quiet | jq -r 'count')
+BLOCKED=$(jit query blocked --json --quiet | jq -r 'count')
 DONE_TODAY=$(jit events query --event-type state_changed --limit 100 --json | \
   jq -r '[.[] | select(.new_state == "done")] | length')
 

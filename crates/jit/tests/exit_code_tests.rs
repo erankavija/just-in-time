@@ -75,7 +75,7 @@ fn test_exit_code_validation_failed_cycle() {
         .unwrap();
     assert!(output1.status.success());
     let json1: serde_json::Value = serde_json::from_slice(&output1.stdout).unwrap();
-    let id1 = json1["data"]["id"].as_str().expect("id1 should exist");
+    let id1 = json1["id"].as_str().expect("id1 should exist");
 
     let output2 = Command::new(jit_binary())
         .current_dir(&temp_dir)
@@ -84,7 +84,7 @@ fn test_exit_code_validation_failed_cycle() {
         .unwrap();
     assert!(output2.status.success());
     let json2: serde_json::Value = serde_json::from_slice(&output2.stdout).unwrap();
-    let id2 = json2["data"]["id"].as_str().expect("id2 should exist");
+    let id2 = json2["id"].as_str().expect("id2 should exist");
 
     // Add dependency A -> B
     let status = Command::new(jit_binary())
@@ -186,7 +186,7 @@ fn test_exit_code_json_error_format() {
 
     // Should have valid JSON error
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["success"], false);
+    // Check error via exit code or error field
     assert_eq!(json["error"]["code"], "ISSUE_NOT_FOUND");
 }
 
@@ -210,7 +210,7 @@ fn test_exit_code_validation_command() {
         .output()
         .unwrap();
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    let id = json["data"]["id"].as_str().expect("id should exist");
+    let id = json["id"].as_str().expect("id should exist");
 
     // Corrupt the issue file by adding invalid dependency reference
     let issue_path = temp_dir
@@ -283,7 +283,7 @@ fn test_exit_code_state_transition_blocked_by_gates() {
         .unwrap();
     assert!(output.status.success());
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    let id = json["data"]["id"].as_str().expect("id should exist");
+    let id = json["id"].as_str().expect("id should exist");
 
     // Mark as ready
     let status = Command::new(jit_binary())
@@ -317,7 +317,7 @@ fn test_exit_code_state_transition_blocked_by_gates() {
         .unwrap();
     assert!(output.status.success());
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["data"]["state"], "gated");
+    assert_eq!(json["state"], "gated");
 
     // Now pass the gate and verify transition to done succeeds
     let status = Command::new(jit_binary())
@@ -335,7 +335,7 @@ fn test_exit_code_state_transition_blocked_by_gates() {
         .unwrap();
     assert!(output.status.success());
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["data"]["state"], "done");
+    assert_eq!(json["state"], "done");
 }
 
 #[test]
@@ -366,7 +366,7 @@ fn test_exit_code_state_transition_blocked_by_gates_json() {
         .unwrap();
     assert!(output.status.success());
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    let id = json["data"]["id"].as_str().expect("id should exist");
+    let id = json["id"].as_str().expect("id should exist");
 
     // Try to transition to done with --json flag - should get JSON error
     let output = Command::new(jit_binary())
@@ -380,7 +380,7 @@ fn test_exit_code_state_transition_blocked_by_gates_json() {
 
     // Should have valid JSON error output
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["success"], false);
+    // Check error via exit code or error field
     assert!(
         json["error"]["code"].as_str().unwrap().contains("GATE")
             || json["error"]["code"]

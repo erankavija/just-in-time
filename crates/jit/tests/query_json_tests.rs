@@ -48,11 +48,9 @@ fn test_query_ready_json_output() {
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
     // Verify structure
-    assert_eq!(json["success"], true);
-    assert!(json["data"]["issues"].is_array());
-    assert_eq!(json["data"]["count"], 1);
-    assert!(json["metadata"]["timestamp"].is_string());
-    assert_eq!(json["metadata"]["version"], "0.2.1");
+    // success field removed
+    assert!(json["issues"].is_array());
+    assert_eq!(json["count"], 1);
 }
 
 #[test]
@@ -102,15 +100,13 @@ fn test_query_blocked_json_output() {
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
     // Verify structure
-    assert_eq!(json["success"], true);
-    assert!(json["data"]["issues"].is_array());
-    assert_eq!(json["data"]["count"], 1);
-    assert!(json["data"]["issues"][0]["blocked_reasons"].is_array());
+    // success field removed
+    assert!(json["issues"].is_array());
+    assert_eq!(json["count"], 1);
+    assert!(json["issues"][0]["blocked_reasons"].is_array());
 
     // blocked_reasons is now an array of strings, not objects
-    let blocked_reasons = json["data"]["issues"][0]["blocked_reasons"]
-        .as_array()
-        .unwrap();
+    let blocked_reasons = json["issues"][0]["blocked_reasons"].as_array().unwrap();
     assert_eq!(blocked_reasons.len(), 1);
     let reason_str = blocked_reasons[0].as_str().unwrap();
     assert!(reason_str.starts_with("dependency:"));
@@ -151,9 +147,9 @@ fn test_query_assignee_json_output() {
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
     // Verify structure (filters field removed)
-    assert_eq!(json["success"], true);
-    assert!(json["data"]["issues"].is_array());
-    assert_eq!(json["data"]["count"], 1);
+    // success field removed
+    assert!(json["issues"].is_array());
+    assert_eq!(json["count"], 1);
 }
 
 #[test]
@@ -180,9 +176,9 @@ fn test_query_state_json_output() {
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
     // Verify structure (filters field removed)
-    assert_eq!(json["success"], true);
-    assert!(json["data"]["issues"].is_array());
-    assert_eq!(json["data"]["count"], 1);
+    // success field removed
+    assert!(json["issues"].is_array());
+    assert_eq!(json["count"], 1);
 }
 
 #[test]
@@ -211,7 +207,7 @@ fn test_query_priority_json_output() {
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
     // Verify structure (filters field removed)
-    assert_eq!(json["success"], true);
-    assert!(json["data"]["issues"].is_array());
-    assert_eq!(json["data"]["count"], 1);
+    // success field removed
+    assert!(json["issues"].is_array());
+    assert_eq!(json["count"], 1);
 }

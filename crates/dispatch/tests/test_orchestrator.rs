@@ -43,7 +43,7 @@ fn create_ready_issue(repo_path: &Path, title: &str, priority: &str) -> String {
 
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     // JSON format: { "success": true, "data": { "id": "...", ... }, "metadata": {...} }
-    let id = json["data"]["id"].as_str().unwrap().to_string();
+    let id = json["id"].as_str().unwrap().to_string();
 
     // No need to set to ready - auto-transitions when no blockers
 

@@ -83,7 +83,7 @@ fn test_search_returns_compact_by_default() {
     assert!(output.status.success());
 
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    let data = &json["data"];
+    let data = &json;
     let issues = data["issues"].as_array().unwrap();
 
     assert!(!issues.is_empty(), "Should find authentication issues");
@@ -145,7 +145,7 @@ fn test_search_returns_full_with_flag() {
     assert!(output.status.success());
 
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    let data = &json["data"];
+    let data = &json;
     let issues = data["issues"].as_array().unwrap();
 
     assert!(!issues.is_empty(), "Should find authentication issues");
@@ -203,7 +203,7 @@ fn test_search_compact_has_short_id() {
     assert!(output.status.success());
 
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    let data = &json["data"];
+    let data = &json;
     let issues = data["issues"].as_array().unwrap();
 
     assert!(!issues.is_empty());
@@ -234,7 +234,7 @@ fn test_search_compact_preserves_count() {
     assert!(output.status.success());
 
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    let data = &json["data"];
+    let data = &json;
     let issues = data["issues"].as_array().unwrap();
     let count = data["count"].as_u64().unwrap();
 

@@ -112,8 +112,8 @@ fn test_quiet_with_json_outputs_only_json() {
     let json: serde_json::Value =
         serde_json::from_str(&stdout).expect("Output should be pure JSON in quiet+json mode");
 
-    assert_eq!(json["success"], true);
-    assert_eq!(json["data"]["title"], "Test Issue");
+    // success field removed
+    assert_eq!(json["title"], "Test Issue");
 }
 
 #[test]

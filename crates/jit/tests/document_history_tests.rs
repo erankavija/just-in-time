@@ -124,7 +124,7 @@ fn test_doc_history_lists_commits() {
 
     // Create issue with document reference
     let create_output = repo.run_jit_json(&["issue", "create", "--title", "Implement auth"]);
-    let issue_id = create_output["data"]["id"].as_str().unwrap();
+    let issue_id = create_output["id"].as_str().unwrap();
 
     repo.run_jit(&["doc", "add", issue_id, "docs/design.md"]);
 
@@ -132,8 +132,7 @@ fn test_doc_history_lists_commits() {
     let history_output = repo.run_jit_json(&["doc", "history", issue_id, "docs/design.md"]);
 
     // Should return wrapped result with commits array
-    assert!(history_output["success"].as_bool().unwrap());
-    let commits = history_output["data"]["commits"].as_array().unwrap();
+    let commits = history_output["commits"].as_array().unwrap();
     assert_eq!(commits.len(), 3, "Expected 3 commits");
 
     // Verify commit information (most recent first)
@@ -164,7 +163,7 @@ fn test_doc_history_nonexistent_document() {
     repo.init_jit();
 
     let create_output = repo.run_jit_json(&["issue", "create", "--title", "Test"]);
-    let issue_id = create_output["data"]["id"].as_str().unwrap();
+    let issue_id = create_output["id"].as_str().unwrap();
 
     // Try to get history for document not referenced in issue
     let output = repo.run_jit(&["doc", "history", issue_id, "docs/missing.md"]);
@@ -195,7 +194,7 @@ fn test_doc_show_at_specific_commit() {
 
     // Create issue with document reference
     let create_output = repo.run_jit_json(&["issue", "create", "--title", "API work"]);
-    let issue_id = create_output["data"]["id"].as_str().unwrap();
+    let issue_id = create_output["id"].as_str().unwrap();
     repo.run_jit(&["doc", "add", issue_id, "docs/api.md"]);
 
     // Test: View document at old commit
@@ -223,7 +222,7 @@ fn test_doc_show_at_head_by_default() {
     repo.commit("Update readme");
 
     let create_output = repo.run_jit_json(&["issue", "create", "--title", "Test"]);
-    let issue_id = create_output["data"]["id"].as_str().unwrap();
+    let issue_id = create_output["id"].as_str().unwrap();
     repo.run_jit(&["doc", "add", issue_id, "docs/readme.md"]);
 
     // Without --at flag, should show HEAD
@@ -244,7 +243,7 @@ fn test_doc_show_at_invalid_commit() {
     repo.commit("Add test doc");
 
     let create_output = repo.run_jit_json(&["issue", "create", "--title", "Test"]);
-    let issue_id = create_output["data"]["id"].as_str().unwrap();
+    let issue_id = create_output["id"].as_str().unwrap();
     repo.run_jit(&["doc", "add", issue_id, "docs/test.md"]);
 
     // Invalid commit hash
@@ -279,7 +278,7 @@ fn test_doc_diff_between_commits() {
     let commit2 = repo.get_commit_hash("HEAD");
 
     let create_output = repo.run_jit_json(&["issue", "create", "--title", "Test"]);
-    let issue_id = create_output["data"]["id"].as_str().unwrap();
+    let issue_id = create_output["id"].as_str().unwrap();
     repo.run_jit(&["doc", "add", issue_id, "docs/spec.md"]);
 
     // Test: Diff between commits
@@ -315,7 +314,7 @@ fn test_doc_diff_from_old_to_head() {
     repo.commit("Update plan");
 
     let create_output = repo.run_jit_json(&["issue", "create", "--title", "Test"]);
-    let issue_id = create_output["data"]["id"].as_str().unwrap();
+    let issue_id = create_output["id"].as_str().unwrap();
     repo.run_jit(&["doc", "add", issue_id, "docs/plan.md"]);
 
     // Diff from old commit to HEAD (implicit)
@@ -338,14 +337,13 @@ fn test_doc_history_json_output() {
     repo.commit("Second version");
 
     let create_output = repo.run_jit_json(&["issue", "create", "--title", "Test"]);
-    let issue_id = create_output["data"]["id"].as_str().unwrap();
+    let issue_id = create_output["id"].as_str().unwrap();
     repo.run_jit(&["doc", "add", issue_id, "docs/doc.md"]);
 
     // JSON output for history
     let history_output = repo.run_jit_json(&["doc", "history", issue_id, "docs/doc.md"]);
 
-    assert!(history_output["success"].as_bool().unwrap());
-    let commits = history_output["data"]["commits"].as_array().unwrap();
+    let commits = history_output["commits"].as_array().unwrap();
     assert!(commits.len() >= 2);
 
     // Validate structure
@@ -366,7 +364,7 @@ fn test_doc_history_empty_for_new_file() {
     repo.write_file("docs/new.md", "content");
 
     let create_output = repo.run_jit_json(&["issue", "create", "--title", "Test"]);
-    let issue_id = create_output["data"]["id"].as_str().unwrap();
+    let issue_id = create_output["id"].as_str().unwrap();
 
     // Can't add document reference to uncommitted file
     let output = repo.run_jit(&["doc", "add", issue_id, "docs/new.md"]);

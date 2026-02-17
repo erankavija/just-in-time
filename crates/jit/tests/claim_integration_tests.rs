@@ -73,7 +73,7 @@ fn create_issue(repo_path: &Path, title: &str) -> String {
     assert!(output.status.success());
 
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    json["data"]["id"].as_str().unwrap().to_string()
+    json["id"].as_str().unwrap().to_string()
 }
 
 #[test]
@@ -122,10 +122,10 @@ fn test_claim_acquire_json_output() {
     assert!(output.status.success());
 
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["success"], true);
-    assert!(json["data"]["lease_id"].is_string());
-    assert_eq!(json["data"]["issue_id"], issue_id);
-    assert_eq!(json["data"]["ttl_secs"], 600);
+    // success field removed
+    assert!(json["lease_id"].is_string());
+    assert_eq!(json["issue_id"], issue_id);
+    assert_eq!(json["ttl_secs"], 600);
 }
 
 #[test]
@@ -220,7 +220,7 @@ fn test_claim_list_json_output() {
         .unwrap();
 
     let acquire_json: Value = serde_json::from_slice(&acquire_output.stdout).unwrap();
-    let lease_id = acquire_json["data"]["lease_id"].as_str().unwrap();
+    let lease_id = acquire_json["lease_id"].as_str().unwrap();
 
     // List claims with JSON
     let list_output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
@@ -232,10 +232,10 @@ fn test_claim_list_json_output() {
     assert!(list_output.status.success());
 
     let list_json: Value = serde_json::from_slice(&list_output.stdout).unwrap();
-    assert_eq!(list_json["success"], true);
-    assert!(list_json["data"]["leases"].is_array());
+    // Envelope removed - success field no longer present
+    assert!(list_json["leases"].is_array());
 
-    let leases = list_json["data"]["leases"].as_array().unwrap();
+    let leases = list_json["leases"].as_array().unwrap();
     assert_eq!(leases.len(), 1);
     assert_eq!(leases[0]["lease_id"], lease_id);
     assert_eq!(leases[0]["issue_id"], issue_id);
@@ -263,7 +263,7 @@ fn test_claim_release_happy_path() {
         .unwrap();
 
     let acquire_json: Value = serde_json::from_slice(&acquire_output.stdout).unwrap();
-    let lease_id = acquire_json["data"]["lease_id"].as_str().unwrap();
+    let lease_id = acquire_json["lease_id"].as_str().unwrap();
 
     // Release claim
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
@@ -315,7 +315,7 @@ fn test_claim_workflow_end_to_end() {
 
     assert!(acquire_output.status.success());
     let acquire_json: Value = serde_json::from_slice(&acquire_output.stdout).unwrap();
-    let lease_id = acquire_json["data"]["lease_id"].as_str().unwrap();
+    let lease_id = acquire_json["lease_id"].as_str().unwrap();
 
     // Step 2: List claims and verify
     let list_output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
@@ -326,7 +326,7 @@ fn test_claim_workflow_end_to_end() {
 
     assert!(list_output.status.success());
     let list_json: Value = serde_json::from_slice(&list_output.stdout).unwrap();
-    let leases = list_json["data"]["leases"].as_array().unwrap();
+    let leases = list_json["leases"].as_array().unwrap();
     assert_eq!(leases.len(), 1);
     assert_eq!(leases[0]["lease_id"], lease_id);
 
@@ -346,7 +346,7 @@ fn test_claim_workflow_end_to_end() {
         .unwrap();
 
     let list_after_json: Value = serde_json::from_slice(&list_after_output.stdout).unwrap();
-    let leases_after = list_after_json["data"]["leases"].as_array().unwrap();
+    let leases_after = list_after_json["leases"].as_array().unwrap();
     assert_eq!(
         leases_after.len(),
         0,
@@ -428,7 +428,7 @@ fn test_claim_renew_success() {
         .unwrap();
 
     let acquire_json: Value = serde_json::from_slice(&acquire_output.stdout).unwrap();
-    let lease_id = acquire_json["data"]["lease_id"].as_str().unwrap();
+    let lease_id = acquire_json["lease_id"].as_str().unwrap();
 
     // Renew claim
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
@@ -462,7 +462,7 @@ fn test_claim_renew_json_output() {
         .unwrap();
 
     let acquire_json: Value = serde_json::from_slice(&acquire_output.stdout).unwrap();
-    let lease_id = acquire_json["data"]["lease_id"].as_str().unwrap();
+    let lease_id = acquire_json["lease_id"].as_str().unwrap();
 
     // Renew with JSON output
     let renew_output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
@@ -475,10 +475,10 @@ fn test_claim_renew_json_output() {
     assert!(renew_output.status.success());
 
     let renew_json: Value = serde_json::from_slice(&renew_output.stdout).unwrap();
-    assert_eq!(renew_json["success"], true);
+    // Envelope removed - success field no longer present
     // Check that lease object is returned
-    assert!(renew_json["data"]["lease"].is_object());
-    assert_eq!(renew_json["data"]["lease"]["lease_id"], lease_id);
+    assert!(renew_json["lease"].is_object());
+    assert_eq!(renew_json["lease"]["lease_id"], lease_id);
 }
 
 #[test]
@@ -523,7 +523,7 @@ fn test_claim_force_evict_success() {
         .unwrap();
 
     let acquire_json: Value = serde_json::from_slice(&acquire_output.stdout).unwrap();
-    let lease_id = acquire_json["data"]["lease_id"].as_str().unwrap();
+    let lease_id = acquire_json["lease_id"].as_str().unwrap();
 
     // Force-evict (admin operation - doesn't need same agent)
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
@@ -541,7 +541,7 @@ fn test_claim_force_evict_success() {
         .unwrap();
 
     let list_json: Value = serde_json::from_slice(&list_output.stdout).unwrap();
-    let leases = list_json["data"]["leases"].as_array().unwrap();
+    let leases = list_json["leases"].as_array().unwrap();
     assert_eq!(leases.len(), 0, "Lease should be evicted");
 }
 
@@ -588,7 +588,7 @@ fn test_claim_heartbeat_success() {
     );
 
     let acquire_json: Value = serde_json::from_slice(&acquire_output.stdout).unwrap();
-    let lease_id = acquire_json["data"]["lease_id"].as_str().unwrap();
+    let lease_id = acquire_json["lease_id"].as_str().unwrap();
 
     // Heartbeat to update last_beat
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
@@ -624,7 +624,7 @@ fn test_claim_heartbeat_json_output() {
         .unwrap();
 
     let acquire_json: Value = serde_json::from_slice(&acquire_output.stdout).unwrap();
-    let lease_id = acquire_json["data"]["lease_id"].as_str().unwrap();
+    let lease_id = acquire_json["lease_id"].as_str().unwrap();
 
     // Heartbeat with JSON output
     let heartbeat_output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
@@ -637,9 +637,9 @@ fn test_claim_heartbeat_json_output() {
     assert!(heartbeat_output.status.success());
 
     let hb_json: Value = serde_json::from_slice(&heartbeat_output.stdout).unwrap();
-    assert_eq!(hb_json["success"], true);
-    assert_eq!(hb_json["data"]["lease_id"], lease_id);
-    assert!(hb_json["data"]["message"].is_string());
+    // Envelope removed - success field no longer present
+    assert_eq!(hb_json["lease_id"], lease_id);
+    assert!(hb_json["message"].is_string());
 }
 
 #[test]
@@ -681,12 +681,12 @@ fn test_claim_ttl0_workflow_acquire_heartbeat_release() {
 
     assert!(acquire_output.status.success());
     let acquire_json: Value = serde_json::from_slice(&acquire_output.stdout).unwrap();
-    let lease_id = acquire_json["data"]["lease_id"].as_str().unwrap();
+    let lease_id = acquire_json["lease_id"].as_str().unwrap();
     assert!(
-        acquire_json["data"]["expires_at"].is_null(),
+        acquire_json["expires_at"].is_null(),
         "Indefinite lease should have no expiry"
     );
-    assert_eq!(acquire_json["data"]["ttl_secs"], 0);
+    assert_eq!(acquire_json["ttl_secs"], 0);
 
     // Step 2: List claims and verify indefinite marker
     let list_output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
@@ -718,7 +718,7 @@ fn test_claim_ttl0_workflow_acquire_heartbeat_release() {
         .unwrap();
 
     let status_json: Value = serde_json::from_slice(&status_output.stdout).unwrap();
-    let leases = status_json["data"]["leases"].as_array().unwrap();
+    let leases = status_json["leases"].as_array().unwrap();
     assert_eq!(leases.len(), 1);
     assert_eq!(leases[0]["lease_id"], lease_id);
 
@@ -738,6 +738,6 @@ fn test_claim_ttl0_workflow_acquire_heartbeat_release() {
         .unwrap();
 
     let final_json: Value = serde_json::from_slice(&final_list.stdout).unwrap();
-    let final_leases = final_json["data"]["leases"].as_array().unwrap();
+    let final_leases = final_json["leases"].as_array().unwrap();
     assert_eq!(final_leases.len(), 0, "Lease should be released");
 }

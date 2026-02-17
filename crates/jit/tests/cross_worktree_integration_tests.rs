@@ -84,7 +84,7 @@ fn test_issue_show_reads_from_git_in_secondary_worktree() {
     )
     .unwrap();
     let json: serde_json::Value = serde_json::from_str(&output).unwrap();
-    let issue_id = json["data"]["id"].as_str().unwrap();
+    let issue_id = json["id"].as_str().unwrap();
 
     Command::new("git")
         .args(["add", ".jit"])
@@ -122,7 +122,7 @@ fn test_issue_show_reads_from_git_in_secondary_worktree() {
     let output = run_jit(&secondary_path, &["issue", "show", issue_id, "--json"]).unwrap();
     let loaded: serde_json::Value = serde_json::from_str(&output).unwrap();
 
-    assert_eq!(loaded["data"]["title"].as_str().unwrap(), "Issue in Git");
+    assert_eq!(loaded["title"].as_str().unwrap(), "Issue in Git");
 }
 
 #[test]
@@ -139,7 +139,7 @@ fn test_issue_show_reads_from_main_worktree_uncommitted() {
     )
     .unwrap();
     let json: serde_json::Value = serde_json::from_str(&output).unwrap();
-    let issue_id = json["data"]["id"].as_str().unwrap();
+    let issue_id = json["id"].as_str().unwrap();
 
     // Create secondary worktree with unique name
     let secondary_path = repo_path
@@ -165,10 +165,7 @@ fn test_issue_show_reads_from_main_worktree_uncommitted() {
     let output = run_jit(&secondary_path, &["issue", "show", issue_id, "--json"]).unwrap();
     let loaded: serde_json::Value = serde_json::from_str(&output).unwrap();
 
-    assert_eq!(
-        loaded["data"]["title"].as_str().unwrap(),
-        "Uncommitted Issue"
-    );
+    assert_eq!(loaded["title"].as_str().unwrap(), "Uncommitted Issue");
 }
 
 #[test]
@@ -185,7 +182,7 @@ fn test_query_all_shows_issues_from_all_sources() {
     )
     .unwrap();
     let json_a: serde_json::Value = serde_json::from_str(&output_a).unwrap();
-    let id_a = json_a["data"]["id"].as_str().unwrap();
+    let id_a = json_a["id"].as_str().unwrap();
 
     Command::new("git")
         .args(["add", ".jit"])
@@ -206,7 +203,7 @@ fn test_query_all_shows_issues_from_all_sources() {
     )
     .unwrap();
     let json_b: serde_json::Value = serde_json::from_str(&output_b).unwrap();
-    let id_b = json_b["data"]["id"].as_str().unwrap();
+    let id_b = json_b["id"].as_str().unwrap();
 
     // Create secondary worktree with unique name
     let secondary_path = repo_path
@@ -235,12 +232,12 @@ fn test_query_all_shows_issues_from_all_sources() {
     )
     .unwrap();
     let json_c: serde_json::Value = serde_json::from_str(&output_c).unwrap();
-    let id_c = json_c["data"]["id"].as_str().unwrap();
+    let id_c = json_c["id"].as_str().unwrap();
 
     // Query all from secondary - should see A (git), B (main), C (local)
     let output = run_jit(&secondary_path, &["query", "all", "--json"]).unwrap();
     let result: serde_json::Value = serde_json::from_str(&output).unwrap();
-    let issues_array = result["data"]["issues"].as_array().unwrap();
+    let issues_array = result["issues"].as_array().unwrap();
 
     assert_eq!(issues_array.len(), 3, "Should see all 3 issues");
 
@@ -271,7 +268,7 @@ fn test_graph_show_works_across_worktrees() {
     )
     .unwrap();
     let json1: serde_json::Value = serde_json::from_str(&output1).unwrap();
-    let id1 = json1["data"]["id"].as_str().unwrap();
+    let id1 = json1["id"].as_str().unwrap();
 
     let output2 = run_jit(
         &repo_path,
@@ -279,7 +276,7 @@ fn test_graph_show_works_across_worktrees() {
     )
     .unwrap();
     let json2: serde_json::Value = serde_json::from_str(&output2).unwrap();
-    let id2 = json2["data"]["id"].as_str().unwrap();
+    let id2 = json2["id"].as_str().unwrap();
 
     run_jit(&repo_path, &["dep", "add", id2, id1]).unwrap();
 
@@ -320,7 +317,7 @@ fn test_graph_show_works_across_worktrees() {
     let query: serde_json::Value = serde_json::from_str(&output).unwrap();
 
     // Should see both issues in the query
-    let issues = query["data"]["issues"].as_array().unwrap();
+    let issues = query["issues"].as_array().unwrap();
     assert_eq!(issues.len(), 2, "Should see both issues in query");
 
     let titles: Vec<&str> = issues
@@ -345,7 +342,7 @@ fn test_partial_id_resolution_across_worktrees() {
     )
     .unwrap();
     let json: serde_json::Value = serde_json::from_str(&output).unwrap();
-    let full_id = json["data"]["id"].as_str().unwrap();
+    let full_id = json["id"].as_str().unwrap();
     let partial_id = &full_id[..8];
 
     Command::new("git")
@@ -384,8 +381,8 @@ fn test_partial_id_resolution_across_worktrees() {
     let output = run_jit(&secondary_path, &["issue", "show", partial_id, "--json"]).unwrap();
     let loaded: serde_json::Value = serde_json::from_str(&output).unwrap();
 
-    assert_eq!(loaded["data"]["id"].as_str().unwrap(), full_id);
-    assert_eq!(loaded["data"]["title"].as_str().unwrap(), "Find Me");
+    assert_eq!(loaded["id"].as_str().unwrap(), full_id);
+    assert_eq!(loaded["title"].as_str().unwrap(), "Find Me");
 }
 
 #[test]
@@ -402,7 +399,7 @@ fn test_local_overrides_git_and_main() {
     )
     .unwrap();
     let json: serde_json::Value = serde_json::from_str(&output).unwrap();
-    let issue_id = json["data"]["id"].as_str().unwrap();
+    let issue_id = json["id"].as_str().unwrap();
 
     Command::new("git")
         .args(["add", ".jit"])
@@ -453,16 +450,13 @@ fn test_local_overrides_git_and_main() {
     let output = run_jit(&secondary_path, &["issue", "show", issue_id, "--json"]).unwrap();
     let loaded: serde_json::Value = serde_json::from_str(&output).unwrap();
 
-    assert_eq!(
-        loaded["data"]["title"].as_str().unwrap(),
-        "Modified in Secondary"
-    );
+    assert_eq!(loaded["title"].as_str().unwrap(), "Modified in Secondary");
 
     // Main worktree should still see original
     let output = run_jit(&repo_path, &["issue", "show", issue_id, "--json"]).unwrap();
     let loaded_main: serde_json::Value = serde_json::from_str(&output).unwrap();
 
-    assert_eq!(loaded_main["data"]["title"].as_str().unwrap(), "Original");
+    assert_eq!(loaded_main["title"].as_str().unwrap(), "Original");
 }
 
 #[test]

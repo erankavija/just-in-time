@@ -31,7 +31,7 @@ fn test_doc_show_without_git() {
     assert!(output.status.success());
 
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    let issue_id = json["data"]["id"].as_str().unwrap();
+    let issue_id = json["id"].as_str().unwrap();
     let short_id = &issue_id[..8];
 
     // Create a document file
@@ -112,7 +112,7 @@ fn test_doc_show_with_git() {
     assert!(output.status.success());
 
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    let issue_id = json["data"]["id"].as_str().unwrap();
+    let issue_id = json["id"].as_str().unwrap();
     let short_id = &issue_id[..8];
 
     // Create and commit a document

@@ -115,7 +115,7 @@ fn test_issue_show_enriched_dependencies() {
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
     // Verify dependencies are enriched with metadata
-    let deps = json["data"]["dependencies"].as_array().unwrap();
+    let deps = json["dependencies"].as_array().unwrap();
     assert_eq!(deps.len(), 2);
 
     // Each dependency should have: id, title, state, priority
@@ -188,7 +188,7 @@ fn test_issue_show_no_dependencies() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
-    let deps = json["data"]["dependencies"].as_array().unwrap();
+    let deps = json["dependencies"].as_array().unwrap();
     assert_eq!(deps.len(), 0);
 
     // Test human output

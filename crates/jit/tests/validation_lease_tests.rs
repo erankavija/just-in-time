@@ -109,7 +109,7 @@ fn get_worktree_id(worktree_path: &Path) -> String {
         .unwrap();
 
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    json["data"]["worktree_id"].as_str().unwrap().to_string()
+    json["worktree_id"].as_str().unwrap().to_string()
 }
 
 /// Write a claims index file
@@ -177,8 +177,8 @@ fn test_validate_leases_no_claims_index() {
     );
 
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["success"], true);
-    assert_eq!(json["data"]["valid"], true);
+    // success field removed
+    assert_eq!(json["valid"], true);
 }
 
 #[test]
@@ -196,7 +196,7 @@ fn test_validate_leases_detects_expired_lease() {
         .unwrap();
 
     let create_json: Value = serde_json::from_slice(&create_output.stdout).unwrap();
-    let issue_id = create_json["data"]["id"].as_str().unwrap();
+    let issue_id = create_json["id"].as_str().unwrap();
 
     // Create expired lease (acquired 2 days ago, 1 hour TTL)
     let acquired_at = Utc::now() - Duration::days(2);
@@ -246,7 +246,7 @@ fn test_validate_leases_detects_missing_worktree() {
         .unwrap();
 
     let create_json: Value = serde_json::from_slice(&create_output.stdout).unwrap();
-    let issue_id = create_json["data"]["id"].as_str().unwrap();
+    let issue_id = create_json["id"].as_str().unwrap();
 
     // Create valid lease for the worktree
     let lease = create_test_lease(
@@ -342,7 +342,7 @@ fn test_validate_leases_all_valid_succeeds() {
         .unwrap();
 
     let create_json: Value = serde_json::from_slice(&create_output.stdout).unwrap();
-    let issue_id = create_json["data"]["id"].as_str().unwrap();
+    let issue_id = create_json["id"].as_str().unwrap();
 
     // Create valid lease (not expired, worktree exists, issue exists)
     let lease = create_test_lease(
@@ -368,8 +368,8 @@ fn test_validate_leases_all_valid_succeeds() {
     );
 
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["success"], true);
-    assert_eq!(json["data"]["valid"], true);
+    // success field removed
+    assert_eq!(json["valid"], true);
 }
 
 #[test]
@@ -387,7 +387,7 @@ fn test_validate_leases_json_output_on_failure() {
         .unwrap();
 
     let create_json: Value = serde_json::from_slice(&create_output.stdout).unwrap();
-    let issue_id = create_json["data"]["id"].as_str().unwrap();
+    let issue_id = create_json["id"].as_str().unwrap();
 
     // Create expired lease
     let acquired_at = Utc::now() - Duration::days(1);
@@ -415,13 +415,10 @@ fn test_validate_leases_json_output_on_failure() {
 
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
     // Note: "success" field is always true (command executed), but "valid" is false
-    assert_eq!(
-        json["data"]["valid"], false,
-        "Validation should report invalid"
-    );
+    assert_eq!(json["valid"], false, "Validation should report invalid");
 
     // Check that validations array contains lease validation result
-    let validations = json["data"]["validations"].as_array().unwrap();
+    let validations = json["validations"].as_array().unwrap();
     assert!(!validations.is_empty());
 
     let lease_validation = &validations[0];

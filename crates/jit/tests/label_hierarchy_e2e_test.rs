@@ -258,9 +258,9 @@ fn test_label_hierarchy_complete_workflow() {
         serde_json::from_str(&String::from_utf8_lossy(&output.stdout)).unwrap();
 
     // Check new structure: namespaces should be array of strings
-    assert!(json["data"]["namespaces"].is_array());
-    assert!(json["data"]["count"].is_number());
-    let namespaces = json["data"]["namespaces"].as_array().unwrap();
+    assert!(json["namespaces"].is_array());
+    assert!(json["count"].is_number());
+    let namespaces = json["namespaces"].as_array().unwrap();
     let namespace_names: Vec<String> = namespaces
         .iter()
         .map(|v| v.as_str().unwrap().to_string())
@@ -607,12 +607,9 @@ fn test_label_operations_json_output() {
         serde_json::from_str(&stdout).expect("Output should be valid JSON");
 
     // Should contain labels field
+    assert!(json["labels"].is_array(), "JSON should have labels array");
     assert!(
-        json["data"]["labels"].is_array(),
-        "JSON should have labels array"
-    );
-    assert!(
-        !json["data"]["labels"].as_array().unwrap().is_empty(),
+        !json["labels"].as_array().unwrap().is_empty(),
         "Labels array should not be empty"
     );
 
@@ -631,10 +628,10 @@ fn test_label_operations_json_output() {
     let json: serde_json::Value =
         serde_json::from_str(&stdout).expect("Namespaces output should be valid JSON");
     assert!(
-        json["data"]["namespaces"].is_array(),
+        json["namespaces"].is_array(),
         "Should have namespaces array"
     );
-    assert!(json["data"]["count"].is_number(), "Should have count field");
+    assert!(json["count"].is_number(), "Should have count field");
 }
 
 // ============================================================================

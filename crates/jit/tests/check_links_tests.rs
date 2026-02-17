@@ -100,10 +100,7 @@ impl TestContext {
 
         let json: serde_json::Value =
             serde_json::from_slice(&output.stdout).expect("Failed to parse JSON from issue create");
-        json["data"]["id"]
-            .as_str()
-            .expect("No ID in response")
-            .to_string()
+        json["id"].as_str().expect("No ID in response").to_string()
     }
 }
 
@@ -291,12 +288,12 @@ fn test_json_output_structure() {
     let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
 
     // Validate JSON structure
-    assert!(json["success"].as_bool().unwrap());
-    assert!(json["data"]["valid"].is_boolean());
-    assert!(json["data"]["errors"].is_array());
-    assert!(json["data"]["warnings"].is_array());
-    assert!(json["data"]["summary"].is_object());
-    assert!(json["data"]["summary"]["total_documents"].is_number());
+    // success field removed
+    assert!(json["valid"].is_boolean());
+    assert!(json["errors"].is_array());
+    assert!(json["warnings"].is_array());
+    assert!(json["summary"].is_object());
+    assert!(json["summary"]["total_documents"].is_number());
 }
 
 #[test]

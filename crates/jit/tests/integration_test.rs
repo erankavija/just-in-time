@@ -836,7 +836,7 @@ fn test_issue_timestamps_on_create() {
 
     assert!(output.status.success());
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    let issue = &json["data"];
+    let issue = &json;
 
     // Verify timestamps exist and are valid RFC 3339
     let created_at = issue["created_at"].as_str().unwrap();
@@ -881,8 +881,8 @@ fn test_issue_timestamps_persist() {
         .unwrap();
 
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    let initial_created = json["data"]["created_at"].as_str().unwrap().to_string();
-    let initial_updated = json["data"]["updated_at"].as_str().unwrap().to_string();
+    let initial_created = json["created_at"].as_str().unwrap().to_string();
+    let initial_updated = json["updated_at"].as_str().unwrap().to_string();
 
     // Update the issue (this will change updated_at)
     std::thread::sleep(std::time::Duration::from_millis(10)); // Ensure timestamp difference
@@ -903,8 +903,8 @@ fn test_issue_timestamps_persist() {
         .unwrap();
 
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    let final_created = json["data"]["created_at"].as_str().unwrap();
-    let final_updated = json["data"]["updated_at"].as_str().unwrap();
+    let final_created = json["created_at"].as_str().unwrap();
+    let final_updated = json["updated_at"].as_str().unwrap();
 
     // created_at should be unchanged (immutable)
     assert_eq!(

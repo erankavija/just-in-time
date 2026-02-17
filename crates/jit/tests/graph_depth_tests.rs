@@ -45,12 +45,12 @@ fn test_graph_deps_depth_default() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
-    let tree = json["data"]["tree"].as_array().unwrap();
+    let tree = json["tree"].as_array().unwrap();
     assert_eq!(tree.len(), 1); // Only B (immediate dependency)
     assert_eq!(tree[0]["id"], b);
 
     // Verify depth is reported
-    assert_eq!(json["data"]["depth"], 1);
+    assert_eq!(json["depth"], 1);
 }
 
 #[test]
@@ -75,7 +75,7 @@ fn test_graph_deps_depth_2() {
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
     // Now uses tree structure
-    let tree = json["data"]["tree"].as_array().unwrap();
+    let tree = json["tree"].as_array().unwrap();
 
     // Collect all issue IDs from tree (including children)
     let mut all_ids = Vec::new();
@@ -93,7 +93,7 @@ fn test_graph_deps_depth_2() {
     assert!(all_ids.contains(&b));
     assert!(all_ids.contains(&c));
 
-    assert_eq!(json["data"]["depth"], 2);
+    assert_eq!(json["depth"], 2);
 }
 
 #[test]
@@ -119,7 +119,7 @@ fn test_graph_deps_depth_unlimited() {
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
     // Collect all IDs from tree
-    let tree = json["data"]["tree"].as_array().unwrap();
+    let tree = json["tree"].as_array().unwrap();
     let mut all_ids = Vec::new();
     fn collect_ids(nodes: &[serde_json::Value], ids: &mut Vec<String>) {
         for node in nodes {
@@ -133,7 +133,7 @@ fn test_graph_deps_depth_unlimited() {
 
     assert_eq!(all_ids.len(), 3); // B, C, D
 
-    assert_eq!(json["data"]["depth"], 0); // 0 = unlimited
+    assert_eq!(json["depth"], 0); // 0 = unlimited
 }
 
 // Helper functions
@@ -208,7 +208,7 @@ fn test_graph_deps_tree_structure() {
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
     // Should have tree structure
-    let tree = &json["data"]["tree"];
+    let tree = &json["tree"];
     assert!(tree.is_array());
 
     let tree_nodes = tree.as_array().unwrap();
@@ -249,7 +249,7 @@ fn test_graph_deps_diamond_detection() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
-    let tree = json["data"]["tree"].as_array().unwrap();
+    let tree = json["tree"].as_array().unwrap();
 
     // Both B and C should have D as child, and D should be marked as shared
     let node_b = tree.iter().find(|n| n["id"] == b).unwrap();
@@ -296,7 +296,7 @@ fn test_graph_deps_summary_stats() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
-    let summary = &json["data"]["summary"];
+    let summary = &json["summary"];
     assert_eq!(summary["total"], 3);
     assert_eq!(summary["by_state"]["done"], 2);
     assert_eq!(summary["by_state"]["ready"], 1);

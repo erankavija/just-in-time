@@ -141,9 +141,9 @@ fn test_gate_list_json() {
         .clone();
 
     let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
-    assert_eq!(json["success"], true);
-    assert!(json["data"]["gates"].is_array());
-    assert!(json["data"]["count"].is_number());
+    // success field removed
+    assert!(json["gates"].is_array());
+    assert!(json["count"].is_number());
 }
 
 #[test]
@@ -177,9 +177,9 @@ fn test_gate_show_json() {
         .clone();
 
     let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
-    assert_eq!(json["success"], true);
-    assert_eq!(json["data"]["key"], "test-gate");
-    assert_eq!(json["data"]["title"], "Test Gate");
+    // success field removed
+    assert_eq!(json["key"], "test-gate");
+    assert_eq!(json["title"], "Test Gate");
 }
 
 #[test]

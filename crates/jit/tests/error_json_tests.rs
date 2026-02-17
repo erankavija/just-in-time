@@ -41,14 +41,12 @@ fn test_issue_not_found_error_json() {
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
     // Verify error structure
-    assert_eq!(json["success"], false);
     assert!(json["error"]["code"]
         .as_str()
         .unwrap()
         .contains("NOT_FOUND"));
     assert!(json["error"]["message"].is_string());
     assert!(json["error"]["suggestions"].is_array());
-    assert!(json["metadata"]["timestamp"].is_string());
 }
 
 #[test]
@@ -98,7 +96,6 @@ fn test_cycle_detected_error_json() {
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
     // Verify error structure
-    assert_eq!(json["success"], false);
     assert!(json["error"]["code"]
         .as_str()
         .unwrap()
@@ -158,9 +155,7 @@ fn test_gate_operation_error_json() {
 
     // This should fail or at least handle gracefully
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    let _json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
-    // Verify JSON structure (success or error)
-    assert!(json["success"].is_boolean());
-    assert!(json["metadata"]["timestamp"].is_string());
+    // Verify JSON structure - envelope removed, just check valid JSON
 }

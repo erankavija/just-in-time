@@ -261,7 +261,7 @@ Most modern tools start with a web UI and add CLI later. JIT inverts this:
 ```bash
 # Agents and scripts compose commands
 jit query available --json | \
-  jq -r '.data.issues[0].id' | \
+  jq -r 'issues[0].id' | \
   xargs -I {} jit claim acquire {} --agent-id agent:worker-1
 ```
 

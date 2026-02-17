@@ -93,7 +93,7 @@ fi
 
 # Verify issue count (use --json for reliable parsing)
 if command -v jq &> /dev/null; then
-    issue_count=$(jit query all --json 2>/dev/null | jq '.data.issues | length')
+    issue_count=$(jit query all --json 2>/dev/null | jq 'issues | length')
 else
     # Fallback: count lines in normal output (each issue is one line)
     issue_count=$(jit query all 2>/dev/null | tail -n +1 | wc -l)

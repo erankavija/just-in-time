@@ -57,13 +57,12 @@ fn test_registry_list_json_output() {
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
     // Verify structure
-    assert_eq!(json["success"], true);
-    assert!(json["data"]["gates"].is_array());
-    assert_eq!(json["data"]["count"], 1);
-    assert_eq!(json["data"]["gates"][0]["key"], "test-gate");
-    assert_eq!(json["data"]["gates"][0]["title"], "Test Gate");
-    assert_eq!(json["data"]["gates"][0]["auto"], true);
-    assert!(json["metadata"]["timestamp"].is_string());
+    // success field removed
+    assert!(json["gates"].is_array());
+    assert_eq!(json["count"], 1);
+    assert_eq!(json["gates"][0]["key"], "test-gate");
+    assert_eq!(json["gates"][0]["title"], "Test Gate");
+    assert_eq!(json["gates"][0]["auto"], true);
 }
 
 #[test]
@@ -101,13 +100,12 @@ fn test_registry_show_json_output() {
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
     // Verify structure
-    assert_eq!(json["success"], true);
-    assert_eq!(json["data"]["key"], "test-gate");
-    assert_eq!(json["data"]["title"], "Test Gate");
-    assert_eq!(json["data"]["description"], "A test gate description");
-    assert_eq!(json["data"]["auto"], true);
-    assert_eq!(json["data"]["example_integration"], "Example command");
-    assert!(json["metadata"]["timestamp"].is_string());
+    // success field removed
+    assert_eq!(json["key"], "test-gate");
+    assert_eq!(json["title"], "Test Gate");
+    assert_eq!(json["description"], "A test gate description");
+    assert_eq!(json["auto"], true);
+    assert_eq!(json["example_integration"], "Example command");
 }
 
 #[test]
@@ -127,9 +125,9 @@ fn test_registry_list_empty_json_output() {
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
     // Verify structure
-    assert_eq!(json["success"], true);
-    assert!(json["data"]["gates"].is_array());
-    assert_eq!(json["data"]["count"], 0);
+    // success field removed
+    assert!(json["gates"].is_array());
+    assert_eq!(json["count"], 0);
 }
 
 #[test]
@@ -170,9 +168,9 @@ fn test_registry_add_with_stage_option() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
-    assert_eq!(json["data"]["key"], "tdd-reminder");
-    assert_eq!(json["data"]["stage"], "precheck");
-    assert_eq!(json["data"]["mode"], "manual");
+    assert_eq!(json["key"], "tdd-reminder");
+    assert_eq!(json["stage"], "precheck");
+    assert_eq!(json["mode"], "manual");
 }
 
 #[test]
@@ -208,8 +206,8 @@ fn test_registry_add_defaults_to_postcheck() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
-    assert_eq!(json["data"]["key"], "code-review");
-    assert_eq!(json["data"]["stage"], "postcheck");
+    assert_eq!(json["key"], "code-review");
+    assert_eq!(json["stage"], "postcheck");
 }
 
 #[test]

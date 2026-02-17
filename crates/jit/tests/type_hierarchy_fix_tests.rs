@@ -96,7 +96,7 @@ fn test_fix_unknown_type_with_suggestion() {
     assert!(output.status.success());
     let json: serde_json::Value =
         serde_json::from_str(&String::from_utf8_lossy(&output.stdout)).unwrap();
-    let labels = json["data"]["labels"].as_array().unwrap();
+    let labels = json["labels"].as_array().unwrap();
     assert!(labels.iter().any(|l| l.as_str() == Some("type:task")));
     assert!(!labels.iter().any(|l| l.as_str() == Some("type:taks")));
 
@@ -202,7 +202,7 @@ fn test_dry_run_doesnt_modify() {
     let output = run_jit(&temp, &["issue", "show", &issue_id, "--json"]);
     let json: serde_json::Value =
         serde_json::from_str(&String::from_utf8_lossy(&output.stdout)).unwrap();
-    let labels = json["data"]["labels"].as_array().unwrap();
+    let labels = json["labels"].as_array().unwrap();
     assert!(labels.iter().any(|l| l.as_str() == Some("type:taks")));
     assert!(!labels.iter().any(|l| l.as_str() == Some("type:task")));
 
@@ -230,9 +230,9 @@ fn test_fix_json_output() {
     let json: serde_json::Value = serde_json::from_str(&String::from_utf8_lossy(&output.stdout))
         .expect("Should output valid JSON");
 
-    assert_eq!(json["success"], true);
-    assert!(json["data"]["fixes_applied"].as_u64().unwrap() > 0);
-    assert_eq!(json["data"]["dry_run"], false);
+    // success field removed
+    assert!(json["fixes_applied"].as_u64().unwrap() > 0);
+    assert_eq!(json["dry_run"], false);
 }
 
 #[test]

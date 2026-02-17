@@ -144,9 +144,9 @@ fn test_bulk_update_add_labels() {
 
     // Parse JSON response
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
-    assert!(json["success"].as_bool().unwrap());
+    // success field removed
 
-    let summary = &json["data"]["summary"];
+    let summary = &json["summary"];
     assert_eq!(summary["total_matched"].as_u64().unwrap(), 2); // 2 tasks
     assert_eq!(summary["total_modified"].as_u64().unwrap(), 2);
 }
@@ -192,10 +192,7 @@ fn test_bulk_update_state_transition() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
-    assert_eq!(
-        json["data"]["summary"]["total_modified"].as_u64().unwrap(),
-        2
-    );
+    assert_eq!(json["summary"]["total_modified"].as_u64().unwrap(), 2);
 }
 
 #[test]
@@ -226,10 +223,7 @@ fn test_bulk_update_assignee() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
-    assert_eq!(
-        json["data"]["summary"]["total_modified"].as_u64().unwrap(),
-        2
-    );
+    assert_eq!(json["summary"]["total_modified"].as_u64().unwrap(), 2);
 }
 
 #[test]
@@ -282,7 +276,7 @@ fn test_bulk_update_validation_errors() {
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
     // Should have errors for gate requirement
-    assert!(json["data"]["summary"]["total_errors"].as_u64().unwrap() > 0);
+    assert!(json["summary"]["total_errors"].as_u64().unwrap() > 0);
 }
 
 #[test]
@@ -315,14 +309,8 @@ fn test_bulk_update_complex_query() {
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
     // Should match only 1 issue (high-priority task, not epic)
-    assert_eq!(
-        json["data"]["summary"]["total_matched"].as_u64().unwrap(),
-        1
-    );
-    assert_eq!(
-        json["data"]["summary"]["total_modified"].as_u64().unwrap(),
-        1
-    );
+    assert_eq!(json["summary"]["total_matched"].as_u64().unwrap(), 1);
+    assert_eq!(json["summary"]["total_modified"].as_u64().unwrap(), 1);
 }
 
 #[test]
@@ -353,10 +341,7 @@ fn test_bulk_update_remove_labels() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
-    assert_eq!(
-        json["data"]["summary"]["total_modified"].as_u64().unwrap(),
-        2
-    );
+    assert_eq!(json["summary"]["total_modified"].as_u64().unwrap(), 2);
 }
 
 #[test]
@@ -385,12 +370,6 @@ fn test_bulk_update_no_matches() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
-    assert_eq!(
-        json["data"]["summary"]["total_matched"].as_u64().unwrap(),
-        0
-    );
-    assert_eq!(
-        json["data"]["summary"]["total_modified"].as_u64().unwrap(),
-        0
-    );
+    assert_eq!(json["summary"]["total_matched"].as_u64().unwrap(), 0);
+    assert_eq!(json["summary"]["total_modified"].as_u64().unwrap(), 0);
 }

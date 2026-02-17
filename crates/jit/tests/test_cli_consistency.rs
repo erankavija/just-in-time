@@ -49,12 +49,9 @@ fn test_issue_create_supports_json() {
     let json: Value = serde_json::from_slice(&output.stdout).expect("Output should be valid JSON");
 
     // Should contain id field
-    assert!(json["data"]["id"].is_string(), "Should have 'id' field");
-    assert!(
-        json["data"]["title"].is_string(),
-        "Should have 'title' field"
-    );
-    assert_eq!(json["data"]["title"].as_str().unwrap(), "Test task");
+    assert!(json["id"].is_string(), "Should have 'id' field");
+    assert!(json["title"].is_string(), "Should have 'title' field");
+    assert_eq!(json["title"].as_str().unwrap(), "Test task");
 }
 
 #[test]
@@ -94,7 +91,7 @@ fn test_issue_update_supports_json() {
         .unwrap();
 
     let create_json: Value = serde_json::from_slice(&create_output.stdout).unwrap();
-    let id = create_json["data"]["id"].as_str().unwrap();
+    let id = create_json["id"].as_str().unwrap();
 
     // Update with JSON output
     let output = Command::new(jit_binary())
@@ -107,8 +104,8 @@ fn test_issue_update_supports_json() {
 
     let json: Value = serde_json::from_slice(&output.stdout).expect("Output should be valid JSON");
 
-    assert_eq!(json["data"]["id"].as_str().unwrap(), id);
-    assert_eq!(json["data"]["title"].as_str().unwrap(), "Updated");
+    assert_eq!(json["id"].as_str().unwrap(), id);
+    assert_eq!(json["title"].as_str().unwrap(), "Updated");
 }
 
 // ============================================================================
@@ -127,7 +124,7 @@ fn test_issue_claim_takes_id_first() {
         .unwrap();
 
     let json: Value = serde_json::from_slice(&create_output.stdout).unwrap();
-    let id = json["data"]["id"].as_str().unwrap();
+    let id = json["id"].as_str().unwrap();
 
     // Set to ready
     Command::new(jit_binary())
@@ -150,8 +147,8 @@ fn test_issue_claim_takes_id_first() {
 
     let json: Value = serde_json::from_slice(&output.stdout).expect("Should return JSON");
 
-    assert_eq!(json["data"]["id"].as_str().unwrap(), id);
-    assert_eq!(json["data"]["assignee"].as_str().unwrap(), "agent:test");
+    assert_eq!(json["id"].as_str().unwrap(), id);
+    assert_eq!(json["assignee"].as_str().unwrap(), "agent:test");
 }
 
 #[test]
@@ -165,7 +162,7 @@ fn test_issue_claim_supports_json() {
         .unwrap();
 
     let json: Value = serde_json::from_slice(&create_output.stdout).unwrap();
-    let id = json["data"]["id"].as_str().unwrap();
+    let id = json["id"].as_str().unwrap();
 
     Command::new(jit_binary())
         .args(["issue", "update", id, "--state", "ready"])
@@ -199,7 +196,7 @@ fn test_issue_delete_supports_json() {
         .unwrap();
 
     let json: Value = serde_json::from_slice(&create_output.stdout).unwrap();
-    let id = json["data"]["id"].as_str().unwrap();
+    let id = json["id"].as_str().unwrap();
 
     let output = Command::new(jit_binary())
         .args(["issue", "delete", id, "--json"])
@@ -212,11 +209,8 @@ fn test_issue_delete_supports_json() {
 
     let json: Value = serde_json::from_slice(&output.stdout).expect("Should return JSON");
 
-    assert_eq!(json["data"]["id"].as_str().unwrap(), id);
-    assert!(
-        json["data"]["deleted"].as_bool().unwrap(),
-        "deleted should be true"
-    );
+    assert_eq!(json["id"].as_str().unwrap(), id);
+    assert!(json["deleted"].as_bool().unwrap(), "deleted should be true");
 }
 
 // ============================================================================
@@ -235,7 +229,7 @@ fn test_issue_release_supports_json() {
         .unwrap();
 
     let json: Value = serde_json::from_slice(&create_output.stdout).unwrap();
-    let id = json["data"]["id"].as_str().unwrap();
+    let id = json["id"].as_str().unwrap();
 
     Command::new(jit_binary())
         .args(["issue", "update", id, "--state", "ready"])
@@ -260,11 +254,8 @@ fn test_issue_release_supports_json() {
 
     let json: Value = serde_json::from_slice(&output.stdout).expect("Should return JSON");
 
-    assert_eq!(json["data"]["id"].as_str().unwrap(), id);
-    assert!(
-        json["data"]["assignee"].is_null(),
-        "Assignee should be cleared"
-    );
+    assert_eq!(json["id"].as_str().unwrap(), id);
+    assert!(json["assignee"].is_null(), "Assignee should be cleared");
 }
 
 // ============================================================================
@@ -289,8 +280,8 @@ fn test_json_output_has_consistent_structure() {
 
     // Check for expected fields
     assert!(json.is_object(), "Root should be an object");
-    assert!(json["data"]["id"].is_string(), "Should have id");
-    assert!(json["data"]["title"].is_string(), "Should have title");
-    assert!(json["data"]["state"].is_string(), "Should have state");
-    assert!(json["data"]["priority"].is_string(), "Should have priority");
+    assert!(json["id"].is_string(), "Should have id");
+    assert!(json["title"].is_string(), "Should have title");
+    assert!(json["state"].is_string(), "Should have state");
+    assert!(json["priority"].is_string(), "Should have priority");
 }

@@ -4,17 +4,13 @@
 //! and error cases, ensuring machine-readable output that works well with
 //! AI agents and automation tools.
 
-use chrono::Utc;
 use schemars::JsonSchema;
-use serde::{Serialize, Serializer};
+use serde::Serialize;
 use serde_json::Value;
 use std::fmt::Display;
 use std::io::{self, Write};
 
 use crate::domain::{MinimalBlockedIssue, MinimalIssue, Priority, State};
-
-/// Version of the JSON output format
-const OUTPUT_VERSION: &str = "0.2.1";
 
 // ============================================================================
 // Output Context for Quiet Mode
@@ -112,37 +108,30 @@ fn writeln_safe_stderr(msg: &str) -> io::Result<()> {
 // JSON Output Types
 // ============================================================================
 
-/// Wrapper for successful command output with metadata
-#[derive(Debug, Serialize)]
+/// Wrapper for successful command output (now returns raw data without envelope)
+#[derive(Debug)]
 pub struct JsonOutput<T: Serialize> {
-    pub success: bool,
     pub data: T,
-    pub metadata: Metadata,
 }
 
 impl<T: Serialize> JsonOutput<T> {
     /// Create a new successful output with the given data
-    pub fn success(data: T, command: impl Into<String>) -> Self {
-        Self {
-            success: true,
-            data,
-            metadata: Metadata::new(command),
-        }
+    /// Note: command parameter is kept for API compatibility but no longer used
+    pub fn success(data: T, _command: impl Into<String>) -> Self {
+        Self { data }
     }
 
-    /// Serialize to JSON string with pretty formatting
+    /// Serialize to JSON string with pretty formatting (returns raw data, no envelope)
     pub fn to_json_string(&self) -> Result<String, serde_json::Error> {
-        serde_json::to_string_pretty(self)
+        serde_json::to_string_pretty(&self.data)
     }
 }
 
-/// Wrapper for error output with suggestions
+/// Wrapper for error output with suggestions (simplified, no envelope)
 #[allow(dead_code)]
 #[derive(Debug, Serialize)]
 pub struct JsonError {
-    pub success: bool,
     pub error: ErrorDetail,
-    pub metadata: Metadata,
 }
 
 #[allow(dead_code)]
@@ -151,17 +140,15 @@ impl JsonError {
     pub fn new(
         code: impl Into<String>,
         message: impl Into<String>,
-        command: impl Into<String>,
+        _command: impl Into<String>, // Kept for API compatibility
     ) -> Self {
         Self {
-            success: false,
             error: ErrorDetail {
                 code: code.into(),
                 message: message.into(),
                 details: None,
                 suggestions: Vec::new(),
             },
-            metadata: Metadata::new(command),
         }
     }
 
@@ -432,36 +419,6 @@ impl JsonError {
             issue_id
         ))
     }
-}
-
-/// Metadata included in all responses
-#[derive(Debug, Serialize)]
-pub struct Metadata {
-    /// Timestamp when the response was generated
-    #[serde(serialize_with = "serialize_timestamp")]
-    pub timestamp: chrono::DateTime<Utc>,
-    /// Version of the output format
-    pub version: String,
-    /// Command that generated this response
-    pub command: String,
-}
-
-impl Metadata {
-    fn new(command: impl Into<String>) -> Self {
-        Self {
-            timestamp: Utc::now(),
-            version: OUTPUT_VERSION.to_string(),
-            command: command.into(),
-        }
-    }
-}
-
-/// Serialize timestamp in ISO 8601 format
-fn serialize_timestamp<S>(dt: &chrono::DateTime<Utc>, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    serializer.serialize_str(&dt.to_rfc3339())
 }
 
 // ============================================================================
@@ -783,33 +740,31 @@ mod tests {
         let data = json!({"id": "123", "title": "Test"});
         let output = JsonOutput::success(data, "issue show");
 
-        assert!(output.success);
+        // success field removed
         assert_eq!(output.data["id"], "123");
-        assert_eq!(output.metadata.version, "0.2.1");
-        assert_eq!(output.metadata.command, "issue show");
+        // metadata removed
     }
 
     #[test]
     fn test_json_output_serialization() {
-        let data = json!({"id": "123"});
+        let data = json!({"id": "123", "title": "test"});
         let output = JsonOutput::success(data, "issue list");
 
         let json_str = output.to_json_string().unwrap();
-        assert!(json_str.contains("\"success\": true"));
+        // Should contain raw data without envelope
         assert!(json_str.contains("\"id\": \"123\""));
-        assert!(json_str.contains("\"version\": \"0.2.1\""));
-        assert!(json_str.contains("\"timestamp\":"));
-        assert!(json_str.contains("\"command\": \"issue list\""));
+        assert!(json_str.contains("\"title\": \"test\""));
+        // Should NOT contain envelope fields
+        assert!(!json_str.contains("\"success\""));
+        assert!(!json_str.contains("\"data\":"));
     }
 
     #[test]
     fn test_json_error_basic() {
         let error = JsonError::new("TEST_ERROR", "This is a test error", "test command");
 
-        assert!(!error.success);
         assert_eq!(error.error.code, "TEST_ERROR");
         assert_eq!(error.error.message, "This is a test error");
-        assert_eq!(error.metadata.command, "test command");
         assert!(error.error.details.is_none());
         assert!(error.error.suggestions.is_empty());
     }
@@ -820,7 +775,6 @@ mod tests {
             .with_details(json!({"requested_id": "abc123"}));
 
         assert_eq!(error.error.details, Some(json!({"requested_id": "abc123"})));
-        assert_eq!(error.metadata.command, "show resource");
     }
 
     #[test]
@@ -831,7 +785,6 @@ mod tests {
 
         assert_eq!(error.error.suggestions.len(), 2);
         assert!(error.error.suggestions[0].contains("jit issue list"));
-        assert_eq!(error.metadata.command, "issue show");
     }
 
     #[test]
@@ -841,23 +794,14 @@ mod tests {
             .with_suggestion("Try something");
 
         let json_str = error.to_json_string().unwrap();
-        assert!(json_str.contains("\"success\": false"));
+        // Should have error object without envelope
         assert!(json_str.contains("\"code\": \"TEST_ERROR\""));
         assert!(json_str.contains("\"message\": \"Test\""));
         assert!(json_str.contains("\"details\""));
         assert!(json_str.contains("\"suggestions\""));
-        assert!(json_str.contains("\"command\": \"test\""));
-    }
-
-    #[test]
-    fn test_metadata_includes_timestamp() {
-        let metadata = Metadata::new("test command");
-        assert_eq!(metadata.version, "0.2.1");
-        assert_eq!(metadata.command, "test command");
-        // Timestamp should be recent (within last 5 seconds)
-        let now = Utc::now();
-        let diff = now.signed_duration_since(metadata.timestamp);
-        assert!(diff.num_seconds() < 5);
+        // Should NOT have envelope fields
+        assert!(!json_str.contains("\"success\""));
+        assert!(!json_str.contains("\"metadata\""));
     }
 
     // ========================================================================
@@ -884,10 +828,11 @@ mod tests {
         let json_output = JsonOutput::success(response, "query ready");
         let serialized = json_output.to_json_string().unwrap();
 
-        assert!(serialized.contains("\"success\": true"));
         assert!(serialized.contains("\"count\": 1"));
-        assert!(serialized.contains("\"metadata\""));
-        assert!(serialized.contains("\"command\": \"query ready\""));
+        // Envelope fields removed - raw data only
+        assert!(!serialized.contains("\"success\""));
+        assert!(!serialized.contains("\"metadata\""));
+        assert!(!serialized.contains("\"command\""));
     }
 
     #[test]
@@ -908,9 +853,10 @@ mod tests {
         let json_output = JsonOutput::success(response, "query blocked");
         let serialized = json_output.to_json_string().unwrap();
 
-        assert!(serialized.contains("\"success\": true"));
         assert!(serialized.contains("\"blocked_reasons\""));
-        assert!(serialized.contains("\"command\": \"query blocked\""));
+        // Envelope fields removed - raw data only
+        assert!(!serialized.contains("\"success\""));
+        assert!(!serialized.contains("\"command\""));
     }
 
     #[test]
@@ -928,7 +874,8 @@ mod tests {
 
         assert!(serialized.contains("\"assignee\""));
         assert!(serialized.contains("copilot:session-1"));
-        assert!(serialized.contains("\"command\": \"query assignee\""));
+        // Envelope fields removed - raw data only
+        assert!(!serialized.contains("\"command\""));
     }
 
     #[test]
@@ -946,7 +893,8 @@ mod tests {
 
         assert!(serialized.contains("\"state\""));
         assert!(serialized.contains("\"ready\""));
-        assert!(serialized.contains("\"command\": \"query state\""));
+        // Envelope fields removed - raw data only
+        assert!(!serialized.contains("\"command\""));
     }
 
     #[test]
@@ -964,7 +912,8 @@ mod tests {
 
         assert!(serialized.contains("\"priority\""));
         assert!(serialized.contains("\"high\""));
-        assert!(serialized.contains("\"command\": \"query priority\""));
+        // Envelope fields removed - raw data only
+        assert!(!serialized.contains("\"command\""));
     }
 
     #[test]

@@ -126,13 +126,12 @@ fn test_worktree_info_json_output() {
     assert!(output.status.success());
 
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["success"], true);
-    assert!(json["data"]["worktree_id"].is_string());
-    assert!(json["data"]["branch"].is_string());
-    assert!(json["data"]["root_path"].is_string());
+    assert!(json["worktree_id"].is_string());
+    assert!(json["branch"].is_string());
+    assert!(json["root_path"].is_string());
 
     // Worktree ID should start with "wt:"
-    let wt_id = json["data"]["worktree_id"].as_str().unwrap();
+    let wt_id = json["worktree_id"].as_str().unwrap();
     assert!(wt_id.starts_with("wt:"), "ID should start with 'wt:'");
 }
 
@@ -168,7 +167,7 @@ fn test_worktree_info_stable_across_invocations() {
         .unwrap();
 
     let json1: Value = serde_json::from_slice(&output1.stdout).unwrap();
-    let id1 = json1["data"]["worktree_id"].as_str().unwrap();
+    let id1 = json1["worktree_id"].as_str().unwrap();
 
     // Second invocation
     let output2 = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
@@ -178,7 +177,7 @@ fn test_worktree_info_stable_across_invocations() {
         .unwrap();
 
     let json2: Value = serde_json::from_slice(&output2.stdout).unwrap();
-    let id2 = json2["data"]["worktree_id"].as_str().unwrap();
+    let id2 = json2["worktree_id"].as_str().unwrap();
 
     assert_eq!(id1, id2, "Worktree ID should be stable");
 }
@@ -250,10 +249,9 @@ fn test_worktree_list_json_output() {
     assert!(output.status.success());
 
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["success"], true);
-    assert!(json["data"]["worktrees"].is_array());
+    assert!(json["worktrees"].is_array());
 
-    let worktrees = json["data"]["worktrees"].as_array().unwrap();
+    let worktrees = json["worktrees"].as_array().unwrap();
     assert!(!worktrees.is_empty(), "Should have at least one worktree");
 
     // Check first worktree has expected fields
@@ -287,8 +285,7 @@ fn test_validate_json_output() {
     assert!(output.status.success());
 
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["success"], true);
-    assert_eq!(json["data"]["valid"], true);
+    assert_eq!(json["valid"], true);
 }
 
 #[test]
@@ -352,8 +349,8 @@ fn test_recover_json_output() {
 
     assert!(output.status.success());
 
-    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["success"], true);
+    let _json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    // Envelope removed - just check valid JSON
 }
 
 // === jit init in worktrees tests ===
@@ -460,7 +457,7 @@ fn test_worktree_list_shows_distinct_ids() {
     assert!(output.status.success());
 
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    let worktrees = json["data"]["worktrees"].as_array().unwrap();
+    let worktrees = json["worktrees"].as_array().unwrap();
 
     // Collect all worktree IDs
     let mut ids = std::collections::HashSet::new();
@@ -550,7 +547,7 @@ fn test_git_worktree_move_preserves_id() {
         .unwrap();
 
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    let id_before = json["data"]["worktree_id"].as_str().unwrap().to_string();
+    let id_before = json["worktree_id"].as_str().unwrap().to_string();
 
     // Move the worktree using git worktree move
     let moved_path = temp.path().join("feature-moved");
@@ -573,7 +570,7 @@ fn test_git_worktree_move_preserves_id() {
         .unwrap();
 
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    let id_after = json["data"]["worktree_id"].as_str().unwrap().to_string();
+    let id_after = json["worktree_id"].as_str().unwrap().to_string();
 
     // The ID should be preserved after git worktree move
     assert_eq!(

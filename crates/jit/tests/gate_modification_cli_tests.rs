@@ -84,7 +84,7 @@ fn get_issue_json(temp: &TempDir, id: &str) -> serde_json::Value {
 
     assert!(output.status.success(), "Failed to show issue");
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    json["data"].clone()
+    json.clone()
 }
 
 #[test]
@@ -374,7 +374,7 @@ fn test_batch_add_gates() {
         .unwrap();
 
     let result: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    let issues = result["data"]["issues"].as_array().unwrap();
+    let issues = result["issues"].as_array().unwrap();
     assert_eq!(issues.len(), 2);
 
     for issue in issues {
@@ -399,7 +399,7 @@ fn test_gates_in_json_output() {
     assert!(output.status.success());
 
     let result: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    let gates = result["data"]["gates_required"].as_array().unwrap();
+    let gates = result["gates_required"].as_array().unwrap();
     assert!(gates.contains(&serde_json::json!("tests")));
 }
 
@@ -532,7 +532,7 @@ fn test_batch_remove_gates() {
         .unwrap();
 
     let result: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    let issues = result["data"]["issues"].as_array().unwrap();
+    let issues = result["issues"].as_array().unwrap();
 
     for issue in issues {
         let gates = issue["gates_required"].as_array().unwrap();
