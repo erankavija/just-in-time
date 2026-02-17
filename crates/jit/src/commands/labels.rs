@@ -13,9 +13,11 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     /// Add a label to an issue.
     ///
+    /// Returns warnings from validation if any.
+    ///
     /// Note: Part of public API, may be used by external consumers.
     #[allow(dead_code)]
-    pub fn add_label(&self, issue_id: &str, label: &str) -> Result<()> {
+    pub fn add_label(&self, issue_id: &str, label: &str) -> Result<Vec<String>> {
         use crate::labels as label_utils;
 
         // Validate label format
@@ -48,20 +50,16 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue.labels.push(label.to_string());
 
         // Validate the updated issue with configured rules
+        let mut warnings = Vec::new();
         let config = self.config_manager.load()?;
         if let Some(ref validation_config) = config.validation {
             let validator =
                 crate::validation::IssueValidator::new(validation_config.clone(), namespaces);
-            let warnings = validator.validate(&issue)?;
-
-            // Log warnings if any
-            for warning in warnings {
-                eprintln!("⚠️  Warning: {}", warning);
-            }
+            warnings = validator.validate(&issue)?;
         }
 
         self.storage.save_issue(issue)?;
-        Ok(())
+        Ok(warnings)
     }
 
     pub fn list_label_values(&self, namespace: &str) -> Result<Vec<String>> {

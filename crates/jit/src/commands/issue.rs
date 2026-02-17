@@ -159,9 +159,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     ) -> Result<Vec<String>> {
         let full_id = self.storage.resolve_issue_id(id)?;
 
-        // Require active lease for structural operations
+        // Collect warnings instead of printing
+        let mut warnings = Vec::new();
         if let Some(warning) = self.require_active_lease(&full_id)? {
-            eprintln!("⚠️  Warning: {}", warning);
+            warnings.push(warning);
         }
 
         let mut issue = self.storage.load_issue(&full_id)?;
@@ -263,27 +264,35 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(warnings)
     }
 
-    pub fn delete_issue(&self, id: &str) -> Result<()> {
+    /// Delete an issue.
+    ///
+    /// Returns warnings (e.g., lease warnings) if any.
+    pub fn delete_issue(&self, id: &str) -> Result<Vec<String>> {
         let full_id = self.storage.resolve_issue_id(id)?;
 
-        // Require active lease for structural operations
+        // Collect warnings instead of printing
+        let mut warnings = Vec::new();
         if let Some(warning) = self.require_active_lease(&full_id)? {
-            eprintln!("⚠️  Warning: {}", warning);
+            warnings.push(warning);
         }
 
-        self.storage.delete_issue(&full_id)
+        self.storage.delete_issue(&full_id)?;
+        Ok(warnings)
     }
 
     /// Update issue state with precheck/postcheck hooks
     ///
     /// This method runs prechecks before transitioning to InProgress
     /// and postchecks when transitioning to Gated.
-    pub fn update_issue_state(&self, id: &str, new_state: State) -> Result<()> {
+    ///
+    /// Returns warnings (e.g., lease warnings) if any.
+    pub fn update_issue_state(&self, id: &str, new_state: State) -> Result<Vec<String>> {
         let full_id = self.storage.resolve_issue_id(id)?;
 
-        // Require active lease for structural operations
+        // Collect warnings instead of printing
+        let mut warnings = Vec::new();
         if let Some(warning) = self.require_active_lease(&full_id)? {
-            eprintln!("⚠️  Warning: {}", warning);
+            warnings.push(warning);
         }
 
         let issue = self.storage.load_issue(&full_id)?;
@@ -350,7 +359,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
                 // Run postchecks (which may auto-transition to Done)
                 self.run_postchecks(&full_id)?;
-                return Ok(());
+                return Ok(warnings);
             }
             _ => {
                 issue.state = new_state;
@@ -376,21 +385,25 @@ impl<S: IssueStore> CommandExecutor<S> {
             self.storage.save_issue(issue)?;
         }
 
-        Ok(())
+        Ok(warnings)
     }
 
-    pub fn assign_issue(&self, id: &str, assignee: String) -> Result<()> {
+    /// Assign an issue to someone.
+    ///
+    /// Returns warnings (e.g., lease warnings) if any.
+    pub fn assign_issue(&self, id: &str, assignee: String) -> Result<Vec<String>> {
         let full_id = self.storage.resolve_issue_id(id)?;
 
-        // Require active lease for structural operations
+        // Collect warnings instead of printing
+        let mut warnings = Vec::new();
         if let Some(warning) = self.require_active_lease(&full_id)? {
-            eprintln!("⚠️  Warning: {}", warning);
+            warnings.push(warning);
         }
 
         let mut issue = self.storage.load_issue(&full_id)?;
         issue.assignee = Some(assignee);
         self.storage.save_issue(issue)?;
-        Ok(())
+        Ok(warnings)
     }
 
     pub fn claim_issue(&self, id: &str, assignee: String) -> Result<()> {
@@ -445,18 +458,22 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(())
     }
 
-    pub fn unassign_issue(&self, id: &str) -> Result<()> {
+    /// Unassign an issue.
+    ///
+    /// Returns warnings (e.g., lease warnings) if any.
+    pub fn unassign_issue(&self, id: &str) -> Result<Vec<String>> {
         let full_id = self.storage.resolve_issue_id(id)?;
 
-        // Require active lease for structural operations
+        // Collect warnings instead of printing
+        let mut warnings = Vec::new();
         if let Some(warning) = self.require_active_lease(&full_id)? {
-            eprintln!("⚠️  Warning: {}", warning);
+            warnings.push(warning);
         }
 
         let mut issue = self.storage.load_issue(&full_id)?;
         issue.assignee = None;
         self.storage.save_issue(issue)?;
-        Ok(())
+        Ok(warnings)
     }
 
     pub fn release_issue(&self, id: &str, reason: &str) -> Result<()> {
@@ -588,7 +605,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Helper to handle gate blocking when transitioning to Done
     ///
     /// Transitions issue to Gated, saves, logs, and returns error with clear feedback
-    fn handle_gate_blocking(&self, issue: &mut Issue, old_state: State) -> Result<()> {
+    fn handle_gate_blocking(&self, issue: &mut Issue, old_state: State) -> Result<Vec<String>> {
         let unpassed = issue.get_unpassed_gates();
         issue.state = State::Gated;
 

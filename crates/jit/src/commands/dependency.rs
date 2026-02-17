@@ -19,14 +19,22 @@ pub struct DependenciesRemoveResult {
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
-    pub fn add_dependency(&self, issue_id: &str, dep_id: &str) -> Result<DependencyAddResult> {
+    /// Add a dependency to an issue.
+    ///
+    /// Returns (result, warnings) tuple where warnings contains lease warnings if any.
+    pub fn add_dependency(
+        &self,
+        issue_id: &str,
+        dep_id: &str,
+    ) -> Result<(DependencyAddResult, Vec<String>)> {
         // Resolve both IDs first
         let full_issue_id = self.storage.resolve_issue_id(issue_id)?;
         let full_dep_id = self.storage.resolve_issue_id(dep_id)?;
 
-        // Require active lease for structural operations
+        // Collect warnings instead of printing
+        let mut warnings = Vec::new();
         if let Some(warning) = self.require_active_lease(&full_issue_id)? {
-            eprintln!("⚠️  Warning: {}", warning);
+            warnings.push(warning);
         }
 
         // Load all issues and build graph for analysis
@@ -41,13 +49,13 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Check if this dependency is transitive (redundant)
         if graph.is_transitive(&full_issue_id, &full_dep_id) {
             let reason = "transitive (already reachable via other dependencies)".to_string();
-            return Ok(DependencyAddResult::Skipped { reason });
+            return Ok((DependencyAddResult::Skipped { reason }, warnings));
         }
 
         // Load the issue and add dependency
         let mut from_issue = self.storage.load_issue(&full_issue_id)?;
         if from_issue.dependencies.contains(&full_dep_id.to_string()) {
-            return Ok(DependencyAddResult::AlreadyExists);
+            return Ok((DependencyAddResult::AlreadyExists, warnings));
         }
 
         from_issue.dependencies.push(full_dep_id.to_string());
@@ -79,16 +87,20 @@ impl<S: IssueStore> CommandExecutor<S> {
             self.storage.save_issue(from_issue)?;
         }
 
-        Ok(DependencyAddResult::Added)
+        Ok((DependencyAddResult::Added, warnings))
     }
 
-    pub fn remove_dependency(&self, issue_id: &str, dep_id: &str) -> Result<()> {
+    /// Remove a dependency from an issue.
+    ///
+    /// Returns warnings (e.g., lease warnings) if any.
+    pub fn remove_dependency(&self, issue_id: &str, dep_id: &str) -> Result<Vec<String>> {
         let full_issue_id = self.storage.resolve_issue_id(issue_id)?;
         let full_dep_id = self.storage.resolve_issue_id(dep_id)?;
 
-        // Require active lease for structural operations
+        // Collect warnings instead of printing
+        let mut warnings = Vec::new();
         if let Some(warning) = self.require_active_lease(&full_issue_id)? {
-            eprintln!("⚠️  Warning: {}", warning);
+            warnings.push(warning);
         }
 
         let mut issue = self.storage.load_issue(&full_issue_id)?;
@@ -98,7 +110,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Check if this issue can now transition to ready
         self.auto_transition_to_ready(&full_issue_id)?;
 
-        Ok(())
+        Ok(warnings)
     }
 
     /// Add multiple dependencies to an issue
@@ -122,13 +134,13 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Try to add each dependency individually
         for dep_id in dep_ids {
             match self.add_dependency(issue_id, dep_id) {
-                Ok(DependencyAddResult::Added) => {
+                Ok((DependencyAddResult::Added, _warnings)) => {
                     result.added.push(dep_id.clone());
                 }
-                Ok(DependencyAddResult::AlreadyExists) => {
+                Ok((DependencyAddResult::AlreadyExists, _warnings)) => {
                     result.already_exist.push(dep_id.clone());
                 }
-                Ok(DependencyAddResult::Skipped { reason }) => {
+                Ok((DependencyAddResult::Skipped { reason }, _warnings)) => {
                     result.skipped.push((dep_id.clone(), reason));
                 }
                 Err(e) => {

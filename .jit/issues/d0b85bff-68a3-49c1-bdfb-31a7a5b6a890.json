@@ -1,0 +1,20 @@
+{
+  "id": "d0b85bff-68a3-49c1-bdfb-31a7a5b6a890",
+  "title": "Add JSON output support to doc archive command",
+  "description": "## Problem\n\nThe `jit doc archive` command lacks `--json` flag, making it inconsistent with other commands and preventing proper structured warning output.\n\n## Current State\n\n- All other doc commands (add, list, history, etc.) support `--json`\n- Archive command prints directly via `println!` \n- Warnings from `archive_document()` method are currently ignored in main.rs because there's no way to format them properly\n\n## Acceptance Criteria\n\n- [ ] Add `json: bool` parameter to `DocCommands::Archive`\n- [ ] Update main.rs to use `OutputContext` for archive warnings\n- [ ] Ensure archive success/failure output respects `--json` flag\n- [ ] All existing tests pass",
+  "state": "ready",
+  "priority": "low",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "component:core",
+    "epic:production-polish"
+  ],
+  "created_at": "2026-02-17T19:20:27.369210588+00:00",
+  "updated_at": "2026-02-17T19:20:27.369239488+00:00"
+}

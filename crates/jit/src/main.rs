@@ -506,9 +506,15 @@ strategic_types = {}
 
                         // Handle assignee changes
                         if unassign {
-                            executor.unassign_issue(&full_id)?;
+                            let warnings = executor.unassign_issue(&full_id)?;
+                            for warning in warnings {
+                                output_ctx.print_warning(&warning)?;
+                            }
                         } else if let Some(assignee_str) = assignee {
-                            executor.assign_issue(&full_id, assignee_str)?;
+                            let warnings = executor.assign_issue(&full_id, assignee_str)?;
+                            for warning in warnings {
+                                output_ctx.print_warning(&warning)?;
+                            }
                         }
 
                         match executor.update_issue(
@@ -629,8 +635,6 @@ strategic_types = {}
                     }
                 }
                 IssueCommands::Delete { id, json } => {
-                    let output_ctx = OutputContext::new(quiet, json);
-
                     // Phase 3 safety check: Block deletion in secondary worktrees
                     if storage.is_secondary_worktree() {
                         anyhow::bail!("Deletion is not allowed in secondary worktrees. Deletions must be performed from the main worktree to maintain consistency across all worktrees.");
@@ -648,7 +652,11 @@ strategic_types = {}
                         );
                     }
 
-                    executor.delete_issue(&id)?;
+                    let output_ctx = OutputContext::new(quiet, json);
+                    let warnings = executor.delete_issue(&id)?;
+                    for warning in warnings {
+                        output_ctx.print_warning(&warning)?;
+                    }
 
                     if json {
                         let result = serde_json::json!({
@@ -727,7 +735,10 @@ strategic_types = {}
                 IssueCommands::Assign { id, assignee, json } => {
                     let output_ctx = OutputContext::new(quiet, json);
                     let full_id = storage.resolve_issue_id(&id)?;
-                    executor.assign_issue(&full_id, assignee)?;
+                    let warnings = executor.assign_issue(&full_id, assignee)?;
+                    for warning in warnings {
+                        output_ctx.print_warning(&warning)?;
+                    }
 
                     if json {
                         let issue = storage.load_issue(&full_id)?;
@@ -753,7 +764,10 @@ strategic_types = {}
                 IssueCommands::Unassign { id, json } => {
                     let output_ctx = OutputContext::new(quiet, json);
                     let full_id = storage.resolve_issue_id(&id)?;
-                    executor.unassign_issue(&full_id)?;
+                    let warnings = executor.unassign_issue(&full_id)?;
+                    for warning in warnings {
+                        output_ctx.print_warning(&warning)?;
+                    }
 
                     if json {
                         let issue = storage.load_issue(&full_id)?;
@@ -770,12 +784,19 @@ strategic_types = {}
                     let full_id = storage.resolve_issue_id(&id)?;
 
                     // Update state to rejected
-                    executor.update_issue_state(&full_id, State::Rejected)?;
+                    let mut all_warnings =
+                        executor.update_issue_state(&full_id, State::Rejected)?;
 
                     // Add resolution label if reason provided
                     if let Some(ref reason_value) = reason {
                         let label = format!("resolution:{}", reason_value);
-                        executor.add_label(&full_id, &label)?;
+                        let warnings = executor.add_label(&full_id, &label)?;
+                        all_warnings.extend(warnings);
+                    }
+
+                    // Print all warnings
+                    for warning in all_warnings {
+                        output_ctx.print_warning(&warning)?;
                     }
 
                     if json {
@@ -1824,7 +1845,8 @@ strategic_types = {}
                 skip_scan,
                 json,
             } => {
-                executor.add_document_reference(
+                let output_ctx = OutputContext::new(quiet, json);
+                let warnings = executor.add_document_reference(
                     &id,
                     &path,
                     commit.as_deref(),
@@ -1833,6 +1855,9 @@ strategic_types = {}
                     skip_scan,
                     json,
                 )?;
+                for warning in warnings {
+                    output_ctx.print_warning(&warning)?;
+                }
             }
             DocCommands::List { id, json } => {
                 use jit::output::JsonOutput;
@@ -2107,7 +2132,12 @@ strategic_types = {}
                 dry_run,
                 force,
             } => {
-                executor.archive_document(&path, &category, dry_run, force)?;
+                let warnings = executor.archive_document(&path, &category, dry_run, force)?;
+                // TODO(d0b85bff): Archive command needs --json flag to properly handle warnings
+                // For now, print warnings to stderr as archive still prints directly
+                for warning in warnings {
+                    eprintln!("⚠️  Warning: {}", warning);
+                }
             }
         },
         Commands::Query(query_cmd) => match query_cmd {

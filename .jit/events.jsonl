@@ -1761,3 +1761,6 @@
 {"type":"gate_passed","id":"f870aa58-79a3-46fc-9d1f-ed3d61b69554","issue_id":"f3af98cd-9cb8-47a6-bff7-461af5c7e238","timestamp":"2026-02-15T01:31:27.705736690Z","gate_key":"tests","updated_by":"auto:executor"}
 {"type":"gate_passed","id":"57ce642a-7d05-4d18-8f36-6dc993f6fe63","issue_id":"f3af98cd-9cb8-47a6-bff7-461af5c7e238","timestamp":"2026-02-15T01:32:55.989754868Z","gate_key":"tests","updated_by":"auto:executor"}
 {"type":"issue_created","id":"51119b7d-4a0f-4f8a-9e7e-b2cd5c9f3297","issue_id":"5e819f23-f3a6-4156-bb99-c6a859b4165f","timestamp":"2026-02-15T01:40:52.150228008Z","title":"Assignee test","priority":"normal"}
+{"type":"issue_state_changed","id":"0ef77889-a99b-4220-866b-dea9d41565ba","issue_id":"32f804f1-9c96-40d4-b9aa-94e3fbf1cd7d","timestamp":"2026-02-17T19:10:35.401877273Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"f96c5923-7599-411a-b60a-835331177771","issue_id":"32f804f1-9c96-40d4-b9aa-94e3fbf1cd7d","timestamp":"2026-02-17T19:10:35.402210123Z"}
+{"type":"issue_created","id":"a2e390d8-d09c-4b43-ac1b-ea5c5bdc6d4f","issue_id":"d0b85bff-68a3-49c1-bdfb-31a7a5b6a890","timestamp":"2026-02-17T19:20:27.369477588Z","title":"Add JSON output support to doc archive command","priority":"low"}

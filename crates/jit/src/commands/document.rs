@@ -13,13 +13,15 @@ impl<S: IssueStore> CommandExecutor<S> {
         doc_type: Option<&str>,
         skip_scan: bool,
         json: bool,
-    ) -> Result<()> {
+    ) -> Result<Vec<String>> {
         use crate::document::{AdapterRegistry, AssetScanner};
         use crate::domain::DocumentReference;
         use crate::output::{JsonError, JsonOutput};
         use anyhow::anyhow;
         use std::fs;
         use std::path::Path;
+
+        let mut warnings = Vec::new();
 
         let full_id = self.storage.resolve_issue_id(issue_id)?;
         let mut issue = self.storage.load_issue(&full_id).inspect_err(|_| {
@@ -54,7 +56,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 scanner
                     .scan_document(Path::new(path), &content)
                     .unwrap_or_else(|e| {
-                        eprintln!("Warning: Failed to scan assets: {}", e);
+                        warnings.push(format!("Failed to scan assets: {}", e));
                         Vec::new()
                     })
             } else {
@@ -64,10 +66,10 @@ impl<S: IssueStore> CommandExecutor<S> {
             (format, assets)
         } else {
             // File doesn't exist or can't be read - skip scanning but don't fail
-            eprintln!(
-                "Warning: Could not read document at {} - skipping asset scan",
+            warnings.push(format!(
+                "Could not read document at {} - skipping asset scan",
                 path
-            );
+            ));
             (None, Vec::new())
         };
 
@@ -112,7 +114,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
-        Ok(())
+        Ok(warnings)
     }
 
     pub fn list_document_references(
@@ -955,13 +957,16 @@ fn check_asset_in_git(repo: &Option<git2::Repository>, path: &std::path::Path) -
 
 impl<S: IssueStore> CommandExecutor<S> {
     /// Archive a document with its assets
+    /// Archive a document and its per-doc assets to a configured archive directory.
+    ///
+    /// Returns warnings (e.g., file removal failures) if any.
     pub fn archive_document(
         &self,
         path: &str,
         category: &str,
         dry_run: bool,
         force: bool,
-    ) -> Result<()> {
+    ) -> Result<Vec<String>> {
         use crate::config::JitConfig;
         use anyhow::anyhow;
         use std::path::Path;
@@ -1031,7 +1036,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
 
             println!("\n  Run without --dry-run to execute.");
-            return Ok(());
+            return Ok(Vec::new());
         }
 
         // 6. Check for active issue links (unless --force)
@@ -1047,7 +1052,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         // 7. Perform atomic move with temp directory pattern
-        self.atomic_archive_move(doc_path, &dest_path, &per_doc_assets, repo_root)?;
+        let warnings =
+            self.atomic_archive_move(doc_path, &dest_path, &per_doc_assets, repo_root)?;
         let assets_moved = per_doc_assets.len();
 
         // 8. Verify links still work post-move
@@ -1074,7 +1080,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             println!("  Updated {} issue(s)", updated_issues.len());
         }
 
-        Ok(())
+        Ok(warnings)
     }
 
     /// Validate that a document can be archived
@@ -1381,13 +1387,16 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// 2. Move from temp to final destinations (atomic renames)
     /// 3. On error: rollback (delete any partial destinations)
     /// 4. Delete sources only after all destinations verified
+    /// Perform atomic move of document and assets using temp directory pattern.
+    ///
+    /// Returns warnings if any source files couldn't be removed (non-fatal).
     fn atomic_archive_move(
         &self,
         source_doc: &std::path::Path,
         dest_doc: &std::path::Path,
         assets: &[std::path::PathBuf],
         repo_root: &std::path::Path,
-    ) -> Result<()> {
+    ) -> Result<Vec<String>> {
         use anyhow::Context;
         use std::path::Path;
 
@@ -1483,23 +1492,24 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         // Step 4: Delete sources only after all destinations verified
+        let mut warnings = Vec::new();
         for (source_rel, _, _) in &files_to_move {
             let source_full = repo_root.join(source_rel);
             if let Err(e) = std::fs::remove_file(&source_full) {
                 // Critical: we've moved files but can't delete source
                 // Log warning but don't fail - destination is valid
-                eprintln!(
-                    "Warning: Failed to remove source file {}: {}",
+                warnings.push(format!(
+                    "Failed to remove source file {}: {}",
                     source_full.display(),
                     e
-                );
+                ));
             }
         }
 
         // Cleanup temp directory
         cleanup_temp();
 
-        Ok(())
+        Ok(warnings)
     }
 
     /// Verify that links still work after archival.
