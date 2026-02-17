@@ -12,11 +12,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         label: Option<&str>,
         doc_type: Option<&str>,
         skip_scan: bool,
-        json: bool,
-    ) -> Result<Vec<String>> {
+    ) -> Result<(DocumentAddResult, Vec<String>)> {
         use crate::document::{AdapterRegistry, AssetScanner};
         use crate::domain::DocumentReference;
-        use crate::output::{JsonError, JsonOutput};
         use anyhow::anyhow;
         use std::fs;
         use std::path::Path;
@@ -24,12 +22,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let mut warnings = Vec::new();
 
         let full_id = self.storage.resolve_issue_id(issue_id)?;
-        let mut issue = self.storage.load_issue(&full_id).inspect_err(|_| {
-            if json {
-                let err = JsonError::issue_not_found(issue_id, "doc add");
-                println!("{}", err.to_json_string().unwrap());
-            }
-        })?;
+        let mut issue = self.storage.load_issue(&full_id)?;
 
         // Get repository root (parent of .jit directory)
         let repo_root = self
@@ -85,36 +78,13 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue.documents.push(doc_ref.clone());
         self.storage.save_issue(issue)?;
 
-        if json {
-            let output = JsonOutput::success(
-                serde_json::json!({
-                    "issue_id": full_id,
-                    "document": doc_ref,
-                }),
-                "doc add",
-            );
-            println!("{}", output.to_json_string()?);
-        } else {
-            println!("Added document reference to issue {}", full_id);
-            println!("  Path: {}", path);
-            if let Some(c) = commit {
-                println!("  Commit: {}", c);
-            }
-            if let Some(l) = label {
-                println!("  Label: {}", l);
-            }
-            if let Some(t) = doc_type {
-                println!("  Type: {}", t);
-            }
-            if let Some(f) = &doc_ref.format {
-                println!("  Format: {}", f);
-            }
-            if !doc_ref.assets.is_empty() {
-                println!("  Assets: {} discovered", doc_ref.assets.len());
-            }
-        }
-
-        Ok(warnings)
+        Ok((
+            DocumentAddResult {
+                issue_id: full_id,
+                document: doc_ref,
+            },
+            warnings,
+        ))
     }
 
     pub fn list_document_references(
@@ -131,46 +101,31 @@ impl<S: IssueStore> CommandExecutor<S> {
         })
     }
 
-    pub fn remove_document_reference(&self, issue_id: &str, path: &str, json: bool) -> Result<()> {
-        use crate::output::{JsonError, JsonOutput};
-
+    pub fn remove_document_reference(
+        &self,
+        issue_id: &str,
+        path: &str,
+    ) -> Result<DocumentRemoveResult> {
         let full_id = self.storage.resolve_issue_id(issue_id)?;
-        let mut issue = self.storage.load_issue(&full_id).inspect_err(|_| {
-            if json {
-                let err = JsonError::issue_not_found(issue_id, "doc remove");
-                println!("{}", err.to_json_string().unwrap());
-            }
-        })?;
+        let mut issue = self.storage.load_issue(&full_id)?;
 
         let original_len = issue.documents.len();
         issue.documents.retain(|doc| doc.path != path);
 
         if issue.documents.len() == original_len {
-            let err_msg = format!("Document reference {} not found in issue {}", path, full_id);
-            if json {
-                let err = JsonError::new("DOCUMENT_NOT_FOUND", &err_msg, "doc remove")
-                    .with_suggestion("Run 'jit doc list <issue-id>' to see available documents");
-                println!("{}", err.to_json_string()?);
-            }
-            return Err(anyhow!(err_msg));
+            return Err(anyhow!(
+                "Document reference {} not found in issue {}",
+                path,
+                full_id
+            ));
         }
 
         self.storage.save_issue(issue)?;
 
-        if json {
-            let output = JsonOutput::success(
-                serde_json::json!({
-                    "issue_id": full_id,
-                    "removed_path": path,
-                }),
-                "doc remove",
-            );
-            println!("{}", output.to_json_string()?);
-        } else {
-            println!("Removed document reference {} from issue {}", path, full_id);
-        }
-
-        Ok(())
+        Ok(DocumentRemoveResult {
+            issue_id: full_id,
+            path: path.to_string(),
+        })
     }
 
     pub fn show_document_content(
@@ -178,7 +133,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue_id: &str,
         path: &str,
         at_commit: Option<&str>,
-    ) -> Result<()> {
+    ) -> Result<DocumentContentResult> {
         use git2::Repository;
 
         let full_id = self.storage.resolve_issue_id(issue_id)?;
@@ -198,17 +153,6 @@ impl<S: IssueStore> CommandExecutor<S> {
         } else {
             "HEAD"
         };
-
-        // Display metadata
-        println!("Document: {}", doc.path);
-        if let Some(ref label) = doc.label {
-            println!("Label: {}", label);
-        }
-        println!("Commit: {}", reference);
-        if let Some(ref doc_type) = doc.doc_type {
-            println!("Type: {}", doc_type);
-        }
-        println!("\n---\n");
 
         // Read content: try git first, fall back to filesystem if git unavailable
         let content = if at_commit.is_some() || doc.commit.is_some() {
@@ -233,9 +177,13 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         };
 
-        println!("{}", content);
-
-        Ok(())
+        Ok(DocumentContentResult {
+            path: doc.path.clone(),
+            label: doc.label.clone(),
+            commit: reference.to_string(),
+            doc_type: doc.doc_type.clone(),
+            content,
+        })
     }
 
     pub fn document_history(
@@ -271,7 +219,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         path: &str,
         from: &str,
         to: Option<&str>,
-    ) -> Result<()> {
+    ) -> Result<DocumentDiffResult> {
         use git2::Repository;
 
         let full_id = self.storage.resolve_issue_id(issue_id)?;
@@ -293,10 +241,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         let to_content = self.read_file_from_git(&repo, path, to_ref)?;
 
         // Generate unified diff
-        println!("diff --git a/{} b/{}", path, path);
-        println!("--- a/{} ({})", path, from);
-        println!("+++ b/{} ({})", path, to_ref);
-        println!();
+        let mut diff_output = String::new();
+        diff_output.push_str(&format!("diff --git a/{} b/{}\n", path, path));
+        diff_output.push_str(&format!("--- a/{} ({})\n", path, from));
+        diff_output.push_str(&format!("+++ b/{} ({})\n", path, to_ref));
+        diff_output.push('\n');
 
         // Use similar crate for diff generation
         use similar::{ChangeTag, TextDiff};
@@ -308,10 +257,15 @@ impl<S: IssueStore> CommandExecutor<S> {
                 ChangeTag::Insert => "+",
                 ChangeTag::Equal => " ",
             };
-            print!("{}{}", sign, change);
+            diff_output.push_str(&format!("{}{}", sign, change));
         }
 
-        Ok(())
+        Ok(DocumentDiffResult {
+            path: path.to_string(),
+            from_commit: from.to_string(),
+            to_commit: to_ref.to_string(),
+            diff: diff_output,
+        })
     }
 
     /// Read document content from git or filesystem.

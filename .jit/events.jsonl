@@ -1787,3 +1787,7 @@
 {"type":"issue_state_changed","id":"cdc025cf-9ddb-4086-a760-1e868753dff5","issue_id":"d0b85bff-68a3-49c1-bdfb-31a7a5b6a890","timestamp":"2026-02-17T19:58:21.541694122Z","from":"gated","to":"done"}
 {"type":"issue_completed","id":"36aba28e-073a-4f10-b4a9-e54b4a3da77a","issue_id":"d0b85bff-68a3-49c1-bdfb-31a7a5b6a890","timestamp":"2026-02-17T19:58:21.541716722Z"}
 {"type":"issue_created","id":"b06e8d0e-459b-4b46-8d7b-585e1ccb3e33","issue_id":"7806c333-b474-4994-a477-63b653699d75","timestamp":"2026-02-17T20:28:46.116117129Z","title":"Bug: worktree list shows stale active_claims count after lease expiry","priority":"normal"}
+{"type":"issue_state_changed","id":"d9fc15fa-f631-4094-9cd4-ad569e43f2c9","issue_id":"f766b092-5eec-4537-b391-ae7017965835","timestamp":"2026-02-17T20:41:49.211264207Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"6c987483-0cc0-4d17-b5f8-e6faea1e09fe","issue_id":"f766b092-5eec-4537-b391-ae7017965835","timestamp":"2026-02-17T20:41:49.211294117Z"}
+{"type":"issue_state_changed","id":"eb2c40fa-837c-498f-9553-64dfff036d13","issue_id":"f766b092-5eec-4537-b391-ae7017965835","timestamp":"2026-02-17T20:44:51.034166524Z","from":"done","to":"backlog"}
+{"type":"issue_state_changed","id":"c8de06c6-3093-4500-9658-0a8ac32aaae7","issue_id":"f766b092-5eec-4537-b391-ae7017965835","timestamp":"2026-02-17T20:44:51.040700519Z","from":"done","to":"ready"}

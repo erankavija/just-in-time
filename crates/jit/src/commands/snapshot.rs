@@ -1,5 +1,6 @@
 //! Snapshot export command implementation
 
+use crate::commands::SnapshotExportResult;
 use crate::document::{AdapterRegistry, AssetScanner};
 use crate::domain::{DocumentReference, Issue};
 use crate::snapshot::{
@@ -515,7 +516,7 @@ This is a read-only export. Future versions may support:
         mode: &SourceMode,
         format: &SnapshotFormat,
         out_path: Option<&Path>,
-    ) -> Result<(String, Vec<String>)> {
+    ) -> Result<(SnapshotExportResult, Vec<String>)> {
         // Phase 2: Enumerate issues
         let issues = self.enumerate_issues(scope)?;
 
@@ -566,16 +567,33 @@ This is a read-only export. Future versions may support:
         // Phase 5: Package
         let output_path = self.determine_output_path(out_path)?;
 
-        match format {
+        let format_str = match format {
             SnapshotFormat::Directory => {
                 self.package_as_directory(temp_dir, &output_path, &manifest)?;
+                "directory"
             }
             SnapshotFormat::Tar => {
                 self.package_as_tar(temp_dir, &output_path, &manifest)?;
+                "tar"
             }
-        }
+        };
 
-        Ok((output_path.to_string_lossy().to_string(), warnings))
+        let size_bytes = if format_str == "tar" {
+            output_path.metadata().ok().map(|m| m.len())
+        } else {
+            None
+        };
+
+        Ok((
+            SnapshotExportResult {
+                path: output_path.to_string_lossy().to_string(),
+                issue_count: manifest.issues.count,
+                document_count: manifest.documents.count,
+                format: format_str.to_string(),
+                size_bytes,
+            },
+            warnings,
+        ))
     }
 
     /// Determine output path with default timestamp-based naming
@@ -595,7 +613,7 @@ This is a read-only export. Future versions may support:
         &self,
         temp_dir: tempfile::TempDir,
         out_path: &Path,
-        manifest: &SnapshotManifest,
+        _manifest: &SnapshotManifest,
     ) -> Result<()> {
         // Check if output path already exists
         if out_path.exists() {
@@ -608,10 +626,6 @@ This is a read-only export. Future versions may support:
         // Atomic rename from temp to final destination
         std::fs::rename(temp_dir.path(), out_path)?;
 
-        println!("✓ Snapshot exported to: {}", out_path.display());
-        println!("  {} issues", manifest.issues.count);
-        println!("  {} documents", manifest.documents.count);
-
         Ok(())
     }
 
@@ -620,7 +634,7 @@ This is a read-only export. Future versions may support:
         &self,
         temp_dir: tempfile::TempDir,
         out_path: &Path,
-        manifest: &SnapshotManifest,
+        _manifest: &SnapshotManifest,
     ) -> Result<()> {
         use std::fs::File;
         use tar::Builder;
@@ -660,11 +674,6 @@ This is a read-only export. Future versions may support:
         }
 
         tar.finish()?;
-
-        println!("✓ Snapshot exported to: {}", out_path.display());
-        println!("  {} issues", manifest.issues.count);
-        println!("  {} documents", manifest.documents.count);
-        println!("  Archive: {} bytes", out_path.metadata()?.len());
 
         Ok(())
     }

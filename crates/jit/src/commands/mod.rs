@@ -112,6 +112,39 @@ pub struct ArchiveResult {
     pub dry_run: bool,
 }
 
+/// Document content display result
+#[derive(Debug, Serialize)]
+pub struct DocumentContentResult {
+    pub path: String,
+    pub label: Option<String>,
+    pub commit: String,
+    pub doc_type: Option<String>,
+    pub content: String,
+}
+
+/// Document diff result
+#[derive(Debug, Serialize)]
+pub struct DocumentDiffResult {
+    pub path: String,
+    pub from_commit: String,
+    pub to_commit: String,
+    pub diff: String,
+}
+
+/// Result of adding a document reference
+#[derive(Debug, Serialize)]
+pub struct DocumentAddResult {
+    pub issue_id: String,
+    pub document: crate::domain::DocumentReference,
+}
+
+/// Result of removing a document reference
+#[derive(Debug, Serialize)]
+pub struct DocumentRemoveResult {
+    pub issue_id: String,
+    pub path: String,
+}
+
 /// Summary of asset counts by category
 #[derive(Debug, Serialize)]
 pub struct AssetSummary {
@@ -120,6 +153,16 @@ pub struct AssetSummary {
     pub shared: usize,
     pub external: usize,
     pub missing: usize,
+}
+
+/// Result of exporting a snapshot
+#[derive(Debug, Serialize)]
+pub struct SnapshotExportResult {
+    pub path: String,
+    pub issue_count: usize,
+    pub document_count: usize,
+    pub format: String,
+    pub size_bytes: Option<u64>,
 }
 
 /// Result of checking document links

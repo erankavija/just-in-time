@@ -755,6 +755,9 @@ pub enum DocCommands {
         /// View document at specific commit (defaults to HEAD)
         #[arg(long)]
         at: Option<String>,
+
+        #[arg(long)]
+        json: bool,
     },
 
     /// List commit history for a document
@@ -784,6 +787,9 @@ pub enum DocCommands {
         /// Target commit (defaults to HEAD)
         #[arg(long)]
         to: Option<String>,
+
+        #[arg(long)]
+        json: bool,
     },
 
     /// Asset management commands

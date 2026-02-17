@@ -1861,17 +1861,40 @@ strategic_types = {}
                 json,
             } => {
                 let output_ctx = OutputContext::new(quiet, json);
-                let warnings = executor.add_document_reference(
+                let (result, warnings) = executor.add_document_reference(
                     &id,
                     &path,
                     commit.as_deref(),
                     label.as_deref(),
                     doc_type.as_deref(),
                     skip_scan,
-                    json,
                 )?;
                 for warning in warnings {
                     output_ctx.print_warning(&warning)?;
+                }
+
+                if json {
+                    use jit::output::JsonOutput;
+                    let output = JsonOutput::success(&result, "doc add");
+                    println!("{}", output.to_json_string()?);
+                } else {
+                    println!("Added document reference to issue {}", result.issue_id);
+                    println!("  Path: {}", result.document.path);
+                    if let Some(ref c) = result.document.commit {
+                        println!("  Commit: {}", c);
+                    }
+                    if let Some(ref l) = result.document.label {
+                        println!("  Label: {}", l);
+                    }
+                    if let Some(ref t) = result.document.doc_type {
+                        println!("  Type: {}", t);
+                    }
+                    if let Some(ref f) = result.document.format {
+                        println!("  Format: {}", f);
+                    }
+                    if !result.document.assets.is_empty() {
+                        println!("  Assets: {} discovered", result.document.assets.len());
+                    }
                 }
             }
             DocCommands::List { id, json } => {
@@ -1912,10 +1935,38 @@ strategic_types = {}
                 }
             }
             DocCommands::Remove { id, path, json } => {
-                executor.remove_document_reference(&id, &path, json)?;
+                let result = executor.remove_document_reference(&id, &path)?;
+
+                if json {
+                    use jit::output::JsonOutput;
+                    let output = JsonOutput::success(&result, "doc remove");
+                    println!("{}", output.to_json_string()?);
+                } else {
+                    println!(
+                        "Removed document reference {} from issue {}",
+                        result.path, result.issue_id
+                    );
+                }
             }
-            DocCommands::Show { id, path, at } => {
-                executor.show_document_content(&id, &path, at.as_deref())?;
+            DocCommands::Show { id, path, at, json } => {
+                let result = executor.show_document_content(&id, &path, at.as_deref())?;
+
+                if json {
+                    use jit::output::JsonOutput;
+                    let output = JsonOutput::success(&result, "doc show");
+                    println!("{}", output.to_json_string()?);
+                } else {
+                    println!("Document: {}", result.path);
+                    if let Some(ref label) = result.label {
+                        println!("Label: {}", label);
+                    }
+                    println!("Commit: {}", result.commit);
+                    if let Some(ref doc_type) = result.doc_type {
+                        println!("Type: {}", doc_type);
+                    }
+                    println!("\n---\n");
+                    println!("{}", result.content);
+                }
             }
             DocCommands::History { id, path, json } => {
                 use jit::output::JsonOutput;
@@ -1938,8 +1989,22 @@ strategic_types = {}
                     }
                 }
             }
-            DocCommands::Diff { id, path, from, to } => {
-                executor.document_diff(&id, &path, &from, to.as_deref())?;
+            DocCommands::Diff {
+                id,
+                path,
+                from,
+                to,
+                json,
+            } => {
+                let result = executor.document_diff(&id, &path, &from, to.as_deref())?;
+
+                if json {
+                    use jit::output::JsonOutput;
+                    let output = JsonOutput::success(&result, "doc diff");
+                    println!("{}", output.to_json_string()?);
+                } else {
+                    print!("{}", result.diff);
+                }
             }
             DocCommands::Assets { command } => match command {
                 jit::cli::AssetCommands::List {
@@ -3908,7 +3973,7 @@ strategic_types = {}
 
                 // Create exporter and export
                 let exporter = SnapshotExporter::new(storage);
-                let (output_path, warnings) = exporter.export(
+                let (result, warnings) = exporter.export(
                     &snapshot_scope,
                     &source_mode,
                     &snapshot_format,
@@ -3921,17 +3986,16 @@ strategic_types = {}
 
                 if json {
                     use jit::output::JsonOutput;
-                    use serde_json::json;
 
-                    let output_data = json!({
-                        "path": output_path,
-                        "format": format,
-                        "scope": scope,
-                    });
-                    println!(
-                        "{}",
-                        JsonOutput::success(output_data, "graph export").to_json_string()?
-                    );
+                    let output = JsonOutput::success(&result, "snapshot export");
+                    println!("{}", output.to_json_string()?);
+                } else {
+                    println!("✓ Snapshot exported to: {}", result.path);
+                    println!("  {} issues", result.issue_count);
+                    println!("  {} documents", result.document_count);
+                    if let Some(size) = result.size_bytes {
+                        println!("  Archive: {} bytes", size);
+                    }
                 }
             }
         },
