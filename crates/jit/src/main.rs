@@ -1230,48 +1230,36 @@ strategic_types = {}
             }
             GateCommands::CheckAll { id, json } => {
                 let output_ctx = OutputContext::new(quiet, json);
-                match executor.check_all_gates(&id) {
-                    Ok(results) => {
-                        if json {
-                            use jit::output::JsonOutput;
-                            let output = JsonOutput::success(results, "gate check-all");
-                            println!("{}", output.to_json_string()?);
-                        } else if results.is_empty() {
-                            let _ = output_ctx.print_info(format!(
-                                "No automated gates to check for issue {}",
-                                id
-                            ));
-                        } else {
-                            let _ =
-                                output_ctx.print_info(format!("Checking gates for issue {}:", id));
-                            for result in results {
-                                match result.status {
-                                    jit::domain::GateRunStatus::Passed => {
-                                        println!("  ✓ {} passed", result.gate_key);
-                                    }
-                                    jit::domain::GateRunStatus::Failed => {
-                                        println!("  ✗ {} failed", result.gate_key);
-                                        println!(
-                                            "    Full output: .jit/gate-runs/{}/result.json",
-                                            result.run_id
-                                        );
-                                    }
-                                    _ => {
-                                        println!("  {} - {:?}", result.gate_key, result.status);
-                                    }
-                                }
+                let (results, warnings) = executor.check_all_gates(&id)?;
+
+                for warning in warnings {
+                    output_ctx.print_warning(&warning)?;
+                }
+
+                if json {
+                    use jit::output::JsonOutput;
+                    let output = JsonOutput::success(results, "gate check-all");
+                    println!("{}", output.to_json_string()?);
+                } else if results.is_empty() {
+                    let _ = output_ctx
+                        .print_info(format!("No automated gates to check for issue {}", id));
+                } else {
+                    let _ = output_ctx.print_info(format!("Checking gates for issue {}:", id));
+                    for result in results {
+                        match result.status {
+                            jit::domain::GateRunStatus::Passed => {
+                                println!("  ✓ {} passed", result.gate_key);
                             }
-                        }
-                    }
-                    Err(e) => {
-                        if json {
-                            use jit::output::JsonError;
-                            let json_error =
-                                JsonError::new("GATE_CHECK_ERROR", e.to_string(), "gate check");
-                            println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error.exit_code().code());
-                        } else {
-                            return Err(e);
+                            jit::domain::GateRunStatus::Failed => {
+                                println!("  ✗ {} failed", result.gate_key);
+                                println!(
+                                    "    Full output: .jit/gate-runs/{}/result.json",
+                                    result.run_id
+                                );
+                            }
+                            _ => {
+                                println!("  {} - {:?}", result.gate_key, result.status);
+                            }
                         }
                     }
                 }
@@ -3913,12 +3901,16 @@ strategic_types = {}
 
                 // Create exporter and export
                 let exporter = SnapshotExporter::new(storage);
-                let output_path = exporter.export(
+                let (output_path, warnings) = exporter.export(
                     &snapshot_scope,
                     &source_mode,
                     &snapshot_format,
                     out.as_deref().map(std::path::Path::new),
                 )?;
+
+                for warning in warnings {
+                    eprintln!("Warning: {}", warning);
+                }
 
                 if json {
                     use jit::output::JsonOutput;

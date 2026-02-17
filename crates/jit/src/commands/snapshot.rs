@@ -515,7 +515,7 @@ This is a read-only export. Future versions may support:
         mode: &SourceMode,
         format: &SnapshotFormat,
         out_path: Option<&Path>,
-    ) -> Result<String> {
+    ) -> Result<(String, Vec<String>)> {
         // Phase 2: Enumerate issues
         let issues = self.enumerate_issues(scope)?;
 
@@ -528,11 +528,12 @@ This is a read-only export. Future versions may support:
 
         // Phase 3: Create document snapshots
         let mut doc_snapshots = Vec::new();
+        let mut warnings = Vec::new();
         for doc_ref in &doc_refs {
             match self.create_document_snapshot(doc_ref, mode) {
                 Ok(snapshot) => doc_snapshots.push(snapshot),
                 Err(e) => {
-                    eprintln!("Warning: Failed to snapshot {}: {}", doc_ref.path, e);
+                    warnings.push(format!("Failed to snapshot {}: {}", doc_ref.path, e));
                     // Continue with other documents
                 }
             }
@@ -574,7 +575,7 @@ This is a read-only export. Future versions may support:
             }
         }
 
-        Ok(output_path.to_string_lossy().to_string())
+        Ok((output_path.to_string_lossy().to_string(), warnings))
     }
 
     /// Determine output path with default timestamp-based naming

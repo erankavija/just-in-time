@@ -105,13 +105,14 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     /// Check all automated gates for an issue
     ///
-    /// Returns the results of all automated gate checks.
-    pub fn check_all_gates(&self, issue_id: &str) -> Result<Vec<GateRunResult>> {
+    /// Returns the results of all automated gate checks and any warnings.
+    pub fn check_all_gates(&self, issue_id: &str) -> Result<(Vec<GateRunResult>, Vec<String>)> {
         let full_id = self.storage.resolve_issue_id(issue_id)?;
         let issue = self.storage.load_issue(&full_id)?;
         let registry = self.storage.load_gate_registry()?;
 
         let mut results = Vec::new();
+        let mut warnings = Vec::new();
 
         for gate_key in &issue.gates_required {
             if let Some(gate) = registry.gates.get(gate_key) {
@@ -120,14 +121,14 @@ impl<S: IssueStore> CommandExecutor<S> {
                         Ok(result) => results.push(result),
                         Err(e) => {
                             // Log error but continue checking other gates
-                            eprintln!("Failed to check gate '{}': {}", gate_key, e);
+                            warnings.push(format!("Failed to check gate '{}': {}", gate_key, e));
                         }
                     }
                 }
             }
         }
 
-        Ok(results)
+        Ok((results, warnings))
     }
 
     /// Run all prechecks for an issue
@@ -413,7 +414,7 @@ enforce_leases = "off"
         executor.add_gate(&issue_id, "gate-2".to_string()).unwrap();
 
         // Check all gates
-        let results = executor.check_all_gates(&issue_id).unwrap();
+        let (results, _warnings) = executor.check_all_gates(&issue_id).unwrap();
 
         assert_eq!(results.len(), 2);
         assert!(results.iter().all(|r| r.status == GateRunStatus::Passed));
