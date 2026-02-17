@@ -3268,8 +3268,15 @@ strategic_types = {}
 
             // Standard repository validation (existing code)
             if fix {
-                // Use auto-fix mode (pass quiet=true if json mode)
-                let fixes_applied = executor.validate_with_fix(true, dry_run, json)?;
+                // Use auto-fix mode
+                let (fixes_applied, messages) = executor.validate_with_fix(true, dry_run)?;
+
+                // Print messages unless in JSON mode
+                if !json {
+                    for message in &messages {
+                        println!("{}", message);
+                    }
+                }
 
                 if json {
                     use jit::output::JsonOutput;

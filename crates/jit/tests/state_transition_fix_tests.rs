@@ -32,7 +32,7 @@ fn test_validate_fix_transitions_backlog_to_ready() {
     assert_eq!(story_issue.state, State::Backlog);
 
     // Run validate --fix
-    let fixes = h.executor.validate_with_fix(true, false, true).unwrap();
+    let (fixes, _messages) = h.executor.validate_with_fix(true, false).unwrap();
     assert_eq!(fixes, 1, "Should fix one pending transition");
 
     // Story should now be ready
@@ -61,7 +61,7 @@ fn test_validate_fix_ignores_incomplete_dependencies() {
     h.storage.save_issue(task1_issue.clone()).unwrap();
 
     // Run validate --fix
-    let fixes = h.executor.validate_with_fix(true, false, true).unwrap();
+    let (fixes, _messages) = h.executor.validate_with_fix(true, false).unwrap();
     assert_eq!(fixes, 0, "Should not fix - dependencies incomplete");
 
     // Story should still be in backlog
@@ -92,7 +92,7 @@ fn test_validate_fix_transitions_multiple_issues() {
     h.storage.save_issue(task2_issue.clone()).unwrap();
 
     // Run validate --fix
-    let fixes = h.executor.validate_with_fix(true, false, true).unwrap();
+    let (fixes, _messages) = h.executor.validate_with_fix(true, false).unwrap();
     assert_eq!(fixes, 2, "Should fix two pending transitions");
 
     // Both stories should be ready
@@ -117,7 +117,7 @@ fn test_validate_fix_dry_run_no_changes() {
     h.storage.save_issue(task_issue).unwrap();
 
     // Run validate --fix with dry-run
-    let fixes = h.executor.validate_with_fix(true, true, true).unwrap();
+    let (fixes, _messages) = h.executor.validate_with_fix(true, true).unwrap();
     assert_eq!(fixes, 1, "Should detect one pending transition");
 
     // Story should still be in backlog (dry run doesn't apply changes)
@@ -147,7 +147,7 @@ fn test_validate_fix_ignores_ready_issues() {
     h.storage.save_issue(issue2_loaded.clone()).unwrap();
 
     // Run validate --fix
-    let fixes = h.executor.validate_with_fix(true, false, true).unwrap();
+    let (fixes, _messages) = h.executor.validate_with_fix(true, false).unwrap();
     assert_eq!(fixes, 0, "Should not touch issues already in ready state");
 }
 
@@ -170,7 +170,7 @@ fn test_validate_fix_ignores_done_issues() {
     h.storage.save_issue(story_issue).unwrap();
 
     // Run validate --fix
-    let fixes = h.executor.validate_with_fix(true, false, true).unwrap();
+    let (fixes, _messages) = h.executor.validate_with_fix(true, false).unwrap();
     assert_eq!(fixes, 0, "Should not touch done issues");
 }
 
@@ -200,7 +200,7 @@ fn test_validate_fix_complex_dependency_chain() {
     }
 
     // Run validate --fix
-    let fixes = h.executor.validate_with_fix(true, false, true).unwrap();
+    let (fixes, _messages) = h.executor.validate_with_fix(true, false).unwrap();
     assert_eq!(fixes, 2, "Should transition story1 and story2 only");
 
     // Stories should be ready
@@ -224,7 +224,7 @@ fn test_validate_fix_complex_dependency_chain() {
     h.storage.save_issue(story2_loaded.clone()).unwrap();
 
     // Run validate --fix again
-    let more_fixes = h.executor.validate_with_fix(true, false, true).unwrap();
+    let (more_fixes, _messages) = h.executor.validate_with_fix(true, false).unwrap();
     assert_eq!(more_fixes, 1, "Should now transition epic");
 
     // Epic should now be ready

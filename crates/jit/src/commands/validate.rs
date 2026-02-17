@@ -27,74 +27,68 @@ impl Default for ValidationConfigFlags {
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
-    #[allow(dead_code)] // Used internally by validate_with_options
-    pub fn validate(&self) -> Result<()> {
-        self.validate_silent()?;
-        println!("✓ Repository is valid");
-        Ok(())
-    }
-
     /// Validate with optional fix mode.
     ///
     /// # Arguments
     ///
     /// * `fix` - If true, attempt to fix validation issues
     /// * `dry_run` - If true, show what would be fixed without applying changes
-    /// * `quiet` - If true, suppress progress messages (for JSON output)
     ///
     /// # Returns
     ///
-    /// Returns Ok with count of fixes applied, or Err if validation fails
-    pub fn validate_with_fix(&mut self, fix: bool, dry_run: bool, quiet: bool) -> Result<usize> {
+    /// Returns Ok with (count of fixes applied, messages), or Err if validation fails
+    pub fn validate_with_fix(&mut self, fix: bool, dry_run: bool) -> Result<(usize, Vec<String>)> {
         // First run standard validation
         let validation_result = self.validate_silent();
 
         if validation_result.is_ok() && !fix {
-            return Ok(0);
+            return Ok((0, vec![]));
         }
 
         // If fix mode is enabled, detect and fix issues
         if fix {
             let mut total_fixes = 0;
+            let mut all_messages = Vec::new();
 
             // Fix type hierarchy issues
-            let hierarchy_fixes = self.detect_and_fix_hierarchy_issues(dry_run, quiet)?;
+            let (hierarchy_fixes, mut messages) = self.detect_and_fix_hierarchy_issues(dry_run)?;
             total_fixes += hierarchy_fixes;
+            all_messages.append(&mut messages);
 
             // Fix transitive reduction violations (both dry-run and actual fix)
-            let reduction_fixes = self.fix_all_transitive_reductions(dry_run, quiet)?;
+            let (reduction_fixes, mut messages) = self.fix_all_transitive_reductions(dry_run)?;
             total_fixes += reduction_fixes;
+            all_messages.append(&mut messages);
 
             // Fix pending state transitions
-            let transition_fixes = self.check_pending_transitions(dry_run, quiet)?;
+            let (transition_fixes, mut messages) = self.check_pending_transitions(dry_run)?;
             total_fixes += transition_fixes;
+            all_messages.append(&mut messages);
 
-            if !quiet {
-                if dry_run {
-                    println!(
-                        "\nDry run complete. {} fixes would be applied.",
-                        total_fixes
-                    );
-                } else if total_fixes > 0 {
-                    println!("\n✓ Applied {} fixes", total_fixes);
-
-                    // Re-run validation to verify fixes worked
-                    self.validate_silent()?;
-                    println!("✓ Repository is now valid");
-                } else {
-                    println!("\n✓ No fixes needed");
-                }
+            // Add summary message
+            if dry_run {
+                all_messages.push(format!(
+                    "\nDry run complete. {} fixes would be applied.",
+                    total_fixes
+                ));
+            } else if total_fixes > 0 {
+                all_messages.push(format!("\n✓ Applied {} fixes", total_fixes));
+                // Re-run validation to verify fixes worked
+                self.validate_silent()?;
+                all_messages.push("✓ Repository is now valid".to_string());
+            } else {
+                all_messages.push("\n✓ No fixes needed".to_string());
             }
 
-            return Ok(total_fixes);
+            return Ok((total_fixes, all_messages));
         }
 
         // Not in fix mode, just propagate the validation error
         validation_result?;
-        Ok(0)
+        Ok((0, vec![]))
     }
 
-    fn detect_and_fix_hierarchy_issues(&mut self, dry_run: bool, quiet: bool) -> Result<usize> {
+    fn detect_and_fix_hierarchy_issues(&mut self, dry_run: bool) -> Result<(usize, Vec<String>)> {
         use crate::hierarchy_templates::get_hierarchy_config;
 
         let config = get_hierarchy_config(&self.storage)?;
@@ -109,7 +103,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         if all_validation_issues.is_empty() {
-            return Ok(0);
+            return Ok((0, vec![]));
         }
 
         // Generate fixes
@@ -117,39 +111,41 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         if fixes.is_empty() {
             // We found issues but can't auto-fix them
-            if !quiet {
-                println!(
-                    "\nFound {} validation issues but no automatic fixes available:",
-                    all_validation_issues.len()
-                );
-                for issue in &all_validation_issues {
-                    match issue {
-                        ValidationIssue::UnknownType {
-                            issue_id,
-                            unknown_type,
-                            ..
-                        } => {
-                            println!("  • Issue {} has unknown type '{}'", issue_id, unknown_type);
-                        }
-                        ValidationIssue::InvalidMembershipReference {
-                            issue_id,
-                            label,
-                            reason,
-                            ..
-                        } => {
-                            println!(
-                                "  • Issue {} has invalid membership label '{}': {}",
-                                issue_id, label, reason
-                            );
-                        }
+            let mut messages = vec![format!(
+                "Found {} validation issues but no automatic fixes available:",
+                all_validation_issues.len()
+            )];
+            for issue in &all_validation_issues {
+                match issue {
+                    ValidationIssue::UnknownType {
+                        issue_id,
+                        unknown_type,
+                        ..
+                    } => {
+                        messages.push(format!(
+                            "  • Issue {} has unknown type '{}'",
+                            issue_id, unknown_type
+                        ));
+                    }
+                    ValidationIssue::InvalidMembershipReference {
+                        issue_id,
+                        label,
+                        reason,
+                        ..
+                    } => {
+                        messages.push(format!(
+                            "  • Issue {} has invalid membership label '{}': {}",
+                            issue_id, label, reason
+                        ));
                     }
                 }
             }
-            return Ok(0);
+            return Ok((0, messages));
         }
 
         // Apply or preview fixes
         let mut fixes_applied = 0;
+        let mut messages = Vec::new();
 
         for fix in &fixes {
             match fix {
@@ -158,28 +154,24 @@ impl<S: IssueStore> CommandExecutor<S> {
                     old_type,
                     new_type,
                 } => {
-                    if !quiet {
-                        if dry_run {
-                            println!(
-                                "Would replace type '{}' with '{}' for issue {}",
-                                old_type, new_type, issue_id
-                            );
-                        } else {
-                            self.apply_type_fix(issue_id, old_type, new_type)?;
-                            println!(
-                                "✓ Replaced type '{}' with '{}' for issue {}",
-                                old_type, new_type, issue_id
-                            );
-                        }
-                    } else if !dry_run {
+                    if dry_run {
+                        messages.push(format!(
+                            "Would replace type '{}' with '{}' for issue {}",
+                            old_type, new_type, issue_id
+                        ));
+                    } else {
                         self.apply_type_fix(issue_id, old_type, new_type)?;
+                        messages.push(format!(
+                            "✓ Replaced type '{}' with '{}' for issue {}",
+                            old_type, new_type, issue_id
+                        ));
                     }
                     fixes_applied += 1;
                 }
             }
         }
 
-        Ok(fixes_applied)
+        Ok((fixes_applied, messages))
     }
 
     fn apply_type_fix(&mut self, issue_id: &str, old_type: &str, new_type: &str) -> Result<()> {
@@ -697,12 +689,13 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Fix transitive reduction violations for all issues.
     ///
     /// Returns count of redundant edges fixed (or that would be fixed if dry_run).
-    fn fix_all_transitive_reductions(&mut self, dry_run: bool, quiet: bool) -> Result<usize> {
+    fn fix_all_transitive_reductions(&mut self, dry_run: bool) -> Result<(usize, Vec<String>)> {
         let issues = self.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
         let graph = DependencyGraph::new(&issue_refs);
 
         let mut total_redundancies = 0;
+        let mut messages = Vec::new();
 
         for issue in &issues {
             if issue.dependencies.is_empty() {
@@ -712,8 +705,8 @@ impl<S: IssueStore> CommandExecutor<S> {
             let fixed_count = self.fix_transitive_reduction(&graph, &issue.id, dry_run)?;
             if fixed_count > 0 {
                 total_redundancies += fixed_count;
-                if !quiet && !dry_run {
-                    println!(
+                if !dry_run {
+                    messages.push(format!(
                         "Fixed {} redundant {} in issue {}",
                         fixed_count,
                         if fixed_count == 1 {
@@ -722,12 +715,12 @@ impl<S: IssueStore> CommandExecutor<S> {
                             "dependencies"
                         },
                         &issue.id[..8.min(issue.id.len())]
-                    );
+                    ));
                 }
             }
         }
 
-        Ok(total_redundancies)
+        Ok((total_redundancies, messages))
     }
 
     /// Check for and fix pending state transitions.
@@ -742,13 +735,13 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// # Arguments
     ///
     /// * `dry_run` - If true, report what would be fixed without applying changes
-    /// * `quiet` - If true, suppress progress messages
     ///
     /// # Returns
     ///
-    /// Count of issues transitioned (or that would be transitioned if dry_run)
-    fn check_pending_transitions(&mut self, dry_run: bool, quiet: bool) -> Result<usize> {
+    /// Count of issues transitioned and informational messages
+    fn check_pending_transitions(&mut self, dry_run: bool) -> Result<(usize, Vec<String>)> {
         let mut total_fixed = 0;
+        let mut messages = Vec::new();
         let max_passes = 10; // Safety limit to prevent infinite loops
 
         // Keep checking until no more transitions found (cascading transitions)
@@ -768,12 +761,10 @@ impl<S: IssueStore> CommandExecutor<S> {
             let mut pass_fixed = 0;
             for issue in backlog_issues {
                 if issue.should_auto_transition_to_ready(&resolved) {
-                    if !quiet {
-                        println!(
-                            "  → Transitioning {} to ready (dependencies complete)",
-                            &issue.id[..8.min(issue.id.len())]
-                        );
-                    }
+                    messages.push(format!(
+                        "  → Transitioning {} to ready (dependencies complete)",
+                        &issue.id[..8.min(issue.id.len())]
+                    ));
 
                     if !dry_run {
                         self.auto_transition_to_ready(&issue.id)?;
@@ -790,7 +781,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
-        Ok(total_fixed)
+        Ok((total_fixed, messages))
     }
 
     /// Validate branch hasn't diverged from main.
