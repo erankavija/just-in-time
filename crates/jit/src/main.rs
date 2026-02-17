@@ -497,11 +497,18 @@ strategic_types = {}
 
                         // Handle gate modifications first (before other updates)
                         if !add_gate.is_empty() {
-                            executor.add_gates(&full_id, &add_gate)?;
+                            let (_result, warnings) = executor.add_gates(&full_id, &add_gate)?;
+                            for warning in warnings {
+                                output_ctx.print_warning(&warning)?;
+                            }
                         }
 
                         if !remove_gate.is_empty() {
-                            executor.remove_gates(&full_id, &remove_gate)?;
+                            let (_result, warnings) =
+                                executor.remove_gates(&full_id, &remove_gate)?;
+                            for warning in warnings {
+                                output_ctx.print_warning(&warning)?;
+                            }
                         }
 
                         // Handle assignee changes
@@ -1276,7 +1283,12 @@ strategic_types = {}
             } => {
                 let output_ctx = OutputContext::new(quiet, json);
                 match executor.add_gates(&id, &gate_keys) {
-                    Ok(result) => {
+                    Ok((result, warnings)) => {
+                        // Print warnings first
+                        for warning in warnings {
+                            output_ctx.print_warning(&warning)?;
+                        }
+
                         if json {
                             use jit::output::JsonOutput;
                             let response = serde_json::json!({
@@ -1337,7 +1349,12 @@ strategic_types = {}
             } => {
                 let output_ctx = OutputContext::new(quiet, json);
                 match executor.pass_gate(&id, gate_key.clone(), by) {
-                    Ok(_) => {
+                    Ok(warnings) => {
+                        // Print warnings first
+                        for warning in warnings {
+                            output_ctx.print_warning(&warning)?;
+                        }
+
                         if json {
                             use jit::output::JsonOutput;
                             let response = serde_json::json!({
@@ -1376,7 +1393,12 @@ strategic_types = {}
             } => {
                 let output_ctx = OutputContext::new(quiet, json);
                 match executor.fail_gate(&id, gate_key.clone(), by) {
-                    Ok(_) => {
+                    Ok(warnings) => {
+                        // Print warnings first
+                        for warning in warnings {
+                            output_ctx.print_warning(&warning)?;
+                        }
+
                         if json {
                             use jit::output::JsonOutput;
                             let response = serde_json::json!({
@@ -1537,8 +1559,9 @@ strategic_types = {}
                             no_postcheck,
                             &except,
                         ) {
-                            Ok(result) => {
-                                results.push((id.clone(), result));
+                            Ok((result, warnings)) => {
+                                // Store warnings with result
+                                results.push((id.clone(), result, warnings));
                             }
                             Err(e) => {
                                 errors.push((id.clone(), e.to_string()));
@@ -1550,7 +1573,7 @@ strategic_types = {}
                         let output = JsonOutput::success(
                             serde_json::json!({
                                 "preset": name,
-                                "success": results.iter().map(|(id, r)| {
+                                "success": results.iter().map(|(id, r, _)| {
                                     serde_json::json!({
                                         "issue_id": id,
                                         "gates_added": r.added,
@@ -1570,7 +1593,11 @@ strategic_types = {}
                     } else {
                         if !results.is_empty() {
                             println!("Applied preset '{}' to {} issue(s):", name, results.len());
-                            for (id, result) in &results {
+                            for (id, result, warnings) in &results {
+                                // Print warnings for each issue
+                                for warning in warnings {
+                                    eprintln!("⚠️  Warning ({}): {}", id, warning);
+                                }
                                 println!("  {} - gates added: {}", id, result.added.join(", "));
                             }
                         }

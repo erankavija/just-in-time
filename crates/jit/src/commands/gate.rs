@@ -18,12 +18,16 @@ pub struct GateRemoveResult {
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
-    pub fn add_gate(&self, issue_id: &str, gate_key: String) -> Result<()> {
+    /// Add a single gate to an issue.
+    ///
+    /// Returns warnings (e.g., lease warnings) if any.
+    pub fn add_gate(&self, issue_id: &str, gate_key: String) -> Result<Vec<String>> {
         let full_id = self.storage.resolve_issue_id(issue_id)?;
 
-        // Require active lease for structural operations
+        // Collect warnings instead of printing
+        let mut warnings = Vec::new();
         if let Some(warning) = self.require_active_lease(&full_id)? {
-            eprintln!("⚠️  Warning: {}", warning);
+            warnings.push(warning);
         }
 
         let mut issue = self.storage.load_issue(&full_id)?;
@@ -32,11 +36,17 @@ impl<S: IssueStore> CommandExecutor<S> {
             // Note: Gates don't block Ready state, only Done state
             self.storage.save_issue(issue)?;
         }
-        Ok(())
+        Ok(warnings)
     }
 
-    /// Add multiple gates to an issue atomically
-    pub fn add_gates(&self, issue_id: &str, gate_keys: &[String]) -> Result<GateAddResult> {
+    /// Add multiple gates to an issue atomically.
+    ///
+    /// Returns (result, warnings) where warnings contains lease warnings if any.
+    pub fn add_gates(
+        &self,
+        issue_id: &str,
+        gate_keys: &[String],
+    ) -> Result<(GateAddResult, Vec<String>)> {
         // Validate input
         if gate_keys.is_empty() {
             return Err(anyhow!("Must provide at least one gate key"));
@@ -44,9 +54,10 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let full_id = self.storage.resolve_issue_id(issue_id)?;
 
-        // Require active lease for structural operations
+        // Collect warnings instead of printing
+        let mut warnings = Vec::new();
         if let Some(warning) = self.require_active_lease(&full_id)? {
-            eprintln!("⚠️  Warning: {}", warning);
+            warnings.push(warning);
         }
 
         let registry = self.storage.load_gate_registry()?;
@@ -101,14 +112,23 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Save issue
         self.storage.save_issue(issue)?;
 
-        Ok(GateAddResult {
-            added,
-            already_exist,
-        })
+        Ok((
+            GateAddResult {
+                added,
+                already_exist,
+            },
+            warnings,
+        ))
     }
 
-    /// Remove multiple gates from an issue
-    pub fn remove_gates(&self, issue_id: &str, gate_keys: &[String]) -> Result<GateRemoveResult> {
+    /// Remove multiple gates from an issue.
+    ///
+    /// Returns (result, warnings) where warnings contains lease warnings if any.
+    pub fn remove_gates(
+        &self,
+        issue_id: &str,
+        gate_keys: &[String],
+    ) -> Result<(GateRemoveResult, Vec<String>)> {
         // Validate input
         if gate_keys.is_empty() {
             return Err(anyhow!("Must provide at least one gate key"));
@@ -116,9 +136,10 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let full_id = self.storage.resolve_issue_id(issue_id)?;
 
-        // Require active lease for structural operations
+        // Collect warnings instead of printing
+        let mut warnings = Vec::new();
         if let Some(warning) = self.require_active_lease(&full_id)? {
-            eprintln!("⚠️  Warning: {}", warning);
+            warnings.push(warning);
         }
 
         let mut issue = self.storage.load_issue(&full_id)?;
@@ -143,15 +164,24 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Save issue
         self.storage.save_issue(issue)?;
 
-        Ok(GateRemoveResult { removed, not_found })
+        Ok((GateRemoveResult { removed, not_found }, warnings))
     }
 
-    pub fn pass_gate(&self, issue_id: &str, gate_key: String, by: Option<String>) -> Result<()> {
+    /// Mark a gate as passed.
+    ///
+    /// Returns warnings (e.g., lease warnings) if any.
+    pub fn pass_gate(
+        &self,
+        issue_id: &str,
+        gate_key: String,
+        by: Option<String>,
+    ) -> Result<Vec<String>> {
         let full_id = self.storage.resolve_issue_id(issue_id)?;
 
-        // Require active lease for structural operations
+        // Collect warnings instead of printing
+        let mut warnings = Vec::new();
         if let Some(warning) = self.require_active_lease(&full_id)? {
-            eprintln!("⚠️  Warning: {}", warning);
+            warnings.push(warning);
         }
 
         let mut issue = self.storage.load_issue(&full_id)?;
@@ -169,7 +199,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             if gate.mode == GateMode::Auto {
                 // Smart behavior: auto-run the checker
                 self.check_gate(&full_id, &gate_key)?;
-                return Ok(());
+                return Ok(warnings);
             }
         }
 
@@ -193,15 +223,24 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Check if Gated issue can now transition to Done
         self.auto_transition_to_done(&full_id)?;
 
-        Ok(())
+        Ok(warnings)
     }
 
-    pub fn fail_gate(&self, issue_id: &str, gate_key: String, by: Option<String>) -> Result<()> {
+    /// Mark a gate as failed.
+    ///
+    /// Returns warnings (e.g., lease warnings) if any.
+    pub fn fail_gate(
+        &self,
+        issue_id: &str,
+        gate_key: String,
+        by: Option<String>,
+    ) -> Result<Vec<String>> {
         let full_id = self.storage.resolve_issue_id(issue_id)?;
 
-        // Require active lease for structural operations
+        // Collect warnings instead of printing
+        let mut warnings = Vec::new();
         if let Some(warning) = self.require_active_lease(&full_id)? {
-            eprintln!("⚠️  Warning: {}", warning);
+            warnings.push(warning);
         }
 
         let mut issue = self.storage.load_issue(&full_id)?;
@@ -240,7 +279,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let event = Event::new_gate_failed(issue_id, gate_key, by);
         self.storage.append_event(&event)?;
 
-        Ok(())
+        Ok(warnings)
     }
 
     pub fn list_gates(&self) -> Result<Vec<Gate>> {
@@ -392,6 +431,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         self.storage.get_gate_preset(name)
     }
 
+    /// Apply a gate preset to an issue.
+    ///
+    /// Returns (result, warnings) where warnings contains lease warnings if any.
     pub fn apply_gate_preset(
         &self,
         issue_id: &str,
@@ -400,14 +442,15 @@ impl<S: IssueStore> CommandExecutor<S> {
         skip_precheck: bool,
         skip_postcheck: bool,
         except_gates: &[String],
-    ) -> Result<GateAddResult> {
+    ) -> Result<(GateAddResult, Vec<String>)> {
         use crate::domain::{GateChecker, GateStage};
 
         let full_id = self.storage.resolve_issue_id(issue_id)?;
 
-        // Require active lease for structural operations
+        // Collect warnings instead of printing
+        let mut warnings = Vec::new();
         if let Some(warning) = self.require_active_lease(&full_id)? {
-            eprintln!("⚠️  Warning: {}", warning);
+            warnings.push(warning);
         }
 
         // Load preset

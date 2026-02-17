@@ -43,7 +43,7 @@ fn test_add_gates_some_already_exist() {
     h.executor.add_gate(&issue_id, "tests".to_string()).unwrap();
 
     // Try to add tests again plus new ones
-    let result = h
+    let (result, _warnings) = h
         .executor
         .add_gates(&issue_id, &["tests".to_string(), "clippy".to_string()])
         .unwrap();
@@ -135,7 +135,7 @@ fn test_remove_gates_some_not_present() {
         .add_gates(&issue_id, &["tests".to_string()])
         .unwrap();
 
-    let result = h
+    let (result, _warnings) = h
         .executor
         .remove_gates(&issue_id, &["tests".to_string(), "clippy".to_string()])
         .unwrap();
