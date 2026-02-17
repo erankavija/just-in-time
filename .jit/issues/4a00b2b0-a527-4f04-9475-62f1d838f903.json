@@ -22,6 +22,13 @@
       "commit": null,
       "label": "Design Document",
       "doc_type": "design"
+    },
+    {
+      "path": "dev/studies/worktree-merge-analysis.md",
+      "commit": null,
+      "label": "Worktree Merge Analysis",
+      "doc_type": "notes",
+      "format": "markdown"
     }
   ],
   "labels": [
@@ -30,5 +37,5 @@
     "milestone:v1.0"
   ],
   "created_at": "2025-12-19T23:02:42.968811870Z",
-  "updated_at": "2025-12-19T23:04:34.614365592Z"
+  "updated_at": "2026-02-17T22:10:00.704644844+00:00"
 }
