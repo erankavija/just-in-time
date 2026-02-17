@@ -647,3 +647,477 @@ fn test_query_available_sorts_by_priority() {
     assert_eq!(issues[3]["id"], id_low);
     assert_eq!(issues[3]["priority"], "low");
 }
+
+// ── query_all: combined filters ───────────────────────────────────────────────
+
+#[test]
+fn test_query_all_no_filters_returns_all() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    for title in &["Task A", "Task B", "Task C"] {
+        Command::new(&jit)
+            .args(["issue", "create", "-t", title, "-d", "desc"])
+            .current_dir(temp.path())
+            .output()
+            .unwrap();
+    }
+
+    let output = Command::new(&jit)
+        .args(["query", "all", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let json: serde_json::Value =
+        serde_json::from_str(&String::from_utf8_lossy(&output.stdout)).unwrap();
+    assert_eq!(json["count"], 3);
+}
+
+#[test]
+fn test_query_all_combined_state_and_priority() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    // high + done
+    let out = Command::new(&jit)
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "High Done",
+            "-d",
+            "d",
+            "--priority",
+            "high",
+        ])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let id_high_done = String::from_utf8_lossy(&out.stdout)
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+
+    // high + ready (should not appear)
+    Command::new(&jit)
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "High Ready",
+            "-d",
+            "d",
+            "--priority",
+            "high",
+        ])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    // low + done (should not appear)
+    let out = Command::new(&jit)
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Low Done",
+            "-d",
+            "d",
+            "--priority",
+            "low",
+        ])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let id_low_done = String::from_utf8_lossy(&out.stdout)
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+
+    Command::new(&jit)
+        .args(["issue", "update", &id_high_done, "--state", "done"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    Command::new(&jit)
+        .args(["issue", "update", &id_low_done, "--state", "done"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    let output = Command::new(&jit)
+        .args([
+            "query",
+            "all",
+            "--state",
+            "done",
+            "--priority",
+            "high",
+            "--json",
+        ])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let json: serde_json::Value =
+        serde_json::from_str(&String::from_utf8_lossy(&output.stdout)).unwrap();
+    assert_eq!(json["count"], 1);
+    assert_eq!(json["issues"][0]["id"], id_high_done);
+}
+
+#[test]
+fn test_query_all_combined_state_and_assignee() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    let out = Command::new(&jit)
+        .args(["issue", "create", "-t", "Task A", "-d", "d"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let id_a = String::from_utf8_lossy(&out.stdout)
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+
+    let out = Command::new(&jit)
+        .args(["issue", "create", "-t", "Task B", "-d", "d"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let id_b = String::from_utf8_lossy(&out.stdout)
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+
+    // Assign both to the same agent without changing state
+    for id in &[&id_a, &id_b] {
+        Command::new(&jit)
+            .args(["issue", "update", id, "--assignee", "agent:worker-1"])
+            .current_dir(temp.path())
+            .output()
+            .unwrap();
+    }
+
+    // Move only id_a to in_progress
+    Command::new(&jit)
+        .args(["issue", "update", &id_a, "--state", "in_progress"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    let output = Command::new(&jit)
+        .args([
+            "query",
+            "all",
+            "--state",
+            "in_progress",
+            "--assignee",
+            "agent:worker-1",
+            "--full",
+            "--json",
+        ])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let json: serde_json::Value =
+        serde_json::from_str(&String::from_utf8_lossy(&output.stdout)).unwrap();
+    assert_eq!(json["count"], 1);
+    assert_eq!(json["issues"][0]["id"], id_a);
+}
+
+#[test]
+fn test_query_all_combined_state_and_label() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    let out = Command::new(&jit)
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Tagged Ready",
+            "-d",
+            "d",
+            "--label",
+            "component:api",
+        ])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let id_tagged = String::from_utf8_lossy(&out.stdout)
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+
+    // ready but no label — should not appear
+    Command::new(&jit)
+        .args(["issue", "create", "-t", "Untagged Ready", "-d", "d"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    // tagged but done — should not appear
+    let out = Command::new(&jit)
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Tagged Done",
+            "-d",
+            "d",
+            "--label",
+            "component:api",
+        ])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let id_tagged_done = String::from_utf8_lossy(&out.stdout)
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+    Command::new(&jit)
+        .args(["issue", "update", &id_tagged_done, "--state", "done"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    let output = Command::new(&jit)
+        .args([
+            "query",
+            "all",
+            "--state",
+            "ready",
+            "--label",
+            "component:api",
+            "--json",
+        ])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let json: serde_json::Value =
+        serde_json::from_str(&String::from_utf8_lossy(&output.stdout)).unwrap();
+    assert_eq!(json["count"], 1);
+    assert_eq!(json["issues"][0]["id"], id_tagged);
+}
+
+#[test]
+fn test_query_all_returns_empty_when_no_match() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    Command::new(&jit)
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Low Ready",
+            "-d",
+            "d",
+            "--priority",
+            "low",
+        ])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    // Filter for critical — nothing matches
+    let output = Command::new(&jit)
+        .args(["query", "all", "--priority", "critical", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let json: serde_json::Value =
+        serde_json::from_str(&String::from_utf8_lossy(&output.stdout)).unwrap();
+    assert_eq!(json["count"], 0);
+    assert!(json["issues"].as_array().unwrap().is_empty());
+}
+
+// ── query_by_assignee: additional cases ──────────────────────────────────────
+
+#[test]
+fn test_query_by_assignee_no_match() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    let out = Command::new(&jit)
+        .args(["issue", "create", "-t", "Task", "-d", "d"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let id = String::from_utf8_lossy(&out.stdout)
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+
+    Command::new(&jit)
+        .args(["issue", "claim", &id, "agent:worker-1"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    let output = Command::new(&jit)
+        .args(["query", "all", "--assignee", "agent:nobody", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let json: serde_json::Value =
+        serde_json::from_str(&String::from_utf8_lossy(&output.stdout)).unwrap();
+    assert_eq!(json["count"], 0);
+}
+
+#[test]
+fn test_query_by_assignee_multiple_issues_same_agent() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    let mut ids = vec![];
+    for title in &["Task 1", "Task 2", "Task 3"] {
+        let out = Command::new(&jit)
+            .args(["issue", "create", "-t", title, "-d", "d"])
+            .current_dir(temp.path())
+            .output()
+            .unwrap();
+        ids.push(
+            String::from_utf8_lossy(&out.stdout)
+                .split_whitespace()
+                .last()
+                .unwrap()
+                .to_string(),
+        );
+    }
+
+    // Assign first two to agent:worker-1, third to agent:worker-2
+    for id in &ids[..2] {
+        Command::new(&jit)
+            .args(["issue", "claim", id, "agent:worker-1"])
+            .current_dir(temp.path())
+            .output()
+            .unwrap();
+    }
+    Command::new(&jit)
+        .args(["issue", "claim", &ids[2], "agent:worker-2"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    let output = Command::new(&jit)
+        .args([
+            "query",
+            "all",
+            "--assignee",
+            "agent:worker-1",
+            "--full",
+            "--json",
+        ])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let json: serde_json::Value =
+        serde_json::from_str(&String::from_utf8_lossy(&output.stdout)).unwrap();
+    assert_eq!(json["count"], 2);
+
+    let returned_ids: Vec<&str> = json["issues"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|i| i["id"].as_str().unwrap())
+        .collect();
+    assert!(returned_ids.contains(&ids[0].as_str()));
+    assert!(returned_ids.contains(&ids[1].as_str()));
+    assert!(!returned_ids.contains(&ids[2].as_str()));
+}
+
+// ── query_by_priority: additional cases ──────────────────────────────────────
+
+#[test]
+fn test_query_by_priority_empty_results() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    Command::new(&jit)
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Low",
+            "-d",
+            "d",
+            "--priority",
+            "low",
+        ])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    let output = Command::new(&jit)
+        .args(["query", "all", "--priority", "critical", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let json: serde_json::Value =
+        serde_json::from_str(&String::from_utf8_lossy(&output.stdout)).unwrap();
+    assert_eq!(json["count"], 0);
+}
+
+#[test]
+fn test_query_by_priority_all_levels() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    let priorities = ["critical", "high", "normal", "low"];
+    let mut ids = std::collections::HashMap::new();
+
+    for p in &priorities {
+        let out = Command::new(&jit)
+            .args(["issue", "create", "-t", p, "-d", "d", "--priority", p])
+            .current_dir(temp.path())
+            .output()
+            .unwrap();
+        ids.insert(
+            *p,
+            String::from_utf8_lossy(&out.stdout)
+                .split_whitespace()
+                .last()
+                .unwrap()
+                .to_string(),
+        );
+    }
+
+    for p in &priorities {
+        let output = Command::new(&jit)
+            .args(["query", "all", "--priority", p, "--json"])
+            .current_dir(temp.path())
+            .output()
+            .unwrap();
+
+        assert!(output.status.success());
+        let json: serde_json::Value =
+            serde_json::from_str(&String::from_utf8_lossy(&output.stdout)).unwrap();
+        assert_eq!(json["count"], 1, "Expected 1 issue for priority={p}");
+        assert_eq!(json["issues"][0]["id"], ids[p]);
+        assert_eq!(json["issues"][0]["priority"], *p);
+    }
+}
