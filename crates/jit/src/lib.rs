@@ -41,5 +41,8 @@ pub use domain::queries::{
     query_closed, query_ready, query_strategic,
 };
 
+// Re-export key domain operations for library consumers
+pub use domain::{DependencyGraph, GraphError, GraphNode, IssueValidator};
+
 // Backwards compatibility alias
 pub type Storage = JsonFileStorage;
