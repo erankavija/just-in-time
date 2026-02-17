@@ -844,12 +844,7 @@ mod tests {
     fn test_status_empty() -> Result<()> {
         let (temp, _storage) = setup_test_repo()?;
 
-        let result = execute_claim_status_test(&temp, None, None);
-        if let Err(e) = &result {
-            eprintln!("Error: {:?}", e);
-        }
-        assert!(result.is_ok());
-        let leases = result.unwrap();
+        let leases = execute_claim_status_test(&temp, None, None)?;
         assert!(leases.is_empty());
         Ok(())
     }

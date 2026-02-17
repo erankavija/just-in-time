@@ -1786,3 +1786,4 @@
 {"type":"gate_passed","id":"6332a088-901d-4ea5-9e76-2565b3ae66a2","issue_id":"d0b85bff-68a3-49c1-bdfb-31a7a5b6a890","timestamp":"2026-02-17T19:58:21.538861060Z","gate_key":"code-review","updated_by":"agent:copilot-session"}
 {"type":"issue_state_changed","id":"cdc025cf-9ddb-4086-a760-1e868753dff5","issue_id":"d0b85bff-68a3-49c1-bdfb-31a7a5b6a890","timestamp":"2026-02-17T19:58:21.541694122Z","from":"gated","to":"done"}
 {"type":"issue_completed","id":"36aba28e-073a-4f10-b4a9-e54b4a3da77a","issue_id":"d0b85bff-68a3-49c1-bdfb-31a7a5b6a890","timestamp":"2026-02-17T19:58:21.541716722Z"}
+{"type":"issue_created","id":"b06e8d0e-459b-4b46-8d7b-585e1ccb3e33","issue_id":"7806c333-b474-4994-a477-63b653699d75","timestamp":"2026-02-17T20:28:46.116117129Z","title":"Bug: worktree list shows stale active_claims count after lease expiry","priority":"normal"}
