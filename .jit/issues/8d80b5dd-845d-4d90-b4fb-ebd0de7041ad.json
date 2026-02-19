@@ -11,7 +11,15 @@
   ],
   "gates_status": {},
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "dev/plans/benchmarks-8d80b5dd.md",
+      "commit": null,
+      "label": "Implementation Plan",
+      "doc_type": "implementation-plan",
+      "format": "markdown"
+    }
+  ],
   "labels": [
     "type:task",
     "epic:production-stability",
@@ -19,5 +27,5 @@
     "component:core"
   ],
   "created_at": "2025-12-19T23:03:19.328584562Z",
-  "updated_at": "2025-12-19T23:03:19.328584562Z"
+  "updated_at": "2026-02-19T22:27:39.909150196+00:00"
 }
