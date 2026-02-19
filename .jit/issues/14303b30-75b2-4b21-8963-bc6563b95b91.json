@@ -2,7 +2,7 @@
   "id": "14303b30-75b2-4b21-8963-bc6563b95b91",
   "title": "Epic: Agent-Friendly Additions",
   "description": "Enhance gate system with preview, history, and improved error messages for better agent experience",
-  "state": "backlog",
+  "state": "done",
   "priority": "high",
   "assignee": null,
   "dependencies": [
@@ -17,7 +17,13 @@
   "gates_required": [
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_by": "agent:claude",
+      "updated_at": "2026-02-19T19:07:18.207764525Z"
+    }
+  },
   "context": {},
   "documents": [
     {
@@ -39,5 +45,5 @@
     "milestone:v1.0"
   ],
   "created_at": "2025-12-18T20:36:11.605950735Z",
-  "updated_at": "2025-12-18T20:36:44.522506772Z"
+  "updated_at": "2026-02-19T19:07:20.759284139+00:00"
 }

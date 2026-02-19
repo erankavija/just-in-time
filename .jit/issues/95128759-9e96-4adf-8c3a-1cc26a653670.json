@@ -2,7 +2,7 @@
   "id": "95128759-9e96-4adf-8c3a-1cc26a653670",
   "title": "Story: Quality & Polish",
   "description": "Add testing and audit trail improvements for production readiness.\n\n## Goal\nImprove test coverage and event logging for better quality and observability.\n\n## Tasks\n- Add event logging for transitive reduction fixes\n- Add property-based tests for short hash resolution\n\n## Success Criteria\n- Transitive reduction fixes logged in event stream\n- Property-based tests cover short hash edge cases\n- 100% test coverage for dependency validation\n\n## Benefits\n- Better audit trail for automatic fixes\n- Increased confidence in short hash resolution\n- Improved test coverage for graph operations",
-  "state": "ready",
+  "state": "done",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -20,5 +20,5 @@
     "story:quality-polish"
   ],
   "created_at": "2025-12-28T21:33:07.491067703Z",
-  "updated_at": "2026-02-19T19:01:43.313970894+00:00"
+  "updated_at": "2026-02-19T19:06:59.455267351+00:00"
 }
