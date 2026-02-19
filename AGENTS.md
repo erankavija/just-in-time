@@ -48,7 +48,7 @@ cargo fmt --all
 
 # 5. Pass gates
 jit gate pass <short-hash> tests
-jit gate pass <short-hash> clippy  
+jit gate pass <short-hash> clippy
 jit gate pass <short-hash> fmt
 ```
 
@@ -65,9 +65,8 @@ jit query available --json | head -5
 ## Key Files to Know
 
 - **README.md** - Project overview, why JIT exists
-- **ROADMAP.md** - Where we are, where we're going
 - **TESTING.md** - TDD approach, test strategy
-- **.copilot-instructions.md** - Coding standards, patterns to follow
+- **.github/copilot-instructions.md** - Coding standards, patterns to follow
 - **dev/architecture/core-system-design.md** - Core architecture
 - **dev/index.md** - Development documentation guide
 - **docs/index.md** - Product documentation (user-facing)

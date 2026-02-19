@@ -32,7 +32,6 @@ Design documents for **features currently in progress**, linked to open issues i
 
 **Contents:**
 - [core-system-design.md](architecture/core-system-design.md) - Foundational system design
-- [storage-abstraction.md](architecture/storage-abstraction.md) - Storage layer architecture
 - [web-ui-architecture.md](architecture/web-ui-architecture.md) - Web UI design
 - [graph-filtering-architecture.md](architecture/graph-filtering-architecture.md) - Graph query design
 - [cli-and-mcp-strategy.md](architecture/cli-and-mcp-strategy.md) - CLI and MCP integration
@@ -93,18 +92,16 @@ archive/        → After 1-2 releases
 
 ### Architecture & Design
 - [core-system-design.md](architecture/core-system-design.md) - Start here for system overview
-- [storage-abstraction.md](architecture/storage-abstraction.md) - Storage layer details
 - [web-ui-architecture.md](architecture/web-ui-architecture.md) - Web UI design
 
 ### Development Guides
 - See [docs/tutorials/quickstart.md](../docs/tutorials/quickstart.md) - Getting started (10 min)
 - See [docs/reference/cli-commands.md](../docs/reference/cli-commands.md#mcp-tools-reference) - MCP tools for agents
-- See [CONTRIBUTOR-QUICKSTART.md](../CONTRIBUTOR-QUICKSTART.md) - Contributor guide
+- See [AGENTS.md](../AGENTS.md) - Agent quick start guide
 
 ### Reference
 - [studies/architecture-pitfalls.md](studies/architecture-pitfalls.md) - Common pitfalls
 - [studies/clippy-suppressions.md](studies/clippy-suppressions.md) - Documented suppressions
-- [studies/label-conventions.md](studies/label-conventions.md) - Label usage guide
 
 ### Strategy
 - [studies/documentation-organization-strategy.md](studies/documentation-organization-strategy.md) - This reorganization
@@ -115,10 +112,9 @@ archive/        → After 1-2 releases
 ## For Contributors
 
 **Getting Started:**
-1. Read [CONTRIBUTOR-QUICKSTART.md](../CONTRIBUTOR-QUICKSTART.md)
+1. Read [AGENTS.md](../AGENTS.md)
 2. Review [architecture/core-system-design.md](architecture/core-system-design.md)
-3. Check `.copilot-instructions.md` for coding standards
-4. Use `jit query available` to find tasks
+3. Use `jit query available` to find tasks
 
 **Adding Documentation:**
 - **Active work?** → Add design doc to `active/` and link to issue
@@ -131,7 +127,6 @@ archive/        → After 1-2 releases
 
 **See also:**
 - [docs/index.md](../docs/index.md) - Product documentation
-- [ROADMAP.md](../ROADMAP.md) - Project roadmap
 - [TESTING.md](../TESTING.md) - Testing strategy
 
 ---
