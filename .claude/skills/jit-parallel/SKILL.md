@@ -19,13 +19,22 @@ Dispatch multiple independent issues to sub-agents running concurrently in the s
 
 Send a **single message** with one `Task` tool call per issue so they run concurrently.
 
-Use agent type `general-purpose` for implementation tasks, `Explore` for read-only research.
+Choose the agent type based on the nature of the work:
+
+| Task type | Agent type |
+|-----------|------------|
+| Implementation (write code, add tests) | `general-purpose` |
+| Planning (design doc, implementation plan) | `Plan` |
+| Review (verify correctness, pass gate) | `general-purpose` |
+| Research / exploration only | `Explore` |
+
+**When to plan first:** If an issue lacks acceptance criteria, references a design doc that doesn't exist yet, or the description says "investigate" / "design" / "figure out how to" — dispatch a `Plan` agent first. Planning agents return a step-by-step plan and identify critical files; feed their output into a subsequent implementation agent rather than implementing directly.
 
 For each sub-agent, compose a prompt using the template in [references/agent-prompt-template.md](references/agent-prompt-template.md). Key fields to fill in:
 - Issue ID, title, full description
 - Acceptance criteria or success criteria from the issue
 - Any linked design doc paths
-- Whether the task is implementation or review
+- Task type: implementation, planning, or review
 
 ## Step 3: Post-flight — verify and integrate
 
