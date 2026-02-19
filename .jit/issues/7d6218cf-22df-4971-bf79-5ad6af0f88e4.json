@@ -2,9 +2,9 @@
   "id": "7d6218cf-22df-4971-bf79-5ad6af0f88e4",
   "title": "Add event logging for transitive reduction fixes",
   "description": "When validate --fix removes redundant dependencies via transitive reduction, it should log events for audit trail.\n\nCurrent: No events logged when dependencies are automatically removed.\n\nNeeded:\n- Add Event::DependencyReduced variant with fields: issue_id, old_count, new_count, removed_deps\n- OR add generic Event::Custom variant for extensibility\n- Update fix_transitive_reduction() in validate.rs to log events\n- Add test verifying events are logged\n\nBenefits:\n- Complete audit trail of automated changes\n- Better observability for agent coordination\n- Consistent with other dependency operations (add/remove already log events)\n\nReferences: docs/session-2025-12-21-short-hash-progress.md (Issue #1)",
-  "state": "ready",
+  "state": "done",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [],
   "gates_required": [],
   "gates_status": {},
@@ -22,5 +22,5 @@
     "epic:agent-friendly"
   ],
   "created_at": "2025-12-21T22:48:24.835711958Z",
-  "updated_at": "2025-12-21T22:48:24.835711958Z"
+  "updated_at": "2026-02-19T18:41:51.034424454+00:00"
 }

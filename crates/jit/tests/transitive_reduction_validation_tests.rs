@@ -8,6 +8,55 @@ use harness::TestHarness;
 use jit::storage::IssueStore;
 
 #[test]
+fn test_fix_transitive_reduction_logs_event() {
+    let h = TestHarness::new();
+
+    // Create A → B → C and add redundant A → C
+    let a = h.create_issue("A");
+    let b = h.create_issue("B");
+    let c = h.create_issue("C");
+
+    h.executor.add_dependency(&b, &c).unwrap();
+    h.executor.add_dependency(&a, &b).unwrap();
+
+    // Manually inject redundant edge
+    let mut issue_a = h.storage.load_issue(&a).unwrap();
+    issue_a.dependencies.push(c.clone());
+    h.storage.save_issue(issue_a).unwrap();
+
+    let events_before = h.storage.read_events().unwrap().len();
+
+    // Apply fix
+    let mut executor = h.executor;
+    let (fixes_applied, _) = executor.validate_with_fix(true, false).unwrap();
+    assert_eq!(fixes_applied, 1);
+
+    // Verify a DependencyReduced event was logged
+    let events = h.storage.read_events().unwrap();
+    assert_eq!(events.len(), events_before + 1, "Should log one event");
+
+    let event = &events[events_before];
+    assert_eq!(event.get_type(), "dependency_reduced");
+    assert_eq!(event.get_issue_id(), a);
+
+    if let jit::domain::Event::DependencyReduced {
+        issue_id,
+        old_count,
+        new_count,
+        removed_deps,
+        ..
+    } = event
+    {
+        assert_eq!(issue_id, &a);
+        assert_eq!(*old_count, 2);
+        assert_eq!(*new_count, 1);
+        assert_eq!(removed_deps, &[c]);
+    } else {
+        panic!("Expected DependencyReduced event");
+    }
+}
+
+#[test]
 fn test_detect_transitive_redundancy() {
     let h = TestHarness::new();
 

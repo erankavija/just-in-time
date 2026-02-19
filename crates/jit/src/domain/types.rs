@@ -691,6 +691,21 @@ pub enum Event {
         /// Fields that changed
         fields: Vec<String>,
     },
+    /// Redundant dependencies were removed by transitive reduction during validate --fix
+    DependencyReduced {
+        /// Event ID
+        id: String,
+        /// Issue whose dependencies were reduced
+        issue_id: String,
+        /// When this occurred
+        timestamp: DateTime<Utc>,
+        /// Number of dependencies before reduction
+        old_count: usize,
+        /// Number of dependencies after reduction
+        new_count: usize,
+        /// IDs of the removed (redundant) dependencies
+        removed_deps: Vec<String>,
+    },
 }
 
 impl Event {
@@ -805,6 +820,23 @@ impl Event {
         }
     }
 
+    /// Create a dependency reduced event
+    pub fn new_dependency_reduced(
+        issue_id: String,
+        old_count: usize,
+        new_count: usize,
+        removed_deps: Vec<String>,
+    ) -> Self {
+        Event::DependencyReduced {
+            id: Uuid::new_v4().to_string(),
+            issue_id,
+            timestamp: Utc::now(),
+            old_count,
+            new_count,
+            removed_deps,
+        }
+    }
+
     /// Create an issue updated event
     pub fn new_issue_updated(issue_id: String, updated_by: String, fields: Vec<String>) -> Self {
         Event::IssueUpdated {
@@ -830,6 +862,7 @@ impl Event {
             Event::IssueReleased { issue_id, .. } => issue_id,
             Event::IssueUpdated { issue_id, .. } => issue_id,
             Event::DocumentArchived { .. } => "", // No associated issue
+            Event::DependencyReduced { issue_id, .. } => issue_id,
         }
     }
 
@@ -847,6 +880,7 @@ impl Event {
             Event::IssueReleased { .. } => "issue_released",
             Event::IssueUpdated { .. } => "issue_updated",
             Event::DocumentArchived { .. } => "document_archived",
+            Event::DependencyReduced { .. } => "dependency_reduced",
         }
     }
 }

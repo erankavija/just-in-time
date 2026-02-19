@@ -675,13 +675,26 @@ impl<S: IssueStore> CommandExecutor<S> {
         let redundant_count = current_len - reduced_len;
 
         if !dry_run {
-            // Actually apply the fix
-            issue.dependencies = reduced.into_iter().collect();
-            self.storage.save_issue(issue)?;
-        }
+            let reduced_set: std::collections::HashSet<String> =
+                reduced.iter().cloned().collect();
+            let removed_deps: Vec<String> = issue
+                .dependencies
+                .iter()
+                .filter(|d| !reduced_set.contains(*d))
+                .cloned()
+                .collect();
 
-        // Note: Event logging for transitive reduction fixes could be added
-        // via a new Event variant in future if needed for audit trail
+            issue.dependencies = reduced.into_iter().collect();
+            self.storage.save_issue(issue.clone())?;
+
+            let event = Event::new_dependency_reduced(
+                issue.id.clone(),
+                current_len,
+                reduced_len,
+                removed_deps,
+            );
+            self.storage.append_event(&event)?;
+        }
 
         Ok(redundant_count)
     }
