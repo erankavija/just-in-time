@@ -675,8 +675,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let redundant_count = current_len - reduced_len;
 
         if !dry_run {
-            let reduced_set: std::collections::HashSet<String> =
-                reduced.iter().cloned().collect();
+            let reduced_set: std::collections::HashSet<String> = reduced.iter().cloned().collect();
             let removed_deps: Vec<String> = issue
                 .dependencies
                 .iter()

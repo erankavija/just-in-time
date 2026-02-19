@@ -2,7 +2,7 @@
   "id": "16982211-7ed9-4b8a-9ca6-d024ed7fa255",
   "title": "Story: Gate Command Enhancements",
   "description": "Enhance gate commands with better error messages, smart detection, history tracking, and improved UX.\n\n## Goal\nMake gate system more intuitive and informative for both humans and agents.\n\n## Tasks\n- Enhance gate error messages with excerpts and suggestions\n- Add gate modification flags to issue update command\n- Implement smart 'jit gate pass' with auto-detection\n- Add gate history command for auditing\n\n## Success Criteria\n- Gate errors show relevant output excerpts and suggest fixes\n- Can modify gates via issue update (--add-gate/--remove-gate)\n- 'jit gate pass' auto-detects automated vs manual gates\n- Gate history shows all runs with filtering\n\n## Benefits\n- Reduced trial-and-error for gate usage\n- Consistent command patterns (like labels)\n- Better audit trail for quality gates\n- Improved agent understanding of gate failures",
-  "state": "backlog",
+  "state": "ready",
   "priority": "high",
   "assignee": null,
   "dependencies": [
@@ -23,5 +23,5 @@
     "story:gate-enhancements"
   ],
   "created_at": "2025-12-28T21:32:56.272473341Z",
-  "updated_at": "2025-12-28T21:33:25.842353322Z"
+  "updated_at": "2026-02-19T18:59:58.435110517+00:00"
 }

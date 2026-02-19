@@ -2,7 +2,7 @@
   "id": "f3af98cd-9cb8-47a6-bff7-461af5c7e238",
   "title": "Enhance gate error messages",
   "description": "When an automated gate check fails, show the path to the full output file.\n\n## Current Behavior\n\nWhen `jit gate check <issue> <gate>` fails, the output shows:\n```\n✗ Gate 'fmt' failed for issue 5863c67c\n  Error: Diff in /home/user/project/src/file.rs:123:\n```\n\nOnly the first line of stderr is displayed. Users don't know where to find the full output.\n\n## Proposed Behavior\n\nWhen a gate fails, include the path to the result file:\n```\n✗ Gate 'fmt' failed for issue 5863c67c\n  Error: Diff in /home/user/project/src/file.rs:123:\n  Full output: .jit/gate-runs/2aa8649a-d747-4326-8b9a-f76dac94a6d7/result.json\n```\n\n## Implementation\n\nThe `GateRunResult` already contains `run_id`. The file path is:\n`.jit/gate-runs/<run_id>/result.json`\n\nUpdate the gate check output in `main.rs` (around line 1157-1164) to print the file path after showing the error preview.\n\n## Scope\n\n- Only for automated gates (manual gates don't produce result files)\n- Human-readable output only (JSON output already contains full result)\n- Both `gate check` and `gate check-all` commands",
-  "state": "gated",
+  "state": "done",
   "priority": "normal",
   "assignee": "agent:copilot-session",
   "dependencies": [],
@@ -14,15 +14,15 @@
     "tdd-reminder"
   ],
   "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_by": "agent:claude",
+      "updated_at": "2026-02-19T18:59:58.401535852Z"
+    },
     "tests": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-02-15T01:32:35.575059547Z"
-    },
-    "fmt": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-15T01:14:19.274188583Z"
     },
     "tdd-reminder": {
       "status": "passed",
@@ -33,6 +33,11 @@
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-02-15T01:14:15.068448580Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-15T01:14:19.274188583Z"
     }
   },
   "context": {},
@@ -44,5 +49,5 @@
     "component:cli"
   ],
   "created_at": "2025-12-18T20:37:08.854872534Z",
-  "updated_at": "2026-02-15T01:26:29.527817840+00:00"
+  "updated_at": "2026-02-19T18:59:59.966064630+00:00"
 }

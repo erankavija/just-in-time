@@ -2,9 +2,9 @@
   "id": "9072e447-02f7-4efa-ab25-04eac073f1ac",
   "title": "Add property-based tests for short hash resolution",
   "description": "Enhance test coverage for short hash resolution with property-based testing using proptest.\n\nCurrent: 14 unit tests provide good coverage with specific test cases.\n\nEnhancement: Add property-based tests for additional confidence:\n- Random UUID generation with varying prefix lengths (4-16 chars)\n- Automatic edge case discovery\n- Verify resolution correctness across large input space\n- Test ambiguity detection with random collision scenarios\n\nExample test:\n```rust\nproptest! {\n    #[test]\n    fn test_resolve_random_prefixes(prefix_len in 4usize..16) {\n        // Generate random UUIDs, test various prefix lengths\n        // Verify unique prefixes resolve correctly\n        // Verify ambiguous prefixes fail appropriately\n    }\n}\n```\n\nPriority: Low - current unit tests are thorough and comprehensive.\n\nReferences: docs/session-2025-12-21-short-hash-progress.md (Issue #2)",
-  "state": "ready",
+  "state": "done",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [],
   "gates_required": [],
   "gates_status": {},
@@ -22,5 +22,5 @@
     "epic:agent-friendly"
   ],
   "created_at": "2025-12-21T22:48:39.259812023Z",
-  "updated_at": "2025-12-21T22:48:39.259812023Z"
+  "updated_at": "2026-02-19T19:01:43.271184261+00:00"
 }
