@@ -17,30 +17,38 @@ You are [implementing / planning / reviewing] issue [SHORT-ID] in the JIT reposi
 
 1. [Derive concrete steps from the issue description and acceptance criteria.]
 2. Write tests first (TDD). Run `cargo test <feature> -- --nocapture` to confirm they fail, then implement.
-3. Run the full suite when done:
+3. Ensure that the full test suite passes when done:
    ```bash
    cargo test --workspace --quiet
    cargo clippy --workspace --all-targets
    cargo fmt --all
    ```
+4. Check the automated quality gates.
+
 
 ## [For planning tasks] What to do
 
 1. Explore the codebase to understand the current state — find relevant files, existing patterns, and constraints.
-2. Write a concrete implementation plan to `dev/active/[SHORT-ID]-[slug].md`. The plan must include:
+2. Write a concrete implementation plan to `dev/plans/[SHORT-ID]-[slug].md`. The plan must include:
    - Problem statement and goals
    - Ordered implementation steps
    - Files to create or modify (with rationale)
    - Key design decisions and trade-offs considered
+   - TDD approach: concrete test names to write first
    - Acceptance criteria (refine or define if missing from the issue)
    - Any risks or unknowns that need resolution before implementation begins
 3. Link the document to the issue:
    ```
-   mcp__jit__jit_doc_add(id="[SHORT-ID]", path="dev/active/[SHORT-ID]-[slug].md",
-       doc_type="design", label="Implementation Plan")
+   mcp__jit__jit_doc_add(id="[SHORT-ID]", path="dev/plans/[SHORT-ID]-[slug].md",
+       doc_type="implementation-plan", label="Implementation Plan")
    ```
-4. Do NOT write implementation code. Return the plan path and a summary of key decisions.
-5. The saved plan will be reviewed and fed into a subsequent implementation agent.
+4. Commit the plan file (and any updated `.jit/` files) so the document has a commit hash:
+   ```bash
+   git add dev/plans/[SHORT-ID]-[slug].md .jit/
+   git commit -m "jit: [SHORT-ID] add implementation plan for [slug]"
+   ```
+5. Do NOT write implementation code. Return the plan path and a summary of key decisions.
+6. The saved plan will be reviewed and fed into a subsequent implementation agent.
 
 ## [For review tasks] What to do
 

@@ -24,9 +24,11 @@ Choose the agent type based on the nature of the work:
 | Task type | Agent type |
 |-----------|------------|
 | Implementation (write code, add tests) | `general-purpose` |
-| Planning (design doc, implementation plan) | `Plan` |
+| Planning (design doc, implementation plan) | `general-purpose` |
 | Review (verify correctness, pass gate) | `general-purpose` |
 | Research / exploration only | `Explore` |
+
+> **Note:** `Plan` agents cannot write files (`Write`/`Edit` tools are unavailable to them), so planning tasks must use `general-purpose` agents which have the full tool set including file writes and MCP calls.
 
 **When to plan first:** If an issue lacks acceptance criteria, references a design doc that doesn't exist yet, or the description says "investigate" / "design" / "figure out how to" — dispatch a `Plan` agent first. Planning agents return a step-by-step plan and identify critical files; feed their output into a subsequent implementation agent rather than implementing directly.
 
