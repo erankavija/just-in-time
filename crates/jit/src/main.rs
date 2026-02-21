@@ -195,6 +195,21 @@ fn run() -> Result<()> {
     match &command {
         Commands::Init { hierarchy_template } => {
             let output_ctx = OutputContext::new(quiet, false);
+
+            // Resolve the template before init so we can error early on bad names
+            let template = if let Some(template_name) = hierarchy_template {
+                Some(
+                    jit::hierarchy_templates::HierarchyTemplate::get(template_name)
+                        .ok_or_else(|| anyhow!("Unknown hierarchy template: {}", template_name))?,
+                )
+            } else {
+                None
+            };
+
+            // Note whether config.toml already exists before we touch anything
+            let config_path = jit_dir.join("config.toml");
+            let config_already_existed = config_path.exists();
+
             let worktree_identity = executor.init()?;
 
             // Set up .gitattributes for merge drivers (if in git repo)
@@ -202,44 +217,19 @@ fn run() -> Result<()> {
                 eprintln!("Warning: Could not set up .gitattributes: {}", e);
             }
 
-            // If a template is specified, write it to config.toml
-            if let Some(template_name) = hierarchy_template {
-                let template = jit::hierarchy_templates::HierarchyTemplate::get(template_name)
-                    .ok_or_else(|| anyhow!("Unknown hierarchy template: {}", template_name))?;
+            // Write config.toml only when it did not already exist (idempotent)
+            if !config_already_existed {
+                let chosen = template
+                    .as_ref()
+                    .cloned()
+                    .unwrap_or_else(jit::hierarchy_templates::HierarchyTemplate::default);
+                std::fs::write(&config_path, chosen.generate_config_toml())?;
+            }
 
-                // Generate config.toml content with the template
-                let config_path = jit_dir.join("config.toml");
-                let config_content = format!(
-                    r#"[version]
-schema = 2
-
-[type_hierarchy]
-types = {}
-strategic_types = {}
-
-[type_hierarchy.label_associations]
-{}
-
-# Add namespace definitions below
-# [namespaces.type]
-# description = "Issue type (hierarchical)"
-# unique = true
-"#,
-                    toml::to_string(&template.hierarchy)?,
-                    toml::to_string(&template.get_strategic_types())?,
-                    template
-                        .label_associations
-                        .iter()
-                        .map(|(k, v)| format!("{} = \"{}\"", k, v))
-                        .collect::<Vec<_>>()
-                        .join("\n")
-                );
-
-                std::fs::write(&config_path, config_content)?;
-
+            if let Some(ref t) = template {
                 let _ = output_ctx.print_success(format!(
                     "Initialized with '{}' hierarchy template",
-                    template_name
+                    t.name
                 ));
             } else if let Some(identity) = worktree_identity {
                 let _ = output_ctx.print_success(format!(

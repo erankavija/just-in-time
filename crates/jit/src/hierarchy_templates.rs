@@ -29,11 +29,104 @@ impl HierarchyTemplate {
 
     /// Get strategic types (levels 1-2) from hierarchy
     pub fn get_strategic_types(&self) -> Vec<String> {
-        self.hierarchy
+        let mut strategic: Vec<_> = self
+            .hierarchy
             .iter()
             .filter(|(_, &level)| level <= 2)
-            .map(|(name, _)| name.clone())
-            .collect()
+            .collect();
+        strategic.sort_by_key(|(_, &level)| level);
+        strategic.into_iter().map(|(name, _)| name.clone()).collect()
+    }
+
+    /// Generate a well-commented config.toml for this template.
+    ///
+    /// Produces valid TOML with inline types, strategic_types array, and
+    /// label_associations — ready to write directly to `.jit/config.toml`.
+    pub fn generate_config_toml(&self) -> String {
+        // Sort types by level, then alphabetically within the same level
+        let mut sorted_types: Vec<_> = self.hierarchy.iter().collect();
+        sorted_types.sort_by(|a, b| a.1.cmp(b.1).then(a.0.cmp(b.0)));
+        let types_inline = sorted_types
+            .iter()
+            .map(|(k, v)| format!("{} = {}", k, v))
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        let strategic = self.get_strategic_types();
+        let strategic_array = strategic
+            .iter()
+            .map(|s| format!("\"{}\"", s))
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        // Sort label_associations by the level of the key in the hierarchy
+        let mut sorted_assoc: Vec<_> = self.label_associations.iter().collect();
+        sorted_assoc.sort_by(|a, b| {
+            let level_a = self.hierarchy.get(a.0).copied().unwrap_or(u8::MAX);
+            let level_b = self.hierarchy.get(b.0).copied().unwrap_or(u8::MAX);
+            level_a.cmp(&level_b).then(a.0.cmp(b.0))
+        });
+        let label_assoc_lines = sorted_assoc
+            .iter()
+            .map(|(k, v)| format!("{} = \"{}\"", k, v))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        format!(
+            r#"# JIT Configuration File
+#
+# Created by `jit init`. Customize as needed.
+# All settings are optional — JIT uses sensible defaults without this file.
+
+[version]
+schema = 2
+
+[type_hierarchy]
+# Issue types and their hierarchy level (lower number = more strategic).
+types = {{ {types_inline} }}
+
+# Types shown by `jit query strategic`.
+strategic_types = [{strategic_array}]
+
+# Maps each parent type to its membership label namespace.
+# E.g. issues belonging to an epic carry an "epic:<name>" label.
+[type_hierarchy.label_associations]
+{label_assoc_lines}
+
+[validation]
+# Strictness level: "strict" | "loose" | "permissive"
+strictness = "loose"
+
+# Auto-assign this type when creating issues without a type:* label.
+default_type = "task"
+
+# Require exactly one type:* label per issue.
+require_type_label = false
+
+# =============================================================================
+# NAMESPACE REGISTRY (optional)
+# =============================================================================
+# Define label namespaces for documentation and optional enforcement.
+
+[namespaces.type]
+description = "Issue type (hierarchical). Exactly one per issue."
+unique = true
+examples = ["type:task", "type:story", "type:epic", "type:milestone"]
+
+[namespaces.component]
+description = "Technical area or subsystem affected."
+unique = false
+examples = ["component:backend", "component:frontend", "component:cli"]
+
+[namespaces.resolution]
+description = "Reason for issue closure (used with rejected state)."
+unique = true
+examples = ["resolution:wont-fix", "resolution:duplicate", "resolution:obsolete"]
+"#,
+            types_inline = types_inline,
+            strategic_array = strategic_array,
+            label_assoc_lines = label_assoc_lines,
+        )
     }
 
     /// Default 4-level hierarchy: milestone → epic → story → task
