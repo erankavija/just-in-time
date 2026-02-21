@@ -36,16 +36,25 @@ fn test_init_creates_config_toml() {
     assert!(out.status.success(), "jit init failed: {:?}", out);
 
     let config = temp.path().join(".jit/config.toml");
-    assert!(config.exists(), ".jit/config.toml should be created by init");
+    assert!(
+        config.exists(),
+        ".jit/config.toml should be created by init"
+    );
 
     let content = fs::read_to_string(&config).unwrap();
     // Should contain the default hierarchy types
-    assert!(content.contains("milestone"), "config should mention milestone");
+    assert!(
+        content.contains("milestone"),
+        "config should mention milestone"
+    );
     assert!(content.contains("epic"), "config should mention epic");
     assert!(content.contains("story"), "config should mention story");
     assert!(content.contains("task"), "config should mention task");
     // Should contain strategic_types
-    assert!(content.contains("strategic_types"), "config should have strategic_types");
+    assert!(
+        content.contains("strategic_types"),
+        "config should have strategic_types"
+    );
     // Should be commented
     assert!(content.contains('#'), "config should have comments");
 }
@@ -102,15 +111,13 @@ fn test_init_idempotent_does_not_overwrite_index() {
         .output()
         .unwrap();
 
-    let index_before =
-        fs::read_to_string(temp.path().join(".jit/index.json")).unwrap();
+    let index_before = fs::read_to_string(temp.path().join(".jit/index.json")).unwrap();
 
     // Second init
     let out = jit_init(temp.path(), &[]);
     assert!(out.status.success());
 
-    let index_after =
-        fs::read_to_string(temp.path().join(".jit/index.json")).unwrap();
+    let index_after = fs::read_to_string(temp.path().join(".jit/index.json")).unwrap();
     assert_eq!(
         index_before, index_after,
         "second init should not reset index.json"
@@ -125,20 +132,40 @@ fn test_init_idempotent_does_not_overwrite_index() {
 fn test_init_template_default() {
     let temp = TempDir::new().unwrap();
     let out = jit_init(temp.path(), &["--hierarchy-template", "default"]);
-    assert!(out.status.success(), "init with default template failed: {:?}", out);
+    assert!(
+        out.status.success(),
+        "init with default template failed: {:?}",
+        out
+    );
 
     let content = fs::read_to_string(temp.path().join(".jit/config.toml")).unwrap();
-    assert!(content.contains("milestone"), "default template should include milestone");
-    assert!(content.contains("epic"), "default template should include epic");
-    assert!(content.contains("story"), "default template should include story");
-    assert!(content.contains("task"), "default template should include task");
+    assert!(
+        content.contains("milestone"),
+        "default template should include milestone"
+    );
+    assert!(
+        content.contains("epic"),
+        "default template should include epic"
+    );
+    assert!(
+        content.contains("story"),
+        "default template should include story"
+    );
+    assert!(
+        content.contains("task"),
+        "default template should include task"
+    );
 }
 
 #[test]
 fn test_init_template_agile() {
     let temp = TempDir::new().unwrap();
     let out = jit_init(temp.path(), &["--hierarchy-template", "agile"]);
-    assert!(out.status.success(), "init with agile template failed: {:?}", out);
+    assert!(
+        out.status.success(),
+        "init with agile template failed: {:?}",
+        out
+    );
 
     let content = fs::read_to_string(temp.path().join(".jit/config.toml")).unwrap();
     // The types line should contain "release" and not "milestone"
@@ -146,35 +173,64 @@ fn test_init_template_agile() {
         .lines()
         .find(|l| l.trim_start().starts_with("types ="))
         .expect("config should have a types = line");
-    assert!(types_line.contains("release"), "agile types should include release");
-    assert!(!types_line.contains("milestone"), "agile types should not include milestone");
+    assert!(
+        types_line.contains("release"),
+        "agile types should include release"
+    );
+    assert!(
+        !types_line.contains("milestone"),
+        "agile types should not include milestone"
+    );
 }
 
 #[test]
 fn test_init_template_minimal() {
     let temp = TempDir::new().unwrap();
     let out = jit_init(temp.path(), &["--hierarchy-template", "minimal"]);
-    assert!(out.status.success(), "init with minimal template failed: {:?}", out);
+    assert!(
+        out.status.success(),
+        "init with minimal template failed: {:?}",
+        out
+    );
 
     let content = fs::read_to_string(temp.path().join(".jit/config.toml")).unwrap();
     let types_line = content
         .lines()
         .find(|l| l.trim_start().starts_with("types ="))
         .expect("config should have a types = line");
-    assert!(types_line.contains("milestone"), "minimal types should include milestone");
-    assert!(types_line.contains("task"), "minimal types should include task");
-    assert!(!types_line.contains("story"), "minimal types should not include story");
-    assert!(!types_line.contains("epic"), "minimal types should not include epic");
+    assert!(
+        types_line.contains("milestone"),
+        "minimal types should include milestone"
+    );
+    assert!(
+        types_line.contains("task"),
+        "minimal types should include task"
+    );
+    assert!(
+        !types_line.contains("story"),
+        "minimal types should not include story"
+    );
+    assert!(
+        !types_line.contains("epic"),
+        "minimal types should not include epic"
+    );
 }
 
 #[test]
 fn test_init_template_extended() {
     let temp = TempDir::new().unwrap();
     let out = jit_init(temp.path(), &["--hierarchy-template", "extended"]);
-    assert!(out.status.success(), "init with extended template failed: {:?}", out);
+    assert!(
+        out.status.success(),
+        "init with extended template failed: {:?}",
+        out
+    );
 
     let content = fs::read_to_string(temp.path().join(".jit/config.toml")).unwrap();
-    assert!(content.contains("program"), "extended template should include program");
+    assert!(
+        content.contains("program"),
+        "extended template should include program"
+    );
 }
 
 #[test]
@@ -228,7 +284,11 @@ fn test_init_config_is_valid_toml() {
     let content = fs::read_to_string(temp.path().join(".jit/config.toml")).unwrap();
     // toml crate can parse it — use the library directly
     let parsed: Result<toml::Value, _> = toml::from_str(&content);
-    assert!(parsed.is_ok(), "generated config.toml is not valid TOML: {:?}", parsed.err());
+    assert!(
+        parsed.is_ok(),
+        "generated config.toml is not valid TOML: {:?}",
+        parsed.err()
+    );
 }
 
 #[test]

@@ -35,7 +35,10 @@ impl HierarchyTemplate {
             .filter(|(_, &level)| level <= 2)
             .collect();
         strategic.sort_by_key(|(_, &level)| level);
-        strategic.into_iter().map(|(name, _)| name.clone()).collect()
+        strategic
+            .into_iter()
+            .map(|(name, _)| name.clone())
+            .collect()
     }
 
     /// Generate a well-commented config.toml for this template.

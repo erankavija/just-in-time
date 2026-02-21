@@ -227,10 +227,8 @@ fn run() -> Result<()> {
             }
 
             if let Some(ref t) = template {
-                let _ = output_ctx.print_success(format!(
-                    "Initialized with '{}' hierarchy template",
-                    t.name
-                ));
+                let _ = output_ctx
+                    .print_success(format!("Initialized with '{}' hierarchy template", t.name));
             } else if let Some(identity) = worktree_identity {
                 let _ = output_ctx.print_success(format!(
                     "Initialized jit repository (worktree: {})",
