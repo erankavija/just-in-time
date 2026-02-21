@@ -93,6 +93,11 @@ strategic_types = [{strategic_array}]
 [type_hierarchy.label_associations]
 {label_assoc_lines}
 
+# Icon preset for the web UI: "simple" | "navigation" | "minimal" | "construction"
+# [type_hierarchy.icons]
+# preset = "simple"
+# custom = {{ bug = "🐛" }}   # per-type overrides (merged with preset)
+
 [validation]
 # How strictly JIT enforces rules:
 #   strict      — fail on any violation; suitable for CI and automated pipelines.
@@ -109,6 +114,11 @@ require_type_label = false
 # Warning toggles (both enabled by default; set to false to silence):
 # warn_orphaned_leaves = true       # tasks that carry no parent epic/story label
 # warn_strategic_consistency = true # hierarchy inconsistencies across issues
+
+# Label format enforcement (default: warn only):
+# label_regex = '^[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9._-]*$'
+# reject_malformed_labels = false   # set true to block instead of warn
+# enforce_namespace_registry = false # set true to reject undeclared namespaces
 
 # =============================================================================
 # NAMESPACE REGISTRY (optional)
@@ -134,19 +144,40 @@ examples = ["resolution:wont-fix", "resolution:duplicate", "resolution:obsolete"
 # ADVANCED (uncomment to enable)
 # =============================================================================
 
-# Lease duration for multi-agent coordination (seconds).
-# [coordination]
-# default_ttl_secs = 600
-
-# Worktree isolation mode: "auto" detects git worktrees automatically.
+# Worktree isolation and lease enforcement for parallel/agent work.
 # [worktree]
-# mode = "auto"   # "auto" | "on" | "off"
+# mode = "auto"              # "auto" | "on" | "off"
+# enforce_leases = "strict"  # "strict" | "warn" | "off"
+
+# Multi-agent lease coordination.
+# [coordination]
+# default_ttl_secs = 600              # claim TTL before expiry
+# heartbeat_interval_secs = 30        # renewal interval for indefinite leases
+# stale_threshold_secs = 3600         # age at which a TTL=0 lease is considered stale
+# max_indefinite_leases_per_agent = 2
+# max_indefinite_leases_per_repo = 10
+# auto_renew_leases = false
 
 # Development document lifecycle (design docs, session notes, etc.).
 # [documentation]
 # development_root = "dev"
 # managed_paths = ["dev/active", "dev/sessions"]
+# permanent_paths = ["docs/"]         # never archived
 # archive_root = "dev/archive"
+# [documentation.categories]          # doc-type → archive subdirectory
+# design = "features"
+# session = "sessions"
+
+# Branches permitted to modify global config (default: ["main"]).
+# [global_operations]
+# require_main_history = true
+# allowed_branches = ["main"]
+
+# Low-level tuning (rarely needed):
+# [locks]
+# max_age_secs = 3600       # stale lock file threshold
+# [events]
+# enable_sequences = true   # sequence numbers in event log
 "#,
             types_inline = types_inline,
             strategic_array = strategic_array,
