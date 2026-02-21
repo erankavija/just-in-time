@@ -94,7 +94,10 @@ strategic_types = [{strategic_array}]
 {label_assoc_lines}
 
 [validation]
-# Strictness level: "strict" | "loose" | "permissive"
+# How strictly JIT enforces rules:
+#   strict      — fail on any violation; suitable for CI and automated pipelines.
+#   loose       — warn but allow operations; good for everyday development (default).
+#   permissive  — minimal checks; useful during imports or migrations.
 strictness = "loose"
 
 # Auto-assign this type when creating issues without a type:* label.
@@ -102,6 +105,10 @@ default_type = "task"
 
 # Require exactly one type:* label per issue.
 require_type_label = false
+
+# Warning toggles (both enabled by default; set to false to silence):
+# warn_orphaned_leaves = true       # tasks that carry no parent epic/story label
+# warn_strategic_consistency = true # hierarchy inconsistencies across issues
 
 # =============================================================================
 # NAMESPACE REGISTRY (optional)
@@ -122,6 +129,24 @@ examples = ["component:backend", "component:frontend", "component:cli"]
 description = "Reason for issue closure (used with rejected state)."
 unique = true
 examples = ["resolution:wont-fix", "resolution:duplicate", "resolution:obsolete"]
+
+# =============================================================================
+# ADVANCED (uncomment to enable)
+# =============================================================================
+
+# Lease duration for multi-agent coordination (seconds).
+# [coordination]
+# default_ttl_secs = 600
+
+# Worktree isolation mode: "auto" detects git worktrees automatically.
+# [worktree]
+# mode = "auto"   # "auto" | "on" | "off"
+
+# Development document lifecycle (design docs, session notes, etc.).
+# [documentation]
+# development_root = "dev"
+# managed_paths = ["dev/active", "dev/sessions"]
+# archive_root = "dev/archive"
 "#,
             types_inline = types_inline,
             strategic_array = strategic_array,
