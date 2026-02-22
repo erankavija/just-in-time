@@ -49,6 +49,24 @@ level 1 = `milestone`, level 2 = `epic`, level 3 = `story`, level 4 = `task`.
 **Never pass hardcoded type names to the analysis agent — always use the
 actual configured names.**
 
+### Dependency direction invariant
+
+The `depends_on` field means "this issue is blocked by its dependencies."
+Two kinds of edge exist:
+
+| Kind | Direction | Example |
+|------|-----------|---------|
+| **Containment** | Parent depends on its children | Epic "GPU accel" depends on task "Write shader" |
+| **Sequencing** | Later work depends on earlier work | Task "Run benchmark" depends on task "Write shader" |
+| **Cross-branch** | Work depends on a different epic/story | Task "Integrate QAM" depends on epic "Implement QAM" |
+
+The resulting DAG flows **upward**: leaf tasks → stories → epics → milestones.
+A child never lists its own parent in `depends_on`; a task *may* depend on an
+unrelated epic when that entire body of work is a genuine prerequisite.
+
+Verify this invariant holds during plan review (Step 5) and after execution
+(Step 7).
+
 ---
 
 ## Step 3: Discover planning artifacts
@@ -112,10 +130,10 @@ Present the plan to the user as a tree, then ask for approval.
 ```
 Migration plan  (N issues, M dependency edges)
 
-[level-1-type] Title of broad issue (ref: A, priority: high)
-  └─ [level-2-type] Title of mid-scope issue (ref: B)  ← depends on A
-       └─ [leaf-type] Fine-grained task (ref: C)        ← depends on B
-  └─ [level-2-type] Parallel item (ref: D)              (no deps)
+[level-1-type] Title of broad issue (ref: A, priority: high)  ← A depends on B, D
+  └─ [level-2-type] Title of mid-scope issue (ref: B)         ← B depends on C
+       └─ [leaf-type] Fine-grained task (ref: C)               (no deps — leaf)
+  └─ [level-2-type] Parallel item (ref: D)                     (no deps — leaf)
 
 Notes from analysis agent:
   <notes field from JSON>
