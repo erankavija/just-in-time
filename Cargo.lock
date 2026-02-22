@@ -997,20 +997,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "jit-dispatch"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 1.0.69",
- "tokio",
- "toml",
-]
-
-[[package]]
 name = "jit-server"
 version = "0.1.0"
 dependencies = [

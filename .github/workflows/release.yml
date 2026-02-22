@@ -42,21 +42,17 @@ jobs:
       - name: Build API server (static binary)
         run: cargo build --release --target x86_64-unknown-linux-musl --bin jit-server
       
-      - name: Build dispatch coordinator (static binary)
-        run: cargo build --release --target x86_64-unknown-linux-musl --bin jit-dispatch
-      
       - name: Strip binaries
         run: |
           strip target/x86_64-unknown-linux-musl/release/jit
           strip target/x86_64-unknown-linux-musl/release/jit-server
-          strip target/x86_64-unknown-linux-musl/release/jit-dispatch
       
       - name: Create tarball
         run: |
           mkdir -p dist
           tar -czf dist/jit-linux-x64.tar.gz \
             -C target/x86_64-unknown-linux-musl/release \
-            jit jit-server jit-dispatch
+            jit jit-server
       
       - name: Generate checksums
         run: |
@@ -164,7 +160,7 @@ jobs:
             ```bash
             wget https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/jit-linux-x64.tar.gz
             tar -xzf jit-linux-x64.tar.gz
-            sudo mv jit jit-server jit-dispatch /usr/local/bin/
+            sudo mv jit jit-server /usr/local/bin/
             ```
             
             ### MCP Server (Node.js)

@@ -203,11 +203,6 @@ jit/
 │   ├── test_cli_consistency.rs # 8 CLI consistency tests
 │   └── test_no_coordinator.rs  # 6 post-refactor validation tests
 └── Cargo.toml
-
-dispatch/
-├── tests/
-│   └── test_dispatch.rs   # 3 orchestrator tests (using jit CLI)
-└── Cargo.toml
 ```
 
 ## Best Practices

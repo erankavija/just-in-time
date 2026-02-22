@@ -42,7 +42,6 @@ Cargo workspace with three crates plus Node.js and React components:
 
 - **`crates/jit/`** — Core CLI binary and library. Contains all domain logic, storage, graph algorithms, and command implementations.
 - **`crates/server/`** — Web UI HTTP server wrapping the jit CLI.
-- **`crates/dispatch/`** — Agent dispatcher/orchestrator.
 - **`mcp-server/`** — MCP (Model Context Protocol) server (Node.js). Auto-generates 60+ tools from CLI schema.
 - **`web/`** — React + TypeScript + Vite web UI for issue visualization.
 - **`docs/`** — User-facing documentation (Diataxis structure).

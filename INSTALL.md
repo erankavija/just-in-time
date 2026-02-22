@@ -24,7 +24,7 @@ wget https://github.com/erankavija/just-in-time/releases/latest/download/jit-lin
 tar -xzf jit-linux-x64.tar.gz
 
 # Install to system (requires sudo)
-sudo mv jit jit-server jit-dispatch /usr/local/bin/
+sudo mv jit jit-server /usr/local/bin/
 
 # Verify installation
 jit --version
@@ -160,18 +160,16 @@ docker run -d \
 git clone https://github.com/erankavija/just-in-time.git
 cd just-in-time
 
-# Build all Rust binaries (CLI, API server, dispatch)
+# Build all Rust binaries (CLI, API server)
 cargo build --release --workspace
 
 # Binaries are in target/release/
 ./target/release/jit --version
 ./target/release/jit-server --version
-./target/release/jit-dispatch --version
 
 # Optional: Install to system
 sudo cp target/release/jit /usr/local/bin/
 sudo cp target/release/jit-server /usr/local/bin/
-sudo cp target/release/jit-dispatch /usr/local/bin/
 ```
 
 ### Build MCP Server
@@ -329,7 +327,6 @@ rg --version
 ```bash
 sudo rm /usr/local/bin/jit
 sudo rm /usr/local/bin/jit-server
-sudo rm /usr/local/bin/jit-dispatch
 ```
 
 ### Docker
