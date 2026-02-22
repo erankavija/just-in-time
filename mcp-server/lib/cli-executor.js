@@ -100,7 +100,13 @@ export function buildCliArgs(cmdPath, args, cmdDef) {
   for (const argName of positionalArgNames) {
     const value = args[argName];
     if (value !== undefined && value !== "") {
-      cliArgs.push(String(value));
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          cliArgs.push(String(item));
+        }
+      } else {
+        cliArgs.push(String(value));
+      }
     }
   }
   

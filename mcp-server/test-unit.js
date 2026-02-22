@@ -531,6 +531,22 @@ await runTest('multiple positional args appear in order', () => {
   assert.ok(idIndex > 1, 'positional args should come after command path');
 });
 
+await runTest('array positional arg expands to multiple CLI args (e.g. dep add to_ids)', () => {
+  const cmdDef = {
+    args: [
+      { name: 'from_id', type: 'string' },
+      { name: 'to_ids', type: 'array' },
+    ],
+    flags: [{ name: 'json', type: 'boolean' }],
+  };
+  const result = buildCliArgs(
+    ['dep', 'add'],
+    { from_id: '350bff7f', to_ids: ['bfe0ba7b', '2248b17d'] },
+    cmdDef
+  );
+  assert.deepStrictEqual(result, ['dep', 'add', '350bff7f', 'bfe0ba7b', '2248b17d', '--json']);
+});
+
 // ---------------------------------------------------------------------------
 // concurrency limiter tests
 // ---------------------------------------------------------------------------
