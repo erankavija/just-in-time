@@ -428,13 +428,15 @@ impl<S: IssueStore> CommandExecutor<S> {
                 } else {
                     // No commit specified - check working tree or HEAD
                     if has_commits {
-                        // Repository has commits - validate against HEAD
-                        if self
+                        // Repository has commits - validate against HEAD, falling back to
+                        // working tree so that newly added (not yet committed) files pass.
+                        let in_git = self
                             .check_file_exists_in_git(&repo, &doc.path, "HEAD")
-                            .is_err()
-                        {
+                            .is_ok();
+                        let in_working_tree = std::path::Path::new(&doc.path).exists();
+                        if !in_git && !in_working_tree {
                             return Err(anyhow!(
-                                "Invalid document reference in issue '{}': file '{}' not found at HEAD",
+                                "Invalid document reference in issue '{}': file '{}' not found at HEAD or in working tree",
                                 issue.id,
                                 doc.path
                             ));
