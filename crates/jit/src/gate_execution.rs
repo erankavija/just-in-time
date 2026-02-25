@@ -89,8 +89,13 @@ fn execute_command(
 
     #[cfg(unix)]
     let mut cmd = {
+        use std::os::unix::process::CommandExt;
         let mut c = Command::new("sh");
         c.arg("-c").arg(command);
+        // Place the child in its own process group (PGID = child PID) so that
+        // on timeout we can kill all descendants (e.g. test binaries spawned by
+        // `cargo test`) as a group, not just the immediate shell process.
+        c.process_group(0);
         c
     };
 
@@ -113,19 +118,54 @@ fn execute_command(
     // Spawn the process
     let mut child = cmd.spawn().context("Failed to spawn command")?;
 
+    // Save PID before waiting; needed to kill the process group on timeout.
+    #[cfg(unix)]
+    let child_pid = child.id();
+
+    // Drain stdout/stderr in background threads to prevent a pipe-buffer
+    // deadlock.  Commands like `cargo test` spawn many child processes that
+    // together can produce more data than the OS pipe buffer (~64 KB).  If we
+    // don't drain the pipes concurrently, those processes block on write(2) and
+    // we deadlock waiting for them to exit.
+    let stdout_thread = child.stdout.take().map(|stdout| {
+        std::thread::spawn(move || {
+            use std::io::Read;
+            let mut buf = String::new();
+            let _ = std::io::BufReader::new(stdout).read_to_string(&mut buf);
+            buf
+        })
+    });
+    let stderr_thread = child.stderr.take().map(|stderr| {
+        std::thread::spawn(move || {
+            use std::io::Read;
+            let mut buf = String::new();
+            let _ = std::io::BufReader::new(stderr).read_to_string(&mut buf);
+            buf
+        })
+    });
+
     // Wait with timeout
     let wait_result = wait_with_timeout(&mut child, timeout)?;
 
-    let output = child.wait_with_output()?;
+    // On timeout, kill the entire process group so that any grandchildren still
+    // holding pipe ends (e.g. test binaries that outlived the killed `cargo`
+    // process) release them and the reader threads above can reach EOF.
+    #[cfg(unix)]
+    if wait_result.timed_out {
+        use nix::sys::signal::{kill, Signal};
+        use nix::unistd::Pid;
+        // A negative PID in kill(2) targets the process group with that PGID.
+        // PGID == child_pid because we called process_group(0) above.
+        let _ = kill(Pid::from_raw(-(child_pid as i32)), Signal::SIGKILL);
+    }
+
+    let stdout = stdout_thread.and_then(|h| h.join().ok()).unwrap_or_default();
+    let stderr = stderr_thread.and_then(|h| h.join().ok()).unwrap_or_default();
 
     Ok(CommandExecutionResult {
-        exit_code: if wait_result.timed_out {
-            None
-        } else {
-            output.status.code()
-        },
-        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        exit_code: wait_result.exit_code,
+        stdout,
+        stderr,
         command: command.to_string(),
     })
 }
@@ -133,6 +173,7 @@ fn execute_command(
 /// Wait for a child process with timeout
 struct WaitResult {
     timed_out: bool,
+    exit_code: Option<i32>,
 }
 
 fn wait_with_timeout(child: &mut std::process::Child, timeout: Duration) -> Result<WaitResult> {
@@ -140,13 +181,20 @@ fn wait_with_timeout(child: &mut std::process::Child, timeout: Duration) -> Resu
 
     loop {
         match child.try_wait()? {
-            Some(_status) => return Ok(WaitResult { timed_out: false }),
+            Some(status) => {
+                return Ok(WaitResult {
+                    timed_out: false,
+                    exit_code: status.code(),
+                })
+            }
             None => {
                 if start.elapsed() >= timeout {
-                    // Kill the process on timeout
                     let _ = child.kill();
                     let _ = child.wait();
-                    return Ok(WaitResult { timed_out: true });
+                    return Ok(WaitResult {
+                        timed_out: true,
+                        exit_code: None,
+                    });
                 }
                 std::thread::sleep(Duration::from_millis(100));
             }
