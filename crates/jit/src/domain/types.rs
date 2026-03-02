@@ -494,7 +494,34 @@ pub enum GateChecker {
         /// Environment variables
         #[serde(default)]
         env: HashMap<String, String>,
+        /// Whether to pass structured context to the checker process
+        #[serde(default)]
+        pass_context: bool,
+        /// Inline prompt/instructions for the checker
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        prompt: Option<String>,
+        /// Path to a prompt file (relative to repo root), read at check time
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        prompt_file: Option<String>,
     },
+}
+
+/// Structured context passed to gate checker processes
+///
+/// When `pass_context` is enabled on a gate checker, this context is serialized
+/// to a JSON file and made available via the `JIT_CONTEXT_FILE` env var.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GateContext {
+    /// Schema version for forward compatibility
+    pub schema_version: u32,
+    /// Resolved prompt (from inline `prompt` or `prompt_file`)
+    pub prompt: Option<String>,
+    /// Full issue data as JSON value
+    pub issue: serde_json::Value,
+    /// Gate definition as JSON value
+    pub gate: serde_json::Value,
+    /// Chronologically-sorted run history for this gate+issue pair
+    pub run_history: Vec<GateRunResult>,
 }
 
 /// Result of a gate execution

@@ -1,14 +1,17 @@
 //! Gate checking and execution operations
 
 use super::*;
-use crate::domain::{GateMode, GateRunResult, GateRunStatus, GateStage};
+use crate::domain::{GateContext, GateMode, GateRunResult, GateRunStatus, GateStage};
 use crate::gate_execution;
+use crate::output::IssueShowResponse;
 
 impl<S: IssueStore> CommandExecutor<S> {
     /// Check a single gate for an issue
     ///
     /// Runs the gate checker if it's an automated gate, updates the issue status,
-    /// and returns the run result.
+    /// and returns the run result. When the checker has `pass_context: true`, builds
+    /// structured context (issue data, gate definition, prompt, run history) and
+    /// passes it to the checker process via a temp file.
     pub fn check_gate(&self, issue_id: &str, gate_key: &str) -> Result<GateRunResult> {
         let full_id = self.storage.resolve_issue_id(issue_id)?;
         let issue = self.storage.load_issue(&full_id)?;
@@ -43,7 +46,6 @@ impl<S: IssueStore> CommandExecutor<S> {
             .as_ref()
             .ok_or_else(|| anyhow!("Gate '{}' has no checker configured", gate_key))?;
 
-        // Execute the checker
         // Determine working directory: repo root (parent of .jit dir)
         // For InMemoryStorage in tests, parent of "." is "", so fallback to current_dir
         let repo_root = self
@@ -61,15 +63,19 @@ impl<S: IssueStore> CommandExecutor<S> {
                 working_dir: Some(subdir),
                 ..
             } => repo_root.join(subdir),
-            _ => repo_root,
+            _ => repo_root.clone(),
         };
 
-        let result = gate_execution::execute_gate_checker(
+        // Build context if pass_context is enabled
+        let context = self.build_gate_context(checker, &full_id, gate_key, gate, &repo_root)?;
+
+        let result = gate_execution::execute_gate_checker_with_context(
             gate_key,
             &full_id,
             gate.stage,
             checker,
             &working_dir,
+            context.as_ref(),
         )?;
 
         // Save run result
@@ -101,6 +107,72 @@ impl<S: IssueStore> CommandExecutor<S> {
         self.storage.append_event(&event)?;
 
         Ok(result)
+    }
+
+    /// Build structured context for a gate checker when `pass_context` is enabled.
+    ///
+    /// Returns `None` if the checker does not request context.
+    fn build_gate_context(
+        &self,
+        checker: &crate::domain::GateChecker,
+        issue_id: &str,
+        gate_key: &str,
+        gate: &crate::domain::Gate,
+        repo_root: &std::path::Path,
+    ) -> Result<Option<GateContext>> {
+        let (pass_context, prompt, prompt_file) = match checker {
+            crate::domain::GateChecker::Exec {
+                pass_context,
+                prompt,
+                prompt_file,
+                ..
+            } => (*pass_context, prompt.as_deref(), prompt_file.as_deref()),
+        };
+
+        if !pass_context {
+            return Ok(None);
+        }
+
+        // Resolve prompt: prompt_file takes precedence over inline prompt
+        let resolved_prompt = if let Some(pf) = prompt_file {
+            let path = repo_root.join(pf);
+            Some(
+                std::fs::read_to_string(&path)
+                    .with_context(|| format!("Failed to read prompt file: {}", path.display()))?,
+            )
+        } else {
+            prompt.map(|s| s.to_string())
+        };
+
+        // Build issue data (reuse IssueShowResponse for consistent JSON structure)
+        let issue = self.storage.load_issue(issue_id)?;
+        let issue_response = IssueShowResponse::from_issue(issue, vec![]);
+        let issue_json =
+            serde_json::to_value(&issue_response).context("Failed to serialize issue to JSON")?;
+
+        // Build gate definition JSON
+        let gate_json = serde_json::json!({
+            "key": gate.key,
+            "title": gate.title,
+            "description": gate.description,
+            "stage": gate.stage,
+        });
+
+        // Load run history for this gate+issue pair, sorted chronologically
+        let all_runs = self.storage.list_gate_runs_for_issue(issue_id)?;
+        let mut run_history: Vec<_> = all_runs
+            .into_iter()
+            .filter(|r| r.gate_key == gate_key)
+            .collect();
+        run_history.sort_by(|a, b| a.started_at.cmp(&b.started_at));
+
+        Ok(Some(GateContext {
+            schema_version: 1,
+            prompt: resolved_prompt,
+            issue: issue_json,
+            gate: gate_json,
+            run_history,
+        }))
     }
 
     /// Check all automated gates for an issue
@@ -263,6 +335,9 @@ enforce_leases = "off"
                     timeout_seconds: 10,
                     working_dir: None,
                     env: HashMap::new(),
+                    pass_context: false,
+                    prompt: None,
+                    prompt_file: None,
                 }),
                 reserved: HashMap::new(),
                 auto: true,
@@ -311,6 +386,9 @@ enforce_leases = "off"
                     timeout_seconds: 10,
                     working_dir: None,
                     env: HashMap::new(),
+                    pass_context: false,
+                    prompt: None,
+                    prompt_file: None,
                 }),
                 reserved: HashMap::new(),
                 auto: true,
@@ -397,6 +475,9 @@ enforce_leases = "off"
                         timeout_seconds: 10,
                         working_dir: None,
                         env: HashMap::new(),
+                        pass_context: false,
+                        prompt: None,
+                        prompt_file: None,
                     }),
                     reserved: HashMap::new(),
                     auto: true,
@@ -440,6 +521,9 @@ enforce_leases = "off"
                     timeout_seconds: 10,
                     working_dir: None,
                     env: HashMap::new(),
+                    pass_context: false,
+                    prompt: None,
+                    prompt_file: None,
                 }),
                 reserved: HashMap::new(),
                 auto: true,
@@ -490,6 +574,9 @@ enforce_leases = "off"
                     timeout_seconds: 10,
                     working_dir: None,
                     env: HashMap::new(),
+                    pass_context: false,
+                    prompt: None,
+                    prompt_file: None,
                 }),
                 reserved: HashMap::new(),
                 auto: true,
@@ -537,6 +624,9 @@ enforce_leases = "off"
                     timeout_seconds: 10,
                     working_dir: None,
                     env: HashMap::new(),
+                    pass_context: false,
+                    prompt: None,
+                    prompt_file: None,
                 }),
                 reserved: HashMap::new(),
                 auto: true,
@@ -587,6 +677,9 @@ enforce_leases = "off"
                     timeout_seconds: 10,
                     working_dir: None,
                     env: HashMap::new(),
+                    pass_context: false,
+                    prompt: None,
+                    prompt_file: None,
                 }),
                 reserved: HashMap::new(),
                 auto: true,
@@ -615,5 +708,230 @@ enforce_leases = "off"
 
         let gate_state = issue.gates_status.get("postcheck-fail").unwrap();
         assert_eq!(gate_state.status, crate::domain::GateStatus::Failed);
+    }
+
+    #[test]
+    fn test_check_gate_with_pass_context_builds_context() {
+        let executor = setup();
+
+        // Define a gate with pass_context that reads the context file
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        registry.gates.insert(
+            "review".to_string(),
+            crate::domain::Gate {
+                version: 1,
+                key: "review".to_string(),
+                title: "Code Review".to_string(),
+                description: "AI-powered code review".to_string(),
+                stage: GateStage::Postcheck,
+                mode: GateMode::Auto,
+                checker: Some(GateChecker::Exec {
+                    command: "cat $JIT_CONTEXT_FILE".to_string(),
+                    timeout_seconds: 10,
+                    working_dir: None,
+                    env: HashMap::new(),
+                    pass_context: true,
+                    prompt: Some("Review the implementation for correctness.".to_string()),
+                    prompt_file: None,
+                }),
+                reserved: HashMap::new(),
+                auto: true,
+                example_integration: None,
+            },
+        );
+        executor.storage.save_gate_registry(&registry).unwrap();
+
+        // Create an issue with the gate
+        let mut issue = crate::domain::Issue::new(
+            "Implement feature X".to_string(),
+            "Add the X feature".to_string(),
+        );
+        issue.state = State::InProgress;
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(issue).unwrap();
+        executor.add_gate(&issue_id, "review".to_string()).unwrap();
+
+        // Check the gate - should build context and pass it
+        let result = executor.check_gate(&issue_id, "review").unwrap();
+        assert_eq!(result.status, GateRunStatus::Passed);
+
+        // Parse the context JSON from stdout
+        let context: serde_json::Value =
+            serde_json::from_str(&result.stdout).expect("stdout should be valid context JSON");
+
+        assert_eq!(context["schema_version"], 1);
+        assert_eq!(
+            context["prompt"],
+            "Review the implementation for correctness."
+        );
+        assert_eq!(context["issue"]["title"], "Implement feature X");
+        assert_eq!(context["gate"]["key"], "review");
+        assert_eq!(context["gate"]["title"], "Code Review");
+        assert!(context["run_history"].as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_check_gate_with_prompt_file() {
+        let executor = setup();
+
+        // Write a prompt file relative to repo root
+        let repo_root = executor.storage.root().parent().unwrap().to_path_buf();
+        let prompt_path = repo_root.join("review-prompt.md");
+        std::fs::write(
+            &prompt_path,
+            "You are a senior engineer. Review for security issues.",
+        )
+        .unwrap();
+
+        // Define a gate with prompt_file
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        registry.gates.insert(
+            "review".to_string(),
+            crate::domain::Gate {
+                version: 1,
+                key: "review".to_string(),
+                title: "Code Review".to_string(),
+                description: "AI review".to_string(),
+                stage: GateStage::Postcheck,
+                mode: GateMode::Auto,
+                checker: Some(GateChecker::Exec {
+                    command: "cat $JIT_CONTEXT_FILE".to_string(),
+                    timeout_seconds: 10,
+                    working_dir: None,
+                    env: HashMap::new(),
+                    pass_context: true,
+                    prompt: Some("This should be overridden by prompt_file".to_string()),
+                    prompt_file: Some("review-prompt.md".to_string()),
+                }),
+                reserved: HashMap::new(),
+                auto: true,
+                example_integration: None,
+            },
+        );
+        executor.storage.save_gate_registry(&registry).unwrap();
+
+        // Create issue
+        let issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(issue).unwrap();
+        executor.add_gate(&issue_id, "review".to_string()).unwrap();
+
+        let result = executor.check_gate(&issue_id, "review").unwrap();
+        assert_eq!(result.status, GateRunStatus::Passed);
+
+        let context: serde_json::Value = serde_json::from_str(&result.stdout).unwrap();
+        // prompt_file takes precedence over inline prompt
+        assert_eq!(
+            context["prompt"],
+            "You are a senior engineer. Review for security issues."
+        );
+
+        // Clean up
+        let _ = std::fs::remove_file(&prompt_path);
+    }
+
+    #[test]
+    fn test_check_gate_run_history_accumulates() {
+        let executor = setup();
+
+        // Define a gate with pass_context that always fails (exit 1) but outputs context
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        registry.gates.insert(
+            "review".to_string(),
+            crate::domain::Gate {
+                version: 1,
+                key: "review".to_string(),
+                title: "Code Review".to_string(),
+                description: "Review".to_string(),
+                stage: GateStage::Postcheck,
+                mode: GateMode::Auto,
+                checker: Some(GateChecker::Exec {
+                    // Output context then fail
+                    command: "cat $JIT_CONTEXT_FILE; exit 1".to_string(),
+                    timeout_seconds: 10,
+                    working_dir: None,
+                    env: HashMap::new(),
+                    pass_context: true,
+                    prompt: Some("Review".to_string()),
+                    prompt_file: None,
+                }),
+                reserved: HashMap::new(),
+                auto: true,
+                example_integration: None,
+            },
+        );
+        executor.storage.save_gate_registry(&registry).unwrap();
+
+        // Create issue
+        let mut issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        issue.state = State::InProgress;
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(issue).unwrap();
+        executor.add_gate(&issue_id, "review".to_string()).unwrap();
+
+        // First run - should have empty history
+        let result1 = executor.check_gate(&issue_id, "review").unwrap();
+        assert_eq!(result1.status, GateRunStatus::Failed);
+
+        // stdout contains the context JSON (before the exit 1)
+        let ctx1: serde_json::Value = serde_json::from_str(&result1.stdout).unwrap();
+        assert_eq!(ctx1["run_history"].as_array().unwrap().len(), 0);
+
+        // Second run - should include first run in history
+        let result2 = executor.check_gate(&issue_id, "review").unwrap();
+        let ctx2: serde_json::Value = serde_json::from_str(&result2.stdout).unwrap();
+        let history2 = ctx2["run_history"].as_array().unwrap();
+        assert_eq!(history2.len(), 1);
+        assert_eq!(history2[0]["status"], "failed");
+
+        // Third run - should include both previous runs
+        let result3 = executor.check_gate(&issue_id, "review").unwrap();
+        let ctx3: serde_json::Value = serde_json::from_str(&result3.stdout).unwrap();
+        let history3 = ctx3["run_history"].as_array().unwrap();
+        assert_eq!(history3.len(), 2);
+    }
+
+    #[test]
+    fn test_check_gate_without_pass_context_unchanged() {
+        let executor = setup();
+
+        // Define a normal gate without pass_context
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        registry.gates.insert(
+            "test-gate".to_string(),
+            crate::domain::Gate {
+                version: 1,
+                key: "test-gate".to_string(),
+                title: "Test Gate".to_string(),
+                description: "Test gate".to_string(),
+                stage: GateStage::Postcheck,
+                mode: GateMode::Auto,
+                checker: Some(GateChecker::Exec {
+                    command: "echo \"CTX=${JIT_CONTEXT_FILE:-unset}\"".to_string(),
+                    timeout_seconds: 10,
+                    working_dir: None,
+                    env: HashMap::new(),
+                    pass_context: false,
+                    prompt: None,
+                    prompt_file: None,
+                }),
+                reserved: HashMap::new(),
+                auto: true,
+                example_integration: None,
+            },
+        );
+        executor.storage.save_gate_registry(&registry).unwrap();
+
+        let issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(issue).unwrap();
+        executor
+            .add_gate(&issue_id, "test-gate".to_string())
+            .unwrap();
+
+        let result = executor.check_gate(&issue_id, "test-gate").unwrap();
+        assert_eq!(result.status, GateRunStatus::Passed);
+        // JIT_CONTEXT_FILE should not be set when pass_context is false
+        assert!(result.stdout.contains("CTX=unset"));
     }
 }

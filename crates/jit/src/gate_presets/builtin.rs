@@ -38,6 +38,9 @@ impl BuiltinPresets {
                         timeout_seconds: 300,
                         working_dir: None,
                         env: HashMap::new(),
+                        pass_context: false,
+                        prompt: None,
+                        prompt_file: None,
                     }),
                 },
                 GateTemplate {
@@ -51,6 +54,9 @@ impl BuiltinPresets {
                         timeout_seconds: 120,
                         working_dir: None,
                         env: HashMap::new(),
+                        pass_context: false,
+                        prompt: None,
+                        prompt_file: None,
                     }),
                 },
                 GateTemplate {
@@ -64,6 +70,9 @@ impl BuiltinPresets {
                         timeout_seconds: 30,
                         working_dir: None,
                         env: HashMap::new(),
+                        pass_context: false,
+                        prompt: None,
+                        prompt_file: None,
                     }),
                 },
                 GateTemplate {

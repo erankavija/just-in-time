@@ -60,6 +60,9 @@ enforce_leases = "off"
             timeout_seconds: 300,
             working_dir: None,
             env: HashMap::new(),
+            pass_context: false,
+            prompt: None,
+            prompt_file: None,
         };
 
         let result = executor.define_gate(
@@ -142,6 +145,9 @@ enforce_leases = "off"
                     timeout_seconds: 10,
                     working_dir: None,
                     env: HashMap::new(),
+                    pass_context: false,
+                    prompt: None,
+                    prompt_file: None,
                 }),
             )
             .unwrap();
@@ -165,6 +171,9 @@ enforce_leases = "off"
             timeout_seconds: 180,
             working_dir: Some("src".to_string()),
             env: HashMap::from([("RUST_BACKTRACE".to_string(), "1".to_string())]),
+            pass_context: false,
+            prompt: None,
+            prompt_file: None,
         };
 
         executor
@@ -192,6 +201,7 @@ enforce_leases = "off"
             timeout_seconds,
             working_dir,
             env,
+            ..
         }) = gate.checker
         {
             assert_eq!(command, "cargo clippy");
@@ -267,6 +277,9 @@ enforce_leases = "off"
             timeout_seconds: 10,
             working_dir: None,
             env: HashMap::new(),
+            pass_context: false,
+            prompt: None,
+            prompt_file: None,
         };
 
         // Should succeed but checker is ignored for manual gates

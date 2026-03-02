@@ -137,6 +137,9 @@ mod tests {
                 timeout_seconds: 300,
                 working_dir: None,
                 env: HashMap::new(),
+                pass_context: false,
+                prompt: None,
+                prompt_file: None,
             }),
         };
 

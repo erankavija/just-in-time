@@ -982,6 +982,9 @@ fn run() -> Result<()> {
                 checker_command,
                 timeout,
                 working_dir,
+                pass_context,
+                prompt,
+                prompt_file,
                 json,
             } => {
                 use jit::domain::{GateChecker, GateMode, GateStage};
@@ -1017,6 +1020,9 @@ fn run() -> Result<()> {
                     timeout_seconds: timeout,
                     working_dir: working_dir.clone(),
                     env: std::collections::HashMap::new(),
+                    pass_context,
+                    prompt,
+                    prompt_file,
                 });
 
                 match executor.define_gate(

@@ -508,6 +508,18 @@ pub enum GateCommands {
         #[arg(long)]
         working_dir: Option<String>,
 
+        /// Pass structured context (issue data, run history, prompt) to checker
+        #[arg(long)]
+        pass_context: bool,
+
+        /// Inline prompt/instructions for the checker process
+        #[arg(long)]
+        prompt: Option<String>,
+
+        /// Path to a prompt file (relative to repo root), read at check time
+        #[arg(long)]
+        prompt_file: Option<String>,
+
         #[arg(long)]
         json: bool,
     },
