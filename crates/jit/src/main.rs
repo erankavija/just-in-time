@@ -985,6 +985,7 @@ fn run() -> Result<()> {
                 pass_context,
                 prompt,
                 prompt_file,
+                env,
                 json,
             } => {
                 use jit::domain::{GateChecker, GateMode, GateStage};
@@ -1014,12 +1015,31 @@ fn run() -> Result<()> {
                     }
                 };
 
+                // Parse --env KEY=VALUE pairs into a HashMap
+                let env_map: std::collections::HashMap<String, String> = env
+                    .into_iter()
+                    .map(|pair| {
+                        pair.split_once('=')
+                            .map(|(k, v)| (k.to_string(), v.to_string()))
+                            .ok_or_else(|| {
+                                anyhow::anyhow!(
+                                    "Invalid --env format '{}': expected KEY=VALUE",
+                                    pair
+                                )
+                            })
+                    })
+                    .collect::<Result<_, _>>()
+                    .unwrap_or_else(|e| {
+                        eprintln!("Error: {}", e);
+                        std::process::exit(2);
+                    });
+
                 // Build checker if command provided
                 let checker = checker_command.map(|cmd| GateChecker::Exec {
                     command: cmd,
                     timeout_seconds: timeout,
                     working_dir: working_dir.clone(),
-                    env: std::collections::HashMap::new(),
+                    env: env_map,
                     pass_context,
                     prompt,
                     prompt_file,

@@ -520,6 +520,10 @@ pub enum GateCommands {
         #[arg(long)]
         prompt_file: Option<String>,
 
+        /// Environment variables to pass to the checker (repeatable, format: KEY=VALUE)
+        #[arg(long)]
+        env: Vec<String>,
+
         #[arg(long)]
         json: bool,
     },

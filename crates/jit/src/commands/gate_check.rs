@@ -177,7 +177,8 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Build issue data (reuse IssueShowResponse for consistent JSON structure)
         let issue = self.storage.load_issue(issue_id)?;
-        let issue_response = IssueShowResponse::from_issue(issue, vec![]);
+        let enriched_deps = self.get_dependencies_enriched(&issue);
+        let issue_response = IssueShowResponse::from_issue(issue, enriched_deps);
         let issue_json =
             serde_json::to_value(&issue_response).context("Failed to serialize issue to JSON")?;
 
@@ -1122,5 +1123,78 @@ enforce_leases = "off"
         assert_eq!(result.status, GateRunStatus::Passed);
         // JIT_CONTEXT_FILE should not be set when pass_context is false
         assert!(result.stdout.contains("CTX=unset"));
+    }
+
+    #[test]
+    fn test_gate_context_includes_enriched_dependencies() {
+        let executor = setup();
+
+        // Create two dependency issues
+        let dep1 = crate::domain::Issue::new(
+            "Setup database schema".to_string(),
+            "Create tables".to_string(),
+        );
+        let dep1_id = dep1.id.clone();
+        executor.storage.save_issue(dep1).unwrap();
+
+        let dep2 = crate::domain::Issue::new(
+            "Implement auth module".to_string(),
+            "OAuth2 flow".to_string(),
+        );
+        let dep2_id = dep2.id.clone();
+        executor.storage.save_issue(dep2).unwrap();
+
+        // Create main issue that depends on both
+        let mut main_issue = crate::domain::Issue::new(
+            "Build user dashboard".to_string(),
+            "Dashboard feature".to_string(),
+        );
+        main_issue.state = State::InProgress;
+        main_issue.dependencies.push(dep1_id.clone());
+        main_issue.dependencies.push(dep2_id.clone());
+        let main_id = main_issue.id.clone();
+        executor.storage.save_issue(main_issue).unwrap();
+
+        // Define a context-aware gate
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        registry.gates.insert(
+            "review".to_string(),
+            crate::domain::Gate {
+                version: 1,
+                key: "review".to_string(),
+                title: "Code Review".to_string(),
+                description: "Review".to_string(),
+                stage: GateStage::Postcheck,
+                mode: GateMode::Auto,
+                checker: Some(GateChecker::Exec {
+                    command: "cat $JIT_CONTEXT_FILE".to_string(),
+                    timeout_seconds: 10,
+                    working_dir: None,
+                    env: HashMap::new(),
+                    pass_context: true,
+                    prompt: Some("Review the dashboard.".to_string()),
+                    prompt_file: None,
+                }),
+                reserved: HashMap::new(),
+                auto: true,
+                example_integration: None,
+            },
+        );
+        executor.storage.save_gate_registry(&registry).unwrap();
+
+        executor.add_gate(&main_id, "review".to_string()).unwrap();
+
+        let result = executor.check_gate(&main_id, "review").unwrap();
+        assert_eq!(result.status, GateRunStatus::Passed);
+
+        let context: serde_json::Value =
+            serde_json::from_str(&result.stdout).expect("stdout should be valid context JSON");
+
+        let deps = context["issue"]["dependencies"].as_array().unwrap();
+        assert_eq!(deps.len(), 2, "Expected 2 enriched dependencies");
+
+        let dep_titles: Vec<&str> = deps.iter().filter_map(|d| d["title"].as_str()).collect();
+        assert!(dep_titles.contains(&"Setup database schema"));
+        assert!(dep_titles.contains(&"Implement auth module"));
     }
 }

@@ -339,3 +339,154 @@ fn test_gate_check_all() {
         .stdout(predicate::str::contains("gate-1"))
         .stdout(predicate::str::contains("gate-2"));
 }
+
+#[test]
+fn test_gate_define_with_env_vars() {
+    let temp = setup_repo();
+
+    // Define a gate with --env flags
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
+    cmd.current_dir(temp.path())
+        .args([
+            "gate",
+            "define",
+            "review",
+            "--title",
+            "AI Review",
+            "--description",
+            "AI-powered code review",
+            "--mode",
+            "auto",
+            "--checker-command",
+            "echo ok",
+            "--env",
+            "REVIEWER_AGENT=copilot -s",
+            "--env",
+            "MODEL=claude-haiku-4.5",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Defined gate 'review'"));
+
+    // Verify env vars persisted via --json
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
+    let output = cmd
+        .current_dir(temp.path())
+        .args(["gate", "show", "review", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    let checker = &json["checker"];
+    assert_eq!(checker["env"]["REVIEWER_AGENT"], "copilot -s");
+    assert_eq!(checker["env"]["MODEL"], "claude-haiku-4.5");
+}
+
+#[test]
+fn test_gate_define_env_invalid_format_fails() {
+    let temp = setup_repo();
+
+    // --env without = should fail
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
+    cmd.current_dir(temp.path())
+        .args([
+            "gate",
+            "define",
+            "bad-env",
+            "--title",
+            "Bad",
+            "--description",
+            "Bad env",
+            "--mode",
+            "auto",
+            "--checker-command",
+            "echo ok",
+            "--env",
+            "NO_EQUALS_SIGN",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("KEY=VALUE"));
+}
+
+#[test]
+fn test_gate_env_vars_passed_to_checker() {
+    let temp = setup_repo();
+
+    // Define a gate with env vars; checker prints them
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
+    cmd.current_dir(temp.path())
+        .args([
+            "gate",
+            "define",
+            "env-test",
+            "--title",
+            "Env Test",
+            "--description",
+            "Test env passing",
+            "--mode",
+            "auto",
+            "--checker-command",
+            "echo FOO=$FOO BAZ=$BAZ",
+            "--env",
+            "FOO=bar",
+            "--env",
+            "BAZ=qux",
+        ])
+        .assert()
+        .success();
+
+    // Create issue with the gate
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
+    let output = cmd
+        .current_dir(temp.path())
+        .args([
+            "issue",
+            "create",
+            "--title",
+            "Test issue",
+            "--gate",
+            "env-test",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let output_str = String::from_utf8_lossy(&output);
+    let issue_id = output_str
+        .lines()
+        .find(|l| l.contains("Created issue:"))
+        .unwrap()
+        .split_whitespace()
+        .last()
+        .unwrap();
+
+    // Check the gate — checker should see the env vars (use --json to get stdout)
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
+    let output = cmd
+        .current_dir(temp.path())
+        .args(["gate", "check", issue_id, "env-test", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    let stdout = json["stdout"].as_str().unwrap();
+    assert!(
+        stdout.contains("FOO=bar"),
+        "Expected FOO=bar in stdout: {}",
+        stdout
+    );
+    assert!(
+        stdout.contains("BAZ=qux"),
+        "Expected BAZ=qux in stdout: {}",
+        stdout
+    );
+}
