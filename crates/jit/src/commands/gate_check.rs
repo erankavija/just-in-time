@@ -109,6 +109,12 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(result)
     }
 
+    /// Maximum number of recent runs included in gate context.
+    const MAX_RUN_HISTORY: usize = 5;
+
+    /// Maximum prompt file size in bytes (~1000 lines of 80 chars).
+    const MAX_PROMPT_FILE_SIZE: u64 = 100_000;
+
     /// Build structured context for a gate checker when `pass_context` is enabled.
     ///
     /// Returns `None` if the checker does not request context.
@@ -136,8 +142,33 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Resolve prompt: prompt_file takes precedence over inline prompt
         let resolved_prompt = if let Some(pf) = prompt_file {
             let path = repo_root.join(pf);
+
+            // Path traversal guard: resolved path must stay within repo root
+            let canonical = path
+                .canonicalize()
+                .with_context(|| format!("Failed to resolve prompt file: {}", path.display()))?;
+            let canonical_root = repo_root
+                .canonicalize()
+                .with_context(|| format!("Failed to resolve repo root: {}", repo_root.display()))?;
+            if !canonical.starts_with(&canonical_root) {
+                anyhow::bail!("prompt_file '{}' resolves outside the repository", pf);
+            }
+
+            // Size guard
+            let metadata = std::fs::metadata(&canonical).with_context(|| {
+                format!("Failed to read prompt file metadata: {}", path.display())
+            })?;
+            if metadata.len() > Self::MAX_PROMPT_FILE_SIZE {
+                anyhow::bail!(
+                    "prompt_file '{}' exceeds size limit ({} bytes > {} byte limit)",
+                    pf,
+                    metadata.len(),
+                    Self::MAX_PROMPT_FILE_SIZE
+                );
+            }
+
             Some(
-                std::fs::read_to_string(&path)
+                std::fs::read_to_string(&canonical)
                     .with_context(|| format!("Failed to read prompt file: {}", path.display()))?,
             )
         } else {
@@ -158,13 +189,17 @@ impl<S: IssueStore> CommandExecutor<S> {
             "stage": gate.stage,
         });
 
-        // Load run history for this gate+issue pair, sorted chronologically
+        // Load run history for this gate+issue pair, sorted chronologically.
+        // Cap to the most recent N runs to bound context size.
         let all_runs = self.storage.list_gate_runs_for_issue(issue_id)?;
         let mut run_history: Vec<_> = all_runs
             .into_iter()
             .filter(|r| r.gate_key == gate_key)
             .collect();
         run_history.sort_by(|a, b| a.started_at.cmp(&b.started_at));
+        if run_history.len() > Self::MAX_RUN_HISTORY {
+            run_history = run_history.split_off(run_history.len() - Self::MAX_RUN_HISTORY);
+        }
 
         Ok(Some(GateContext {
             schema_version: 1,
@@ -889,6 +924,160 @@ enforce_leases = "off"
         let ctx3: serde_json::Value = serde_json::from_str(&result3.stdout).unwrap();
         let history3 = ctx3["run_history"].as_array().unwrap();
         assert_eq!(history3.len(), 2);
+    }
+
+    #[test]
+    fn test_prompt_file_path_traversal_rejected() {
+        let executor = setup();
+
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        registry.gates.insert(
+            "review".to_string(),
+            crate::domain::Gate {
+                version: 1,
+                key: "review".to_string(),
+                title: "Review".to_string(),
+                description: "Review".to_string(),
+                stage: GateStage::Postcheck,
+                mode: GateMode::Auto,
+                checker: Some(GateChecker::Exec {
+                    command: "echo ok".to_string(),
+                    timeout_seconds: 10,
+                    working_dir: None,
+                    env: HashMap::new(),
+                    pass_context: true,
+                    prompt: None,
+                    prompt_file: Some("../../etc/passwd".to_string()),
+                }),
+                reserved: HashMap::new(),
+                auto: true,
+                example_integration: None,
+            },
+        );
+        executor.storage.save_gate_registry(&registry).unwrap();
+
+        let issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(issue).unwrap();
+        executor.add_gate(&issue_id, "review".to_string()).unwrap();
+
+        let result = executor.check_gate(&issue_id, "review");
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("outside the repository"),
+            "Expected path traversal error, got: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_run_history_capped_at_limit() {
+        let executor = setup();
+
+        // Define a context-aware gate that always fails
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        registry.gates.insert(
+            "review".to_string(),
+            crate::domain::Gate {
+                version: 1,
+                key: "review".to_string(),
+                title: "Review".to_string(),
+                description: "Review".to_string(),
+                stage: GateStage::Postcheck,
+                mode: GateMode::Auto,
+                checker: Some(GateChecker::Exec {
+                    command: "cat $JIT_CONTEXT_FILE; exit 1".to_string(),
+                    timeout_seconds: 10,
+                    working_dir: None,
+                    env: HashMap::new(),
+                    pass_context: true,
+                    prompt: Some("Review".to_string()),
+                    prompt_file: None,
+                }),
+                reserved: HashMap::new(),
+                auto: true,
+                example_integration: None,
+            },
+        );
+        executor.storage.save_gate_registry(&registry).unwrap();
+
+        let mut issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        issue.state = State::InProgress;
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(issue).unwrap();
+        executor.add_gate(&issue_id, "review".to_string()).unwrap();
+
+        // Run the gate 7 times (more than the cap of 5)
+        for _ in 0..7 {
+            let _ = executor.check_gate(&issue_id, "review").unwrap();
+        }
+
+        // 8th run should have at most 5 entries in run_history
+        let result = executor.check_gate(&issue_id, "review").unwrap();
+        let ctx: serde_json::Value = serde_json::from_str(&result.stdout).unwrap();
+        let history = ctx["run_history"].as_array().unwrap();
+        assert!(
+            history.len() <= 5,
+            "Expected at most 5 history entries, got {}",
+            history.len()
+        );
+    }
+
+    #[test]
+    fn test_prompt_file_size_limit_enforced() {
+        let executor = setup();
+
+        // Write a prompt file that exceeds the size limit (~100KB, well over 1000 lines)
+        let repo_root = executor.storage.root().parent().unwrap().to_path_buf();
+        let prompt_path = repo_root.join("huge-prompt.md");
+        let big_content = (0..1100)
+            .map(|_| "x".repeat(100))
+            .collect::<Vec<_>>()
+            .join("\n"); // 1100 lines of 100 chars = ~110KB
+        std::fs::write(&prompt_path, &big_content).unwrap();
+
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        registry.gates.insert(
+            "review".to_string(),
+            crate::domain::Gate {
+                version: 1,
+                key: "review".to_string(),
+                title: "Review".to_string(),
+                description: "Review".to_string(),
+                stage: GateStage::Postcheck,
+                mode: GateMode::Auto,
+                checker: Some(GateChecker::Exec {
+                    command: "echo ok".to_string(),
+                    timeout_seconds: 10,
+                    working_dir: None,
+                    env: HashMap::new(),
+                    pass_context: true,
+                    prompt: None,
+                    prompt_file: Some("huge-prompt.md".to_string()),
+                }),
+                reserved: HashMap::new(),
+                auto: true,
+                example_integration: None,
+            },
+        );
+        executor.storage.save_gate_registry(&registry).unwrap();
+
+        let issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(issue).unwrap();
+        executor.add_gate(&issue_id, "review".to_string()).unwrap();
+
+        let result = executor.check_gate(&issue_id, "review");
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("exceeds"),
+            "Expected size limit error, got: {}",
+            err
+        );
+
+        let _ = std::fs::remove_file(&prompt_path);
     }
 
     #[test]
