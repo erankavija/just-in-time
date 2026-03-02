@@ -61,15 +61,22 @@ if [ -z "${PROMPT:-}" ]; then
   exit 1
 fi
 
+# Extract structured fields from context so the prompt leads the input.
+CONTEXT_JSON=$(jq -c 'del(.prompt)' "$JIT_CONTEXT_FILE")
+
 # Capture agent stderr to a temp file so we can surface it on errors.
 AGENT_STDERR=$(mktemp)
 trap 'rm -f "$AGENT_STDERR"' EXIT
 
-# Pipe the context JSON to the reviewer agent. The prompt field inside the
-# context is the full instruction — the only thing appended is the verdict
-# format requirement.
+# Feed the agent: prompt first, then context data, then verdict instruction.
 REVIEW_OUTPUT=$(cat <<EOF | eval "$REVIEWER_AGENT" 2>"$AGENT_STDERR"
-$(cat "$JIT_CONTEXT_FILE")
+${PROMPT}
+
+## Context
+
+\`\`\`json
+${CONTEXT_JSON}
+\`\`\`
 
 You MUST end your response with exactly one of these lines:
 VERDICT: PASS
