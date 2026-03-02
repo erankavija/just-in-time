@@ -195,6 +195,9 @@ jit_issue_create({
   checker_command?: string,   // For automated gates
   timeout?: number,           // Seconds
   working_dir?: string,
+  pass_context?: boolean,     // Pass issue/gate/history context to checker
+  prompt?: string,            // Inline prompt for context-aware checkers
+  prompt_file?: string,       // Path to prompt file (relative to repo root)
   json?: boolean
 }
 ```
@@ -816,6 +819,9 @@ jit gate define <KEY> --title <TITLE> --description <DESCRIPTION> [OPTIONS]
 - `--checker-command <COMMAND>` - Command to run for automated gates
 - `--timeout <SECONDS>` - Checker timeout in seconds (default: 300)
 - `--working-dir <PATH>` - Working directory for checker (relative to repo root)
+- `--pass-context` - Pass structured context (issue data, run history, prompt) to checker via `JIT_CONTEXT_FILE`
+- `--prompt <TEXT>` - Inline prompt/instructions included in context
+- `--prompt-file <PATH>` - Path to prompt file (relative to repo root), read at check time; takes precedence over `--prompt`
 
 **Examples:**
 ```bash
@@ -835,12 +841,14 @@ jit gate define tests \
   --checker-command "cargo test --lib" \
   --timeout 300
 
-# TDD precheck reminder
-jit gate define tdd-reminder \
-  --title "Write Tests First" \
-  --description "Reminder to follow TDD practice" \
-  --stage precheck \
-  --mode manual
+# Context-aware gate with prompt
+jit gate define review \
+  --title "AI Review" \
+  --description "AI-powered code review" \
+  --mode auto \
+  --pass-context \
+  --prompt-file "docs/review-prompt.md" \
+  --checker-command "./scripts/ai-review.sh"
 ```
 
 ### `jit gate add`

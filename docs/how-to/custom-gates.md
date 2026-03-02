@@ -117,6 +117,23 @@ jit gate add $ISSUE code-review
 # Automated gates run automatically, manual gate requires sign-off
 ```
 
+## Environment Variables
+
+Every gate checker receives these environment variables:
+
+| Variable | Description |
+|----------|-------------|
+| `JIT_ISSUE_ID` | Full issue ID being checked |
+| `JIT_GATE_KEY` | Gate key (e.g., `tests`) |
+| `JIT_STAGE` | `precheck` or `postcheck` |
+| `JIT_CONTEXT_FILE` | Path to context JSON (only when `--pass-context` is set) |
+
+```bash
+#!/bin/bash
+# Checker scripts can use these variables
+echo "Checking gate $JIT_GATE_KEY for issue $JIT_ISSUE_ID"
+```
+
 ## Write Gate Checker Scripts
 
 Automated gates execute shell commands. Follow these patterns for reliable checkers.
@@ -216,6 +233,84 @@ jit gate define quality \
   --mode auto \
   --checker-command "./scripts/quality-gate.sh" \
   --timeout 300
+```
+
+## Context-Aware Gates
+
+Standard checkers are stateless — they run a command and check the exit code. Context-aware gates receive structured data about the issue, gate definition, prompt instructions, and previous run history.
+
+### Enabling Context
+
+Add `--pass-context` when defining a gate:
+
+```bash
+jit gate define review \
+  --title "Code Review" \
+  --description "AI-powered code review" \
+  --mode auto \
+  --pass-context \
+  --prompt "Review the implementation for correctness and style." \
+  --checker-command "./scripts/ai-review.sh"
+```
+
+The checker receives a `JIT_CONTEXT_FILE` env var pointing to a JSON file:
+
+```json
+{
+  "schema_version": 1,
+  "prompt": "Review the implementation for correctness and style.",
+  "issue": {
+    "id": "...", "title": "...", "description": "...",
+    "state": "in_progress", "priority": "high",
+    "documents": [], "labels": [], "gates_required": []
+  },
+  "gate": {
+    "key": "review", "title": "Code Review",
+    "description": "AI-powered code review", "stage": "postcheck"
+  },
+  "run_history": []
+}
+```
+
+### Prompt Files
+
+Use `--prompt-file` for version-controlled prompts:
+
+```bash
+jit gate define review \
+  --title "Code Review" \
+  --description "AI review" \
+  --mode auto \
+  --pass-context \
+  --prompt-file "docs/review-prompt.md" \
+  --checker-command "./scripts/ai-review.sh"
+```
+
+`--prompt-file` takes precedence over `--prompt`. The file is read at check time, so updates take effect without redefining the gate.
+
+### Run History
+
+Each subsequent run includes previous results in `run_history`, sorted chronologically. This enables iterative workflows — a review gate can see its prior feedback:
+
+```bash
+# First run: run_history is empty
+jit gate check $ISSUE review
+
+# Second run: run_history contains the first run's stdout/stderr/exit_code
+jit gate check $ISSUE review
+```
+
+### Example: AI Review Script
+
+```bash
+#!/bin/bash
+# scripts/ai-review.sh
+CONTEXT=$(cat "$JIT_CONTEXT_FILE")
+PROMPT=$(echo "$CONTEXT" | jq -r '.prompt')
+HISTORY=$(echo "$CONTEXT" | jq -r '.run_history | length')
+
+echo "Reviewing issue (attempt $((HISTORY + 1)))..."
+# Pass context to your AI tool of choice
 ```
 
 ## Prechecks vs Postchecks
@@ -698,17 +793,11 @@ jit label values epic
 
 ### Gate System Extensibility
 
-The current gate system is intentionally simple and flexible. Future enhancements being considered:
-
 **Potential extensions** (not yet implemented):
 - **Conditional gates**: Apply different gates based on issue labels or properties
 - **Gate dependencies**: Enforce gate ordering (e.g., tests before code-review)
 - **Parallel execution**: Run multiple automated gates concurrently
-- **Rich output**: Structured results with metrics, warnings, and artifacts
-- **Gate templates**: Pre-configured gate bundles for common workflows
 - **Custom gate stages**: Beyond precheck/postcheck for complex pipelines
-
-These would be added based on real-world usage patterns while maintaining backward compatibility.
 
 ### Adapting Gates to Your Domain
 
