@@ -822,6 +822,7 @@ jit gate define <KEY> --title <TITLE> --description <DESCRIPTION> [OPTIONS]
 - `--pass-context` - Pass structured context (issue data, run history, prompt) to checker via `JIT_CONTEXT_FILE`
 - `--prompt <TEXT>` - Inline prompt/instructions included in context
 - `--prompt-file <PATH>` - Path to prompt file (relative to repo root), read at check time; takes precedence over `--prompt`
+- `--env <KEY=VALUE>` - Environment variable to pass to the checker process (repeatable)
 
 **Examples:**
 ```bash
@@ -848,7 +849,8 @@ jit gate define review \
   --mode auto \
   --pass-context \
   --prompt-file "docs/review-prompt.md" \
-  --checker-command "./scripts/ai-review.sh"
+  --checker-command "./scripts/ai-review.sh" \
+  --env REVIEWER_AGENT="copilot -s --model claude-haiku-4.5"
 ```
 
 ### `jit gate add`

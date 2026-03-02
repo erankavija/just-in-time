@@ -128,10 +128,25 @@ Every gate checker receives these environment variables:
 | `JIT_STAGE` | `precheck` or `postcheck` |
 | `JIT_CONTEXT_FILE` | Path to context JSON (only when `--pass-context` is set) |
 
+Custom environment variables can be set with `--env` when defining a gate:
+
+```bash
+jit gate define ai-review \
+  --title "AI Review" \
+  --description "AI-powered code review" \
+  --mode auto \
+  --checker-command "./scripts/ai-review.sh" \
+  --env REVIEWER_AGENT="copilot -s --model claude-haiku-4.5" \
+  --env MODEL=claude-haiku-4.5
+```
+
+These are passed to the checker process alongside the built-in variables. Use `--env` multiple times to set several variables.
+
 ```bash
 #!/bin/bash
 # Checker scripts can use these variables
 echo "Checking gate $JIT_GATE_KEY for issue $JIT_ISSUE_ID"
+echo "Custom env: REVIEWER_AGENT=$REVIEWER_AGENT"
 ```
 
 ## Write Gate Checker Scripts
@@ -262,7 +277,11 @@ The checker receives a `JIT_CONTEXT_FILE` env var pointing to a JSON file:
   "issue": {
     "id": "...", "title": "...", "description": "...",
     "state": "in_progress", "priority": "high",
-    "documents": [], "labels": [], "gates_required": []
+    "documents": [], "labels": [], "gates_required": [],
+    "dependencies": [
+      { "id": "...", "title": "Setup database schema", "state": "done", "priority": "high" },
+      { "id": "...", "title": "Implement auth module", "state": "in_progress", "priority": "medium" }
+    ]
   },
   "gate": {
     "key": "review", "title": "Code Review",
@@ -271,6 +290,8 @@ The checker receives a `JIT_CONTEXT_FILE` env var pointing to a JSON file:
   "run_history": []
 }
 ```
+
+The `dependencies` array contains enriched summaries of upstream issues — their current state, title, and priority — so context-aware gates can reason about prerequisite work.
 
 ### Prompt Files
 
@@ -302,16 +323,47 @@ jit gate check $ISSUE review
 
 ### Example: AI Review Script
 
-```bash
-#!/bin/bash
-# scripts/ai-review.sh
-CONTEXT=$(cat "$JIT_CONTEXT_FILE")
-PROMPT=$(echo "$CONTEXT" | jq -r '.prompt')
-HISTORY=$(echo "$CONTEXT" | jq -r '.run_history | length')
+A production-ready AI review script is provided in `contrib/gates/ai-review.sh`. It pipes the gate context into an AI agent CLI (set via `REVIEWER_AGENT`) and parses a `VERDICT: PASS` / `VERDICT: FAIL` from the output.
 
-echo "Reviewing issue (attempt $((HISTORY + 1)))..."
-# Pass context to your AI tool of choice
+```bash
+# Copy the script into your repo
+cp contrib/gates/ai-review.sh scripts/
+
+# Define the gate with --env to set the reviewer agent
+jit gate define ai-review \
+  --title "AI Code Review" \
+  --description "AI-powered code review" \
+  --mode auto --stage postcheck \
+  --pass-context \
+  --prompt-file "contrib/gates/prompts/code-review.md" \
+  --checker-command "./scripts/ai-review.sh" \
+  --env REVIEWER_AGENT="copilot -s --model claude-haiku-4.5" \
+  --timeout 120
 ```
+
+### Prompt Library
+
+Ready-to-use prompt templates are provided in `contrib/gates/prompts/`:
+
+| Prompt | Description |
+|--------|-------------|
+| `code-review.md` | General review — correctness, style, error handling, simplicity |
+| `security-audit.md` | OWASP Top 10 checklist with severity ratings |
+| `test-adequacy.md` | Test coverage vs requirements, edge cases, naming conventions |
+
+Reference them with `--prompt-file`:
+
+```bash
+jit gate define security-audit \
+  --title "Security Audit" \
+  --description "OWASP Top 10 security check" \
+  --mode auto --pass-context \
+  --prompt-file "contrib/gates/prompts/security-audit.md" \
+  --checker-command "./scripts/ai-review.sh" \
+  --env REVIEWER_AGENT="copilot -s --model claude-sonnet-4.5"
+```
+
+The prompts reference the context JSON structure (issue, gate, documents, dependencies, run_history) and end with the verdict format. Customize them or use them as starting points for your own.
 
 ## Prechecks vs Postchecks
 
