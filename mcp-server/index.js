@@ -16,7 +16,7 @@ import {
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { loadSchema } from "./lib/schema-loader.js";
-import { generateTools, parseToolName, getCommandByPath } from "./lib/tool-generator.js";
+import { generateTools, generateDefaultTools, parseToolName, getCommandByPath } from "./lib/tool-generator.js";
 import { validateArguments } from "./lib/validator.js";
 import { executeCommand, getTimeoutForCommand } from "./lib/cli-executor.js";
 import { ConcurrencyLimiter } from "./lib/concurrency.js";
@@ -406,23 +406,40 @@ const server = new Server(
 );
 
 // Cache generated tools
-let cachedTools = null;
+let cachedAllTools = null;
+let cachedListedTools = null;
 
 /**
- * Get or generate tools
+ * Get or generate all tools (used for command lookup and execution)
  */
-function getTools() {
-  if (!cachedTools) {
+function getAllTools() {
+  if (!cachedAllTools) {
     const includeOutputSchema = RESPONSE_MODE === "structured";
-    cachedTools = generateTools(jitSchema, includeOutputSchema);
+    cachedAllTools = generateTools(jitSchema, includeOutputSchema);
   }
-  return cachedTools;
+  return cachedAllTools;
+}
+
+/**
+ * Get tools to advertise in tools/list.
+ * Returns all tools if JIT_MCP_ALL_TOOLS is set, otherwise the curated default set.
+ */
+function getListedTools() {
+  if (!cachedListedTools) {
+    if (process.env.JIT_MCP_ALL_TOOLS) {
+      cachedListedTools = getAllTools();
+    } else {
+      const includeOutputSchema = RESPONSE_MODE === "structured";
+      cachedListedTools = generateDefaultTools(jitSchema, includeOutputSchema);
+    }
+  }
+  return cachedListedTools;
 }
 
 // Register tool handlers
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
-    tools: getTools(),
+    tools: getListedTools(),
   };
 });
 
@@ -453,8 +470,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     };
   }
   
-  // Find the tool definition for validation
-  const tools = getTools();
+  // Find the tool definition for validation (search all tools, not just listed ones)
+  const tools = getAllTools();
   const tool = tools.find(t => t.name === name);
   
   if (!tool) {
@@ -547,7 +564,7 @@ async function main() {
   
   console.error("JIT MCP Server running on stdio");
   console.error(`Version: ${jitSchema.version}`);
-  console.error(`Tools: ${getTools().length}`);
+  console.error(`Tools: ${getListedTools().length} listed (${getAllTools().length} total)`);
   
   // Display schema warnings
   if (schemaWarnings.length > 0) {

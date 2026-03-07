@@ -224,6 +224,76 @@ export function generateTools(schema, includeOutputSchema = true) {
 }
 
 /**
+ * Default tool set for the core agent workflow.
+ * Non-default tools are still executable but not advertised in tools/list.
+ * Set JIT_MCP_ALL_TOOLS=1 to expose everything.
+ */
+const DEFAULT_TOOLS = new Set([
+  // Overview
+  'jit_status',
+  'jit_validate',
+  'jit_search',
+  'jit_recover',
+
+  // Issue CRUD + lifecycle
+  'jit_issue_create',
+  'jit_issue_show',
+  'jit_issue_update',
+  'jit_issue_delete',
+  'jit_issue_search',
+  'jit_issue_claim',
+  'jit_issue_claim-next',
+  'jit_issue_release',
+  'jit_issue_reject',
+  'jit_issue_breakdown',
+
+  // Queries
+  'jit_query_available',
+  'jit_query_all',
+  'jit_query_blocked',
+
+  // Dependencies & graph
+  'jit_dep_add',
+  'jit_dep_rm',
+  'jit_graph_deps',
+  'jit_graph_downstream',
+
+  // Gates
+  'jit_gate_check-all',
+  'jit_gate_pass',
+  'jit_gate_fail',
+  'jit_gate_add',
+  'jit_gate_list',
+
+  // Documents
+  'jit_doc_add',
+  'jit_doc_list',
+  'jit_doc_show',
+  'jit_doc_remove',
+
+  // Claims (multi-agent coordination)
+  'jit_claim_acquire',
+  'jit_claim_release',
+  'jit_claim_renew',
+
+  // Labels
+  'jit_label_namespaces',
+  'jit_label_values',
+]);
+
+/**
+ * Generate the default (curated) set of MCP tools from JIT schema.
+ * Returns only tools in DEFAULT_TOOLS. Use generateTools() for the full set.
+ * @param {Object} schema - JIT schema object
+ * @param {boolean} includeOutputSchema - Whether to include outputSchema
+ * @returns {Object[]} Filtered array of MCP tool definitions
+ */
+export function generateDefaultTools(schema, includeOutputSchema = true) {
+  const allTools = generateTools(schema, includeOutputSchema);
+  return allTools.filter(t => DEFAULT_TOOLS.has(t.name));
+}
+
+/**
  * Parse tool name back to command path
  * @param {string} toolName - MCP tool name (e.g., 'jit_doc_assets_list')
  * @returns {string[]} Command path (e.g., ['doc', 'assets', 'list'])

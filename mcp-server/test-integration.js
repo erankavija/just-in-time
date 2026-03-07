@@ -178,14 +178,21 @@ async function main() {
       assert.ok(resp.result.protocolVersion);
     });
 
-    await runTest('tools/list returns non-empty array with correct shape', async () => {
+    await runTest('tools/list returns curated default set with correct shape', async () => {
       const resp = await tester.request('tools/list');
       const tools = resp.result.tools;
-      assert.ok(tools.length > 50, `expected 50+ tools, got ${tools.length}`);
+      // Default set is curated (~30-40 tools), not the full 75
+      assert.ok(tools.length >= 20, `expected 20+ tools, got ${tools.length}`);
+      assert.ok(tools.length < 50, `expected curated set (<50), got ${tools.length}`);
       for (const tool of tools) {
         assert.ok(tool.name.startsWith('jit_'));
         assert.ok(tool.description);
         assert.strictEqual(tool.inputSchema.type, 'object');
+      }
+      // Core workflow tools must be present
+      const names = new Set(tools.map(t => t.name));
+      for (const required of ['jit_status', 'jit_issue_create', 'jit_issue_show', 'jit_query_available', 'jit_dep_add', 'jit_gate_check-all']) {
+        assert.ok(names.has(required), `missing core tool: ${required}`);
       }
     });
 

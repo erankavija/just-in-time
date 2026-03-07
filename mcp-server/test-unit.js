@@ -8,7 +8,7 @@
  */
 
 import { strict as assert } from 'node:assert';
-import { generateTools, parseToolName, getCommandByPath } from './lib/tool-generator.js';
+import { generateTools, generateDefaultTools, parseToolName, getCommandByPath } from './lib/tool-generator.js';
 import { validateArguments, createValidator } from './lib/validator.js';
 import { buildCliArgs } from './lib/cli-executor.js';
 import { ConcurrencyLimiter } from './lib/concurrency.js';
@@ -279,6 +279,23 @@ await runTest('generateTools matches real schema without errors', () => {
     assert.ok(tool.description, `tool should have description: ${tool.name}`);
     assert.ok(tool.inputSchema, `tool should have inputSchema: ${tool.name}`);
     assert.strictEqual(tool.inputSchema.type, 'object');
+  }
+});
+
+await runTest('generateDefaultTools returns curated subset of all tools', () => {
+  const realSchema = JSON.parse(readFileSync(join(__dirname, 'jit-schema.json'), 'utf-8'));
+  const allTools = generateTools(realSchema);
+  const defaultTools = generateDefaultTools(realSchema);
+  assert.ok(defaultTools.length >= 20, `should have 20+ default tools, got ${defaultTools.length}`);
+  assert.ok(defaultTools.length < allTools.length, `default (${defaultTools.length}) should be fewer than all (${allTools.length})`);
+  // Every default tool must exist in the full set
+  const allNames = new Set(allTools.map(t => t.name));
+  for (const tool of defaultTools) {
+    assert.ok(allNames.has(tool.name), `default tool ${tool.name} not in full set`);
+  }
+  // Core workflow tools must be present
+  for (const name of ['jit_status', 'jit_issue_create', 'jit_issue_show', 'jit_query_available', 'jit_dep_add', 'jit_gate_check-all']) {
+    assert.ok(defaultTools.some(t => t.name === name), `missing core tool: ${name}`);
   }
 });
 
