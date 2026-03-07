@@ -8,7 +8,7 @@ use clap::{Arg, ArgAction, CommandFactory};
 use schemars::{schema_for, JsonSchema};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// Complete command schema for the JIT CLI
 #[derive(Debug, Serialize, Deserialize)]
@@ -30,6 +30,9 @@ pub struct CommandSchema {
 pub struct Command {
     /// Command description
     pub description: String,
+    /// Whether this command is hidden from default MCP tool listing
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub hidden: bool,
     /// Subcommands (for issue, dep, gate, etc.)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub subcommands: Option<HashMap<String, Command>>,
@@ -138,12 +141,73 @@ impl CommandSchema {
         }
     }
 
+    /// Commands hidden from the default MCP tool listing.
+    /// These are still present in the schema and executable, but the MCP server
+    /// filters them from `tools/list` unless `JIT_MCP_ALL_TOOLS=1` is set.
+    fn hidden_commands() -> HashSet<&'static str> {
+        [
+            "claim_force-evict",
+            "claim_heartbeat",
+            "claim_list",
+            "claim_status",
+            "config_get",
+            "config_list-templates",
+            "config_set",
+            "config_show",
+            "config_show-hierarchy",
+            "config_validate",
+            "doc_archive",
+            "doc_assets_list",
+            "doc_check-links",
+            "doc_diff",
+            "doc_history",
+            "events_query",
+            "events_tail",
+            "gate_check",
+            "gate_define",
+            "gate_preset_apply",
+            "gate_preset_create",
+            "gate_preset_list",
+            "gate_preset_show",
+            "gate_remove",
+            "gate_show",
+            "graph_export",
+            "graph_roots",
+            "hooks_install",
+            "init",
+            "issue_assign",
+            "issue_unassign",
+            "query_closed",
+            "query_strategic",
+            "registry_add",
+            "registry_list",
+            "registry_remove",
+            "registry_show",
+            "snapshot_export",
+            "worktree_info",
+            "worktree_list",
+        ]
+        .into_iter()
+        .collect()
+    }
+
     /// Extract command from clap Command with full path for output schema lookup
     fn extract_command_with_path(clap_cmd: &clap::Command, cmd_path: &str) -> Command {
+        Self::extract_command_with_path_hidden(clap_cmd, cmd_path, false, &Self::hidden_commands())
+    }
+
+    fn extract_command_with_path_hidden(
+        clap_cmd: &clap::Command,
+        cmd_path: &str,
+        parent_hidden: bool,
+        hidden_commands: &HashSet<&str>,
+    ) -> Command {
         let description = clap_cmd
             .get_about()
             .map(|s| s.to_string())
             .unwrap_or_default();
+
+        let hidden = parent_hidden || hidden_commands.contains(cmd_path);
 
         // Check if this has subcommands
         let subcommands_vec: Vec<_> = clap_cmd.get_subcommands().collect();
@@ -157,7 +221,12 @@ impl CommandSchema {
                     let sub_path = format!("{}_{}", cmd_path, name);
                     sub_map.insert(
                         name.to_string(),
-                        Self::extract_command_with_path(subcmd, &sub_path),
+                        Self::extract_command_with_path_hidden(
+                            subcmd,
+                            &sub_path,
+                            hidden,
+                            hidden_commands,
+                        ),
                     );
                 }
             }
@@ -185,6 +254,7 @@ impl CommandSchema {
 
         Command {
             description,
+            hidden,
             subcommands,
             args,
             flags,
@@ -446,5 +516,90 @@ impl CommandSchema {
                 description: "External dependency failed (git, file system, etc.)".to_string(),
             },
         ]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_hidden_field_set_for_known_commands() {
+        let schema = CommandSchema::generate();
+
+        // Known hidden commands should have hidden=true on their leaf
+        let init = schema.commands.get("init");
+        assert!(init.is_some(), "init command should exist");
+        assert!(init.unwrap().hidden, "init should be hidden");
+
+        // issue_assign should be hidden (leaf under issue)
+        let issue = schema.commands.get("issue").expect("issue command");
+        let assign = issue.subcommands.as_ref().and_then(|s| s.get("assign"));
+        assert!(assign.is_some(), "issue assign should exist");
+        assert!(assign.unwrap().hidden, "issue assign should be hidden");
+
+        // Non-hidden commands should not have hidden=true
+        let status = schema.commands.get("status");
+        assert!(status.is_some(), "status command should exist");
+        assert!(!status.unwrap().hidden, "status should not be hidden");
+
+        let issue_create = issue.subcommands.as_ref().and_then(|s| s.get("create"));
+        assert!(issue_create.is_some(), "issue create should exist");
+        assert!(
+            !issue_create.unwrap().hidden,
+            "issue create should not be hidden"
+        );
+    }
+
+    #[test]
+    fn test_hidden_propagates_to_children() {
+        let schema = CommandSchema::generate();
+
+        // gate_preset is hidden, so its children should inherit hidden
+        let gate = schema.commands.get("gate").expect("gate command");
+        if let Some(preset) = gate.subcommands.as_ref().and_then(|s| s.get("preset")) {
+            if let Some(children) = &preset.subcommands {
+                for (name, child) in children {
+                    assert!(
+                        child.hidden,
+                        "gate preset {name} should be hidden (inherited from parent)"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_hidden_not_serialized_when_false() {
+        let cmd = Command {
+            description: "test".to_string(),
+            hidden: false,
+            subcommands: None,
+            args: vec![],
+            flags: vec![],
+            output: None,
+        };
+        let json = serde_json::to_string(&cmd).unwrap();
+        assert!(
+            !json.contains("hidden"),
+            "hidden:false should be skipped in serialization"
+        );
+    }
+
+    #[test]
+    fn test_hidden_serialized_when_true() {
+        let cmd = Command {
+            description: "test".to_string(),
+            hidden: true,
+            subcommands: None,
+            args: vec![],
+            flags: vec![],
+            output: None,
+        };
+        let json = serde_json::to_string(&cmd).unwrap();
+        assert!(
+            json.contains("\"hidden\":true"),
+            "hidden:true should be present in serialization"
+        );
     }
 }

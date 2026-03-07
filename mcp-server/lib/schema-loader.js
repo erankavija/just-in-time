@@ -1,69 +1,33 @@
 /**
- * Schema loading with runtime preference
- * 
- * Loads JIT schema either from runtime CLI (`jit --schema`) or falls back
- * to bundled schema file. Warns when versions differ.
+ * Schema loading from the jit CLI
+ *
+ * The CLI is the single source of truth for the command schema.
+ * No bundled schema file is shipped — `jit --schema` must be available.
  */
 
 import { execFile } from "child_process";
 import { promisify } from "util";
-import { readFileSync } from "fs";
 
 const execFileAsync = promisify(execFile);
 
 /**
- * Load schema from jit CLI at runtime
- * @returns {Promise<Object>} Schema object from jit --schema
+ * Load schema from the jit CLI (`jit --schema`).
+ * @returns {Promise<{schema: Object, warnings: string[]}>}
+ * @throws {Error} if jit is not in PATH or does not support --schema
  */
-async function loadSchemaFromCli() {
+export async function loadSchema() {
+  const warnings = [];
+
   try {
     const { stdout } = await execFileAsync('jit', ['--schema'], {
       timeout: 5000,
       maxBuffer: 10 * 1024 * 1024,
     });
-    return JSON.parse(stdout);
+    return { schema: JSON.parse(stdout), warnings };
   } catch (error) {
-    // CLI not available or doesn't support --schema
-    return null;
-  }
-}
-
-/**
- * Load schema from bundled file
- * @param {string} schemaPath - Path to bundled schema file
- * @returns {Object} Schema object
- */
-function loadSchemaFromFile(schemaPath) {
-  return JSON.parse(readFileSync(schemaPath, "utf-8"));
-}
-
-/**
- * Load schema with preference for runtime CLI
- * @param {string} bundledSchemaPath - Path to bundled schema file
- * @returns {Promise<{schema: Object, warnings: string[]}>}
- */
-export async function loadSchema(bundledSchemaPath) {
-  const warnings = [];
-  
-  // Try loading from CLI first
-  const cliSchema = await loadSchemaFromCli();
-  const bundledSchema = loadSchemaFromFile(bundledSchemaPath);
-  
-  if (!cliSchema) {
-    warnings.push(
-      "Could not load schema from jit CLI (--schema not supported or jit not in PATH). " +
-      "Using bundled schema. Schema may be out of sync with installed jit binary."
-    );
-    return { schema: bundledSchema, warnings };
-  }
-  
-  // Check version mismatch
-  if (cliSchema.version !== bundledSchema.version) {
-    warnings.push(
-      `Schema version mismatch: CLI reports ${cliSchema.version}, ` +
-      `bundled schema is ${bundledSchema.version}. Using CLI schema.`
+    throw new Error(
+      "Failed to load schema from jit CLI. Ensure jit is installed and in PATH.\n" +
+      `Underlying error: ${error.message}`
     );
   }
-  
-  return { schema: cliSchema, warnings };
 }

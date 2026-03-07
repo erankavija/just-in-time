@@ -13,19 +13,14 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { join, dirname } from "path";
-import { fileURLToPath } from "url";
 import { loadSchema } from "./lib/schema-loader.js";
 import { generateTools, generateDefaultTools, parseToolName, getCommandByPath } from "./lib/tool-generator.js";
 import { validateArguments } from "./lib/validator.js";
 import { executeCommand, getTimeoutForCommand } from "./lib/cli-executor.js";
 import { ConcurrencyLimiter } from "./lib/concurrency.js";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-
-// Load JIT schema with runtime preference
-const schemaPath = join(__dirname, "jit-schema.json");
-const { schema: jitSchema, warnings: schemaWarnings } = await loadSchema(schemaPath);
+// Load JIT schema from CLI (single source of truth)
+const { schema: jitSchema, warnings: schemaWarnings } = await loadSchema();
 
 // Create concurrency limiter (max 10 concurrent commands)
 const concurrencyLimiter = new ConcurrencyLimiter(10);

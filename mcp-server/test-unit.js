@@ -8,15 +8,14 @@
  */
 
 import { strict as assert } from 'node:assert';
+import { execFileSync } from 'node:child_process';
 import { generateTools, generateDefaultTools, parseToolName, getCommandByPath } from './lib/tool-generator.js';
 import { validateArguments, createValidator } from './lib/validator.js';
 import { buildCliArgs } from './lib/cli-executor.js';
 import { ConcurrencyLimiter } from './lib/concurrency.js';
-import { readFileSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+// Load the real schema from the CLI (single source of truth)
+const realSchema = JSON.parse(execFileSync('jit', ['--schema'], { maxBuffer: 10 * 1024 * 1024 }).toString());
 
 // ---------------------------------------------------------------------------
 // Test infrastructure
@@ -127,6 +126,7 @@ const testSchema = {
       subcommands: {
         define: {
           description: 'Define a new gate',
+          hidden: true,
           args: [],
           flags: [
             { name: 'key', type: 'string', required: true, description: 'Unique gate key' },
@@ -199,6 +199,15 @@ await runTest('tool description comes from command', () => {
   assert.strictEqual(statusTool.description, 'Show overall status');
 });
 
+await runTest('propagates hidden flag to generated tool as _hidden', () => {
+  const tools = generateTools(testSchema);
+  const defineTool = tools.find(t => t.name === 'jit_gate_define');
+  assert.ok(defineTool, 'should generate jit_gate_define');
+  assert.strictEqual(defineTool._hidden, true, 'gate define should be _hidden');
+  const statusTool = tools.find(t => t.name === 'jit_status');
+  assert.strictEqual(statusTool._hidden, false, 'status should not be _hidden');
+});
+
 await runTest('parseToolName strips jit_ prefix and splits on _', () => {
   assert.deepStrictEqual(parseToolName('jit_issue_create'), ['issue', 'create']);
   assert.deepStrictEqual(parseToolName('jit_doc_assets_list'), ['doc', 'assets', 'list']);
@@ -245,7 +254,7 @@ await runTest('omits outputSchema when success_schema is absent', () => {
 });
 
 await runTest('real schema: outputSchema resolves $ref definitions inline', () => {
-  const realSchema = JSON.parse(readFileSync(join(__dirname, 'jit-schema.json'), 'utf-8'));
+
   const tools = generateTools(realSchema);
 
   // gate.list has $ref to GateDefinition
@@ -258,7 +267,7 @@ await runTest('real schema: outputSchema resolves $ref definitions inline', () =
 });
 
 await runTest('real schema: tools with success_schema get outputSchema', () => {
-  const realSchema = JSON.parse(readFileSync(join(__dirname, 'jit-schema.json'), 'utf-8'));
+
   const tools = generateTools(realSchema);
   const withOutput = tools.filter(t => t.outputSchema);
   assert.ok(withOutput.length >= 10, `should have 10+ tools with outputSchema, got ${withOutput.length}`);
@@ -270,7 +279,7 @@ await runTest('real schema: tools with success_schema get outputSchema', () => {
 });
 
 await runTest('generateTools matches real schema without errors', () => {
-  const realSchema = JSON.parse(readFileSync(join(__dirname, 'jit-schema.json'), 'utf-8'));
+
   const tools = generateTools(realSchema);
   assert.ok(tools.length > 50, `should generate 50+ tools, got ${tools.length}`);
   // Every tool should have a name, description, and inputSchema
@@ -283,7 +292,7 @@ await runTest('generateTools matches real schema without errors', () => {
 });
 
 await runTest('generateDefaultTools returns curated subset of all tools', () => {
-  const realSchema = JSON.parse(readFileSync(join(__dirname, 'jit-schema.json'), 'utf-8'));
+
   const allTools = generateTools(realSchema);
   const defaultTools = generateDefaultTools(realSchema);
   assert.ok(defaultTools.length >= 20, `should have 20+ default tools, got ${defaultTools.length}`);
@@ -296,6 +305,22 @@ await runTest('generateDefaultTools returns curated subset of all tools', () => 
   // Core workflow tools must be present
   for (const name of ['jit_status', 'jit_issue_create', 'jit_issue_show', 'jit_query_available', 'jit_dep_add', 'jit_gate_check-all']) {
     assert.ok(defaultTools.some(t => t.name === name), `missing core tool: ${name}`);
+  }
+});
+
+await runTest('generateDefaultTools filters based on schema hidden field', () => {
+
+  const allTools = generateTools(realSchema);
+  const defaultTools = generateDefaultTools(realSchema);
+  // Default tools should be exactly the non-hidden tools
+  const hiddenTools = allTools.filter(t => t._hidden);
+  const nonHiddenTools = allTools.filter(t => !t._hidden);
+  assert.strictEqual(defaultTools.length, nonHiddenTools.length,
+    `default tools (${defaultTools.length}) should equal non-hidden tools (${nonHiddenTools.length})`);
+  assert.ok(hiddenTools.length > 0, 'should have some hidden tools');
+  // No default tool should have _hidden=true
+  for (const tool of defaultTools) {
+    assert.ok(!tool._hidden, `default tool ${tool.name} should not be hidden`);
   }
 });
 
