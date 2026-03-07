@@ -18,7 +18,7 @@ import { fileURLToPath } from "url";
 import { loadSchema } from "./lib/schema-loader.js";
 import { generateTools, parseToolName, getCommandByPath } from "./lib/tool-generator.js";
 import { validateArguments } from "./lib/validator.js";
-import { executeCommand } from "./lib/cli-executor.js";
+import { executeCommand, getTimeoutForCommand } from "./lib/cli-executor.js";
 import { ConcurrencyLimiter } from "./lib/concurrency.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -499,7 +499,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   try {
     // Execute command with concurrency limiting
     const result = await concurrencyLimiter.run(async () => {
-      return await executeCommand(cmdPath, validation.data, cmdDef);
+      const timeout = getTimeoutForCommand(cmdPath);
+      return await executeCommand(cmdPath, validation.data, cmdDef, timeout);
     });
     
     // Check if result is an error

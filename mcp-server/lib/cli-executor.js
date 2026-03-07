@@ -13,6 +13,9 @@ const execFileAsync = promisify(execFile);
 // Default timeout for CLI commands (30 seconds)
 const DEFAULT_TIMEOUT = 30000;
 
+// Longer timeout for commands that run external checkers (10 minutes)
+const LONG_TIMEOUT = 600000;
+
 /**
  * Execute jit CLI command and return parsed output
  * @param {string[]} cmdPath - Command path (e.g., ['doc', 'assets', 'list'])
@@ -138,6 +141,19 @@ export function buildCliArgs(cmdPath, args, cmdDef) {
   }
   
   return cliArgs;
+}
+
+/**
+ * Get appropriate timeout for a command based on its path.
+ * Gate check commands run external processes and need longer timeouts.
+ * @param {string[]} cmdPath - Command path (e.g., ['gate', 'check'])
+ * @returns {number} Timeout in milliseconds
+ */
+export function getTimeoutForCommand(cmdPath) {
+  if (cmdPath[0] === 'gate' && (cmdPath[1] === 'check' || cmdPath[1] === 'check-all')) {
+    return LONG_TIMEOUT;
+  }
+  return DEFAULT_TIMEOUT;
 }
 
 /**

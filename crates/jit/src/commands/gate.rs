@@ -513,6 +513,30 @@ impl<S: IssueStore> CommandExecutor<S> {
         self.add_gates(issue_id, &gate_keys)
     }
 
+    /// List all gate run results for an issue, optionally filtered by gate key.
+    ///
+    /// Results are sorted newest-first by `started_at`.
+    pub fn list_gate_runs(
+        &self,
+        issue_id: &str,
+        gate_key_filter: Option<&str>,
+    ) -> Result<Vec<crate::domain::GateRunResult>> {
+        let full_id = self.storage.resolve_issue_id(issue_id)?;
+        let mut runs = self.storage.list_gate_runs_for_issue(&full_id)?;
+
+        if let Some(key) = gate_key_filter {
+            runs.retain(|r| r.gate_key == key);
+        }
+
+        runs.sort_by(|a, b| b.started_at.cmp(&a.started_at));
+        Ok(runs)
+    }
+
+    /// Load a single gate run result by run ID.
+    pub fn get_gate_run_result(&self, run_id: &str) -> Result<crate::domain::GateRunResult> {
+        self.storage.load_gate_run_result(run_id)
+    }
+
     pub fn create_gate_preset(
         &self,
         preset_name: &str,

@@ -8,15 +8,39 @@ export interface DocumentReference {
   doc_type?: string;
 }
 
-export interface Gate {
-  key: string;
-  name: string;
-  description?: string;
+export interface GateState {
+  status: 'pending' | 'passed' | 'failed';
+  updated_by?: string;
+  updated_at: string;
 }
 
-export interface GateStatus {
+export interface GateDefinition {
+  key: string;
+  title: string;
+  description: string;
+  stage: 'precheck' | 'postcheck';
+  mode: 'manual' | 'auto';
+}
+
+export interface GateRunSummary {
+  run_id: string;
   gate_key: string;
-  state: 'pending' | 'passed' | 'failed';
+  stage: 'precheck' | 'postcheck';
+  status: 'passed' | 'failed' | 'error' | 'pending' | 'skipped';
+  started_at: string;
+  completed_at?: string;
+  duration_ms?: number;
+  exit_code?: number;
+  command: string;
+  commit?: string;
+  branch?: string;
+  by?: string;
+  message?: string;
+}
+
+export interface GateRunDetail extends GateRunSummary {
+  stdout: string;
+  stderr: string;
 }
 
 export interface Issue {
@@ -29,8 +53,8 @@ export interface Issue {
   dependencies: string[];
   labels: string[];
   documents: DocumentReference[];
-  gates: string[];
-  gates_status: GateStatus[];
+  gates_required: string[];
+  gates_status: Record<string, GateState>;
   created_at: string;
   updated_at: string;
 }

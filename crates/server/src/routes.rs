@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use jit::commands::CommandExecutor;
-use jit::domain::{Issue, Priority, State as IssueState};
+use jit::domain::{Gate, GateRunResult, Issue, Priority, State as IssueState};
 use jit::search::{SearchOptions, SearchResult};
 use jit::storage::IssueStore;
 
@@ -39,6 +39,10 @@ pub fn create_routes<S: IssueStore + Send + Sync + 'static>(
             get(get_document_history),
         )
         .route("/issues/:id/documents/:path/diff", get(get_document_diff))
+        .route("/gates", get(list_gates))
+        .route("/gates/:key", get(get_gate_definition))
+        .route("/issues/:id/gate-runs", get(list_gate_runs))
+        .route("/issues/:id/gate-runs/:run_id", get(get_gate_run))
         .route("/config/strategic-types", get(get_strategic_types))
         .route("/config/hierarchy", get(get_hierarchy))
         .route("/config/namespaces", get(get_namespaces))
@@ -468,6 +472,101 @@ async fn get_document_diff<S: IssueStore>(
         to: to_ref.to_string(),
         diff,
     }))
+}
+
+/// List all gate definitions from the registry
+async fn list_gates<S: IssueStore>(
+    State(executor): State<AppState<S>>,
+) -> Result<Json<Vec<Gate>>, StatusCode> {
+    executor.list_gates().map(Json).map_err(|e| {
+        tracing::error!("Failed to list gates: {:?}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })
+}
+
+/// Get a single gate definition by key
+async fn get_gate_definition<S: IssueStore>(
+    Path(key): Path<String>,
+    State(executor): State<AppState<S>>,
+) -> Result<Json<Gate>, StatusCode> {
+    executor.show_gate_definition(&key).map(Json).map_err(|e| {
+        tracing::error!("Failed to get gate definition {}: {:?}", key, e);
+        StatusCode::NOT_FOUND
+    })
+}
+
+/// Query parameters for gate runs
+#[derive(Debug, Deserialize)]
+struct GateRunsQuery {
+    gate_key: Option<String>,
+}
+
+/// Summary of a gate run (excludes stdout/stderr for size)
+#[derive(Debug, Serialize)]
+struct GateRunSummary {
+    run_id: String,
+    gate_key: String,
+    stage: jit::domain::GateStage,
+    status: jit::domain::GateRunStatus,
+    started_at: String,
+    completed_at: Option<String>,
+    duration_ms: Option<u64>,
+    exit_code: Option<i32>,
+    command: String,
+    commit: Option<String>,
+    branch: Option<String>,
+    by: Option<String>,
+    message: Option<String>,
+}
+
+impl From<GateRunResult> for GateRunSummary {
+    fn from(r: GateRunResult) -> Self {
+        Self {
+            run_id: r.run_id,
+            gate_key: r.gate_key,
+            stage: r.stage,
+            status: r.status,
+            started_at: r.started_at.to_rfc3339(),
+            completed_at: r.completed_at.map(|t| t.to_rfc3339()),
+            duration_ms: r.duration_ms,
+            exit_code: r.exit_code,
+            command: r.command,
+            commit: r.commit,
+            branch: r.branch,
+            by: r.by,
+            message: r.message,
+        }
+    }
+}
+
+/// List gate run results for an issue (summaries without stdout/stderr)
+async fn list_gate_runs<S: IssueStore>(
+    Path(id): Path<String>,
+    Query(params): Query<GateRunsQuery>,
+    State(executor): State<AppState<S>>,
+) -> Result<Json<Vec<GateRunSummary>>, StatusCode> {
+    let runs = executor
+        .list_gate_runs(&id, params.gate_key.as_deref())
+        .map_err(|e| {
+            tracing::error!("Failed to list gate runs for {}: {:?}", id, e);
+            StatusCode::NOT_FOUND
+        })?;
+
+    Ok(Json(runs.into_iter().map(GateRunSummary::from).collect()))
+}
+
+/// Get a single gate run result with full stdout/stderr
+async fn get_gate_run<S: IssueStore>(
+    Path((_id, run_id)): Path<(String, String)>,
+    State(executor): State<AppState<S>>,
+) -> Result<Json<GateRunResult>, StatusCode> {
+    executor
+        .get_gate_run_result(&run_id)
+        .map(Json)
+        .map_err(|e| {
+            tracing::error!("Failed to get gate run {}: {:?}", run_id, e);
+            StatusCode::NOT_FOUND
+        })
 }
 
 /// Response for strategic types

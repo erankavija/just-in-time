@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Issue, GraphData, StatusSummary, DocumentContent, DocumentHistory, DocumentDiff, ConfigHierarchy, ConfigNamespaces } from '../types/models';
+import type { Issue, GraphData, StatusSummary, DocumentContent, DocumentHistory, DocumentDiff, ConfigHierarchy, ConfigNamespaces, GateDefinition, GateRunSummary, GateRunDetail } from '../types/models';
 
 // Use relative URL or construct from current host to avoid CORS issues
 const API_BASE = window.location.hostname === 'localhost' 
@@ -109,6 +109,29 @@ export const apiClient = {
 
   async getNamespaces(): Promise<ConfigNamespaces> {
     const response = await api.get('/config/namespaces');
+    return response.data;
+  },
+
+  async listGates(): Promise<GateDefinition[]> {
+    const response = await api.get('/gates');
+    return response.data;
+  },
+
+  async getGateDefinition(key: string): Promise<GateDefinition> {
+    const response = await api.get(`/gates/${encodeURIComponent(key)}`);
+    return response.data;
+  },
+
+  async listGateRuns(issueId: string, gateKey?: string): Promise<GateRunSummary[]> {
+    const params = new URLSearchParams();
+    if (gateKey) params.set('gate_key', gateKey);
+    const qs = params.toString();
+    const response = await api.get(`/issues/${issueId}/gate-runs${qs ? '?' + qs : ''}`);
+    return response.data;
+  },
+
+  async getGateRun(issueId: string, runId: string): Promise<GateRunDetail> {
+    const response = await api.get(`/issues/${issueId}/gate-runs/${runId}`);
     return response.data;
   },
 };

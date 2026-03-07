@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import remarkGfm from 'remark-gfm';
@@ -8,9 +8,20 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import 'katex/dist/katex.min.css';
 import './IssueDetail.css';
 import { apiClient } from '../../api/client';
-import type { Issue, DocumentReference } from '../../types/models';
+import type { Issue, DocumentReference, GateDefinition, GateRunSummary, GateRunDetail } from '../../types/models';
 import { DocumentViewer } from '../Document/DocumentViewer';
 import { LabelBadge } from '../Labels/LabelBadge';
+
+function timeAgo(dateStr: string): string {
+  const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
 
 interface IssueDetailProps {
   issueId: string | null;
@@ -24,6 +35,11 @@ export function IssueDetail({ issueId, allIssues = [], onNavigate, onFocusInGrap
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedDocument, setSelectedDocument] = useState<DocumentReference | null>(null);
+  const [gateDefinitions, setGateDefinitions] = useState<Record<string, GateDefinition>>({});
+  const [expandedGate, setExpandedGate] = useState<string | null>(null);
+  const [gateRuns, setGateRuns] = useState<Record<string, GateRunSummary[]>>({});
+  const [selectedRun, setSelectedRun] = useState<GateRunDetail | null>(null);
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!issueId) {
@@ -33,6 +49,63 @@ export function IssueDetail({ issueId, allIssues = [], onNavigate, onFocusInGrap
 
     loadIssue(issueId);
   }, [issueId]);
+
+  // Load gate definitions when issue has gates
+  const gateKeys = issue ? Object.keys(issue.gates_status) : [];
+  const hasGates = gateKeys.length > 0;
+  useEffect(() => {
+    if (!hasGates) return;
+    apiClient.listGates().then(gates => {
+      const map: Record<string, GateDefinition> = {};
+      for (const g of gates) map[g.key] = g;
+      setGateDefinitions(map);
+    }).catch(err => console.error('Failed to load gate definitions:', err));
+  }, [hasGates]);
+
+  // Reset gate UI state when issue changes
+  useEffect(() => {
+    setExpandedGate(null);
+    setGateRuns({});
+    setSelectedRun(null);
+    setSelectedRunId(null);
+  }, [issueId]);
+
+  const toggleGateHistory = useCallback(async (gateKey: string) => {
+    if (expandedGate === gateKey) {
+      setExpandedGate(null);
+      setSelectedRun(null);
+      setSelectedRunId(null);
+      return;
+    }
+    setExpandedGate(gateKey);
+    setSelectedRun(null);
+    setSelectedRunId(null);
+    if (!issue) return;
+    if (!gateRuns[gateKey]) {
+      try {
+        const runs = await apiClient.listGateRuns(issue.id, gateKey);
+        setGateRuns(prev => ({ ...prev, [gateKey]: runs }));
+      } catch (err) {
+        console.error('Failed to load gate runs:', err);
+      }
+    }
+  }, [expandedGate, issue, gateRuns]);
+
+  const loadRunDetail = useCallback(async (runId: string) => {
+    if (!issue) return;
+    if (selectedRunId === runId) {
+      setSelectedRun(null);
+      setSelectedRunId(null);
+      return;
+    }
+    setSelectedRunId(runId);
+    try {
+      const detail = await apiClient.getGateRun(issue.id, runId);
+      setSelectedRun(detail);
+    } catch (err) {
+      console.error('Failed to load gate run detail:', err);
+    }
+  }, [issue, selectedRunId]);
 
   const loadIssue = async (id: string) => {
     try {
@@ -348,40 +421,183 @@ export function IssueDetail({ issueId, allIssues = [], onNavigate, onFocusInGrap
         </section>
       )}
 
-      {issue.gates_status && issue.gates_status.length > 0 && (
-        <section style={{ marginBottom: '20px' }}>
-          <h2 style={{ 
-            fontSize: '13px',
-            fontWeight: 600,
-            marginBottom: '10px',
-            color: 'var(--text-primary)',
-          }}>
-            ✓ Gates ({issue.gates_status.filter(g => g.state === 'passed').length}/{issue.gates_status.length} passed)
-          </h2>
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-            {issue.gates_status.map((gate) => {
-              const symbol = gate.state === 'passed' ? '[✓]' : gate.state === 'failed' ? '[✗]' : '[ ]';
-              const color = gate.state === 'passed' ? 'var(--success)' : gate.state === 'failed' ? 'var(--error)' : 'var(--text-muted)';
-              return (
-                <li key={gate.gate_key} style={{ 
-                  padding: '8px 10px',
-                  backgroundColor: 'var(--bg-tertiary)',
-                  marginBottom: '6px',
-                  borderRadius: '4px',
-                  fontSize: '11px',
-                  border: '1px solid var(--border)',
-                  fontFamily: 'var(--font-mono)',
-                  display: 'flex',
-                  gap: '8px',
-                }}>
-                  <span style={{ color }}>{symbol}</span>
-                  <span style={{ color: 'var(--text-secondary)' }}>{gate.gate_key}</span>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      )}
+      {issue.gates_status && Object.keys(issue.gates_status).length > 0 && (() => {
+        const entries = Object.entries(issue.gates_status);
+        const passedCount = entries.filter(([, g]) => g.status === 'passed').length;
+        return (
+          <section style={{ marginBottom: '20px' }}>
+            <h2 style={{
+              fontSize: '13px',
+              fontWeight: 600,
+              marginBottom: '10px',
+              color: 'var(--text-primary)',
+            }}>
+              Gates ({passedCount}/{entries.length} passed)
+            </h2>
+            <div style={{
+              border: '1px solid var(--border)',
+              borderRadius: '6px',
+              overflow: 'hidden',
+            }}>
+              {entries.map(([gateKey, gateState], idx) => {
+                const symbol = gateState.status === 'passed' ? '[✓]' : gateState.status === 'failed' ? '[✗]' : '[ ]';
+                const color = gateState.status === 'passed' ? 'var(--success)' : gateState.status === 'failed' ? 'var(--error)' : 'var(--text-muted)';
+                const def = gateDefinitions[gateKey];
+                const isExpanded = expandedGate === gateKey;
+                const runs = gateRuns[gateKey];
+
+                return (
+                  <div key={gateKey} style={{
+                    borderTop: idx > 0 ? '1px solid var(--border)' : 'none',
+                  }}>
+                    <div style={{
+                      padding: '10px 12px',
+                      backgroundColor: 'var(--bg-tertiary)',
+                    }}>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '12px' }}>
+                        <span style={{ color, fontWeight: 600 }}>{symbol}</span>
+                        <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{gateKey}</span>
+                      </div>
+                      {def && (
+                        <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '3px', marginLeft: '28px' }}>
+                          {def.title} · {def.mode} · {def.stage}
+                        </div>
+                      )}
+                      <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px', marginLeft: '28px' }}>
+                        {gateState.status === 'pending' ? 'pending' : (
+                          <>{gateState.status}{gateState.updated_by ? ` by ${gateState.updated_by}` : ''} · {timeAgo(gateState.updated_at)}</>
+                        )}
+                      </div>
+                      {(!def || def.mode === 'auto') && (
+                        <div
+                          style={{
+                            fontSize: '10px',
+                            color: 'var(--accent)',
+                            marginTop: '4px',
+                            marginLeft: '28px',
+                            cursor: 'pointer',
+                            userSelect: 'none',
+                          }}
+                          onClick={() => toggleGateHistory(gateKey)}
+                        >
+                          {isExpanded ? '▾' : '▸'} Run History{runs ? ` (${runs.length})` : ''}
+                        </div>
+                      )}
+                    </div>
+
+                    {isExpanded && (!def || def.mode === 'auto') && (
+                      <div style={{
+                        padding: '0 12px 10px 40px',
+                        backgroundColor: 'var(--bg-tertiary)',
+                      }}>
+                        {!runs ? (
+                          <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Loading...</div>
+                        ) : runs.length === 0 ? (
+                          <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>No runs recorded</div>
+                        ) : (
+                          <div style={{
+                            border: '1px solid var(--border)',
+                            borderRadius: '4px',
+                            overflow: 'hidden',
+                          }}>
+                            {runs.map((run, runIdx) => {
+                              const runSymbol = run.status === 'passed' ? '✓' : run.status === 'failed' ? '✗' : run.status === 'error' ? '!' : '·';
+                              const runColor = run.status === 'passed' ? 'var(--success)' : run.status === 'failed' || run.status === 'error' ? 'var(--error)' : 'var(--text-muted)';
+                              const duration = run.duration_ms != null ? `(${(run.duration_ms / 1000).toFixed(1)}s)` : '';
+                              const isSelected = selectedRunId === run.run_id;
+
+                              return (
+                                <div key={run.run_id} style={{
+                                  borderTop: runIdx > 0 ? '1px solid var(--border)' : 'none',
+                                }}>
+                                  <div style={{
+                                    padding: '6px 8px',
+                                    fontSize: '10px',
+                                    display: 'flex',
+                                    gap: '8px',
+                                    alignItems: 'center',
+                                    backgroundColor: 'var(--bg-secondary)',
+                                  }}>
+                                    <span style={{ color: runColor, fontWeight: 600 }}>{runSymbol}</span>
+                                    <span style={{ color: 'var(--text-secondary)' }}>{run.status}</span>
+                                    <span style={{ color: 'var(--text-muted)' }}>{timeAgo(run.started_at)}</span>
+                                    {duration && <span style={{ color: 'var(--text-muted)' }}>{duration}</span>}
+                                    <span
+                                      style={{ color: 'var(--accent)', cursor: 'pointer', marginLeft: 'auto' }}
+                                      onClick={() => loadRunDetail(run.run_id)}
+                                    >
+                                      {isSelected ? 'Hide' : 'View'}
+                                    </span>
+                                  </div>
+                                  {isSelected && selectedRun && (
+                                    <div style={{
+                                      padding: '8px',
+                                      fontSize: '10px',
+                                      backgroundColor: '#1e1e1e',
+                                      color: '#d4d4d4',
+                                      fontFamily: 'var(--font-mono)',
+                                    }}>
+                                      <div style={{ color: 'var(--text-muted)', marginBottom: '4px' }}>
+                                        $ {selectedRun.command}
+                                      </div>
+                                      {selectedRun.stdout && (
+                                        <pre style={{
+                                          margin: '4px 0',
+                                          padding: '6px',
+                                          backgroundColor: '#252526',
+                                          borderRadius: '3px',
+                                          maxHeight: '200px',
+                                          overflow: 'auto',
+                                          whiteSpace: 'pre-wrap',
+                                          wordBreak: 'break-all',
+                                          fontSize: '10px',
+                                          lineHeight: '1.4',
+                                        }}>
+                                          {selectedRun.stdout}
+                                        </pre>
+                                      )}
+                                      {selectedRun.stderr && (
+                                        <>
+                                          <div style={{ color: 'var(--error)', marginTop: '4px', marginBottom: '2px' }}>stderr:</div>
+                                          <pre style={{
+                                            margin: '0',
+                                            padding: '6px',
+                                            backgroundColor: '#252526',
+                                            borderRadius: '3px',
+                                            maxHeight: '200px',
+                                            overflow: 'auto',
+                                            whiteSpace: 'pre-wrap',
+                                            wordBreak: 'break-all',
+                                            fontSize: '10px',
+                                            lineHeight: '1.4',
+                                            color: '#f48771',
+                                          }}>
+                                            {selectedRun.stderr}
+                                          </pre>
+                                        </>
+                                      )}
+                                      {selectedRun.exit_code != null && (
+                                        <div style={{ color: 'var(--text-muted)', marginTop: '4px' }}>
+                                          exit code: {selectedRun.exit_code}
+                                          {selectedRun.commit && <> · commit: {selectedRun.commit.substring(0, 7)}</>}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        );
+      })()}
 
       {issue.documents && issue.documents.length > 0 && (
         <section style={{ marginBottom: '20px' }}>
