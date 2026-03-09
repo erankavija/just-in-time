@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "e5e86670-1f08-4691-b305-23f36a6491f8",
+  "gate_key": "clippy",
+  "stage": "postcheck",
+  "issue_id": "eb5b6ffe-f47c-4405-97c9-59b1b3b05bf2",
+  "commit": "6759285e4a02a9ce0002e26be464a1c89e03e50d",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-03-09T20:27:31.069284520Z",
+  "completed_at": "2026-03-09T20:27:35.776223717Z",
+  "duration_ms": 4706,
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "    Checking hyper v1.8.1\n    Checking jit v0.2.1 (/home/vkaskivuo/Projects/just-in-time/crates/jit)\n    Checking hyper-util v0.1.19\n    Checking axum v0.7.9\n    Checking jit-server v0.1.0 (/home/vkaskivuo/Projects/just-in-time/crates/server)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.55s\n",
+  "command": "cargo clippy --lib -- -D warnings",
+  "by": "auto:executor",
+  "message": null
+}

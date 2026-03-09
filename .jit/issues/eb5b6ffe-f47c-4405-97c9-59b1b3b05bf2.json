@@ -1,0 +1,60 @@
+{
+  "id": "eb5b6ffe-f47c-4405-97c9-59b1b3b05bf2",
+  "title": "Add SSE endpoint and file-watching change tracker to web server",
+  "description": "Add real-time change notification infrastructure to the jit-server:\n\n1. Add `notify` crate for filesystem watching of `.jit/` directory\n2. Create `ChangeTracker` module with monotonic version counter and broadcast channel\n3. Add SSE endpoint `GET /api/events/stream` that streams `{\"version\": N}` on changes\n4. Add `GET /api/changes` endpoint returning current version\n5. Debounce filesystem events (~200ms) to coalesce burst writes\n6. Update `AppState` to carry both `CommandExecutor` and `ChangeTracker`\n\nNew files: `crates/server/src/watcher.rs`, `crates/server/src/sse.rs`\nModified: `Cargo.toml`, `lib.rs`, `main.rs`, `routes.rs`",
+  "state": "done",
+  "priority": "high",
+  "assignee": "agent:claude-opus",
+  "dependencies": [],
+  "gates_required": [
+    "tdd-reminder",
+    "tests",
+    "clippy",
+    "fmt",
+    "code-review"
+  ],
+  "gates_status": {
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-03-09T20:27:06.749966892Z"
+    },
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-03-09T20:27:31.069284520Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-03-09T20:27:35.776599607Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "human:user",
+      "updated_at": "2026-03-09T20:41:21.938488214Z"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": "agent:claude-opus",
+      "updated_at": "2026-03-09T20:14:20.781990707Z"
+    }
+  },
+  "context": {},
+  "documents": [
+    {
+      "path": ".claude/plans/hidden-coalescing-lovelace.md",
+      "commit": null,
+      "label": "Implementation Plan",
+      "doc_type": "implementation-plan"
+    }
+  ],
+  "labels": [
+    "type:task",
+    "epic:usability",
+    "milestone:v1.0",
+    "component:web"
+  ],
+  "created_at": "2026-03-09T20:10:37.485302172+00:00",
+  "updated_at": "2026-03-09T20:41:26.171235065+00:00"
+}

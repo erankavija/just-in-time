@@ -28,9 +28,11 @@ interface IssueDetailProps {
   allIssues?: Issue[];
   onNavigate?: (issueId: string) => void;
   onFocusInGraph?: (issueId: string) => void;
+  /** Monotonic version from SSE — triggers re-fetch when changed */
+  version?: number;
 }
 
-export function IssueDetail({ issueId, allIssues = [], onNavigate, onFocusInGraph }: IssueDetailProps) {
+export function IssueDetail({ issueId, allIssues = [], onNavigate, onFocusInGraph, version }: IssueDetailProps) {
   const [issue, setIssue] = useState<Issue | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,7 +50,7 @@ export function IssueDetail({ issueId, allIssues = [], onNavigate, onFocusInGrap
     }
 
     loadIssue(issueId);
-  }, [issueId]);
+  }, [issueId, version]);
 
   // Load gate definitions when issue has gates
   const gateKeys = issue ? Object.keys(issue.gates_status) : [];

@@ -451,16 +451,19 @@ interface GraphViewProps {
   focusNodeId?: string | null;
   /** Callback when focus operation completes (or fails) */
   onFocusComplete?: (success: boolean) => void;
+  /** Monotonic version from SSE — triggers re-fetch when changed */
+  version?: number;
 }
 
-export function GraphView({ 
-  onNodeClick, 
-  viewMode = 'tactical', 
+export function GraphView({
+  onNodeClick,
+  viewMode = 'tactical',
   labelFilters = [],
   layoutAlgorithm = 'compact',
   // onLayoutChange is received but not used in current implementation
   focusNodeId,
   onFocusComplete,
+  version,
 }: GraphViewProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -991,7 +994,7 @@ export function GraphView({
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setNodes, setEdges, viewMode, labelFilters, strategicTypes, layoutAlgorithm, hierarchyConfig, expansionState]); // nodeStats is setState, not a dependency
+  }, [setNodes, setEdges, viewMode, labelFilters, strategicTypes, layoutAlgorithm, hierarchyConfig, expansionState, version]); // nodeStats is setState, not a dependency
 
   useEffect(() => {
     loadGraph();

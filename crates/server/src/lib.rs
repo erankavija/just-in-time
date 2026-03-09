@@ -4,6 +4,8 @@
 //! and external integrations to query and visualize issues.
 
 pub mod routes;
+pub mod sse;
+pub mod watcher;
 
 // Re-export for convenience
 pub use routes::create_routes;

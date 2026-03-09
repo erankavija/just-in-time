@@ -2,7 +2,7 @@ import axios from 'axios';
 import type { Issue, GraphData, StatusSummary, DocumentContent, DocumentHistory, DocumentDiff, ConfigHierarchy, ConfigNamespaces, GateDefinition, GateRunSummary, GateRunDetail } from '../types/models';
 
 // Use relative URL or construct from current host to avoid CORS issues
-const API_BASE = window.location.hostname === 'localhost' 
+export const API_BASE = window.location.hostname === 'localhost'
   ? 'http://localhost:3000/api'
   : `http://${window.location.hostname}:3000/api`;
 

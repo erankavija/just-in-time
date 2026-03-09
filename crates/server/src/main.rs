@@ -4,6 +4,8 @@
 //! and external integrations to query and visualize issues.
 
 mod routes;
+mod sse;
+mod watcher;
 
 use anyhow::Result;
 use axum::Router;
@@ -14,6 +16,7 @@ use tracing::info;
 
 use jit::commands::CommandExecutor;
 use jit::storage::JsonFileStorage;
+use routes::AppState;
 
 /// JIT REST API Server
 #[derive(Parser, Debug)]
@@ -59,6 +62,13 @@ async fn main() -> Result<()> {
     info!("Using JIT repository at: {}", args.data_dir);
     let executor = Arc::new(CommandExecutor::new(storage));
 
+    // Start file watcher for live updates
+    let (tracker, _watcher) = watcher::start_watching(&args.data_dir)?;
+    let tracker = Arc::new(tracker);
+    info!("Watching {} for changes", args.data_dir);
+
+    let state = AppState { executor, tracker };
+
     // Build CORS layer for local development
     let cors = CorsLayer::new()
         .allow_origin(Any)
@@ -67,7 +77,7 @@ async fn main() -> Result<()> {
 
     // Build router
     let app = Router::new()
-        .nest("/api", routes::create_routes(executor))
+        .nest("/api", routes::create_routes(state))
         .layer(cors)
         .layer(tower_http::trace::TraceLayer::new_for_http());
 

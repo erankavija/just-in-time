@@ -4,6 +4,8 @@ use axum_test::TestServer;
 use jit::commands::CommandExecutor;
 use jit::domain::Priority;
 use jit::storage::InMemoryStorage;
+use jit_server::routes::AppState;
+use jit_server::watcher::ChangeTracker;
 use std::sync::Arc;
 
 /// Helper to create test server with initialized storage
@@ -12,7 +14,11 @@ async fn create_test_server() -> TestServer {
     let executor = CommandExecutor::new(storage);
     executor.init().expect("Failed to init");
 
-    let app = jit_server::routes::create_routes(Arc::new(executor));
+    let state = AppState {
+        executor: Arc::new(executor),
+        tracker: Arc::new(ChangeTracker::new(16)),
+    };
+    let app = jit_server::routes::create_routes(state);
     TestServer::new(app).expect("Failed to create test server")
 }
 
@@ -33,7 +39,11 @@ async fn create_test_server_with_issue() -> (TestServer, String) {
         )
         .expect("Failed to create issue");
 
-    let app = jit_server::routes::create_routes(Arc::new(executor));
+    let state = AppState {
+        executor: Arc::new(executor),
+        tracker: Arc::new(ChangeTracker::new(16)),
+    };
+    let app = jit_server::routes::create_routes(state);
     let server = TestServer::new(app).expect("Failed to create test server");
 
     (server, issue_id)
@@ -82,7 +92,11 @@ async fn test_get_document_content_not_yet_implemented() {
     // Add document reference (if method exists)
     // For now, this will fail because we need the document to exist
 
-    let app = jit_server::routes::create_routes(Arc::new(executor));
+    let state = AppState {
+        executor: Arc::new(executor),
+        tracker: Arc::new(ChangeTracker::new(16)),
+    };
+    let app = jit_server::routes::create_routes(state);
     let server = TestServer::new(app).expect("Failed to create test server");
 
     // Without a document, we get 404

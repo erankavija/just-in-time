@@ -15,13 +15,18 @@ use jit::domain::{Gate, GateRunResult, Issue, Priority, State as IssueState};
 use jit::search::{SearchOptions, SearchResult};
 use jit::storage::IssueStore;
 
+use crate::sse;
+use crate::watcher::ChangeTracker;
+
 /// Shared application state
-pub type AppState<S> = Arc<CommandExecutor<S>>;
+#[derive(Clone)]
+pub struct AppState<S: IssueStore> {
+    pub executor: Arc<CommandExecutor<S>>,
+    pub tracker: Arc<ChangeTracker>,
+}
 
 /// Create API routes
-pub fn create_routes<S: IssueStore + Send + Sync + 'static>(
-    executor: Arc<CommandExecutor<S>>,
-) -> Router {
+pub fn create_routes<S: IssueStore + Send + Sync + 'static>(state: AppState<S>) -> Router {
     Router::new()
         .route("/health", get(health_check))
         .route("/issues", get(list_issues))
@@ -46,7 +51,9 @@ pub fn create_routes<S: IssueStore + Send + Sync + 'static>(
         .route("/config/strategic-types", get(get_strategic_types))
         .route("/config/hierarchy", get(get_hierarchy))
         .route("/config/namespaces", get(get_namespaces))
-        .with_state(executor)
+        .route("/changes", get(get_changes))
+        .route("/events/stream", get(events_stream))
+        .with_state(state)
 }
 
 /// Health check endpoint
@@ -60,9 +67,10 @@ async fn health_check() -> impl IntoResponse {
 
 /// List all issues
 async fn list_issues<S: IssueStore>(
-    State(executor): State<AppState<S>>,
+    State(state): State<AppState<S>>,
 ) -> Result<Json<Vec<Issue>>, StatusCode> {
-    executor
+    state
+        .executor
         .list_issues(None, None, None)
         .map(Json)
         .map_err(|e| {
@@ -74,9 +82,9 @@ async fn list_issues<S: IssueStore>(
 /// Get single issue by ID
 async fn get_issue<S: IssueStore>(
     Path(id): Path<String>,
-    State(executor): State<AppState<S>>,
+    State(state): State<AppState<S>>,
 ) -> Result<Json<Issue>, StatusCode> {
-    executor.show_issue(&id).map(Json).map_err(|e| {
+    state.executor.show_issue(&id).map(Json).map_err(|e| {
         tracing::error!("Failed to get issue {}: {:?}", id, e);
         StatusCode::NOT_FOUND
     })
@@ -108,9 +116,9 @@ pub struct GraphEdge {
 
 /// Get dependency graph
 async fn get_graph<S: IssueStore>(
-    State(executor): State<AppState<S>>,
+    State(state): State<AppState<S>>,
 ) -> Result<Json<GraphData>, StatusCode> {
-    let issues = executor.list_issues(None, None, None).map_err(|e| {
+    let issues = state.executor.list_issues(None, None, None).map_err(|e| {
         tracing::error!("Failed to list issues for graph: {:?}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
@@ -160,9 +168,9 @@ pub struct StatusResponse {
 
 /// Get repository status
 async fn get_status<S: IssueStore>(
-    State(executor): State<AppState<S>>,
+    State(state): State<AppState<S>>,
 ) -> Result<Json<StatusResponse>, StatusCode> {
-    let summary = executor.get_status().map_err(|e| {
+    let summary = state.executor.get_status().map_err(|e| {
         tracing::error!("Failed to get status: {:?}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
@@ -209,12 +217,12 @@ pub struct SearchResponse {
 /// Search issues and documents
 async fn search_issues<S: IssueStore>(
     Query(params): Query<SearchQuery>,
-    State(executor): State<AppState<S>>,
+    State(state): State<AppState<S>>,
 ) -> Result<Json<SearchResponse>, StatusCode> {
     let start = std::time::Instant::now();
 
     // Get all linked document paths to restrict search
-    let linked_docs = executor.get_linked_document_paths().map_err(|e| {
+    let linked_docs = state.executor.get_linked_document_paths().map_err(|e| {
         tracing::error!("Failed to get linked documents: {:?}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
@@ -262,7 +270,7 @@ struct DocumentByPathQuery {
 /// associated with a specific issue context.
 async fn get_document_by_path<S: IssueStore>(
     Query(query): Query<DocumentByPathQuery>,
-    State(_executor): State<AppState<S>>,
+    State(_state): State<AppState<S>>,
 ) -> Result<Json<DocumentContentResponse>, StatusCode> {
     use std::fs;
     use std::path::Path;
@@ -360,11 +368,12 @@ struct DocumentContentResponse {
 async fn get_document_content<S: IssueStore>(
     Path((id, path)): Path<(String, String)>,
     Query(query): Query<DocumentContentQuery>,
-    State(executor): State<AppState<S>>,
+    State(state): State<AppState<S>>,
 ) -> Result<Json<DocumentContentResponse>, StatusCode> {
     let at_commit = query.commit.as_deref();
 
-    let (content, commit_hash) = executor
+    let (content, commit_hash) = state
+        .executor
         .read_document_content(&id, &path, at_commit)
         .map_err(|e| {
             tracing::error!("Failed to read document content: {:?}", e);
@@ -402,16 +411,19 @@ struct CommitInfoResponse {
 /// Get document history
 async fn get_document_history<S: IssueStore>(
     Path((id, path)): Path<(String, String)>,
-    State(executor): State<AppState<S>>,
+    State(state): State<AppState<S>>,
 ) -> Result<Json<DocumentHistoryResponse>, StatusCode> {
-    let commits = executor.get_document_history(&id, &path).map_err(|e| {
-        tracing::error!("Failed to get document history: {:?}", e);
-        if e.to_string().contains("not found") {
-            StatusCode::NOT_FOUND
-        } else {
-            StatusCode::INTERNAL_SERVER_ERROR
-        }
-    })?;
+    let commits = state
+        .executor
+        .get_document_history(&id, &path)
+        .map_err(|e| {
+            tracing::error!("Failed to get document history: {:?}", e);
+            if e.to_string().contains("not found") {
+                StatusCode::NOT_FOUND
+            } else {
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
+        })?;
 
     let commits_response = commits
         .into_iter()
@@ -449,11 +461,12 @@ struct DocumentDiffResponse {
 async fn get_document_diff<S: IssueStore>(
     Path((id, path)): Path<(String, String)>,
     Query(query): Query<DocumentDiffQuery>,
-    State(executor): State<AppState<S>>,
+    State(state): State<AppState<S>>,
 ) -> Result<Json<DocumentDiffResponse>, StatusCode> {
     let to = query.to.as_deref();
 
-    let diff = executor
+    let diff = state
+        .executor
         .get_document_diff(&id, &path, &query.from, to)
         .map_err(|e| {
             tracing::error!("Failed to get document diff: {:?}", e);
@@ -476,9 +489,9 @@ async fn get_document_diff<S: IssueStore>(
 
 /// List all gate definitions from the registry
 async fn list_gates<S: IssueStore>(
-    State(executor): State<AppState<S>>,
+    State(state): State<AppState<S>>,
 ) -> Result<Json<Vec<Gate>>, StatusCode> {
-    executor.list_gates().map(Json).map_err(|e| {
+    state.executor.list_gates().map(Json).map_err(|e| {
         tracing::error!("Failed to list gates: {:?}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     })
@@ -487,12 +500,16 @@ async fn list_gates<S: IssueStore>(
 /// Get a single gate definition by key
 async fn get_gate_definition<S: IssueStore>(
     Path(key): Path<String>,
-    State(executor): State<AppState<S>>,
+    State(state): State<AppState<S>>,
 ) -> Result<Json<Gate>, StatusCode> {
-    executor.show_gate_definition(&key).map(Json).map_err(|e| {
-        tracing::error!("Failed to get gate definition {}: {:?}", key, e);
-        StatusCode::NOT_FOUND
-    })
+    state
+        .executor
+        .show_gate_definition(&key)
+        .map(Json)
+        .map_err(|e| {
+            tracing::error!("Failed to get gate definition {}: {:?}", key, e);
+            StatusCode::NOT_FOUND
+        })
 }
 
 /// Query parameters for gate runs
@@ -543,9 +560,10 @@ impl From<GateRunResult> for GateRunSummary {
 async fn list_gate_runs<S: IssueStore>(
     Path(id): Path<String>,
     Query(params): Query<GateRunsQuery>,
-    State(executor): State<AppState<S>>,
+    State(state): State<AppState<S>>,
 ) -> Result<Json<Vec<GateRunSummary>>, StatusCode> {
-    let runs = executor
+    let runs = state
+        .executor
         .list_gate_runs(&id, params.gate_key.as_deref())
         .map_err(|e| {
             tracing::error!("Failed to list gate runs for {}: {:?}", id, e);
@@ -558,9 +576,10 @@ async fn list_gate_runs<S: IssueStore>(
 /// Get a single gate run result with full stdout/stderr
 async fn get_gate_run<S: IssueStore>(
     Path((_id, run_id)): Path<(String, String)>,
-    State(executor): State<AppState<S>>,
+    State(state): State<AppState<S>>,
 ) -> Result<Json<GateRunResult>, StatusCode> {
-    executor
+    state
+        .executor
         .get_gate_run_result(&run_id)
         .map(Json)
         .map_err(|e| {
@@ -577,12 +596,16 @@ struct StrategicTypesResponse {
 
 /// Get strategic types from configuration
 async fn get_strategic_types<S: IssueStore>(
-    State(executor): State<AppState<S>>,
+    State(state): State<AppState<S>>,
 ) -> Result<Json<StrategicTypesResponse>, StatusCode> {
-    let namespaces = executor.config_manager.get_namespaces().map_err(|e| {
-        tracing::error!("Failed to load configuration: {:?}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
+    let namespaces = state
+        .executor
+        .config_manager
+        .get_namespaces()
+        .map_err(|e| {
+            tracing::error!("Failed to load configuration: {:?}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     let strategic_types = namespaces.strategic_types.unwrap_or_default();
 
@@ -599,21 +622,29 @@ struct HierarchyResponse {
 
 /// Get type hierarchy configuration
 async fn get_hierarchy<S: IssueStore>(
-    State(executor): State<AppState<S>>,
+    State(state): State<AppState<S>>,
 ) -> Result<Json<HierarchyResponse>, StatusCode> {
-    let namespaces = executor.config_manager.get_namespaces().map_err(|e| {
-        tracing::error!("Failed to load configuration: {:?}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
+    let namespaces = state
+        .executor
+        .config_manager
+        .get_namespaces()
+        .map_err(|e| {
+            tracing::error!("Failed to load configuration: {:?}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     let types = namespaces.type_hierarchy.unwrap_or_default();
     let strategic_types = namespaces.strategic_types.unwrap_or_default();
 
     // Get resolved icons
-    let icons = executor.config_manager.get_hierarchy_icons().map_err(|e| {
-        tracing::error!("Failed to load hierarchy icons: {:?}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
+    let icons = state
+        .executor
+        .config_manager
+        .get_hierarchy_icons()
+        .map_err(|e| {
+            tracing::error!("Failed to load hierarchy icons: {:?}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     Ok(Json(HierarchyResponse {
         types,
@@ -636,12 +667,16 @@ struct NamespaceInfo {
 
 /// Get namespace registry from configuration
 async fn get_namespaces<S: IssueStore>(
-    State(executor): State<AppState<S>>,
+    State(state): State<AppState<S>>,
 ) -> Result<Json<NamespacesResponse>, StatusCode> {
-    let label_namespaces = executor.config_manager.get_namespaces().map_err(|e| {
-        tracing::error!("Failed to load configuration: {:?}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
+    let label_namespaces = state
+        .executor
+        .config_manager
+        .get_namespaces()
+        .map_err(|e| {
+            tracing::error!("Failed to load configuration: {:?}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     let namespaces = label_namespaces
         .namespaces
@@ -660,6 +695,24 @@ async fn get_namespaces<S: IssueStore>(
     Ok(Json(NamespacesResponse { namespaces }))
 }
 
+/// Response for current change version
+#[derive(Debug, Serialize, Deserialize)]
+struct ChangesResponse {
+    version: u64,
+}
+
+/// Get current change version
+async fn get_changes<S: IssueStore>(State(state): State<AppState<S>>) -> Json<ChangesResponse> {
+    Json(ChangesResponse {
+        version: state.tracker.current_version(),
+    })
+}
+
+/// SSE stream of change events
+async fn events_stream<S: IssueStore>(State(state): State<AppState<S>>) -> impl IntoResponse {
+    sse::change_stream(&state.tracker)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -667,10 +720,14 @@ mod tests {
     use jit::domain::Priority;
     use jit::storage::InMemoryStorage;
 
+    use crate::watcher::ChangeTracker;
+
     fn create_test_app() -> TestServer {
         let storage = InMemoryStorage::new();
         let executor = Arc::new(CommandExecutor::new(storage));
-        let app = create_routes(executor);
+        let tracker = Arc::new(ChangeTracker::new(16));
+        let state = AppState { executor, tracker };
+        let app = create_routes(state);
         TestServer::new(app).unwrap()
     }
 
@@ -727,7 +784,9 @@ mod tests {
             )
             .unwrap();
 
-        let app = create_routes(executor);
+        let tracker = Arc::new(ChangeTracker::new(16));
+        let state = AppState { executor, tracker };
+        let app = create_routes(state);
         let server = TestServer::new(app).unwrap();
 
         let response = server.get("/issues").await;
@@ -772,7 +831,9 @@ enforce_leases = "off"
 
         executor.add_dependency(&id2, &id1).unwrap();
 
-        let app = create_routes(executor);
+        let tracker = Arc::new(ChangeTracker::new(16));
+        let state = AppState { executor, tracker };
+        let app = create_routes(state);
         let server = TestServer::new(app).unwrap();
 
         let response = server.get("/graph").await;
@@ -799,7 +860,9 @@ enforce_leases = "off"
             )
             .unwrap();
 
-        let app = create_routes(executor);
+        let tracker = Arc::new(ChangeTracker::new(16));
+        let state = AppState { executor, tracker };
+        let app = create_routes(state);
         let server = TestServer::new(app).unwrap();
 
         let response = server.get("/status").await;
@@ -917,16 +980,47 @@ enforce_leases = "off"
 
         let storage = InMemoryStorage::new();
         let executor = Arc::new(CommandExecutor::new(storage));
+        let tracker = Arc::new(ChangeTracker::new(16));
 
         // Create a test document file
         let doc_path = temp_dir.path().join("test.md");
         fs::write(&doc_path, "# Test Document\n\nSome content.").unwrap();
 
-        let app = create_routes(executor);
+        let state = AppState { executor, tracker };
+        let app = create_routes(state);
         let _server = TestServer::new(app).unwrap();
 
         // Note: This test will fail because we can't easily change working directory
         // in async tests. We'll test this manually or with integration tests.
         // For now, we just verify the route exists.
+    }
+
+    #[tokio::test]
+    async fn test_get_changes_returns_version() {
+        let server = create_test_app();
+        let response = server.get("/changes").await;
+        response.assert_status_ok();
+        let data: ChangesResponse = response.json();
+        assert_eq!(data.version, 0);
+    }
+
+    #[tokio::test]
+    async fn test_get_changes_reflects_tracker_state() {
+        let storage = InMemoryStorage::new();
+        let executor = Arc::new(CommandExecutor::new(storage));
+        let tracker = Arc::new(ChangeTracker::new(16));
+
+        // Simulate a change
+        tracker.notify_change();
+        tracker.notify_change();
+
+        let state = AppState { executor, tracker };
+        let app = create_routes(state);
+        let server = TestServer::new(app).unwrap();
+
+        let response = server.get("/changes").await;
+        response.assert_status_ok();
+        let data: ChangesResponse = response.json();
+        assert_eq!(data.version, 2);
     }
 }

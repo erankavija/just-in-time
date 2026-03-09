@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import Split from 'react-split';
 import { GraphView } from './components/Graph/GraphView';
 import { IssueDetail } from './components/Issue/IssueDetail';
@@ -6,6 +6,7 @@ import { SearchBar } from './components/Search/SearchBar';
 import { LabelFilter } from './components/Labels/LabelFilter';
 import { DocumentViewer } from './components/Document/DocumentViewer';
 import { useTheme } from './hooks/useTheme';
+import { useEventStream } from './hooks/useEventStream';
 import { useSearch } from './components/Search/useSearch';
 import { apiClient } from './api/client';
 import type { Issue } from './types/models';
@@ -26,13 +27,51 @@ function App() {
     path: string;
     searchQuery?: string;
   } | null>(null);
+
+  // Track whether a drag happened so onClick can be suppressed
+  const dragRef = useRef(false);
+
+  // Pointer down on toggle button: detect horizontal drag and forward to gutter
+  const handleTogglePointerDown = useCallback((e: React.PointerEvent) => {
+    dragRef.current = false;
+    const startX = e.clientX;
+    const startY = e.clientY;
+
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      if (!dragRef.current && Math.abs(moveEvent.clientX - startX) > 5) {
+        dragRef.current = true;
+        const gutterEl = document.querySelector('.gutter-horizontal') as HTMLElement;
+        if (gutterEl) {
+          gutterEl.dispatchEvent(new MouseEvent('mousedown', {
+            clientX: startX,
+            clientY: startY,
+            bubbles: true,
+          }));
+        }
+      }
+    };
+
+    const onPointerUp = () => {
+      document.removeEventListener('pointermove', onPointerMove);
+      document.removeEventListener('pointerup', onPointerUp);
+    };
+
+    document.addEventListener('pointermove', onPointerMove);
+    document.addEventListener('pointerup', onPointerUp);
+  }, []);
   const { theme, toggleTheme } = useTheme();
   const searchResults = useSearch(searchQuery, allIssues);
 
-  // Load all issues for client-side search
+  // Live update version from SSE
+  const [version, setVersion] = useState(0);
+  const { connected } = useEventStream({
+    onChanged: useCallback((v: number) => setVersion(v), []),
+  });
+
+  // Load all issues for client-side search (re-fetch on version change)
   useEffect(() => {
     apiClient.listIssues().then(setAllIssues).catch(console.error);
-  }, []);
+  }, [version]);
 
   // Extract all unique labels from issues
   const allLabels = useMemo(() => {
@@ -178,13 +217,14 @@ function App() {
           cursor="col-resize"
         >
           <div style={{ height: '100%', position: 'relative' }}>
-            <GraphView 
-              onNodeClick={setSelectedIssueId} 
+            <GraphView
+              onNodeClick={setSelectedIssueId}
               viewMode={viewMode}
               labelFilters={labelFilters}
               layoutAlgorithm={layoutAlgorithm}
               onLayoutChange={setLayoutAlgorithm}
               focusNodeId={focusIssueId}
+              version={version}
               onFocusComplete={(success) => {
                 if (success) {
                   // Clear focus request after successful focus
@@ -196,57 +236,37 @@ function App() {
               }}
             />
             
-            {/* Minimize button */}
-            {!isDetailPaneMinimized && (
-              <button
-                onClick={() => setIsDetailPaneMinimized(true)}
-                style={{
-                  position: 'absolute',
-                  right: 0,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  backgroundColor: 'var(--bg-secondary)',
-                  border: '1px solid var(--border)',
-                  borderRight: 'none',
-                  borderRadius: '4px 0 0 4px',
-                  padding: '8px 6px',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  color: 'var(--text-secondary)',
-                  zIndex: 10,
-                  fontFamily: 'var(--font-mono)',
-                }}
-                title="Minimize detail pane"
-              >
-                ▶
-              </button>
-            )}
-            
-            {/* Maximize button */}
-            {isDetailPaneMinimized && (
-              <button
-                onClick={() => setIsDetailPaneMinimized(false)}
-                style={{
-                  position: 'absolute',
-                  right: 0,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  backgroundColor: 'var(--bg-secondary)',
-                  border: '1px solid var(--border)',
-                  borderRight: 'none',
-                  borderRadius: '4px 0 0 4px',
-                  padding: '8px 6px',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  color: 'var(--text-secondary)',
-                  zIndex: 10,
-                  fontFamily: 'var(--font-mono)',
-                }}
-                title="Expand detail pane"
-              >
-                ◀
-              </button>
-            )}
+            {/* Toggle button that also acts as a drag handle */}
+            <button
+              onPointerDown={handleTogglePointerDown}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!dragRef.current) {
+                  setIsDetailPaneMinimized(prev => !prev);
+                }
+              }}
+              style={{
+                position: 'absolute',
+                right: 0,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                backgroundColor: 'var(--bg-secondary)',
+                border: '1px solid var(--border)',
+                borderRight: 'none',
+                borderRadius: '4px 0 0 4px',
+                padding: '8px 6px',
+                cursor: 'col-resize',
+                fontSize: '12px',
+                color: 'var(--text-secondary)',
+                zIndex: 10,
+                fontFamily: 'var(--font-mono)',
+                touchAction: 'none',
+                userSelect: 'none',
+              }}
+              title={isDetailPaneMinimized ? 'Expand detail pane (or drag)' : 'Minimize detail pane (or drag)'}
+            >
+              {isDetailPaneMinimized ? '◀' : '▶'}
+            </button>
           </div>
           
           <div style={{ 
@@ -256,18 +276,19 @@ function App() {
             position: 'relative',
             display: isDetailPaneMinimized ? 'none' : 'block',
           }}>
-            <IssueDetail 
+            <IssueDetail
               issueId={selectedIssueId}
               allIssues={allIssues}
               onNavigate={setSelectedIssueId}
               onFocusInGraph={setFocusIssueId}
+              version={version}
             />
           </div>
         </Split>
       </div>
 
       <footer className="app-footer">
-        jit v0.1.0 | api: {window.location.hostname}:3000 | {theme} mode | search: {searchQuery ? `"${searchQuery}"` : 'ready'}
+        jit v0.1.0 | api: {window.location.hostname}:3000 | {theme} mode | {connected ? 'live' : 'reconnecting...'} | search: {searchQuery ? `"${searchQuery}"` : 'ready'}
       </footer>
 
       {/* Document Viewer Modal */}
