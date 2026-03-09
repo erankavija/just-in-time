@@ -516,6 +516,9 @@ export function GraphView({
   const savedViewportRef = useRef<SavedViewportData | null>(null);
   const clusterDataRef = useRef<ReturnType<typeof prepareClusteredGraphForReactFlow> | null>(null);
   const [isRenderable, setIsRenderable] = useState(true); // Control rendering during viewport restoration
+  // Stable-layout: tracks the topology fingerprint of the last full Dagre run so
+  // we can skip re-layout when only node data (state, labels, gate results) changed.
+  const prevTopologyKeyRef = useRef<string>('');
 
   // Save expansion state to localStorage whenever it changes
   useEffect(() => {
@@ -671,7 +674,7 @@ export function GraphView({
       setLoading(true);
       setError(null);
       const data = await apiClient.getGraph();
-      
+
       // Build filter configuration
       const filters: GraphFilter[] = [];
       if (viewMode === 'strategic') {
@@ -956,36 +959,67 @@ export function GraphView({
         })
         .filter((edge): edge is Edge => edge !== null);
 
-      // Apply layout algorithm
-      const layouted = getLayoutedElements(flowNodes, flowEdges, layoutAlgorithm, clusterData, data.edges, expansionState);
-      
-      // Filter nodes to only show visible ones (respecting expansion state)
-      const visibleNodeIds = clusterData 
-        ? new Set(clusterData.visibleNodes.map(n => n.id))
-        : new Set(nodesToRender.map(n => n.id));
-      
-      const finalNodes = layouted.nodes.filter(node => {
-        // Always show visual cluster boxes (for expanded clusters only, created in layout)
-        if (node.id.startsWith('cluster-')) return true;
-        
-        // Show nodes that are visible according to expansion state
-        return visibleNodeIds.has(node.id);
-      });
-      
-      setNodes(finalNodes);
-      setEdges(layouted.edges);
-      
-      // Only fit view on first load if no saved viewport exists
-      if (!hasInitialFit && finalNodes.length > 0) {
-        setHasInitialFit(true);
-        const savedViewport = localStorage.getItem('jit.graph.viewport');
-        if (!savedViewport) {
-          // No saved viewport, fit to view
-          setTimeout(() => {
-            reactFlowInstanceRef.current?.fitView({ duration: 200 });
-          }, 50);
+      // Apply layout algorithm — but only when the graph topology has actually
+      // changed (nodes added/removed or edges rewired).  For SSE events that
+      // only change node *data* (state colour, labels, gate results) we update
+      // each node's data/style in-place, preserving the existing Dagre-computed
+      // positions so the graph doesn't jump around.
+      const topologyKey = [
+        ...flowNodes.map(n => n.id).sort(),
+        '|',
+        ...flowEdges.map(e => `${e.source}->${e.target}`).sort(),
+      ].join(',');
+
+      const topologyUnchanged =
+        prevTopologyKeyRef.current !== '' &&
+        topologyKey === prevTopologyKeyRef.current;
+
+      if (topologyUnchanged) {
+        // Patch node data/style in-place — positions are NOT touched.
+        setNodes(prev =>
+          prev.map(existing => {
+            const updated = flowNodes.find(n => n.id === existing.id);
+            if (!updated) return existing;
+            return { ...existing, data: updated.data, style: updated.style };
+          })
+        );
+        // Edge paths in ReactFlow are derived from node positions; replacing
+        // the edge objects only updates their visual style (dimming, colour).
+        setEdges(flowEdges);
+      } else {
+        // Full layout: topology changed (first load, node added/removed, edge
+        // added/removed, or filter/view-mode change).
+        const layouted = getLayoutedElements(flowNodes, flowEdges, layoutAlgorithm, clusterData, data.edges, expansionState);
+
+        // Filter nodes to only show visible ones (respecting expansion state)
+        const visibleNodeIds = clusterData
+          ? new Set(clusterData.visibleNodes.map(n => n.id))
+          : new Set(nodesToRender.map(n => n.id));
+
+        const finalNodes = layouted.nodes.filter(node => {
+          // Always show visual cluster boxes (for expanded clusters only, created in layout)
+          if (node.id.startsWith('cluster-')) return true;
+
+          // Show nodes that are visible according to expansion state
+          return visibleNodeIds.has(node.id);
+        });
+
+        setNodes(finalNodes);
+        setEdges(layouted.edges);
+        prevTopologyKeyRef.current = topologyKey;
+
+        // Only fit view on first load if no saved viewport exists
+        if (!hasInitialFit && finalNodes.length > 0) {
+          setHasInitialFit(true);
+          const savedViewport = localStorage.getItem('jit.graph.viewport');
+          if (!savedViewport) {
+            // No saved viewport, fit to view
+            setTimeout(() => {
+              reactFlowInstanceRef.current?.fitView({ duration: 200 });
+            }, 50);
+          }
+          // Otherwise defaultViewport prop handles restoration
         }
-        // Otherwise defaultViewport prop handles restoration
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load graph');
@@ -995,6 +1029,13 @@ export function GraphView({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setNodes, setEdges, viewMode, labelFilters, strategicTypes, layoutAlgorithm, hierarchyConfig, expansionState, version]); // nodeStats is setState, not a dependency
+
+  // Reset the stable-layout topology fingerprint whenever view settings that
+  // affect the rendered structure change.  This forces a full Dagre run on the
+  // next loadGraph call so the layout reflects the new configuration.
+  useEffect(() => {
+    prevTopologyKeyRef.current = '';
+  }, [viewMode, labelFilters, strategicTypes, layoutAlgorithm, hierarchyConfig, expansionState]);
 
   useEffect(() => {
     loadGraph();

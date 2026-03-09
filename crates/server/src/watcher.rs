@@ -2,6 +2,10 @@
 //!
 //! Watches the `.jit/` directory for changes and maintains a monotonic version
 //! counter. SSE subscribers receive notifications via a broadcast channel.
+//!
+//! Only graph-relevant file changes trigger a version bump. High-frequency
+//! noise files (audit log, leases, temp files, server metadata) are ignored
+//! so that the web UI graph is not constantly re-rendered during active work.
 
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -54,6 +58,65 @@ impl ChangeTracker {
 
 const DEBOUNCE_MS: u64 = 200;
 
+/// Returns `true` if the notify event affects files that are displayed in the
+/// graph — issue records, the index, gate registry, and gate run results.
+///
+/// High-frequency noise files that never affect the rendered graph are
+/// explicitly excluded:
+///
+/// * `events.jsonl` — append-only audit log, written on every command
+/// * `claims.jsonl` / `claims/` — lease coordination heartbeats
+/// * `server.pid.json`, `server.log` — server lifecycle metadata
+/// * `*.tmp` — atomic-write intermediaries (written then immediately renamed)
+///
+/// Paths that *do* trigger a refresh:
+/// * `issues/*.json` — issue state, labels, gates, dependencies
+/// * `index.json` — issue added or removed
+/// * `gates.json` — gate registry changed
+/// * `gate-runs/**` — automated gate execution results
+pub fn is_graph_relevant(event: &notify::Event) -> bool {
+    event.paths.iter().any(|path| {
+        let filename = path.file_name().and_then(|f| f.to_str()).unwrap_or("");
+
+        // Skip atomic-write temp files.
+        if filename.ends_with(".tmp") {
+            return false;
+        }
+
+        // Ignore known high-frequency noise files.
+        if matches!(
+            filename,
+            "events.jsonl" | "claims.jsonl" | "server.pid.json" | "server.log"
+        ) {
+            return false;
+        }
+
+        // Ignore the claims/ lease directory.
+        if path.components().any(|c| c.as_os_str() == "claims") {
+            return false;
+        }
+
+        // Gate run results (any file under gate-runs/) are graph-relevant —
+        // they update gate status shown on issue nodes.
+        if path.components().any(|c| c.as_os_str() == "gate-runs") {
+            return true;
+        }
+
+        // Issue records.
+        let parent_name = path
+            .parent()
+            .and_then(|p| p.file_name())
+            .and_then(|f| f.to_str())
+            .unwrap_or("");
+        if parent_name == "issues" && filename.ends_with(".json") {
+            return true;
+        }
+
+        // Top-level registry files.
+        matches!(filename, "index.json" | "gates.json")
+    })
+}
+
 /// Start watching the given data directory for changes.
 ///
 /// Returns a `ChangeTracker` and keeps the watcher alive. The caller must
@@ -67,8 +130,10 @@ pub fn start_watching(data_dir: &str) -> Result<(ChangeTracker, RecommendedWatch
 
     let mut watcher = notify::recommended_watcher(
         move |res: std::result::Result<notify::Event, notify::Error>| {
-            if res.is_ok() {
-                let _ = fs_tx.try_send(());
+            if let Ok(event) = res {
+                if is_graph_relevant(&event) {
+                    let _ = fs_tx.try_send(());
+                }
             }
         },
     )?;
@@ -149,7 +214,7 @@ mod tests {
         let mut rx = tracker.subscribe();
 
         // Write a file into the watched directory
-        std::fs::write(tmp.path().join("test.json"), "{}").unwrap();
+        std::fs::write(tmp.path().join("index.json"), "{}").unwrap();
 
         // Wait for debounced notification (200ms debounce + margin)
         let version = tokio::time::timeout(Duration::from_secs(2), rx.recv())
@@ -161,15 +226,36 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_start_watching_ignores_events_jsonl() {
+        let tmp = tempfile::tempdir().unwrap();
+        let data_dir = tmp.path().to_str().unwrap();
+
+        let (tracker, _watcher) = start_watching(data_dir).unwrap();
+
+        // Write an events.jsonl entry (should NOT trigger a version bump)
+        std::fs::write(tmp.path().join("events.jsonl"), "{}\n").unwrap();
+
+        // Wait longer than the debounce window
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        assert_eq!(
+            tracker.current_version(),
+            0,
+            "events.jsonl write must not trigger a version bump"
+        );
+    }
+
+    #[tokio::test]
     async fn test_debounce_coalesces_burst_writes() {
         let tmp = tempfile::tempdir().unwrap();
         let data_dir = tmp.path().to_str().unwrap();
 
         let (tracker, _watcher) = start_watching(data_dir).unwrap();
 
-        // Write multiple files in rapid succession
+        // Write multiple relevant files in rapid succession
+        let issues_dir = tmp.path().join("issues");
+        std::fs::create_dir_all(&issues_dir).unwrap();
         for i in 0..5 {
-            std::fs::write(tmp.path().join(format!("file{i}.json")), "{}").unwrap();
+            std::fs::write(issues_dir.join(format!("{i}.json")), "{}").unwrap();
         }
 
         // Wait for debounce to settle
@@ -181,5 +267,78 @@ mod tests {
             version >= 1,
             "should have at least one notification, got {version}"
         );
+    }
+
+    // --- is_graph_relevant unit tests ---
+
+    fn make_event(paths: &[&str]) -> notify::Event {
+        use std::path::PathBuf;
+        notify::Event {
+            kind: notify::EventKind::Modify(notify::event::ModifyKind::Data(
+                notify::event::DataChange::Any,
+            )),
+            paths: paths.iter().map(|p| PathBuf::from(p)).collect(),
+            attrs: Default::default(),
+        }
+    }
+
+    #[test]
+    fn test_relevant_issue_json() {
+        let e = make_event(&["/repo/.jit/issues/abc123.json"]);
+        assert!(is_graph_relevant(&e));
+    }
+
+    #[test]
+    fn test_relevant_index_json() {
+        let e = make_event(&["/repo/.jit/index.json"]);
+        assert!(is_graph_relevant(&e));
+    }
+
+    #[test]
+    fn test_relevant_gates_json() {
+        let e = make_event(&["/repo/.jit/gates.json"]);
+        assert!(is_graph_relevant(&e));
+    }
+
+    #[test]
+    fn test_relevant_gate_run_result() {
+        let e = make_event(&["/repo/.jit/gate-runs/run-123/result.json"]);
+        assert!(is_graph_relevant(&e));
+    }
+
+    #[test]
+    fn test_irrelevant_events_jsonl() {
+        let e = make_event(&["/repo/.jit/events.jsonl"]);
+        assert!(!is_graph_relevant(&e));
+    }
+
+    #[test]
+    fn test_irrelevant_claims_jsonl() {
+        let e = make_event(&["/repo/.jit/claims.jsonl"]);
+        assert!(!is_graph_relevant(&e));
+    }
+
+    #[test]
+    fn test_irrelevant_claims_dir() {
+        let e = make_event(&["/repo/.jit/claims/lease-abc.json"]);
+        assert!(!is_graph_relevant(&e));
+    }
+
+    #[test]
+    fn test_irrelevant_server_pid() {
+        let e = make_event(&["/repo/.jit/server.pid.json"]);
+        assert!(!is_graph_relevant(&e));
+    }
+
+    #[test]
+    fn test_irrelevant_server_log() {
+        let e = make_event(&["/repo/.jit/server.log"]);
+        assert!(!is_graph_relevant(&e));
+    }
+
+    #[test]
+    fn test_irrelevant_tmp_file() {
+        let e = make_event(&["/repo/.jit/issues/abc123.tmp"]);
+        assert!(!is_graph_relevant(&e));
     }
 }
