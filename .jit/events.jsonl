@@ -1850,3 +1850,8 @@
 {"type":"issue_state_changed","id":"74f63cc6-2187-428a-a5d3-c173333bd7f5","issue_id":"0ea4f9a8-c1ee-424d-b4a8-12197b2b8cc4","timestamp":"2026-03-09T20:41:26.244926966Z","from":"ready","to":"done"}
 {"type":"issue_completed","id":"584a636a-50f8-4d9d-bd7b-25302a832fcf","issue_id":"0ea4f9a8-c1ee-424d-b4a8-12197b2b8cc4","timestamp":"2026-03-09T20:41:26.244957266Z"}
 {"type":"issue_state_changed","id":"8a35b37e-0605-4dae-aa50-e6f1bc68435c","issue_id":"6d0128ae-38cf-48a6-9dbb-5fd962aef470","timestamp":"2026-03-09T20:41:26.288734918Z","from":"backlog","to":"ready"}
+{"type":"issue_created","id":"6a30dcf3-ad91-4761-aef0-765633c71b17","issue_id":"3a7caca1-8126-4b02-b94e-435d5b679fbe","timestamp":"2026-03-09T21:17:31.160198513Z","title":"Implement jit serve command for background API and web UI server","priority":"high"}
+{"type":"issue_state_changed","id":"49a65719-734d-400e-bdba-7533d7edcba0","issue_id":"3a7caca1-8126-4b02-b94e-435d5b679fbe","timestamp":"2026-03-09T21:17:34.431926939Z","from":"ready","to":"backlog"}
+{"type":"issue_claimed","id":"8e92d2fc-a50b-4acd-b061-612216acb0b0","issue_id":"3a7caca1-8126-4b02-b94e-435d5b679fbe","timestamp":"2026-03-09T21:17:37.888236568Z","assignee":"agent:copilot"}
+{"type":"issue_state_changed","id":"e011cdf5-2345-4c68-8eb6-d1b721e12dac","issue_id":"3a7caca1-8126-4b02-b94e-435d5b679fbe","timestamp":"2026-03-09T21:19:05.859169606Z","from":"backlog","to":"ready"}
+{"type":"issue_state_changed","id":"8201c645-b203-4833-938f-f6ed8883b463","issue_id":"afe30eeb-1963-490d-9dad-d819485b5f2a","timestamp":"2026-03-09T21:19:09.066083874Z","from":"ready","to":"backlog"}

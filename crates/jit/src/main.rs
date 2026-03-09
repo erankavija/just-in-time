@@ -3518,6 +3518,143 @@ fn run() -> Result<()> {
                 }
             }
         }
+        Commands::Serve {
+            port,
+            stop,
+            status,
+            fg,
+            log,
+            json,
+        } => {
+            use jit::commands::serve::{
+                server_status, start_server, stop_server, ServeOptions, ServeOutcome, StopOutcome,
+            };
+            use serde_json::json;
+
+            let log_file = log.map(|l| jit_dir.join(l));
+
+            if stop {
+                match stop_server(&jit_dir) {
+                    Ok(StopOutcome::Stopped { pid, port: p }) => {
+                        if json {
+                            println!(
+                                "{}",
+                                serde_json::to_string_pretty(&json!({
+                                    "status": "stopped",
+                                    "pid": pid,
+                                    "port": p
+                                }))?
+                            );
+                        } else {
+                            println!("Server stopped (was PID {pid} on port {p})");
+                        }
+                    }
+                    Ok(StopOutcome::NotRunning) => {
+                        if json {
+                            println!(
+                                "{}",
+                                serde_json::to_string_pretty(&json!({"status": "not_running"}))?
+                            );
+                        } else {
+                            println!("Server is not running.");
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Error stopping server: {e}");
+                        std::process::exit(1);
+                    }
+                }
+            } else if status {
+                match server_status(&jit_dir) {
+                    Ok(Some(pf)) => {
+                        let url = format!("http://localhost:{}", pf.port);
+                        if json {
+                            println!(
+                                "{}",
+                                serde_json::to_string_pretty(&json!({
+                                    "status": "running",
+                                    "pid": pf.pid,
+                                    "port": pf.port,
+                                    "url": url,
+                                    "log_file": pf.log_file,
+                                    "started_at": pf.started_at
+                                }))?
+                            );
+                        } else {
+                            println!(
+                                "Server is running: {} (PID {}, started {})",
+                                url, pf.pid, pf.started_at
+                            );
+                        }
+                    }
+                    Ok(None) => {
+                        if json {
+                            println!(
+                                "{}",
+                                serde_json::to_string_pretty(&json!({"status": "not_running"}))?
+                            );
+                        } else {
+                            println!("Server is not running.");
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Error checking server status: {e}");
+                        std::process::exit(1);
+                    }
+                }
+            } else {
+                // Start (or report already-running)
+                let opts = ServeOptions {
+                    data_dir: jit_dir.clone(),
+                    preferred_port: port,
+                    log_file,
+                    foreground: fg,
+                };
+                match start_server(opts) {
+                    Ok(ServeOutcome::Started { pid, port: p }) => {
+                        let url = format!("http://localhost:{p}");
+                        let log_path = jit_dir.join("server.log");
+                        if json {
+                            println!(
+                                "{}",
+                                serde_json::to_string_pretty(&json!({
+                                    "status": "started",
+                                    "pid": pid,
+                                    "port": p,
+                                    "url": url,
+                                    "log_file": log_path
+                                }))?
+                            );
+                        } else {
+                            println!("Server started on {url} (PID {pid})");
+                            println!("  API: {url}/api");
+                            println!("  Web: {url}/");
+                            println!("  Log: {}", log_path.display());
+                        }
+                    }
+                    Ok(ServeOutcome::AlreadyRunning { pid, port: p }) => {
+                        let url = format!("http://localhost:{p}");
+                        if json {
+                            println!(
+                                "{}",
+                                serde_json::to_string_pretty(&json!({
+                                    "status": "running",
+                                    "pid": pid,
+                                    "port": p,
+                                    "url": url
+                                }))?
+                            );
+                        } else {
+                            println!("Server is already running on {url} (PID {pid})");
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Error starting server: {e}");
+                        std::process::exit(1);
+                    }
+                }
+            }
+        }
         Commands::Claim(claim_cmd) => match claim_cmd {
             ClaimCommands::Acquire {
                 issue_id,

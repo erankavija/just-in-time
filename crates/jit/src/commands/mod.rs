@@ -31,6 +31,7 @@ mod issue;
 mod labels;
 mod query;
 mod search;
+pub mod serve;
 pub mod snapshot;
 mod validate;
 pub mod worktree;

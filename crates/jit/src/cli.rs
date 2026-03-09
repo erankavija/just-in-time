@@ -182,6 +182,48 @@ pub enum Commands {
         #[arg(long)]
         json: bool,
     },
+
+    /// Start the JIT API and web UI server as a background process
+    ///
+    /// Launches `jit-server` as a daemon (detached from the terminal).
+    /// If a server is already running for this repository it prints its
+    /// status and exits without starting a second instance.
+    ///
+    /// Multiple repositories on the same host are supported — each gets its
+    /// own port, auto-selected in the range 3000–3099.
+    ///
+    /// Examples:
+    ///   jit serve                  # Start (or report already-running)
+    ///   jit serve --port 3010      # Prefer a specific port
+    ///   jit serve --status         # Check if server is running
+    ///   jit serve --stop           # Stop the running server
+    ///   jit serve --fg             # Run in foreground (for debugging)
+    ///   jit serve --json           # Machine-readable output
+    Serve {
+        /// Preferred port to listen on (auto-selects from 3000–3099 if taken)
+        #[arg(long, default_value = "3000")]
+        port: u16,
+
+        /// Stop the running server for this repository
+        #[arg(long, conflicts_with_all = ["status", "fg"])]
+        stop: bool,
+
+        /// Show server status and exit
+        #[arg(long, conflicts_with_all = ["stop", "fg"])]
+        status: bool,
+
+        /// Run in foreground instead of daemonizing (useful for debugging)
+        #[arg(long)]
+        fg: bool,
+
+        /// Write server output to this file [default: .jit/server.log]
+        #[arg(long)]
+        log: Option<String>,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Subcommand)]

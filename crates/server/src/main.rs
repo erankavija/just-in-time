@@ -10,6 +10,7 @@ mod watcher;
 use anyhow::Result;
 use axum::Router;
 use clap::Parser;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
 use tracing::info;
@@ -32,6 +33,13 @@ struct Args {
     /// Address to bind the server to
     #[arg(short, long, default_value = "0.0.0.0:3000")]
     bind: String,
+
+    /// Directory containing built web UI static files to serve at /
+    ///
+    /// When provided, the server serves the web UI alongside the API.
+    /// If the directory does not exist, the flag is silently ignored.
+    #[arg(long)]
+    web_dir: Option<PathBuf>,
 }
 
 #[tokio::main]
@@ -75,11 +83,16 @@ async fn main() -> Result<()> {
         .allow_methods(Any)
         .allow_headers(Any);
 
-    // Build router
-    let app = Router::new()
+    // Build router — API always at /api, optional web UI static files at /
+    let mut app = Router::new()
         .nest("/api", routes::create_routes(state))
         .layer(cors)
         .layer(tower_http::trace::TraceLayer::new_for_http());
+
+    if let Some(web_dir) = args.web_dir.filter(|d| d.exists()) {
+        info!("Serving web UI from {}", web_dir.display());
+        app = app.fallback_service(tower_http::services::ServeDir::new(web_dir));
+    }
 
     // Start server
     let listener = tokio::net::TcpListener::bind(&args.bind).await?;

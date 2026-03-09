@@ -184,6 +184,7 @@ impl CommandSchema {
             "registry_remove",
             "registry_show",
             "snapshot_export",
+            "serve",
             "worktree_info",
             "worktree_list",
         ]
