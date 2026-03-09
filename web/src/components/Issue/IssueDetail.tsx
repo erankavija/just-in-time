@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import remarkGfm from 'remark-gfm';
@@ -42,6 +42,9 @@ export function IssueDetail({ issueId, allIssues = [], onNavigate, onFocusInGrap
   const [gateRuns, setGateRuns] = useState<Record<string, GateRunSummary[]>>({});
   const [selectedRun, setSelectedRun] = useState<GateRunDetail | null>(null);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  // Once an issue has loaded once, SSE-triggered refreshes update silently
+  // (no loading overlay) so the pane doesn't flash on every version bump.
+  const hasLoadedOnceRef = useRef(false);
 
   useEffect(() => {
     if (!issueId) {
@@ -66,6 +69,7 @@ export function IssueDetail({ issueId, allIssues = [], onNavigate, onFocusInGrap
 
   // Reset gate UI state when issue changes
   useEffect(() => {
+    hasLoadedOnceRef.current = false; // Show loading indicator for the newly selected issue
     setExpandedGate(null);
     setGateRuns({});
     setSelectedRun(null);
@@ -110,8 +114,9 @@ export function IssueDetail({ issueId, allIssues = [], onNavigate, onFocusInGrap
   }, [issue, selectedRunId]);
 
   const loadIssue = async (id: string) => {
+    const isBackground = hasLoadedOnceRef.current;
     try {
-      setLoading(true);
+      if (!isBackground) setLoading(true);
       setError(null);
       const data = await apiClient.getIssue(id);
       setIssue(data);
@@ -119,7 +124,8 @@ export function IssueDetail({ issueId, allIssues = [], onNavigate, onFocusInGrap
       setError(err instanceof Error ? err.message : 'Failed to load issue');
       console.error('Failed to load issue:', err);
     } finally {
-      setLoading(false);
+      hasLoadedOnceRef.current = true;
+      if (!isBackground) setLoading(false);
     }
   };
 

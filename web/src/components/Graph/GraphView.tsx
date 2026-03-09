@@ -519,6 +519,9 @@ export function GraphView({
   // Stable-layout: tracks the topology fingerprint of the last full Dagre run so
   // we can skip re-layout when only node data (state, labels, gate results) changed.
   const prevTopologyKeyRef = useRef<string>('');
+  // Once the graph has loaded once, background SSE refreshes should not show
+  // the full-page loading overlay (which blanks out the graph and causes flashing).
+  const hasLoadedOnceRef = useRef(false);
 
   // Save expansion state to localStorage whenever it changes
   useEffect(() => {
@@ -670,8 +673,9 @@ export function GraphView({
   }, []);
 
   const loadGraph = useCallback(async () => {
+    const isBackground = hasLoadedOnceRef.current;
     try {
-      setLoading(true);
+      if (!isBackground) setLoading(true);
       setError(null);
       const data = await apiClient.getGraph();
 
@@ -1025,7 +1029,8 @@ export function GraphView({
       setError(err instanceof Error ? err.message : 'Failed to load graph');
       console.error('Failed to load graph:', err);
     } finally {
-      setLoading(false);
+      hasLoadedOnceRef.current = true;
+      if (!isBackground) setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setNodes, setEdges, viewMode, labelFilters, strategicTypes, layoutAlgorithm, hierarchyConfig, expansionState, version]); // nodeStats is setState, not a dependency
