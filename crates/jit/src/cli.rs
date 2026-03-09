@@ -220,6 +220,10 @@ pub enum Commands {
         #[arg(long)]
         log: Option<String>,
 
+        /// Directory containing built web UI static files (auto-detected if omitted)
+        #[arg(long)]
+        web_dir: Option<String>,
+
         /// Output as JSON
         #[arg(long)]
         json: bool,

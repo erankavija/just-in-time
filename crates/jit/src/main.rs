@@ -3524,10 +3524,12 @@ fn run() -> Result<()> {
             status,
             fg,
             log,
+            web_dir,
             json,
         } => {
             use jit::commands::serve::{
-                server_status, start_server, stop_server, ServeOptions, ServeOutcome, StopOutcome,
+                find_web_dir, server_status, start_server, stop_server, ServeOptions, ServeOutcome,
+                StopOutcome,
             };
             use serde_json::json;
 
@@ -3604,11 +3606,16 @@ fn run() -> Result<()> {
                 }
             } else {
                 // Start (or report already-running)
+                // Resolve web_dir: explicit flag > auto-detect
+                let resolved_web_dir = web_dir
+                    .map(|d| jit_dir.parent().unwrap_or(&jit_dir).join(d))
+                    .or_else(find_web_dir);
                 let opts = ServeOptions {
                     data_dir: jit_dir.clone(),
                     preferred_port: port,
                     log_file,
                     foreground: fg,
+                    web_dir: resolved_web_dir,
                 };
                 match start_server(opts) {
                     Ok(ServeOutcome::Started { pid, port: p }) => {

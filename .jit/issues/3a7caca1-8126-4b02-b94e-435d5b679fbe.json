@@ -13,7 +13,28 @@
     "fmt",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-03-09T21:35:03.096612124Z"
+    },
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-03-09T21:35:03.095036784Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-03-09T21:35:03.093719853Z"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": "agent:copilot",
+      "updated_at": "2026-03-09T21:35:00.330707443Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -24,5 +45,5 @@
     "component:web"
   ],
   "created_at": "2026-03-09T21:17:31.159919453+00:00",
-  "updated_at": "2026-03-09T21:19:05.859056106+00:00"
+  "updated_at": "2026-03-09T21:35:23.910165499+00:00"
 }

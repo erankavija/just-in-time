@@ -187,6 +187,41 @@ pub struct ServeOptions {
     pub log_file: Option<PathBuf>,
     /// Keep process in foreground instead of daemonizing.
     pub foreground: bool,
+    /// Directory containing built web UI static files.
+    /// `None` means auto-detect; use [`find_web_dir`] before calling `start_server`.
+    pub web_dir: Option<PathBuf>,
+}
+
+/// Tries to locate the built web UI `dist/` directory.
+///
+/// Search order:
+/// 1. Sibling `web/dist/` next to the current executable
+/// 2. `web/dist/` relative to the current working directory
+pub fn find_web_dir() -> Option<PathBuf> {
+    // 1. Next to the jit binary (installed layout or cargo target/debug/)
+    if let Ok(exe) = std::env::current_exe() {
+        // e.g. target/debug/jit -> target/debug/../../../web/dist (dev build)
+        let candidates = [
+            exe.parent().and_then(|p| {
+                // target/{profile}/ -> repo root is three levels up
+                p.parent()?.parent()?.parent().map(|r| r.join("web/dist"))
+            }),
+            exe.parent().map(|p| p.join("web/dist")),
+        ];
+        for c in candidates.into_iter().flatten() {
+            if c.is_dir() {
+                return Some(c);
+            }
+        }
+    }
+    // 2. Current working directory
+    if let Ok(cwd) = std::env::current_dir() {
+        let p = cwd.join("web/dist");
+        if p.is_dir() {
+            return Some(p);
+        }
+    }
+    None
 }
 
 /// Checks for a running server; if alive returns `AlreadyRunning`, otherwise
@@ -226,6 +261,12 @@ pub fn start_server(opts: ServeOptions) -> Result<ServeOutcome> {
         .arg(data_dir_str)
         .arg("--bind")
         .arg(&bind_addr);
+
+    if let Some(web_dir) = &opts.web_dir {
+        if web_dir.is_dir() {
+            cmd.arg("--web-dir").arg(web_dir);
+        }
+    }
 
     if opts.foreground {
         // Run in foreground — block until the process exits.
