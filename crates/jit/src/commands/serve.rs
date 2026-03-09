@@ -200,11 +200,11 @@ pub struct ServeOptions {
 pub fn find_web_dir() -> Option<PathBuf> {
     // 1. Next to the jit binary (installed layout or cargo target/debug/)
     if let Ok(exe) = std::env::current_exe() {
-        // e.g. target/debug/jit -> target/debug/../../../web/dist (dev build)
+        // target/{profile}/jit -> exe.parent() = target/{profile}/
+        // go up two more: target/ -> repo root
         let candidates = [
             exe.parent().and_then(|p| {
-                // target/{profile}/ -> repo root is three levels up
-                p.parent()?.parent()?.parent().map(|r| r.join("web/dist"))
+                p.parent()?.parent().map(|r| r.join("web/dist"))
             }),
             exe.parent().map(|p| p.join("web/dist")),
         ];

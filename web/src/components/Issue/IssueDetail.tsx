@@ -430,7 +430,7 @@ export function IssueDetail({ issueId, allIssues = [], onNavigate, onFocusInGrap
       )}
 
       {issue.gates_status && Object.keys(issue.gates_status).length > 0 && (() => {
-        const entries = Object.entries(issue.gates_status);
+        const entries = Object.entries(issue.gates_status).sort(([a], [b]) => a.localeCompare(b));
         const passedCount = entries.filter(([, g]) => g.status === 'passed').length;
         return (
           <section style={{ marginBottom: '20px' }}>

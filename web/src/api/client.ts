@@ -1,10 +1,9 @@
 import axios from 'axios';
 import type { Issue, GraphData, StatusSummary, DocumentContent, DocumentHistory, DocumentDiff, ConfigHierarchy, ConfigNamespaces, GateDefinition, GateRunSummary, GateRunDetail } from '../types/models';
 
-// Use relative URL or construct from current host to avoid CORS issues
-export const API_BASE = window.location.hostname === 'localhost'
-  ? 'http://localhost:3000/api'
-  : `http://${window.location.hostname}:3000/api`;
+// Use the origin the page was served from so that multiple jit servers
+// running on different ports each talk to their own API.
+export const API_BASE = `${window.location.origin}/api`;
 
 const api = axios.create({
   baseURL: API_BASE,
