@@ -50,12 +50,23 @@
     "code-review": {
       "version": 1,
       "key": "code-review",
-      "title": "Code Review",
-      "description": "Human review of changes",
+      "title": "AI Code Review",
+      "description": "AI-powered code review against just-in-time project standards",
       "stage": "postcheck",
-      "mode": "manual",
+      "mode": "auto",
+      "checker": {
+        "type": "exec",
+        "command": "./scripts/ai-review.sh",
+        "timeout_seconds": 600,
+        "working_dir": null,
+        "env": {
+          "REVIEWER_AGENT": "copilot -s --model gpt-5.4"
+        },
+        "pass_context": true,
+        "prompt_file": "./scripts/code-review-prompt.md"
+      },
       "reserved": {},
-      "auto": false,
+      "auto": true,
       "example_integration": null
     },
     "clippy": {
