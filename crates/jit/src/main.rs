@@ -3704,6 +3704,7 @@ fn run() -> Result<()> {
                         preferred_port: port,
                         log_file,
                         web_dir: resolved_web_dir,
+                        server_binary: None,
                     };
                     match start_server(opts) {
                         Ok(ServeOutcome::Started {

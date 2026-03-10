@@ -61,6 +61,7 @@ pub struct ServerPidFile {
 ///     preferred_port: 3000,
 ///     log_file: None,
 ///     web_dir: None,
+///     server_binary: None,
 /// };
 /// match start_server(opts).unwrap() {
 ///     ServeOutcome::Started { pid, port, log_file } => {
@@ -307,6 +308,7 @@ pub fn find_server_binary() -> Result<PathBuf> {
 ///     preferred_port: 3000,
 ///     log_file: None,
 ///     web_dir: None,
+///     server_binary: None,
 /// };
 /// assert_eq!(opts.preferred_port, 3000);
 /// ```
@@ -321,6 +323,9 @@ pub struct ServeOptions {
     /// Directory containing built web UI static files.
     /// `None` means auto-detect; use [`find_web_dir`] before calling `start_server`.
     pub web_dir: Option<PathBuf>,
+    /// Override the server binary path (testing only; normally resolved by
+    /// [`find_server_binary`] automatically).
+    pub server_binary: Option<PathBuf>,
 }
 
 /// Tries to locate the built web UI `dist/` directory.
@@ -385,6 +390,7 @@ pub fn find_web_dir() -> Option<PathBuf> {
 ///     preferred_port: 3000,
 ///     log_file: None,
 ///     web_dir: None,
+///     server_binary: None,
 /// };
 /// match start_server(opts).unwrap() {
 ///     ServeOutcome::Started { pid, port, log_file } => {
@@ -410,7 +416,10 @@ pub fn start_server(opts: ServeOptions) -> Result<ServeOutcome> {
 
     let port = find_available_port(opts.preferred_port)?;
     let log_file = opts.log_file.unwrap_or_else(|| data_dir.join("server.log"));
-    let server_bin = find_server_binary()?;
+    let server_bin = match opts.server_binary {
+        Some(p) => p,
+        None => find_server_binary()?,
+    };
 
     let bind_addr = format!("0.0.0.0:{port}");
     let data_dir_str = data_dir
@@ -451,12 +460,24 @@ pub fn start_server(opts: ServeOptions) -> Result<ServeOutcome> {
         cmd.process_group(0);
     }
 
-    let child = cmd.spawn().context("Failed to spawn jit-server")?;
+    let mut child = cmd.spawn().context("Failed to spawn jit-server")?;
 
     let pid = child.id();
 
-    // Brief pause to let the server bind its port before we record the PID.
+    // Brief pause to let the server bind its port before checking liveness.
     std::thread::sleep(Duration::from_millis(300));
+
+    // Verify the child is still alive. A rapid exit indicates a startup
+    // failure (e.g. the port was grabbed between our probe and the bind).
+    // In that case we must not write a PID file — doing so would leave a
+    // stale record that falsely reports a running server.
+    if let Some(exit_status) = child.try_wait().context("Failed to check server startup")? {
+        bail!(
+            "jit-server exited during startup with {exit_status}. \
+             Check the log file for details: {}",
+            log_file.display()
+        );
+    }
 
     let pf = ServerPidFile {
         pid,
@@ -755,5 +776,40 @@ mod tests {
         let outcome = stop_server(data_dir).unwrap();
         assert_eq!(outcome, StopOutcome::NotRunning);
         assert!(!pid_file_path(data_dir).exists());
+    }
+
+    // ── startup failure: child exits immediately ──────────────────────────────
+
+    #[test]
+    #[cfg(unix)]
+    fn test_start_server_errors_when_child_exits_immediately() {
+        let tmp = TempDir::new().unwrap();
+        let data_dir = tmp.path();
+
+        // `/bin/false` exits immediately with exit code 1 — simulates a
+        // jit-server that fails to bind its port.
+        let opts = ServeOptions {
+            data_dir: data_dir.to_path_buf(),
+            preferred_port: 3000,
+            log_file: None,
+            web_dir: None,
+            server_binary: Some(PathBuf::from("/bin/false")),
+        };
+
+        let result = start_server(opts);
+        assert!(
+            result.is_err(),
+            "must return Err when server exits immediately"
+        );
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("exited during startup"),
+            "error message should mention startup exit, got: {msg}"
+        );
+        // No stale PID file should be written.
+        assert!(
+            !pid_file_path(data_dir).exists(),
+            "PID file must not be written when server exits immediately"
+        );
     }
 }
