@@ -203,9 +203,8 @@ pub fn find_web_dir() -> Option<PathBuf> {
         // target/{profile}/jit -> exe.parent() = target/{profile}/
         // go up two more: target/ -> repo root
         let candidates = [
-            exe.parent().and_then(|p| {
-                p.parent()?.parent().map(|r| r.join("web/dist"))
-            }),
+            exe.parent()
+                .and_then(|p| p.parent()?.parent().map(|r| r.join("web/dist"))),
             exe.parent().map(|p| p.join("web/dist")),
         ];
         for c in candidates.into_iter().flatten() {
