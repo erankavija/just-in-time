@@ -3625,69 +3625,141 @@ fn run() -> Result<()> {
                     }
                 }
             } else {
-                // Start (or report already-running)
-                // Resolve web_dir: explicit flag > auto-detect
-                let resolved_web_dir = web_dir
-                    .map(|d| jit_dir.parent().unwrap_or(&jit_dir).join(d))
-                    .or_else(find_web_dir);
-                let opts = ServeOptions {
-                    data_dir: jit_dir.clone(),
-                    preferred_port: port,
-                    log_file,
-                    foreground: fg,
-                    web_dir: resolved_web_dir,
-                };
-                match start_server(opts) {
-                    Ok(ServeOutcome::Started { pid, port: p }) => {
-                        let url = format!("http://localhost:{p}");
-                        let log_path = jit_dir.join("server.log");
-                        if json {
-                            println!(
-                                "{}",
-                                serde_json::to_string_pretty(&json!({
-                                    "status": "started",
-                                    "pid": pid,
-                                    "port": p,
-                                    "url": url,
-                                    "log_file": log_path
-                                }))?
-                            );
-                        } else {
-                            println!("Server started on {url} (PID {pid})");
-                            println!("  API: {url}/api");
-                            println!("  Web: {url}/");
-                            println!("  Log: {}", log_path.display());
+                // Foreground mode: run inline so we can print the URL before blocking.
+                if fg {
+                    use jit::commands::serve::{
+                        find_available_port, find_server_binary, find_web_dir, is_process_alive,
+                        read_pid_file,
+                    };
+
+                    // Honour existing running server.
+                    if let Some(pf) = read_pid_file(&jit_dir)? {
+                        if is_process_alive(pf.pid) {
+                            let url = format!("http://localhost:{}", pf.port);
+                            if json {
+                                println!(
+                                    "{}",
+                                    serde_json::to_string_pretty(&json!({
+                                        "status": "running",
+                                        "pid": pf.pid,
+                                        "port": pf.port,
+                                        "url": url
+                                    }))?
+                                );
+                            } else {
+                                println!("Server is already running on {url} (PID {})", pf.pid);
+                            }
+                            return Ok(());
                         }
                     }
-                    Ok(ServeOutcome::AlreadyRunning { pid, port: p }) => {
-                        let url = format!("http://localhost:{p}");
-                        if json {
-                            println!(
-                                "{}",
-                                serde_json::to_string_pretty(&json!({
-                                    "status": "running",
-                                    "pid": pid,
-                                    "port": p,
-                                    "url": url
-                                }))?
-                            );
-                        } else {
-                            println!("Server is already running on {url} (PID {pid})");
+
+                    let p = find_available_port(port)?;
+                    let url = format!("http://localhost:{p}");
+                    let server_bin = find_server_binary()?;
+                    let data_dir_str = jit_dir
+                        .to_str()
+                        .ok_or_else(|| anyhow::anyhow!("data_dir is not valid UTF-8"))?;
+
+                    let resolved_web_dir = web_dir
+                        .map(|d| jit_dir.parent().unwrap_or(&jit_dir).join(d))
+                        .or_else(find_web_dir);
+
+                    if !json {
+                        println!("Starting server on {url} (foreground, Ctrl+C to stop)");
+                        println!("  API: {url}/api");
+                        println!("  Web: {url}/");
+                    }
+
+                    let mut cmd = std::process::Command::new(&server_bin);
+                    cmd.arg("--data-dir")
+                        .arg(data_dir_str)
+                        .arg("--bind")
+                        .arg(format!("0.0.0.0:{p}"));
+                    if let Some(web) = &resolved_web_dir {
+                        if web.is_dir() {
+                            cmd.arg("--web-dir").arg(web);
                         }
                     }
-                    Err(e) => {
-                        if json {
-                            println!(
-                                "{}",
-                                serde_json::to_string_pretty(&json!({
-                                    "status": "error",
-                                    "error": e.to_string()
-                                }))?
-                            );
-                        } else {
-                            eprintln!("Error starting server: {e}");
+                    let status = cmd.status().context("Failed to run jit-server")?;
+                    if json {
+                        println!(
+                            "{}",
+                            serde_json::to_string_pretty(&json!({
+                                "status": "exited",
+                                "port": p,
+                                "exit_code": status.code()
+                            }))?
+                        );
+                    }
+                    if !status.success() {
+                        std::process::exit(status.code().unwrap_or(1));
+                    }
+                } else {
+                    // Daemonize via start_server.
+                    let resolved_web_dir = web_dir
+                        .map(|d| jit_dir.parent().unwrap_or(&jit_dir).join(d))
+                        .or_else(find_web_dir);
+                    let opts = ServeOptions {
+                        data_dir: jit_dir.clone(),
+                        preferred_port: port,
+                        log_file,
+                        web_dir: resolved_web_dir,
+                    };
+                    match start_server(opts) {
+                        Ok(ServeOutcome::Started {
+                            pid,
+                            port: p,
+                            log_file: lf,
+                        }) => {
+                            let url = format!("http://localhost:{p}");
+                            if json {
+                                println!(
+                                    "{}",
+                                    serde_json::to_string_pretty(&json!({
+                                        "status": "started",
+                                        "pid": pid,
+                                        "port": p,
+                                        "url": url,
+                                        "log_file": lf
+                                    }))?
+                                );
+                            } else {
+                                println!("Server started on {url} (PID {pid})");
+                                println!("  API: {url}/api");
+                                println!("  Web: {url}/");
+                                println!("  Log: {}", lf.display());
+                            }
                         }
-                        std::process::exit(1);
+                        Ok(ServeOutcome::AlreadyRunning { pid, port: p }) => {
+                            let url = format!("http://localhost:{p}");
+                            if json {
+                                println!(
+                                    "{}",
+                                    serde_json::to_string_pretty(&json!({
+                                        "status": "running",
+                                        "pid": pid,
+                                        "port": p,
+                                        "url": url
+                                    }))?
+                                );
+                            } else {
+                                println!("Server is already running on {url} (PID {pid})");
+                            }
+                        }
+                        Err(e) => {
+                            if json {
+                                println!(
+                                    "{}",
+                                    serde_json::to_string_pretty(&json!({
+                                        "status": "error",
+                                        "error": e.to_string()
+                                    }))?
+                                );
+                            } else {
+                                eprintln!("Error starting server: {e}");
+                            }
+                            std::process::exit(1);
+                        }
                     }
                 }
             }

@@ -60,19 +60,25 @@ pub struct ServerPidFile {
 ///     data_dir: PathBuf::from("/repo/.jit"),
 ///     preferred_port: 3000,
 ///     log_file: None,
-///     foreground: false,
 ///     web_dir: None,
 /// };
 /// match start_server(opts).unwrap() {
-///     ServeOutcome::Started { pid, port } => println!("started on :{port} (pid {pid})"),
+///     ServeOutcome::Started { pid, port, log_file } => {
+///         println!("started on :{port} (pid {pid}), log: {}", log_file.display());
+///     }
 ///     ServeOutcome::AlreadyRunning { pid, port } => println!("already on :{port} (pid {pid})"),
 /// }
 /// ```
 #[derive(Debug, PartialEq)]
 pub enum ServeOutcome {
-    /// Server was successfully started.
-    Started { pid: u32, port: u16 },
-    /// A live server was already running — we printed its info and exited.
+    /// Server was successfully started as a background daemon.
+    Started {
+        pid: u32,
+        port: u16,
+        /// The effective log file path (resolved default or user-supplied).
+        log_file: PathBuf,
+    },
+    /// A live server was already running — caller should print its info.
     AlreadyRunning { pid: u32, port: u16 },
 }
 
@@ -102,11 +108,29 @@ pub enum StopOutcome {
 // ────────────────────────────────────────────────────────────────────────────
 
 /// Returns the canonical path of the PID file for the given data directory.
+///
+/// # Examples
+///
+/// ```
+/// use jit::commands::serve::pid_file_path;
+/// use std::path::Path;
+/// let path = pid_file_path(Path::new("/repo/.jit"));
+/// assert_eq!(path.file_name().unwrap(), "server.pid.json");
+/// ```
 pub fn pid_file_path(data_dir: &Path) -> PathBuf {
     data_dir.join("server.pid.json")
 }
 
 /// Reads and deserialises the PID file, returning `None` if it does not exist.
+///
+/// # Examples
+///
+/// ```
+/// use jit::commands::serve::read_pid_file;
+/// use std::path::Path;
+/// // Returns None when the file is absent.
+/// assert!(read_pid_file(Path::new("/tmp/nonexistent-jit-test")).unwrap().is_none());
+/// ```
 pub fn read_pid_file(data_dir: &Path) -> Result<Option<ServerPidFile>> {
     let path = pid_file_path(data_dir);
     if !path.exists() {
@@ -118,6 +142,18 @@ pub fn read_pid_file(data_dir: &Path) -> Result<Option<ServerPidFile>> {
 }
 
 /// Writes the PID file atomically (temp → rename).
+///
+/// # Examples
+///
+/// ```no_run
+/// use jit::commands::serve::{ServerPidFile, write_pid_file};
+/// use std::path::Path;
+/// let pf = ServerPidFile {
+///     pid: 42, port: 3000, started_at: chrono::Utc::now(),
+///     data_dir: "/repo/.jit".into(), log_file: "/repo/.jit/server.log".into(),
+/// };
+/// write_pid_file(Path::new("/repo/.jit"), &pf).unwrap();
+/// ```
 pub fn write_pid_file(data_dir: &Path, pf: &ServerPidFile) -> Result<()> {
     let path = pid_file_path(data_dir);
     let tmp = path.with_extension("pid.tmp");
@@ -128,6 +164,15 @@ pub fn write_pid_file(data_dir: &Path, pf: &ServerPidFile) -> Result<()> {
 }
 
 /// Removes the PID file, ignoring "not found" errors.
+///
+/// # Examples
+///
+/// ```
+/// use jit::commands::serve::remove_pid_file;
+/// use std::path::Path;
+/// // Removing a non-existent file is not an error.
+/// remove_pid_file(Path::new("/tmp/nonexistent-jit-test")).unwrap();
+/// ```
 pub fn remove_pid_file(data_dir: &Path) -> Result<()> {
     let path = pid_file_path(data_dir);
     match std::fs::remove_file(&path) {
@@ -151,6 +196,17 @@ pub fn remove_pid_file(data_dir: &Path) -> Result<()> {
 /// are rejected and return `false` — casting them to `i32` would produce
 /// negative values that have special `kill(2)` semantics (e.g. -1 = all
 /// processes), which would be catastrophic.
+///
+/// # Examples
+///
+/// ```
+/// use jit::commands::serve::is_process_alive;
+/// // Current process is always alive.
+/// let my_pid = std::process::id();
+/// assert!(is_process_alive(my_pid));
+/// // u32::MAX overflows i32 — must never signal such a PID.
+/// assert!(!is_process_alive(u32::MAX));
+/// ```
 pub fn is_process_alive(pid: u32) -> bool {
     #[cfg(unix)]
     {
@@ -181,6 +237,14 @@ pub fn is_process_alive(pid: u32) -> bool {
 /// Returns the first free TCP port in `start..=start+99`, or an error.
 ///
 /// A port is "free" if we can successfully bind a `TcpListener` to it.
+///
+/// # Examples
+///
+/// ```no_run
+/// use jit::commands::serve::find_available_port;
+/// let port = find_available_port(3000).unwrap();
+/// assert!((3000..=3099).contains(&port));
+/// ```
 pub fn find_available_port(start: u16) -> Result<u16> {
     (start..=start.saturating_add(99))
         .find(|&port| TcpListener::bind(("127.0.0.1", port)).is_ok())
@@ -201,6 +265,14 @@ pub fn find_available_port(start: u16) -> Result<u16> {
 /// Search order:
 /// 1. Sibling of the current executable (covers `cargo install` and release builds)
 /// 2. `which jit-server` (covers PATH-based installs)
+///
+/// # Examples
+///
+/// ```no_run
+/// use jit::commands::serve::find_server_binary;
+/// let path = find_server_binary().unwrap();
+/// assert!(path.exists());
+/// ```
 pub fn find_server_binary() -> Result<PathBuf> {
     // 1. Sibling of current executable
     if let Ok(exe) = std::env::current_exe() {
@@ -223,7 +295,21 @@ pub fn find_server_binary() -> Result<PathBuf> {
 // Start / stop logic
 // ────────────────────────────────────────────────────────────────────────────
 
-/// Options for starting the server.
+/// Options for starting the server as a background daemon.
+///
+/// # Examples
+///
+/// ```
+/// use jit::commands::serve::ServeOptions;
+/// use std::path::PathBuf;
+/// let opts = ServeOptions {
+///     data_dir: PathBuf::from("/repo/.jit"),
+///     preferred_port: 3000,
+///     log_file: None,
+///     web_dir: None,
+/// };
+/// assert_eq!(opts.preferred_port, 3000);
+/// ```
 #[derive(Debug)]
 pub struct ServeOptions {
     /// Absolute path to the `.jit` data directory.
@@ -232,8 +318,6 @@ pub struct ServeOptions {
     pub preferred_port: u16,
     /// Log file path. Defaults to `<data_dir>/server.log`.
     pub log_file: Option<PathBuf>,
-    /// Keep process in foreground instead of daemonizing.
-    pub foreground: bool,
     /// Directory containing built web UI static files.
     /// `None` means auto-detect; use [`find_web_dir`] before calling `start_server`.
     pub web_dir: Option<PathBuf>,
@@ -284,6 +368,31 @@ pub fn find_web_dir() -> Option<PathBuf> {
 
 /// Checks for a running server; if alive returns `AlreadyRunning`, otherwise
 /// starts a new daemonized `jit-server` process and returns `Started`.
+///
+/// Foreground mode is handled by the caller, not this function. Use
+/// [`find_server_binary`] and [`find_available_port`] to build the command,
+/// then invoke it with `Command::status()` so the caller can print the URL
+/// before blocking.
+///
+/// # Examples
+///
+/// ```no_run
+/// use jit::commands::serve::{start_server, ServeOptions, ServeOutcome};
+/// use std::path::PathBuf;
+///
+/// let opts = ServeOptions {
+///     data_dir: PathBuf::from("/repo/.jit"),
+///     preferred_port: 3000,
+///     log_file: None,
+///     web_dir: None,
+/// };
+/// match start_server(opts).unwrap() {
+///     ServeOutcome::Started { pid, port, log_file } => {
+///         println!("started on :{port} (pid {pid}), log: {}", log_file.display());
+///     }
+///     ServeOutcome::AlreadyRunning { pid, port } => println!("already on :{port} (pid {pid})"),
+/// }
+/// ```
 pub fn start_server(opts: ServeOptions) -> Result<ServeOutcome> {
     let data_dir = &opts.data_dir;
 
@@ -326,16 +435,6 @@ pub fn start_server(opts: ServeOptions) -> Result<ServeOutcome> {
         }
     }
 
-    if opts.foreground {
-        // Run in foreground — block until the process exits.
-        let status = cmd.status().context("Failed to start jit-server")?;
-        if !status.success() {
-            bail!("jit-server exited with status {status}");
-        }
-        // In foreground mode there is no PID to track.
-        return Ok(ServeOutcome::Started { pid: 0, port });
-    }
-
     // Daemonize: redirect stdin to /dev/null, stdout/stderr to log file.
     let dev_null = std::fs::File::open("/dev/null")
         .or_else(|_| std::fs::File::open("NUL")) // Windows fallback
@@ -368,10 +467,30 @@ pub fn start_server(opts: ServeOptions) -> Result<ServeOutcome> {
     };
     write_pid_file(data_dir, &pf)?;
 
-    Ok(ServeOutcome::Started { pid, port })
+    Ok(ServeOutcome::Started {
+        pid,
+        port,
+        log_file,
+    })
 }
 
 /// Stops the running server for the given data directory.
+///
+/// Sends `SIGTERM` to the server process and removes the PID file.
+/// Returns [`StopOutcome::NotRunning`] if no server was running or the PID
+/// file is stale.
+///
+/// # Examples
+///
+/// ```no_run
+/// use jit::commands::serve::{stop_server, StopOutcome};
+/// use std::path::Path;
+///
+/// match stop_server(Path::new("/repo/.jit")).unwrap() {
+///     StopOutcome::Stopped { pid, port } => println!("stopped pid {pid} on :{port}"),
+///     StopOutcome::NotRunning => println!("no server was running"),
+/// }
+/// ```
 pub fn stop_server(data_dir: &Path) -> Result<StopOutcome> {
     let pf = match read_pid_file(data_dir)? {
         Some(pf) if is_process_alive(pf.pid) => pf,
@@ -412,6 +531,18 @@ pub fn stop_server(data_dir: &Path) -> Result<StopOutcome> {
 }
 
 /// Returns the current server status for the given data directory.
+///
+/// Returns `Some(ServerPidFile)` when a live server is found, `None` when
+/// no server is running or the PID file is stale (stale files are cleaned up).
+///
+/// # Examples
+///
+/// ```
+/// use jit::commands::serve::server_status;
+/// use std::path::Path;
+/// // No server running in a temp dir.
+/// assert!(server_status(Path::new("/tmp/nonexistent-jit-test")).unwrap().is_none());
+/// ```
 pub fn server_status(data_dir: &Path) -> Result<Option<ServerPidFile>> {
     match read_pid_file(data_dir)? {
         Some(pf) if is_process_alive(pf.pid) => Ok(Some(pf)),
