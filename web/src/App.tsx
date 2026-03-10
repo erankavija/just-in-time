@@ -115,7 +115,7 @@ function App() {
             }}>
               {searchResults.results.map((result, idx) => (
                 <div
-                  key={idx}
+                  key={result.issue?.id ?? `server-${result.serverResult?.path}-${result.serverResult?.line_number}-${idx}`}
                   style={{
                     padding: '0.5rem',
                     cursor: 'pointer',

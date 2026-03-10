@@ -31,8 +31,9 @@ export function filterIssues(issues: Issue[], query: string): ClientSearchResult
     }
   }
   
-  // Sort by score descending
-  return results.sort((a, b) => b.score - a.score);
+  // Sort by score descending, with issue ID as stable tiebreaker so results
+  // don't reorder when `allIssues` arrives in a different sequence from the API.
+  return results.sort((a, b) => b.score - a.score || a.issue.id.localeCompare(b.issue.id));
 }
 
 /**

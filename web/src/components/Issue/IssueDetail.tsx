@@ -45,6 +45,9 @@ export function IssueDetail({ issueId, allIssues = [], onNavigate, onFocusInGrap
   // Once an issue has loaded once, SSE-triggered refreshes update silently
   // (no loading overlay) so the pane doesn't flash on every version bump.
   const hasLoadedOnceRef = useRef(false);
+  // Monotonic counter — each loadIssue call gets its own sequence number so
+  // out-of-order responses (slow network, rapid version bumps) are discarded.
+  const fetchSeqRef = useRef(0);
 
   useEffect(() => {
     if (!issueId) {
@@ -70,11 +73,28 @@ export function IssueDetail({ issueId, allIssues = [], onNavigate, onFocusInGrap
   // Reset gate UI state when issue changes
   useEffect(() => {
     hasLoadedOnceRef.current = false; // Show loading indicator for the newly selected issue
+    fetchSeqRef.current = 0; // Reset sequence so stale in-flight requests are discarded
     setExpandedGate(null);
     setGateRuns({});
     setSelectedRun(null);
     setSelectedRunId(null);
   }, [issueId]);
+
+  // When version bumps while gate history is expanded, refresh those runs so
+  // the list reflects any new run that just completed.
+  const expandedGateRef = useRef(expandedGate);
+  useEffect(() => { expandedGateRef.current = expandedGate; }, [expandedGate]);
+  const issueIdRef = useRef(issue?.id);
+  useEffect(() => { issueIdRef.current = issue?.id; }, [issue?.id]);
+
+  useEffect(() => {
+    const gateKey = expandedGateRef.current;
+    const id = issueIdRef.current;
+    if (!gateKey || !id || version === 0) return;
+    apiClient.listGateRuns(id, gateKey)
+      .then(runs => setGateRuns(prev => ({ ...prev, [gateKey]: runs })))
+      .catch(err => console.error('Failed to refresh gate runs:', err));
+  }, [version]);
 
   const toggleGateHistory = useCallback(async (gateKey: string) => {
     if (expandedGate === gateKey) {
@@ -114,18 +134,24 @@ export function IssueDetail({ issueId, allIssues = [], onNavigate, onFocusInGrap
   }, [issue, selectedRunId]);
 
   const loadIssue = async (id: string) => {
+    const seq = ++fetchSeqRef.current;
     const isBackground = hasLoadedOnceRef.current;
     try {
       if (!isBackground) setLoading(true);
       setError(null);
       const data = await apiClient.getIssue(id);
+      // Discard responses that arrived out of order.
+      if (fetchSeqRef.current !== seq) return;
       setIssue(data);
     } catch (err) {
+      if (fetchSeqRef.current !== seq) return;
       setError(err instanceof Error ? err.message : 'Failed to load issue');
       console.error('Failed to load issue:', err);
     } finally {
-      hasLoadedOnceRef.current = true;
-      if (!isBackground) setLoading(false);
+      if (fetchSeqRef.current === seq) {
+        hasLoadedOnceRef.current = true;
+        if (!isBackground) setLoading(false);
+      }
     }
   };
 

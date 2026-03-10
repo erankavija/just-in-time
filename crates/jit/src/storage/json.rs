@@ -169,7 +169,11 @@ impl JsonFileStorage {
 
         Ok(Index {
             schema_version: 2,
-            all_ids: all_ids.into_iter().collect(),
+            all_ids: {
+                let mut ids: Vec<String> = all_ids.into_iter().collect();
+                ids.sort();
+                ids
+            },
             deleted_ids: vec![], // Don't propagate deleted_ids in aggregated index
         })
     }
