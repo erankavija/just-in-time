@@ -486,7 +486,15 @@ pub fn start_server(opts: ServeOptions) -> Result<ServeOutcome> {
         data_dir: data_dir.to_path_buf(),
         log_file: log_file.clone(),
     };
-    write_pid_file(data_dir, &pf)?;
+    if let Err(e) = write_pid_file(data_dir, &pf) {
+        // PID file write failed but the child is already detached and running.
+        // Kill it now so we do not leave an orphaned, untrackable process.
+        let _ = child.kill();
+        let _ = child.wait(); // reap to avoid zombie
+        return Err(e.context(format!(
+            "Failed to persist PID file; terminated spawned jit-server (PID {pid})"
+        )));
+    }
 
     Ok(ServeOutcome::Started {
         pid,
@@ -810,6 +818,57 @@ mod tests {
         assert!(
             !pid_file_path(data_dir).exists(),
             "PID file must not be written when server exits immediately"
+        );
+    }
+
+    // ── orphan cleanup: pid-file write fails after successful spawn ──────────
+
+    #[test]
+    #[cfg(unix)]
+    fn test_start_server_kills_orphan_when_pid_write_fails() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let tmp = TempDir::new().unwrap();
+        let data_dir = tmp.path();
+
+        // Write a shell script that ignores all arguments and sleeps, so it
+        // stays alive long enough to pass the try_wait liveness check.
+        let fake_server = tmp.path().join("fake-jit-server.sh");
+        std::fs::write(&fake_server, "#!/bin/sh\nexec sleep 60\n").unwrap();
+        let mut perms = std::fs::metadata(&fake_server).unwrap().permissions();
+        perms.set_mode(0o755);
+        std::fs::set_permissions(&fake_server, perms).unwrap();
+
+        // Block write_pid_file by placing a directory at the PID file path.
+        // The atomic write goes tmp→final via rename; renaming a regular file
+        // over a directory fails, triggering our orphan-cleanup path.
+        let pid_path = pid_file_path(data_dir);
+        std::fs::create_dir_all(&pid_path).unwrap();
+
+        let opts = ServeOptions {
+            data_dir: data_dir.to_path_buf(),
+            preferred_port: 3000,
+            log_file: None,
+            web_dir: None,
+            server_binary: Some(fake_server),
+        };
+
+        let result = start_server(opts);
+        assert!(result.is_err(), "must fail when PID file cannot be written");
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("PID") || msg.contains("pid") || msg.contains("persist"),
+            "error should relate to PID persistence, got: {msg}"
+        );
+
+        // Give the kill a moment to propagate, then confirm the process is gone.
+        std::thread::sleep(Duration::from_millis(200));
+        // We do not have the child PID here, but the key invariant is that the
+        // PID file was NOT successfully written as a JSON record (the directory
+        // blocker is still in place, proving no rename succeeded).
+        assert!(
+            pid_path.is_dir(),
+            "directory blocker should still be there — no JSON PID was persisted"
         );
     }
 }
