@@ -2,7 +2,7 @@
   "id": "3a7caca1-8126-4b02-b94e-435d5b679fbe",
   "title": "Implement jit serve command for background API and web UI server",
   "description": "Add a `jit serve` command to the jit CLI that starts the jit-server API and web UI as a detached background process (not tied to the terminal), with PID-file-based collision detection and automatic port selection for multi-repo hosts.\n\n## Acceptance Criteria\n\n- `jit serve` starts the jit-server binary as a daemon process (detached from terminal)\n- `jit serve --stop` stops the server for the current repo\n- `jit serve --status` shows whether the server is running (port, PID, uptime)\n- Multiple repos on the same host can run servers simultaneously (auto port selection 3000–3099)\n- If server already running for this repo, `jit serve` prints its info and exits 0 (idempotent)\n- Stale PID files (dead process) are cleaned up automatically\n- `--json` flag provides machine-readable output\n- `jit serve` is excluded from default MCP tool listing (hidden flag in schema)\n- `crates/server` is enhanced with `--web-dir` to serve built web UI static files\n\n## Command Interface\n```\njit serve [--port PORT] [--stop] [--status] [--fg] [--log FILE] [--json]\n```\n\n## PID File\n`.jit/server.pid.json` — stores pid, port, started_at, data_dir, log_file\n\n## Output\n- Start: `Server started on http://localhost:3000 (PID 12345)`\n- Already running: `Server is already running on http://localhost:3000 (PID 12345)`\n- Stop: `Server stopped (was PID 12345 on port 3000)`\n- Status: `Server is running: http://localhost:3000 (PID 12345, started ...)`",
-  "state": "ready",
+  "state": "done",
   "priority": "high",
   "assignee": "agent:copilot",
   "dependencies": [],
@@ -17,17 +17,22 @@
     "fmt": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-03-09T21:35:03.096612124Z"
-    },
-    "clippy": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-03-09T21:35:03.095036784Z"
+      "updated_at": "2026-03-10T22:10:57.880744744Z"
     },
     "tests": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-03-09T21:35:03.093719853Z"
+      "updated_at": "2026-03-10T22:10:32.454472559Z"
+    },
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-03-10T22:10:55.375970347Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-03-10T22:10:58.389965120Z"
     },
     "tdd-reminder": {
       "status": "passed",
@@ -45,5 +50,5 @@
     "component:web"
   ],
   "created_at": "2026-03-09T21:17:31.159919453+00:00",
-  "updated_at": "2026-03-09T21:35:23.910165499+00:00"
+  "updated_at": "2026-03-10T22:33:02.174712527+00:00"
 }

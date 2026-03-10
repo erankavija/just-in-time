@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "a4b7f7bf-8a2c-4e99-81a1-2200d9f5632c",
+  "gate_key": "fmt",
+  "stage": "postcheck",
+  "issue_id": "3a7caca1-8126-4b02-b94e-435d5b679fbe",
+  "commit": "08296e6a1d29c497b517f5bb79e94e8fc3c09f8b",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-03-10T19:35:41.412293172Z",
+  "completed_at": "2026-03-10T19:35:41.915235145Z",
+  "duration_ms": 502,
+  "exit_code": 1,
+  "stdout": "Diff in /home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/serve.rs:203:\n         // target/{profile}/jit -> exe.parent() = target/{profile}/\n         // go up two more: target/ -> repo root\n         let candidates = [\n\u001b[31m-            exe.parent().and_then(|p| {\n\u001b[m\u000f\u001b[31m-                p.parent()?.parent().map(|r| r.join(\"web/dist\"))\n\u001b[m\u000f\u001b[31m-            }),\n\u001b[m\u000f\u001b[32m+            exe.parent()\n\u001b[m\u000f\u001b[32m+                .and_then(|p| p.parent()?.parent().map(|r| r.join(\"web/dist\"))),\n\u001b[m\u000f             exe.parent().map(|p| p.join(\"web/dist\")),\n         ];\n         for c in candidates.into_iter().flatten() {\n",
+  "stderr": "",
+  "command": "cargo fmt -- --check",
+  "by": "auto:executor",
+  "message": null
+}
