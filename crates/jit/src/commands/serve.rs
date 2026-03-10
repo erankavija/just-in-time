@@ -18,6 +18,22 @@ use anyhow::{bail, Context, Result};
 // ────────────────────────────────────────────────────────────────────────────
 
 /// Runtime state persisted in `.jit/server.pid.json`.
+///
+/// # Examples
+///
+/// ```no_run
+/// use jit::commands::serve::{ServerPidFile, write_pid_file};
+/// use std::path::Path;
+///
+/// let pf = ServerPidFile {
+///     pid: 12345,
+///     port: 3000,
+///     started_at: chrono::Utc::now(),
+///     data_dir: "/repo/.jit".into(),
+///     log_file: "/repo/.jit/server.log".into(),
+/// };
+/// write_pid_file(Path::new("/repo/.jit"), &pf).unwrap();
+/// ```
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct ServerPidFile {
     /// OS process ID of the running `jit-server` process.
@@ -33,6 +49,25 @@ pub struct ServerPidFile {
 }
 
 /// Outcome of a `jit serve` (start) invocation.
+///
+/// # Examples
+///
+/// ```no_run
+/// use jit::commands::serve::{start_server, ServeOptions, ServeOutcome};
+/// use std::path::PathBuf;
+///
+/// let opts = ServeOptions {
+///     data_dir: PathBuf::from("/repo/.jit"),
+///     preferred_port: 3000,
+///     log_file: None,
+///     foreground: false,
+///     web_dir: None,
+/// };
+/// match start_server(opts).unwrap() {
+///     ServeOutcome::Started { pid, port } => println!("started on :{port} (pid {pid})"),
+///     ServeOutcome::AlreadyRunning { pid, port } => println!("already on :{port} (pid {pid})"),
+/// }
+/// ```
 #[derive(Debug, PartialEq)]
 pub enum ServeOutcome {
     /// Server was successfully started.
@@ -42,6 +77,18 @@ pub enum ServeOutcome {
 }
 
 /// Outcome of `jit serve --stop`.
+///
+/// # Examples
+///
+/// ```no_run
+/// use jit::commands::serve::{stop_server, StopOutcome};
+/// use std::path::Path;
+///
+/// match stop_server(Path::new("/repo/.jit")).unwrap() {
+///     StopOutcome::Stopped { pid, port } => println!("stopped pid {pid} on :{port}"),
+///     StopOutcome::NotRunning => println!("no server running"),
+/// }
+/// ```
 #[derive(Debug, PartialEq)]
 pub enum StopOutcome {
     /// Server was killed successfully.
@@ -197,6 +244,18 @@ pub struct ServeOptions {
 /// Search order:
 /// 1. Sibling `web/dist/` next to the current executable
 /// 2. `web/dist/` relative to the current working directory
+///
+/// # Examples
+///
+/// ```no_run
+/// use jit::commands::serve::find_web_dir;
+///
+/// if let Some(dir) = find_web_dir() {
+///     println!("web UI at: {}", dir.display());
+/// } else {
+///     println!("web UI not found; pass --web-dir explicitly");
+/// }
+/// ```
 pub fn find_web_dir() -> Option<PathBuf> {
     // 1. Next to the jit binary (installed layout or cargo target/debug/)
     if let Ok(exe) = std::env::current_exe() {
@@ -333,6 +392,10 @@ pub fn stop_server(data_dir: &Path) -> Result<StopOutcome> {
         use nix::unistd::Pid;
         let pid_i32 =
             i32::try_from(pid).with_context(|| format!("PID {pid} is out of range for kill(2)"))?;
+        // Guard against pid 0 (signal whole process group) and negative values.
+        if pid_i32 <= 0 {
+            bail!("Refusing to signal PID {pid}: value would target a process group");
+        }
         kill(Pid::from_raw(pid_i32), Signal::SIGTERM)
             .with_context(|| format!("Failed to send SIGTERM to PID {pid}"))?;
     }
@@ -497,7 +560,7 @@ mod tests {
         let bound_port = listener.local_addr().unwrap().port();
 
         // Ask for that specific port; it should return a different one (if any free).
-        if bound_port >= 3000 && bound_port <= 3099 {
+        if (3000..=3099).contains(&bound_port) {
             let port = find_available_port(bound_port).unwrap();
             assert_ne!(port, bound_port);
         }

@@ -3562,7 +3562,17 @@ fn run() -> Result<()> {
                         }
                     }
                     Err(e) => {
-                        eprintln!("Error stopping server: {e}");
+                        if json {
+                            println!(
+                                "{}",
+                                serde_json::to_string_pretty(&json!({
+                                    "status": "error",
+                                    "error": e.to_string()
+                                }))?
+                            );
+                        } else {
+                            eprintln!("Error stopping server: {e}");
+                        }
                         std::process::exit(1);
                     }
                 }
@@ -3600,7 +3610,17 @@ fn run() -> Result<()> {
                         }
                     }
                     Err(e) => {
-                        eprintln!("Error checking server status: {e}");
+                        if json {
+                            println!(
+                                "{}",
+                                serde_json::to_string_pretty(&json!({
+                                    "status": "error",
+                                    "error": e.to_string()
+                                }))?
+                            );
+                        } else {
+                            eprintln!("Error checking server status: {e}");
+                        }
                         std::process::exit(1);
                     }
                 }
@@ -3656,7 +3676,17 @@ fn run() -> Result<()> {
                         }
                     }
                     Err(e) => {
-                        eprintln!("Error starting server: {e}");
+                        if json {
+                            println!(
+                                "{}",
+                                serde_json::to_string_pretty(&json!({
+                                    "status": "error",
+                                    "error": e.to_string()
+                                }))?
+                            );
+                        } else {
+                            eprintln!("Error starting server: {e}");
+                        }
                         std::process::exit(1);
                     }
                 }

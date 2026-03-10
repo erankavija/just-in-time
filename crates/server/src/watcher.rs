@@ -277,7 +277,7 @@ mod tests {
             kind: notify::EventKind::Modify(notify::event::ModifyKind::Data(
                 notify::event::DataChange::Any,
             )),
-            paths: paths.iter().map(|p| PathBuf::from(p)).collect(),
+            paths: paths.iter().map(|p| PathBuf::from(*p)).collect(),
             attrs: Default::default(),
         }
     }
