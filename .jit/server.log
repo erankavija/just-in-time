@@ -1,9 +1,0 @@
-[2m2026-03-09T21:38:10.747744Z[0m [32m INFO[0m Starting JIT API Server...
-[2m2026-03-09T21:38:10.747794Z[0m [32m INFO[0m Using JIT repository at: /home/vkaskivuo/Projects/just-in-time/.jit
-[2m2026-03-09T21:38:10.755560Z[0m [32m INFO[0m Watching /home/vkaskivuo/Projects/just-in-time/.jit for changes
-[2m2026-03-09T21:38:10.756210Z[0m [32m INFO[0m Server listening on http://0.0.0.0:3000
-[2m2026-03-09T21:39:51.962348Z[0m [32m INFO[0m Starting JIT API Server...
-[2m2026-03-09T21:39:51.962395Z[0m [32m INFO[0m Using JIT repository at: /home/vkaskivuo/Projects/just-in-time/.jit
-[2m2026-03-09T21:39:51.969975Z[0m [32m INFO[0m Watching /home/vkaskivuo/Projects/just-in-time/.jit for changes
-[2m2026-03-09T21:39:51.970609Z[0m [32m INFO[0m Serving web UI from /home/vkaskivuo/Projects/just-in-time/web/dist
-[2m2026-03-09T21:39:51.970657Z[0m [32m INFO[0m Server listening on http://0.0.0.0:3000

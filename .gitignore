@@ -4,6 +4,10 @@
 # Jit lock files (temporary coordination)
 .jit/**/*.lock
 
+# Jit server runtime files (ephemeral, machine-specific)
+.jit/server.log
+.jit/server.pid.json
+
 # Jit worktree identity (machine-specific, regenerated on init — never commit)
 .jit/worktree.json
 
