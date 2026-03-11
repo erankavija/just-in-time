@@ -58,7 +58,9 @@ pub fn execute_gate_checker_with_context(
     base_env.insert("JIT_GATE_KEY".to_string(), gate_key.to_string());
     base_env.insert("JIT_STAGE".to_string(), stage_str.to_string());
 
-    // Write context file if context is provided
+    // Write context file if context is provided; otherwise explicitly clear
+    // JIT_CONTEXT_FILE so it is never inherited from the parent environment
+    // (e.g. when cargo test is invoked from inside a gate checker).
     let _context_tempfile = if let Some(ctx) = context {
         let mut tmpfile = tempfile::NamedTempFile::new()
             .context("Failed to create temp file for gate context")?;
@@ -153,6 +155,11 @@ fn execute_command(
         .stderr(Stdio::piped());
 
     // Add base env vars (JIT_ISSUE_ID, JIT_GATE_KEY, JIT_STAGE, JIT_CONTEXT_FILE)
+    // Clear JIT_CONTEXT_FILE if not explicitly set, to prevent leaking from the
+    // parent environment (e.g. when tests run inside a gate checker).
+    if !base_env.contains_key("JIT_CONTEXT_FILE") {
+        cmd.env_remove("JIT_CONTEXT_FILE");
+    }
     for (key, value) in base_env {
         cmd.env(key, value);
     }

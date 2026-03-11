@@ -1287,13 +1287,22 @@ fn run() -> Result<()> {
 
                 if json {
                     use jit::output::JsonOutput;
+                    use serde_json::json;
                     let passed_count = results
                         .iter()
                         .filter(|r| r.status == jit::domain::GateRunStatus::Passed)
                         .count();
                     let total = results.len();
                     let msg = format!("{}/{} gates passed", passed_count, total);
-                    let output = JsonOutput::success(results, "gate check-all").with_message(msg);
+                    let output = JsonOutput::success(
+                        json!({
+                            "results": results,
+                            "passed": passed_count,
+                            "total": total,
+                        }),
+                        "gate check-all",
+                    )
+                    .with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else if results.is_empty() {
                     let _ = output_ctx
@@ -1478,10 +1487,12 @@ fn run() -> Result<()> {
                     match executor.list_gate_presets() {
                         Ok(presets) => {
                             if json {
+                                let msg = format!("{} preset(s)", presets.len());
                                 let output = JsonOutput::success(
                                     serde_json::json!({ "presets": presets }),
                                     "gate preset list",
-                                );
+                                )
+                                .with_message(msg);
                                 println!("{}", output.to_json_string()?);
                             } else if presets.is_empty() {
                                 println!("No gate presets available");
@@ -1529,7 +1540,9 @@ fn run() -> Result<()> {
                     match executor.show_gate_preset(&name) {
                         Ok(preset) => {
                             if json {
-                                let output = JsonOutput::success(preset, "gate preset show");
+                                let msg = format!("Preset {}: {}", preset.name, preset.description);
+                                let output = JsonOutput::success(preset, "gate preset show")
+                                    .with_message(msg);
                                 println!("{}", output.to_json_string()?);
                             } else {
                                 println!("Preset: {}", preset.name);
@@ -1613,6 +1626,8 @@ fn run() -> Result<()> {
                     }
 
                     if json {
+                        let msg =
+                            format!("Applied preset '{}' to {} issue(s)", name, results.len());
                         let output = JsonOutput::success(
                             serde_json::json!({
                                 "preset": name,
@@ -1631,7 +1646,8 @@ fn run() -> Result<()> {
                                 }).collect::<Vec<_>>()
                             }),
                             "gate preset apply",
-                        );
+                        )
+                        .with_message(msg);
                         println!("{}", output.to_json_string()?);
                     } else {
                         if !results.is_empty() {
@@ -1662,10 +1678,12 @@ fn run() -> Result<()> {
                     match executor.create_gate_preset(&name, &from_issue) {
                         Ok(path) => {
                             if json {
+                                let msg = format!("Created preset '{}'", name);
                                 let output = JsonOutput::success(
                                     serde_json::json!({ "name": name, "path": path.display().to_string() }),
                                     "gate preset create",
-                                );
+                                )
+                                .with_message(msg);
                                 println!("{}", output.to_json_string()?);
                             } else {
                                 println!("Created preset '{}' at {}", name, path.display());
@@ -2741,7 +2759,9 @@ fn run() -> Result<()> {
                     });
                     println!(
                         "{}",
-                        JsonOutput::success(output, "config show").to_json_string()?
+                        JsonOutput::success(output, "config show")
+                            .with_message("Effective configuration")
+                            .to_json_string()?
                     );
                 } else {
                     println!("Effective Configuration:");
@@ -2893,6 +2913,7 @@ fn run() -> Result<()> {
                             println!(
                                 "{}",
                                 JsonOutput::success(json!({"key": key, "value": v}), "config get")
+                                    .with_message(format!("{} = {}", key, v))
                                     .to_json_string()?
                             );
                         } else {
@@ -3081,7 +3102,18 @@ fn run() -> Result<()> {
                     });
                     println!(
                         "{}",
-                        JsonOutput::success(output, "config validate").to_json_string()?
+                        JsonOutput::success(output, "config validate")
+                            .with_message(if has_errors {
+                                format!("Validation failed: {} error(s)", result.errors.len())
+                            } else if has_warnings {
+                                format!(
+                                    "Validation passed with {} warning(s)",
+                                    result.warnings.len()
+                                )
+                            } else {
+                                "Configuration is valid".to_string()
+                            })
+                            .to_json_string()?
                     );
                 } else if result.errors.is_empty() && result.warnings.is_empty() {
                     println!("✓ Configuration is valid");
@@ -3118,7 +3150,9 @@ fn run() -> Result<()> {
                     use jit::output::JsonOutput;
                     println!(
                         "{}",
-                        JsonOutput::success(hierarchy, "config show-hierarchy").to_json_string()?
+                        JsonOutput::success(hierarchy, "config show-hierarchy")
+                            .with_message("Type hierarchy")
+                            .to_json_string()?
                     );
                 } else {
                     let _ = output_ctx.print_info("Type Hierarchy:\n");
@@ -3146,10 +3180,15 @@ fn run() -> Result<()> {
                             })
                         })
                         .collect();
+                    let count = template_data.len();
                     println!(
                         "{}",
-                        JsonOutput::success(template_data, "config list-templates")
-                            .to_json_string()?
+                        JsonOutput::success(
+                            serde_json::json!({"templates": template_data, "count": count}),
+                            "config list-templates",
+                        )
+                        .with_message(format!("{} template(s)", count))
+                        .to_json_string()?
                     );
                 } else {
                     let _ = output_ctx.print_info("Available Hierarchy Templates:\n");
@@ -3175,7 +3214,12 @@ fn run() -> Result<()> {
                                     "skipped": result.skipped,
                                 }),
                                 "hooks install",
-                            );
+                            )
+                            .with_message(format!(
+                                "Installed {} hook(s) to {}",
+                                result.installed.len(),
+                                result.hooks_dir
+                            ));
                             println!("{}", output.to_json_string()?);
                         } else {
                             println!("Installed hooks to: {}", result.hooks_dir);
@@ -4027,11 +4071,13 @@ fn run() -> Result<()> {
                 ) {
                     Ok(leases) => {
                         if json {
+                            let msg = format!("{} active lease(s)", leases.len());
                             let response = serde_json::json!({
                                 "leases": leases,
                                 "count": leases.len(),
                             });
-                            let output = JsonOutput::success(response, "claim status");
+                            let output =
+                                JsonOutput::success(response, "claim status").with_message(msg);
                             println!("{}", output.to_json_string()?);
                         } else if leases.is_empty() {
                             println!("No active leases found.");
@@ -4105,11 +4151,13 @@ fn run() -> Result<()> {
                 match execute_claim_list() {
                     Ok(leases) => {
                         if json {
+                            let msg = format!("{} lease(s) found", leases.len());
                             let response = serde_json::json!({
                                 "leases": leases,
                                 "count": leases.len(),
                             });
-                            let output = JsonOutput::success(response, "claim list");
+                            let output =
+                                JsonOutput::success(response, "claim list").with_message(msg);
                             println!("{}", output.to_json_string()?);
                         } else if leases.is_empty() {
                             println!("No active leases.");
@@ -4218,7 +4266,11 @@ fn run() -> Result<()> {
                                 "is_main_worktree": info.is_main_worktree,
                                 "common_dir": info.common_dir,
                             });
-                            let output = JsonOutput::success(response, "worktree info");
+                            let output = JsonOutput::success(response, "worktree info")
+                                .with_message(format!(
+                                    "Worktree {} on branch {}",
+                                    info.worktree_id, info.branch
+                                ));
                             println!("{}", output.to_json_string()?);
                         } else {
                             println!("Worktree Information:");
@@ -4262,7 +4314,8 @@ fn run() -> Result<()> {
                                 "worktrees": worktrees,
                                 "count": worktrees.len(),
                             });
-                            let output = JsonOutput::success(response, "worktree list");
+                            let output = JsonOutput::success(response, "worktree list")
+                                .with_message(format!("{} worktree(s)", worktrees.len()));
                             println!("{}", output.to_json_string()?);
                         } else {
                             // Human-readable table format
@@ -4349,7 +4402,9 @@ fn run() -> Result<()> {
                 if json {
                     use jit::output::JsonOutput;
 
-                    let output = JsonOutput::success(&result, "snapshot export");
+                    let output = JsonOutput::success(&result, "snapshot export").with_message(
+                        format!("Exported {} issues to {}", result.issue_count, result.path),
+                    );
                     println!("{}", output.to_json_string()?);
                 } else {
                     println!("✓ Snapshot exported to: {}", result.path);

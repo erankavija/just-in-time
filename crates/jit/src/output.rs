@@ -125,7 +125,23 @@ impl<T: Serialize> JsonOutput<T> {
         }
     }
 
-    /// Add a human-readable message to the JSON output
+    /// Add a human-readable message to the JSON output.
+    ///
+    /// The message is injected as a top-level `"message"` field in the
+    /// serialized JSON object. If the data serializes to a non-object
+    /// (e.g. an array), the message is silently dropped.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::output::JsonOutput;
+    /// use serde_json::json;
+    ///
+    /// let output = JsonOutput::success(json!({"id": "abc"}), "issue create")
+    ///     .with_message("Created issue abc");
+    /// let json_str = output.to_json_string().unwrap();
+    /// assert!(json_str.contains("\"message\": \"Created issue abc\""));
+    /// ```
     pub fn with_message(mut self, msg: impl Into<String>) -> Self {
         self.message = Some(msg.into());
         self
@@ -797,6 +813,20 @@ mod tests {
         let json_str = output.to_json_string().unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&json_str).unwrap();
         assert!(parsed.get("message").is_none());
+    }
+
+    #[test]
+    fn test_json_output_with_message_array_payload() {
+        // When data serializes to a JSON array (not object), message cannot be injected.
+        // Verify the output is still valid JSON (the array), just without message.
+        let data = json!([{"id": "a"}, {"id": "b"}]);
+        let output = JsonOutput::success(data, "some list").with_message("Should not appear");
+
+        let json_str = output.to_json_string().unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&json_str).unwrap();
+        assert!(parsed.is_array(), "Array payload should serialize as array");
+        assert_eq!(parsed.as_array().unwrap().len(), 2);
+        // message is silently dropped for non-object payloads
     }
 
     #[test]

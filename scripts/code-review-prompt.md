@@ -65,7 +65,7 @@ If `run_history` is non-empty, check whether issues from the most recent run hav
 
 ## Jit issue management
 
-- jit validate must pass. Label warnings are allowed.
+- `./scripts/jit-validate.sh` must pass. Label warnings are allowed.
 - Check `issue.dependencies` — has prerequisite work been completed? Does this change correctly build on it?
 
 ## Output
