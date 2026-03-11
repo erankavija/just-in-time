@@ -33,9 +33,22 @@ macro_rules! output_message {
 ///     println!("ID: {}", issue.id);
 ///     println!("Title: {}", issue.title);
 /// });
+/// // With message:
+/// output_data!(quiet, json, "issue show", issue, "Issue found", {
+///     println!("ID: {}", issue.id);
+/// });
 /// ```
 #[macro_export]
 macro_rules! output_data {
+    ($quiet:expr, $json:expr, $command:expr, $data:expr, $msg:expr, $human_block:block) => {
+        if $json {
+            use jit::output::JsonOutput;
+            let output = JsonOutput::success(&$data, $command).with_message($msg);
+            println!("{}", output.to_json_string()?);
+        } else {
+            $human_block
+        }
+    };
     ($quiet:expr, $json:expr, $command:expr, $data:expr, $human_block:block) => {
         if $json {
             use jit::output::JsonOutput;
@@ -62,6 +75,15 @@ macro_rules! output_data {
 /// ```
 #[macro_export]
 macro_rules! output_json {
+    ($quiet:expr, $json:expr, $command:expr, $json_data:expr, $msg:expr, $human_block:block) => {
+        if $json {
+            use jit::output::JsonOutput;
+            let output = JsonOutput::success($json_data, $command).with_message($msg);
+            println!("{}", output.to_json_string()?);
+        } else {
+            $human_block
+        }
+    };
     ($quiet:expr, $json:expr, $command:expr, $json_data:expr, $human_block:block) => {
         if $json {
             use jit::output::JsonOutput;

@@ -273,7 +273,8 @@ fn run() -> Result<()> {
 
                     if json {
                         let issue = storage.load_issue(&id)?;
-                        let output = JsonOutput::success(issue, "issue create");
+                        let msg = format!("Created issue {} - {}", issue.short_id(), issue.title);
+                        let output = JsonOutput::success(issue, "issue create").with_message(msg);
                         println!("{}", output.to_json_string()?);
                     } else {
                         // In quiet mode, output just the ID for scripting
@@ -361,7 +362,9 @@ fn run() -> Result<()> {
                             })
                         };
 
-                        let output = JsonOutput::success(output_data, "issue search");
+                        let msg = format!("Found {} issue(s) matching '{}'", issues.len(), query);
+                        let output =
+                            JsonOutput::success(output_data, "issue search").with_message(msg);
                         println!("{}", output.to_json_string()?);
                     } else {
                         let _ = output_ctx.print_info(format!("Found {} issue(s):", issues.len()));
@@ -381,7 +384,13 @@ fn run() -> Result<()> {
                             enriched_deps.clone(),
                         );
 
-                        output_data!(quiet, json, "issue show", response, {
+                        let show_msg = format!(
+                            "Issue {}: {} [{:?}]",
+                            &response.id[..8],
+                            response.title,
+                            response.state
+                        );
+                        output_data!(quiet, json, "issue show", response, show_msg, {
                             println!("ID: {}", response.id);
                             println!("Title: {}", response.title);
                             println!("Description: {}", response.description);
@@ -529,7 +538,13 @@ fn run() -> Result<()> {
 
                                 if json {
                                     let issue = storage.load_issue(&full_id)?;
-                                    let output = JsonOutput::success(issue, "issue update");
+                                    let msg = format!(
+                                        "Updated issue {} to {:?}",
+                                        issue.short_id(),
+                                        issue.state
+                                    );
+                                    let output = JsonOutput::success(issue, "issue update")
+                                        .with_message(msg);
                                     println!("{}", output.to_json_string()?);
                                 } else {
                                     let _ = output_ctx
@@ -589,7 +604,10 @@ fn run() -> Result<()> {
                         let result = executor.apply_bulk_update(&query_filter, &operations)?;
 
                         if json {
-                            let output = JsonOutput::success(result, "bulk update");
+                            let msg =
+                                format!("Modified {} issue(s)", result.summary.total_modified);
+                            let output =
+                                JsonOutput::success(result, "bulk update").with_message(msg);
                             println!("{}", output.to_json_string()?);
                         } else {
                             // Human-readable output
@@ -654,11 +672,13 @@ fn run() -> Result<()> {
                     }
 
                     if json {
+                        let short = if id.len() >= 8 { &id[..8] } else { &id };
                         let result = serde_json::json!({
                             "id": id,
                             "deleted": true
                         });
-                        let output = JsonOutput::success(result, "issue delete");
+                        let msg = format!("Deleted issue {}", short);
+                        let output = JsonOutput::success(result, "issue delete").with_message(msg);
                         println!("{}", output.to_json_string()?);
                     } else {
                         let _ = output_ctx.print_success(format!("Deleted issue: {}", id));
@@ -737,7 +757,12 @@ fn run() -> Result<()> {
 
                     if json {
                         let issue = storage.load_issue(&full_id)?;
-                        let output = JsonOutput::success(issue, "issue assign");
+                        let msg = format!(
+                            "Assigned issue {} to {}",
+                            issue.short_id(),
+                            issue.assignee.as_deref().unwrap_or("unknown")
+                        );
+                        let output = JsonOutput::success(issue, "issue assign").with_message(msg);
                         println!("{}", output.to_json_string()?);
                     } else {
                         let _ = output_ctx.print_success(format!("Assigned issue: {}", full_id));
@@ -750,7 +775,8 @@ fn run() -> Result<()> {
 
                     if json {
                         let issue = storage.load_issue(&full_id)?;
-                        let output = JsonOutput::success(issue, "issue claim");
+                        let msg = format!("Claimed issue {}", issue.short_id());
+                        let output = JsonOutput::success(issue, "issue claim").with_message(msg);
                         println!("{}", output.to_json_string()?);
                     } else {
                         let _ = output_ctx.print_success(format!("Claimed issue: {}", full_id));
@@ -766,7 +792,8 @@ fn run() -> Result<()> {
 
                     if json {
                         let issue = storage.load_issue(&full_id)?;
-                        let output = JsonOutput::success(issue, "issue unassign");
+                        let msg = format!("Unassigned issue {}", issue.short_id());
+                        let output = JsonOutput::success(issue, "issue unassign").with_message(msg);
                         println!("{}", output.to_json_string()?);
                     } else {
                         let _ = output_ctx.print_success(format!("Unassigned issue: {}", full_id));
@@ -796,7 +823,8 @@ fn run() -> Result<()> {
 
                     if json {
                         let issue = storage.load_issue(&full_id)?;
-                        let output = JsonOutput::success(issue, "issue reject");
+                        let msg = format!("Rejected issue {}", issue.short_id());
+                        let output = JsonOutput::success(issue, "issue reject").with_message(msg);
                         println!("{}", output.to_json_string()?);
                     } else if let Some(reason_value) = reason {
                         let _ = output_ctx.print_success(format!(
@@ -814,7 +842,8 @@ fn run() -> Result<()> {
 
                     if json {
                         let issue = storage.load_issue(&full_id)?;
-                        let output = JsonOutput::success(issue, "issue release");
+                        let msg = format!("Released issue {}", issue.short_id());
+                        let output = JsonOutput::success(issue, "issue release").with_message(msg);
                         println!("{}", output.to_json_string()?);
                     } else {
                         let _ = output_ctx.print_success(format!(
@@ -1086,11 +1115,14 @@ fn run() -> Result<()> {
                             use jit::output::{GateDefinition, JsonOutput, RegistryListResponse};
                             let gate_defs: Vec<GateDefinition> =
                                 gates.into_iter().map(GateDefinition::from).collect();
+                            let count = gate_defs.len();
                             let response = RegistryListResponse {
-                                count: gate_defs.len(),
+                                count,
                                 gates: gate_defs,
                             };
-                            let output = JsonOutput::success(response, "gate list");
+                            let msg = format!("{} gate definition(s)", count);
+                            let output =
+                                JsonOutput::success(response, "gate list").with_message(msg);
                             println!("{}", output.to_json_string()?);
                         } else if gates.is_empty() {
                             let _ = output_ctx.print_info("No gates defined");
@@ -1120,7 +1152,8 @@ fn run() -> Result<()> {
                 Ok(gate) => {
                     if json {
                         use jit::output::JsonOutput;
-                        let output = JsonOutput::success(gate, "gate show");
+                        let msg = format!("Gate {}: {}", gate.key, gate.title);
+                        let output = JsonOutput::success(gate, "gate show").with_message(msg);
                         println!("{}", output.to_json_string()?);
                     } else {
                         println!("Gate: {}", gate.key);
@@ -1192,7 +1225,9 @@ fn run() -> Result<()> {
                     Ok(result) => {
                         if json {
                             use jit::output::JsonOutput;
-                            let output = JsonOutput::success(result, "gate check");
+                            let msg = format!("Gate {}: {:?}", gate_key, result.status);
+                            let output =
+                                JsonOutput::success(result, "gate check").with_message(msg);
                             println!("{}", output.to_json_string()?);
                         } else {
                             match result.status {
@@ -1252,7 +1287,13 @@ fn run() -> Result<()> {
 
                 if json {
                     use jit::output::JsonOutput;
-                    let output = JsonOutput::success(results, "gate check-all");
+                    let passed_count = results
+                        .iter()
+                        .filter(|r| r.status == jit::domain::GateRunStatus::Passed)
+                        .count();
+                    let total = results.len();
+                    let msg = format!("{}/{} gates passed", passed_count, total);
+                    let output = JsonOutput::success(results, "gate check-all").with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else if results.is_empty() {
                     let _ = output_ctx
@@ -1665,7 +1706,8 @@ fn run() -> Result<()> {
                         tree,
                         summary,
                     };
-                    let output = JsonOutput::success(response, "graph deps");
+                    let msg = format!("{} dependencies", response.summary.total);
+                    let output = JsonOutput::success(response, "graph deps").with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else {
                     // For human output, use tree structure
@@ -1709,7 +1751,9 @@ fn run() -> Result<()> {
                         dependents: minimal_issues,
                         count: issues.len(),
                     };
-                    let output = JsonOutput::success(response, "graph downstream");
+                    let msg = format!("{} dependents", issues.len());
+                    let output =
+                        JsonOutput::success(response, "graph downstream").with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else {
                     let _ = output_ctx.print_info(format!("Downstream dependents of {}:", id));
@@ -1731,7 +1775,8 @@ fn run() -> Result<()> {
                         roots: minimal_issues,
                         count: issues.len(),
                     };
-                    let output = JsonOutput::success(response, "graph roots");
+                    let msg = format!("{} root issues", issues.len());
+                    let output = JsonOutput::success(response, "graph roots").with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else {
                     let _ = output_ctx.print_info("Root issues (no dependencies):");
@@ -1781,7 +1826,8 @@ fn run() -> Result<()> {
                         count: gate_defs.len(),
                         gates: gate_defs,
                     };
-                    let output = JsonOutput::success(response, "registry list");
+                    let msg = format!("{} gate definition(s)", response.count);
+                    let output = JsonOutput::success(response, "registry list").with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else {
                     for gate in gates {
@@ -1833,7 +1879,8 @@ fn run() -> Result<()> {
                             jit::domain::GateMode::Auto => "auto".to_string(),
                         },
                     };
-                    let output = JsonOutput::success(gate_def, "registry show");
+                    let msg = format!("Gate {}: {}", gate_def.key, gate_def.title);
+                    let output = JsonOutput::success(gate_def, "registry show").with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else {
                     println!("Key: {}", gate.key);
@@ -1889,7 +1936,8 @@ fn run() -> Result<()> {
 
                 if json {
                     use jit::output::JsonOutput;
-                    let output = JsonOutput::success(&result, "doc add");
+                    let msg = format!("Added document reference to issue {}", result.issue_id);
+                    let output = JsonOutput::success(&result, "doc add").with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else {
                     println!("Added document reference to issue {}", result.issue_id);
@@ -1918,7 +1966,8 @@ fn run() -> Result<()> {
                 let result = executor.list_document_references(&id)?;
 
                 if json {
-                    let output = JsonOutput::success(&result, "doc list");
+                    let msg = format!("{} document(s) attached", result.count);
+                    let output = JsonOutput::success(&result, "doc list").with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else if result.documents.is_empty() {
                     output_ctx.print_data(format!(
@@ -1953,7 +2002,11 @@ fn run() -> Result<()> {
 
                 if json {
                     use jit::output::JsonOutput;
-                    let output = JsonOutput::success(&result, "doc remove");
+                    let msg = format!(
+                        "Removed document reference {} from issue {}",
+                        result.path, result.issue_id
+                    );
+                    let output = JsonOutput::success(&result, "doc remove").with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else {
                     println!(
@@ -1967,7 +2020,8 @@ fn run() -> Result<()> {
 
                 if json {
                     use jit::output::JsonOutput;
-                    let output = JsonOutput::success(&result, "doc show");
+                    let msg = "Document content retrieved".to_string();
+                    let output = JsonOutput::success(&result, "doc show").with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else {
                     println!("Document: {}", result.path);
@@ -1989,7 +2043,8 @@ fn run() -> Result<()> {
                 let result = executor.document_history(&id, &path)?;
 
                 if json {
-                    let output = JsonOutput::success(&result, "doc history");
+                    let msg = format!("{} commits in history", result.commits.len());
+                    let output = JsonOutput::success(&result, "doc history").with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else {
                     output_ctx.print_data(format!("History for {}:\n", result.path))?;
@@ -2014,7 +2069,8 @@ fn run() -> Result<()> {
 
                 if json {
                     use jit::output::JsonOutput;
-                    let output = JsonOutput::success(&result, "doc diff");
+                    let msg = "Document diff retrieved".to_string();
+                    let output = JsonOutput::success(&result, "doc diff").with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else {
                     print!("{}", result.diff);
@@ -2039,7 +2095,8 @@ fn run() -> Result<()> {
                     }
 
                     if json {
-                        let output = JsonOutput::success(&result, "doc assets");
+                        let msg = format!("{} assets found", result.summary.total);
+                        let output = JsonOutput::success(&result, "doc assets").with_message(msg);
                         println!("{}", output.to_json_string()?);
                     } else {
                         // Get repository root to check if assets exist
@@ -2170,7 +2227,15 @@ fn run() -> Result<()> {
                 let result = executor.check_document_links(&scope)?;
 
                 if json {
-                    let output = JsonOutput::success(&result, "doc check-links");
+                    let msg = if result.summary.errors == 0 && result.summary.warnings == 0 {
+                        "All links valid".to_string()
+                    } else {
+                        format!(
+                            "{} error(s), {} warning(s)",
+                            result.summary.errors, result.summary.warnings
+                        )
+                    };
+                    let output = JsonOutput::success(&result, "doc check-links").with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else {
                     output_ctx.print_data(format!(
@@ -2239,7 +2304,12 @@ fn run() -> Result<()> {
                 }
 
                 if json {
-                    let output = JsonOutput::success(result, "doc archive");
+                    let msg = if result.dry_run {
+                        "Archival plan (dry run)".to_string()
+                    } else {
+                        format!("Archived {} to {}", result.source_path, result.dest_path)
+                    };
+                    let output = JsonOutput::success(result, "doc archive").with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else if result.dry_run {
                     println!("✓ Archival plan (--dry-run)\n");
@@ -2294,6 +2364,7 @@ fn run() -> Result<()> {
                     use jit::output::JsonOutput;
                     use serde_json::json;
 
+                    let msg = format!("Found {} issue(s)", issues.len());
                     let output = if full {
                         JsonOutput::success(
                             json!({
@@ -2312,7 +2383,8 @@ fn run() -> Result<()> {
                             }),
                             "query all",
                         )
-                    };
+                    }
+                    .with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else {
                     let _ = output_ctx.print_info("All issues (filtered):");
@@ -2343,6 +2415,7 @@ fn run() -> Result<()> {
                     use jit::output::JsonOutput;
                     use serde_json::json;
 
+                    let msg = format!("Found {} issue(s)", issues.len());
                     let output = if full {
                         JsonOutput::success(
                             json!({
@@ -2361,7 +2434,8 @@ fn run() -> Result<()> {
                             }),
                             "query available",
                         )
-                    };
+                    }
+                    .with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else {
                     let _ = output_ctx.print_info("Available issues (unassigned, unblocked):");
@@ -2389,6 +2463,7 @@ fn run() -> Result<()> {
                     use jit::output::JsonOutput;
                     use serde_json::json;
 
+                    let msg = format!("Found {} issue(s)", blocked.len());
                     let output = if full {
                         use jit::output::{BlockedIssue, BlockedReason, BlockedReasonType};
                         let blocked_issues: Vec<BlockedIssue> = blocked
@@ -2442,7 +2517,8 @@ fn run() -> Result<()> {
                             }),
                             "query blocked",
                         )
-                    };
+                    }
+                    .with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else {
                     let _ = output_ctx.print_info("Blocked issues:");
@@ -2474,6 +2550,7 @@ fn run() -> Result<()> {
                     use jit::output::JsonOutput;
                     use serde_json::json;
 
+                    let msg = format!("Found {} issue(s)", issues.len());
                     let output = if full {
                         JsonOutput::success(
                             json!({
@@ -2492,7 +2569,8 @@ fn run() -> Result<()> {
                             }),
                             "query strategic",
                         )
-                    };
+                    }
+                    .with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else {
                     let _ = output_ctx.print_info("Strategic issues:");
@@ -2520,6 +2598,7 @@ fn run() -> Result<()> {
                     use jit::output::JsonOutput;
                     use serde_json::json;
 
+                    let msg = format!("Found {} issue(s)", issues.len());
                     let output = if full {
                         JsonOutput::success(
                             json!({
@@ -2538,7 +2617,8 @@ fn run() -> Result<()> {
                             }),
                             "query closed",
                         )
-                    };
+                    }
+                    .with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else {
                     let _ = output_ctx.print_info("Closed issues (Done or Rejected):");
@@ -2563,7 +2643,9 @@ fn run() -> Result<()> {
                         count: namespace_names.len(),
                         namespaces: namespace_names,
                     };
-                    let output = JsonOutput::success(response, "label namespaces");
+                    let msg = format!("{} namespace(s)", response.count);
+                    let output =
+                        JsonOutput::success(response, "label namespaces").with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else {
                     let _ = output_ctx.print_info("Label Namespaces:\n");
@@ -2580,6 +2662,7 @@ fn run() -> Result<()> {
                 let values = executor.list_label_values(&namespace)?;
                 if json {
                     use jit::output::JsonOutput;
+                    let msg = format!("{} value(s)", values.len());
                     let output = JsonOutput::success(
                         serde_json::json!({
                             "namespace": namespace,
@@ -2587,7 +2670,8 @@ fn run() -> Result<()> {
                             "count": values.len()
                         }),
                         "label values",
-                    );
+                    )
+                    .with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else {
                     let _ =
@@ -3155,6 +3239,7 @@ fn run() -> Result<()> {
                         use jit::output::JsonOutput;
                         use serde_json::json;
 
+                        let msg = format!("Found {} result(s)", results.len());
                         let output = JsonOutput::success(
                             json!({
                                 "query": query,
@@ -3162,7 +3247,8 @@ fn run() -> Result<()> {
                                 "results": results
                             }),
                             "search",
-                        );
+                        )
+                        .with_message(msg);
                         println!("{}", output.to_json_string()?);
                     } else if results.is_empty() {
                         let _ =
@@ -3232,7 +3318,11 @@ fn run() -> Result<()> {
             let summary = executor.get_status()?;
 
             if json {
-                let output = JsonOutput::success(&summary, "status");
+                let msg = format!(
+                    "{} open, {} ready, {} in progress, {} done",
+                    summary.open, summary.ready, summary.in_progress, summary.done
+                );
+                let output = JsonOutput::success(&summary, "status").with_message(msg);
                 println!("{}", output.to_json_string()?);
             } else {
                 output_ctx.print_data("Status:")?;
@@ -3328,13 +3418,19 @@ fn run() -> Result<()> {
                         })
                         .collect();
 
+                    let msg = if all_valid {
+                        "Validation passed".to_string()
+                    } else {
+                        "Validation failed".to_string()
+                    };
                     let output = JsonOutput::success(
                         json!({
                             "valid": all_valid,
                             "validations": results_json
                         }),
                         "validate",
-                    );
+                    )
+                    .with_message(msg);
                     println!("{}", output.to_json_string()?);
 
                     if !all_valid {
@@ -3480,6 +3576,10 @@ fn run() -> Result<()> {
             match execute_recover(&storage) {
                 Ok(report) => {
                     if json {
+                        let msg = format!(
+                            "Recovery: {} locks cleaned, {} leases evicted",
+                            report.stale_locks_cleaned, report.expired_leases_evicted
+                        );
                         let output = JsonOutput::success(
                             json!({
                                 "success": true,
@@ -3489,7 +3589,8 @@ fn run() -> Result<()> {
                                 "temp_files_removed": report.temp_files_removed,
                             }),
                             "recover",
-                        );
+                        )
+                        .with_message(msg);
                         println!("{}", output.to_json_string()?);
                     } else {
                         println!("Recovery complete:");

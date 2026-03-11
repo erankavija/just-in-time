@@ -1886,3 +1886,7 @@
 {"type":"issue_state_changed","id":"87208f9a-66a1-4f57-a055-048421ee4d20","issue_id":"3a7caca1-8126-4b02-b94e-435d5b679fbe","timestamp":"2026-03-10T22:33:02.174664327Z","from":"ready","to":"done"}
 {"type":"issue_completed","id":"349ecab7-f8ac-4bae-8fbc-ac81ce0e4c09","issue_id":"3a7caca1-8126-4b02-b94e-435d5b679fbe","timestamp":"2026-03-10T22:33:02.174696037Z"}
 {"type":"issue_state_changed","id":"a5e54d34-7249-49ab-b237-538edd8585c9","issue_id":"afe30eeb-1963-490d-9dad-d819485b5f2a","timestamp":"2026-03-10T22:33:02.215703329Z","from":"backlog","to":"ready"}
+{"type":"issue_created","id":"9c068c6d-465b-463a-b83e-28f0dbeaabd3","issue_id":"8d97547d-f88e-4066-9dde-0afa08b260ab","timestamp":"2026-03-11T19:46:34.516973678Z","title":"CLI as single source of truth for MCP output messages","priority":"high"}
+{"type":"issue_state_changed","id":"5378d6ea-8856-441b-a1c2-8f8a9a30f914","issue_id":"afe30eeb-1963-490d-9dad-d819485b5f2a","timestamp":"2026-03-11T19:46:39.593689040Z","from":"ready","to":"backlog"}
+{"type":"issue_state_changed","id":"daa29564-3763-4950-b03e-40d87181a161","issue_id":"8d97547d-f88e-4066-9dde-0afa08b260ab","timestamp":"2026-03-11T19:46:50.651588844Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"f94225de-dbec-4562-9bce-74e681994faa","issue_id":"8d97547d-f88e-4066-9dde-0afa08b260ab","timestamp":"2026-03-11T19:46:50.651770004Z","assignee":"agent:claude"}

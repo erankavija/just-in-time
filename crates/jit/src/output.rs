@@ -112,18 +112,35 @@ fn writeln_safe_stderr(msg: &str) -> io::Result<()> {
 #[derive(Debug)]
 pub struct JsonOutput<T: Serialize> {
     pub data: T,
+    pub message: Option<String>,
 }
 
 impl<T: Serialize> JsonOutput<T> {
     /// Create a new successful output with the given data
     /// Note: command parameter is kept for API compatibility but no longer used
     pub fn success(data: T, _command: impl Into<String>) -> Self {
-        Self { data }
+        Self {
+            data,
+            message: None,
+        }
+    }
+
+    /// Add a human-readable message to the JSON output
+    pub fn with_message(mut self, msg: impl Into<String>) -> Self {
+        self.message = Some(msg.into());
+        self
     }
 
     /// Serialize to JSON string with pretty formatting (returns raw data, no envelope)
+    /// If a message is set, it is injected into the top-level object.
     pub fn to_json_string(&self) -> Result<String, serde_json::Error> {
-        serde_json::to_string_pretty(&self.data)
+        let mut value = serde_json::to_value(&self.data)?;
+        if let Some(ref msg) = self.message {
+            if let Value::Object(ref mut map) = value {
+                map.insert("message".to_string(), Value::String(msg.clone()));
+            }
+        }
+        serde_json::to_string_pretty(&value)
     }
 }
 
@@ -757,6 +774,29 @@ mod tests {
         // Should NOT contain envelope fields
         assert!(!json_str.contains("\"success\""));
         assert!(!json_str.contains("\"data\":"));
+    }
+
+    #[test]
+    fn test_json_output_with_message() {
+        let data = json!({"id": "abc12345", "title": "Test issue"});
+        let output = JsonOutput::success(data, "issue create")
+            .with_message("Created issue abc12345 - Test issue");
+
+        let json_str = output.to_json_string().unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&json_str).unwrap();
+        assert_eq!(parsed["message"], "Created issue abc12345 - Test issue");
+        assert_eq!(parsed["id"], "abc12345");
+        assert_eq!(parsed["title"], "Test issue");
+    }
+
+    #[test]
+    fn test_json_output_without_message() {
+        let data = json!({"id": "123"});
+        let output = JsonOutput::success(data, "test");
+
+        let json_str = output.to_json_string().unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&json_str).unwrap();
+        assert!(parsed.get("message").is_none());
     }
 
     #[test]

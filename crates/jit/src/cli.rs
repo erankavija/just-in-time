@@ -489,11 +489,10 @@ pub enum DepCommands {
     ///   jit dep add epic-123 task-456           # Single dependency
     ///   jit dep add epic-123 task-1 task-2 task-3  # Multiple dependencies
     Add {
-        /// Issue that depends on another (FROM)
+        /// The blocked issue (depends on the others)
         from_id: String,
 
-        /// Dependency/dependencies required (TO)
-        /// Can specify multiple: jit dep add <from> to1 to2 to3
+        /// The blocking issue(s) that must complete first
         #[arg(required = true)]
         to_ids: Vec<String>,
 
@@ -507,10 +506,10 @@ pub enum DepCommands {
     ///   jit dep rm epic-123 task-456            # Single dependency
     ///   jit dep rm epic-123 task-1 task-2       # Multiple dependencies
     Rm {
-        /// Issue to modify (FROM)
+        /// Issue to remove dependencies from
         from_id: String,
 
-        /// Dependency/dependencies to remove (TO)
+        /// Dependencies to remove (the blocking issues)
         #[arg(required = true)]
         to_ids: Vec<String>,
 
