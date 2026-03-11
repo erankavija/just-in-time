@@ -145,12 +145,12 @@ export function buildCliArgs(cmdPath, args, cmdDef) {
 
 /**
  * Get appropriate timeout for a command based on its path.
- * Gate check commands run external processes and need longer timeouts.
+ * Gate check/pass commands may run external processes and need longer timeouts.
  * @param {string[]} cmdPath - Command path (e.g., ['gate', 'check'])
  * @returns {number} Timeout in milliseconds
  */
 export function getTimeoutForCommand(cmdPath) {
-  if (cmdPath[0] === 'gate' && (cmdPath[1] === 'check' || cmdPath[1] === 'check-all')) {
+  if (cmdPath[0] === 'gate' && (cmdPath[1] === 'check' || cmdPath[1] === 'check-all' || cmdPath[1] === 'pass')) {
     return LONG_TIMEOUT;
   }
   return DEFAULT_TIMEOUT;
