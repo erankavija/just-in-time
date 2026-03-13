@@ -1015,6 +1015,7 @@ fn run() -> Result<()> {
                 prompt,
                 prompt_file,
                 env,
+                priority,
                 json,
             } => {
                 use jit::domain::{GateChecker, GateMode, GateStage};
@@ -1081,6 +1082,7 @@ fn run() -> Result<()> {
                     gate_stage,
                     gate_mode,
                     checker,
+                    priority,
                 ) {
                     Ok(_) => {
                         if json {

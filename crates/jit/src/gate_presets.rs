@@ -44,6 +44,7 @@ impl GateTemplate {
             stage: self.stage,
             mode: self.mode,
             checker: self.checker.clone(),
+            priority: 100,
             reserved: HashMap::new(),
             auto: self.mode == GateMode::Auto,
             example_integration: None,

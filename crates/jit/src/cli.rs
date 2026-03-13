@@ -569,6 +569,10 @@ pub enum GateCommands {
         #[arg(long)]
         env: Vec<String>,
 
+        /// Execution priority (lower number runs first, default: 100)
+        #[arg(long, default_value = "100")]
+        priority: u32,
+
         #[arg(long)]
         json: bool,
     },

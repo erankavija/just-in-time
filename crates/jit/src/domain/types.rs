@@ -445,6 +445,9 @@ pub struct Gate {
     /// Checker configuration for automated gates
     #[serde(skip_serializing_if = "Option::is_none")]
     pub checker: Option<GateChecker>,
+    /// Execution priority (lower runs first, default 100)
+    #[serde(default = "default_gate_priority")]
+    pub priority: u32,
     /// Reserved for future extensions
     #[serde(default)]
     pub reserved: HashMap<String, serde_json::Value>,
@@ -457,6 +460,10 @@ pub struct Gate {
 
 fn default_gate_version() -> u32 {
     1
+}
+
+fn default_gate_priority() -> u32 {
+    100
 }
 
 /// Gate execution stage

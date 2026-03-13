@@ -331,6 +331,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     crate::domain::GateMode::Manual
                 },
                 checker: None,
+                priority: 100,
                 reserved: std::collections::HashMap::new(),
                 auto,
                 example_integration,
@@ -342,6 +343,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     /// Define a new gate with full control over stage, mode, and checker
+    #[allow(clippy::too_many_arguments)]
     pub fn define_gate(
         &self,
         key: String,
@@ -350,6 +352,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         stage: crate::domain::GateStage,
         mode: crate::domain::GateMode,
         checker: Option<crate::domain::GateChecker>,
+        priority: u32,
     ) -> Result<()> {
         // Global operation - enforce common history with main
         crate::commands::worktree::enforce_main_only_operations()?;
@@ -384,6 +387,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 stage,
                 mode,
                 checker: final_checker,
+                priority,
                 reserved: std::collections::HashMap::new(),
                 auto: mode == crate::domain::GateMode::Auto,
                 example_integration: None,
@@ -637,6 +641,7 @@ enforce_leases = "off"
                     prompt: None,
                     prompt_file: None,
                 }),
+                priority: 100,
                 reserved: HashMap::new(),
                 auto: true,
                 example_integration: None,
@@ -696,6 +701,7 @@ enforce_leases = "off"
                     prompt: None,
                     prompt_file: None,
                 }),
+                priority: 100,
                 reserved: HashMap::new(),
                 auto: true,
                 example_integration: None,
@@ -744,6 +750,7 @@ enforce_leases = "off"
                 stage: GateStage::Postcheck,
                 mode: GateMode::Manual,
                 checker: None,
+                priority: 100,
                 reserved: HashMap::new(),
                 auto: false,
                 example_integration: None,

@@ -846,6 +846,7 @@ mod tests {
             stage: crate::domain::GateStage::Postcheck,
             mode: crate::domain::GateMode::Manual,
             checker: None,
+            priority: 100,
             reserved: std::collections::HashMap::new(),
             auto: false,
             example_integration: None,

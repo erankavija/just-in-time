@@ -222,16 +222,21 @@ impl<S: IssueStore> CommandExecutor<S> {
         let mut results = Vec::new();
         let mut warnings = Vec::new();
 
-        for gate_key in &issue.gates_required {
-            if let Some(gate) = registry.gates.get(gate_key) {
-                if gate.mode == GateMode::Auto {
-                    match self.check_gate(&full_id, gate_key) {
-                        Ok(result) => results.push(result),
-                        Err(e) => {
-                            // Log error but continue checking other gates
-                            warnings.push(format!("Failed to check gate '{}': {}", gate_key, e));
-                        }
-                    }
+        // Collect auto gates and sort by priority (stable sort preserves insertion order for ties)
+        let mut auto_gates: Vec<_> = issue
+            .gates_required
+            .iter()
+            .filter_map(|key| registry.gates.get(key).map(|g| (key, g)))
+            .filter(|(_, gate)| gate.mode == GateMode::Auto)
+            .collect();
+        auto_gates.sort_by_key(|(_, gate)| gate.priority);
+
+        for (gate_key, _) in auto_gates {
+            match self.check_gate(&full_id, gate_key) {
+                Ok(result) => results.push(result),
+                Err(e) => {
+                    // Log error but continue checking other gates
+                    warnings.push(format!("Failed to check gate '{}': {}", gate_key, e));
                 }
             }
         }
@@ -249,28 +254,32 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let mut failed_gates = Vec::new();
 
-        for gate_key in &issue.gates_required {
-            if let Some(gate) = registry.gates.get(gate_key) {
-                if gate.stage == GateStage::Precheck {
-                    match gate.mode {
-                        GateMode::Auto => {
-                            // Run automated precheck
-                            let result = self.check_gate(&full_id, gate_key)?;
-                            if result.status != GateRunStatus::Passed {
-                                failed_gates.push((gate_key.clone(), result));
-                            }
-                        }
-                        GateMode::Manual => {
-                            // Check if manual precheck already passed
-                            let gate_status = issue.gates_status.get(gate_key);
-                            if !matches!(gate_status, Some(state) if state.status == GateStatus::Passed)
-                            {
-                                anyhow::bail!(
-                                    "Manual precheck '{}' has not been passed. Pass it first with: jit gate pass {} {}",
-                                    gate_key, full_id, gate_key
-                                );
-                            }
-                        }
+        // Collect precheck gates and sort by priority (stable sort preserves insertion order for ties)
+        let mut precheck_gates: Vec<_> = issue
+            .gates_required
+            .iter()
+            .filter_map(|key| registry.gates.get(key).map(|g| (key, g)))
+            .filter(|(_, gate)| gate.stage == GateStage::Precheck)
+            .collect();
+        precheck_gates.sort_by_key(|(_, gate)| gate.priority);
+
+        for (gate_key, gate) in precheck_gates {
+            match gate.mode {
+                GateMode::Auto => {
+                    // Run automated precheck
+                    let result = self.check_gate(&full_id, gate_key)?;
+                    if result.status != GateRunStatus::Passed {
+                        failed_gates.push((gate_key.clone(), result));
+                    }
+                }
+                GateMode::Manual => {
+                    // Check if manual precheck already passed
+                    let gate_status = issue.gates_status.get(gate_key);
+                    if !matches!(gate_status, Some(state) if state.status == GateStatus::Passed) {
+                        anyhow::bail!(
+                            "Manual precheck '{}' has not been passed. Pass it first with: jit gate pass {} {}",
+                            gate_key, full_id, gate_key
+                        );
                     }
                 }
             }
@@ -375,6 +384,7 @@ enforce_leases = "off"
                     prompt: None,
                     prompt_file: None,
                 }),
+                priority: 100,
                 reserved: HashMap::new(),
                 auto: true,
                 example_integration: None,
@@ -426,6 +436,7 @@ enforce_leases = "off"
                     prompt: None,
                     prompt_file: None,
                 }),
+                priority: 100,
                 reserved: HashMap::new(),
                 auto: true,
                 example_integration: None,
@@ -469,6 +480,7 @@ enforce_leases = "off"
                 stage: GateStage::Postcheck,
                 mode: GateMode::Manual,
                 checker: None,
+                priority: 100,
                 reserved: HashMap::new(),
                 auto: false,
                 example_integration: None,
@@ -515,6 +527,7 @@ enforce_leases = "off"
                         prompt: None,
                         prompt_file: None,
                     }),
+                    priority: 100,
                     reserved: HashMap::new(),
                     auto: true,
                     example_integration: None,
@@ -561,6 +574,7 @@ enforce_leases = "off"
                     prompt: None,
                     prompt_file: None,
                 }),
+                priority: 100,
                 reserved: HashMap::new(),
                 auto: true,
                 example_integration: None,
@@ -614,6 +628,7 @@ enforce_leases = "off"
                     prompt: None,
                     prompt_file: None,
                 }),
+                priority: 100,
                 reserved: HashMap::new(),
                 auto: true,
                 example_integration: None,
@@ -664,6 +679,7 @@ enforce_leases = "off"
                     prompt: None,
                     prompt_file: None,
                 }),
+                priority: 100,
                 reserved: HashMap::new(),
                 auto: true,
                 example_integration: None,
@@ -717,6 +733,7 @@ enforce_leases = "off"
                     prompt: None,
                     prompt_file: None,
                 }),
+                priority: 100,
                 reserved: HashMap::new(),
                 auto: true,
                 example_integration: None,
@@ -770,6 +787,7 @@ enforce_leases = "off"
                     prompt: Some("Review the implementation for correctness.".to_string()),
                     prompt_file: None,
                 }),
+                priority: 100,
                 reserved: HashMap::new(),
                 auto: true,
                 example_integration: None,
@@ -839,6 +857,7 @@ enforce_leases = "off"
                     prompt: Some("This should be overridden by prompt_file".to_string()),
                     prompt_file: Some("review-prompt.md".to_string()),
                 }),
+                priority: 100,
                 reserved: HashMap::new(),
                 auto: true,
                 example_integration: None,
@@ -891,6 +910,7 @@ enforce_leases = "off"
                     prompt: Some("Review".to_string()),
                     prompt_file: None,
                 }),
+                priority: 100,
                 reserved: HashMap::new(),
                 auto: true,
                 example_integration: None,
@@ -950,6 +970,7 @@ enforce_leases = "off"
                     prompt: None,
                     prompt_file: Some("../../etc/passwd".to_string()),
                 }),
+                priority: 100,
                 reserved: HashMap::new(),
                 auto: true,
                 example_integration: None,
@@ -996,6 +1017,7 @@ enforce_leases = "off"
                     prompt: Some("Review".to_string()),
                     prompt_file: None,
                 }),
+                priority: 100,
                 reserved: HashMap::new(),
                 auto: true,
                 example_integration: None,
@@ -1057,6 +1079,7 @@ enforce_leases = "off"
                     prompt: None,
                     prompt_file: Some("huge-prompt.md".to_string()),
                 }),
+                priority: 100,
                 reserved: HashMap::new(),
                 auto: true,
                 example_integration: None,
@@ -1105,6 +1128,7 @@ enforce_leases = "off"
                     prompt: None,
                     prompt_file: None,
                 }),
+                priority: 100,
                 reserved: HashMap::new(),
                 auto: true,
                 example_integration: None,
@@ -1175,6 +1199,7 @@ enforce_leases = "off"
                     prompt: Some("Review the dashboard.".to_string()),
                     prompt_file: None,
                 }),
+                priority: 100,
                 reserved: HashMap::new(),
                 auto: true,
                 example_integration: None,
@@ -1196,5 +1221,131 @@ enforce_leases = "off"
         let dep_titles: Vec<&str> = deps.iter().filter_map(|d| d["title"].as_str()).collect();
         assert!(dep_titles.contains(&"Setup database schema"));
         assert!(dep_titles.contains(&"Implement auth module"));
+    }
+
+    #[test]
+    fn test_check_all_gates_respects_priority_order() {
+        let executor = setup();
+
+        // Define 3 auto gates with priorities 30, 10, 20
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        for (key, priority) in [("gate-p30", 30u32), ("gate-p10", 10), ("gate-p20", 20)] {
+            registry.gates.insert(
+                key.to_string(),
+                crate::domain::Gate {
+                    version: 1,
+                    key: key.to_string(),
+                    title: format!("Gate {}", key),
+                    description: format!("Priority {}", priority),
+                    stage: GateStage::Postcheck,
+                    mode: GateMode::Auto,
+                    checker: Some(GateChecker::Exec {
+                        command: "exit 0".to_string(),
+                        timeout_seconds: 10,
+                        working_dir: None,
+                        env: HashMap::new(),
+                        pass_context: false,
+                        prompt: None,
+                        prompt_file: None,
+                    }),
+                    priority,
+                    reserved: HashMap::new(),
+                    auto: true,
+                    example_integration: None,
+                },
+            );
+        }
+        executor.storage.save_gate_registry(&registry).unwrap();
+
+        // Create issue with gates added in priority 30, 10, 20 order
+        let issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(issue).unwrap();
+        executor
+            .add_gate(&issue_id, "gate-p30".to_string())
+            .unwrap();
+        executor
+            .add_gate(&issue_id, "gate-p10".to_string())
+            .unwrap();
+        executor
+            .add_gate(&issue_id, "gate-p20".to_string())
+            .unwrap();
+
+        let (results, _) = executor.check_all_gates(&issue_id).unwrap();
+
+        // Results should arrive in priority order: 10, 20, 30
+        assert_eq!(results.len(), 3);
+        assert_eq!(results[0].gate_key, "gate-p10");
+        assert_eq!(results[1].gate_key, "gate-p20");
+        assert_eq!(results[2].gate_key, "gate-p30");
+    }
+
+    #[test]
+    fn test_check_all_gates_stable_sort_same_priority() {
+        let executor = setup();
+
+        // Define 3 auto gates all with default priority 100
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        for key in ["alpha", "beta", "gamma"] {
+            registry.gates.insert(
+                key.to_string(),
+                crate::domain::Gate {
+                    version: 1,
+                    key: key.to_string(),
+                    title: format!("Gate {}", key),
+                    description: "Same priority".to_string(),
+                    stage: GateStage::Postcheck,
+                    mode: GateMode::Auto,
+                    checker: Some(GateChecker::Exec {
+                        command: "exit 0".to_string(),
+                        timeout_seconds: 10,
+                        working_dir: None,
+                        env: HashMap::new(),
+                        pass_context: false,
+                        prompt: None,
+                        prompt_file: None,
+                    }),
+                    priority: 100,
+                    reserved: HashMap::new(),
+                    auto: true,
+                    example_integration: None,
+                },
+            );
+        }
+        executor.storage.save_gate_registry(&registry).unwrap();
+
+        // Add gates in specific insertion order
+        let issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(issue).unwrap();
+        executor.add_gate(&issue_id, "alpha".to_string()).unwrap();
+        executor.add_gate(&issue_id, "beta".to_string()).unwrap();
+        executor.add_gate(&issue_id, "gamma".to_string()).unwrap();
+
+        let (results, _) = executor.check_all_gates(&issue_id).unwrap();
+
+        // Same-priority gates should maintain insertion order
+        assert_eq!(results.len(), 3);
+        assert_eq!(results[0].gate_key, "alpha");
+        assert_eq!(results[1].gate_key, "beta");
+        assert_eq!(results[2].gate_key, "gamma");
+    }
+
+    #[test]
+    fn test_gate_priority_defaults_on_deserialization() {
+        // Deserialize Gate JSON without priority field — should default to 100
+        let json = r#"{
+            "version": 1,
+            "key": "old-gate",
+            "title": "Old Gate",
+            "description": "Pre-priority gate",
+            "stage": "postcheck",
+            "mode": "manual",
+            "auto": false,
+            "example_integration": null
+        }"#;
+
+        let gate: crate::domain::Gate = serde_json::from_str(json).unwrap();
+        assert_eq!(gate.priority, 100);
     }
 }

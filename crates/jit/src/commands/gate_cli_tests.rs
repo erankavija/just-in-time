@@ -37,6 +37,7 @@ enforce_leases = "off"
             GateStage::Postcheck,
             GateMode::Manual,
             None,
+            100,
         );
 
         assert!(result.is_ok());
@@ -72,6 +73,7 @@ enforce_leases = "off"
             GateStage::Postcheck,
             GateMode::Auto,
             Some(checker.clone()),
+            100,
         );
 
         assert!(result.is_ok());
@@ -99,6 +101,7 @@ enforce_leases = "off"
                 GateStage::Postcheck,
                 GateMode::Manual,
                 None,
+                100,
             )
             .unwrap();
 
@@ -110,6 +113,7 @@ enforce_leases = "off"
             GateStage::Postcheck,
             GateMode::Manual,
             None,
+            100,
         );
 
         assert!(result.is_err());
@@ -130,6 +134,7 @@ enforce_leases = "off"
                 GateStage::Postcheck,
                 GateMode::Manual,
                 None,
+                100,
             )
             .unwrap();
 
@@ -149,6 +154,7 @@ enforce_leases = "off"
                     prompt: None,
                     prompt_file: None,
                 }),
+                100,
             )
             .unwrap();
 
@@ -184,6 +190,7 @@ enforce_leases = "off"
                 GateStage::Postcheck,
                 GateMode::Auto,
                 Some(checker),
+                100,
             )
             .unwrap();
 
@@ -236,6 +243,7 @@ enforce_leases = "off"
                 GateStage::Postcheck,
                 GateMode::Manual,
                 None,
+                100,
             )
             .unwrap();
 
@@ -261,6 +269,7 @@ enforce_leases = "off"
             GateStage::Postcheck,
             GateMode::Auto,
             None, // No checker for auto gate
+            100,
         );
 
         assert!(result.is_err());
@@ -290,6 +299,7 @@ enforce_leases = "off"
             GateStage::Postcheck,
             GateMode::Manual,
             Some(checker),
+            100,
         );
 
         assert!(result.is_ok());
