@@ -1,20 +1,12 @@
 import type { GraphNode, GraphEdge } from '../types/models';
 
-// Default strategic types - should be fetched from API/config in the future
-const DEFAULT_STRATEGIC_TYPES = ['milestone', 'epic'];
-
 /**
  * Filter configuration for graph visualization
  * Supports multiple independent filter types that can be combined
  */
 export interface GraphFilter {
-  type: 'strategic' | 'label';
-  config: StrategicFilterConfig | LabelFilterConfig;
-}
-
-export interface StrategicFilterConfig {
-  enabled: boolean;
-  strategicTypes?: string[]; // Optional: defaults to DEFAULT_STRATEGIC_TYPES
+  type: 'label';
+  config: LabelFilterConfig;
 }
 
 export interface LabelFilterConfig {
@@ -51,26 +43,9 @@ export function applyFiltersToNode(
   }
 
   let shouldDim = false;
-  let shouldHide = false;
 
   for (const filter of filters) {
-    if (filter.type === 'strategic') {
-      const config = filter.config as StrategicFilterConfig;
-      if (config.enabled) {
-        const strategicTypes = config.strategicTypes || DEFAULT_STRATEGIC_TYPES;
-        // Strategic filter HIDES non-strategic nodes
-        const isStrategic = node.labels.some(label => {
-          if (label.startsWith('type:')) {
-            const typeValue = label.substring(5);
-            return strategicTypes.includes(typeValue);
-          }
-          return false;
-        });
-        if (!isStrategic) {
-          shouldHide = true;
-        }
-      }
-    } else if (filter.type === 'label') {
+    if (filter.type === 'label') {
       const config = filter.config as LabelFilterConfig;
       if (config.patterns.length > 0) {
         // Label filter DIMS non-matching nodes
@@ -83,9 +58,9 @@ export function applyFiltersToNode(
   }
 
   return {
-    visible: !shouldHide,
+    visible: true,
     dimmed: shouldDim,
-    reason: shouldHide ? 'hidden by strategic filter' : shouldDim ? 'dimmed by label filter' : undefined,
+    reason: shouldDim ? 'dimmed by label filter' : undefined,
   };
 }
 
@@ -117,7 +92,7 @@ export function matchesAnyPattern(labels: string[], patterns: string[]): boolean
     return true; // No patterns means no filtering
   }
 
-  return patterns.some(pattern => 
+  return patterns.some(pattern =>
     labels.some(label => matchesPattern(label, pattern))
   );
 }
@@ -132,16 +107,6 @@ export function matchesPattern(label: string, pattern: string): boolean {
     return label.startsWith(prefix);
   }
   return label === pattern;
-}
-
-/**
- * Create a strategic filter configuration
- */
-export function createStrategicFilter(enabled: boolean, strategicTypes?: string[]): GraphFilter {
-  return {
-    type: 'strategic',
-    config: { enabled, strategicTypes },
-  };
 }
 
 /**

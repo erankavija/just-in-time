@@ -12,17 +12,17 @@ import { apiClient } from './api/client';
 import type { Issue } from './types/models';
 import './App.css';
 
-import type { ViewMode, LayoutAlgorithm } from './components/Graph/GraphView';
+import type { LayoutAlgorithm } from './components/Graph/GraphView';
 
 function App() {
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
   const [focusIssueId, setFocusIssueId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [allIssues, setAllIssues] = useState<Issue[]>([]);
-  const [viewMode, setViewMode] = useState<ViewMode>('tactical');
   const [layoutAlgorithm, setLayoutAlgorithm] = useState<LayoutAlgorithm>('compact');
   const [labelFilters, setLabelFilters] = useState<string[]>([]);
   const [isDetailPaneMinimized, setIsDetailPaneMinimized] = useState(false);
+  const [projectName, setProjectName] = useState<string | null>(null);
   const [documentViewerState, setDocumentViewerState] = useState<{
     path: string;
     searchQuery?: string;
@@ -68,6 +68,16 @@ function App() {
     onChanged: useCallback((v: number) => setVersion(v), []),
   });
 
+  // Set page title to project name
+  useEffect(() => {
+    apiClient.getHealth().then((health) => {
+      if (health.project_name) {
+        setProjectName(health.project_name);
+        document.title = `${health.project_name} — jit`;
+      }
+    }).catch(() => {});
+  }, []);
+
   // Load all issues for client-side search (re-fetch on version change)
   useEffect(() => {
     apiClient.listIssues().then(setAllIssues).catch(console.error);
@@ -87,7 +97,7 @@ function App() {
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       <header className="app-header">
-        <h1>$ jit --ui</h1>
+        <h1>{projectName ? `${projectName} — jit` : '$ jit --ui'}</h1>
         <div style={{ flex: 1, maxWidth: '600px', margin: '0 2rem', position: 'relative' }}>
           <SearchBar
             onSearch={setSearchQuery}
@@ -188,13 +198,6 @@ function App() {
           )}
         </div>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <button 
-            className="theme-toggle"
-            onClick={() => setViewMode(viewMode === 'tactical' ? 'strategic' : 'tactical')}
-            title={viewMode === 'tactical' ? 'Switch to Strategic View' : 'Switch to Tactical View'}
-          >
-            {viewMode === 'tactical' ? '📋 Tactical' : '🎯 Strategic'}
-          </button>
           <button className="theme-toggle" onClick={toggleTheme}>
             {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
           </button>
@@ -219,7 +222,6 @@ function App() {
           <div style={{ height: '100%', position: 'relative' }}>
             <GraphView
               onNodeClick={setSelectedIssueId}
-              viewMode={viewMode}
               labelFilters={labelFilters}
               layoutAlgorithm={layoutAlgorithm}
               onLayoutChange={setLayoutAlgorithm}

@@ -139,10 +139,6 @@ export interface NamespaceInfo {
   unique: boolean;
 }
 
-export interface ConfigStrategicTypes {
-  strategic_types: string[];
-}
-
 export interface ConfigHierarchy {
   types: Record<string, number>;
   strategic_types: string[];

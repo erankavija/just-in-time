@@ -16,8 +16,7 @@ import 'reactflow/dist/style.css';
 import { apiClient } from '../../api/client';
 import type { State, Priority, GraphNode as ApiGraphNode, GraphEdge } from '../../types/models';
 import type { SubgraphCluster } from '../../types/subgraphCluster';
-import { calculateDownstreamStats, type DownstreamStats } from '../../utils/strategicView';
-import { applyFiltersToNode, applyFiltersToEdge, createStrategicFilter, createLabelFilter, type GraphFilter } from '../../utils/graphFilter';
+import { applyFiltersToNode, applyFiltersToEdge, createLabelFilter, type GraphFilter } from '../../utils/graphFilter';
 import type { HierarchyConfig, ExpansionState } from '../../types/subgraphCluster';
 import { prepareClusteredGraphForReactFlow } from '../../utils/clusteredGraphLayout';
 import { createClusterAwareLayout } from '../../utils/clusterAwareLayout';
@@ -439,11 +438,8 @@ const getLayoutedElements = (
   }
 };
 
-export type ViewMode = 'tactical' | 'strategic';
-
 interface GraphViewProps {
   onNodeClick?: (issueId: string) => void;
-  viewMode?: ViewMode;
   labelFilters?: string[]; // e.g., ["milestone:v1.0", "epic:*"]
   layoutAlgorithm?: LayoutAlgorithm;
   onLayoutChange?: (algorithm: LayoutAlgorithm) => void;
@@ -457,7 +453,6 @@ interface GraphViewProps {
 
 export function GraphView({
   onNodeClick,
-  viewMode = 'tactical',
   labelFilters = [],
   layoutAlgorithm = 'compact',
   // onLayoutChange is received but not used in current implementation
@@ -469,9 +464,6 @@ export function GraphView({
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // nodeStats maintained for future use (e.g., showing stats in UI)
-  const [, setNodeStats] = useState<Map<string, DownstreamStats>>(new Map());
-  const [strategicTypes, setStrategicTypes] = useState<string[]>(['milestone', 'epic']); // Default fallback
   const [hierarchyConfig, setHierarchyConfig] = useState<HierarchyConfig | null>(null);
   const [expansionState, setExpansionState] = useState<ExpansionState>(() => {
     // Load initial state from localStorage
@@ -629,20 +621,6 @@ export function GraphView({
     }
   }, [nodes, loading]);
 
-  // Fetch strategic types from API on mount
-  useEffect(() => {
-    const fetchStrategicTypes = async () => {
-      try {
-        const types = await apiClient.getStrategicTypes();
-        setStrategicTypes(types);
-      } catch (err) {
-        console.warn('Failed to fetch strategic types, using defaults:', err);
-        // Keep default values
-      }
-    };
-    fetchStrategicTypes();
-  }, []);
-
   // Fetch hierarchy config from API on mount
   useEffect(() => {
     const fetchHierarchyConfig = async () => {
@@ -681,9 +659,6 @@ export function GraphView({
 
       // Build filter configuration
       const filters: GraphFilter[] = [];
-      if (viewMode === 'strategic') {
-        filters.push(createStrategicFilter(true, strategicTypes));
-      }
       if (labelFilters.length > 0) {
         filters.push(createLabelFilter(labelFilters));
       }
@@ -695,12 +670,6 @@ export function GraphView({
       
       // Filter out hidden nodes
       const visibleNodes = data.nodes.filter(node => nodeFilterResults.get(node.id)?.visible);
-      
-      // Calculate downstream stats for visible nodes (using full graph)
-      const stats = new Map<string, DownstreamStats>();
-      for (const node of visibleNodes) {
-        stats.set(node.id, calculateDownstreamStats(node.id, data.nodes, data.edges, hierarchyConfig?.levels));
-      }
       
       // Apply clustering if using compact layout and hierarchy config is available
       let nodesToRender = visibleNodes;
@@ -720,32 +689,6 @@ export function GraphView({
         nodesToRender = visibleNodes; // Use ALL visible nodes, not filtered ones
         clusterData = clustered; // Pass to layout function
         clusterDataRef.current = clustered; // Store in ref for focus effect
-        
-        // Recalculate stats for cluster containers based on their actual members
-        // (not dependency traversal which may include cross-cluster nodes)
-        for (const cluster of clustered.clusters) {
-          const clusterStats: DownstreamStats = {
-            total: 0,
-            done: 0,
-            inProgress: 0,
-            blocked: 0,
-            ready: 0,
-          };
-          
-          // Count cluster members (excluding the container itself)
-          for (const member of cluster.nodes) {
-            if (member.id !== cluster.containerId) {
-              clusterStats.total++;
-              if (member.state === 'done') clusterStats.done++;
-              else if (member.state === 'in_progress') clusterStats.inProgress++;
-              else if (member.state === 'ready') clusterStats.ready++;
-              if (member.blocked) clusterStats.blocked++;
-            }
-          }
-          
-          // Override the dependency-based stats with cluster-based stats
-          stats.set(cluster.containerId, clusterStats);
-        }
         
         // Collect all edges that should be visible:
         // 1. visibleEdges (edges between visible nodes)
@@ -777,24 +720,10 @@ export function GraphView({
         edgesToRender = Array.from(edgeMap.values());
       }
       
-      // Set node stats AFTER clustering has updated them
-      setNodeStats(stats);
-      
       const flowNodes: Node[] = nodesToRender.map((node: ApiGraphNode) => {
-        const nodeStats = stats.get(node.id); // Use local stats, not state
-        const hasDownstream = nodeStats && nodeStats.total > 0;
         const filterResult = nodeFilterResults.get(node.id)!;
         const isDimmed = filterResult.dimmed;
-        
-        // Check if this is a strategic node (based on configured strategic types)
-        const isStrategic = node.labels.some(label => {
-          if (label.startsWith('type:')) {
-            const typeValue = label.substring(5);
-            return strategicTypes.includes(typeValue);
-          }
-          return false;
-        });
-        
+
         // Get icon for this node's type
         const nodeType = node.labels.find(l => l.startsWith('type:'))?.substring(5);
         const typeIcon = nodeType && hierarchyConfig?.icons?.[nodeType];
@@ -825,8 +754,6 @@ export function GraphView({
               priority: node.priority,
               labels: node.labels,
               nodeId: node.id, // For reference
-              isStrategic, // Pass strategic flag
-              downstreamStats: hasDownstream ? nodeStats : undefined, // Pass stats if available
             },
             style: {
               opacity: isDimmed ? 0.4 : 1,
@@ -888,23 +815,6 @@ export function GraphView({
                     | {node.state}
                   </span>
                 </div>
-                {hasDownstream && isStrategic && (
-                  <div 
-                    style={{
-                      fontSize: '10px',
-                      color: 'var(--text-secondary)',
-                      fontFamily: 'var(--font-mono)',
-                      borderTop: '1px solid var(--border)',
-                      paddingTop: '4px',
-                      marginTop: '6px',
-                    }}
-                    title={`Downstream: ${nodeStats.total} tasks (${nodeStats.done} done, ${nodeStats.inProgress} in progress, ${nodeStats.blocked} blocked)`}
-                  >
-                    ↓ {nodeStats.total} task{nodeStats.total !== 1 ? 's' : ''}
-                    {nodeStats.done > 0 && ` • ✓ ${nodeStats.done}`}
-                    {nodeStats.blocked > 0 && ` • ⚠ ${nodeStats.blocked}`}
-                  </div>
-                )}
               </div>
             ),
           },
@@ -1033,14 +943,14 @@ export function GraphView({
       if (!isBackground) setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setNodes, setEdges, viewMode, labelFilters, strategicTypes, layoutAlgorithm, hierarchyConfig, expansionState, version]); // nodeStats is setState, not a dependency
+  }, [setNodes, setEdges, labelFilters, layoutAlgorithm, hierarchyConfig, expansionState, version]);
 
   // Reset the stable-layout topology fingerprint whenever view settings that
   // affect the rendered structure change.  This forces a full Dagre run on the
   // next loadGraph call so the layout reflects the new configuration.
   useEffect(() => {
     prevTopologyKeyRef.current = '';
-  }, [viewMode, labelFilters, strategicTypes, layoutAlgorithm, hierarchyConfig, expansionState]);
+  }, [labelFilters, layoutAlgorithm, hierarchyConfig, expansionState]);
 
   useEffect(() => {
     loadGraph();

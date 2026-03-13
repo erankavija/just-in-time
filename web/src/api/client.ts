@@ -13,7 +13,7 @@ const api = axios.create({
 });
 
 export const apiClient = {
-  async getHealth(): Promise<{ status: string }> {
+  async getHealth(): Promise<{ status: string; project_name?: string }> {
     const response = await api.get('/health');
     return response.data;
   },
@@ -94,11 +94,6 @@ export const apiClient = {
     if (commit) params.set('commit', commit);
     const response = await api.get(`/documents?${params.toString()}`);
     return response.data;
-  },
-
-  async getStrategicTypes(): Promise<string[]> {
-    const response = await api.get('/config/strategic-types');
-    return response.data.strategic_types;
   },
 
   async getHierarchy(): Promise<ConfigHierarchy> {

@@ -66,49 +66,33 @@ vi.mock('../../../api/client', () => ({
         { from: '2', to: '3' },
       ],
     })),
-    getStrategicTypes: vi.fn(() => Promise.resolve(['milestone', 'epic'])),
   },
 }));
 
 describe('GraphView', () => {
   it('should render without crashing', async () => {
-    render(<GraphView viewMode="tactical" />);
+    render(<GraphView />);
     // Wait for async state updates to complete
     await waitFor(() => {
       // Component has completed loading
     });
   });
 
-  it('should accept viewMode prop', async () => {
-    const { rerender } = render(<GraphView viewMode="tactical" />);
-    await waitFor(() => {});
-    
-    rerender(<GraphView viewMode="strategic" />);
-    await waitFor(() => {});
-    // Component accepts both view modes
-  });
-
   it('should accept labelFilters prop', async () => {
-    render(<GraphView viewMode="tactical" labelFilters={['milestone:*']} />);
+    render(<GraphView labelFilters={['milestone:*']} />);
     await waitFor(() => {});
     // Component renders with label filters
   });
 
   it('should accept empty labelFilters', async () => {
-    render(<GraphView viewMode="tactical" labelFilters={[]} />);
+    render(<GraphView labelFilters={[]} />);
     await waitFor(() => {});
     // Component renders with empty filters
   });
 
   it('should accept multiple label filters', async () => {
-    render(<GraphView viewMode="tactical" labelFilters={['milestone:*', 'epic:*']} />);
+    render(<GraphView labelFilters={['milestone:*', 'epic:*']} />);
     await waitFor(() => {});
     // Component renders with multiple filters
-  });
-
-  it('should combine viewMode and labelFilters', async () => {
-    render(<GraphView viewMode="strategic" labelFilters={['milestone:v1.0']} />);
-    await waitFor(() => {});
-    // Component renders with both strategic mode and label filters
   });
 });

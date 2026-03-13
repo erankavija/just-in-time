@@ -4,10 +4,8 @@ import {
   applyFiltersToEdge,
   matchesAnyPattern,
   matchesPattern,
-  createStrategicFilter,
   createLabelFilter,
   type GraphFilter,
-  type StrategicFilterConfig,
   type LabelFilterConfig,
 } from './graphFilter';
 import type { GraphNode, GraphEdge } from '../types/models';
@@ -75,45 +73,7 @@ describe('graphFilter', () => {
     it('shows node normally when no filters applied', () => {
       const node = createNode('1', ['component:api']);
       const result = applyFiltersToNode(node, []);
-      
-      expect(result.visible).toBe(true);
-      expect(result.dimmed).toBe(false);
-    });
-  });
 
-  describe('applyFiltersToNode - strategic filter', () => {
-    it('hides non-strategic nodes when strategic filter enabled', () => {
-      const node = createNode('1', ['component:api']);
-      const filters: GraphFilter[] = [createStrategicFilter(true)];
-      const result = applyFiltersToNode(node, filters);
-      
-      expect(result.visible).toBe(false);
-      expect(result.reason).toContain('strategic');
-    });
-
-    it('shows strategic nodes (milestone) when strategic filter enabled', () => {
-      const node = createNode('1', ['type:milestone', 'milestone:v1.0', 'component:api']);
-      const filters: GraphFilter[] = [createStrategicFilter(true)];
-      const result = applyFiltersToNode(node, filters);
-      
-      expect(result.visible).toBe(true);
-      expect(result.dimmed).toBe(false);
-    });
-
-    it('shows strategic nodes (epic) when strategic filter enabled', () => {
-      const node = createNode('1', ['type:epic', 'epic:auth']);
-      const filters: GraphFilter[] = [createStrategicFilter(true)];
-      const result = applyFiltersToNode(node, filters);
-      
-      expect(result.visible).toBe(true);
-      expect(result.dimmed).toBe(false);
-    });
-
-    it('shows all nodes when strategic filter disabled', () => {
-      const node = createNode('1', ['component:api']);
-      const filters: GraphFilter[] = [createStrategicFilter(false)];
-      const result = applyFiltersToNode(node, filters);
-      
       expect(result.visible).toBe(true);
       expect(result.dimmed).toBe(false);
     });
@@ -124,7 +84,7 @@ describe('graphFilter', () => {
       const node = createNode('1', ['component:api']);
       const filters: GraphFilter[] = [createLabelFilter(['milestone:*'])];
       const result = applyFiltersToNode(node, filters);
-      
+
       expect(result.visible).toBe(true);
       expect(result.dimmed).toBe(true);
       expect(result.reason).toContain('label');
@@ -134,7 +94,7 @@ describe('graphFilter', () => {
       const node = createNode('1', ['milestone:v1.0', 'component:api']);
       const filters: GraphFilter[] = [createLabelFilter(['milestone:*'])];
       const result = applyFiltersToNode(node, filters);
-      
+
       expect(result.visible).toBe(true);
       expect(result.dimmed).toBe(false);
     });
@@ -143,7 +103,7 @@ describe('graphFilter', () => {
       const node = createNode('1', ['epic:auth']);
       const filters: GraphFilter[] = [createLabelFilter(['epic:auth'])];
       const result = applyFiltersToNode(node, filters);
-      
+
       expect(result.visible).toBe(true);
       expect(result.dimmed).toBe(false);
     });
@@ -152,7 +112,7 @@ describe('graphFilter', () => {
       const node = createNode('1', ['component:api']);
       const filters: GraphFilter[] = [createLabelFilter([])];
       const result = applyFiltersToNode(node, filters);
-      
+
       expect(result.visible).toBe(true);
       expect(result.dimmed).toBe(false);
     });
@@ -161,48 +121,9 @@ describe('graphFilter', () => {
       const node = createNode('1', ['epic:auth']);
       const filters: GraphFilter[] = [createLabelFilter(['milestone:*', 'epic:*'])];
       const result = applyFiltersToNode(node, filters);
-      
+
       expect(result.visible).toBe(true);
       expect(result.dimmed).toBe(false);
-    });
-  });
-
-  describe('applyFiltersToNode - combined filters', () => {
-    it('hides node when strategic filter hides it, even if label matches', () => {
-      const node = createNode('1', ['component:api']);
-      const filters: GraphFilter[] = [
-        createStrategicFilter(true),
-        createLabelFilter(['component:*']),
-      ];
-      const result = applyFiltersToNode(node, filters);
-      
-      expect(result.visible).toBe(false);
-      expect(result.reason).toContain('strategic');
-    });
-
-    it('shows strategic node normally when both filters match', () => {
-      const node = createNode('1', ['type:milestone', 'milestone:v1.0']);
-      const filters: GraphFilter[] = [
-        createStrategicFilter(true),
-        createLabelFilter(['milestone:*']),
-      ];
-      const result = applyFiltersToNode(node, filters);
-      
-      expect(result.visible).toBe(true);
-      expect(result.dimmed).toBe(false);
-    });
-
-    it('dims strategic node when label filter does not match', () => {
-      const node = createNode('1', ['type:milestone', 'milestone:v1.0']);
-      const filters: GraphFilter[] = [
-        createStrategicFilter(true),
-        createLabelFilter(['epic:*']),
-      ];
-      const result = applyFiltersToNode(node, filters);
-      
-      expect(result.visible).toBe(true);
-      expect(result.dimmed).toBe(true);
-      expect(result.reason).toContain('label');
     });
   });
 
@@ -211,7 +132,7 @@ describe('graphFilter', () => {
       const edge = createEdge('1', '2');
       const sourceResult = { visible: false, dimmed: false };
       const targetResult = { visible: true, dimmed: false };
-      
+
       const result = applyFiltersToEdge(edge, sourceResult, targetResult);
       expect(result.visible).toBe(false);
     });
@@ -220,7 +141,7 @@ describe('graphFilter', () => {
       const edge = createEdge('1', '2');
       const sourceResult = { visible: true, dimmed: false };
       const targetResult = { visible: false, dimmed: false };
-      
+
       const result = applyFiltersToEdge(edge, sourceResult, targetResult);
       expect(result.visible).toBe(false);
     });
@@ -229,7 +150,7 @@ describe('graphFilter', () => {
       const edge = createEdge('1', '2');
       const sourceResult = { visible: true, dimmed: true };
       const targetResult = { visible: true, dimmed: false };
-      
+
       const result = applyFiltersToEdge(edge, sourceResult, targetResult);
       expect(result.visible).toBe(true);
       expect(result.dimmed).toBe(true);
@@ -239,7 +160,7 @@ describe('graphFilter', () => {
       const edge = createEdge('1', '2');
       const sourceResult = { visible: true, dimmed: false };
       const targetResult = { visible: true, dimmed: true };
-      
+
       const result = applyFiltersToEdge(edge, sourceResult, targetResult);
       expect(result.visible).toBe(true);
       expect(result.dimmed).toBe(true);
@@ -249,7 +170,7 @@ describe('graphFilter', () => {
       const edge = createEdge('1', '2');
       const sourceResult = { visible: true, dimmed: true };
       const targetResult = { visible: true, dimmed: true };
-      
+
       const result = applyFiltersToEdge(edge, sourceResult, targetResult);
       expect(result.visible).toBe(true);
       expect(result.dimmed).toBe(true);
@@ -259,7 +180,7 @@ describe('graphFilter', () => {
       const edge = createEdge('1', '2');
       const sourceResult = { visible: true, dimmed: false };
       const targetResult = { visible: true, dimmed: false };
-      
+
       const result = applyFiltersToEdge(edge, sourceResult, targetResult);
       expect(result.visible).toBe(true);
       expect(result.dimmed).toBe(false);
@@ -267,12 +188,6 @@ describe('graphFilter', () => {
   });
 
   describe('filter factory functions', () => {
-    it('creates strategic filter correctly', () => {
-      const filter = createStrategicFilter(true);
-      expect(filter.type).toBe('strategic');
-      expect((filter.config as StrategicFilterConfig).enabled).toBe(true);
-    });
-
     it('creates label filter correctly', () => {
       const filter = createLabelFilter(['milestone:*', 'epic:*']);
       expect(filter.type).toBe('label');
