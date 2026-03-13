@@ -2,7 +2,7 @@
   "id": "8d97547d-f88e-4066-9dde-0afa08b260ab",
   "title": "CLI as single source of truth for MCP output messages",
   "description": "## Problem\n\nThe MCP server wraps the `jit` CLI but contains ~280 lines of hand-coded per-command summary and compaction logic (`generateUserSummary()`, `compactForAssistant()`) that drifts from CLI output and causes bugs. For example, `dep add` produced \"Added dependency: 436795ac → undefined\" because the MCP summary code referenced `result.to_id` which doesn't exist in CLI output (CLI returns `result.added` array).\n\nEvery time a CLI command's JSON shape changes, the MCP server's summary logic must be manually updated — a maintenance burden and bug source.\n\n## Solution\n\nMake the CLI `--json` output the single source of truth by adding a `message` field to all CLI JSON responses, then replacing the MCP server's command-specific logic with a generic pass-through.\n\n### Changes\n\n1. **`output.rs`**: Add `message: Option<String>` field and `with_message()` builder to `JsonOutput<T>`. The `to_json_string()` method injects the message into the serialized JSON object.\n\n2. **`output_macros.rs`**: Add overloaded variants of `output_data!` and `output_json!` macros accepting an optional message parameter.\n\n3. **`main.rs`**: Add `.with_message(...)` to ~30 JSON output paths across all commands (issue CRUD, queries, gates, deps, docs, labels, search, status, recover, validate).\n\n4. **`cli.rs`**: Improve `dep add`/`dep rm` parameter help text to clarify direction (blocked issue vs blocking issues).\n\n5. **`mcp-server/index.js`**: Replace `generateUserSummary()` (~210 lines → 8 lines) with a generic function that reads `result.message`. Simplify `compactForAssistant()` (~70 lines → 40 lines) to use generic truncation rules with zero command-specific branches.\n\n## Success Criteria\n\n- [ ] All CLI `--json` responses for commands that previously lacked a `message` field now include one with a human-readable summary\n- [ ] `JsonOutput::with_message()` injects the message into the top-level JSON object (unit tests verify)\n- [ ] MCP `generateUserSummary()` contains zero command-specific branches — reads `result.message` only\n- [ ] MCP `compactForAssistant()` contains zero command-specific branches — generic truncation only\n- [ ] MCP server `index.js` reduced from ~578 to ~347 LOC\n- [ ] `dep add` no longer produces \"undefined\" in MCP summaries\n- [ ] `dep add`/`dep rm` parameter descriptions clarify blocked vs blocking direction\n- [ ] `cargo test` — all tests pass (660+)\n- [ ] `cargo clippy --workspace --all-targets` — zero warnings\n- [ ] `cargo fmt --all -- --check` — clean\n- [ ] `cd mcp-server && npm test` — all tests pass (52)",
-  "state": "in_progress",
+  "state": "done",
   "priority": "high",
   "assignee": "agent:claude",
   "dependencies": [],
@@ -11,9 +11,9 @@
   ],
   "gates_status": {
     "code-review": {
-      "status": "failed",
+      "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-03-11T21:06:05.840393864Z"
+      "updated_at": "2026-03-11T21:20:41.514109576Z"
     }
   },
   "context": {},
@@ -26,5 +26,5 @@
     "component:mcp"
   ],
   "created_at": "2026-03-11T19:46:34.516683217+00:00",
-  "updated_at": "2026-03-11T21:10:53.585607098+00:00"
+  "updated_at": "2026-03-11T21:30:36.530943852+00:00"
 }
