@@ -464,6 +464,7 @@ export function GraphView({
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [legendExpanded, setLegendExpanded] = useState(false);
   const [hierarchyConfig, setHierarchyConfig] = useState<HierarchyConfig | null>(null);
   const [expansionState, setExpansionState] = useState<ExpansionState>(() => {
     // Load initial state from localStorage
@@ -1190,42 +1191,111 @@ export function GraphView({
         </button>
       </div>
 
-      {/* State Legend */}
-      <div style={{ 
-        position: 'absolute', 
-        bottom: '16px', 
-        left: '16px', 
+      {/* Collapsible Legend */}
+      <div style={{
+        position: 'absolute',
+        bottom: '16px',
+        left: '16px',
         backgroundColor: 'var(--bg-tertiary)',
-        padding: '12px',
         borderRadius: '8px',
         border: '1px solid var(--border)',
         fontFamily: 'var(--font-mono)',
         fontSize: '11px',
+        overflow: 'hidden',
       }}>
-        <div style={{ 
-          fontWeight: 600, 
-          marginBottom: '8px',
-          color: 'var(--text-primary)',
-        }}>
-          State Legend
-        </div>
-        {Object.entries(stateColors).map(([state]) => (
-          <div key={state} style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '8px', 
-            marginTop: '4px',
-          }}>
-            <div style={{ 
-              width: '12px', 
-              height: '12px', 
-              backgroundColor: stateColors[state as State],
-              borderRadius: '2px',
-              border: '1px solid var(--border)',
-            }} />
-            <span style={{ color: 'var(--text-secondary)' }}>{state}</span>
+        <button
+          onClick={() => setLegendExpanded(prev => !prev)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            width: '100%',
+            padding: '8px 12px',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            fontSize: 'inherit',
+            fontWeight: 600,
+            color: 'var(--text-primary)',
+            textAlign: 'left',
+          }}
+        >
+          <span style={{ fontSize: '10px' }}>{legendExpanded ? '⊟' : '⊞'}</span>
+          Legend
+        </button>
+        {legendExpanded && (
+          <div style={{ padding: '0 12px 12px' }}>
+            {/* States */}
+            <div style={{
+              fontSize: '10px',
+              color: 'var(--text-muted)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              marginBottom: '4px',
+            }}>
+              States
+            </div>
+            {Object.entries(stateColors).map(([state]) => (
+              <div key={state} style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                marginTop: '4px',
+              }}>
+                <div style={{
+                  width: '12px',
+                  height: '12px',
+                  backgroundColor: stateColors[state as State],
+                  borderRadius: '2px',
+                  border: '1px solid var(--border)',
+                }} />
+                <span style={{ color: 'var(--text-secondary)' }}>{state}</span>
+              </div>
+            ))}
+
+            {/* Priority */}
+            <div style={{
+              fontSize: '10px',
+              color: 'var(--text-muted)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              marginTop: '10px',
+              marginBottom: '4px',
+            }}>
+              Priority
+            </div>
+            {Object.entries(priorityColors).map(([priority]) => (
+              <div key={priority} style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                marginTop: '4px',
+              }}>
+                <span style={{ color: priorityColors[priority as Priority], fontSize: '12px' }}>●</span>
+                <span style={{ color: 'var(--text-secondary)' }}>{priority}</span>
+              </div>
+            ))}
+
+            {/* Interactions */}
+            <div style={{
+              fontSize: '10px',
+              color: 'var(--text-muted)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              marginTop: '10px',
+              marginBottom: '4px',
+            }}>
+              Interactions
+            </div>
+            <div style={{ color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+              <div>Click node — select issue</div>
+              <div>Scroll — zoom</div>
+              <div>Drag canvas — pan</div>
+              <div>⊞/⊟ — expand/collapse cluster</div>
+            </div>
           </div>
-        ))}
+        )}
       </div>
     </div>
   );
