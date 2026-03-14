@@ -1,7 +1,6 @@
 //! Issue breakdown operations
 
 use super::*;
-use crate::gate_presets::PresetManager;
 
 impl<S: IssueStore> CommandExecutor<S> {
     /// Break down an issue into subtasks with optional gate handling
@@ -60,21 +59,16 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Apply gate option after creating all subtasks
         if let Some(preset_name) = gate_preset {
-            // Apply preset to all subtasks
-            let preset_manager = PresetManager::new(self.storage.root().to_path_buf())?;
-            let preset = preset_manager.get_preset(&preset_name)?;
-
+            // Apply preset via the proper flow (registers gates, initializes status, logs events)
             for subtask_id in &subtask_ids {
-                // Add each gate from the preset to the subtask
-                for gate_spec in &preset.gates {
-                    self.add_gate(subtask_id, gate_spec.key.clone())?;
-                }
+                self.apply_gate_preset(subtask_id, &preset_name, None, false, false, &[])?;
             }
         } else if inherit_gates {
-            // Copy parent's gates to all subtasks
-            for subtask_id in &subtask_ids {
-                for gate_key in &parent.gates_required {
-                    self.add_gate(subtask_id, gate_key.clone())?;
+            // Copy parent's gates to all subtasks via add_gates (validates registry, initializes status)
+            let parent_gates = parent.gates_required.clone();
+            if !parent_gates.is_empty() {
+                for subtask_id in &subtask_ids {
+                    self.add_gates(subtask_id, &parent_gates)?;
                 }
             }
         }

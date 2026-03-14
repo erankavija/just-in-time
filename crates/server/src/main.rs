@@ -79,10 +79,17 @@ async fn main() -> Result<()> {
     let project_name = std::path::Path::new(&args.data_dir)
         .canonicalize()
         .ok()
-        .and_then(|p| p.parent().and_then(|parent| parent.file_name().map(|n| n.to_string_lossy().into_owned())))
+        .and_then(|p| {
+            p.parent()
+                .and_then(|parent| parent.file_name().map(|n| n.to_string_lossy().into_owned()))
+        })
         .unwrap_or_else(|| "jit".to_string());
 
-    let state = AppState { executor, tracker, project_name };
+    let state = AppState {
+        executor,
+        tracker,
+        project_name,
+    };
 
     // Build CORS layer for local development
     let cors = CorsLayer::new()

@@ -5,11 +5,24 @@ use crate::domain::{GateChecker, GateMode, GateStage};
 use anyhow::Result;
 use std::collections::HashMap;
 
-/// Built-in presets bundled with the binary
+/// Built-in presets bundled with the binary.
+///
+/// # Examples
+///
+/// ```
+/// use jit::gate_presets::BuiltinPresets;
+///
+/// let presets = BuiltinPresets::load().unwrap();
+/// assert!(presets.contains_key("rust-tdd"));
+/// assert!(presets.contains_key("minimal"));
+/// assert!(presets.contains_key("python-tdd"));
+/// assert!(presets.contains_key("js-tdd"));
+/// assert!(presets.contains_key("security-audit"));
+/// ```
 pub struct BuiltinPresets;
 
 impl BuiltinPresets {
-    /// Load all built-in presets
+    /// Load all built-in presets.
     pub fn load() -> Result<HashMap<String, GatePresetDefinition>> {
         let mut presets = HashMap::new();
 
@@ -100,19 +113,203 @@ impl BuiltinPresets {
             }],
         };
 
-        // Validate presets
-        rust_tdd.validate()?;
-        minimal.validate()?;
+        // python-tdd preset
+        let python_tdd = GatePresetDefinition {
+            name: "python-tdd".to_string(),
+            description: "Test-driven development workflow for Python projects".to_string(),
+            gates: vec![
+                GateTemplate {
+                    key: "tdd-reminder".to_string(),
+                    title: "Write tests first (TDD)".to_string(),
+                    description: "Reminder to write failing tests before implementation"
+                        .to_string(),
+                    stage: GateStage::Precheck,
+                    mode: GateMode::Manual,
+                    checker: None,
+                },
+                GateTemplate {
+                    key: "pytest".to_string(),
+                    title: "All tests pass".to_string(),
+                    description: "pytest must pass".to_string(),
+                    stage: GateStage::Postcheck,
+                    mode: GateMode::Auto,
+                    checker: Some(GateChecker::Exec {
+                        command: "pytest".to_string(),
+                        timeout_seconds: 300,
+                        working_dir: None,
+                        env: HashMap::new(),
+                        pass_context: false,
+                        prompt: None,
+                        prompt_file: None,
+                    }),
+                },
+                GateTemplate {
+                    key: "black".to_string(),
+                    title: "Code formatted (Black)".to_string(),
+                    description: "Code must be formatted with Black".to_string(),
+                    stage: GateStage::Postcheck,
+                    mode: GateMode::Auto,
+                    checker: Some(GateChecker::Exec {
+                        command: "black --check .".to_string(),
+                        timeout_seconds: 30,
+                        working_dir: None,
+                        env: HashMap::new(),
+                        pass_context: false,
+                        prompt: None,
+                        prompt_file: None,
+                    }),
+                },
+                GateTemplate {
+                    key: "mypy".to_string(),
+                    title: "Type checking passes".to_string(),
+                    description: "mypy type checking must pass".to_string(),
+                    stage: GateStage::Postcheck,
+                    mode: GateMode::Auto,
+                    checker: Some(GateChecker::Exec {
+                        command: "mypy .".to_string(),
+                        timeout_seconds: 120,
+                        working_dir: None,
+                        env: HashMap::new(),
+                        pass_context: false,
+                        prompt: None,
+                        prompt_file: None,
+                    }),
+                },
+                GateTemplate {
+                    key: "code-review".to_string(),
+                    title: "Code review completed".to_string(),
+                    description: "Another developer reviewed the code".to_string(),
+                    stage: GateStage::Postcheck,
+                    mode: GateMode::Manual,
+                    checker: None,
+                },
+            ],
+        };
+
+        // js-tdd preset
+        let js_tdd = GatePresetDefinition {
+            name: "js-tdd".to_string(),
+            description: "Test-driven development workflow for JavaScript/TypeScript".to_string(),
+            gates: vec![
+                GateTemplate {
+                    key: "tdd-reminder".to_string(),
+                    title: "Write tests first (TDD)".to_string(),
+                    description: "Reminder to write failing tests before implementation"
+                        .to_string(),
+                    stage: GateStage::Precheck,
+                    mode: GateMode::Manual,
+                    checker: None,
+                },
+                GateTemplate {
+                    key: "jest".to_string(),
+                    title: "All tests pass".to_string(),
+                    description: "npm test must pass".to_string(),
+                    stage: GateStage::Postcheck,
+                    mode: GateMode::Auto,
+                    checker: Some(GateChecker::Exec {
+                        command: "npm test".to_string(),
+                        timeout_seconds: 300,
+                        working_dir: None,
+                        env: HashMap::new(),
+                        pass_context: false,
+                        prompt: None,
+                        prompt_file: None,
+                    }),
+                },
+                GateTemplate {
+                    key: "eslint".to_string(),
+                    title: "ESLint passes".to_string(),
+                    description: "ESLint must pass with no errors".to_string(),
+                    stage: GateStage::Postcheck,
+                    mode: GateMode::Auto,
+                    checker: Some(GateChecker::Exec {
+                        command: "npm run lint".to_string(),
+                        timeout_seconds: 120,
+                        working_dir: None,
+                        env: HashMap::new(),
+                        pass_context: false,
+                        prompt: None,
+                        prompt_file: None,
+                    }),
+                },
+                GateTemplate {
+                    key: "code-review".to_string(),
+                    title: "Code review completed".to_string(),
+                    description: "Another developer reviewed the code".to_string(),
+                    stage: GateStage::Postcheck,
+                    mode: GateMode::Manual,
+                    checker: None,
+                },
+            ],
+        };
+
+        // security-audit preset
+        let security_audit = GatePresetDefinition {
+            name: "security-audit".to_string(),
+            description: "Security review workflow".to_string(),
+            gates: vec![
+                GateTemplate {
+                    key: "security-review".to_string(),
+                    title: "Security review completed".to_string(),
+                    description:
+                        "Review code for security vulnerabilities: injection, auth, crypto, secrets"
+                            .to_string(),
+                    stage: GateStage::Precheck,
+                    mode: GateMode::Manual,
+                    checker: None,
+                },
+                GateTemplate {
+                    key: "dependency-audit".to_string(),
+                    title: "Dependency vulnerabilities checked".to_string(),
+                    description: "Audit dependencies for known vulnerabilities".to_string(),
+                    stage: GateStage::Postcheck,
+                    mode: GateMode::Auto,
+                    checker: Some(GateChecker::Exec {
+                        command: "cargo audit".to_string(),
+                        timeout_seconds: 60,
+                        working_dir: None,
+                        env: HashMap::new(),
+                        pass_context: false,
+                        prompt: None,
+                        prompt_file: None,
+                    }),
+                },
+            ],
+        };
+
+        // Validate all presets
+        let all_presets = [&rust_tdd, &minimal, &python_tdd, &js_tdd, &security_audit];
+        for preset in &all_presets {
+            preset.validate()?;
+        }
 
         presets.insert(rust_tdd.name.clone(), rust_tdd);
         presets.insert(minimal.name.clone(), minimal);
+        presets.insert(python_tdd.name.clone(), python_tdd);
+        presets.insert(js_tdd.name.clone(), js_tdd);
+        presets.insert(security_audit.name.clone(), security_audit);
 
         Ok(presets)
     }
 
-    /// Get list of builtin preset names
+    /// Get list of builtin preset names.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::gate_presets::BuiltinPresets;
+    /// let names = BuiltinPresets::names();
+    /// assert!(names.contains(&"rust-tdd".to_string()));
+    /// assert!(names.contains(&"minimal".to_string()));
+    /// ```
     pub fn names() -> Vec<String> {
-        vec!["rust-tdd".to_string(), "minimal".to_string()]
+        vec![
+            "rust-tdd".to_string(),
+            "minimal".to_string(),
+            "python-tdd".to_string(),
+            "js-tdd".to_string(),
+            "security-audit".to_string(),
+        ]
     }
 }
 
@@ -123,9 +320,12 @@ mod tests {
     #[test]
     fn test_load_builtin_presets() {
         let presets = BuiltinPresets::load().unwrap();
-        assert_eq!(presets.len(), 2);
+        assert_eq!(presets.len(), 5);
         assert!(presets.contains_key("rust-tdd"));
         assert!(presets.contains_key("minimal"));
+        assert!(presets.contains_key("python-tdd"));
+        assert!(presets.contains_key("js-tdd"));
+        assert!(presets.contains_key("security-audit"));
     }
 
     #[test]

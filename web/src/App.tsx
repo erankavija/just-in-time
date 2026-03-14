@@ -75,7 +75,7 @@ function App() {
         setProjectName(health.project_name);
         document.title = `${health.project_name} — jit`;
       }
-    }).catch(() => {});
+    }).catch((err) => console.warn('Failed to fetch health:', err));
   }, []);
 
   // Load all issues for client-side search (re-fetch on version change)

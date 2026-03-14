@@ -145,7 +145,7 @@ mod tests {
 
         assert!(manager.has_preset("rust-tdd"));
         assert!(manager.has_preset("minimal"));
-        assert_eq!(manager.presets.len(), 2);
+        assert_eq!(manager.presets.len(), 5);
     }
 
     #[test]
@@ -205,7 +205,7 @@ mod tests {
         let manager = PresetManager::new(temp_dir.path().to_path_buf()).unwrap();
 
         let list = manager.list_presets();
-        assert_eq!(list.len(), 2);
+        assert_eq!(list.len(), 5);
 
         let rust_tdd = list.iter().find(|p| p.name == "rust-tdd").unwrap();
         assert_eq!(rust_tdd.gate_count, 5);
@@ -227,7 +227,7 @@ mod tests {
         let manager = PresetManager::new(temp_dir.path().to_path_buf()).unwrap();
         let list = manager.list_presets();
 
-        assert_eq!(list.len(), 3);
+        assert_eq!(list.len(), 6);
         let custom = list.iter().find(|p| p.name == "my-custom").unwrap();
         assert!(!custom.builtin);
     }
@@ -251,6 +251,6 @@ mod tests {
         // Don't create the presets directory
 
         let manager = PresetManager::new(temp_dir.path().to_path_buf()).unwrap();
-        assert_eq!(manager.presets.len(), 2); // Only builtins
+        assert_eq!(manager.presets.len(), 5); // Only builtins
     }
 }
