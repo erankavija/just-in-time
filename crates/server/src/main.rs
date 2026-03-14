@@ -75,7 +75,14 @@ async fn main() -> Result<()> {
     let tracker = Arc::new(tracker);
     info!("Watching {} for changes", args.data_dir);
 
-    let state = AppState { executor, tracker };
+    // Derive project name from the data directory's parent (the repo root)
+    let project_name = std::path::Path::new(&args.data_dir)
+        .canonicalize()
+        .ok()
+        .and_then(|p| p.parent().and_then(|parent| parent.file_name().map(|n| n.to_string_lossy().into_owned())))
+        .unwrap_or_else(|| "jit".to_string());
+
+    let state = AppState { executor, tracker, project_name };
 
     // Build CORS layer for local development
     let cors = CorsLayer::new()

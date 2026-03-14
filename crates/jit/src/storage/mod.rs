@@ -192,6 +192,15 @@ pub trait IssueStore: Clone {
     /// # Errors
     ///
     /// Returns an error if presets cannot be loaded.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use jit::storage::{IssueStore, JsonFileStorage};
+    /// let store = JsonFileStorage::new(".jit");
+    /// let presets = store.list_gate_presets().unwrap();
+    /// for p in &presets { println!("{}: {}", p.name, p.description); }
+    /// ```
     fn list_gate_presets(&self) -> Result<Vec<crate::gate_presets::PresetInfo>>;
 
     /// Get a specific gate preset by name.
@@ -199,13 +208,39 @@ pub trait IssueStore: Clone {
     /// # Errors
     ///
     /// Returns an error if the preset is not found or cannot be loaded.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use jit::storage::{IssueStore, JsonFileStorage};
+    /// let store = JsonFileStorage::new(".jit");
+    /// let preset = store.get_gate_preset("rust-tdd").unwrap();
+    /// assert_eq!(preset.name, "rust-tdd");
+    /// ```
     fn get_gate_preset(&self, name: &str) -> Result<crate::gate_presets::GatePresetDefinition>;
 
     /// Save a custom gate preset.
     ///
+    /// Uses atomic writes (temp file + rename) to prevent corruption.
+    ///
     /// # Errors
     ///
-    /// Returns an error if the preset cannot be saved.
+    /// Returns an error if the preset is invalid or cannot be saved.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use jit::storage::{IssueStore, JsonFileStorage};
+    /// # use jit::gate_presets::{GatePresetDefinition, GateTemplate};
+    /// # use jit::domain::{GateMode, GateStage};
+    /// let store = JsonFileStorage::new(".jit");
+    /// let preset = GatePresetDefinition {
+    ///     name: "my-preset".to_string(),
+    ///     description: "Custom workflow".to_string(),
+    ///     gates: vec![],
+    /// };
+    /// // let path = store.save_gate_preset(&preset).unwrap();
+    /// ```
     fn save_gate_preset(
         &self,
         preset: &crate::gate_presets::GatePresetDefinition,

@@ -697,10 +697,12 @@ impl IssueStore for JsonFileStorage {
         let presets_dir = self.root.join("config").join("gate-presets");
         fs::create_dir_all(&presets_dir)?;
 
-        // Save preset
+        // Save preset (atomic: temp file + rename)
         let preset_path = presets_dir.join(format!("{}.json", preset.name));
         let json = serde_json::to_string_pretty(&preset)?;
-        fs::write(&preset_path, json)?;
+        let temp_path = preset_path.with_extension("json.tmp");
+        fs::write(&temp_path, json)?;
+        fs::rename(&temp_path, &preset_path)?;
 
         Ok(preset_path)
     }

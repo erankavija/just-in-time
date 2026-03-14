@@ -23,6 +23,7 @@ use crate::watcher::ChangeTracker;
 pub struct AppState<S: IssueStore> {
     pub executor: Arc<CommandExecutor<S>>,
     pub tracker: Arc<ChangeTracker>,
+    pub project_name: String,
 }
 
 /// Create API routes
@@ -57,11 +58,14 @@ pub fn create_routes<S: IssueStore + Send + Sync + 'static>(state: AppState<S>) 
 }
 
 /// Health check endpoint
-async fn health_check() -> impl IntoResponse {
+async fn health_check<S: IssueStore>(
+    State(state): State<AppState<S>>,
+) -> impl IntoResponse {
     Json(serde_json::json!({
         "status": "ok",
         "service": "jit-api",
-        "version": env!("CARGO_PKG_VERSION")
+        "version": env!("CARGO_PKG_VERSION"),
+        "project_name": state.project_name
     }))
 }
 
@@ -726,7 +730,7 @@ mod tests {
         let storage = InMemoryStorage::new();
         let executor = Arc::new(CommandExecutor::new(storage));
         let tracker = Arc::new(ChangeTracker::new(16));
-        let state = AppState { executor, tracker };
+        let state = AppState { executor, tracker, project_name: "test-project".to_string() };
         let app = create_routes(state);
         TestServer::new(app).unwrap()
     }
@@ -736,11 +740,11 @@ mod tests {
         let server = create_test_app();
         let response = server.get("/health").await;
         response.assert_status_ok();
-        response.assert_json(&serde_json::json!({
-            "status": "ok",
-            "service": "jit-api",
-            "version": env!("CARGO_PKG_VERSION")
-        }));
+        let body: serde_json::Value = response.json();
+        assert_eq!(body["status"], "ok");
+        assert_eq!(body["service"], "jit-api");
+        assert_eq!(body["version"], env!("CARGO_PKG_VERSION"));
+        assert!(body["project_name"].is_string());
     }
 
     #[tokio::test]
@@ -785,7 +789,7 @@ mod tests {
             .unwrap();
 
         let tracker = Arc::new(ChangeTracker::new(16));
-        let state = AppState { executor, tracker };
+        let state = AppState { executor, tracker, project_name: "test-project".to_string() };
         let app = create_routes(state);
         let server = TestServer::new(app).unwrap();
 
@@ -832,7 +836,7 @@ enforce_leases = "off"
         executor.add_dependency(&id2, &id1).unwrap();
 
         let tracker = Arc::new(ChangeTracker::new(16));
-        let state = AppState { executor, tracker };
+        let state = AppState { executor, tracker, project_name: "test-project".to_string() };
         let app = create_routes(state);
         let server = TestServer::new(app).unwrap();
 
@@ -861,7 +865,7 @@ enforce_leases = "off"
             .unwrap();
 
         let tracker = Arc::new(ChangeTracker::new(16));
-        let state = AppState { executor, tracker };
+        let state = AppState { executor, tracker, project_name: "test-project".to_string() };
         let app = create_routes(state);
         let server = TestServer::new(app).unwrap();
 
@@ -986,7 +990,7 @@ enforce_leases = "off"
         let doc_path = temp_dir.path().join("test.md");
         fs::write(&doc_path, "# Test Document\n\nSome content.").unwrap();
 
-        let state = AppState { executor, tracker };
+        let state = AppState { executor, tracker, project_name: "test-project".to_string() };
         let app = create_routes(state);
         let _server = TestServer::new(app).unwrap();
 
@@ -1014,7 +1018,7 @@ enforce_leases = "off"
         tracker.notify_change();
         tracker.notify_change();
 
-        let state = AppState { executor, tracker };
+        let state = AppState { executor, tracker, project_name: "test-project".to_string() };
         let app = create_routes(state);
         let server = TestServer::new(app).unwrap();
 

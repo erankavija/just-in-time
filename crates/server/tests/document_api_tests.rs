@@ -17,6 +17,7 @@ async fn create_test_server() -> TestServer {
     let state = AppState {
         executor: Arc::new(executor),
         tracker: Arc::new(ChangeTracker::new(16)),
+        project_name: "test-project".to_string(),
     };
     let app = jit_server::routes::create_routes(state);
     TestServer::new(app).expect("Failed to create test server")
@@ -42,6 +43,7 @@ async fn create_test_server_with_issue() -> (TestServer, String) {
     let state = AppState {
         executor: Arc::new(executor),
         tracker: Arc::new(ChangeTracker::new(16)),
+        project_name: "test-project".to_string(),
     };
     let app = jit_server::routes::create_routes(state);
     let server = TestServer::new(app).expect("Failed to create test server");
@@ -95,6 +97,7 @@ async fn test_get_document_content_not_yet_implemented() {
     let state = AppState {
         executor: Arc::new(executor),
         tracker: Arc::new(ChangeTracker::new(16)),
+        project_name: "test-project".to_string(),
     };
     let app = jit_server::routes::create_routes(state);
     let server = TestServer::new(app).expect("Failed to create test server");

@@ -6,7 +6,18 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// Manages gate presets from builtin and custom sources
+/// Manages gate presets from builtin and custom sources.
+///
+/// # Examples
+///
+/// ```
+/// use jit::gate_presets::PresetManager;
+///
+/// let dir = tempfile::tempdir().unwrap();
+/// let manager = PresetManager::new(dir.path().to_path_buf()).unwrap();
+/// assert!(manager.has_preset("rust-tdd"));
+/// assert!(manager.has_preset("minimal"));
+/// ```
 pub struct PresetManager {
     jit_root: PathBuf,
     presets: HashMap<String, GatePresetDefinition>,

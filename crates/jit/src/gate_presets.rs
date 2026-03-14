@@ -15,7 +15,25 @@ use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// A gate template within a preset
+/// A gate template within a preset.
+///
+/// # Examples
+///
+/// ```
+/// use jit::gate_presets::GateTemplate;
+/// use jit::domain::{GateMode, GateStage};
+///
+/// let template = GateTemplate {
+///     key: "tests".to_string(),
+///     title: "All tests pass".to_string(),
+///     description: "Run the test suite".to_string(),
+///     stage: GateStage::Postcheck,
+///     mode: GateMode::Manual,
+///     checker: None,
+/// };
+/// let gate = template.to_gate();
+/// assert_eq!(gate.key, "tests");
+/// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GateTemplate {
     /// Gate key (unique identifier)
@@ -52,7 +70,28 @@ impl GateTemplate {
     }
 }
 
-/// A preset definition containing multiple gate templates
+/// A preset definition containing multiple gate templates.
+///
+/// # Examples
+///
+/// ```
+/// use jit::gate_presets::{GatePresetDefinition, GateTemplate};
+/// use jit::domain::{GateMode, GateStage};
+///
+/// let preset = GatePresetDefinition {
+///     name: "minimal".to_string(),
+///     description: "Minimal workflow".to_string(),
+///     gates: vec![GateTemplate {
+///         key: "review".to_string(),
+///         title: "Code review".to_string(),
+///         description: "Manual code review".to_string(),
+///         stage: GateStage::Postcheck,
+///         mode: GateMode::Manual,
+///         checker: None,
+///     }],
+/// };
+/// assert!(preset.validate().is_ok());
+/// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GatePresetDefinition {
     /// Unique preset name
