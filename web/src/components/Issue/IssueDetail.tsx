@@ -8,7 +8,7 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import 'katex/dist/katex.min.css';
 import './IssueDetail.css';
 import { apiClient } from '../../api/client';
-import type { Issue, DocumentReference, GateDefinition, GateRunSummary, GateRunDetail } from '../../types/models';
+import type { Issue, DocumentReference, GateState, GateDefinition, GateRunSummary, GateRunDetail } from '../../types/models';
 import { DocumentViewer } from '../Document/DocumentViewer';
 import { LabelBadge } from '../Labels/LabelBadge';
 
@@ -455,8 +455,11 @@ export function IssueDetail({ issueId, allIssues = [], onNavigate, onFocusInGrap
         </section>
       )}
 
-      {issue.gates_status && Object.keys(issue.gates_status).length > 0 && (() => {
-        const entries = Object.entries(issue.gates_status).sort(([a], [b]) => a.localeCompare(b));
+      {issue.gates_required && issue.gates_required.length > 0 && (() => {
+        const entries: [string, GateState][] = [...issue.gates_required].sort().map(key => [
+          key,
+          issue.gates_status[key] ?? { status: 'pending' as const, updated_at: '' },
+        ]);
         const passedCount = entries.filter(([, g]) => g.status === 'passed').length;
         return (
           <section style={{ marginBottom: '20px' }}>
