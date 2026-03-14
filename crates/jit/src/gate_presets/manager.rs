@@ -78,14 +78,38 @@ impl PresetManager {
         Ok(presets)
     }
 
-    /// Get a preset by name
+    /// Get a preset by name.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::gate_presets::PresetManager;
+    ///
+    /// let dir = tempfile::tempdir().unwrap();
+    /// let manager = PresetManager::new(dir.path().to_path_buf()).unwrap();
+    /// let preset = manager.get_preset("rust-tdd").unwrap();
+    /// assert_eq!(preset.gates.len(), 5);
+    /// assert!(manager.get_preset("nonexistent").is_err());
+    /// ```
     pub fn get_preset(&self, name: &str) -> Result<&GatePresetDefinition> {
         self.presets
             .get(name)
             .ok_or_else(|| anyhow!("Preset not found: {}", name))
     }
 
-    /// List all available presets
+    /// List all available presets.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::gate_presets::PresetManager;
+    ///
+    /// let dir = tempfile::tempdir().unwrap();
+    /// let manager = PresetManager::new(dir.path().to_path_buf()).unwrap();
+    /// let presets = manager.list_presets();
+    /// assert_eq!(presets.len(), 5);
+    /// assert!(presets.iter().any(|p| p.name == "rust-tdd"));
+    /// ```
     pub fn list_presets(&self) -> Vec<PresetInfo> {
         let builtin_names = BuiltinPresets::names();
 
@@ -100,12 +124,34 @@ impl PresetManager {
             .collect()
     }
 
-    /// Check if a preset exists
+    /// Check if a preset exists.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::gate_presets::PresetManager;
+    ///
+    /// let dir = tempfile::tempdir().unwrap();
+    /// let manager = PresetManager::new(dir.path().to_path_buf()).unwrap();
+    /// assert!(manager.has_preset("minimal"));
+    /// assert!(!manager.has_preset("nonexistent"));
+    /// ```
     pub fn has_preset(&self, name: &str) -> bool {
         self.presets.contains_key(name)
     }
 
-    /// Get custom presets directory path
+    /// Get custom presets directory path.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::gate_presets::PresetManager;
+    ///
+    /// let dir = tempfile::tempdir().unwrap();
+    /// let manager = PresetManager::new(dir.path().to_path_buf()).unwrap();
+    /// let presets_dir = manager.custom_presets_dir();
+    /// assert!(presets_dir.ends_with("config/gate-presets"));
+    /// ```
     pub fn custom_presets_dir(&self) -> PathBuf {
         self.jit_root.join("config").join("gate-presets")
     }

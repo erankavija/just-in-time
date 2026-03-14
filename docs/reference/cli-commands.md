@@ -1245,15 +1245,14 @@ jit gate preset create abc123 my-workflow --json
 
 **Validation:**
 - Issue must have at least one gate
-- Cannot override builtin presets (rust-tdd, minimal)
 - Preset name must be valid (no special characters)
 
 **Storage:**
-Custom presets are stored in `.jit/config/gate-presets/<name>.json` and are automatically loaded alongside builtin presets.
+Custom presets are stored in `.jit/config/gate-presets/<name>.json` and are automatically loaded alongside builtin presets. Custom presets with the same name as a builtin preset override the builtin.
 
 ### Builtin Presets
 
-JIT includes two builtin presets embedded in the binary:
+JIT includes five builtin presets embedded in the binary:
 
 **`rust-tdd`** - Test-driven development workflow for Rust (5 gates)
 - `tdd-reminder` - Manual reminder to write tests first (precheck)
@@ -1262,10 +1261,28 @@ JIT includes two builtin presets embedded in the binary:
 - `fmt` - Automated formatter check (postcheck, 30s timeout)
 - `code-review` - Manual code review requirement (postcheck)
 
+**`python-tdd`** - Test-driven development workflow for Python (5 gates)
+- `tdd-reminder` - Manual reminder to write tests first (precheck)
+- `pytest` - Automated test suite check (postcheck, 300s timeout)
+- `black` - Automated formatter check (postcheck, 30s timeout)
+- `mypy` - Automated type checking (postcheck, 120s timeout)
+- `code-review` - Manual code review requirement (postcheck)
+
+**`js-tdd`** - Test-driven development workflow for JavaScript/TypeScript (4 gates)
+- `tdd-reminder` - Manual reminder to write tests first (precheck)
+- `jest` - Automated test suite check (postcheck, 300s timeout)
+- `eslint` - Automated linter check (postcheck, 120s timeout)
+- `code-review` - Manual code review requirement (postcheck)
+
+**`security-audit`** - Security review workflow (3 gates)
+- `security-review` - Manual security vulnerability review (precheck)
+- `secret-detection` - Automated secret detection via gitleaks (postcheck, 20s timeout)
+- `dependency-audit` - Automated dependency vulnerability audit (postcheck, 60s timeout)
+
 **`minimal`** - Minimal workflow with just code review (1 gate)
 - `code-review` - Manual code review requirement (postcheck)
 
-**Note:** Builtin presets cannot be overridden. To customize, create a new preset with `jit gate preset create` or apply with filtering options.
+**Note:** Builtin presets can be overridden by creating a custom preset with the same name in `.jit/config/gate-presets/`.
 
 ### Custom Presets
 
@@ -1297,7 +1314,7 @@ Custom presets are stored as JSON files in `.jit/config/gate-presets/`:
 
 **Management:**
 - Custom presets appear in `jit gate preset list` with `[custom]` indicator
-- Custom presets override builtin presets with the same name
+- Custom presets with the same name override their builtin counterpart
 - Edit JSON files directly or recreate with `jit gate preset create`
 - Delete files to remove custom presets
 

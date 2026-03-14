@@ -23,6 +23,17 @@ pub struct BuiltinPresets;
 
 impl BuiltinPresets {
     /// Load all built-in presets.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::gate_presets::BuiltinPresets;
+    ///
+    /// let presets = BuiltinPresets::load().unwrap();
+    /// assert_eq!(presets.len(), 5);
+    /// let security = presets.get("security-audit").unwrap();
+    /// assert_eq!(security.gates.len(), 3);
+    /// ```
     pub fn load() -> Result<HashMap<String, GatePresetDefinition>> {
         let mut presets = HashMap::new();
 
@@ -257,6 +268,22 @@ impl BuiltinPresets {
                     stage: GateStage::Precheck,
                     mode: GateMode::Manual,
                     checker: None,
+                },
+                GateTemplate {
+                    key: "secret-detection".to_string(),
+                    title: "No secrets in code".to_string(),
+                    description: "Detect hardcoded secrets and credentials".to_string(),
+                    stage: GateStage::Postcheck,
+                    mode: GateMode::Auto,
+                    checker: Some(GateChecker::Exec {
+                        command: "gitleaks detect --no-git".to_string(),
+                        timeout_seconds: 20,
+                        working_dir: None,
+                        env: HashMap::new(),
+                        pass_context: false,
+                        prompt: None,
+                        prompt_file: None,
+                    }),
                 },
                 GateTemplate {
                     key: "dependency-audit".to_string(),

@@ -164,8 +164,6 @@ fn test_breakdown_no_gates_by_default() {
 
 #[test]
 fn test_breakdown_with_gate_preset() {
-    // This test will be implemented after we add PresetManager integration
-    // For now, we'll test that the method signature accepts the preset parameter
     let harness = TestHarness::new();
 
     let (parent_id, _) = harness
@@ -179,16 +177,30 @@ fn test_breakdown_with_gate_preset() {
         )
         .unwrap();
 
-    // This will fail until we implement the gate preset logic
-    // But we need the signature to exist first
-    let _result = harness.executor.breakdown_issue(
-        &parent_id,
-        "task",
-        vec![("Implement feature".to_string(), String::new())],
-        Some("test-preset".to_string()), // Apply preset
-    );
+    // Apply the builtin "minimal" preset (1 gate: code-review)
+    let subtask_ids = harness
+        .executor
+        .breakdown_issue(
+            &parent_id,
+            "task",
+            vec![
+                ("Task A".to_string(), "First task".to_string()),
+                ("Task B".to_string(), "Second task".to_string()),
+            ],
+            Some("minimal".to_string()),
+        )
+        .unwrap();
 
-    // Test will be expanded once PresetManager integration is complete
+    assert_eq!(subtask_ids.len(), 2);
+
+    // Verify each subtask got the preset's gates
+    for subtask_id in &subtask_ids {
+        let issue = harness.storage.load_issue(subtask_id).unwrap();
+        assert!(
+            issue.gates_required.contains(&"code-review".to_string()),
+            "Subtask should have code-review gate from minimal preset"
+        );
+    }
 }
 
 #[test]
@@ -263,8 +275,26 @@ fn test_breakdown_with_inherit_gates() {
 }
 
 #[test]
-fn test_breakdown_gate_preset_and_inherit_mutually_exclusive() {
-    // This will be tested at the CLI level with clap's conflicts_with
-    // The CLI won't allow both flags simultaneously
-    // This is just a placeholder to track that we need the CLI test
+fn test_breakdown_with_nonexistent_preset_fails() {
+    let harness = TestHarness::new();
+
+    let (parent_id, _) = harness
+        .executor
+        .create_issue(
+            "Story".to_string(),
+            String::new(),
+            Priority::Normal,
+            vec![],
+            vec!["type:story".to_string()],
+        )
+        .unwrap();
+
+    let result = harness.executor.breakdown_issue(
+        &parent_id,
+        "task",
+        vec![("Task".to_string(), String::new())],
+        Some("nonexistent-preset".to_string()),
+    );
+
+    assert!(result.is_err(), "Should fail with nonexistent preset");
 }
