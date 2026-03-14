@@ -21,6 +21,7 @@ use std::path::{Path, PathBuf};
 pub struct PresetManager {
     jit_root: PathBuf,
     presets: HashMap<String, GatePresetDefinition>,
+    custom_names: std::collections::HashSet<String>,
 }
 
 impl PresetManager {
@@ -30,11 +31,16 @@ impl PresetManager {
 
         // Load custom presets and override builtin with same name
         let custom_presets = Self::load_custom_presets(&jit_root)?;
+        let custom_names = custom_presets.keys().cloned().collect();
         for (name, preset) in custom_presets {
             presets.insert(name, preset);
         }
 
-        Ok(Self { jit_root, presets })
+        Ok(Self {
+            jit_root,
+            presets,
+            custom_names,
+        })
     }
 
     /// Load custom presets from .jit/config/gate-presets/
@@ -119,7 +125,8 @@ impl PresetManager {
                 name: preset.name.clone(),
                 description: preset.description.clone(),
                 gate_count: preset.gates.len(),
-                builtin: builtin_names.contains(&preset.name),
+                builtin: builtin_names.contains(&preset.name)
+                    && !self.custom_names.contains(&preset.name),
             })
             .collect()
     }
@@ -276,6 +283,29 @@ mod tests {
         assert_eq!(list.len(), 6);
         let custom = list.iter().find(|p| p.name == "my-custom").unwrap();
         assert!(!custom.builtin);
+    }
+
+    #[test]
+    fn test_overridden_builtin_listed_as_custom() {
+        let temp_dir = TempDir::new().unwrap();
+        let presets_dir = temp_dir.path().join("config").join("gate-presets");
+        fs::create_dir_all(&presets_dir).unwrap();
+
+        // Override builtin "minimal" with a custom version
+        create_test_preset_file(&presets_dir, "minimal").unwrap();
+
+        let manager = PresetManager::new(temp_dir.path().to_path_buf()).unwrap();
+        let list = manager.list_presets();
+
+        let minimal = list.iter().find(|p| p.name == "minimal").unwrap();
+        assert!(
+            !minimal.builtin,
+            "Overridden builtin should be listed as custom"
+        );
+
+        // Non-overridden builtins should still be listed as builtin
+        let rust_tdd = list.iter().find(|p| p.name == "rust-tdd").unwrap();
+        assert!(rust_tdd.builtin);
     }
 
     #[test]
