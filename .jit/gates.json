@@ -60,7 +60,7 @@
         "timeout_seconds": 600,
         "working_dir": null,
         "env": {
-          "REVIEWER_AGENT": "copilot -s --model gpt-5.4 --allow-tool \"shell(cargo test)\" --allow-tool \"shell(cargo clippy)\" --allow-tool \"shell(cargo fmt)\" --allow-tool \"shell(npm test)\" --allow-tool \"shell(./scripts/jit-validate.sh)\""
+          "REVIEWER_AGENT": "copilot -s --model gpt-5.4 --allow-tool \"shell(cargo test)\" --allow-tool \"shell(cargo clippy)\" --allow-tool \"shell(cargo fmt)\" --allow-tool \"shell(npm test)\" --allow-tool \"shell(npm run lint)\" --allow-tool \"shell(npm run build)\" --allow-tool \"shell(./scripts/jit-validate.sh)\""
         },
         "pass_context": true,
         "prompt_file": "./scripts/code-review-prompt.md"
