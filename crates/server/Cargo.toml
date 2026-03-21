@@ -13,6 +13,10 @@ path = "src/lib.rs"
 name = "jit-server"
 path = "src/main.rs"
 
+[features]
+default = ["embed-web"]
+embed-web = ["dep:rust-embed", "dep:mime_guess"]
+
 [dependencies]
 jit = { path = "../jit" }
 axum = "0.7"
@@ -29,6 +33,8 @@ clap = { version = "4.5", features = ["derive", "env"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 git2 = "0.18"
+rust-embed = { version = "8", optional = true }
+mime_guess = { version = "2", optional = true }
 
 [dev-dependencies]
 axum-test = "14.0"

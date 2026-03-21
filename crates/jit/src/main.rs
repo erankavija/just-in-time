@@ -3814,7 +3814,11 @@ fn run() -> Result<()> {
                     if !json {
                         println!("Starting server on {url} (foreground, Ctrl+C to stop)");
                         println!("  API: {url}/api");
-                        println!("  Web: {url}/");
+                        if let Some(web) = resolved_web_dir.as_deref().filter(|d| d.is_dir()) {
+                            println!("  Web: {url}/ (from {})", web.display());
+                        } else {
+                            println!("  Web: {url}/ (embedded assets)");
+                        }
                     }
 
                     let mut cmd = std::process::Command::new(&server_bin);
@@ -3846,6 +3850,10 @@ fn run() -> Result<()> {
                     let resolved_web_dir = web_dir
                         .map(|d| jit_dir.parent().unwrap_or(&jit_dir).join(d))
                         .or_else(find_web_dir);
+                    let web_dir_display = resolved_web_dir
+                        .as_deref()
+                        .filter(|d| d.is_dir())
+                        .map(|d| d.display().to_string());
                     let opts = ServeOptions {
                         data_dir: jit_dir.clone(),
                         preferred_port: port,
@@ -3868,13 +3876,23 @@ fn run() -> Result<()> {
                                         "pid": pid,
                                         "port": p,
                                         "url": url,
-                                        "log_file": lf
+                                        "log_file": lf,
+                                        "web_ui": true,
+                                        "web_ui_source": if web_dir_display.is_some() {
+                                            "filesystem"
+                                        } else {
+                                            "embedded"
+                                        }
                                     }))?
                                 );
                             } else {
                                 println!("Server started on {url} (PID {pid})");
                                 println!("  API: {url}/api");
-                                println!("  Web: {url}/");
+                                if let Some(ref dir) = web_dir_display {
+                                    println!("  Web: {url}/ (from {dir})");
+                                } else {
+                                    println!("  Web: {url}/ (embedded assets)");
+                                }
                                 println!("  Log: {}", lf.display());
                             }
                         }

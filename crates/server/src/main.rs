@@ -3,6 +3,8 @@
 //! Provides a web API for the Just-In-Time issue tracker, enabling web UI
 //! and external integrations to query and visualize issues.
 
+#[cfg(feature = "embed-web")]
+mod embedded;
 mod routes;
 mod sse;
 mod watcher;
@@ -13,7 +15,7 @@ use clap::Parser;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
-use tracing::info;
+use tracing::{info, warn};
 
 use jit::commands::CommandExecutor;
 use jit::storage::JsonFileStorage;
@@ -36,8 +38,8 @@ struct Args {
 
     /// Directory containing built web UI static files to serve at /
     ///
-    /// When provided, the server serves the web UI alongside the API.
-    /// If the directory does not exist, the flag is silently ignored.
+    /// When provided, the server serves these files instead of the embedded
+    /// assets. Useful for development with hot-reload.
     #[arg(long)]
     web_dir: Option<PathBuf>,
 }
@@ -103,9 +105,25 @@ async fn main() -> Result<()> {
         .layer(cors)
         .layer(tower_http::trace::TraceLayer::new_for_http());
 
+    // Web UI: --web-dir override > embedded assets > API-only with warning
     if let Some(web_dir) = args.web_dir.filter(|d| d.exists()) {
-        info!("Serving web UI from {}", web_dir.display());
+        info!("Serving web UI from filesystem: {}", web_dir.display());
         app = app.fallback_service(tower_http::services::ServeDir::new(web_dir));
+    } else {
+        #[cfg(feature = "embed-web")]
+        if embedded::has_embedded_assets() {
+            info!("Serving web UI from embedded assets");
+            app = app.fallback(embedded::embedded_fallback);
+        } else {
+            warn!("Web UI not available — no embedded assets were compiled in");
+            warn!("Rebuild with: cd web && npm run build && cargo build -p jit-server");
+        }
+
+        #[cfg(not(feature = "embed-web"))]
+        {
+            warn!("Web UI not available — built without embed-web feature");
+            warn!("Rebuild with: cd web && npm run build && cargo build -p jit-server");
+        }
     }
 
     // Start server
