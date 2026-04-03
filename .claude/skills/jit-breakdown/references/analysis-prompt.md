@@ -60,6 +60,10 @@ Output **only** the JSON object — no preamble, no explanation, no markdown fen
 3. **Descriptions must stand alone.** The person reading the issue in JIT will not
    have access to the spec document. Include enough context — motivation, acceptance
    criteria, and constraints — that the issue is self-contained.
+   Follow `.claude/skills/jit-manage/references/content-standards.md` for formatting:
+   use Mermaid for diagrams, LaTeX (`$...$` / `$$...$$`) for mathematical notation,
+   and structure the description as a small standalone markdown document with
+   `## Success Criteria` as a required section.
 
 4. **Do NOT include the parent issue itself.** Only return the children to create.
    The parent's dependency on its children is handled separately.
@@ -73,6 +77,9 @@ Output **only** the JSON object — no preamble, no explanation, no markdown fen
    - Sequential phrasing: "after", "once", "then", "next", "phase N"
    - Explicit blockers: "requires", "depends on", "blocked by", "needs"
    - Infrastructure before consumers: a library, schema, or API that other items use
+   - Structural setup before inhabitants: a task that initializes a workspace, project
+     skeleton, directory layout, or build configuration that other tasks *write files
+     into* — even if those tasks don't import or call anything the setup task produces
    - Numbered steps in the spec where order implies sequence
    - Testing/validation work that requires implementation to exist first
 
@@ -85,6 +92,12 @@ Output **only** the JSON object — no preamble, no explanation, no markdown fen
    - No cycle exists (A → B → A).
    - Every ref in `depends_on` exists in the `issues` array.
    - No child lists the parent in `depends_on` (parent is not in the output).
+   - **Verify every root:** for each issue whose `depends_on` is empty, ask: *"Could
+     an agent begin this task on a blank workspace, with none of the other tasks in
+     this breakdown having run?"* If no — because it writes into a directory, crate,
+     or project structure that another task creates — add the missing edge.
+   - Note: JIT will apply transitive reduction when the edges are committed, so it is
+     safe to add all genuine dependencies without manually pruning redundant paths.
 
 8. **Capture everything, even vague items.** If the spec mentions work too vague
    to detail precisely, include it with a description that notes the vagueness and

@@ -1,0 +1,31 @@
+{
+  "skill_name": "project-lead",
+  "setup_script": "evals/setup-test-repo.sh",
+  "notes": "Each eval requires a fresh test repo created by setup-test-repo.sh. The sub-agent must cd into the test repo before starting. The jit binary is at /home/vkaskivuo/.cargo/bin/jit. The skill files are at /home/vkaskivuo/Projects/just-in-time/.claude/skills/project-lead/. MCP server should be disabled to avoid contaminating production .jit. The composed jit skills are at /home/vkaskivuo/Projects/just-in-time/.claude/skills/jit-manage/, jit-breakdown/, jit-parallel/.",
+  "evals": [
+    {
+      "id": 1,
+      "name": "sw-epic-with-children",
+      "prompt": "You are a project lead. Your working directory is a test project at {REPO_PATH}. The jit binary is at /home/vkaskivuo/.cargo/bin/jit. Read the project-lead skill at /home/vkaskivuo/Projects/just-in-time/.claude/skills/project-lead/SKILL.md and follow it to lead the epic in this repo to completion. The epic ID will be output by the setup script. The composed skills (jit-manage, jit-breakdown, jit-parallel) are at /home/vkaskivuo/Projects/just-in-time/.claude/skills/. Drive this epic autonomously — implement the child tasks, pass gates, complete the epic.",
+      "setup_scenario": "sw-with-children",
+      "expected_output": "Epic and all child issues transitioned to done. src/strings.py contains slugify and truncate functions. tests/test_strings.py contains passing tests. All gates passed. Completion report produced.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "sw-epic-needs-breakdown",
+      "prompt": "You are a project lead. Your working directory is a test project at {REPO_PATH}. The jit binary is at /home/vkaskivuo/.cargo/bin/jit. Read the project-lead skill at /home/vkaskivuo/Projects/just-in-time/.claude/skills/project-lead/SKILL.md and follow it to lead the epic in this repo to completion. The epic has a design doc but no children — you must break it down first, then dispatch and complete. The composed skills are at /home/vkaskivuo/Projects/just-in-time/.claude/skills/.",
+      "setup_scenario": "sw-needs-breakdown",
+      "expected_output": "Epic broken down into child tasks covering all 4 arithmetic endpoints. Children created with proper DAG wiring. Implementation completed. All gates passed. Epic transitioned to done. Completion report produced.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "name": "content-project-epic",
+      "prompt": "You are a project lead. Your working directory is a test project at {REPO_PATH}. The jit binary is at /home/vkaskivuo/.cargo/bin/jit. Read the project-lead skill at /home/vkaskivuo/Projects/just-in-time/.claude/skills/project-lead/SKILL.md and follow it to lead the documentation epic in this repo to completion. This is a content project with no code — the skill should handle it without assuming software conventions. The composed skills are at /home/vkaskivuo/Projects/just-in-time/.claude/skills/.",
+      "setup_scenario": "content-project",
+      "expected_output": "Epic broken down into doc tasks. Tutorial, how-to guide, and reference page created in correct directories. All follow Diataxis structure and project conventions. docs/index.md updated. Content-review gate passed. Epic done. No software-specific commands attempted.",
+      "files": []
+    }
+  ]
+}
