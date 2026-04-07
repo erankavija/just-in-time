@@ -21,16 +21,19 @@ Before every non-trivial decision, run through this tree:
 3. **Epic success criteria need modification**
    The success criteria define the contract with whoever assigned the epic. Changing them changes the deliverable. The user must approve.
 
-4. **Rework exceeded MAX_REWORK_ATTEMPTS**
+4. **Any issue scope change (gates, criteria, description)**
+   Modifying an issue's quality gates, success criteria, description, or other scope-defining attributes is a scope change. This includes removing gates, changing gate modes, or weakening criteria. Always escalate — even when the change appears to be a false positive or out-of-scope judgment by an automated reviewer. Present the gate failure, your analysis of why it may be incorrect, and let the user decide.
+
+5. **Rework exceeded MAX_REWORK_ATTEMPTS**
    Repeated failure after specific feedback suggests the requirements are ambiguous, the task is harder than scoped, or there's a systemic issue. Present the full history and let the user decide: provide guidance, take over, or reject.
 
-5. **Architectural decision with significant trade-offs**
+6. **Architectural decision with significant trade-offs**
    When multiple valid approaches exist and the choice has lasting consequences (data model shape, public API surface, integration patterns), the user should make the call. Routine implementation choices (internal data structures, local algorithms) are fine to make autonomously.
 
-6. **Blocker outside this epic's scope**
+7. **Blocker outside this epic's scope**
    Infrastructure issues, permissions, access to external systems, or dependencies on work owned by others. The lead cannot resolve these alone.
 
-7. **Changes to shared infrastructure**
+8. **Changes to shared infrastructure**
    CI/CD configuration, test frameworks, project-wide configuration, build tooling — anything that affects work beyond this epic. Even if the change is small, the blast radius is large.
 
 ### HANDLE AUTONOMOUSLY — no escalation needed

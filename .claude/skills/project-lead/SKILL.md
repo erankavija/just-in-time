@@ -26,11 +26,13 @@ All 8 invariants from jit-manage are inherited and apply without modification. I
 
 1. **Autonomy by default.** Handle all decisions except those in `references/escalation-policy.md`. Do not ask the user for routine confirmations — act, then report.
 2. **Quality is non-negotiable.** Every sub-agent's output is reviewed before acceptance. Unpassed gates, unmet criteria, or coherence failures trigger rework. No exceptions.
-3. **Wave discipline.** Work is dispatched in topological waves. A wave must complete (all issues done or rejected) before the next begins.
-4. **Single epic scope.** Drive exactly one epic to completion, then stop. Do not pick up additional work.
-5. **Rework before escalation.** Failed work is retried with specific feedback up to MAX_REWORK_ATTEMPTS (see `references/escalation-policy.md`) before escalating.
-6. **Resumable state.** Persist progress to `dev/active/<short-id>-progress.json` so execution can resume across sessions.
-7. **Project discovery.** All conventions, gates, documentation standards, and type hierarchies are discovered from the project's own configuration. Assume nothing about language, domain, or tooling.
+3. **Gates are inviolable.** Never remove, bypass, or work around quality gates to unblock state transitions. If a gate fails, the only options are: fix the code to pass it, or escalate to the user. Removing a gate, changing a gate from auto to manual, or any other workaround is strictly forbidden — even when the failure appears to be a false positive.
+4. **Issue scope changes require escalation.** Modifying an issue's gates, success criteria, description, or any other scope-defining attribute always requires explicit user approval. This applies even when the change seems minor or obviously correct.
+5. **Wave discipline.** Work is dispatched in topological waves. A wave must complete (all issues done or rejected) before the next begins.
+6. **Single epic scope.** Drive exactly one epic to completion, then stop. Do not pick up additional work.
+7. **Rework before escalation.** Failed work is retried with specific feedback up to MAX_REWORK_ATTEMPTS (see `references/escalation-policy.md`) before escalating.
+8. **Resumable state.** Persist progress to `dev/active/<short-id>-progress.json` so execution can resume across sessions.
+9. **Project discovery.** All conventions, gates, documentation standards, and type hierarchies are discovered from the project's own configuration. Assume nothing about language, domain, or tooling.
 
 ## Section 1: Project Discovery
 
@@ -117,6 +119,7 @@ Convert the epic's children into ordered execution waves.
 4. **Assess parallelism within each wave.** Read `.claude/skills/jit-parallel/references/conflict-heuristics.md` (if it exists for this project). For issues within the same wave:
    - If two issues are likely to touch the same files, serialize them (move one to a sub-wave).
    - If the wave has 4+ parallel issues, consider worktree mode (see `.claude/skills/jit-parallel/references/worktree-mode.md`).
+   - **CRITICAL**: Initialize the worktree with the current repository state at the start of each wave. Failure to do so will cause workers to operate on stale code and produce invalid output.
 
 5. **Persist the wave plan.** Save to `dev/active/<short-id>-progress.json`:
    ```json
