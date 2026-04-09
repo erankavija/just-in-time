@@ -379,7 +379,7 @@ impl JsonError {
             command,
         )
         .with_details(serde_json::json!({"issue_id": issue_id}))
-        .with_suggestion("Run 'jit issue list' to see available issues")
+        .with_suggestion("Run 'jit query all' to see available issues")
         .with_suggestion("Check if the issue ID is correct")
     }
 
@@ -912,6 +912,8 @@ mod tests {
             title: "Issue 1".to_string(),
             state: State::Ready,
             priority: Priority::Normal,
+            assignee: None,
+            labels: vec![],
             blocked_reasons: vec!["dep:abc123".to_string()],
         };
 

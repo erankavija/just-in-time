@@ -943,19 +943,24 @@ pub enum GraphCommands {
         json: bool,
     },
 
-    /// Show downstream dependents (issues that are blocked by this one)
+    /// Show reverse dependencies (issues that depend on this one)
     ///
-    /// "Downstream" means work flow direction (toward completion/delivery).
-    /// If Epic depends on Task, then Task is upstream and Epic is downstream.
+    /// Symmetric counterpart to `deps`: where `deps` shows what this issue needs,
+    /// `rdeps` shows what needs this issue.
     ///
     /// Example:
-    ///   jit graph downstream task-456
+    ///   jit graph rdeps task-456
     ///   Shows: epic-123, milestone-789 (they depend on this task)
     ///
     /// Note: This shows dependency relationships, not label hierarchy.
-    Downstream {
+    #[command(alias = "downstream")]
+    Rdeps {
         /// Issue ID
         id: String,
+
+        /// Depth of traversal (1 = immediate, 0 = unlimited)
+        #[arg(long, default_value = "0")]
+        depth: u32,
 
         #[arg(long)]
         json: bool,
@@ -969,7 +974,7 @@ pub enum GraphCommands {
 
     /// Export dependency graph in various formats
     Export {
-        /// Output format (dot, mermaid)
+        /// Output format (dot, mermaid, json)
         #[arg(short, long, default_value = "dot")]
         format: String,
 
@@ -1027,6 +1032,9 @@ pub enum EventCommands {
     Tail {
         #[arg(short, long, default_value = "10")]
         n: usize,
+
+        #[arg(long)]
+        json: bool,
     },
 
     /// Query events by type or issue
@@ -1039,6 +1047,9 @@ pub enum EventCommands {
 
         #[arg(short, long, default_value = "50")]
         limit: usize,
+
+        #[arg(long)]
+        json: bool,
     },
 }
 

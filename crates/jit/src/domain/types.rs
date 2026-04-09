@@ -328,13 +328,61 @@ impl MinimalIssue {
 }
 
 /// Minimal blocked issue for queries - includes blocking reasons
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct MinimalBlockedIssue {
     pub id: String,
     pub title: String,
     pub state: State,
     pub priority: Priority,
+    pub assignee: Option<String>,
+    pub labels: Vec<String>,
     pub blocked_reasons: Vec<String>,
+}
+
+// Custom serialization to add computed short_id (mirrors MinimalIssue)
+impl Serialize for MinimalBlockedIssue {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut state = serializer.serialize_struct("MinimalBlockedIssue", 8)?;
+        state.serialize_field("id", &self.id)?;
+        state.serialize_field("short_id", &self.short_id())?;
+        state.serialize_field("title", &self.title)?;
+        state.serialize_field("state", &self.state)?;
+        state.serialize_field("priority", &self.priority)?;
+        if let Some(ref assignee) = self.assignee {
+            state.serialize_field("assignee", assignee)?;
+        } else {
+            state.serialize_field("assignee", &None::<String>)?;
+        }
+        if !self.labels.is_empty() {
+            state.serialize_field("labels", &self.labels)?;
+        }
+        state.serialize_field("blocked_reasons", &self.blocked_reasons)?;
+        state.end()
+    }
+}
+
+impl MinimalBlockedIssue {
+    pub fn short_id(&self) -> String {
+        self.id.chars().take(SHORT_ID_LENGTH).collect()
+    }
+}
+
+impl From<(&Issue, Vec<String>)> for MinimalBlockedIssue {
+    fn from((issue, blocked_reasons): (&Issue, Vec<String>)) -> Self {
+        Self {
+            id: issue.id.clone(),
+            title: issue.title.clone(),
+            state: issue.state,
+            priority: issue.priority,
+            assignee: issue.assignee.clone(),
+            labels: issue.labels.clone(),
+            blocked_reasons,
+        }
+    }
 }
 
 /// Implement GraphNode for Issue to enable dependency graph operations

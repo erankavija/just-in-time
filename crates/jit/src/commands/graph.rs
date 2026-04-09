@@ -114,14 +114,50 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(result)
     }
 
-    pub fn show_downstream(&self, issue_id: &str) -> Result<Vec<Issue>> {
+    pub fn show_rdeps_with_depth(&self, issue_id: &str, depth: u32) -> Result<Vec<Issue>> {
         let full_id = self.storage.resolve_issue_id(issue_id)?;
         let issues = self.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
         let graph = DependencyGraph::new(&issue_refs);
 
-        let dependents = graph.get_transitive_dependents(&full_id);
-        Ok(dependents.into_iter().cloned().collect())
+        if depth == 0 {
+            // Unlimited transitive traversal
+            let dependents = graph.get_transitive_dependents(&full_id);
+            return Ok(dependents.into_iter().cloned().collect());
+        }
+
+        if depth == 1 {
+            // Immediate dependents only
+            let dependents = graph.get_dependents(&full_id);
+            return Ok(dependents.into_iter().cloned().collect());
+        }
+
+        // Depth-limited BFS
+        let mut result = Vec::new();
+        let mut to_process: Vec<(String, u32)> = graph
+            .get_dependents(&full_id)
+            .iter()
+            .map(|issue| (issue.id.to_string(), 1))
+            .collect();
+        let mut processed = HashSet::new();
+
+        while let Some((dep_id, current_depth)) = to_process.pop() {
+            if processed.contains(&dep_id) {
+                continue;
+            }
+            processed.insert(dep_id.clone());
+
+            if let Ok(dep_issue) = self.storage.load_issue(&dep_id) {
+                result.push(dep_issue.clone());
+                if current_depth < depth {
+                    for parent in graph.get_dependents(&dep_id) {
+                        to_process.push((parent.id.to_string(), current_depth + 1));
+                    }
+                }
+            }
+        }
+
+        Ok(result)
     }
 
     pub fn show_roots(&self) -> Result<Vec<Issue>> {
@@ -141,8 +177,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         match format.to_lowercase().as_str() {
             "dot" => Ok(crate::visualization::export_dot(&graph)),
             "mermaid" => Ok(crate::visualization::export_mermaid(&graph)),
+            "json" => Ok(crate::visualization::export_json(&graph)),
             _ => Err(anyhow!(
-                "Unsupported format: {}. Use 'dot' or 'mermaid'",
+                "Unsupported format: {}. Use 'dot', 'mermaid', or 'json'",
                 format
             )),
         }

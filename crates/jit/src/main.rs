@@ -1757,9 +1757,9 @@ fn run() -> Result<()> {
                     }
                 }
             }
-            GraphCommands::Downstream { id, json } => {
+            GraphCommands::Rdeps { id, depth, json } => {
                 let output_ctx = OutputContext::new(quiet, json);
-                let issues = executor.show_downstream(&id)?;
+                let issues = executor.show_rdeps_with_depth(&id, depth)?;
                 if json {
                     use jit::domain::MinimalIssue;
                     use jit::output::{GraphDownstreamResponse, JsonOutput};
@@ -1772,11 +1772,10 @@ fn run() -> Result<()> {
                         count: issues.len(),
                     };
                     let msg = format!("{} dependents", issues.len());
-                    let output =
-                        JsonOutput::success(response, "graph downstream").with_message(msg);
+                    let output = JsonOutput::success(response, "graph rdeps").with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else {
-                    let _ = output_ctx.print_info(format!("Downstream dependents of {}:", id));
+                    let _ = output_ctx.print_info(format!("Reverse dependencies of {}:", id));
                     for issue in issues {
                         println!("  {} | {}", issue.id, issue.title);
                     }
@@ -1914,20 +1913,47 @@ fn run() -> Result<()> {
             }
         },
         Commands::Events(event_cmd) => match event_cmd {
-            EventCommands::Tail { n } => {
+            EventCommands::Tail { n, json } => {
                 let events = executor.tail_events(n)?;
-                for event in events {
-                    println!("{}", serde_json::to_string(&event)?);
+                if json {
+                    use jit::output::JsonOutput;
+                    let output = JsonOutput::success(
+                        serde_json::json!({
+                            "count": events.len(),
+                            "events": events,
+                        }),
+                        "events tail",
+                    )
+                    .with_message(format!("{} event(s)", events.len()));
+                    println!("{}", output.to_json_string()?);
+                } else {
+                    for event in events {
+                        println!("{}", serde_json::to_string(&event)?);
+                    }
                 }
             }
             EventCommands::Query {
                 event_type,
                 issue_id,
                 limit,
+                json,
             } => {
                 let events = executor.query_events(event_type, issue_id, limit)?;
-                for event in events {
-                    println!("{}", serde_json::to_string(&event)?);
+                if json {
+                    use jit::output::JsonOutput;
+                    let output = JsonOutput::success(
+                        serde_json::json!({
+                            "count": events.len(),
+                            "events": events,
+                        }),
+                        "events query",
+                    )
+                    .with_message(format!("{} event(s)", events.len()));
+                    println!("{}", output.to_json_string()?);
+                } else {
+                    for event in events {
+                        println!("{}", serde_json::to_string(&event)?);
+                    }
                 }
             }
         },
@@ -2521,13 +2547,7 @@ fn run() -> Result<()> {
                         use jit::domain::MinimalBlockedIssue;
                         let minimal: Vec<MinimalBlockedIssue> = blocked
                             .iter()
-                            .map(|(issue, reasons)| MinimalBlockedIssue {
-                                id: issue.id.clone(),
-                                title: issue.title.clone(),
-                                state: issue.state,
-                                priority: issue.priority,
-                                blocked_reasons: reasons.clone(),
-                            })
+                            .map(|(issue, reasons)| MinimalBlockedIssue::from((issue, reasons.clone())))
                             .collect();
 
                         JsonOutput::success(

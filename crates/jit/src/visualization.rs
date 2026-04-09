@@ -136,6 +136,46 @@ pub fn export_mermaid(graph: &DependencyGraph<Issue>) -> String {
     output
 }
 
+/// Export Issue dependency graph as JSON for programmatic analysis
+///
+/// Emits `{ "nodes": [...], "edges": [...] }` where each node includes
+/// `id`, `short_id`, `title`, `state`, `priority`, and `labels`, and each
+/// edge is `{ "from": source_id, "to": dep_id }`.
+pub fn export_json(graph: &DependencyGraph<Issue>) -> String {
+    let mut all_nodes = Vec::new();
+    collect_all_nodes(graph, &mut all_nodes);
+
+    let nodes: Vec<serde_json::Value> = all_nodes
+        .iter()
+        .map(|issue| {
+            let short_id: String = issue.id.chars().take(8).collect();
+            serde_json::json!({
+                "id": issue.id,
+                "short_id": short_id,
+                "title": issue.title,
+                "state": issue.state,
+                "priority": issue.priority,
+                "labels": issue.labels,
+            })
+        })
+        .collect();
+
+    let edges: Vec<serde_json::Value> = all_nodes
+        .iter()
+        .flat_map(|issue| {
+            issue.dependencies.iter().map(|dep_id| {
+                serde_json::json!({ "from": issue.id, "to": dep_id })
+            })
+        })
+        .collect();
+
+    serde_json::to_string_pretty(&serde_json::json!({
+        "nodes": nodes,
+        "edges": edges,
+    }))
+    .unwrap_or_else(|_| "{}".to_string())
+}
+
 // Helper function to collect all nodes from the graph
 // Since we don't have direct access to internal nodes, we build the set
 // by traversing from roots and collecting all dependents
