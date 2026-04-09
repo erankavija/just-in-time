@@ -2547,7 +2547,9 @@ fn run() -> Result<()> {
                         use jit::domain::MinimalBlockedIssue;
                         let minimal: Vec<MinimalBlockedIssue> = blocked
                             .iter()
-                            .map(|(issue, reasons)| MinimalBlockedIssue::from((issue, reasons.clone())))
+                            .map(|(issue, reasons)| {
+                                MinimalBlockedIssue::from((issue, reasons.clone()))
+                            })
                             .collect();
 
                         JsonOutput::success(

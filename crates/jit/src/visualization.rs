@@ -163,9 +163,10 @@ pub fn export_json(graph: &DependencyGraph<Issue>) -> String {
     let edges: Vec<serde_json::Value> = all_nodes
         .iter()
         .flat_map(|issue| {
-            issue.dependencies.iter().map(|dep_id| {
-                serde_json::json!({ "from": issue.id, "to": dep_id })
-            })
+            issue
+                .dependencies
+                .iter()
+                .map(|dep_id| serde_json::json!({ "from": issue.id, "to": dep_id }))
         })
         .collect();
 
