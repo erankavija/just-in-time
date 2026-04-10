@@ -14,6 +14,248 @@ fn setup_repo() -> TempDir {
     temp
 }
 
+/// Define a simple auto gate and create an issue with it.
+/// Returns (TempDir, issue_id_short).
+fn setup_auto_gate_issue(checker_command: &str) -> (TempDir, String) {
+    let temp = setup_repo();
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args([
+            "gate",
+            "define",
+            "test-gate",
+            "--title",
+            "Test Gate",
+            "--description",
+            "Test",
+            "--mode",
+            "auto",
+            "--checker-command",
+            checker_command,
+            "--timeout",
+            "10",
+        ])
+        .assert()
+        .success();
+
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args([
+            "issue",
+            "create",
+            "--title",
+            "Test issue",
+            "--gate",
+            "test-gate",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let output_str = String::from_utf8_lossy(&output);
+    let issue_id = output_str
+        .lines()
+        .find(|l| l.contains("Created issue:"))
+        .unwrap()
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+    (temp, issue_id)
+}
+
+#[test]
+fn test_gate_check_no_prior_runs_shows_not_run_message() {
+    let (temp, issue_id) = setup_auto_gate_issue("exit 0");
+
+    // gate check before any pass — should say not run yet, no mutation
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["gate", "check", &issue_id, "test-gate"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("not been run").or(predicate::str::contains("no run")));
+
+    // Confirm non-mutating: gates_status should still be Pending
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["issue", "show", &issue_id, "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    let gate_status = json["gates_status"]["test-gate"]["status"]
+        .as_str()
+        .unwrap_or("Pending");
+    assert!(
+        gate_status == "Pending" || gate_status == "pending",
+        "Expected Pending, got: {gate_status}"
+    );
+}
+
+#[test]
+fn test_gate_check_shows_last_run_after_pass() {
+    let (temp, issue_id) = setup_auto_gate_issue("exit 0");
+
+    // Execute the gate via pass
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["gate", "pass", &issue_id, "test-gate"])
+        .assert()
+        .success();
+
+    // gate check now shows last run
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["gate", "check", &issue_id, "test-gate"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("passed").or(predicate::str::contains("Passed")))
+        .stdout(predicate::str::contains("exit 0").or(predicate::str::contains("exit_code")));
+}
+
+#[test]
+fn test_gate_check_shows_last_run_after_failure() {
+    let (temp, issue_id) = setup_auto_gate_issue("exit 1");
+
+    // Execute (will fail)
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["gate", "pass", &issue_id, "test-gate"])
+        .assert(); // don't assert success — gate fails but command itself is ok
+
+    // gate check shows the failure
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["gate", "check", &issue_id, "test-gate"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("failed").or(predicate::str::contains("Failed")));
+
+    // Non-mutating: gate check itself didn't change status further
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["issue", "show", &issue_id, "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    let gate_status = json["gates_status"]["test-gate"]["status"]
+        .as_str()
+        .unwrap_or("");
+    assert!(
+        gate_status.to_lowercase() == "failed",
+        "Expected Failed, got: {gate_status}"
+    );
+}
+
+#[test]
+fn test_gate_check_is_non_mutating() {
+    let (temp, issue_id) = setup_auto_gate_issue("exit 0");
+
+    // Two gate check calls — neither should mutate
+    for _ in 0..2 {
+        Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+            .current_dir(temp.path())
+            .args(["gate", "check", &issue_id, "test-gate"])
+            .assert()
+            .success();
+    }
+
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["issue", "show", &issue_id, "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    let gate_status = json["gates_status"]["test-gate"]["status"]
+        .as_str()
+        .unwrap_or("Pending");
+    assert!(
+        gate_status == "Pending" || gate_status == "pending",
+        "Expected Pending after check-only, got: {gate_status}"
+    );
+}
+
+#[test]
+fn test_gate_check_json_output() {
+    let (temp, issue_id) = setup_auto_gate_issue("exit 0");
+
+    // Run the gate first so there's a result to show
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["gate", "pass", &issue_id, "test-gate"])
+        .assert()
+        .success();
+
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["gate", "check", &issue_id, "test-gate", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    assert!(json["run_id"].is_string(), "Missing run_id");
+    assert!(json["gate_key"].is_string(), "Missing gate_key");
+    assert!(json["status"].is_string(), "Missing status");
+    assert!(!json["exit_code"].is_null(), "Missing exit_code");
+    assert!(json["stdout"].is_string(), "Missing stdout");
+    assert!(json["stderr"].is_string(), "Missing stderr");
+    assert!(json["started_at"].is_string(), "Missing started_at");
+}
+
+#[test]
+fn test_gate_pass_auto_executes_checker() {
+    let (temp, issue_id) = setup_auto_gate_issue("exit 0");
+
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["gate", "pass", &issue_id, "test-gate"])
+        .assert()
+        .success();
+
+    // gates_status should be Passed
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["issue", "show", &issue_id, "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    let gate_status = json["gates_status"]["test-gate"]["status"]
+        .as_str()
+        .unwrap_or("");
+    assert!(
+        gate_status.to_lowercase() == "passed",
+        "Expected Passed, got: {gate_status}"
+    );
+
+    // A gate run result file should exist in .jit/gate-runs/
+    let gate_runs_dir = temp.path().join(".jit").join("gate-runs");
+    assert!(gate_runs_dir.exists(), ".jit/gate-runs/ should exist");
+    let entries: Vec<_> = std::fs::read_dir(&gate_runs_dir)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .collect();
+    assert!(
+        !entries.is_empty(),
+        "Expected at least one gate run result saved"
+    );
+}
+
 #[test]
 fn test_gate_define_manual_via_cli() {
     let temp = setup_repo();
@@ -269,7 +511,14 @@ fn test_gate_check_single() {
         .last()
         .unwrap();
 
-    // Check the gate
+    // Run the gate first (gate pass executes the checker for auto gates)
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
+    cmd.current_dir(temp.path())
+        .args(["gate", "pass", issue_id, "quick-check"])
+        .assert()
+        .success();
+
+    // Now inspect the last run result (gate check is inspection-only)
     let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
     cmd.current_dir(temp.path())
         .args(["gate", "check", issue_id, "quick-check"])
@@ -466,7 +715,14 @@ fn test_gate_env_vars_passed_to_checker() {
         .last()
         .unwrap();
 
-    // Check the gate — checker should see the env vars (use --json to get stdout)
+    // Run the gate (gate pass executes checker for auto gates)
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
+    cmd.current_dir(temp.path())
+        .args(["gate", "pass", issue_id, "env-test"])
+        .assert()
+        .success();
+
+    // Inspect last run result — checker should have seen the env vars
     let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
     let output = cmd
         .current_dir(temp.path())

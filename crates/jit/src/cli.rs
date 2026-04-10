@@ -624,7 +624,7 @@ pub enum GateCommands {
         json: bool,
     },
 
-    /// Check a single gate for an issue (run automated checker)
+    /// Show the last run result for a gate (inspection only, non-mutating)
     Check {
         /// Issue ID
         id: String,
@@ -645,7 +645,7 @@ pub enum GateCommands {
         json: bool,
     },
 
-    /// Mark a gate as passed
+    /// Run automated checker (auto gates) or record attestation (manual gates)
     Pass {
         /// Issue ID
         id: String,

@@ -109,6 +109,21 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(result)
     }
 
+    /// Return the most recent gate run result for a given issue and gate key.
+    ///
+    /// Returns `Ok(None)` if no runs have been recorded yet.
+    pub fn get_last_gate_run(
+        &self,
+        issue_id: &str,
+        gate_key: &str,
+    ) -> Result<Option<GateRunResult>> {
+        let full_id = self.storage.resolve_issue_id(issue_id)?;
+        let mut runs = self.storage.list_gate_runs_for_issue(&full_id)?;
+        runs.retain(|r| r.gate_key == gate_key);
+        runs.sort_by_key(|r| r.started_at);
+        Ok(runs.into_iter().next_back())
+    }
+
     /// Maximum number of recent runs included in gate context.
     const MAX_RUN_HISTORY: usize = 5;
 
@@ -1347,5 +1362,140 @@ enforce_leases = "off"
 
         let gate: crate::domain::Gate = serde_json::from_str(json).unwrap();
         assert_eq!(gate.priority, 100);
+    }
+
+    fn make_auto_gate(key: &str, command: &str) -> crate::domain::Gate {
+        crate::domain::Gate {
+            version: 1,
+            key: key.to_string(),
+            title: key.to_string(),
+            description: String::new(),
+            stage: GateStage::Postcheck,
+            mode: GateMode::Auto,
+            checker: Some(GateChecker::Exec {
+                command: command.to_string(),
+                timeout_seconds: 10,
+                working_dir: None,
+                env: HashMap::new(),
+                pass_context: false,
+                prompt: None,
+                prompt_file: None,
+            }),
+            priority: 100,
+            reserved: HashMap::new(),
+            auto: true,
+            example_integration: None,
+        }
+    }
+
+    #[test]
+    fn test_get_last_gate_run_returns_none_when_no_runs() {
+        let executor = setup();
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        registry
+            .gates
+            .insert("g".to_string(), make_auto_gate("g", "exit 0"));
+        executor.storage.save_gate_registry(&registry).unwrap();
+
+        let issue = crate::domain::Issue::new("T".to_string(), String::new());
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(issue).unwrap();
+        executor.add_gate(&issue_id, "g".to_string()).unwrap();
+
+        let result = executor.get_last_gate_run(&issue_id, "g").unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_get_last_gate_run_returns_most_recent() {
+        let executor = setup();
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        registry
+            .gates
+            .insert("g".to_string(), make_auto_gate("g", "exit 0"));
+        executor.storage.save_gate_registry(&registry).unwrap();
+
+        let issue = crate::domain::Issue::new("T".to_string(), String::new());
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(issue).unwrap();
+        executor.add_gate(&issue_id, "g".to_string()).unwrap();
+
+        let first = executor.check_gate(&issue_id, "g").unwrap();
+        // Small sleep so timestamps differ
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        let second = executor.check_gate(&issue_id, "g").unwrap();
+
+        let last = executor.get_last_gate_run(&issue_id, "g").unwrap().unwrap();
+        assert_eq!(last.run_id, second.run_id);
+        assert_ne!(last.run_id, first.run_id);
+    }
+
+    #[test]
+    fn test_get_last_gate_run_filters_by_gate_key() {
+        let executor = setup();
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        registry
+            .gates
+            .insert("gate-a".to_string(), make_auto_gate("gate-a", "exit 0"));
+        registry
+            .gates
+            .insert("gate-b".to_string(), make_auto_gate("gate-b", "exit 0"));
+        executor.storage.save_gate_registry(&registry).unwrap();
+
+        let issue = crate::domain::Issue::new("T".to_string(), String::new());
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(issue).unwrap();
+        executor.add_gate(&issue_id, "gate-a".to_string()).unwrap();
+        executor.add_gate(&issue_id, "gate-b".to_string()).unwrap();
+
+        executor.check_gate(&issue_id, "gate-a").unwrap();
+        let b_run = executor.check_gate(&issue_id, "gate-b").unwrap();
+
+        let last_a = executor
+            .get_last_gate_run(&issue_id, "gate-a")
+            .unwrap()
+            .unwrap();
+        let last_b = executor
+            .get_last_gate_run(&issue_id, "gate-b")
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(last_a.gate_key, "gate-a");
+        assert_eq!(last_b.gate_key, "gate-b");
+        assert_eq!(last_b.run_id, b_run.run_id);
+        assert_ne!(last_a.run_id, last_b.run_id);
+    }
+
+    #[test]
+    fn test_get_last_gate_run_shows_failure_details() {
+        let executor = setup();
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        registry.gates.insert(
+            "fail-gate".to_string(),
+            make_auto_gate("fail-gate", "echo 'oops' && exit 1"),
+        );
+        executor.storage.save_gate_registry(&registry).unwrap();
+
+        let issue = crate::domain::Issue::new("T".to_string(), String::new());
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(issue).unwrap();
+        executor
+            .add_gate(&issue_id, "fail-gate".to_string())
+            .unwrap();
+
+        executor.check_gate(&issue_id, "fail-gate").unwrap();
+
+        let last = executor
+            .get_last_gate_run(&issue_id, "fail-gate")
+            .unwrap()
+            .unwrap();
+        assert_eq!(last.status, GateRunStatus::Failed);
+        assert_eq!(last.exit_code, Some(1));
+        assert!(
+            last.stdout.contains("oops") || last.stderr.contains("oops"),
+            "Expected 'oops' in output, got stdout={:?} stderr={:?}",
+            last.stdout,
+            last.stderr
+        );
     }
 }

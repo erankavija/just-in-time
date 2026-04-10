@@ -1223,47 +1223,69 @@ fn run() -> Result<()> {
             }
             GateCommands::Check { id, gate_key, json } => {
                 let output_ctx = OutputContext::new(quiet, json);
-                match executor.check_gate(&id, &gate_key) {
-                    Ok(result) => {
+                match executor.get_last_gate_run(&id, &gate_key) {
+                    Ok(Some(result)) => {
                         if json {
                             use jit::output::JsonOutput;
-                            let msg = format!("Gate {}: {:?}", gate_key, result.status);
+                            let msg = format!("Gate '{}': {:?}", gate_key, result.status);
                             let output =
                                 JsonOutput::success(result, "gate check").with_message(msg);
                             println!("{}", output.to_json_string()?);
                         } else {
-                            match result.status {
-                                jit::domain::GateRunStatus::Passed => {
-                                    let _ = output_ctx.print_success(format!(
-                                        "✓ Gate '{}' passed for issue {}",
-                                        gate_key, id
-                                    ));
-                                }
-                                jit::domain::GateRunStatus::Failed => {
-                                    println!("✗ Gate '{}' failed for issue {}", gate_key, id);
-                                    if !result.stderr.is_empty() {
-                                        eprintln!(
-                                            "  Error: {}",
-                                            result.stderr.lines().next().unwrap_or("")
-                                        );
-                                    }
-                                    eprintln!(
-                                        "  Full output: .jit/gate-runs/{}/result.json",
-                                        result.run_id
-                                    );
-                                }
-                                jit::domain::GateRunStatus::Error => {
-                                    println!("✗ Gate '{}' error for issue {}", gate_key, id);
-                                    eprintln!("  {}", result.stderr);
-                                    eprintln!(
-                                        "  Full output: .jit/gate-runs/{}/result.json",
-                                        result.run_id
-                                    );
-                                }
-                                _ => {
-                                    println!("Gate '{}' status: {:?}", gate_key, result.status);
-                                }
+                            let status_str = match result.status {
+                                jit::domain::GateRunStatus::Passed => "passed",
+                                jit::domain::GateRunStatus::Failed => "failed",
+                                jit::domain::GateRunStatus::Error => "error",
+                                _ => "unknown",
+                            };
+                            println!(
+                                "Gate '{}' last run: {} (exit code: {})",
+                                gate_key,
+                                status_str,
+                                result
+                                    .exit_code
+                                    .map(|c| c.to_string())
+                                    .unwrap_or_else(|| "n/a".to_string())
+                            );
+                            if let Some(ms) = result.duration_ms {
+                                println!("  Duration: {}ms", ms);
                             }
+                            if !result.command.is_empty() {
+                                println!("  Command: {}", result.command);
+                            }
+                            if let Some(branch) = &result.branch {
+                                println!("  Branch: {}", branch);
+                            }
+                            if let Some(commit) = &result.commit {
+                                println!("  Commit: {}", commit);
+                            }
+                            if !result.stdout.is_empty() {
+                                let lines: Vec<&str> = result.stdout.lines().take(20).collect();
+                                println!("  stdout:\n    {}", lines.join("\n    "));
+                            }
+                            if !result.stderr.is_empty() {
+                                let lines: Vec<&str> = result.stderr.lines().take(20).collect();
+                                println!("  stderr:\n    {}", lines.join("\n    "));
+                            }
+                            println!(
+                                "  Full output: .jit/gate-runs/{}/result.json",
+                                result.run_id
+                            );
+                            let _ = output_ctx;
+                        }
+                    }
+                    Ok(None) => {
+                        let msg = format!(
+                            "Gate '{}' has not been run yet for issue {}. Use 'jit gate pass' to run it.",
+                            gate_key, id
+                        );
+                        if json {
+                            use jit::output::JsonOutput;
+                            let output = JsonOutput::<Option<()>>::success(None, "gate check")
+                                .with_message(msg);
+                            println!("{}", output.to_json_string()?);
+                        } else {
+                            println!("{}", msg);
                         }
                     }
                     Err(e) => {
