@@ -12,7 +12,28 @@
     "fmt",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-04-10T00:23:18.852440069Z"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-04-10T00:24:19.155300740Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-04-10T00:24:10.609024515Z"
+    },
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-04-10T00:24:02.938816768Z"
+    }
+  },
   "context": {},
   "documents": [
     {
@@ -30,5 +51,5 @@
     "component:core"
   ],
   "created_at": "2025-12-19T23:03:19.319199080Z",
-  "updated_at": "2026-02-19T22:27:38.692573035+00:00"
+  "updated_at": "2026-04-10T00:28:39.639145158+00:00"
 }
