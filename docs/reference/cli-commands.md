@@ -235,7 +235,7 @@ jit_issue_create({
 }
 ```
 
-**`jit_gate_check`** - Run automated gate checker
+**`jit_gate_check`** - Show the latest recorded run for a gate
 ```javascript
 {
   id: string,
@@ -244,7 +244,7 @@ jit_issue_create({
 }
 ```
 
-**`jit_gate_check_all`** - Run all automated gates
+**`jit_gate_check_all`** - Show the latest recorded runs for all automated gates
 ```javascript
 {
   id: string,
@@ -930,25 +930,25 @@ jit gate check <ISSUE_ID> <GATE_KEY> [--json] [--quiet]
 ```
 
 **Behavior:**
-- Runs the gate's checker command
-- Updates gate status based on exit code (0 = passed, non-zero = failed)
-- Only works for automated gates (manual gates cannot be checked)
+- Shows the most recent recorded run for the gate
+- Does not execute the checker or update gate state
+- Only works for automated gates that have recorded runs
 
 **Examples:**
 ```bash
-# Check single gate
+# Show the latest recorded run for a single gate
 jit gate check abc123 tests
-# ✓ tests passed (exit code 0)
+# Gate 'tests' last run: passed (exit code: 0)
 
-# Check fails
+# Show a failed recorded run
 jit gate check abc123 clippy
-# ✗ clippy failed (exit code 1)
-# Output: found 3 warnings...
+# Gate 'clippy' last run: failed (exit code: 1)
+# stdout/stderr from the stored run are shown inline
 ```
 
 ### `jit gate check-all`
 
-Run all automated gates for an issue.
+Show the latest recorded runs for all automated gates on an issue.
 
 **Usage:**
 ```bash
@@ -956,20 +956,18 @@ jit gate check-all <ISSUE_ID> [--json]
 ```
 
 **Behavior:**
-- Runs checker commands for all automated gates on the issue
-- Manual gates are skipped
-- Reports summary of results
+- Shows the latest recorded run for each automated gate on the issue
+- Does not execute any checker commands
+- Reports which automated gates do not have recorded runs yet
 
 **Example:**
 ```bash
 $ jit gate check-all abc123
 
-Running 3 automated gate(s)...
-✓ tests passed
-✓ fmt passed
-✗ clippy failed
-
-Summary: 2 passed, 1 failed
+Gate run results for issue abc123:
+Gate 'tests' last run: passed (exit code: 0)
+Gate 'fmt' last run: passed (exit code: 0)
+Gate 'clippy' has not been run yet for issue abc123. Use 'jit gate pass' to run it.
 ```
 
 ### `jit gate pass`

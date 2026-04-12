@@ -135,7 +135,7 @@ jit issue update <issue-id> --state in_progress
 # Do your work...
 # (edit code, run tests, etc.)
 
-# Run gates when ready
+# Inspect recorded gate runs when ready
 jit gate check-all <issue-id>
 
 # Complete the issue

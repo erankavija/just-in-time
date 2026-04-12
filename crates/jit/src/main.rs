@@ -21,7 +21,7 @@ use jit::cli::{
     GraphCommands, IssueCommands, RegistryCommands,
 };
 use jit::commands::CommandExecutor;
-use jit::domain::{Priority, State};
+use jit::domain::{GateRunResult, Priority, State};
 use jit::output::{ExitCode, JsonOutput, OutputContext};
 use jit::storage::{IssueStore, JsonFileStorage};
 use std::env;
@@ -107,6 +107,49 @@ fn setup_gitattributes() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn print_gate_run_details(result: &GateRunResult) {
+    let status_str = match result.status {
+        jit::domain::GateRunStatus::Passed => "passed",
+        jit::domain::GateRunStatus::Failed => "failed",
+        jit::domain::GateRunStatus::Error => "error",
+        _ => "unknown",
+    };
+
+    println!(
+        "Gate '{}' last run: {} (exit code: {})",
+        result.gate_key,
+        status_str,
+        result
+            .exit_code
+            .map(|c| c.to_string())
+            .unwrap_or_else(|| "n/a".to_string())
+    );
+    if let Some(ms) = result.duration_ms {
+        println!("  Duration: {}ms", ms);
+    }
+    if !result.command.is_empty() {
+        println!("  Command: {}", result.command);
+    }
+    if let Some(branch) = &result.branch {
+        println!("  Branch: {}", branch);
+    }
+    if let Some(commit) = &result.commit {
+        println!("  Commit: {}", commit);
+    }
+    if !result.stdout.is_empty() {
+        let lines: Vec<&str> = result.stdout.lines().take(20).collect();
+        println!("  stdout:\n    {}", lines.join("\n    "));
+    }
+    if !result.stderr.is_empty() {
+        let lines: Vec<&str> = result.stderr.lines().take(20).collect();
+        println!("  stderr:\n    {}", lines.join("\n    "));
+    }
+    println!(
+        "  Full output: .jit/gate-runs/{}/result.json",
+        result.run_id
+    );
 }
 
 /// Print a dependency tree with tree symbols (├─, └─, │)
@@ -1232,45 +1275,7 @@ fn run() -> Result<()> {
                                 JsonOutput::success(result, "gate check").with_message(msg);
                             println!("{}", output.to_json_string()?);
                         } else {
-                            let status_str = match result.status {
-                                jit::domain::GateRunStatus::Passed => "passed",
-                                jit::domain::GateRunStatus::Failed => "failed",
-                                jit::domain::GateRunStatus::Error => "error",
-                                _ => "unknown",
-                            };
-                            println!(
-                                "Gate '{}' last run: {} (exit code: {})",
-                                gate_key,
-                                status_str,
-                                result
-                                    .exit_code
-                                    .map(|c| c.to_string())
-                                    .unwrap_or_else(|| "n/a".to_string())
-                            );
-                            if let Some(ms) = result.duration_ms {
-                                println!("  Duration: {}ms", ms);
-                            }
-                            if !result.command.is_empty() {
-                                println!("  Command: {}", result.command);
-                            }
-                            if let Some(branch) = &result.branch {
-                                println!("  Branch: {}", branch);
-                            }
-                            if let Some(commit) = &result.commit {
-                                println!("  Commit: {}", commit);
-                            }
-                            if !result.stdout.is_empty() {
-                                let lines: Vec<&str> = result.stdout.lines().take(20).collect();
-                                println!("  stdout:\n    {}", lines.join("\n    "));
-                            }
-                            if !result.stderr.is_empty() {
-                                let lines: Vec<&str> = result.stderr.lines().take(20).collect();
-                                println!("  stderr:\n    {}", lines.join("\n    "));
-                            }
-                            println!(
-                                "  Full output: .jit/gate-runs/{}/result.json",
-                                result.run_id
-                            );
+                            print_gate_run_details(&result);
                             let _ = output_ctx;
                         }
                     }
@@ -1303,11 +1308,7 @@ fn run() -> Result<()> {
             }
             GateCommands::CheckAll { id, json } => {
                 let output_ctx = OutputContext::new(quiet, json);
-                let (results, warnings) = executor.check_all_gates(&id)?;
-
-                for warning in warnings {
-                    output_ctx.print_warning(&warning)?;
-                }
+                let (results, not_run) = executor.get_last_gate_runs_for_issue(&id)?;
 
                 if json {
                     use jit::output::JsonOutput;
@@ -1316,39 +1317,41 @@ fn run() -> Result<()> {
                         .iter()
                         .filter(|r| r.status == jit::domain::GateRunStatus::Passed)
                         .count();
-                    let total = results.len();
-                    let msg = format!("{}/{} gates passed", passed_count, total);
+                    let total = results.len() + not_run.len();
+                    let msg = if not_run.is_empty() {
+                        format!("{}/{} recorded gate runs passed", passed_count, total)
+                    } else {
+                        format!(
+                            "Showing last run results for {}/{} automated gates ({} not run yet)",
+                            results.len(),
+                            total,
+                            not_run.len()
+                        )
+                    };
                     let output = JsonOutput::success(
                         json!({
                             "results": results,
                             "passed": passed_count,
                             "total": total,
+                            "not_run": not_run,
                         }),
                         "gate check-all",
                     )
                     .with_message(msg);
                     println!("{}", output.to_json_string()?);
-                } else if results.is_empty() {
+                } else if results.is_empty() && not_run.is_empty() {
                     let _ = output_ctx
-                        .print_info(format!("No automated gates to check for issue {}", id));
+                        .print_info(format!("No automated gates to inspect for issue {}", id));
                 } else {
-                    let _ = output_ctx.print_info(format!("Checking gates for issue {}:", id));
-                    for result in results {
-                        match result.status {
-                            jit::domain::GateRunStatus::Passed => {
-                                println!("  ✓ {} passed", result.gate_key);
-                            }
-                            jit::domain::GateRunStatus::Failed => {
-                                println!("  ✗ {} failed", result.gate_key);
-                                println!(
-                                    "    Full output: .jit/gate-runs/{}/result.json",
-                                    result.run_id
-                                );
-                            }
-                            _ => {
-                                println!("  {} - {:?}", result.gate_key, result.status);
-                            }
-                        }
+                    let _ = output_ctx.print_info(format!("Gate run results for issue {}:", id));
+                    for result in &results {
+                        print_gate_run_details(result);
+                    }
+                    for gate_key in not_run {
+                        println!(
+                            "Gate '{}' has not been run yet for issue {}. Use 'jit gate pass' to run it.",
+                            gate_key, id
+                        );
                     }
                 }
             }

@@ -237,7 +237,7 @@ jit issue claim $ISSUE agent:worker-1
 **4. Completion**
 
 ```bash
-# Check postchecks
+# Inspect latest postcheck runs
 jit gate check-all $ISSUE
 
 # Mark complete

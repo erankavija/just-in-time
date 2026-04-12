@@ -4,6 +4,7 @@ use super::*;
 use crate::domain::{GateContext, GateMode, GateRunResult, GateRunStatus, GateStage};
 use crate::gate_execution;
 use crate::output::IssueShowResponse;
+use std::collections::HashMap;
 
 impl<S: IssueStore> CommandExecutor<S> {
     /// Check a single gate for an issue
@@ -226,16 +227,17 @@ impl<S: IssueStore> CommandExecutor<S> {
         }))
     }
 
-    /// Check all automated gates for an issue
+    /// Return the most recent recorded run for each automated gate on an issue.
     ///
-    /// Returns the results of all automated gate checks and any warnings.
-    pub fn check_all_gates(&self, issue_id: &str) -> Result<(Vec<GateRunResult>, Vec<String>)> {
+    /// Results are ordered by gate priority, preserving insertion order for ties.
+    /// The second vector contains automated gate keys that have not been run yet.
+    pub fn get_last_gate_runs_for_issue(
+        &self,
+        issue_id: &str,
+    ) -> Result<(Vec<GateRunResult>, Vec<String>)> {
         let full_id = self.storage.resolve_issue_id(issue_id)?;
         let issue = self.storage.load_issue(&full_id)?;
         let registry = self.storage.load_gate_registry()?;
-
-        let mut results = Vec::new();
-        let mut warnings = Vec::new();
 
         // Collect auto gates and sort by priority (stable sort preserves insertion order for ties)
         let mut auto_gates: Vec<_> = issue
@@ -246,17 +248,36 @@ impl<S: IssueStore> CommandExecutor<S> {
             .collect();
         auto_gates.sort_by_key(|(_, gate)| gate.priority);
 
-        for (gate_key, _) in auto_gates {
-            match self.check_gate(&full_id, gate_key) {
-                Ok(result) => results.push(result),
-                Err(e) => {
-                    // Log error but continue checking other gates
-                    warnings.push(format!("Failed to check gate '{}': {}", gate_key, e));
-                }
-            }
-        }
+        let latest_runs = self
+            .storage
+            .list_gate_runs_for_issue(&full_id)?
+            .into_iter()
+            .fold(
+                HashMap::<String, GateRunResult>::new(),
+                |mut latest_runs, run| {
+                    match latest_runs.get(&run.gate_key) {
+                        Some(existing) if existing.started_at >= run.started_at => {}
+                        _ => {
+                            latest_runs.insert(run.gate_key.clone(), run);
+                        }
+                    }
+                    latest_runs
+                },
+            );
 
-        Ok((results, warnings))
+        let (results, not_run) = auto_gates.into_iter().fold(
+            (Vec::new(), Vec::new()),
+            |(mut results, mut not_run), (gate_key, _)| {
+                if let Some(result) = latest_runs.get(gate_key).cloned() {
+                    results.push(result);
+                } else {
+                    not_run.push(gate_key.clone());
+                }
+                (results, not_run)
+            },
+        );
+
+        Ok((results, not_run))
     }
 
     /// Run all prechecks for an issue
@@ -518,7 +539,7 @@ enforce_leases = "off"
     }
 
     #[test]
-    fn test_check_all_gates_for_issue() {
+    fn test_get_last_gate_runs_for_issue() {
         let executor = setup();
 
         // Define two automated gates
@@ -558,11 +579,41 @@ enforce_leases = "off"
         executor.add_gate(&issue_id, "gate-1".to_string()).unwrap();
         executor.add_gate(&issue_id, "gate-2".to_string()).unwrap();
 
-        // Check all gates
-        let (results, _warnings) = executor.check_all_gates(&issue_id).unwrap();
+        executor.check_gate(&issue_id, "gate-1").unwrap();
+        executor.check_gate(&issue_id, "gate-2").unwrap();
+
+        let (results, warnings) = executor.get_last_gate_runs_for_issue(&issue_id).unwrap();
 
         assert_eq!(results.len(), 2);
         assert!(results.iter().all(|r| r.status == GateRunStatus::Passed));
+        assert!(warnings.is_empty());
+    }
+
+    #[test]
+    fn test_get_last_gate_runs_for_issue_reports_not_run_gates() {
+        let executor = setup();
+
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        for key in ["gate-1", "gate-2"] {
+            registry
+                .gates
+                .insert(key.to_string(), make_auto_gate(key, "exit 0"));
+        }
+        executor.storage.save_gate_registry(&registry).unwrap();
+
+        let issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(issue).unwrap();
+        executor.add_gate(&issue_id, "gate-1".to_string()).unwrap();
+        executor.add_gate(&issue_id, "gate-2".to_string()).unwrap();
+
+        executor.check_gate(&issue_id, "gate-1").unwrap();
+
+        let (results, not_run) = executor.get_last_gate_runs_for_issue(&issue_id).unwrap();
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].gate_key, "gate-1");
+        assert_eq!(not_run, vec!["gate-2".to_string()]);
     }
 
     #[test]
@@ -1286,7 +1337,11 @@ enforce_leases = "off"
             .add_gate(&issue_id, "gate-p20".to_string())
             .unwrap();
 
-        let (results, _) = executor.check_all_gates(&issue_id).unwrap();
+        executor.check_gate(&issue_id, "gate-p30").unwrap();
+        executor.check_gate(&issue_id, "gate-p10").unwrap();
+        executor.check_gate(&issue_id, "gate-p20").unwrap();
+
+        let (results, _) = executor.get_last_gate_runs_for_issue(&issue_id).unwrap();
 
         // Results should arrive in priority order: 10, 20, 30
         assert_eq!(results.len(), 3);
@@ -1337,7 +1392,11 @@ enforce_leases = "off"
         executor.add_gate(&issue_id, "beta".to_string()).unwrap();
         executor.add_gate(&issue_id, "gamma".to_string()).unwrap();
 
-        let (results, _) = executor.check_all_gates(&issue_id).unwrap();
+        executor.check_gate(&issue_id, "alpha").unwrap();
+        executor.check_gate(&issue_id, "beta").unwrap();
+        executor.check_gate(&issue_id, "gamma").unwrap();
+
+        let (results, _) = executor.get_last_gate_runs_for_issue(&issue_id).unwrap();
 
         // Same-priority gates should maintain insertion order
         assert_eq!(results.len(), 3);

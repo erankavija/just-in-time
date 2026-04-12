@@ -529,15 +529,15 @@ if [ -z "$ISSUE_ID" ]; then
   exit 0
 fi
 
-# Run all automated gates
+# Inspect recorded automated gate runs
 jit gate check-all $ISSUE_ID --json > gate-results.json
 
-# Check if all passed
-FAILED=$(jq -r '[.[] | select(.status == "failed")] | length' gate-results.json)
+# Check if any recorded run failed
+FAILED=$(jq -r '[.results[] | select(.status == "failed")] | length' gate-results.json)
 
 if [ "$FAILED" -gt 0 ]; then
   echo "❌ $FAILED gate(s) failed"
-  jq -r '.[] | select(.status == "failed") | "  - \(.gate_key): \(.error)"' gate-results.json
+  jq -r '.results[] | select(.status == "failed") | "  - \(.gate_key): \(.stderr // .stdout)"' gate-results.json
   exit 1
 else
   echo "✅ All gates passed"

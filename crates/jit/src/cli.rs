@@ -636,7 +636,7 @@ pub enum GateCommands {
         json: bool,
     },
 
-    /// Check all automated gates for an issue
+    /// Show the last run result for all automated gates on an issue (inspection only, non-mutating)
     CheckAll {
         /// Issue ID
         id: String,

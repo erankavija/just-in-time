@@ -333,12 +333,11 @@ jit issue show abc12
 jit query available --quiet  # Only IDs, one per line
 ```
 
-**3. Progress indicators for long operations**
+**3. Readable summaries for recorded gate runs**
 ```bash
 jit gate check-all $ISSUE
-Running tests... ✓
-Running clippy... ✓
-All gates passed
+Gate 'tests' last run: passed (exit code: 0)
+Gate 'clippy' last run: failed (exit code: 1)
 ```
 
 **4. Colored output for terminals**

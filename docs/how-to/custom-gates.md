@@ -49,10 +49,10 @@ jit gate define tests \
 jit gate add $ISSUE tests
 
 # Run the checker
-jit gate check $ISSUE tests
-# ✓ tests passed (exit code 0)
+jit gate pass $ISSUE tests
+# ✓ Gate 'tests' passed
 
-# Or check all gates at once
+# Inspect the most recent recorded gate runs
 jit gate check-all $ISSUE
 ```
 

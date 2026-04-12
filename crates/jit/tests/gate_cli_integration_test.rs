@@ -65,6 +65,59 @@ fn setup_auto_gate_issue(checker_command: &str) -> (TempDir, String) {
     (temp, issue_id)
 }
 
+/// Define multiple auto gates and create an issue that requires all of them.
+/// Returns (TempDir, issue_id_short).
+fn setup_multi_auto_gate_issue(gates: &[(&str, &str)]) -> (TempDir, String) {
+    let temp = setup_repo();
+
+    for (gate_key, checker_command) in gates {
+        Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+            .current_dir(temp.path())
+            .args([
+                "gate",
+                "define",
+                gate_key,
+                "--title",
+                gate_key,
+                "--description",
+                "Test",
+                "--mode",
+                "auto",
+                "--checker-command",
+                checker_command,
+                "--timeout",
+                "10",
+            ])
+            .assert()
+            .success();
+    }
+
+    let mut issue_args = vec!["issue", "create", "--title", "Test issue"];
+    for (gate_key, _) in gates {
+        issue_args.push("--gate");
+        issue_args.push(gate_key);
+    }
+
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(&issue_args)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let output_str = String::from_utf8_lossy(&output);
+    let issue_id = output_str
+        .lines()
+        .find(|l| l.contains("Created issue:"))
+        .unwrap()
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+    (temp, issue_id)
+}
+
 #[test]
 fn test_gate_check_no_prior_runs_shows_not_run_message() {
     let (temp, issue_id) = setup_auto_gate_issue("exit 0");
@@ -529,64 +582,103 @@ fn test_gate_check_single() {
 
 #[test]
 fn test_gate_check_all() {
-    let temp = setup_repo();
+    let (temp, issue_id) = setup_multi_auto_gate_issue(&[
+        ("gate-1", "printf gate-1-out && exit 0"),
+        ("gate-2", "printf gate-2-out && exit 0"),
+    ]);
 
-    // Define two automated gates
-    for gate_name in &["gate-1", "gate-2"] {
-        let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
-        cmd.current_dir(temp.path())
-            .args([
-                "gate",
-                "define",
-                gate_name,
-                "--title",
-                gate_name,
-                "--description",
-                "Test",
-                "--mode",
-                "auto",
-                "--checker-command",
-                "exit 0",
-            ])
-            .assert()
-            .success();
-    }
-
-    // Create an issue with both gates
-    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
-    let output = cmd
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args([
-            "issue",
-            "create",
-            "--title",
-            "Test issue",
-            "--gate",
-            "gate-1,gate-2",
-        ])
+        .args(["gate", "pass", &issue_id, "gate-1"])
+        .assert()
+        .success();
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["gate", "pass", &issue_id, "gate-2"])
+        .assert()
+        .success();
+
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["gate", "check-all", &issue_id])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Gate 'gate-1' last run: passed"))
+        .stdout(predicate::str::contains("Gate 'gate-2' last run: passed"))
+        .stdout(predicate::str::contains("gate-1-out"))
+        .stdout(predicate::str::contains("gate-2-out"));
+}
+
+#[test]
+fn test_gate_check_all_no_prior_runs_is_non_mutating() {
+    let (temp, issue_id) =
+        setup_multi_auto_gate_issue(&[("gate-1", "exit 0"), ("gate-2", "exit 0")]);
+
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["gate", "check-all", &issue_id])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("gate-1"))
+        .stdout(predicate::str::contains("not been run yet"))
+        .stdout(predicate::str::contains("gate-2"));
+
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["issue", "show", &issue_id, "--json"])
         .assert()
         .success()
         .get_output()
         .stdout
         .clone();
 
-    let output_str = String::from_utf8_lossy(&output);
-    let issue_id = output_str
-        .lines()
-        .find(|l| l.contains("Created issue:"))
-        .unwrap()
-        .split_whitespace()
-        .last()
-        .unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    for gate_key in ["gate-1", "gate-2"] {
+        let gate_status = json["gates_status"][gate_key]["status"]
+            .as_str()
+            .unwrap_or("Pending");
+        assert!(
+            gate_status == "Pending" || gate_status == "pending",
+            "Expected Pending for {gate_key}, got: {gate_status}"
+        );
+    }
+}
 
-    // Check all gates
-    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
-    cmd.current_dir(temp.path())
-        .args(["gate", "check-all", issue_id])
+#[test]
+fn test_gate_check_all_json_output_reports_not_run_gates() {
+    let (temp, issue_id) = setup_multi_auto_gate_issue(&[
+        ("gate-1", "printf gate-1-out && exit 0"),
+        ("gate-2", "printf gate-2-out && exit 0"),
+    ]);
+
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["gate", "pass", &issue_id, "gate-1"])
+        .assert()
+        .success();
+
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["gate", "check-all", &issue_id, "--json"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("gate-1"))
-        .stdout(predicate::str::contains("gate-2"));
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    assert_eq!(json["total"].as_u64(), Some(2));
+    assert_eq!(json["passed"].as_u64(), Some(1));
+    assert_eq!(json["results"].as_array().map(Vec::len), Some(1));
+    assert_eq!(
+        json["results"][0]["gate_key"].as_str(),
+        Some("gate-1"),
+        "Expected only gate-1 to have a recorded run"
+    );
+    assert_eq!(
+        json["not_run"].as_array().and_then(|items| items.first()),
+        Some(&serde_json::Value::String("gate-2".to_string()))
+    );
 }
 
 #[test]

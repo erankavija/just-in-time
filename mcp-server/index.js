@@ -55,7 +55,7 @@ Common workflows:
 2. Claim issue: jit_issue_claim or jit_claim_acquire  
 3. Check details: jit_issue_show (includes labels, gates, documents)
 4. Check dependencies: jit_graph_deps (what blocks this issue)
-5. Run gates: jit_gate_check-all
+5. Inspect gate runs: jit_gate_check-all
 6. Complete: jit_issue_update with state=done
 
 Tips:
