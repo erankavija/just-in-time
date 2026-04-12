@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, type ComponentProps } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import remarkGfm from 'remark-gfm';
@@ -11,6 +11,61 @@ import { apiClient } from '../../api/client';
 import type { Issue, DocumentReference, GateState, GateDefinition, GateRunSummary, GateRunDetail } from '../../types/models';
 import { DocumentViewer } from '../Document/DocumentViewer';
 import { LabelBadge } from '../Labels/LabelBadge';
+import { MermaidDiagram } from '../MermaidDiagram';
+
+// Stable module-level constants so ReactMarkdown never sees new references on re-render,
+// which would unmount/remount MermaidDiagram and cause diagram flashing.
+const REMARK_PLUGINS = [remarkMath, remarkGfm];
+const REHYPE_PLUGINS = [rehypeKatex];
+const MD_COMPONENTS: ComponentProps<typeof ReactMarkdown>['components'] = {
+  code({ className, children, ...props }) {
+    const match = /language-(\w+)/.exec(className || '');
+    const isInline = !className;
+    if (match?.[1] === 'mermaid') {
+      return <MermaidDiagram code={String(children).replace(/\n$/, '')} />;
+    }
+    if (isInline) {
+      return (
+        <code className={className} {...props} style={{
+          backgroundColor: 'var(--bg-secondary)',
+          padding: '2px 6px',
+          borderRadius: '3px',
+          fontSize: '0.9em',
+          fontFamily: 'var(--font-mono)',
+        }}>
+          {children}
+        </code>
+      );
+    }
+    // Note: Type assertions needed due to react-syntax-highlighter v16 type definitions
+    return match ? (
+      <SyntaxHighlighter
+        {...({
+          style: vscDarkPlus,
+          language: match[1],
+          PreTag: 'div',
+          customStyle: {
+            margin: '1em 0',
+            borderRadius: '6px',
+            fontSize: '13px',
+          },
+          children: String(children).replace(/\n$/, ''),
+        } as React.ComponentProps<typeof SyntaxHighlighter>)}
+      />
+    ) : (
+      <code className={className} {...props} style={{
+        display: 'block',
+        backgroundColor: 'var(--bg-secondary)',
+        padding: '12px',
+        borderRadius: '6px',
+        fontFamily: 'var(--font-mono)',
+        fontSize: '13px',
+      }}>
+        {children}
+      </code>
+    );
+  },
+};
 
 function timeAgo(dateStr: string): string {
   const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
@@ -346,54 +401,9 @@ export function IssueDetail({ issueId, allIssues = [], onNavigate, onFocusInGrap
           }}
         >
           <ReactMarkdown
-            remarkPlugins={[remarkMath, remarkGfm]}
-            rehypePlugins={[rehypeKatex]}
-            components={{
-              code({ className, children, ...props }) {
-                const match = /language-(\w+)/.exec(className || '');
-                const isInline = !className;
-                if (isInline) {
-                  return (
-                    <code className={className} {...props} style={{
-                      backgroundColor: 'var(--bg-secondary)',
-                      padding: '2px 6px',
-                      borderRadius: '3px',
-                      fontSize: '0.9em',
-                      fontFamily: 'var(--font-mono)',
-                    }}>
-                      {children}
-                    </code>
-                  );
-                }
-                // Note: Type assertions needed due to react-syntax-highlighter v16 type definitions
-                return match ? (
-                  <SyntaxHighlighter
-                    {...({
-                      style: vscDarkPlus,
-                      language: match[1],
-                      PreTag: 'div',
-                      customStyle: {
-                        margin: '1em 0',
-                        borderRadius: '6px',
-                        fontSize: '13px',
-                      },
-                      children: String(children).replace(/\n$/, ''),
-                    } as React.ComponentProps<typeof SyntaxHighlighter>)}
-                  />
-                ) : (
-                  <code className={className} {...props} style={{
-                    display: 'block',
-                    backgroundColor: 'var(--bg-secondary)',
-                    padding: '12px',
-                    borderRadius: '6px',
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: '13px',
-                  }}>
-                    {children}
-                  </code>
-                );
-              },
-            }}
+            remarkPlugins={REMARK_PLUGINS}
+            rehypePlugins={REHYPE_PLUGINS}
+            components={MD_COMPONENTS}
           >
             {issue.description}
           </ReactMarkdown>
