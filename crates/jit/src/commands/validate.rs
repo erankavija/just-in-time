@@ -279,6 +279,24 @@ impl<S: IssueStore> CommandExecutor<S> {
     fn validate_labels(&self, issues: &[Issue]) -> Result<()> {
         let namespaces = self.config_manager.get_namespaces()?;
 
+        // Pre-compile regex patterns once per validate run; a bad pattern is a
+        // config error and surfaces with the namespace name for debuggability.
+        let mut compiled_patterns: std::collections::HashMap<String, regex::Regex> =
+            std::collections::HashMap::new();
+        for (name, ns_config) in &namespaces.namespaces {
+            if let Some(pattern) = &ns_config.pattern {
+                let re = regex::Regex::new(pattern).map_err(|e| {
+                    anyhow!(
+                        "Invalid regex pattern for namespace '{}': {} (pattern: {:?})",
+                        name,
+                        e,
+                        pattern
+                    )
+                })?;
+                compiled_patterns.insert(name.clone(), re);
+            }
+        }
+
         for issue in issues {
             // Check label format
             for label in &issue.labels {
@@ -290,12 +308,16 @@ impl<S: IssueStore> CommandExecutor<S> {
             for label in &issue.labels {
                 if let Ok((namespace, _)) = label_utils::parse_label(label) {
                     if !namespaces.namespaces.contains_key(&namespace) {
+                        let hint = closest_namespace(&namespace, namespaces.namespaces.keys())
+                            .map(|s| format!(" Did you mean '{}'?", s))
+                            .unwrap_or_default();
                         return Err(anyhow!(
                             "Issue '{}' has label with unknown namespace '{}'. \
-                             Label: '{}'. Available namespaces: {}",
+                             Label: '{}'.{} Available namespaces: {}",
                             issue.id,
                             namespace,
                             label,
+                            hint,
                             namespaces
                                 .namespaces
                                 .keys()
@@ -303,6 +325,40 @@ impl<S: IssueStore> CommandExecutor<S> {
                                 .collect::<Vec<_>>()
                                 .join(", ")
                         ));
+                    }
+                }
+            }
+
+            // Check value-level constraints (enum + regex)
+            for label in &issue.labels {
+                if let Ok((namespace, value)) = label_utils::parse_label(label) {
+                    if let Some(ns_config) = namespaces.namespaces.get(&namespace) {
+                        if let Some(allowed) = &ns_config.values {
+                            if !allowed.iter().any(|v| v == &value) {
+                                return Err(anyhow!(
+                                    "Issue '{}' label '{}' has value '{}' not in allowed \
+                                     set for namespace '{}'. Allowed: {}",
+                                    issue.id,
+                                    label,
+                                    value,
+                                    namespace,
+                                    allowed.join(", ")
+                                ));
+                            }
+                        }
+                        if let Some(re) = compiled_patterns.get(&namespace) {
+                            if !re.is_match(&value) {
+                                return Err(anyhow!(
+                                    "Issue '{}' label '{}' value '{}' does not match \
+                                     pattern {:?} for namespace '{}'",
+                                    issue.id,
+                                    label,
+                                    value,
+                                    ns_config.pattern.as_deref().unwrap_or(""),
+                                    namespace
+                                ));
+                            }
+                        }
                     }
                 }
             }
@@ -325,6 +381,25 @@ impl<S: IssueStore> CommandExecutor<S> {
                             unique_namespaces_seen.insert(namespace, label.clone());
                         }
                     }
+                }
+            }
+
+            // Check required-namespace constraints.
+            for (name, ns_config) in &namespaces.namespaces {
+                if !ns_config.is_required() {
+                    continue;
+                }
+                let has_any = issue.labels.iter().any(|l| {
+                    label_utils::parse_label(l)
+                        .map(|(ns, _)| &ns == name)
+                        .unwrap_or(false)
+                });
+                if !has_any {
+                    return Err(anyhow!(
+                        "Issue '{}' is missing a required label from namespace '{}'",
+                        issue.id,
+                        name
+                    ));
                 }
             }
         }
@@ -930,6 +1005,44 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 }
 
+/// Find the closest match for an unregistered namespace among known ones.
+/// Returns a suggestion only if it's genuinely close (edit distance ≤ 2 or
+/// a shared 4-char prefix); otherwise None so callers can stay silent.
+fn closest_namespace<'a, I: IntoIterator<Item = &'a String>>(
+    unknown: &str,
+    known: I,
+) -> Option<String> {
+    let mut best: Option<(usize, &str)> = None;
+    for candidate in known {
+        let d = edit_distance(unknown, candidate);
+        let prefix_match =
+            unknown.len() >= 4 && candidate.len() >= 4 && unknown[..4] == candidate[..4];
+        let score = if prefix_match { d.min(2) } else { d };
+        if score <= 2 && best.map(|(b, _)| score < b).unwrap_or(true) {
+            best = Some((score, candidate.as_str()));
+        }
+    }
+    best.map(|(_, s)| s.to_string())
+}
+
+/// Damerau-Levenshtein-ish edit distance (insert/delete/substitute).
+/// Small strings only — we don't care about performance here.
+fn edit_distance(a: &str, b: &str) -> usize {
+    let a: Vec<char> = a.chars().collect();
+    let b: Vec<char> = b.chars().collect();
+    let mut prev: Vec<usize> = (0..=b.len()).collect();
+    let mut curr: Vec<usize> = vec![0; b.len() + 1];
+    for i in 1..=a.len() {
+        curr[0] = i;
+        for j in 1..=b.len() {
+            let cost = if a[i - 1] == b[j - 1] { 0 } else { 1 };
+            curr[j] = (prev[j] + 1).min(curr[j - 1] + 1).min(prev[j - 1] + cost);
+        }
+        std::mem::swap(&mut prev, &mut curr);
+    }
+    prev[b.len()]
+}
+
 /// Format duration in human-readable form
 fn format_duration(duration: chrono::Duration) -> String {
     let secs = duration.num_seconds();
@@ -1111,5 +1224,37 @@ mod tests {
         assert_eq!(format_duration(Duration::seconds(90000)), "1 day");
         assert_eq!(format_duration(Duration::seconds(172800)), "2 days");
         assert_eq!(format_duration(Duration::seconds(604800)), "7 days");
+    }
+
+    #[test]
+    fn test_edit_distance_basic() {
+        assert_eq!(edit_distance("type", "type"), 0);
+        assert_eq!(edit_distance("type", "typ"), 1);
+        assert_eq!(edit_distance("type", "types"), 1);
+        assert_eq!(edit_distance("type", "typo"), 1);
+        assert!(edit_distance("type", "component") >= 5);
+    }
+
+    #[test]
+    fn test_closest_namespace_finds_near_match() {
+        let known: Vec<String> = ["type", "component", "milestone"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        assert_eq!(closest_namespace("typ", &known), Some("type".to_string()));
+        assert_eq!(closest_namespace("typo", &known), Some("type".to_string()));
+        assert_eq!(
+            closest_namespace("component-", &known),
+            Some("component".to_string())
+        );
+    }
+
+    #[test]
+    fn test_closest_namespace_ignores_distant_match() {
+        let known: Vec<String> = ["type", "component"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        assert_eq!(closest_namespace("xyz", &known), None);
     }
 }

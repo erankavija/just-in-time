@@ -147,6 +147,15 @@ pub struct NamespaceConfig {
     pub unique: bool,
     /// Example labels (optional, for documentation).
     pub examples: Option<Vec<String>>,
+    /// Allowed values for the value portion of the label. When set, `jit validate`
+    /// rejects labels whose value is not in this list (free-form otherwise).
+    pub values: Option<Vec<String>>,
+    /// Optional regex applied to the value portion of the label. Compiled and
+    /// checked by `jit validate`; a malformed pattern surfaces as a validation error.
+    pub pattern: Option<String>,
+    /// If true, every issue must carry at least one label from this namespace
+    /// (generalizes the legacy `validation.require_type_label` flag).
+    pub required: Option<bool>,
 }
 
 /// Worktree and parallel work configuration.

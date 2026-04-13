@@ -2753,6 +2753,7 @@ fn run() -> Result<()> {
         Commands::Config(config_cmd) => match config_cmd {
             jit::cli::ConfigCommands::Show { json } => {
                 use jit::config::ConfigLoader;
+                use jit::config_manager::ConfigManager;
                 use jit::output::JsonOutput;
                 use serde_json::json;
 
@@ -2779,6 +2780,21 @@ fn run() -> Result<()> {
                 let config = loader.build();
 
                 if json {
+                    // Namespace registry is sourced from repo-level config.toml
+                    // (same path the server's /config/namespaces endpoint uses,
+                    // so MCP/web consumers see a single canonical shape).
+                    let namespaces_json = ConfigManager::new(&jit_dir)
+                        .get_namespaces()
+                        .ok()
+                        .map(|ns| {
+                            let mut map = serde_json::Map::new();
+                            for (name, cfg) in ns.namespaces {
+                                map.insert(name, serde_json::to_value(cfg).unwrap_or(json!({})));
+                            }
+                            serde_json::Value::Object(map)
+                        })
+                        .unwrap_or_else(|| json!({}));
+
                     let output = json!({
                         "worktree": {
                             "mode": format!("{:?}", config.worktree_mode().unwrap_or(jit::config::WorktreeMode::Auto)).to_lowercase(),
@@ -2805,6 +2821,7 @@ fn run() -> Result<()> {
                             "enable_sequences": config.events().enable_sequences(),
                             "use_unified_envelope": config.events().use_unified_envelope(),
                         },
+                        "namespaces": namespaces_json,
                     });
                     println!(
                         "{}",

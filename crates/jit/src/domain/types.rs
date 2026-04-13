@@ -1596,6 +1596,15 @@ pub struct LabelNamespace {
     pub description: String,
     /// Whether only one label from this namespace can be applied per issue
     pub unique: bool,
+    /// Optional allowed-value enum for the value portion of the label.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub values: Option<Vec<String>>,
+    /// Optional regex applied to the value portion of the label (validated at check time).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pattern: Option<String>,
+    /// If true, every issue must carry at least one label from this namespace.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub required: Option<bool>,
 }
 
 impl LabelNamespace {
@@ -1604,7 +1613,33 @@ impl LabelNamespace {
         Self {
             description: description.into(),
             unique,
+            values: None,
+            pattern: None,
+            required: None,
         }
+    }
+
+    /// Set the allowed-value enum.
+    pub fn with_values(mut self, values: Vec<String>) -> Self {
+        self.values = Some(values);
+        self
+    }
+
+    /// Set the value-portion regex.
+    pub fn with_pattern(mut self, pattern: impl Into<String>) -> Self {
+        self.pattern = Some(pattern.into());
+        self
+    }
+
+    /// Mark the namespace as required on every issue.
+    pub fn required(mut self, required: bool) -> Self {
+        self.required = Some(required);
+        self
+    }
+
+    /// Whether this namespace is required on every issue.
+    pub fn is_required(&self) -> bool {
+        self.required.unwrap_or(false)
     }
 }
 

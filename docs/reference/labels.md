@@ -173,8 +173,37 @@ Store in `.jit/label-namespaces.json`:
 
 ### Namespace Properties
 
-- **unique**: If true, issue can only have ONE label from this namespace
-- **required_for_strategic_view**: If true, this namespace defines strategic issues
+Declared in `.jit/config.toml` under `[namespaces.<name>]`:
+
+- **description** (string, required): Human-readable purpose, shown by `jit config show` and the web UI.
+- **unique** (bool, required): If true, an issue can carry at most one label from this namespace.
+- **required** (bool, optional): If true, every issue must carry at least one label from this namespace. Generalizes the legacy `validation.require_type_label` flag — prefer `required = true` on the specific namespace.
+- **values** (list of string, optional): Allowed values for the value portion of the label. When set, `jit validate` rejects any label whose value is not in the list. Omit for free-form content.
+- **pattern** (string, optional): Regex applied to the value portion (PCRE-compatible via the `regex` crate). An invalid pattern surfaces as a config error at `jit validate` time. `values` and `pattern` may be combined — both are checked.
+- **examples** (list of string, optional): Documentation-only examples; not enforced.
+- **required_for_strategic_view** (bool, optional): Marks this namespace as defining strategic issues (used by `jit query strategic`).
+
+Enforcement flags (in `[validation]`):
+
+- **reject_malformed_labels** — hard-reject labels that don't match the `namespace:value` format. New repos default to `true`; existing repos keep whatever they have written.
+- **enforce_namespace_registry** — hard-reject labels whose namespace isn't declared under `[namespaces.*]`. New repos default to `true`.
+
+Example combining all constraints:
+
+```toml
+[namespaces.type]
+description = "Issue type (hierarchical). Exactly one per issue."
+unique = true
+required = true
+values = ["epic", "story", "task", "bug", "spike", "chore", "milestone"]
+
+[namespaces.milestone]
+description = "Release milestone membership."
+unique = false
+pattern = '^v\d+\.\d+(\.\d+)?$'
+```
+
+When `jit validate` reports an unregistered namespace, it suggests the closest registered one (for example `typo` → `type`) using edit distance, so typos are caught without the author having to re-read the registry.
 
 ### Standard Work Item Types
 

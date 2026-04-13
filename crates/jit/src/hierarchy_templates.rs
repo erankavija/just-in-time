@@ -111,37 +111,64 @@ strictness = "loose"
 # Auto-assign this type when creating issues without a type:* label.
 default_type = "task"
 
-# Require exactly one type:* label per issue.
-require_type_label = false
-
 # Warning toggles (both enabled by default; set to false to silence):
 # warn_orphaned_leaves = true       # tasks that carry no parent epic/story label
 # warn_strategic_consistency = true # hierarchy inconsistencies across issues
 
-# Label format enforcement (default: warn only):
+# Label semantics — new repos start strict so convention drift is caught early.
+# Set either flag to false if you want looser enforcement during onboarding.
+reject_malformed_labels = true      # block labels that violate namespace:value format
+enforce_namespace_registry = true   # reject labels whose namespace isn't declared below
+
+# Legacy flag; prefer `required = true` on individual namespaces (see [namespaces.type]).
+# require_type_label = false
 # label_regex = '^[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9._-]*$'
-# reject_malformed_labels = false   # set true to block instead of warn
-# enforce_namespace_registry = false # set true to reject undeclared namespaces
 
 # =============================================================================
-# NAMESPACE REGISTRY (optional)
+# NAMESPACE REGISTRY
 # =============================================================================
-# Define label namespaces for documentation and optional enforcement.
+# Declare label namespaces here. Each namespace supports:
+#   description — human-readable purpose (required)
+#   unique      — at most one label from this namespace per issue (required)
+#   examples    — documentation only, not enforced
+#   values      — optional allowed-value enum; free-form if omitted
+#   pattern     — optional regex over the value portion (checked by `jit validate`)
+#   required    — optional; when true every issue must carry a label from this namespace
 
 [namespaces.type]
 description = "Issue type (hierarchical). Exactly one per issue."
 unique = true
-examples = ["type:task", "type:story", "type:epic", "type:milestone"]
+required = true
+values = ["epic", "story", "task", "bug", "spike", "chore", "milestone"]
+examples = ["type:task", "type:story", "type:epic"]
 
 [namespaces.component]
 description = "Technical area or subsystem affected."
 unique = false
 examples = ["component:backend", "component:frontend", "component:cli"]
 
+[namespaces.priority]
+description = "Work priority. Orthogonal to issue priority field; used for filtering."
+unique = true
+values = ["critical", "high", "normal", "low"]
+examples = ["priority:high", "priority:low"]
+
+[namespaces.team]
+description = "Owning team."
+unique = true
+examples = ["team:backend", "team:platform"]
+
+[namespaces.milestone]
+description = "Release milestone membership (version tag)."
+unique = false
+pattern = '^v\d+\.\d+(\.\d+)?(-[a-zA-Z0-9.-]+)?$'
+examples = ["milestone:v1.0", "milestone:v1.2.3", "milestone:v2.0-rc1"]
+
 [namespaces.resolution]
 description = "Reason for issue closure (used with rejected state)."
 unique = true
-examples = ["resolution:wont-fix", "resolution:duplicate", "resolution:obsolete"]
+values = ["wont-fix", "duplicate", "obsolete", "invalid"]
+examples = ["resolution:wont-fix", "resolution:duplicate"]
 
 # =============================================================================
 # ADVANCED (uncomment to enable)
@@ -345,5 +372,37 @@ mod tests {
     #[test]
     fn test_get_nonexistent_template() {
         assert!(HierarchyTemplate::get("nonexistent").is_none());
+    }
+
+    #[test]
+    fn test_generated_config_has_strict_label_defaults() {
+        let toml = HierarchyTemplate::default().generate_config_toml();
+        assert!(toml.contains("reject_malformed_labels = true"));
+        assert!(toml.contains("enforce_namespace_registry = true"));
+    }
+
+    #[test]
+    fn test_generated_config_seeds_namespace_constraints() {
+        let toml = HierarchyTemplate::default().generate_config_toml();
+        // type namespace declares enum + required
+        assert!(toml.contains("[namespaces.type]"));
+        assert!(toml.contains("required = true"));
+        assert!(toml.contains(
+            r#"values = ["epic", "story", "task", "bug", "spike", "chore", "milestone"]"#
+        ));
+        // milestone declares a version pattern
+        assert!(toml.contains("[namespaces.milestone]"));
+        assert!(toml.contains(r"pattern = '^v\d+\.\d+(\.\d+)?"));
+    }
+
+    #[test]
+    fn test_generated_config_parses_as_valid_toml() {
+        let toml = HierarchyTemplate::default().generate_config_toml();
+        let cfg: crate::config::JitConfig =
+            ::toml::from_str(&toml).expect("generated template must parse");
+        let ns = cfg.namespaces.expect("namespaces block present");
+        let type_ns = ns.get("type").expect("type namespace present");
+        assert_eq!(type_ns.required, Some(true));
+        assert!(type_ns.values.is_some());
     }
 }

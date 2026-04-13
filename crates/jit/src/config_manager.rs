@@ -156,10 +156,11 @@ impl ConfigManager {
     ) -> LabelNamespaces {
         let mut namespaces = HashMap::new();
         for (name, ns_config) in namespaces_config {
-            namespaces.insert(
-                name,
-                LabelNamespace::new(ns_config.description, ns_config.unique),
-            );
+            let mut ns = LabelNamespace::new(ns_config.description, ns_config.unique);
+            ns.values = ns_config.values;
+            ns.pattern = ns_config.pattern;
+            ns.required = ns_config.required;
+            namespaces.insert(name, ns);
         }
 
         let mut result = LabelNamespaces {
@@ -298,6 +299,41 @@ milestone = "milestone"
         // Should return defaults
         assert!(namespaces.namespaces.contains_key("type"));
         assert!(namespaces.namespaces.contains_key("epic"));
+    }
+
+    #[test]
+    fn test_namespace_constraints_propagate() {
+        let temp_dir = setup_test_dir();
+        let jit_dir = temp_dir.path().join(".jit");
+        fs::create_dir(&jit_dir).unwrap();
+
+        let config_toml = r#"
+[namespaces.type]
+description = "Issue type"
+unique = true
+required = true
+values = ["task", "bug", "story"]
+
+[namespaces.milestone]
+description = "Release milestone"
+unique = false
+pattern = '^v\d+\.\d+$'
+"#;
+        fs::write(jit_dir.join("config.toml"), config_toml).unwrap();
+
+        let config_mgr = ConfigManager::new(&jit_dir);
+        let namespaces = config_mgr.get_namespaces().unwrap();
+
+        let type_ns = namespaces.namespaces.get("type").unwrap();
+        assert_eq!(type_ns.required, Some(true));
+        assert_eq!(
+            type_ns.values.as_deref(),
+            Some(&["task".to_string(), "bug".to_string(), "story".to_string()][..])
+        );
+
+        let ms_ns = namespaces.namespaces.get("milestone").unwrap();
+        assert_eq!(ms_ns.pattern.as_deref(), Some(r"^v\d+\.\d+$"));
+        assert!(ms_ns.values.is_none());
     }
 
     #[test]
