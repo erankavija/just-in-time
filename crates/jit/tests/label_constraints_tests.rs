@@ -201,20 +201,9 @@ required = true
 
 #[test]
 fn test_config_show_json_includes_namespace_registry() {
-    let jit_bin = {
-        let manifest_dir = env!("CARGO_MANIFEST_DIR");
-        std::path::Path::new(manifest_dir)
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .join("target/debug/jit")
-    };
-    if !jit_bin.exists() {
-        // Build isn't available in this test run — skip. The harness-level
-        // tests above already exercise the same shaping logic directly.
-        return;
-    }
+    // CARGO_BIN_EXE_jit is set by Cargo for integration tests and guarantees
+    // we're exercising the just-built binary — no silent skip path.
+    let jit_bin = std::path::PathBuf::from(env!("CARGO_BIN_EXE_jit"));
 
     let temp = TempDir::new().unwrap();
     let init = std::process::Command::new(&jit_bin)
