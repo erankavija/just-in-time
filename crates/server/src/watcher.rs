@@ -258,15 +258,22 @@ mod tests {
             std::fs::write(issues_dir.join(format!("{i}.json")), "{}").unwrap();
         }
 
-        // Wait for debounce to settle
-        tokio::time::sleep(Duration::from_millis(500)).await;
-
-        // Version should be much less than 5 due to debouncing
-        let version = tracker.current_version();
-        assert!(
-            version >= 1,
-            "should have at least one notification, got {version}"
-        );
+        // Poll for up to ~5s instead of a fixed sleep — the notify backend
+        // can take noticeably longer under parallel test load, which made
+        // a single 500ms sleep flaky in CI.
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        loop {
+            if tracker.current_version() >= 1 {
+                break;
+            }
+            if std::time::Instant::now() >= deadline {
+                panic!(
+                    "should have at least one notification within 5s, got {}",
+                    tracker.current_version()
+                );
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
     }
 
     // --- is_graph_relevant unit tests ---
