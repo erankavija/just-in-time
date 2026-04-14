@@ -247,20 +247,23 @@ mod tests {
     #[tokio::test]
     async fn test_debounce_coalesces_burst_writes() {
         let tmp = tempfile::tempdir().unwrap();
+        // Create the issues subdirectory *before* start_watching so notify's
+        // recursive inotify registration covers it. Creating it after has
+        // proven racy under parallel test load (the first file writes can
+        // land before inotify sees the new subdir).
+        let issues_dir = tmp.path().join("issues");
+        std::fs::create_dir_all(&issues_dir).unwrap();
         let data_dir = tmp.path().to_str().unwrap();
 
         let (tracker, _watcher) = start_watching(data_dir).unwrap();
 
-        // Write multiple relevant files in rapid succession
-        let issues_dir = tmp.path().join("issues");
-        std::fs::create_dir_all(&issues_dir).unwrap();
+        // Write multiple relevant files in rapid succession.
         for i in 0..5 {
             std::fs::write(issues_dir.join(format!("{i}.json")), "{}").unwrap();
         }
 
         // Poll for up to ~5s instead of a fixed sleep — the notify backend
-        // can take noticeably longer under parallel test load, which made
-        // a single 500ms sleep flaky in CI.
+        // can take noticeably longer under parallel test load.
         let deadline = std::time::Instant::now() + Duration::from_secs(5);
         loop {
             if tracker.current_version() >= 1 {

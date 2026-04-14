@@ -983,6 +983,64 @@ enforce_leases = "off"
     }
 
     #[tokio::test]
+    async fn test_get_namespaces_exposes_values_pattern_required() {
+        use jit::storage::{IssueStore, JsonFileStorage};
+
+        // A file-backed storage with a config.toml that exercises every new
+        // field, so the response contract (mirror of CLI config show --json)
+        // stays protected against drift.
+        let temp = tempfile::tempdir().unwrap();
+        let jit_dir = temp.path().join(".jit");
+        std::fs::create_dir(&jit_dir).unwrap();
+        std::fs::write(
+            jit_dir.join("config.toml"),
+            r#"
+[namespaces.type]
+description = "Issue type"
+unique = true
+required = true
+values = ["task", "bug"]
+
+[namespaces.milestone]
+description = "Release"
+unique = false
+pattern = '^v\d+\.\d+$'
+"#,
+        )
+        .unwrap();
+        let storage = JsonFileStorage::new(&jit_dir);
+        storage.init().unwrap();
+        let executor = Arc::new(CommandExecutor::new(storage));
+        let tracker = Arc::new(ChangeTracker::new(16));
+        let state = AppState {
+            executor,
+            tracker,
+            project_name: "test".to_string(),
+        };
+        let server = TestServer::new(create_routes(state)).unwrap();
+
+        let response = server.get("/config/namespaces").await;
+        response.assert_status_ok();
+        let data: NamespacesResponse = response.json();
+
+        let type_ns = data.namespaces.get("type").expect("type namespace");
+        assert_eq!(type_ns.required, Some(true));
+        assert_eq!(
+            type_ns.values.as_deref(),
+            Some(&["task".to_string(), "bug".to_string()][..])
+        );
+        assert!(type_ns.pattern.is_none());
+
+        let ms_ns = data
+            .namespaces
+            .get("milestone")
+            .expect("milestone namespace");
+        assert_eq!(ms_ns.pattern.as_deref(), Some(r"^v\d+\.\d+$"));
+        assert!(ms_ns.values.is_none());
+        assert!(ms_ns.required.is_none());
+    }
+
+    #[tokio::test]
     async fn test_get_document_by_path_missing_param() {
         let server = create_test_app();
         let response = server.get("/documents").await;
