@@ -118,62 +118,54 @@ jit issue update <id> --label "milestone-v1.0"
 
 ### Core Namespaces (Built-in)
 
-Store in `.jit/label-namespaces.json`:
+Namespaces are declared in `.jit/config.toml` under `[namespaces.<name>]` tables.
+The older `.jit/label-namespaces.json` file is no longer used; `jit init` now
+seeds a starter registry directly in the generated `config.toml`. A fresh repo
+ships with `type`, `component`, `priority`, `team`, `milestone`, and `resolution`
+pre-declared and ready to customize.
 
-```json
-{
-  "schema_version": 1,
-  "namespaces": {
-    "milestone": {
-      "description": "Release or time-bounded goal",
-      "examples": ["milestone:v1.0", "milestone:q1-2026"],
-      "unique": false,
-      "required_for_strategic_view": true
-    },
-    "epic": {
-      "description": "Large feature or initiative",
-      "examples": ["epic:auth", "epic:api"],
-      "unique": false,
-      "required_for_strategic_view": true
-    },
-    "component": {
-      "description": "Technical area or subsystem",
-      "examples": ["component:backend", "component:frontend", "component:infra"],
-      "unique": false,
-      "required_for_strategic_view": false
-    },
-    "type": {
-      "description": "Work item type",
-      "examples": ["type:idea", "type:research", "type:task", "type:epic", "type:milestone", "type:bug", "type:feature"],
-      "unique": true,
-      "required_for_strategic_view": false,
-      "note": "Research tasks are time-boxed investigations (sometimes called 'spikes' in Agile contexts)"
-    },
-    "priority": {
-      "description": "Priority level (supplements built-in priority field)",
-      "examples": ["priority:p0", "priority:p1", "priority:p2"],
-      "unique": true,
-      "required_for_strategic_view": false
-    },
-    "status": {
-      "description": "Additional status markers",
-      "examples": ["status:needs-review", "status:blocked", "status:ready-to-merge"],
-      "unique": true,
-      "required_for_strategic_view": false
-    },
-    "team": {
-      "description": "Owning team or group",
-      "examples": ["team:backend", "team:frontend", "team:platform"],
-      "unique": true,
-      "required_for_strategic_view": false
-    }
-  }
-}
+```toml
+[namespaces.type]
+description = "Issue type (hierarchical). Exactly one per issue."
+unique = true
+required = true
+values = ["epic", "story", "task", "bug", "spike", "chore", "milestone"]
+examples = ["type:task", "type:story", "type:epic"]
+
+[namespaces.priority]
+description = "Work priority (orthogonal to the issue priority field; used for filtering)."
+unique = true
+values = ["critical", "high", "normal", "low"]
+
+[namespaces.milestone]
+description = "Release milestone membership (version tag)."
+unique = false
+pattern = '^v\d+\.\d+(\.\d+)?(-[a-zA-Z0-9.-]+)?$'
+examples = ["milestone:v1.0", "milestone:v1.2.3", "milestone:v2.0-rc1"]
+
+[namespaces.component]
+description = "Technical area or subsystem affected."
+unique = false
+examples = ["component:backend", "component:frontend", "component:cli"]
+
+[namespaces.team]
+description = "Owning team."
+unique = true
+examples = ["team:backend", "team:platform"]
+
+[namespaces.resolution]
+description = "Reason for issue closure (used with rejected state)."
+unique = true
+values = ["wont-fix", "duplicate", "obsolete", "invalid"]
 ```
+
+Membership namespaces for parent types (`epic:*`, `story:*`, `milestone:*`
+when used as membership rather than as the version tag) are inferred from
+`[type_hierarchy.label_associations]` and do not need to be redeclared.
 
 ### Namespace Properties
 
-Declared in `.jit/config.toml` under `[namespaces.<name>]`:
+Each `[namespaces.<name>]` table supports these fields:
 
 - **description** (string, required): Human-readable purpose, shown by `jit config show` and the web UI.
 - **unique** (bool, required): If true, an issue can carry at most one label from this namespace.
@@ -181,7 +173,6 @@ Declared in `.jit/config.toml` under `[namespaces.<name>]`:
 - **values** (list of string, optional): Allowed values for the value portion of the label. When set, `jit validate` rejects any label whose value is not in the list. Omit for free-form content.
 - **pattern** (string, optional): Regex applied to the value portion (PCRE-compatible via the `regex` crate). An invalid pattern surfaces as a config error at `jit validate` time. `values` and `pattern` may be combined — both are checked.
 - **examples** (list of string, optional): Documentation-only examples; not enforced.
-- **required_for_strategic_view** (bool, optional): Marks this namespace as defining strategic issues (used by `jit query strategic`).
 
 Enforcement flags (in `[validation]`):
 

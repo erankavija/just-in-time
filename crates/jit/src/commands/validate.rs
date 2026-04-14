@@ -1015,8 +1015,14 @@ fn closest_namespace<'a, I: IntoIterator<Item = &'a String>>(
     let mut best: Option<(usize, &str)> = None;
     for candidate in known {
         let d = edit_distance(unknown, candidate);
-        let prefix_match =
-            unknown.len() >= 4 && candidate.len() >= 4 && unknown[..4] == candidate[..4];
+        // Character-based prefix check — namespace keys can contain non-ASCII,
+        // so byte-slicing would panic mid-codepoint.
+        let prefix_match = unknown.chars().zip(candidate.chars()).take(4).count() == 4
+            && unknown
+                .chars()
+                .zip(candidate.chars())
+                .take(4)
+                .all(|(a, b)| a == b);
         let score = if prefix_match { d.min(2) } else { d };
         if score <= 2 && best.map(|(b, _)| score < b).unwrap_or(true) {
             best = Some((score, candidate.as_str()));
@@ -1256,5 +1262,17 @@ mod tests {
             .map(|s| s.to_string())
             .collect();
         assert_eq!(closest_namespace("xyz", &known), None);
+    }
+
+    #[test]
+    fn test_closest_namespace_handles_non_ascii_safely() {
+        // Regression: namespace keys can be non-ASCII; byte-slicing would have
+        // panicked mid-codepoint. This just needs to not panic.
+        let known: Vec<String> = ["café", "naïve", "type"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        let _ = closest_namespace("cafe", &known);
+        let _ = closest_namespace("typé", &known);
     }
 }

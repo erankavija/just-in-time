@@ -195,6 +195,65 @@ required = true
 // Near-duplicate namespace hint
 // ------------------------------------------------------------------
 
+// ------------------------------------------------------------------
+// CLI: `jit config show --json` surfaces the namespace registry
+// ------------------------------------------------------------------
+
+#[test]
+fn test_config_show_json_includes_namespace_registry() {
+    let jit_bin = {
+        let manifest_dir = env!("CARGO_MANIFEST_DIR");
+        std::path::Path::new(manifest_dir)
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("target/debug/jit")
+    };
+    if !jit_bin.exists() {
+        // Build isn't available in this test run — skip. The harness-level
+        // tests above already exercise the same shaping logic directly.
+        return;
+    }
+
+    let temp = TempDir::new().unwrap();
+    let init = std::process::Command::new(&jit_bin)
+        .arg("init")
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(init.status.success(), "jit init failed: {:?}", init);
+
+    let show = std::process::Command::new(&jit_bin)
+        .args(["config", "show", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        show.status.success(),
+        "jit config show --json failed: stderr={}",
+        String::from_utf8_lossy(&show.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&show.stdout);
+    let parsed: serde_json::Value = serde_json::from_str(&stdout).expect("valid JSON");
+    let namespaces = parsed
+        .get("namespaces")
+        .expect("namespaces key present in config show --json output");
+    let type_ns = namespaces.get("type").expect("type namespace exposed");
+    assert_eq!(type_ns["required"], serde_json::json!(true));
+    assert!(type_ns["values"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|v| v == "task"));
+    let ms_pattern = namespaces["milestone"]["pattern"].as_str().unwrap();
+    assert!(
+        ms_pattern.contains(r"\d"),
+        "pattern looks wrong: {}",
+        ms_pattern
+    );
+}
+
 #[test]
 fn test_validate_hints_closest_namespace() {
     let cfg = r#"

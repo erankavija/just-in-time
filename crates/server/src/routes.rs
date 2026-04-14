@@ -665,6 +665,12 @@ struct NamespacesResponse {
 struct NamespaceInfo {
     description: String,
     unique: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    values: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pattern: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    required: Option<bool>,
 }
 
 /// Get namespace registry from configuration
@@ -689,6 +695,9 @@ async fn get_namespaces<S: IssueStore>(
                 NamespaceInfo {
                     description: ns.description,
                     unique: ns.unique,
+                    values: ns.values,
+                    pattern: ns.pattern,
+                    required: ns.required,
                 },
             )
         })

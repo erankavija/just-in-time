@@ -2783,17 +2783,13 @@ fn run() -> Result<()> {
                     // Namespace registry is sourced from repo-level config.toml
                     // (same path the server's /config/namespaces endpoint uses,
                     // so MCP/web consumers see a single canonical shape).
-                    let namespaces_json = ConfigManager::new(&jit_dir)
-                        .get_namespaces()
-                        .ok()
-                        .map(|ns| {
-                            let mut map = serde_json::Map::new();
-                            for (name, cfg) in ns.namespaces {
-                                map.insert(name, serde_json::to_value(cfg).unwrap_or(json!({})));
-                            }
-                            serde_json::Value::Object(map)
-                        })
-                        .unwrap_or_else(|| json!({}));
+                    // Propagate load errors rather than silently hiding the registry.
+                    let label_namespaces = ConfigManager::new(&jit_dir).get_namespaces()?;
+                    let mut namespaces_map = serde_json::Map::new();
+                    for (name, cfg) in label_namespaces.namespaces {
+                        namespaces_map.insert(name, serde_json::to_value(cfg)?);
+                    }
+                    let namespaces_json = serde_json::Value::Object(namespaces_map);
 
                     let output = json!({
                         "worktree": {
