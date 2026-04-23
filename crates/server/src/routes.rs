@@ -1317,9 +1317,10 @@ pattern = '^v\d+\.\d+$'
             .expect("CSP header must be present")
             .to_str()
             .unwrap();
-        assert!(
-            csp.contains("default-src"),
-            "CSP should contain default-src directive"
+        // Verify the full CSP policy matches the spec-required value.
+        assert_eq!(
+            csp, CSP_HEADER,
+            "CSP header must match the specified policy"
         );
     }
 
@@ -1342,7 +1343,8 @@ pattern = '^v\d+\.\d+$'
         // (e.g. the slashes in the path on Linux/macOS).
         let temp = tempfile::tempdir().unwrap();
         let doc_path = temp.path().join("slide.html");
-        fs::write(&doc_path, "<p>test</p>").unwrap();
+        let html_body = "<p>test</p>";
+        fs::write(&doc_path, html_body).unwrap();
         let path_str = doc_path.to_string_lossy().into_owned();
 
         let server = create_test_app();
@@ -1351,6 +1353,7 @@ pattern = '^v\d+\.\d+$'
             .add_query_param("path", &path_str)
             .await;
         response.assert_status_ok();
+        // Verify Content-Type.
         let ct = response
             .headers()
             .get("content-type")
@@ -1358,11 +1361,16 @@ pattern = '^v\d+\.\d+$'
             .to_str()
             .unwrap();
         assert!(ct.starts_with("text/html"), "expected text/html, got {ct}");
+        // Verify CSP matches the full specified policy.
         let csp = response
             .headers()
             .get("content-security-policy")
-            .expect("CSP header");
-        assert!(!csp.is_empty());
+            .expect("CSP header must be present")
+            .to_str()
+            .unwrap();
+        assert_eq!(csp, CSP_HEADER, "CSP header must match specified policy");
+        // Verify exact body bytes are returned unchanged.
+        assert_eq!(response.text(), html_body);
     }
 
     #[tokio::test]
