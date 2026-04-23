@@ -50,6 +50,82 @@ pub trait DocFormatAdapter {
     }
 }
 
+/// HTML format adapter
+///
+/// Supports HTML files with `.html` and `.htm` extensions.
+/// Extracts asset references from `src` and `href` attributes.
+///
+/// # Supported Syntax
+///
+/// - Script/image tags: `<script src="...">`, `<img src="...">`
+/// - Link tags: `<a href="...">`, `<link href="...">`
+///
+/// # Excluded
+///
+/// - Anchor-only links: `#section`
+/// - Mailto links: `mailto:user@example.com`
+pub struct HtmlAdapter;
+
+impl DocFormatAdapter for HtmlAdapter {
+    fn id(&self) -> &str {
+        "html"
+    }
+
+    fn supports_path(&self, path: &str) -> bool {
+        let path_obj = Path::new(path);
+        if let Some(ext) = path_obj.extension() {
+            let ext_str = ext.to_string_lossy().to_lowercase();
+            ext_str == "html" || ext_str == "htm"
+        } else {
+            false
+        }
+    }
+
+    fn detect(&self, content: &str) -> bool {
+        let trimmed = content.trim_start();
+        trimmed.to_lowercase().starts_with("<!doctype html")
+            || content.to_lowercase().contains("<html")
+    }
+
+    fn scan_assets(&self, content: &str) -> HashSet<String> {
+        use regex::Regex;
+
+        let mut assets = HashSet::new();
+        let re = Regex::new(r#"(?i)(?:src|href)\s*=\s*["']([^"']+)["']"#)
+            .expect("static regex is valid");
+
+        for cap in re.captures_iter(content) {
+            let value = cap[1].trim();
+
+            // Skip anchor-only links
+            if value.starts_with('#') {
+                continue;
+            }
+
+            // Skip mailto links
+            if value.starts_with("mailto:") {
+                continue;
+            }
+
+            // Strip fragment
+            let without_fragment = if let Some(pos) = value.find('#') {
+                &value[..pos]
+            } else {
+                value
+            };
+
+            // Skip empty after stripping
+            if without_fragment.is_empty() {
+                continue;
+            }
+
+            assets.insert(without_fragment.to_string());
+        }
+
+        assets
+    }
+}
+
 /// Registry for managing document format adapters
 ///
 /// Maintains a collection of format adapters and resolves the appropriate
@@ -82,6 +158,7 @@ impl AdapterRegistry {
     pub fn with_builtins() -> Self {
         let mut registry = Self::new();
         registry.register(Box::new(MarkdownAdapter));
+        registry.register(Box::new(HtmlAdapter));
         registry
     }
 
@@ -383,7 +460,7 @@ Another real: [Another](another.md)
     #[test]
     fn test_registry_with_builtins() {
         let registry = AdapterRegistry::with_builtins();
-        assert_eq!(registry.adapters.len(), 1);
+        assert_eq!(registry.adapters.len(), 2);
     }
 
     #[test]
@@ -418,8 +495,130 @@ Another real: [Another](another.md)
     #[test]
     fn test_registry_default() {
         let registry = AdapterRegistry::default();
-        assert_eq!(registry.adapters.len(), 1);
+        assert_eq!(registry.adapters.len(), 2);
         let adapter = registry.resolve("test.md", "").unwrap();
         assert_eq!(adapter.id(), "markdown");
+    }
+}
+
+#[cfg(test)]
+mod html_tests {
+    use super::*;
+
+    #[test]
+    fn test_html_adapter_id_returns_html() {
+        let adapter = HtmlAdapter;
+        assert_eq!(adapter.id(), "html");
+    }
+
+    #[test]
+    fn test_html_adapter_supports_path() {
+        let adapter = HtmlAdapter;
+
+        // Positive cases
+        assert!(adapter.supports_path("foo.html"));
+        assert!(adapter.supports_path("foo.htm"));
+        assert!(adapter.supports_path("FOO.HTML"));
+        assert!(adapter.supports_path("FOO.HTM"));
+        assert!(adapter.supports_path("docs/index.html"));
+        assert!(adapter.supports_path("pages/about.htm"));
+
+        // Negative cases
+        assert!(!adapter.supports_path("foo.md"));
+        assert!(!adapter.supports_path("foo.txt"));
+        assert!(!adapter.supports_path("foo.html.bak"));
+        assert!(!adapter.supports_path("noextension"));
+        assert!(!adapter.supports_path(""));
+    }
+
+    #[test]
+    fn test_html_adapter_detect_doctype() {
+        let adapter = HtmlAdapter;
+
+        // Positive: real DOCTYPE
+        assert!(adapter.detect("<!DOCTYPE html>\n<html>"));
+        // Case-insensitive
+        assert!(adapter.detect("<!doctype HTML>\n<html>"));
+        // Leading whitespace
+        assert!(adapter.detect("  \n<!DOCTYPE html><html>"));
+    }
+
+    #[test]
+    fn test_html_adapter_detect_html_tag() {
+        let adapter = HtmlAdapter;
+
+        // Positive: contains <html without doctype
+        assert!(adapter.detect("<html lang=\"en\">"));
+        assert!(adapter.detect("<HTML>"));
+        assert!(adapter.detect("Some content\n<html>\n</html>"));
+    }
+
+    #[test]
+    fn test_html_adapter_detect_negative() {
+        let adapter = HtmlAdapter;
+
+        assert!(!adapter.detect("Plain text without markup"));
+        assert!(!adapter.detect("# Markdown heading\n\n[link](url)"));
+        assert!(!adapter.detect(""));
+    }
+
+    #[test]
+    fn test_html_adapter_scan_assets_reveal_js() {
+        let adapter = HtmlAdapter;
+        let content = r##"<!DOCTYPE html>
+<html>
+<head>
+  <link rel="stylesheet" href="css/reveal.css">
+  <link rel="stylesheet" href="#slide-1">
+</head>
+<body>
+  <script src="js/reveal.js"></script>
+  <img src="https://example.com/banner.png" alt="Banner">
+</body>
+</html>"##;
+
+        let assets = adapter.scan_assets(content);
+
+        // Stylesheet and external image must be included
+        assert!(assets.contains("css/reveal.css"), "missing reveal.css");
+        assert!(
+            assets.contains("https://example.com/banner.png"),
+            "missing external image"
+        );
+        assert!(assets.contains("js/reveal.js"), "missing reveal.js");
+
+        // Anchor-only href must be excluded
+        assert!(
+            !assets.contains("#slide-1"),
+            "anchor-only link should be excluded"
+        );
+    }
+
+    #[test]
+    fn test_html_adapter_scan_assets_mailto_excluded() {
+        let adapter = HtmlAdapter;
+        let content = r#"<a href="mailto:user@example.com">Contact</a>
+<a href="page.html">Page</a>"#;
+
+        let assets = adapter.scan_assets(content);
+        assert!(!assets.contains("mailto:user@example.com"));
+        assert!(assets.contains("page.html"));
+    }
+
+    #[test]
+    fn test_html_adapter_scan_assets_strips_fragment() {
+        let adapter = HtmlAdapter;
+        let content = r##"<a href="doc.html#section">Doc</a>"##;
+
+        let assets = adapter.scan_assets(content);
+        assert!(assets.contains("doc.html"));
+        assert!(!assets.contains("doc.html#section"));
+    }
+
+    #[test]
+    fn test_adapter_registry_with_builtins_resolves_html() {
+        let registry = AdapterRegistry::with_builtins();
+        let adapter = registry.resolve("foo.html", "").unwrap();
+        assert_eq!(adapter.id(), "html");
     }
 }
