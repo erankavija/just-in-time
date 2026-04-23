@@ -1,7 +1,7 @@
 {
   "id": "75b1ccb8-6796-41da-9a96-fa95ed96cc94",
   "title": "Server: expand content-type inference + add raw-bytes document endpoint",
-  "description": "Extend crates/server/src/routes.rs:\n\n1. infer_content_type() (line 340) recognizes .html / .htm → text/html.\n2. New route GET /api/issues/:id/documents/:path/raw returns file bytes with Content-Type header set (not JSON-wrapped). Reuses executor.read_document_content() for path resolution.\n3. Symmetric GET /api/documents/raw?path=… for path-only access (mirrors get_document_by_path).\n4. Set CSP response header permitting https: so CDN-hosted assets (e.g. reveal.js from jsdelivr) work through the iframe.\n5. Tests cover text/html inference; raw endpoint success; 404 on missing; correct bytes for a fixture.\n\nAcceptance:\n- curl of the raw endpoint on a .html document returns the file with Content-Type: text/html.\n- Existing JSON content endpoint behavior unchanged.\n- New tests green under cargo test -p jit-server.\n\nPart of story abfd6016 (multi-format doc rendering). Unblocks task eeafaa78 (HtmlRenderer).",
+  "description": "Extend crates/server/src/routes.rs to support non-Markdown artifacts. Part of story abfd6016 (multi-format doc rendering). Unblocks task eeafaa78 (HtmlRenderer).\n\n## Implementation\n\n1. infer_content_type() (line ~340) recognizes .html / .htm → text/html.\n2. New route GET /api/issues/:id/documents/:path/raw returns file bytes with Content-Type set on the HTTP response (not JSON-wrapped). Reuses executor.read_document_content() for path and commit resolution.\n3. Symmetric GET /api/documents/raw?path=…&commit=… for path-only access (mirrors get_document_by_path at line ~268).\n4. Raw endpoints set a Content-Security-Policy response header permitting https: so CDN-hosted assets (reveal.js from jsdelivr) work through the iframe.\n5. Tests in the existing server test module cover: text/html inference; raw endpoint success with correct bytes and Content-Type; 404 on missing document; CSP header present; path-only variant.\n\n## Success Criteria\n\n- [ ] infer_content_type(\"x.html\") and infer_content_type(\"x.htm\") both return \"text/html\"; existing extensions (.md, .txt, .json) unchanged — covered by a unit test.\n- [ ] GET /api/issues/:id/documents/:path/raw returns HTTP 200 with Content-Type: text/html and body equal to the file bytes for a .html fixture linked to an issue — covered by an integration test.\n- [ ] That same endpoint returns HTTP 404 when the document is not linked to the issue — covered by a test.\n- [ ] The raw response includes a Content-Security-Policy response header permitting https: — covered by a test asserting the header.\n- [ ] GET /api/documents/raw?path=<.html fixture> returns the same Content-Type and body — covered by a test.\n- [ ] Existing get_document_content endpoint behavior is unchanged — no regression in existing tests.\n- [ ] cargo-ci gate passes (cargo fmt --check && cargo clippy --workspace --all-targets -D warnings && cargo test --workspace all green).\n- [ ] code-review gate passes.",
   "state": "backlog",
   "priority": "high",
   "assignee": "agent:claude",
@@ -13,15 +13,15 @@
     "code-review"
   ],
   "gates_status": {
-    "cargo-ci": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-04-23T21:32:04.897940202Z"
-    },
     "code-review": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-04-23T21:32:04.897987142Z"
+    },
+    "cargo-ci": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-04-23T21:37:22.020139151Z"
     }
   },
   "context": {},
@@ -35,5 +35,5 @@
     "component:server"
   ],
   "created_at": "2026-04-23T21:20:52.814332637+00:00",
-  "updated_at": "2026-04-23T21:32:11.457437208+00:00"
+  "updated_at": "2026-04-23T21:38:02.399094013+00:00"
 }

@@ -1962,3 +1962,4 @@
 {"type":"issue_claimed","id":"cd2a759d-e3d0-4985-ba49-21bbbf0e9650","issue_id":"75b1ccb8-6796-41da-9a96-fa95ed96cc94","timestamp":"2026-04-23T21:32:11.457761708Z","assignee":"agent:claude"}
 {"type":"issue_claimed","id":"a5566931-04bf-47e2-b79d-9a1a9c1a7564","issue_id":"42bd50ce-7cd9-47e6-993f-2b9bb7c16a35","timestamp":"2026-04-23T21:32:11.474989743Z","assignee":"agent:claude"}
 {"type":"issue_claimed","id":"1e6f23b8-aeef-4988-aed8-bf12e0527e83","issue_id":"85bd1288-6d6b-4f56-8d2c-ca859df7e92c","timestamp":"2026-04-23T21:32:11.492322008Z","assignee":"agent:claude"}
+{"type":"gate_failed","id":"b97bfb0c-ca54-4190-9e7e-c6901f4d2231","issue_id":"75b1ccb8-6796-41da-9a96-fa95ed96cc94","timestamp":"2026-04-23T21:38:02.403637875Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
