@@ -1,9 +1,10 @@
 //! API route definitions
 
 use axum::{
+    body::Body,
     extract::{Path, Query, State},
-    http::StatusCode,
-    response::IntoResponse,
+    http::{HeaderValue, StatusCode},
+    response::{IntoResponse, Response},
     routing::get,
     Json, Router,
 };
@@ -36,10 +37,12 @@ pub fn create_routes<S: IssueStore + Send + Sync + 'static>(state: AppState<S>) 
         .route("/status", get(get_status))
         .route("/search", get(search_issues))
         .route("/documents", get(get_document_by_path))
+        .route("/documents/raw", get(get_document_raw_by_path))
         .route(
             "/issues/:id/documents/:path/content",
             get(get_document_content),
         )
+        .route("/issues/:id/documents/:path/raw", get(get_document_raw))
         .route(
             "/issues/:id/documents/:path/history",
             get(get_document_history),
@@ -338,18 +341,28 @@ async fn get_document_by_path<S: IssueStore>(
 }
 
 /// Infer content type from file extension
-fn infer_content_type(path: &str) -> String {
+pub(crate) fn infer_content_type(path: &str) -> String {
     if path.ends_with(".md") {
         "text/markdown"
     } else if path.ends_with(".txt") {
         "text/plain"
     } else if path.ends_with(".json") {
         "application/json"
+    } else if path.ends_with(".html") || path.ends_with(".htm") {
+        "text/html"
+    } else if path.ends_with(".svg") {
+        "image/svg+xml"
+    } else if path.ends_with(".css") {
+        "text/css"
+    } else if path.ends_with(".js") {
+        "application/javascript"
     } else {
         "text/plain"
     }
     .to_string()
 }
+
+const CSP_HEADER: &str = "default-src 'self' https: data:; script-src 'self' 'unsafe-inline' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:;";
 
 /// Query parameters for document content
 #[derive(Debug, Deserialize)]
@@ -392,6 +405,105 @@ async fn get_document_content<S: IssueStore>(
         content,
         content_type: infer_content_type(&path),
     }))
+}
+
+/// Get raw document bytes (issue-scoped variant)
+async fn get_document_raw<S: IssueStore>(
+    Path((id, path)): Path<(String, String)>,
+    Query(query): Query<DocumentContentQuery>,
+    State(state): State<AppState<S>>,
+) -> Result<Response<Body>, StatusCode> {
+    let at_commit = query.commit.as_deref();
+
+    let (content, _commit_hash) = state
+        .executor
+        .read_document_content(&id, &path, at_commit)
+        .map_err(|e| {
+            tracing::error!("Failed to read raw document content: {:?}", e);
+            if e.to_string().contains("not found") {
+                StatusCode::NOT_FOUND
+            } else {
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
+        })?;
+
+    let content_type = infer_content_type(&path);
+    let mut response = Response::new(Body::from(content));
+    response.headers_mut().insert(
+        axum::http::header::CONTENT_TYPE,
+        HeaderValue::from_str(&content_type)
+            .unwrap_or_else(|_| HeaderValue::from_static("text/plain")),
+    );
+    response.headers_mut().insert(
+        "content-security-policy",
+        HeaderValue::from_static(CSP_HEADER),
+    );
+    Ok(response)
+}
+
+/// Get raw document bytes (path-only variant)
+async fn get_document_raw_by_path<S: IssueStore>(
+    Query(query): Query<DocumentByPathQuery>,
+    State(_state): State<AppState<S>>,
+) -> Result<Response<Body>, StatusCode> {
+    use std::fs;
+    use std::path::Path;
+
+    let file_path = Path::new(&query.path);
+
+    let content = if let Some(ref commit) = query.commit {
+        use git2::Repository;
+
+        let repo = Repository::open(".").map_err(|e| {
+            tracing::error!("Failed to open git repository: {:?}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+        let commit_obj = repo.revparse_single(commit).map_err(|e| {
+            tracing::error!("Failed to find commit {}: {:?}", commit, e);
+            StatusCode::NOT_FOUND
+        })?;
+
+        let commit = commit_obj.peel_to_commit().map_err(|e| {
+            tracing::error!("Failed to peel to commit: {:?}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+        let tree = commit.tree().map_err(|e| {
+            tracing::error!("Failed to get commit tree: {:?}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+        let entry = tree.get_path(file_path).map_err(|e| {
+            tracing::error!("File {} not found in commit: {:?}", query.path, e);
+            StatusCode::NOT_FOUND
+        })?;
+
+        let blob = repo.find_blob(entry.id()).map_err(|e| {
+            tracing::error!("Failed to read blob: {:?}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+        String::from_utf8_lossy(blob.content()).to_string()
+    } else {
+        fs::read_to_string(file_path).map_err(|e| {
+            tracing::error!("Failed to read file {}: {:?}", query.path, e);
+            StatusCode::NOT_FOUND
+        })?
+    };
+
+    let content_type = infer_content_type(&query.path);
+    let mut response = Response::new(Body::from(content));
+    response.headers_mut().insert(
+        axum::http::header::CONTENT_TYPE,
+        HeaderValue::from_str(&content_type)
+            .unwrap_or_else(|_| HeaderValue::from_static("text/plain")),
+    );
+    response.headers_mut().insert(
+        "content-security-policy",
+        HeaderValue::from_static(CSP_HEADER),
+    );
+    Ok(response)
 }
 
 /// Response for document history
@@ -1082,6 +1194,185 @@ pattern = '^v\d+\.\d+$'
         // Note: This test will fail because we can't easily change working directory
         // in async tests. We'll test this manually or with integration tests.
         // For now, we just verify the route exists.
+    }
+
+    // ── infer_content_type unit tests ────────────────────────────────────────
+
+    #[test]
+    fn test_infer_content_type_html() {
+        assert_eq!(infer_content_type("foo/bar.html"), "text/html");
+        assert_eq!(infer_content_type("index.htm"), "text/html");
+    }
+
+    #[test]
+    fn test_infer_content_type_other_extensions() {
+        assert_eq!(infer_content_type("doc.md"), "text/markdown");
+        assert_eq!(infer_content_type("data.json"), "application/json");
+        assert_eq!(infer_content_type("style.css"), "text/css");
+        assert_eq!(infer_content_type("app.js"), "application/javascript");
+        assert_eq!(infer_content_type("logo.svg"), "image/svg+xml");
+        assert_eq!(infer_content_type("readme.txt"), "text/plain");
+        assert_eq!(infer_content_type("unknown.xyz"), "text/plain");
+    }
+
+    // ── /api/issues/:id/documents/:path/raw tests ────────────────────────────
+
+    /// Build a JsonFileStorage-backed server with a real tempdir that has an
+    /// HTML document linked to an issue.  Returns the server, the issue id, and
+    /// the document path string.
+    fn create_test_app_with_html_doc() -> (
+        axum_test::TestServer,
+        String, // issue id
+        String, // doc path relative to repo root
+    ) {
+        use jit::domain::Priority;
+        use jit::storage::JsonFileStorage;
+        use std::fs;
+
+        let temp = tempfile::tempdir().unwrap();
+        let jit_dir = temp.path().join(".jit");
+        fs::create_dir_all(&jit_dir).unwrap();
+
+        // Write a permissive config so the executor is happy.
+        fs::write(
+            jit_dir.join("config.toml"),
+            "[worktree]\nenforce_leases = \"off\"\n",
+        )
+        .unwrap();
+
+        let storage = JsonFileStorage::new(&jit_dir);
+        storage.init().unwrap();
+
+        let executor = Arc::new(CommandExecutor::new(storage));
+
+        // Create an issue.
+        let (id, _) = executor
+            .create_issue(
+                "Test issue".to_string(),
+                "desc".to_string(),
+                Priority::Normal,
+                vec![],
+                vec![],
+            )
+            .unwrap();
+
+        // Write the HTML file relative to repo root (parent of .jit/).
+        let doc_rel = "slide.html";
+        let doc_abs = temp.path().join(doc_rel);
+        fs::write(&doc_abs, "<html><body>hello</body></html>").unwrap();
+
+        // Link the document to the issue (skip_scan=true to avoid git dep).
+        executor
+            .add_document_reference(&id, doc_rel, None, None, None, true)
+            .unwrap();
+
+        // Keep tempdir alive for the duration of the test via Box::leak – this
+        // is acceptable in test code; the OS cleans it up.
+        Box::leak(Box::new(temp));
+
+        let tracker = Arc::new(ChangeTracker::new(16));
+        let state = AppState {
+            executor,
+            tracker,
+            project_name: "test-project".to_string(),
+        };
+        let server = TestServer::new(create_routes(state)).unwrap();
+        (server, id, doc_rel.to_string())
+    }
+
+    #[tokio::test]
+    async fn test_get_document_raw_html_returns_200_with_correct_content_type() {
+        let (server, id, path) = create_test_app_with_html_doc();
+        let url = format!("/issues/{}/documents/{}/raw", id, path);
+        let response = server.get(&url).await;
+        response.assert_status_ok();
+        let ct = response
+            .headers()
+            .get("content-type")
+            .expect("content-type header")
+            .to_str()
+            .unwrap();
+        assert!(ct.starts_with("text/html"), "expected text/html, got {ct}");
+    }
+
+    #[tokio::test]
+    async fn test_get_document_raw_html_returns_exact_bytes() {
+        let (server, id, path) = create_test_app_with_html_doc();
+        let url = format!("/issues/{}/documents/{}/raw", id, path);
+        let response = server.get(&url).await;
+        response.assert_status_ok();
+        let body = response.text();
+        assert_eq!(body, "<html><body>hello</body></html>");
+    }
+
+    #[tokio::test]
+    async fn test_get_document_raw_has_csp_header() {
+        let (server, id, path) = create_test_app_with_html_doc();
+        let url = format!("/issues/{}/documents/{}/raw", id, path);
+        let response = server.get(&url).await;
+        response.assert_status_ok();
+        let csp = response
+            .headers()
+            .get("content-security-policy")
+            .expect("CSP header must be present")
+            .to_str()
+            .unwrap();
+        assert!(
+            csp.contains("default-src"),
+            "CSP should contain default-src directive"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_document_raw_not_found_when_path_not_linked() {
+        let (server, id, _path) = create_test_app_with_html_doc();
+        let url = format!("/issues/{}/documents/nonexistent.html/raw", id);
+        let response = server.get(&url).await;
+        assert_eq!(response.status_code(), StatusCode::NOT_FOUND);
+    }
+
+    // ── /api/documents/raw?path=... tests ────────────────────────────────────
+
+    #[tokio::test]
+    async fn test_get_document_raw_by_path_html_returns_correct_content_type() {
+        use std::fs;
+
+        // Write a temp HTML file into a tempdir.  Pass the absolute path via
+        // add_query_param so axum_test properly URL-encodes any special chars
+        // (e.g. the slashes in the path on Linux/macOS).
+        let temp = tempfile::tempdir().unwrap();
+        let doc_path = temp.path().join("slide.html");
+        fs::write(&doc_path, "<p>test</p>").unwrap();
+        let path_str = doc_path.to_string_lossy().into_owned();
+
+        let server = create_test_app();
+        let response = server
+            .get("/documents/raw")
+            .add_query_param("path", &path_str)
+            .await;
+        response.assert_status_ok();
+        let ct = response
+            .headers()
+            .get("content-type")
+            .expect("content-type header")
+            .to_str()
+            .unwrap();
+        assert!(ct.starts_with("text/html"), "expected text/html, got {ct}");
+        let csp = response
+            .headers()
+            .get("content-security-policy")
+            .expect("CSP header");
+        assert!(!csp.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_document_raw_by_path_not_found() {
+        let server = create_test_app();
+        let response = server
+            .get("/documents/raw")
+            .add_query_param("path", "no_such_file.html")
+            .await;
+        assert_eq!(response.status_code(), StatusCode::NOT_FOUND);
     }
 
     #[tokio::test]

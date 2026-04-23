@@ -1,74 +1,8 @@
-import { useEffect, useState, useRef, useCallback, type ComponentProps } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkMath from 'remark-math';
-import remarkGfm from 'remark-gfm';
-import rehypeKatex from 'rehype-katex';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import 'katex/dist/katex.min.css';
+import { useEffect, useState, useCallback } from 'react';
 import { apiClient } from '../../api/client';
 import type { DocumentReference, DocumentContent, DocumentHistory } from '../../types/models';
-import { MermaidDiagram } from '../MermaidDiagram';
+import { pickRenderer } from './renderers/index';
 import './Document.css';
-
-// Stable module-level constants — prevents ReactMarkdown from seeing new references
-// on every re-render, which would unmount/remount MermaidDiagram and cause flashing.
-const REMARK_PLUGINS = [remarkMath, remarkGfm];
-const REHYPE_PLUGINS = [rehypeKatex];
-const MD_COMPONENTS: ComponentProps<typeof ReactMarkdown>['components'] = {
-  code({ className, children, ...props }) {
-    const match = /language-(\w+)/.exec(className || '');
-    const language = match ? match[1] : '';
-    const isInline = !className;
-
-    if (language === 'mermaid') {
-      return <MermaidDiagram code={String(children).replace(/\n$/, '')} />;
-    }
-
-    if (isInline) {
-      return (
-        <code className={className} {...props} style={{
-          backgroundColor: 'var(--bg-tertiary)',
-          padding: '2px 6px',
-          borderRadius: '3px',
-          fontSize: '0.9em',
-          fontFamily: 'var(--font-mono)',
-        }}>
-          {children}
-        </code>
-      );
-    }
-
-    // Note: Type assertions needed due to react-syntax-highlighter v16 type definitions
-    return match ? (
-      <SyntaxHighlighter
-        {...({
-          style: vscDarkPlus,
-          language,
-          PreTag: 'div',
-          customStyle: {
-            margin: '1em 0',
-            borderRadius: '6px',
-            fontSize: '13px',
-          },
-          children: String(children).replace(/\n$/, ''),
-        } as React.ComponentProps<typeof SyntaxHighlighter>)}
-      />
-    ) : (
-      <code className={className} {...props} style={{
-        display: 'block',
-        backgroundColor: 'var(--bg-tertiary)',
-        padding: '12px',
-        borderRadius: '6px',
-        fontFamily: 'var(--font-mono)',
-        fontSize: '13px',
-        overflowX: 'auto',
-      }}>
-        {children}
-      </code>
-    );
-  },
-};
 
 interface DocumentViewerProps {
   // Option 1: Via issue context
@@ -88,14 +22,12 @@ export function DocumentViewer({ issueId, documentRef, documentPath, searchQuery
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
-  const [highlightsActive, setHighlightsActive] = useState(true);
-  const contentContainerRef = useRef<HTMLDivElement>(null);
 
   const loadContent = useCallback(async (path: string, commit?: string) => {
     try {
       setLoading(true);
       setError(null);
-      
+
       // Use standalone endpoint if no issueId, otherwise use issue-specific endpoint
       let data: DocumentContent;
       if (issueId) {
@@ -103,7 +35,7 @@ export function DocumentViewer({ issueId, documentRef, documentPath, searchQuery
       } else {
         data = await apiClient.getDocumentByPath(path, commit);
       }
-      
+
       setContent(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load document');
@@ -119,77 +51,6 @@ export function DocumentViewer({ issueId, documentRef, documentPath, searchQuery
       loadContent(path, selectedCommit);
     }
   }, [documentPath, documentRef?.path, selectedCommit, loadContent]);
-
-  // Handle ESC key to clear highlights
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && highlightsActive) {
-        setHighlightsActive(false);
-        // Remove all highlight marks
-        if (contentContainerRef.current) {
-          const marks = contentContainerRef.current.querySelectorAll('mark');
-          marks.forEach(mark => {
-            const text = mark.textContent;
-            const textNode = document.createTextNode(text || '');
-            mark.parentNode?.replaceChild(textNode, mark);
-          });
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [highlightsActive]);
-
-  // Highlight search query in rendered content
-  useEffect(() => {
-    if (searchQuery && highlightsActive && content && contentContainerRef.current) {
-      setTimeout(() => {
-        const container = contentContainerRef.current;
-        if (!container) return;
-
-        // Use browser's find-in-page API to highlight
-        const searchTerms = searchQuery.trim().split(/\s+/);
-        
-        // Simple text highlighting using CSS
-        const highlightText = (node: Node) => {
-          if (node.nodeType === Node.TEXT_NODE) {
-            const text = node.textContent || '';
-            let hasMatch = false;
-            let html = text;
-            
-            searchTerms.forEach(term => {
-              const regex = new RegExp(`(${term})`, 'gi');
-              if (regex.test(text)) {
-                hasMatch = true;
-                html = html.replace(regex, '<mark style="background-color: rgba(255, 215, 0, 0.4); padding: 0 2px;">$1</mark>');
-              }
-            });
-            
-            if (hasMatch && node.parentNode) {
-              const span = document.createElement('span');
-              span.innerHTML = html;
-              node.parentNode.replaceChild(span, node);
-              
-              // Scroll to first match
-              const firstMark = container.querySelector('mark');
-              if (firstMark) {
-                firstMark.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              }
-            }
-          } else if (node.nodeType === Node.ELEMENT_NODE) {
-            // Don't highlight inside code blocks or other special elements
-            const element = node as Element;
-            if (!element.matches('code, pre, script, style')) {
-              Array.from(node.childNodes).forEach(highlightText);
-            }
-          }
-        };
-        
-        highlightText(container);
-      }, 500);
-    }
-  }, [searchQuery, highlightsActive, content]);
 
   if (loading) {
     return (
@@ -222,6 +83,8 @@ export function DocumentViewer({ issueId, documentRef, documentPath, searchQuery
     return null;
   }
 
+  const Renderer = pickRenderer(content, documentRef).Component;
+
   return (
     <div className="document-viewer">
       <div className="document-header">
@@ -231,17 +94,12 @@ export function DocumentViewer({ issueId, documentRef, documentPath, searchQuery
           {searchQuery && (
             <span style={{ marginLeft: '1rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
               Searching: "{searchQuery}"
-              {highlightsActive && (
-                <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', opacity: 0.7 }}>
-                  (ESC to clear)
-                </span>
-              )}
             </span>
           )}
         </div>
         <div className="document-actions">
           {issueId && documentRef && (
-            <button 
+            <button
               className="history-btn"
               onClick={() => setShowHistory(!showHistory)}
               title="View commit history"
@@ -271,14 +129,13 @@ export function DocumentViewer({ issueId, documentRef, documentPath, searchQuery
         </div>
       )}
 
-      <div className="document-content markdown-content" ref={contentContainerRef} style={{ position: 'relative' }}>
-          <ReactMarkdown
-            remarkPlugins={REMARK_PLUGINS}
-            rehypePlugins={REHYPE_PLUGINS}
-            components={MD_COMPONENTS}
-          >
-            {content.content}
-          </ReactMarkdown>
+      <div className="document-content markdown-content" style={{ position: 'relative' }}>
+        <Renderer
+          content={content}
+          issueId={issueId}
+          documentRef={documentRef}
+          searchTerm={searchQuery}
+        />
       </div>
 
       <div className="document-footer">
