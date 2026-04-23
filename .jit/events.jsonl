@@ -1986,3 +1986,6 @@
 {"type":"gate_failed","id":"cb512bcc-b214-4585-97a1-af1d7f4c5d63","issue_id":"75b1ccb8-6796-41da-9a96-fa95ed96cc94","timestamp":"2026-04-23T22:06:34.253867919Z","gate_key":"code-review","updated_by":"auto:executor"}
 {"type":"gate_passed","id":"0d1be740-457f-44c8-9d18-eda345d78169","issue_id":"42bd50ce-7cd9-47e6-993f-2b9bb7c16a35","timestamp":"2026-04-23T22:08:11.513579295Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
 {"type":"gate_passed","id":"02fdf8c9-1a7a-48f7-9a36-4b62a7fe9a92","issue_id":"75b1ccb8-6796-41da-9a96-fa95ed96cc94","timestamp":"2026-04-23T22:08:52.175059708Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"4d0c7f75-0d59-497e-8a8b-00844c4a9559","issue_id":"42bd50ce-7cd9-47e6-993f-2b9bb7c16a35","timestamp":"2026-04-23T22:11:09.086908989Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"48cfa72c-7ff2-4c05-a1e1-cb266973e471","issue_id":"75b1ccb8-6796-41da-9a96-fa95ed96cc94","timestamp":"2026-04-23T22:11:57.684297353Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"a086d4a3-ee9f-4e95-bd01-2cd679814612","issue_id":"85bd1288-6d6b-4f56-8d2c-ca859df7e92c","timestamp":"2026-04-23T22:12:02.444831065Z","gate_key":"code-review","updated_by":"auto:executor"}
