@@ -2010,3 +2010,4 @@
 {"type":"gate_failed","id":"697d7a21-5b66-44b0-b3bd-ab3d27005cef","issue_id":"42bd50ce-7cd9-47e6-993f-2b9bb7c16a35","timestamp":"2026-04-23T22:36:44.851809005Z","gate_key":"code-review","updated_by":"auto:executor"}
 {"type":"gate_failed","id":"cceef1e3-35e2-4403-9f2c-4fd5104dbafa","issue_id":"42bd50ce-7cd9-47e6-993f-2b9bb7c16a35","timestamp":"2026-04-23T22:38:19.968658628Z","gate_key":"code-review","updated_by":"auto:executor"}
 {"type":"gate_passed","id":"ad553a62-dc83-43af-9ddd-60b196cf6532","issue_id":"75b1ccb8-6796-41da-9a96-fa95ed96cc94","timestamp":"2026-04-23T22:40:12.055674036Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"85da36fb-1606-416e-9c60-7c10cef1b28f","issue_id":"75b1ccb8-6796-41da-9a96-fa95ed96cc94","timestamp":"2026-04-23T22:45:14.394468236Z","gate_key":"code-review","updated_by":"auto:executor"}
