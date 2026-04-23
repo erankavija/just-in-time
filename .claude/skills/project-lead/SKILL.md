@@ -85,6 +85,7 @@ Hold all discovered context in working memory for the duration of the session.
    - Load it. It contains the wave plan and per-issue status.
    - Jump to the appropriate phase and wave.
    - Verify loaded state matches current JIT state (children may have changed).
+   - Also read every `dev/active/<short-id>-handoff*.md` in order (oldest to newest). Pay particular attention to the **Traps — do not repeat these** sections — every trap from every prior handoff remains in force unless the handoff explicitly records its resolution. The traps section exists specifically to prevent the new session from repeating approaches that earlier sessions proved wrong.
 
 6. **Inform the user.** Briefly state: which epic you're leading, how many success criteria, whether children exist, and what phase you're entering. This is informational — do not wait for approval.
 
@@ -114,14 +115,26 @@ Convert the epic's children into ordered execution waves.
    - **Wave 1:** Children with no sibling dependencies (can start immediately).
    - **Wave N:** Children whose dependencies are all in waves 1..N-1.
 
-3. **Classify each issue.** Read `references/task-classifier.md`. Assign each child a classification: `design`, `research`, `implementation`, or `documentation`. This determines which agent prompt template is used.
+3. **Resolve open design questions BEFORE dispatching.** Before dispatching any wave, scan the epic description and every dependent story/task description for:
+   - Sections titled **Open Issues**, **TBD**, **Unresolved**, **Questions**, **Pending decisions**, or similar.
+   - Parameters that have multiple plausible values and no resolution ("dimension is either 640 or 646", "either algorithm A or algorithm B would work").
+   - Algorithm choices listed without a selected variant ("LDPC", without BP vs NMS vs MS specified).
+   - References to planning docs that themselves flag unresolved choices.
 
-4. **Assess parallelism within each wave.** Read `.claude/skills/jit-parallel/references/conflict-heuristics.md` (if it exists for this project). For issues within the same wave:
+   Every such question that blocks an implementation issue must become a **resolved prerequisite before the dependent issue is dispatched**:
+   - If the lead can make the decision under `references/escalation-policy.md` (routine implementation choice), create a small `decision` task whose output is a JIT doc (or a note in the parent issue's description) recording the chosen value and the reasoning, then wire the dependent issue to depend on it.
+   - If the decision has architectural impact, multiple plausible options, or affects shared infrastructure, escalate to the user via `AskUserQuestion` per `references/escalation-policy.md` entry 6. Do not pick the option yourself.
+
+   Implementation issues are **not dispatched** until their upstream decisions are `done`. Dispatching a story that embeds an unresolved question forces the worker to guess; their guess will differ from what the reviewer expects and burns at least one review cycle resolving the decision rather than writing code. This is a hard blocker, not a soft recommendation.
+
+4. **Classify each issue.** Read `references/task-classifier.md`. Assign each child a classification: `design`, `research`, `implementation`, or `documentation`. This determines which agent prompt template is used.
+
+5. **Assess parallelism within each wave.** Read `.claude/skills/jit-parallel/references/conflict-heuristics.md` (if it exists for this project). For issues within the same wave:
    - If two issues are likely to touch the same files, serialize them (move one to a sub-wave).
    - If the wave has 4+ parallel issues, consider worktree mode (see `.claude/skills/jit-parallel/references/worktree-mode.md`).
    - **CRITICAL**: Initialize the worktree with the current repository state at the start of each wave. Failure to do so will cause workers to operate on stale code and produce invalid output.
 
-5. **Persist the wave plan.** Save to `dev/active/<short-id>-progress.json`:
+6. **Persist the wave plan.** Save to `dev/active/<short-id>-progress.json`:
    ```json
    {
      "epic_id": "<full-id>",
@@ -254,6 +267,25 @@ The decision tree is defined there. In summary — escalate ONLY for:
 When escalating, use the escalation prompt template from the policy. Be concise — the user's time is the scarcest resource.
 
 Everything else is handled autonomously.
+
+## Section 9b: Session Handoff (when the epic is not yet complete)
+
+If the session ends without completing the epic (budget exhausted, wave still in progress, waiting for user input on an escalation, or a graceful stop mid-wave):
+
+1. **Write a session handoff.** Follow `references/handoff-template.md` verbatim. Save to `dev/active/<epic-short-id>-handoff-<N>.md` where `<N>` is 1 more than the highest existing handoff index for this epic (or omit `-<N>` for the first handoff). Do not overwrite a prior handoff.
+
+2. **Populate the Traps section from the session's actual experience.** This section is mandatory and must not be empty unless no wrong approaches were tried or considered this session. Include:
+   - Every wrong algorithm choice, parameter value, or approach that was tried and rejected, with the evidence it was wrong.
+   - Every misleading reference in the handoff chain or spec docs (e.g., a prior handoff's shell-comment that embedded `NMS` when the correct variant is `BP`).
+   - Any dispatch prompts that led a worker astray — quote the misleading line and state the correct alternative.
+
+   Unresolved traps from prior handoffs carry forward — link them (do not copy-paste) and add new ones.
+
+3. **Update the progress file.** Ensure `dev/active/<epic-short-id>-progress.json` reflects the current wave number, per-issue statuses, rework counts, and any open escalations.
+
+4. **Commit the handoff + progress file together.** Follow jit-manage state-commit-patterns for the commit scope.
+
+Section 9b runs before the session ends but after Section 8 (rework) has settled the current wave's reviews. When the session resumes, the Resume check step in Section 2 loads the handoff and progress file to continue where this one left off.
 
 ## Section 10: Epic Completion
 

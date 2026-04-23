@@ -1,6 +1,6 @@
 # Lead Review Protocol
 
-The lead reviews every sub-agent's output before accepting it. This review has three tiers, applied in order. A failure at any tier is an automatic FAIL — do not continue to later tiers.
+The lead reviews every sub-agent's output before accepting it. This review has four tiers (1, 2, 2.5, 3), applied in order. A failure at any tier is an automatic FAIL — do not continue to later tiers.
 
 ## Tier 1: Gate Verification
 
@@ -27,6 +27,22 @@ Common pitfalls to watch for:
 - Agent claims criterion is met but the implementation is partial or superficial.
 - Criterion requires a specific behavior but no test covers it.
 - Criterion is about documentation but the doc was not created or is placeholder-only.
+
+## Tier 2.5: Pre-close Stale-Narrative Sweep
+
+Before rendering the Tier-3 verdict, sweep the whole workspace for stale references to the work this issue just landed. Long-running projects accumulate forward-looking narrative ("is planned", "future work", "once X lands") in docstrings, benchmark prose, and design docs. When the work lands, those references become lies. The reviewer will find them one or two per cycle unless the lead sweeps proactively.
+
+Run, at minimum:
+
+```
+git grep -nE "future work.*<task-key-term>|<task-key-term> lands|pending <task-key-term>|upcoming <task-key-term>|is planned.*<task-key-term>"
+```
+
+Also grep for the issue's short ID and any aliases (function names, feature names) that external docs might reference as "future". Examples of terms worth sweeping on past work: a newly-added function name, a just-implemented algorithm name, a benchmark that replaces an old one.
+
+If the sweep finds stale references, the verdict is **FAIL** with those references listed. The rework agent will be required to resolve every match in a single submission (see the Resolution table in `rework-prompt-template.md`) rather than discovering them one cycle at a time.
+
+This tier is cheap to run — a single grep — and eliminates the single largest source of multi-cycle rework loops observed in practice.
 
 ## Tier 3: Holistic Coherence Review
 

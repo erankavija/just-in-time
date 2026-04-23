@@ -65,6 +65,34 @@ Output **only** the JSON object — no preamble, no explanation, no markdown fen
    and structure the description as a small standalone markdown document with
    `## Success Criteria` as a required section.
 
+   **Every measurable criterion must be machine-verifiable.** For each criterion
+   that mentions an algorithm, parameter, threshold, artifact, or comparison, name:
+   (a) the exact variant/value, (b) the acceptance tolerance, (c) the artifact
+   path and format, (d) the spec doc line or prior-decision reference.
+   A criterion a worker has to guess at is a bug.
+
+   **Before (vague):**
+   > Reproduce the paper's product-code-outperforms-LDPC result for Fig 7.
+
+   **After (verifiable):**
+   > - Algorithm: 5G NR LDPC with sum-product (BP), `I_max=50`, per
+   >   `[SPEC_DOC_PATH]:314`.
+   > - Minimum statistics: ≥100 frame errors at every reported SNR point;
+   >   `max_frames` ≥ 100 000 at SNR ≥ 3.0 dB.
+   > - Required artifacts: `dev/simulation_results/fig7_gldpc.{csv,json}` and
+   >   `dev/simulation_results/fig7_ldpc_bp.{csv,json}`.
+   > - Acceptance: GLDPC BLER within 3× of paper reference at all SNR points.
+
+   Non-measurable criteria ("API is ergonomic", "docstring explains intent")
+   are exempt — these are reviewer-judgement, not machine-checkable.
+
+   **Optional: criterion-maturity tier markers.** If the project distinguishes
+   between hard and aspirational criteria (check the project's
+   `code-review-prompt` or CLAUDE.md), prefix each criterion line with either
+   `[hard]` (default; fails the review if unmet) or `[aspirational]`
+   (amendable in-loop if empirical evidence contradicts). Default to `[hard]`
+   when in doubt.
+
 4. **Do NOT include the parent issue itself.** Only return the children to create.
    The parent's dependency on its children is handled separately.
 

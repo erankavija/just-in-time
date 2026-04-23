@@ -48,6 +48,48 @@ fences.
    include a `## Success Criteria` section with verifiable checklist items.
    These criteria define when the issue is done — nothing more, nothing less.
 
+   **Every measurable criterion must be machine-verifiable.** For each
+   criterion that mentions an algorithm, parameter, threshold, artifact, or
+   comparison, it must name:
+   - (a) the exact variant/value (not "a working baseline" — "5G NR LDPC with
+     sum-product (BP), I_max=50"),
+   - (b) the acceptance tolerance (not "matches the paper" — "BLER within 3×
+     of the paper reference at all SNR points"),
+   - (c) the artifact path and format (not "report it" — "CSV at
+     `dev/simulation_results/fig7_ldpc_bp.csv`"),
+   - (d) the spec doc line or prior-decision reference that resolves the
+     choice (not "per the plan" — "per `dev/plans/comparison.md:314`").
+
+   A criterion a worker has to guess at is a bug. Example of the transformation:
+
+   **Before (vague):**
+   > Reproduce the paper's product-code-outperforms-LDPC result for Fig 7.
+
+   **After (verifiable):**
+   > - Algorithm: 5G NR LDPC with sum-product (BP), `I_max=50`, per
+   >   `dev/plans/grand_5gnr_ldpc_comparison.md:314`.
+   > - Minimum statistics: ≥100 frame errors at every reported SNR point;
+   >   `max_frames` ≥ 100 000 at SNR ≥ 3.0 dB.
+   > - Required artifacts: `dev/simulation_results/fig7_gldpc.{csv,json}` and
+   >   `dev/simulation_results/fig7_ldpc_bp.{csv,json}`.
+   > - Acceptance: GLDPC BLER within 3× of paper reference at all SNR points;
+   >   comparison persisted to
+   >   `dev/simulation_results/fig7_comparison_report.txt`.
+   > - Reproducibility: campaign config at `dev/campaigns/phase3_fig7.toml`
+   >   reproduces all artifacts end-to-end.
+
+   Non-measurable criteria (e.g., "API is ergonomic", "docstring explains
+   intent") are exempt — these are reviewer-judgement, not machine-checkable.
+
+   **Optional: criterion-maturity tier markers.** If the project distinguishes
+   between hard and aspirational criteria (see the project's
+   `code-review-prompt` or CLAUDE.md for whether it does), prefix each
+   criterion line with either `[hard]` (the default; fails the review if
+   unmet) or `[aspirational]` (amendable in-loop if empirical evidence
+   contradicts, as long as the aggregate contract holds). Default to `[hard]`
+   when in doubt. Projects that do not use these markers will simply treat
+   every criterion as hard, which is the safe behaviour.
+
 4. **Descriptions must stand alone.** Include enough context — motivation,
    success criteria, and constraints — that the issue is self-contained.
 
