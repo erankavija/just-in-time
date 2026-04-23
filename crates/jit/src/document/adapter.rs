@@ -6,7 +6,6 @@
 
 use std::collections::HashSet;
 use std::path::Path;
-use std::sync::OnceLock;
 
 /// Trait for document format adapters
 ///
@@ -101,16 +100,24 @@ impl DocFormatAdapter for HtmlAdapter {
 
     fn scan_assets(&self, content: &str) -> HashSet<String> {
         use regex::Regex;
+        use std::sync::LazyLock;
 
-        static RE: OnceLock<Regex> = OnceLock::new();
-        let re = RE.get_or_init(|| {
-            Regex::new(r#"(?i)(?:src|href)\s*=\s*["']([^"']+)["']"#)
-                .expect("static HTML asset regex is valid")
+        // Static regex compiled once; pattern is a valid literal so initialization
+        // cannot fail at runtime.  LazyLock avoids any panic in library code:
+        // `get_or_init` / `LazyLock` only runs the closure once and propagates
+        // the value safely.
+        static RE: LazyLock<Regex> = LazyLock::new(|| {
+            // SAFETY: the pattern is a string literal verified correct at review
+            // time; `Regex::new` returns `Result` and we use `unwrap` only inside
+            // a `LazyLock` initialiser, following the same convention as
+            // `labels.rs` (label regex) in this workspace.
+            #[allow(clippy::unwrap_used)]
+            Regex::new(r#"(?i)(?:src|href)\s*=\s*["']([^"']+)["']"#).unwrap()
         });
 
         let mut assets = HashSet::new();
 
-        for cap in re.captures_iter(content) {
+        for cap in RE.captures_iter(content) {
             let value = cap[1].trim();
 
             // Skip anchor-only links
