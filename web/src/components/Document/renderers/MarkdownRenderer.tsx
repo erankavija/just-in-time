@@ -104,6 +104,8 @@ export default function MarkdownRenderer({
         if (!container) return;
 
         const searchTerms = searchTerm.trim().split(/\s+/);
+        // Escape regex metacharacters so user input is treated as a literal string.
+        const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
         const highlightText = (node: Node) => {
           if (node.nodeType === Node.TEXT_NODE) {
@@ -112,10 +114,10 @@ export default function MarkdownRenderer({
             let html = text;
 
             searchTerms.forEach(term => {
-              const regex = new RegExp(`(${term})`, 'gi');
+              const regex = new RegExp(`(${escapeRegex(term)})`, 'gi');
               if (regex.test(text)) {
                 hasMatch = true;
-                html = html.replace(regex, '<mark style="background-color: rgba(255, 215, 0, 0.4); padding: 0 2px;">$1</mark>');
+                html = html.replace(new RegExp(`(${escapeRegex(term)})`, 'gi'), '<mark style="background-color: rgba(255, 215, 0, 0.4); padding: 0 2px;">$1</mark>');
               }
             });
 
