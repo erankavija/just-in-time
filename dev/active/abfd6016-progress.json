@@ -1,0 +1,59 @@
+{
+  "epic_id": "abfd6016-a79d-4a5c-9d1d-d5393e7acb2d",
+  "epic_short_id": "abfd6016",
+  "epic_title": "Multi-format document rendering in web UI (reveal.js / HTML first)",
+  "epic_type": "story",
+  "parent_epic": "94f873c8",
+  "current_wave": 1,
+  "waves": [
+    {
+      "wave_number": 1,
+      "issues": [
+        {
+          "id": "75b1ccb8-6796-41da-9a96-fa95ed96cc94",
+          "short_id": "75b1ccb8",
+          "title": "Server: content-type inference + raw-bytes endpoint",
+          "classification": "implementation",
+          "status": "pending",
+          "primary_files": ["crates/server/src/routes.rs", "crates/server/tests/"]
+        },
+        {
+          "id": "42bd50ce-7cd9-47e6-993f-2b9bb7c16a35",
+          "short_id": "42bd50ce",
+          "title": "Web: extract renderer-registry abstraction",
+          "classification": "implementation",
+          "status": "pending",
+          "primary_files": ["web/src/components/Document/DocumentViewer.tsx", "web/src/components/Document/renderers/"]
+        },
+        {
+          "id": "85bd1288-6d6b-4f56-8d2c-ca859df7e92c",
+          "short_id": "85bd1288",
+          "title": "Core: HtmlAdapter in Rust format registry",
+          "classification": "implementation",
+          "status": "pending",
+          "primary_files": ["crates/jit/src/document/adapter.rs"]
+        }
+      ]
+    },
+    {
+      "wave_number": 2,
+      "issues": [
+        {
+          "id": "eeafaa78-290d-4390-9097-4d29ff48ef82",
+          "short_id": "eeafaa78",
+          "title": "Web: HtmlRenderer with sandboxed iframe",
+          "classification": "implementation",
+          "status": "pending",
+          "primary_files": ["web/src/components/Document/renderers/HtmlRenderer.tsx", "web/src/api/client.ts"],
+          "depends_on": ["75b1ccb8", "42bd50ce"]
+        }
+      ]
+    }
+  ],
+  "created_during_execution": [],
+  "escalations": [],
+  "rework_counts": {},
+  "started_at": "2026-04-24T00:00:00Z",
+  "gates_applied": ["cargo-ci", "code-review"],
+  "design_doc": "dev/active/abfd6016-multi-format-doc-rendering-design.md"
+}

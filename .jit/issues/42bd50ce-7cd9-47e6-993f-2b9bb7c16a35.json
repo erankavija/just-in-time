@@ -4,12 +4,26 @@
   "description": "Refactor web/src/components/Document/DocumentViewer.tsx so the content renderer is chosen via a registry instead of hardcoded ReactMarkdown.\n\nSteps:\n1. Introduce DocumentRenderer type: { id; match(content, ref); Component }.\n2. Create web/src/components/Document/renderers/index.ts with an ordered registry. First-match-wins; last entry is a catch-all MarkdownRenderer.\n3. Extract the current ReactMarkdown body (code-block handler; syntax highlighting; search highlighting; plugins; the ReactMarkdown call itself) verbatim into renderers/MarkdownRenderer.tsx. Zero behavior change.\n4. DocumentViewer.tsx becomes a thin shell: fetch content as today; keep header/footer/history-panel scaffolding; delegate the content body to the matched renderer.\n5. Unit tests (Vitest) cover: registry picks HtmlRenderer for text/html; MarkdownRenderer for text/markdown; MarkdownRenderer fallback for unknown types.\n\nAcceptance:\n- Existing Markdown documents render byte-identically; visual regression check passes.\n- Registry dispatch covered by unit tests.\n- No direct ReactMarkdown import remains in DocumentViewer.tsx.\n\nPart of story abfd6016. Unblocks task eeafaa78 (HtmlRenderer).",
   "state": "backlog",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [
     "9db27a3a-86c5-4d79-9582-9ad68364ea36"
   ],
-  "gates_required": [],
-  "gates_status": {},
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "code-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-04-23T21:32:04.907552634Z"
+    },
+    "cargo-ci": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-04-23T21:32:04.907500944Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -20,5 +34,5 @@
     "component:web"
   ],
   "created_at": "2026-04-23T21:20:52.816918968+00:00",
-  "updated_at": "2026-04-23T21:22:05.355730051+00:00"
+  "updated_at": "2026-04-23T21:32:11.474649903+00:00"
 }

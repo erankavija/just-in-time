@@ -9,8 +9,22 @@
     "42bd50ce-7cd9-47e6-993f-2b9bb7c16a35",
     "75b1ccb8-6796-41da-9a96-fa95ed96cc94"
   ],
-  "gates_required": [],
-  "gates_status": {},
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-04-23T21:32:04.916805957Z"
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-04-23T21:32:04.916852537Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -21,5 +35,5 @@
     "component:web"
   ],
   "created_at": "2026-04-23T21:20:52.819819058+00:00",
-  "updated_at": "2026-04-23T21:22:15.894929096+00:00"
+  "updated_at": "2026-04-23T21:32:04.916873587+00:00"
 }
