@@ -1,0 +1,36 @@
+{
+  "id": "ba97487f-9936-4f6b-aad1-ca61c33eb840",
+  "title": "Configurable label constraints (enums, patterns, required) + strict init defaults + config schema",
+  "description": "Harden label convention enforcement. Plan: /home/vkaskivuo/.claude/plans/ancient-plotting-rossum.md\n\nScope:\n1. Extend NamespaceConfig with values (enum), pattern (regex), required (bool) fields.\n2. jit validate surfaces enum/pattern/required violations + near-duplicate namespace hints.\n3. jit init writes strict defaults (reject_malformed_labels=true, enforce_namespace_registry=true) for new repos.\n4. jit config show --json exposes the full namespace registry (mirrors server /config/namespaces shape).\n\nCritical files: crates/jit/src/config.rs, config_manager.rs, commands/validate.rs, hierarchy_templates.rs, main.rs; docs/reference/labels.md.\n\nDeferred follow-ups tracked separately: default-value auto-apply, deprecation/alias rewriting, reference validation (epic:<slug> resolves to real epic), hard rejection at add-label time, max cardinality, labels-valid gate, retroactive defaults for existing repos.",
+  "state": "done",
+  "priority": "normal",
+  "assignee": "agent:claude-opus-1m",
+  "dependencies": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-04-14T14:10:08.595694274Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-04-14T14:10:43.380878099Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:production-stability",
+    "milestone:v1.0",
+    "component:core",
+    "component:cli"
+  ],
+  "created_at": "2026-04-13T22:41:45.901160873+00:00",
+  "updated_at": "2026-04-14T14:16:36.865361464+00:00"
+}

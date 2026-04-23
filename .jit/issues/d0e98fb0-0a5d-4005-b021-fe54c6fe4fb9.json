@@ -1,0 +1,37 @@
+{
+  "id": "d0e98fb0-0a5d-4005-b021-fe54c6fe4fb9",
+  "title": "Advanced label conventions: defaults, aliases, reference validation, hard rejection",
+  "description": "Follow-ups deferred from ba97487f (label constraint config). Each sub-bullet is its own eventual task; this story tracks them together so they don't get lost.\n\nDeferred items:\n- Default value auto-apply: NamespaceConfig.default: String. On issue create, if no label from that namespace is present, auto-apply the default. Generalizes existing validation.default_type.\n- Deprecation/alias rewriting: map like priority:p1 -> priority:high. jit label migrate rewrites in bulk; add/validate respect the alias on read/write.\n- Reference validation: values of form <slug> can be required to resolve to an existing issue (e.g. epic:<slug> must match an issue with type:epic and that slug).\n- Hard rejection at add-label time: when enforce_namespace_registry=true and values/pattern are set, reject in add_label() not only in validate.\n- max cardinality on NamespaceConfig (unique becomes sugar for max=1).\n- Built-in labels-valid gate so repos can wire label correctness into the gate system rather than relying only on CLI-time rejection.\n- Retroactive strict defaults for existing repos (needs migration story; intentionally skipped in ba97487f which only touches new-repo init).\n\nDepends on ba97487f (config schema + validate surfacing must exist first).",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "ba97487f-9936-4f6b-aad1-ca61c33eb840"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-04-13T22:46:02.434076508Z"
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-04-13T22:46:02.440673713Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:story",
+    "epic:production-stability",
+    "milestone:v1.0",
+    "component:core"
+  ],
+  "created_at": "2026-04-13T22:43:55.195530333+00:00",
+  "updated_at": "2026-04-14T14:16:36.922487916+00:00"
+}
