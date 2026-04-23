@@ -30,8 +30,11 @@
           "short_id": "85bd1288",
           "title": "Core: HtmlAdapter in Rust format registry",
           "classification": "implementation",
-          "status": "pending",
-          "primary_files": ["crates/jit/src/document/adapter.rs"]
+          "status": "done",
+          "primary_files": ["crates/jit/src/document/adapter.rs"],
+          "review_verdict": "PASS",
+          "review_note": "All 10 success criteria met; gates passed; minor commit-message convention drift self-corrected by final commit (88b2351 includes jit:85bd1288 trailer). 687 unit tests + integration tests pass.",
+          "final_commit": "88b2351"
         }
       ]
     },

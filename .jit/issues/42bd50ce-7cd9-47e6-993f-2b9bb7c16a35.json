@@ -2,12 +2,10 @@
   "id": "42bd50ce-7cd9-47e6-993f-2b9bb7c16a35",
   "title": "Web: extract renderer-registry abstraction from DocumentViewer",
   "description": "Refactor web/src/components/Document/DocumentViewer.tsx so the content renderer is chosen via a registry instead of hardcoded ReactMarkdown. Part of story abfd6016. Unblocks task eeafaa78 (HtmlRenderer).\n\n## Implementation\n\n1. New DocumentRenderer interface: { id: string; match(content, ref): boolean; Component: FC<DocumentRendererProps> }.\n2. New registry at web/src/components/Document/renderers/index.ts. Ordered; first-match-wins; catch-all MarkdownRenderer last. Exports pickRenderer(content, ref?) helper.\n3. Extract current ReactMarkdown body (code-block handler, syntax highlighting, search highlighting effect, plugins, the ReactMarkdown call itself) verbatim into renderers/MarkdownRenderer.tsx. Zero behavior change for existing markdown docs.\n4. Stub renderers/HtmlRenderer.tsx with a placeholder component (real implementation lands in task eeafaa78) so the registry can select it by content_type === \"text/html\".\n5. DocumentViewer.tsx becomes a thin shell: fetch as today; keep header/footer/history-panel scaffolding; delegate content body to the matched renderer.\n6. Unit tests (Vitest) covering dispatch behavior.\n\n## Success Criteria\n\n- [ ] web/src/components/Document/renderers/index.ts exports rendererRegistry (array of DocumentRenderer) and pickRenderer(content, ref?) helper.\n- [ ] pickRenderer({content_type: \"text/html\", ...}) returns the html renderer entry — covered by a unit test.\n- [ ] pickRenderer({content_type: \"text/markdown\", ...}) returns the markdown renderer entry — covered by a unit test.\n- [ ] pickRenderer({content_type: \"application/unknown\", ...}) returns the markdown renderer entry (fallback) — covered by a unit test.\n- [ ] DocumentViewer.tsx contains no direct `from 'react-markdown'` import — markdown rendering is entirely inside MarkdownRenderer.\n- [ ] DocumentViewer.tsx still fetches content via apiClient.getDocumentContent and still renders the header/footer/history scaffolding — existing DocumentViewer tests (if any) continue to pass.\n- [ ] An existing markdown-linked issue rendered through DocumentViewer produces the same DOM structure for heading, code-block, and Mermaid elements as before — covered by a smoke test rendering a fixture and checking for expected elements.\n- [ ] cd web && npm test -- --run passes; npm run lint is clean; npm run build succeeds.\n- [ ] cargo-ci gate passes (no Rust changes expected; gate succeeds trivially).\n- [ ] code-review gate passes.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "high",
   "assignee": "agent:claude",
-  "dependencies": [
-    "9db27a3a-86c5-4d79-9582-9ad68364ea36"
-  ],
+  "dependencies": [],
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -16,7 +14,7 @@
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-04-23T22:07:34.038829713Z"
+      "updated_at": "2026-04-23T22:12:07.517750886Z"
     },
     "code-review": {
       "status": "failed",
@@ -34,5 +32,5 @@
     "component:web"
   ],
   "created_at": "2026-04-23T21:20:52.816918968+00:00",
-  "updated_at": "2026-04-23T22:11:09.086503479+00:00"
+  "updated_at": "2026-04-23T22:15:17.547389514+00:00"
 }
