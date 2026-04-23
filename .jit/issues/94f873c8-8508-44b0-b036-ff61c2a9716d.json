@@ -6,7 +6,7 @@
   "priority": "high",
   "assignee": null,
   "dependencies": [
-    "9db27a3a-86c5-4d79-9582-9ad68364ea36"
+    "abfd6016-a79d-4a5c-9d1d-d5393e7acb2d"
   ],
   "gates_required": [
     "code-review"
@@ -28,5 +28,5 @@
     "component:docs"
   ],
   "created_at": "2025-12-21T19:44:16.802990482Z",
-  "updated_at": "2025-12-21T19:44:47.093390038Z"
+  "updated_at": "2026-04-23T21:20:24.916868915+00:00"
 }

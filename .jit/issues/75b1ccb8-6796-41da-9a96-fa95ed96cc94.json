@@ -1,0 +1,25 @@
+{
+  "id": "75b1ccb8-6796-41da-9a96-fa95ed96cc94",
+  "title": "Server: expand content-type inference + add raw-bytes document endpoint",
+  "description": "Extend crates/server/src/routes.rs:\n\n1. infer_content_type() (line 340) recognizes .html / .htm → text/html.\n2. New route GET /api/issues/:id/documents/:path/raw returns file bytes with Content-Type header set (not JSON-wrapped). Reuses executor.read_document_content() for path resolution.\n3. Symmetric GET /api/documents/raw?path=… for path-only access (mirrors get_document_by_path).\n4. Set CSP response header permitting https: so CDN-hosted assets (e.g. reveal.js from jsdelivr) work through the iframe.\n5. Tests cover text/html inference; raw endpoint success; 404 on missing; correct bytes for a fixture.\n\nAcceptance:\n- curl of the raw endpoint on a .html document returns the file with Content-Type: text/html.\n- Existing JSON content endpoint behavior unchanged.\n- New tests green under cargo test -p jit-server.\n\nPart of story abfd6016 (multi-format doc rendering). Unblocks task eeafaa78 (HtmlRenderer).",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "9db27a3a-86c5-4d79-9582-9ad68364ea36"
+  ],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "epic:docs-lifecycle-p2",
+    "milestone:v1.1",
+    "component:docs",
+    "type:task",
+    "component:web",
+    "component:server"
+  ],
+  "created_at": "2026-04-23T21:20:52.814332637+00:00",
+  "updated_at": "2026-04-23T21:21:56.854772309+00:00"
+}

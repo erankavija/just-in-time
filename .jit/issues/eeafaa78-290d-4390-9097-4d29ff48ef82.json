@@ -1,0 +1,25 @@
+{
+  "id": "eeafaa78-290d-4390-9097-4d29ff48ef82",
+  "title": "Web: HtmlRenderer component with sandboxed iframe and open-in-new-tab",
+  "description": "Add web/src/components/Document/renderers/HtmlRenderer.tsx and wire it into the renderer registry.\n\nRequirements:\n1. Renders <iframe src={rawUrl} sandbox=\"allow-scripts allow-same-origin allow-popups\" title={label} /> at full available height. rawUrl points at the server raw endpoint from task 75b1ccb8 (/api/issues/:id/documents/:path/raw). When content.commit is set, append ?commit=... so pinned-version links still work.\n2. allow-scripts is required for reveal.js; allow-same-origin lets the deck fetch co-located static assets; allow-popups lets in-deck links open.\n3. Header toolbar: document label; path; \"Open in new tab\" button (target=_blank rel=noopener) pointing at rawUrl; content-type badge for parity with Markdown renderer.\n4. Skip search highlighting and the history panel — neither applies through an iframe.\n5. Add getRawDocumentUrl(issueId, path, commit?) helper to web/src/api/client.ts.\n6. Registry selection: content.content_type === \"text/html\" → HtmlRenderer.\n\nAcceptance:\n- Opening a reveal.js .html document through the web UI renders the deck inline with working keyboard navigation and the reveal.js f fullscreen shortcut.\n- \"Open in new tab\" opens the raw HTML standalone.\n- End-to-end: works against the ../gf2 repo's docs/presentations/d4851c3d-modem-framework.html.\n\nDepends on: 75b1ccb8 (server raw endpoint) and 42bd50ce (renderer registry). Part of story abfd6016.",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "42bd50ce-7cd9-47e6-993f-2b9bb7c16a35",
+    "75b1ccb8-6796-41da-9a96-fa95ed96cc94"
+  ],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "epic:docs-lifecycle-p2",
+    "milestone:v1.1",
+    "component:docs",
+    "type:task",
+    "component:web"
+  ],
+  "created_at": "2026-04-23T21:20:52.819819058+00:00",
+  "updated_at": "2026-04-23T21:22:15.894929096+00:00"
+}

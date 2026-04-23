@@ -1,0 +1,27 @@
+{
+  "id": "abfd6016-a79d-4a5c-9d1d-d5393e7acb2d",
+  "title": "Multi-format document rendering in web UI (reveal.js / HTML first)",
+  "description": "Enable non-Markdown issue-linked documents to be viewed through the web UI via a pluggable renderer registry. First concrete child story under Docs Lifecycle Phase 2 (94f873c8)",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "75b1ccb8-6796-41da-9a96-fa95ed96cc94",
+    "42bd50ce-7cd9-47e6-993f-2b9bb7c16a35",
+    "eeafaa78-290d-4390-9097-4d29ff48ef82",
+    "85bd1288-6d6b-4f56-8d2c-ca859df7e92c"
+  ],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "epic:docs-lifecycle-p2",
+    "milestone:v1.1",
+    "component:docs",
+    "type:story",
+    "component:web"
+  ],
+  "created_at": "2026-04-23T21:20:24.883165396+00:00",
+  "updated_at": "2026-04-23T21:21:25.932364722+00:00"
+}

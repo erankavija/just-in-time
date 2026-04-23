@@ -1,0 +1,24 @@
+{
+  "id": "85bd1288-6d6b-4f56-8d2c-ca859df7e92c",
+  "title": "Core: register HtmlAdapter in Rust document format registry",
+  "description": "Add HtmlAdapter to crates/jit/src/document/adapter.rs implementing the DocFormatAdapter trait.\n\nRequirements:\n1. id() → \"html\"\n2. supports_path() → extension html or htm (case-insensitive).\n3. detect() → starts with <!DOCTYPE html or contains <html (case-insensitive).\n4. scan_assets() → coarse extraction of src and href attribute values. Exclude external URLs (http/https); exclude mailto:; exclude anchor-only (#...). Regex-based is acceptable for v1 — asset scanning is not on the critical path for this story.\n5. Register HtmlAdapter in AdapterRegistry::with_builtins().\n6. Unit tests: extension match (positive for .html/.htm; negative for .md); content detection (reveal.js fixture hit; plain text miss); asset-scan smoke test on a reveal.js fixture.\n\nAcceptance:\n- jit document add <issue> <path/to/file.html> records format: \"html\" in the stored DocumentReference.\n- Existing MarkdownAdapter behavior unchanged.\n- No migration of existing stored DocumentReference.format values — new additions only. A retroactive fix-up is tracked as a separate follow-up.\n\nPart of story abfd6016. Independent of the other tasks (a/b/c).",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "9db27a3a-86c5-4d79-9582-9ad68364ea36"
+  ],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "epic:docs-lifecycle-p2",
+    "milestone:v1.1",
+    "component:docs",
+    "type:task",
+    "component:core"
+  ],
+  "created_at": "2026-04-23T21:20:52.822388709+00:00",
+  "updated_at": "2026-04-23T21:22:24.343464404+00:00"
+}
