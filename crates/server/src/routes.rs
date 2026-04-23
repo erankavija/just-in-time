@@ -442,16 +442,20 @@ async fn get_document_raw<S: IssueStore>(
 }
 
 /// Get raw document bytes (path-only variant)
+///
+/// Reads the file as raw bytes to preserve binary content exactly, including
+/// files that may not be valid UTF-8.
 async fn get_document_raw_by_path<S: IssueStore>(
     Query(query): Query<DocumentByPathQuery>,
     State(_state): State<AppState<S>>,
 ) -> Result<Response<Body>, StatusCode> {
     use std::fs;
+    use std::io::ErrorKind;
     use std::path::Path;
 
     let file_path = Path::new(&query.path);
 
-    let content = if let Some(ref commit) = query.commit {
+    let bytes: Vec<u8> = if let Some(ref commit) = query.commit {
         use git2::Repository;
 
         let repo = Repository::open(".").map_err(|e| {
@@ -484,16 +488,24 @@ async fn get_document_raw_by_path<S: IssueStore>(
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
-        String::from_utf8_lossy(blob.content()).to_string()
+        blob.content().to_vec()
     } else {
-        fs::read_to_string(file_path).map_err(|e| {
-            tracing::error!("Failed to read file {}: {:?}", query.path, e);
-            StatusCode::NOT_FOUND
+        // Use fs::read (bytes) instead of read_to_string so that binary files
+        // are served without corruption and non-existence is distinguished from
+        // other I/O errors.
+        fs::read(file_path).map_err(|e| {
+            if e.kind() == ErrorKind::NotFound {
+                tracing::warn!("Document not found: {}", query.path);
+                StatusCode::NOT_FOUND
+            } else {
+                tracing::error!("Failed to read file {}: {:?}", query.path, e);
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
         })?
     };
 
     let content_type = infer_content_type(&query.path);
-    let mut response = Response::new(Body::from(content));
+    let mut response = Response::new(Body::from(bytes));
     response.headers_mut().insert(
         axum::http::header::CONTENT_TYPE,
         HeaderValue::from_str(&content_type)
