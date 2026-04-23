@@ -407,7 +407,36 @@ async fn get_document_content<S: IssueStore>(
     }))
 }
 
+/// Map an anyhow error from document operations to an HTTP status code.
+///
+/// Document-layer errors contain literal "not found" in their message when a
+/// document reference or file is missing; all other errors are internal faults.
+/// This mirrors the same mapping used in `get_document_content` and
+/// `get_document_history`.
+fn document_error_status(e: &anyhow::Error) -> StatusCode {
+    use std::io::ErrorKind;
+    // Try typed IO error first for precision.
+    if let Some(io_err) = e.downcast_ref::<std::io::Error>() {
+        return if io_err.kind() == ErrorKind::NotFound {
+            StatusCode::NOT_FOUND
+        } else {
+            StatusCode::INTERNAL_SERVER_ERROR
+        };
+    }
+    // Fallback: anyhow errors from read_document_content embed "not found" in
+    // their message for missing document references and missing files.
+    if e.to_string().contains("not found") {
+        StatusCode::NOT_FOUND
+    } else {
+        StatusCode::INTERNAL_SERVER_ERROR
+    }
+}
+
 /// Get raw document bytes (issue-scoped variant)
+///
+/// Note: content is sourced via `read_document_content`, which returns `String`
+/// (UTF-8).  Binary documents are therefore not faithfully round-tripped by
+/// this endpoint; see `get_document_raw_by_path` for path-scoped binary reads.
 async fn get_document_raw<S: IssueStore>(
     Path((id, path)): Path<(String, String)>,
     Query(query): Query<DocumentContentQuery>,
@@ -420,15 +449,12 @@ async fn get_document_raw<S: IssueStore>(
         .read_document_content(&id, &path, at_commit)
         .map_err(|e| {
             tracing::error!("Failed to read raw document content: {:?}", e);
-            if e.to_string().contains("not found") {
-                StatusCode::NOT_FOUND
-            } else {
-                StatusCode::INTERNAL_SERVER_ERROR
-            }
+            document_error_status(&e)
         })?;
 
     let content_type = infer_content_type(&path);
-    let mut response = Response::new(Body::from(content));
+    // Convert the String to bytes so Body::from receives an owned byte buffer.
+    let mut response = Response::new(Body::from(content.into_bytes()));
     response.headers_mut().insert(
         axum::http::header::CONTENT_TYPE,
         HeaderValue::from_str(&content_type)
