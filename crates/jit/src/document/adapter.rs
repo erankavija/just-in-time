@@ -6,6 +6,7 @@
 
 use std::collections::HashSet;
 use std::path::Path;
+use std::sync::OnceLock;
 
 /// Trait for document format adapters
 ///
@@ -64,6 +65,17 @@ pub trait DocFormatAdapter {
 ///
 /// - Anchor-only links: `#section`
 /// - Mailto links: `mailto:user@example.com`
+///
+/// # Examples
+///
+/// ```
+/// use jit::document::{DocFormatAdapter, HtmlAdapter};
+///
+/// let adapter = HtmlAdapter;
+/// assert_eq!(adapter.id(), "html");
+/// assert!(adapter.supports_path("index.html"));
+/// assert!(adapter.detect("<!DOCTYPE html><html><body></body></html>"));
+/// ```
 pub struct HtmlAdapter;
 
 impl DocFormatAdapter for HtmlAdapter {
@@ -90,9 +102,13 @@ impl DocFormatAdapter for HtmlAdapter {
     fn scan_assets(&self, content: &str) -> HashSet<String> {
         use regex::Regex;
 
+        static RE: OnceLock<Regex> = OnceLock::new();
+        let re = RE.get_or_init(|| {
+            Regex::new(r#"(?i)(?:src|href)\s*=\s*["']([^"']+)["']"#)
+                .expect("static HTML asset regex is valid")
+        });
+
         let mut assets = HashSet::new();
-        let re = Regex::new(r#"(?i)(?:src|href)\s*=\s*["']([^"']+)["']"#)
-            .expect("static regex is valid");
 
         for cap in re.captures_iter(content) {
             let value = cap[1].trim();

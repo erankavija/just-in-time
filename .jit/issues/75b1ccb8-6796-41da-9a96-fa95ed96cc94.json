@@ -19,9 +19,9 @@
       "updated_at": "2026-04-23T21:32:04.897987142Z"
     },
     "cargo-ci": {
-      "status": "failed",
+      "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-04-23T21:37:22.020139151Z"
+      "updated_at": "2026-04-23T21:43:53.768094881Z"
     }
   },
   "context": {},
@@ -35,5 +35,5 @@
     "component:server"
   ],
   "created_at": "2026-04-23T21:20:52.814332637+00:00",
-  "updated_at": "2026-04-23T21:38:02.399094013+00:00"
+  "updated_at": "2026-04-23T21:44:24.426727002+00:00"
 }

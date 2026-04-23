@@ -95,6 +95,38 @@ fn test_validate_passes_for_uncommitted_document() {
     ctx.jit_assert(&["validate"]).success();
 }
 
+/// `jit doc add` on an `.html` file stores `format == "html"` in the issue.
+#[test]
+fn test_doc_add_html_stores_format_html() {
+    let ctx = TestContext::new();
+    ctx.init_git();
+    ctx.jit_assert(&["init"]).success();
+
+    fs::write(ctx.repo_path.join("README.md"), "# Repo\n").unwrap();
+    ctx.commit_all("initial commit");
+
+    let issue_id = ctx.create_issue("HTML doc task");
+    let doc_path = "docs/index.html";
+    fs::create_dir_all(ctx.repo_path.join("docs")).unwrap();
+    fs::write(
+        ctx.repo_path.join(doc_path),
+        "<!DOCTYPE html><html><body><p>Hello</p></body></html>",
+    )
+    .unwrap();
+
+    ctx.jit_assert(&["doc", "add", &issue_id, doc_path])
+        .success();
+
+    // Read back the issue as JSON and confirm format == "html"
+    let output = ctx.jit(&["issue", "show", &issue_id, "--json"]);
+    assert!(output.status.success(), "issue show failed");
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).expect("parse JSON");
+    let format = json["documents"][0]["format"]
+        .as_str()
+        .expect("format field missing");
+    assert_eq!(format, "html", "expected format 'html', got '{format}'");
+}
+
 /// A document linked to an issue doesn't exist anywhere (not in working tree,
 /// not in git). `jit validate` should fail.
 #[test]

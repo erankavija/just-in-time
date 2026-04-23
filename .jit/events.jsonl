@@ -1966,3 +1966,5 @@
 {"type":"gate_failed","id":"82ca98cb-940c-4b3a-858f-8776a839ad16","issue_id":"85bd1288-6d6b-4f56-8d2c-ca859df7e92c","timestamp":"2026-04-23T21:38:53.903854869Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
 {"type":"gate_failed","id":"c0b2aead-cfd0-4b92-b4fb-40311c677b06","issue_id":"85bd1288-6d6b-4f56-8d2c-ca859df7e92c","timestamp":"2026-04-23T21:42:24.291826041Z","gate_key":"code-review","updated_by":"auto:executor"}
 {"type":"gate_passed","id":"5d175e5c-039f-4042-ad93-30e836a6749d","issue_id":"85bd1288-6d6b-4f56-8d2c-ca859df7e92c","timestamp":"2026-04-23T21:43:53.485783020Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"01517a36-3e68-433d-90a7-04410b68086d","issue_id":"42bd50ce-7cd9-47e6-993f-2b9bb7c16a35","timestamp":"2026-04-23T21:44:20.457822507Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"48cf88ff-3e88-4ecc-a1dc-e7fa29df17a3","issue_id":"75b1ccb8-6796-41da-9a96-fa95ed96cc94","timestamp":"2026-04-23T21:44:24.427098542Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
