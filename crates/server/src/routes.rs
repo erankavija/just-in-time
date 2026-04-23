@@ -268,6 +268,69 @@ struct DocumentByPathQuery {
     commit: Option<String>,
 }
 
+/// Read raw bytes from a file path, optionally at a specific git commit.
+///
+/// Returns the bytes and a commit identifier string ("working-tree" for
+/// filesystem reads).  Centralises the git/filesystem branching so that both
+/// the JSON document endpoint and the raw bytes endpoint share the same I/O
+/// logic without duplication.
+fn read_path_bytes(path: &str, commit: Option<&str>) -> Result<(Vec<u8>, String), StatusCode> {
+    use std::io::ErrorKind;
+    use std::path::Path;
+
+    let file_path = Path::new(path);
+
+    if let Some(commit_ref) = commit {
+        use git2::Repository;
+
+        let repo = Repository::open(".").map_err(|e| {
+            tracing::error!("Failed to open git repository: {:?}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+        let commit_obj = repo.revparse_single(commit_ref).map_err(|e| {
+            tracing::error!("Failed to find commit {}: {:?}", commit_ref, e);
+            StatusCode::NOT_FOUND
+        })?;
+
+        let commit_obj = commit_obj.peel_to_commit().map_err(|e| {
+            tracing::error!("Failed to peel to commit: {:?}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+        let tree = commit_obj.tree().map_err(|e| {
+            tracing::error!("Failed to get commit tree: {:?}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+        let entry = tree.get_path(file_path).map_err(|e| {
+            tracing::error!("File {} not found in commit: {:?}", path, e);
+            StatusCode::NOT_FOUND
+        })?;
+
+        let blob = repo.find_blob(entry.id()).map_err(|e| {
+            tracing::error!("Failed to read blob: {:?}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+        let short_hash = format!("{:.7}", commit_obj.id());
+        Ok((blob.content().to_vec(), short_hash))
+    } else {
+        // Read from filesystem as raw bytes to preserve binary content.
+        std::fs::read(file_path)
+            .map(|bytes| (bytes, "working-tree".to_string()))
+            .map_err(|e| {
+                if e.kind() == ErrorKind::NotFound {
+                    tracing::warn!("File not found: {}", path);
+                    StatusCode::NOT_FOUND
+                } else {
+                    tracing::error!("Failed to read file {}: {:?}", path, e);
+                    StatusCode::INTERNAL_SERVER_ERROR
+                }
+            })
+    }
+}
+
 /// Get document content by path (without requiring issue ID)
 ///
 /// This endpoint allows accessing documents directly by their filesystem path,
@@ -277,67 +340,15 @@ async fn get_document_by_path<S: IssueStore>(
     Query(query): Query<DocumentByPathQuery>,
     State(_state): State<AppState<S>>,
 ) -> Result<Json<DocumentContentResponse>, StatusCode> {
-    use std::fs;
-    use std::path::Path;
-
-    let file_path = Path::new(&query.path);
-
-    // Read from git if commit is specified
-    if let Some(ref commit) = query.commit {
-        use git2::Repository;
-
-        let repo = Repository::open(".").map_err(|e| {
-            tracing::error!("Failed to open git repository: {:?}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-
-        let commit_obj = repo.revparse_single(commit).map_err(|e| {
-            tracing::error!("Failed to find commit {}: {:?}", commit, e);
-            StatusCode::NOT_FOUND
-        })?;
-
-        let commit = commit_obj.peel_to_commit().map_err(|e| {
-            tracing::error!("Failed to peel to commit: {:?}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-
-        let tree = commit.tree().map_err(|e| {
-            tracing::error!("Failed to get commit tree: {:?}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-
-        let entry = tree.get_path(file_path).map_err(|e| {
-            tracing::error!("File {} not found in commit: {:?}", query.path, e);
-            StatusCode::NOT_FOUND
-        })?;
-
-        let blob = repo.find_blob(entry.id()).map_err(|e| {
-            tracing::error!("Failed to read blob: {:?}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-
-        let content = String::from_utf8_lossy(blob.content()).to_string();
-
-        Ok(Json(DocumentContentResponse {
-            path: query.path.clone(),
-            commit: format!("{:.7}", commit.id()),
-            content,
-            content_type: infer_content_type(&query.path),
-        }))
-    } else {
-        // Read from filesystem
-        let content = fs::read_to_string(file_path).map_err(|e| {
-            tracing::error!("Failed to read file {}: {:?}", query.path, e);
-            StatusCode::NOT_FOUND
-        })?;
-
-        Ok(Json(DocumentContentResponse {
-            path: query.path.clone(),
-            commit: "working-tree".to_string(),
-            content,
-            content_type: infer_content_type(&query.path),
-        }))
-    }
+    let (bytes, commit_hash) = read_path_bytes(&query.path, query.commit.as_deref())?;
+    // Convert bytes to String for the JSON response (lossy for binary files).
+    let content = String::from_utf8_lossy(&bytes).into_owned();
+    Ok(Json(DocumentContentResponse {
+        path: query.path.clone(),
+        commit: commit_hash,
+        content,
+        content_type: infer_content_type(&query.path),
+    }))
 }
 
 /// Infer content type from file extension
@@ -469,67 +480,14 @@ async fn get_document_raw<S: IssueStore>(
 
 /// Get raw document bytes (path-only variant)
 ///
-/// Reads the file as raw bytes to preserve binary content exactly, including
-/// files that may not be valid UTF-8.
+/// Delegates I/O to `read_path_bytes` (shared with `get_document_by_path`),
+/// then returns the raw bytes with the inferred Content-Type and CSP headers.
+/// Binary files are served faithfully without UTF-8 conversion.
 async fn get_document_raw_by_path<S: IssueStore>(
     Query(query): Query<DocumentByPathQuery>,
     State(_state): State<AppState<S>>,
 ) -> Result<Response<Body>, StatusCode> {
-    use std::fs;
-    use std::io::ErrorKind;
-    use std::path::Path;
-
-    let file_path = Path::new(&query.path);
-
-    let bytes: Vec<u8> = if let Some(ref commit) = query.commit {
-        use git2::Repository;
-
-        let repo = Repository::open(".").map_err(|e| {
-            tracing::error!("Failed to open git repository: {:?}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-
-        let commit_obj = repo.revparse_single(commit).map_err(|e| {
-            tracing::error!("Failed to find commit {}: {:?}", commit, e);
-            StatusCode::NOT_FOUND
-        })?;
-
-        let commit = commit_obj.peel_to_commit().map_err(|e| {
-            tracing::error!("Failed to peel to commit: {:?}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-
-        let tree = commit.tree().map_err(|e| {
-            tracing::error!("Failed to get commit tree: {:?}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-
-        let entry = tree.get_path(file_path).map_err(|e| {
-            tracing::error!("File {} not found in commit: {:?}", query.path, e);
-            StatusCode::NOT_FOUND
-        })?;
-
-        let blob = repo.find_blob(entry.id()).map_err(|e| {
-            tracing::error!("Failed to read blob: {:?}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-
-        blob.content().to_vec()
-    } else {
-        // Use fs::read (bytes) instead of read_to_string so that binary files
-        // are served without corruption and non-existence is distinguished from
-        // other I/O errors.
-        fs::read(file_path).map_err(|e| {
-            if e.kind() == ErrorKind::NotFound {
-                tracing::warn!("Document not found: {}", query.path);
-                StatusCode::NOT_FOUND
-            } else {
-                tracing::error!("Failed to read file {}: {:?}", query.path, e);
-                StatusCode::INTERNAL_SERVER_ERROR
-            }
-        })?
-    };
-
+    let (bytes, _commit_hash) = read_path_bytes(&query.path, query.commit.as_deref())?;
     let content_type = infer_content_type(&query.path);
     let mut response = Response::new(Body::from(bytes));
     response.headers_mut().insert(
