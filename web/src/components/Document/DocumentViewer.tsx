@@ -22,6 +22,8 @@ export function DocumentViewer({ issueId, documentRef, documentPath, searchQuery
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  // Owned here so the ESC hint in the header stays in sync with renderer state.
+  const [highlightsActive, setHighlightsActive] = useState(true);
 
   const loadContent = useCallback(async (path: string, commit?: string) => {
     try {
@@ -51,6 +53,11 @@ export function DocumentViewer({ issueId, documentRef, documentPath, searchQuery
       loadContent(path, selectedCommit);
     }
   }, [documentPath, documentRef?.path, selectedCommit, loadContent]);
+
+  // Reset highlight state whenever the search query changes so ESC hint reappears.
+  useEffect(() => {
+    setHighlightsActive(true);
+  }, [searchQuery]);
 
   if (loading) {
     return (
@@ -94,9 +101,11 @@ export function DocumentViewer({ issueId, documentRef, documentPath, searchQuery
           {searchQuery && (
             <span style={{ marginLeft: '1rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
               Searching: "{searchQuery}"
-              <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', opacity: 0.7 }}>
-                (ESC to clear)
-              </span>
+              {highlightsActive && (
+                <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', opacity: 0.7 }}>
+                  (ESC to clear)
+                </span>
+              )}
             </span>
           )}
         </div>
@@ -138,6 +147,8 @@ export function DocumentViewer({ issueId, documentRef, documentPath, searchQuery
           issueId={issueId}
           documentRef={documentRef}
           searchTerm={searchQuery}
+          highlightsActive={highlightsActive}
+          onHighlightsCleared={() => setHighlightsActive(false)}
         />
       </div>
 

@@ -1,8 +1,7 @@
 /**
  * DocumentViewer smoke tests: verifies that the renderer-registry dispatch
- * works end-to-end by rendering through DocumentViewer with a mocked API client.
- * Covers heading, fenced code block, and Mermaid diagram parity — all routed
- * through DocumentViewer (not MarkdownRenderer directly).
+ * works end-to-end by rendering a markdown-linked document through DocumentViewer
+ * (not MarkdownRenderer directly) — covers heading, code block, and Mermaid parity.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
@@ -33,35 +32,54 @@ function makeContent(content: string, content_type = 'text/markdown'): DocumentC
   return { path: 'README.md', commit: 'abc1234def5678', content, content_type };
 }
 
+// A single fixture that represents an existing linked markdown document with
+// heading, fenced code block, and Mermaid diagram — the three parity checks
+// required by issue 42bd50ce acceptance criteria.
+const LINKED_DOC_FIXTURE = [
+  '# Project Overview',
+  '',
+  'Here is a code snippet:',
+  '',
+  '```js',
+  'console.log("hello world");',
+  '```',
+  '',
+  'And a diagram:',
+  '',
+  '```mermaid',
+  'graph TD; A-->B;',
+  '```',
+].join('\n');
+
 // Import after mocks are registered
 const { DocumentViewer } = await import('./DocumentViewer');
 
-describe('DocumentViewer — renderer dispatch smoke test', () => {
+describe('DocumentViewer — renderer dispatch smoke test (fixture-backed)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetDocumentHistory.mockResolvedValue({ path: 'README.md', commits: [] });
+    // Default: both fetch methods return the same fixture
+    mockGetDocumentContent.mockResolvedValue(makeContent(LINKED_DOC_FIXTURE));
+    mockGetDocumentByPath.mockResolvedValue(makeContent(LINKED_DOC_FIXTURE));
   });
 
-  it('renders an h1 heading from markdown content via MarkdownRenderer', async () => {
-    mockGetDocumentContent.mockResolvedValue(makeContent('# Heading One'));
+  it('renders an h1 heading from the linked markdown document', async () => {
     render(<DocumentViewer documentPath="README.md" issueId="test-issue-id" />);
     await waitFor(() => {
-      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Heading One');
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Project Overview');
     });
   });
 
-  it('renders a fenced code block from markdown via MarkdownRenderer', async () => {
-    mockGetDocumentContent.mockResolvedValue(makeContent('```js\nconsole.log("hi");\n```'));
+  it('renders a fenced code block from the linked markdown document', async () => {
     render(<DocumentViewer documentPath="README.md" issueId="test-issue-id" />);
     await waitFor(() => {
-      // SyntaxHighlighter or plain code elements will appear in the DOM
+      // SyntaxHighlighter or plain code/pre elements will appear in the DOM
       const codeEl = document.querySelector('code, div[class*="language-"], pre');
       expect(codeEl).toBeTruthy();
     });
   });
 
-  it('renders a Mermaid diagram from markdown via MarkdownRenderer', async () => {
-    mockGetDocumentContent.mockResolvedValue(makeContent('```mermaid\ngraph TD; A-->B;\n```'));
+  it('renders a Mermaid diagram from the linked markdown document', async () => {
     render(<DocumentViewer documentPath="README.md" issueId="test-issue-id" />);
     await waitFor(() => {
       const mermaid = screen.getByTestId('mermaid-diagram');
@@ -71,7 +89,6 @@ describe('DocumentViewer — renderer dispatch smoke test', () => {
   });
 
   it('shows the document footer with commit hash after content loads', async () => {
-    mockGetDocumentContent.mockResolvedValue(makeContent('# Doc'));
     render(<DocumentViewer documentPath="README.md" issueId="test-issue-id" />);
     await waitFor(() => {
       expect(screen.getByText(/Commit:/)).toBeDefined();

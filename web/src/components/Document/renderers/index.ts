@@ -8,6 +8,10 @@ export interface DocumentRendererProps {
   issueId?: string;
   documentRef?: DocumentReference;
   searchTerm?: string;
+  /** Whether search highlights are currently active. Passed from DocumentViewer. */
+  highlightsActive?: boolean;
+  /** Called by the renderer when the user clears highlights (e.g. via ESC). */
+  onHighlightsCleared?: () => void;
 }
 
 export interface DocumentRenderer {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ComponentProps } from 'react';
+import { useEffect, useRef, type ComponentProps } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import remarkGfm from 'remark-gfm';
@@ -68,16 +68,18 @@ const MD_COMPONENTS: ComponentProps<typeof ReactMarkdown>['components'] = {
   },
 };
 
-export default function MarkdownRenderer({ content, searchTerm }: DocumentRendererProps) {
+export default function MarkdownRenderer({
+  content,
+  searchTerm,
+  highlightsActive = true,
+  onHighlightsCleared,
+}: DocumentRendererProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  // Persisted across rerenders so that ESC-to-clear stays cleared when content updates.
-  const [highlightsActive, setHighlightsActive] = useState(true);
 
-  // Handle ESC key to clear highlights
+  // Handle ESC key to clear highlights; notify parent via onHighlightsCleared.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && highlightsActive) {
-        setHighlightsActive(false);
         if (containerRef.current) {
           const marks = containerRef.current.querySelectorAll('mark');
           marks.forEach(mark => {
@@ -86,12 +88,13 @@ export default function MarkdownRenderer({ content, searchTerm }: DocumentRender
             mark.parentNode?.replaceChild(textNode, mark);
           });
         }
+        onHighlightsCleared?.();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [highlightsActive]);
+  }, [highlightsActive, onHighlightsCleared]);
 
   // Highlight search term in rendered content
   useEffect(() => {
