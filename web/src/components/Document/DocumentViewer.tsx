@@ -94,6 +94,9 @@ export function DocumentViewer({ issueId, documentRef, documentPath, searchQuery
           {searchQuery && (
             <span style={{ marginLeft: '1rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
               Searching: "{searchQuery}"
+              <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', opacity: 0.7 }}>
+                (ESC to clear)
+              </span>
             </span>
           )}
         </div>

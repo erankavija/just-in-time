@@ -13,15 +13,15 @@
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-04-23T21:32:04.907552634Z"
-    },
     "cargo-ci": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-04-23T21:32:04.907500944Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-04-23T21:50:51.795137209Z"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-04-23T21:53:01.056143531Z"
     }
   },
   "context": {},
@@ -34,5 +34,5 @@
     "component:web"
   ],
   "created_at": "2026-04-23T21:20:52.816918968+00:00",
-  "updated_at": "2026-04-23T21:36:20.543207562+00:00"
+  "updated_at": "2026-04-23T21:58:49.449367757+00:00"
 }
