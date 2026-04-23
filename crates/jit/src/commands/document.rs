@@ -476,6 +476,23 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// reads).  Used by the server's path-only raw document endpoint so that
     /// filesystem/git I/O stays in the domain layer rather than in route
     /// handlers.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use jit::commands::CommandExecutor;
+    /// use jit::storage::InMemoryStorage;
+    ///
+    /// let storage = InMemoryStorage::new();
+    /// let executor = CommandExecutor::new(storage);
+    ///
+    /// // Read a file from the working tree:
+    /// let (bytes, commit) = executor.read_path_bytes("/path/to/file.md", None).unwrap();
+    /// assert_eq!(commit, "working-tree");
+    ///
+    /// // Read a file at a specific git commit:
+    /// // let (bytes, short_hash) = executor.read_path_bytes("README.md", Some("HEAD")).unwrap();
+    /// ```
     pub fn read_path_bytes(
         &self,
         path: &str,

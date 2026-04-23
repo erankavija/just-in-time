@@ -285,11 +285,7 @@ async fn get_document_by_path<S: IssueStore>(
         .read_path_bytes(&query.path, query.commit.as_deref())
         .map_err(|e| {
             tracing::error!("Failed to read path {}: {:?}", query.path, e);
-            if e.to_string().contains("not found") || e.to_string().contains("Not found") {
-                StatusCode::NOT_FOUND
-            } else {
-                StatusCode::INTERNAL_SERVER_ERROR
-            }
+            document_error_status(&e)
         })?;
     // Convert bytes to String for the JSON response (lossy for binary files).
     let content = String::from_utf8_lossy(&bytes).into_owned();
@@ -442,11 +438,7 @@ async fn get_document_raw_by_path<S: IssueStore>(
         .read_path_bytes(&query.path, query.commit.as_deref())
         .map_err(|e| {
             tracing::error!("Failed to read path {}: {:?}", query.path, e);
-            if e.to_string().contains("not found") || e.to_string().contains("Not found") {
-                StatusCode::NOT_FOUND
-            } else {
-                StatusCode::INTERNAL_SERVER_ERROR
-            }
+            document_error_status(&e)
         })?;
     let content_type = infer_content_type(&query.path);
     let mut response = Response::new(Body::from(bytes));
