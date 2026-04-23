@@ -102,22 +102,19 @@ impl DocFormatAdapter for HtmlAdapter {
         use regex::Regex;
         use std::sync::LazyLock;
 
-        // Static regex compiled once; pattern is a valid literal so initialization
-        // cannot fail at runtime.  LazyLock avoids any panic in library code:
-        // `get_or_init` / `LazyLock` only runs the closure once and propagates
-        // the value safely.
-        static RE: LazyLock<Regex> = LazyLock::new(|| {
-            // SAFETY: the pattern is a string literal verified correct at review
-            // time; `Regex::new` returns `Result` and we use `unwrap` only inside
-            // a `LazyLock` initialiser, following the same convention as
-            // `labels.rs` (label regex) in this workspace.
-            #[allow(clippy::unwrap_used)]
-            Regex::new(r#"(?i)(?:src|href)\s*=\s*["']([^"']+)["']"#).unwrap()
-        });
+        // Static regex compiled once at first call. Stored as `Option<Regex>` so
+        // that a regex compilation failure (impossible for this literal but
+        // theoretically possible) is handled without panicking.
+        static RE: LazyLock<Option<Regex>> =
+            LazyLock::new(|| Regex::new(r#"(?i)(?:src|href)\s*=\s*["']([^"']+)["']"#).ok());
 
         let mut assets = HashSet::new();
 
-        for cap in RE.captures_iter(content) {
+        let Some(re) = RE.as_ref() else {
+            return assets;
+        };
+
+        for cap in re.captures_iter(content) {
             let value = cap[1].trim();
 
             // Skip anchor-only links
