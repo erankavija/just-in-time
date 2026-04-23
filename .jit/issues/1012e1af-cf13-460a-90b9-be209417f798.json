@@ -1,0 +1,22 @@
+{
+  "id": "1012e1af-cf13-460a-90b9-be209417f798",
+  "title": "Bug: jit issue breakdown --description splits on commas, corrupts multi-paragraph descriptions",
+  "description": "## Summary\n\n`jit issue breakdown --child-type task --subtask \"T1\" --subtask \"T2\" --description \"desc one, with commas\" --description \"desc two\"` silently splits each `--description` value on commas before zipping them 1:1 against `--subtask` entries. Multi-paragraph descriptions get shredded into fragments and paired with the wrong subtasks.\n\n## Reproduction\n\n```bash\njit issue breakdown <parent-id> --child-type task \\\n  --subtask \"Task A\" \\\n  --subtask \"Task B\" \\\n  --description \"This is A. It mentions X, Y, and Z.\" \\\n  --description \"This is B. Short.\"\n```\n\nExpected: Task A gets description \"This is A. It mentions X, Y, and Z.\", Task B gets \"This is B. Short.\"\n\nActual: the first description is split on its commas into {\"This is A. It mentions X\", \" Y\", \" and Z.\"}, then the flat fragment list zips to subtasks — Task A gets only \"This is A. It mentions X\", Task B gets \" Y\", and the trailing fragments silently drop on the floor.\n\n## How it was discovered\n\nHit on 2026-04-24 while breaking down story abfd6016 into four tasks (multi-format document rendering). All four task descriptions were corrupted on creation and had to be re-set via `jit issue update --description` — which takes a single string correctly and has no such bug.\n\n## Root cause (hypothesis)\n\nThe clap `#[arg]` attribute on the `SUBTASK_DESCRIPTIONS` field in `jit issue breakdown` almost certainly has (or inherits) `value_delimiter = ','`. Because the flag is `Vec<String>` with multi-occurrence semantics, the delimiter splits within each occurrence before the count is compared to `--subtask`. Remove the delimiter for this field (descriptions are prose — commas belong inside the value).\n\nRelevant files to check:\n- `crates/jit/src/cli.rs` — clap struct for the breakdown subcommand\n- `crates/jit/src/commands/issue.rs` — breakdown handler wiring\n\n## Acceptance criteria\n\n- `jit issue breakdown ... --description \"Prose, with, commas.\"` preserves the description verbatim in the created subtask.\n- Multiple `--description` flags with comma-containing values each map 1:1 to the corresponding `--subtask`.\n- Regression test in integration tests covers: two subtasks, two descriptions each containing at least two commas.\n- `jit issue update --description` behavior unchanged (already correct).\n\n## Related\n\n- Story abfd6016 (multi-format doc rendering) — triggered discovery; descriptions there have already been repaired.",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:bug",
+    "component:cli",
+    "component:core",
+    "epic:production-stability",
+    "milestone:v1.0"
+  ],
+  "created_at": "2026-04-23T21:28:31.776733637+00:00",
+  "updated_at": "2026-04-23T21:28:31.777181297+00:00"
+}

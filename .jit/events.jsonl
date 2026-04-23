@@ -1947,3 +1947,4 @@
 {"type":"issue_state_changed","id":"e787245d-7d59-47d4-90aa-cafd226f242b","issue_id":"42bd50ce-7cd9-47e6-993f-2b9bb7c16a35","timestamp":"2026-04-23T21:20:52.854604888Z","from":"ready","to":"backlog"}
 {"type":"issue_state_changed","id":"6165f8b5-cf35-4255-ad76-303c57857bc8","issue_id":"eeafaa78-290d-4390-9097-4d29ff48ef82","timestamp":"2026-04-23T21:20:52.869957243Z","from":"ready","to":"backlog"}
 {"type":"issue_state_changed","id":"87d9bb61-b7ea-4a97-b77c-1976282e73ef","issue_id":"85bd1288-6d6b-4f56-8d2c-ca859df7e92c","timestamp":"2026-04-23T21:20:52.885993557Z","from":"ready","to":"backlog"}
+{"type":"issue_created","id":"7f3936eb-1389-4ea0-9318-af9d9483616a","issue_id":"1012e1af-cf13-460a-90b9-be209417f798","timestamp":"2026-04-23T21:28:31.777769667Z","title":"Bug: jit issue breakdown --description splits on commas, corrupts multi-paragraph descriptions","priority":"high"}
