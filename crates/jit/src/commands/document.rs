@@ -469,6 +469,68 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(result)
     }
 
+    /// Read a file as raw bytes from the repository, optionally at a git commit.
+    ///
+    /// When `at_commit` is `None`, reads from the working tree.  Returns the
+    /// raw byte content and a commit-hash string ("working-tree" for filesystem
+    /// reads).  Used by the server's path-only raw document endpoint so that
+    /// filesystem/git I/O stays in the domain layer rather than in route
+    /// handlers.
+    pub fn read_path_bytes(
+        &self,
+        path: &str,
+        at_commit: Option<&str>,
+    ) -> Result<(Vec<u8>, String)> {
+        use std::io::ErrorKind;
+
+        if let Some(commit_ref) = at_commit {
+            use git2::Repository;
+
+            // Open the git repository relative to the storage root.
+            let repo_root = self
+                .storage
+                .root()
+                .parent()
+                .ok_or_else(|| anyhow!("Invalid storage path"))?;
+
+            let repo = Repository::open(repo_root)
+                .map_err(|e| anyhow!("Failed to open git repository: {}", e))?;
+
+            let commit_obj = repo
+                .revparse_single(commit_ref)
+                .map_err(|e| anyhow!("Commit {} not found: {}", commit_ref, e))?;
+
+            let commit = commit_obj
+                .peel_to_commit()
+                .map_err(|e| anyhow!("Failed to peel to commit: {}", e))?;
+
+            let tree = commit
+                .tree()
+                .map_err(|e| anyhow!("Failed to get commit tree: {}", e))?;
+
+            let entry = tree
+                .get_path(std::path::Path::new(path))
+                .map_err(|_| anyhow!("File {} not found in commit {}", path, commit_ref))?;
+
+            let blob = repo
+                .find_blob(entry.id())
+                .map_err(|e| anyhow!("Failed to read blob: {}", e))?;
+
+            let short_hash = format!("{:.7}", commit.id());
+            Ok((blob.content().to_vec(), short_hash))
+        } else {
+            std::fs::read(path)
+                .map(|bytes| (bytes, "working-tree".to_string()))
+                .map_err(|e| {
+                    if e.kind() == ErrorKind::NotFound {
+                        anyhow!("File not found: {}", path)
+                    } else {
+                        anyhow!("Failed to read file {}: {}", path, e)
+                    }
+                })
+        }
+    }
+
     fn read_file_from_git(
         &self,
         repo: &git2::Repository,
