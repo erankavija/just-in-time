@@ -269,26 +269,16 @@ impl<S: IssueStore> CommandExecutor<S> {
         })
     }
 
-    /// Map an `anyhow` error from `IssueStore::load_issue` to a typed
-    /// [`PathReadError`].
+    /// Load an issue, returning a typed [`PathReadError`].
     ///
-    /// `load_issue` still returns `anyhow::Error` because refactoring the full
-    /// `IssueStore` trait is out of scope for this bug.  At this adapter
-    /// boundary we do a single string-check on the error message to distinguish
-    /// "issue not found" (→ HTTP 404) from other storage failures (→ HTTP 500).
+    /// Delegates to [`IssueStore::load_issue_or_not_found`], which each
+    /// backend implements without string-matching: `JsonFileStorage` checks for
+    /// file existence structurally, and `InMemoryStorage` checks the HashMap.
     fn load_issue_typed(
         &self,
         issue_id: &str,
     ) -> Result<crate::domain::Issue, crate::storage::PathReadError> {
-        use crate::storage::PathReadError;
-        self.storage.load_issue(issue_id).map_err(|e| {
-            let msg = e.to_string();
-            if msg.contains("not found") || msg.contains("Issue") && msg.contains("not") {
-                PathReadError::NotFound(msg)
-            } else {
-                PathReadError::Other(e)
-            }
-        })
+        self.storage.load_issue_or_not_found(issue_id)
     }
 
     /// Read document content from git or filesystem.

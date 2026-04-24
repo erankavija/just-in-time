@@ -85,6 +85,46 @@ pub trait IssueStore: Clone {
     /// Returns an error if the issue does not exist or cannot be deserialized.
     fn load_issue(&self, id: &str) -> Result<Issue>;
 
+    /// Load an issue by ID, returning a typed [`PathReadError`].
+    ///
+    /// This is the typed-error variant of [`IssueStore::load_issue`] used by
+    /// document command operations that surface HTTP status codes.  Backends
+    /// should override this default to return [`PathReadError::NotFound`] for
+    /// missing issues and [`PathReadError::Other`] for genuine I/O failures,
+    /// without relying on error-message string inspection.
+    ///
+    /// The default implementation delegates to [`load_issue`] and classifies
+    /// errors by message content as a last-resort fallback; backends that can
+    /// distinguish "not found" from "I/O error" structurally should override.
+    ///
+    /// # Errors
+    ///
+    /// - [`PathReadError::NotFound`] when the issue does not exist.
+    /// - [`PathReadError::Other`] for storage or deserialization failures.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use jit::storage::{IssueStore, InMemoryStorage};
+    /// use jit::storage::PathReadError;
+    ///
+    /// let store = InMemoryStorage::new();
+    /// store.init().unwrap();
+    ///
+    /// let result = store.load_issue_or_not_found("nonexistent");
+    /// assert!(matches!(result, Err(PathReadError::NotFound(_))));
+    /// ```
+    fn load_issue_or_not_found(&self, id: &str) -> Result<Issue, PathReadError> {
+        self.load_issue(id).map_err(|e| {
+            let msg = e.to_string().to_lowercase();
+            if msg.contains("not found") {
+                PathReadError::NotFound(e.to_string())
+            } else {
+                PathReadError::Other(e)
+            }
+        })
+    }
+
     /// Resolve a partial issue ID to its full UUID.
     ///
     /// Accepts either a full UUID or a unique prefix (minimum 4 characters).
@@ -293,6 +333,19 @@ pub trait IssueStore: Clone {
     ///
     /// Propagates `PathReadError::NotFound`, `PathReadError::CommitNotFound`,
     /// and `PathReadError::Other` from the underlying `read_path_bytes` call.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use jit::storage::{IssueStore, JsonFileStorage};
+    ///
+    /// let store = JsonFileStorage::new(".jit");
+    ///
+    /// // Read file content as UTF-8 text from the working tree:
+    /// let (text, label) = store.read_path_text("README.md", None).unwrap();
+    /// assert_eq!(label, "working-tree");
+    /// println!("{}", text);
+    /// ```
     fn read_path_text(
         &self,
         path: &str,

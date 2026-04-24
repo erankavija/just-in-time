@@ -7,6 +7,16 @@ use thiserror::Error;
 /// Replaces stringly-typed `anyhow` errors for `IssueStore::read_path_bytes`
 /// so callers (e.g. HTTP route handlers) can branch on the specific failure
 /// without pattern-matching error message strings.
+///
+/// # Examples
+///
+/// ```
+/// use jit::storage::PathReadError;
+///
+/// let err = PathReadError::NotFound("docs/spec.md".to_string());
+/// assert!(matches!(err, PathReadError::NotFound(_)));
+/// assert!(err.to_string().contains("not found"));
+/// ```
 #[derive(Error, Debug)]
 pub enum PathReadError {
     /// The requested file or tree entry does not exist.

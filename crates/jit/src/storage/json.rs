@@ -452,6 +452,32 @@ impl IssueStore for JsonFileStorage {
         ))
     }
 
+    fn load_issue_or_not_found(&self, id: &str) -> Result<Issue, crate::storage::PathReadError> {
+        use crate::storage::PathReadError;
+
+        // Fast path: if the local issue file doesn't exist and git/worktree
+        // fallbacks also fail, we know it's a genuine NotFound without any
+        // I/O error (the file simply isn't there).
+        let issue_path = self.issue_path(id);
+        if !issue_path.exists() {
+            // Try git and main-worktree fallbacks before giving up.
+            if let Ok(issue) = self.load_issue_from_git(id) {
+                return Ok(issue);
+            }
+            if let Ok(issue) = self.load_issue_from_main_worktree(id) {
+                return Ok(issue);
+            }
+            return Err(PathReadError::NotFound(format!(
+                "Issue {} not found in local storage, git, or main worktree",
+                id
+            )));
+        }
+
+        // File exists — delegate to load_issue which handles locking and
+        // deserialization; any remaining error is a genuine I/O/parse failure.
+        self.load_issue(id).map_err(PathReadError::Other)
+    }
+
     fn resolve_issue_id(&self, partial_id: &str) -> Result<String> {
         // Normalize input: lowercase and remove hyphens
         let normalized = partial_id.to_lowercase().replace('-', "");

@@ -1438,4 +1438,56 @@ pattern = '^v\d+\.\d+$'
         let data: ChangesResponse = response.json();
         assert_eq!(data.version, 2);
     }
+
+    // ── path_read_error_status unit tests ─────────────────────────────────────
+
+    /// Verify that `PathReadError::NotFound` → 404 and `Other` → 500.
+    ///
+    /// These are the two invariants the route handlers rely on; having them as
+    /// unit tests ensures a copy-change in the dispatch function is caught
+    /// immediately rather than only at the integration level.
+    #[test]
+    fn test_path_read_error_status_not_found_returns_404() {
+        let err = PathReadError::NotFound("docs/spec.md".to_string());
+        assert_eq!(path_read_error_status(&err), StatusCode::NOT_FOUND);
+    }
+
+    #[test]
+    fn test_path_read_error_status_commit_not_found_returns_404() {
+        let err = PathReadError::CommitNotFound("abc1234".to_string());
+        assert_eq!(path_read_error_status(&err), StatusCode::NOT_FOUND);
+    }
+
+    #[test]
+    fn test_path_read_error_status_other_returns_500() {
+        let err = PathReadError::Other(anyhow::Error::msg("I/O error: permission denied"));
+        assert_eq!(
+            path_read_error_status(&err),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+    }
+
+    /// Verify that the `get_document_by_path` endpoint returns 404 for a
+    /// missing file (relying on typed dispatch, not string-matching).
+    #[tokio::test]
+    async fn test_get_document_by_path_not_found_returns_404() {
+        let server = create_test_app();
+        let response = server
+            .get("/documents")
+            .add_query_param("path", "/absolute/path/does_not_exist.md")
+            .await;
+        assert_eq!(response.status_code(), StatusCode::NOT_FOUND);
+    }
+
+    /// Verify that the `get_document_raw_by_path` endpoint returns 404 for a
+    /// missing file (relying on typed dispatch, not string-matching).
+    #[tokio::test]
+    async fn test_get_document_raw_by_path_returns_404_for_missing() {
+        let server = create_test_app();
+        let response = server
+            .get("/documents/raw")
+            .add_query_param("path", "/absolute/path/does_not_exist.bin")
+            .await;
+        assert_eq!(response.status_code(), StatusCode::NOT_FOUND);
+    }
 }

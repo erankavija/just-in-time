@@ -88,6 +88,17 @@ impl IssueStore for InMemoryStorage {
             .ok_or_else(|| anyhow!("Issue not found: {}", id))
     }
 
+    fn load_issue_or_not_found(&self, id: &str) -> Result<Issue, crate::storage::PathReadError> {
+        use crate::storage::PathReadError;
+        // In-memory: a missing issue is always NotFound (no I/O involved).
+        self.issues
+            .lock()
+            .unwrap()
+            .get(id)
+            .cloned()
+            .ok_or_else(|| PathReadError::NotFound(format!("Issue not found: {}", id)))
+    }
+
     fn resolve_issue_id(&self, partial_id: &str) -> Result<String> {
         // Normalize input: lowercase and remove hyphens
         let normalized = partial_id.to_lowercase().replace('-', "");
