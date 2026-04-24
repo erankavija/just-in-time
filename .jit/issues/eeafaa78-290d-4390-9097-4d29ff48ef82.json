@@ -2,9 +2,9 @@
   "id": "eeafaa78-290d-4390-9097-4d29ff48ef82",
   "title": "Web: HtmlRenderer component with sandboxed iframe and open-in-new-tab",
   "description": "Add web/src/components/Document/renderers/HtmlRenderer.tsx and wire it into the renderer registry so .html documents (e.g. reveal.js presentations) render inline. Depends on tasks 75b1ccb8 (server raw endpoint) and 42bd50ce (renderer registry). Part of story abfd6016.\n\n## Implementation\n\n1. Renders <iframe src={rawUrl} sandbox=\"allow-scripts allow-same-origin allow-popups\" title={label} /> at full available height. rawUrl points at the server raw endpoint (/api/issues/:id/documents/:path/raw). When content.commit is set, append ?commit=… so pinned versions still work.\n2. allow-scripts is required for reveal.js; allow-same-origin lets the deck fetch co-located static assets; allow-popups lets in-deck links open.\n3. Header toolbar: document label, path, \"Open in new tab\" button (target=_blank rel=noopener) pointing at rawUrl, content-type badge.\n4. Skip search highlighting and the history panel (not meaningful through an iframe).\n5. Add getRawDocumentUrl(issueId, path, commit?) helper to web/src/api/client.ts.\n6. Replace the HtmlRenderer stub created in task 42bd50ce with the real component; registry selection logic (content_type === \"text/html\" → HtmlRenderer) unchanged.\n\n## Success Criteria\n\n- [ ] web/src/api/client.ts exports getRawDocumentUrl(issueId, path, commit?) returning a string like /api/issues/<id>/documents/<encoded-path>/raw (with ?commit=… when commit is set) — covered by a unit test.\n- [ ] <HtmlRenderer content={…} issueId=\"x\" documentRef={…} /> renders exactly one <iframe> element with sandbox=\"allow-scripts allow-same-origin allow-popups\" and src equal to getRawDocumentUrl(…) — covered by a rendering unit test.\n- [ ] The header toolbar renders an \"Open in new tab\" link with href equal to the raw URL, target=\"_blank\", and rel=\"noopener\" — covered by a test.\n- [ ] HtmlRenderer does NOT render search-highlighting markers or the history panel — covered by a negative rendering test (e.g. assert no element with the search-highlight class).\n- [ ] When content.commit is present, both the iframe src and the \"Open in new tab\" href include ?commit=<commit> — covered by a test.\n- [ ] End-to-end smoke: when pointed at ../gf2 and opening issue d4851c3d in the web UI, the modem-framework.html deck renders slides inline with working arrow-key navigation. (Record as a manual E2E verification step in the PR/commit, plus an automated test that mounts HtmlRenderer against a minimal reveal.js fixture and asserts the iframe's src resolves.)\n- [ ] cd web && npm test && npm run lint && npm run build all clean.\n- [ ] cargo-ci gate passes (trivially — no Rust changes).\n- [ ] code-review gate passes.",
-  "state": "backlog",
+  "state": "in_progress",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [
     "42bd50ce-7cd9-47e6-993f-2b9bb7c16a35",
     "75b1ccb8-6796-41da-9a96-fa95ed96cc94"
@@ -14,15 +14,15 @@
     "code-review"
   ],
   "gates_status": {
-    "cargo-ci": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-04-23T21:32:04.916805957Z"
-    },
     "code-review": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-04-23T21:32:04.916852537Z"
+    },
+    "cargo-ci": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-04-23T21:32:04.916805957Z"
     }
   },
   "context": {},
@@ -35,5 +35,5 @@
     "component:web"
   ],
   "created_at": "2026-04-23T21:20:52.819819058+00:00",
-  "updated_at": "2026-04-23T21:36:35.924000923+00:00"
+  "updated_at": "2026-04-24T08:19:51.844267201+00:00"
 }
