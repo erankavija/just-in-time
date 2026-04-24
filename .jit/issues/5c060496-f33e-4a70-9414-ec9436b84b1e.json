@@ -12,20 +12,20 @@
     "npm-ci"
   ],
   "gates_status": {
-    "npm-ci": {
-      "status": "passed",
+    "code-review": {
+      "status": "failed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-04-24T21:04:00.162696106Z"
+      "updated_at": "2026-04-24T21:30:06.078158558Z"
     },
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-04-24T21:19:05.970898440Z"
+      "updated_at": "2026-04-24T21:29:38.489887505Z"
     },
-    "code-review": {
-      "status": "failed",
+    "npm-ci": {
+      "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-04-24T21:19:40.038421827Z"
+      "updated_at": "2026-04-24T21:04:00.162696106Z"
     }
   },
   "context": {},
@@ -46,5 +46,5 @@
     "milestone:v1.1"
   ],
   "created_at": "2026-04-24T20:50:25.452331386+00:00",
-  "updated_at": "2026-04-24T21:24:10.784993918+00:00"
+  "updated_at": "2026-04-24T21:37:41.667792343+00:00"
 }

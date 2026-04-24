@@ -403,6 +403,51 @@ fn compute_base_href(html_path: &str) -> String {
     }
 }
 
+/// Check whether a `<base` HTML element is present in a string, ignoring
+/// occurrences that appear inside `<script>`, `<style>`, or `<!--` comment
+/// blocks (plain string scan — no HTML parser dependency).
+fn html_has_base_element(head_content: &str) -> bool {
+    let lower = head_content.to_lowercase();
+    let mut pos = 0;
+    let bytes = lower.as_bytes();
+    let len = bytes.len();
+    while pos < len {
+        // Skip <!-- ... --> comment blocks.
+        if lower[pos..].starts_with("<!--") {
+            if let Some(end) = lower[pos + 4..].find("-->") {
+                pos += 4 + end + 3;
+                continue;
+            } else {
+                break; // unclosed comment — stop scanning
+            }
+        }
+        // Skip <script ... </script> blocks.
+        if lower[pos..].starts_with("<script") {
+            if let Some(end) = lower[pos..].find("</script") {
+                pos += end + 9;
+                continue;
+            } else {
+                break;
+            }
+        }
+        // Skip <style ... </style> blocks.
+        if lower[pos..].starts_with("<style") {
+            if let Some(end) = lower[pos..].find("</style") {
+                pos += end + 8;
+                continue;
+            } else {
+                break;
+            }
+        }
+        // Check for a real <base> element.
+        if lower[pos..].starts_with("<base ") || lower[pos..].starts_with("<base>") {
+            return true;
+        }
+        pos += 1;
+    }
+    false
+}
+
 /// Inject `<base href="...">` into an HTML string so that relative paths
 /// resolve correctly when the document is served from a URL whose directory
 /// doesn't match the source file's location.
@@ -410,7 +455,8 @@ fn compute_base_href(html_path: &str) -> String {
 /// Inserts right after the opening `<head>` (or `<head …attrs…>`) tag.
 /// Falls back to inserting after the opening `<html>` tag if there is no
 /// `<head>`. Returns the string unchanged if:
-/// - It already contains a `<base ` tag inside `<head>` (user intent wins).
+/// - It already contains a real `<base>` element inside `<head>` (user intent wins).
+///   Comments, `<script>`, and `<style>` blocks are skipped during this check.
 /// - There is neither a `<head>` nor an `<html>` element (defensive — don't
 ///   corrupt non-HTML content that was accidentally routed here).
 fn inject_base_href(html: &str, base_href: &str) -> String {
@@ -423,16 +469,15 @@ fn inject_base_href(html: &str, base_href: &str) -> String {
         if let Some(rel_end) = lower[start..].find('>') {
             let tag_end = start + rel_end + 1; // position just after `>`
 
-            // Check if there's already a <base tag before </head>.
-            let lower_before_head_close = if let Some(hc) = lower.find("</head") {
-                &lower[..hc]
+            // Check if there's already a real <base> element before </head>.
+            // Use the script/style/comment-aware helper to avoid false positives.
+            let head_content = if let Some(hc) = lower.find("</head") {
+                &html[..hc]
             } else {
-                &lower[..]
+                html
             };
 
-            if lower_before_head_close.contains("<base ")
-                || lower_before_head_close.contains("<base>")
-            {
+            if html_has_base_element(head_content) {
                 return html.to_string();
             }
 
@@ -562,13 +607,46 @@ async fn get_document_raw<S: IssueStore>(
 /// Delegates I/O to `CommandExecutor::read_path_bytes` so persistence stays
 /// in the domain layer.  Returns raw bytes with the inferred Content-Type and
 /// CSP headers.  Binary files are served faithfully without UTF-8 conversion.
-/// HTML working-tree responses get a `<base href>` injected so sibling assets
-/// resolve via the wildcard `/api/raw/*path` route.
+/// HTML responses get a `<base href>` injected so sibling assets resolve via
+/// the wildcard `/api/raw/*path` route.
+///
+/// For repo-relative working-tree reads, the resolved path is canonicalized to
+/// ensure symlinks cannot escape the repository root.
 async fn get_document_raw_by_path<S: IssueStore>(
     Query(query): Query<DocumentByPathQuery>,
     State(state): State<AppState<S>>,
 ) -> Result<Response<Body>, StatusCode> {
     let at_commit = query.commit.as_deref();
+
+    // For repo-relative working-tree reads, canonicalize to catch symlink escapes.
+    if at_commit.is_none() && !query.path.starts_with('/') {
+        if let Some(repo_root) = state.executor.storage().root().parent() {
+            let resolved = repo_root.join(&query.path);
+            match resolved.canonicalize() {
+                Ok(canonical) => {
+                    let canonical_root = repo_root
+                        .canonicalize()
+                        .unwrap_or_else(|_| repo_root.to_path_buf());
+                    if !canonical.starts_with(&canonical_root) {
+                        tracing::warn!(
+                            "Path traversal via symlink rejected: {} → {}",
+                            query.path,
+                            canonical.display()
+                        );
+                        return Err(StatusCode::BAD_REQUEST);
+                    }
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                    // File not found — let read_path_bytes return a proper 404.
+                }
+                Err(e) => {
+                    tracing::error!("Failed to canonicalize path {}: {:?}", query.path, e);
+                    return Err(StatusCode::INTERNAL_SERVER_ERROR);
+                }
+            }
+        }
+    }
+
     let (bytes, _commit_hash) = state
         .executor
         .read_path_bytes(&query.path, at_commit)
@@ -2036,6 +2114,30 @@ pattern = '^v\d+\.\d+$'
         let result = inject_base_href(html, "/api/raw/");
         // Should return the original string unchanged.
         assert_eq!(result, html);
+    }
+
+    #[test]
+    fn test_inject_base_href_injects_when_base_only_in_script() {
+        // A `<base>` string appearing inside a <script> block is NOT a real
+        // `<base>` element — injection must still happen.
+        let html =
+            r#"<html><head><script>var s = "<base href='x'>";</script></head><body></body></html>"#;
+        let result = inject_base_href(html, "/api/raw/");
+        assert!(
+            result.contains(r#"<base href="/api/raw/">"#),
+            "<base> inside script must not block injection; got: {result}"
+        );
+    }
+
+    #[test]
+    fn test_inject_base_href_injects_when_base_only_in_comment() {
+        // A `<base>` string inside an HTML comment is not a real element.
+        let html = "<html><head><!-- <base href='x'> --></head><body></body></html>";
+        let result = inject_base_href(html, "/api/raw/");
+        assert!(
+            result.contains(r#"<base href="/api/raw/">"#),
+            "<base> inside comment must not block injection; got: {result}"
+        );
     }
 
     #[test]
