@@ -6,14 +6,15 @@
   "priority": "critical",
   "assignee": null,
   "dependencies": [
-    "93f3e4df-990c-4993-b8dc-66a8827acba7",
-    "d7bfd4a4-b2ad-477a-977e-e3242b77b7a2",
-    "41d07c6b-24ff-4d4d-8f7f-56daba93bfd7",
+    "a4e3cfb0-626e-4a73-8be4-364dd0597833",
+    "ad601a15-5217-439f-9b3c-94a52c06c18b",
     "4a00b2b0-a527-4f04-9475-62f1d838f903",
     "9d427a6b-a8f7-4478-a0e1-1637781e00f6",
-    "ad601a15-5217-439f-9b3c-94a52c06c18b",
+    "93f3e4df-990c-4993-b8dc-66a8827acba7",
+    "94f873c8-8508-44b0-b036-ff61c2a9716d",
     "5fe00921-6548-4263-b428-f1e839f68c74",
-    "a4e3cfb0-626e-4a73-8be4-364dd0597833"
+    "d7bfd4a4-b2ad-477a-977e-e3242b77b7a2",
+    "41d07c6b-24ff-4d4d-8f7f-56daba93bfd7"
   ],
   "gates_required": [
     "code-review"
@@ -26,5 +27,5 @@
     "milestone:v1.0"
   ],
   "created_at": "2025-12-18T20:35:58.694584821Z",
-  "updated_at": "2026-03-09T19:55:02.055634303+00:00"
+  "updated_at": "2026-04-24T20:57:07.539517944+00:00"
 }
