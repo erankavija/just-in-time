@@ -2079,3 +2079,5 @@
 {"type":"issue_state_changed","id":"22dc0c29-5e9c-4e85-ad96-fbea52db916a","issue_id":"abfd6016-a79d-4a5c-9d1d-d5393e7acb2d","timestamp":"2026-04-24T14:16:45.054185248Z","from":"ready","to":"done"}
 {"type":"issue_completed","id":"3bb4bc6d-a33d-4a9b-b3d0-e909f019f363","issue_id":"abfd6016-a79d-4a5c-9d1d-d5393e7acb2d","timestamp":"2026-04-24T14:16:45.054236518Z"}
 {"type":"issue_state_changed","id":"90c86cfb-5bfc-44f0-8321-60759d0798a6","issue_id":"94f873c8-8508-44b0-b036-ff61c2a9716d","timestamp":"2026-04-24T14:16:45.138521622Z","from":"backlog","to":"ready"}
+{"type":"issue_created","id":"c5e1ac0d-eb6f-4f04-9525-b738036039c6","issue_id":"5c060496-f33e-4a70-9414-ec9436b84b1e","timestamp":"2026-04-24T20:50:25.453675836Z","title":"Bug: relative asset paths in HTML decks fail to resolve (figures, styles, sub-slides)","priority":"high"}
+{"type":"issue_state_changed","id":"24455d9b-3519-4e25-8463-f9192f04fbdd","issue_id":"94f873c8-8508-44b0-b036-ff61c2a9716d","timestamp":"2026-04-24T20:50:31.119061157Z","from":"ready","to":"backlog"}
