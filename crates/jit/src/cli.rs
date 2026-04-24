@@ -394,7 +394,8 @@ pub enum IssueCommands {
         subtask_titles: Vec<String>,
 
         /// Subtask descriptions (optional, must match number of subtasks)
-        #[arg(long = "description", value_delimiter = ',')]
+        // Descriptions are prose; never split on commas.
+        #[arg(long = "description")]
         subtask_descriptions: Vec<String>,
 
         /// Apply gate preset to all subtasks
@@ -1516,4 +1517,47 @@ pub enum HooksCommands {
         #[arg(long)]
         json: bool,
     },
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::Parser;
+
+    // Regression: each --description was being split on commas before being
+    // zipped against --subtask, shredding prose descriptions. Descriptions
+    // must be taken verbatim.
+    #[test]
+    fn breakdown_description_preserves_commas_verbatim() {
+        let d1 = "This is A. It mentions X, Y, and Z.";
+        let d2 = "This is B. Short, but, commas.";
+        let cli = Cli::parse_from([
+            "jit",
+            "issue",
+            "breakdown",
+            "parent-id",
+            "--child-type",
+            "task",
+            "--subtask",
+            "Task A",
+            "--subtask",
+            "Task B",
+            "--description",
+            d1,
+            "--description",
+            d2,
+        ]);
+
+        let Some(Commands::Issue(IssueCommands::Breakdown {
+            subtask_titles,
+            subtask_descriptions,
+            ..
+        })) = cli.command
+        else {
+            panic!("expected issue breakdown variant");
+        };
+
+        assert_eq!(subtask_titles, vec!["Task A", "Task B"]);
+        assert_eq!(subtask_descriptions, vec![d1, d2]);
+    }
 }
