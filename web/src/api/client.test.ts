@@ -173,3 +173,48 @@ describe('apiClient - Document Methods', () => {
     });
   });
 });
+
+describe('getRawDocumentUrl', () => {
+  it('returns issue-scoped raw URL with encoded path', async () => {
+    const { getRawDocumentUrl } = await import('./client');
+    const url = getRawDocumentUrl('issue-1', 'docs/presentations/deck.html');
+    expect(url).toBe('/api/issues/issue-1/documents/docs%2Fpresentations%2Fdeck.html/raw');
+  });
+
+  it('URL-encodes paths with spaces', async () => {
+    const { getRawDocumentUrl } = await import('./client');
+    const url = getRawDocumentUrl('issue-1', 'docs/my file.html');
+    expect(url).toBe('/api/issues/issue-1/documents/docs%2Fmy%20file.html/raw');
+  });
+
+  it('appends ?commit= query param when commit is provided', async () => {
+    const { getRawDocumentUrl } = await import('./client');
+    const url = getRawDocumentUrl('issue-1', 'index.html', 'deadbeef');
+    expect(url).toBe('/api/issues/issue-1/documents/index.html/raw?commit=deadbeef');
+  });
+
+  it('omits commit param when commit is undefined', async () => {
+    const { getRawDocumentUrl } = await import('./client');
+    const url = getRawDocumentUrl('issue-1', 'index.html', undefined);
+    expect(url).not.toContain('commit');
+    expect(url).toBe('/api/issues/issue-1/documents/index.html/raw');
+  });
+
+  it('returns path-only variant when issueId is null', async () => {
+    const { getRawDocumentUrl } = await import('./client');
+    const url = getRawDocumentUrl(null, 'shared/doc.html');
+    expect(url).toBe('/api/documents/raw?path=shared%2Fdoc.html');
+  });
+
+  it('returns path-only variant when issueId is undefined', async () => {
+    const { getRawDocumentUrl } = await import('./client');
+    const url = getRawDocumentUrl(undefined, 'shared/doc.html');
+    expect(url).toBe('/api/documents/raw?path=shared%2Fdoc.html');
+  });
+
+  it('appends commit to path-only variant', async () => {
+    const { getRawDocumentUrl } = await import('./client');
+    const url = getRawDocumentUrl(null, 'shared/doc.html', 'abc123');
+    expect(url).toBe('/api/documents/raw?path=shared%2Fdoc.html&commit=abc123');
+  });
+});

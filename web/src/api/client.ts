@@ -129,3 +129,24 @@ export const apiClient = {
     return response.data;
   },
 };
+
+/**
+ * Returns the URL for the raw bytes of a document attached to an issue.
+ * When `issueId` is provided the URL uses the issue-scoped endpoint:
+ *   /api/issues/<id>/documents/<encoded-path>/raw[?commit=…]
+ * When `issueId` is omitted it falls back to the path-only endpoint:
+ *   /api/documents/raw?path=<encoded>[&commit=…]
+ */
+export function getRawDocumentUrl(issueId: string, path: string, commit?: string): string;
+export function getRawDocumentUrl(issueId: undefined | null, path: string, commit?: string): string;
+export function getRawDocumentUrl(issueId: string | undefined | null, path: string, commit?: string): string {
+  if (issueId) {
+    const encodedPath = encodeURIComponent(path);
+    const base = `/api/issues/${issueId}/documents/${encodedPath}/raw`;
+    return commit ? `${base}?commit=${encodeURIComponent(commit)}` : base;
+  }
+  // Path-only variant
+  const params = new URLSearchParams({ path });
+  if (commit) params.set('commit', commit);
+  return `/api/documents/raw?${params.toString()}`;
+}
