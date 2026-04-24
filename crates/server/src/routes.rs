@@ -391,9 +391,8 @@ fn compute_base_href(html_path: &str) -> String {
 /// blocks (plain string scan — no HTML parser dependency).
 fn html_has_base_element(head_content: &str) -> bool {
     let lower = head_content.to_lowercase();
+    let len = lower.len();
     let mut pos = 0;
-    let bytes = lower.as_bytes();
-    let len = bytes.len();
     while pos < len {
         // Skip <!-- ... --> comment blocks.
         if lower[pos..].starts_with("<!--") {
@@ -426,7 +425,10 @@ fn html_has_base_element(head_content: &str) -> bool {
         if lower[pos..].starts_with("<base ") || lower[pos..].starts_with("<base>") {
             return true;
         }
-        pos += 1;
+        // Advance by one UTF-8 char, not one byte — slicing `lower[pos..]`
+        // panics if `pos` falls inside a multi-byte character (e.g. non-ASCII
+        // text in a <title>).
+        pos += lower[pos..].chars().next().map_or(1, char::len_utf8);
     }
     false
 }
@@ -2116,6 +2118,26 @@ pattern = '^v\d+\.\d+$'
             inject_base_href(doctype_only, "/api/raw/"),
             doctype_only,
             "DOCTYPE-only/comment-only HTML fragment without <html> must be returned unchanged"
+        );
+    }
+
+    #[test]
+    fn test_inject_base_href_handles_non_ascii_in_head() {
+        // Regression: non-ASCII characters (em-dash, accents, etc.) inside
+        // <head> caused a panic in html_has_base_element when advancing a byte
+        // cursor past a multi-byte UTF-8 character. Must now advance by char.
+        let html = "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\">\n    <title>grand and sogrand in gf2 — reproducing yuan–médard–galligan–duffy</title>\n</head>\n<body></body>\n</html>";
+        let result = inject_base_href(html, "/api/raw/docs/presentations/");
+        assert!(
+            result.contains("<base href=\"/api/raw/docs/presentations/\">"),
+            "base tag must be injected even when <head> contains non-ASCII characters"
+        );
+        // Must be inserted right after <head>, not inside the title.
+        let head_open_end = result.find("<head>").unwrap() + "<head>".len();
+        let base_start = result.find("<base").unwrap();
+        assert_eq!(
+            base_start, head_open_end,
+            "base tag must be inserted immediately after <head>"
         );
     }
 
