@@ -155,13 +155,19 @@ export const apiClient = {
 export function getRawDocumentUrl(issueId: string, path: string, commit?: string): string;
 export function getRawDocumentUrl(issueId: undefined | null, path: string, commit?: string): string;
 export function getRawDocumentUrl(issueId: string | undefined | null, path: string, commit?: string): string {
+  // "working-tree" is the server's sentinel in DocumentContent.commit meaning
+  // "this content was read from the working tree, no specific git commit".
+  // Echoing it back as ?commit=working-tree makes the server try to resolve
+  // "working-tree" as a git ref → 404. Treat it as "no commit" instead.
+  const realCommit = commit && commit !== 'working-tree' ? commit : undefined;
+
   if (issueId) {
     const encodedPath = encodeURIComponent(path);
     const base = `/api/issues/${issueId}/documents/${encodedPath}/raw`;
-    return commit ? `${base}?commit=${encodeURIComponent(commit)}` : base;
+    return realCommit ? `${base}?commit=${encodeURIComponent(realCommit)}` : base;
   }
   // Path-only variant
   const params = new URLSearchParams({ path });
-  if (commit) params.set('commit', commit);
+  if (realCommit) params.set('commit', realCommit);
   return `/api/documents/raw?${params.toString()}`;
 }

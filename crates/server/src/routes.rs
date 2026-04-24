@@ -327,6 +327,11 @@ pub(crate) fn infer_content_type(path: &str) -> String {
     .to_string()
 }
 
+// Defense-in-depth policy for raw document responses. Permits same-origin,
+// HTTPS, and data: URLs for scripts/styles/images/fonts — enough for typical
+// user-authored HTML (reveal.js decks loading from jsdelivr, inline
+// initialization scripts) while blocking plain http:// resources and
+// restricting the origin otherwise.
 const CSP_HEADER: &str = "default-src 'self' https: data:; script-src 'self' 'unsafe-inline' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:;";
 
 /// Query parameters for document content

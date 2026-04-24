@@ -217,4 +217,18 @@ describe('getRawDocumentUrl', () => {
     const url = getRawDocumentUrl(null, 'shared/doc.html', 'abc123');
     expect(url).toBe('/api/documents/raw?path=shared%2Fdoc.html&commit=abc123');
   });
+
+  it('strips "working-tree" sentinel commit (issue-scoped)', async () => {
+    const { getRawDocumentUrl } = await import('./client');
+    const url = getRawDocumentUrl('issue-1', 'index.html', 'working-tree');
+    expect(url).not.toContain('commit');
+    expect(url).toBe('/api/issues/issue-1/documents/index.html/raw');
+  });
+
+  it('strips "working-tree" sentinel commit (path-only)', async () => {
+    const { getRawDocumentUrl } = await import('./client');
+    const url = getRawDocumentUrl(null, 'index.html', 'working-tree');
+    expect(url).not.toContain('commit');
+    expect(url).toBe('/api/documents/raw?path=index.html');
+  });
 });
