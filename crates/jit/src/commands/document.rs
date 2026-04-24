@@ -338,6 +338,63 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok((content, "working-tree".to_string()))
     }
 
+    /// Read raw document bytes for an issue-scoped path (byte-faithful variant).
+    ///
+    /// Unlike [`read_document_content`], this method does not convert file
+    /// content to `String`, so binary artifacts are round-tripped without loss.
+    ///
+    /// Steps:
+    /// 1. Load the issue and verify that `path` is linked as a `DocumentReference`.
+    /// 2. Resolve the effective commit: explicit `at_commit` → doc's pinned commit → `None`.
+    /// 3. For working-tree reads, resolve the document path relative to the repo
+    ///    root so callers do not need to know the on-disk layout.
+    /// 4. Delegate to `IssueStore::read_path_bytes` with the resolved path and commit.
+    ///
+    /// Note: Part of public API used by jit-server.
+    #[allow(dead_code)]
+    pub fn read_document_bytes(
+        &self,
+        issue_id: &str,
+        path: &str,
+        at_commit: Option<&str>,
+    ) -> Result<(Vec<u8>, String)> {
+        let issue = self.storage.load_issue(issue_id)?;
+
+        let doc = issue
+            .documents
+            .iter()
+            .find(|d| d.path == path)
+            .ok_or_else(|| {
+                anyhow!(
+                    "Document reference {} not found in issue {}",
+                    path,
+                    issue_id
+                )
+            })?;
+
+        // Prefer explicit at_commit; fall back to the doc's pinned commit; then
+        // None (working-tree read).
+        let effective_commit = at_commit.or(doc.commit.as_deref());
+
+        // For git reads the path is always relative (passed to tree.get_path).
+        // For working-tree reads, resolve relative paths against the repo root
+        // so the caller does not depend on the process CWD.
+        let resolved_path =
+            if effective_commit.is_none() && !std::path::Path::new(&doc.path).is_absolute() {
+                let repo_root = self
+                    .storage
+                    .root()
+                    .parent()
+                    .ok_or_else(|| anyhow!("Invalid storage path"))?;
+                repo_root.join(&doc.path).to_string_lossy().into_owned()
+            } else {
+                doc.path.clone()
+            };
+
+        self.storage
+            .read_path_bytes(&resolved_path, effective_commit)
+    }
+
     /// Get document history from git.
     ///
     /// Note: Part of public API used by jit-server.
@@ -471,11 +528,12 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     /// Read a file as raw bytes from the repository, optionally at a git commit.
     ///
-    /// When `at_commit` is `None`, reads from the working tree.  Returns the
-    /// raw byte content and a commit-hash string ("working-tree" for filesystem
-    /// reads).  Used by the server's path-only raw document endpoint so that
-    /// filesystem/git I/O stays in the domain layer rather than in route
-    /// handlers.
+    /// Delegates to `IssueStore::read_path_bytes` so that all filesystem/git I/O
+    /// stays in the storage layer.  Returns the raw byte content and a
+    /// commit-hash string (`"working-tree"` for filesystem reads).
+    ///
+    /// Used by the server's raw document endpoints to serve binary-faithful
+    /// content without UTF-8 conversion.
     ///
     /// # Examples
     ///
@@ -498,54 +556,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         path: &str,
         at_commit: Option<&str>,
     ) -> Result<(Vec<u8>, String)> {
-        use std::io::ErrorKind;
-
-        if let Some(commit_ref) = at_commit {
-            use git2::Repository;
-
-            // Open the git repository relative to the storage root.
-            let repo_root = self
-                .storage
-                .root()
-                .parent()
-                .ok_or_else(|| anyhow!("Invalid storage path"))?;
-
-            let repo = Repository::open(repo_root)
-                .map_err(|e| anyhow!("Failed to open git repository: {}", e))?;
-
-            let commit_obj = repo
-                .revparse_single(commit_ref)
-                .map_err(|e| anyhow!("Commit {} not found: {}", commit_ref, e))?;
-
-            let commit = commit_obj
-                .peel_to_commit()
-                .map_err(|e| anyhow!("Failed to peel to commit: {}", e))?;
-
-            let tree = commit
-                .tree()
-                .map_err(|e| anyhow!("Failed to get commit tree: {}", e))?;
-
-            let entry = tree
-                .get_path(std::path::Path::new(path))
-                .map_err(|_| anyhow!("File {} not found in commit {}", path, commit_ref))?;
-
-            let blob = repo
-                .find_blob(entry.id())
-                .map_err(|e| anyhow!("Failed to read blob: {}", e))?;
-
-            let short_hash = format!("{:.7}", commit.id());
-            Ok((blob.content().to_vec(), short_hash))
-        } else {
-            std::fs::read(path)
-                .map(|bytes| (bytes, "working-tree".to_string()))
-                .map_err(|e| {
-                    if e.kind() == ErrorKind::NotFound {
-                        anyhow!("File not found: {}", path)
-                    } else {
-                        anyhow!("Failed to read file {}: {}", path, e)
-                    }
-                })
-        }
+        self.storage.read_path_bytes(path, at_commit)
     }
 
     fn read_file_from_git(

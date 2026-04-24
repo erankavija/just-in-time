@@ -245,6 +245,17 @@ pub trait IssueStore: Clone {
         &self,
         preset: &crate::gate_presets::GatePresetDefinition,
     ) -> Result<std::path::PathBuf>;
+
+    /// Read file bytes from the repository, optionally at a specific git commit.
+    ///
+    /// When `at_commit` is `None`, reads from the working tree.  Returns
+    /// `(bytes, commit_label)` where `commit_label` is the short git hash when
+    /// reading from git, or `"working-tree"` when reading from disk.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file does not exist or cannot be read.
+    fn read_path_bytes(&self, path: &str, at_commit: Option<&str>) -> Result<(Vec<u8>, String)>;
 }
 
 #[cfg(test)]

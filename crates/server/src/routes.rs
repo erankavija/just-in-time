@@ -391,9 +391,10 @@ fn document_error_status(e: &anyhow::Error) -> StatusCode {
 
 /// Get raw document bytes (issue-scoped variant)
 ///
-/// Note: content is sourced via `read_document_content`, which returns `String`
-/// (UTF-8).  Binary documents are therefore not faithfully round-tripped by
-/// this endpoint; see `get_document_raw_by_path` for path-scoped binary reads.
+/// Verifies that `path` is linked to the requested issue, then reads the file
+/// as raw bytes via `read_document_bytes` (which delegates to
+/// `IssueStore::read_path_bytes`).  Binary artifacts are served faithfully
+/// without any UTF-8 conversion.
 async fn get_document_raw<S: IssueStore>(
     Path((id, path)): Path<(String, String)>,
     Query(query): Query<DocumentContentQuery>,
@@ -401,17 +402,16 @@ async fn get_document_raw<S: IssueStore>(
 ) -> Result<Response<Body>, StatusCode> {
     let at_commit = query.commit.as_deref();
 
-    let (content, _commit_hash) = state
+    let (bytes, _commit_hash) = state
         .executor
-        .read_document_content(&id, &path, at_commit)
+        .read_document_bytes(&id, &path, at_commit)
         .map_err(|e| {
-            tracing::error!("Failed to read raw document content: {:?}", e);
+            tracing::error!("Failed to read raw document bytes: {:?}", e);
             document_error_status(&e)
         })?;
 
     let content_type = infer_content_type(&path);
-    // Convert the String to bytes so Body::from receives an owned byte buffer.
-    let mut response = Response::new(Body::from(content.into_bytes()));
+    let mut response = Response::new(Body::from(bytes));
     response.headers_mut().insert(
         axum::http::header::CONTENT_TYPE,
         HeaderValue::from_str(&content_type)
@@ -1278,6 +1278,70 @@ pattern = '^v\d+\.\d+$'
         let url = format!("/issues/{}/documents/nonexistent.html/raw", id);
         let response = server.get(&url).await;
         assert_eq!(response.status_code(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn test_get_document_raw_returns_byte_faithful_for_non_utf8() {
+        use jit::domain::Priority;
+        use jit::storage::JsonFileStorage;
+        use std::fs;
+
+        // 4-byte sequence that is not valid UTF-8.
+        let binary_fixture: &[u8] = b"\xff\xfe\xfd\xfc";
+
+        let temp = tempfile::tempdir().unwrap();
+        let jit_dir = temp.path().join(".jit");
+        fs::create_dir_all(&jit_dir).unwrap();
+        fs::write(
+            jit_dir.join("config.toml"),
+            "[worktree]\nenforce_leases = \"off\"\n",
+        )
+        .unwrap();
+
+        let storage = JsonFileStorage::new(&jit_dir);
+        storage.init().unwrap();
+        let executor = Arc::new(CommandExecutor::new(storage));
+
+        let (id, _) = executor
+            .create_issue(
+                "Binary test".to_string(),
+                "desc".to_string(),
+                Priority::Normal,
+                vec![],
+                vec![],
+            )
+            .unwrap();
+
+        // Write binary fixture with a .dat extension (catches the text/plain fallback).
+        let doc_rel = "artifact.dat";
+        let doc_abs = temp.path().join(doc_rel);
+        fs::write(&doc_abs, binary_fixture).unwrap();
+
+        executor
+            .add_document_reference(&id, doc_rel, None, None, None, true)
+            .unwrap();
+
+        // Keep tempdir alive.
+        Box::leak(Box::new(temp));
+
+        let tracker = Arc::new(ChangeTracker::new(16));
+        let state = AppState {
+            executor,
+            tracker,
+            project_name: "test-project".to_string(),
+        };
+        let server = TestServer::new(create_routes(state)).unwrap();
+
+        let url = format!("/issues/{}/documents/{}/raw", id, doc_rel);
+        let response = server.get(&url).await;
+        response.assert_status_ok();
+
+        // Body bytes must be identical to the original binary fixture.
+        let body_bytes = response.as_bytes().to_vec();
+        assert_eq!(
+            body_bytes, binary_fixture,
+            "raw endpoint must return byte-identical content for non-UTF-8 artifacts"
+        );
     }
 
     // ── /api/documents/raw?path=... tests ────────────────────────────────────

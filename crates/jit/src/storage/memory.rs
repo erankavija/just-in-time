@@ -236,6 +236,21 @@ impl IssueStore for InMemoryStorage {
             "InMemoryStorage does not support saving custom presets"
         ))
     }
+
+    fn read_path_bytes(&self, path: &str, _at_commit: Option<&str>) -> Result<(Vec<u8>, String)> {
+        // InMemoryStorage has no filesystem or git backing; read directly from
+        // disk using the supplied absolute path (used by server tests that
+        // write fixture files to a tempdir and pass the absolute path).
+        std::fs::read(path)
+            .map(|bytes| (bytes, "working-tree".to_string()))
+            .map_err(|e| {
+                if e.kind() == std::io::ErrorKind::NotFound {
+                    anyhow!("File not found: {}", path)
+                } else {
+                    anyhow!("Failed to read file {}: {}", path, e)
+                }
+            })
+    }
 }
 
 #[cfg(test)]

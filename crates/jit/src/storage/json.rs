@@ -688,8 +688,6 @@ impl IssueStore for JsonFileStorage {
         &self,
         preset: &crate::gate_presets::GatePresetDefinition,
     ) -> Result<std::path::PathBuf> {
-        use std::fs;
-
         // Validate preset
         preset.validate()?;
 
@@ -705,6 +703,56 @@ impl IssueStore for JsonFileStorage {
         fs::rename(&temp_path, &preset_path)?;
 
         Ok(preset_path)
+    }
+
+    fn read_path_bytes(&self, path: &str, at_commit: Option<&str>) -> Result<(Vec<u8>, String)> {
+        use std::io::ErrorKind;
+
+        if let Some(commit_ref) = at_commit {
+            use git2::Repository;
+
+            // Resolve repo root: parent of the .jit directory.
+            let repo_root = self
+                .root
+                .parent()
+                .ok_or_else(|| anyhow!("Invalid storage path"))?;
+
+            let repo = Repository::open(repo_root)
+                .map_err(|e| anyhow!("Failed to open git repository: {}", e))?;
+
+            let commit_obj = repo
+                .revparse_single(commit_ref)
+                .map_err(|e| anyhow!("Commit {} not found: {}", commit_ref, e))?;
+
+            let commit = commit_obj
+                .peel_to_commit()
+                .map_err(|e| anyhow!("Failed to peel to commit: {}", e))?;
+
+            let tree = commit
+                .tree()
+                .map_err(|e| anyhow!("Failed to get commit tree: {}", e))?;
+
+            let entry = tree
+                .get_path(std::path::Path::new(path))
+                .map_err(|_| anyhow!("File {} not found in commit {}", path, commit_ref))?;
+
+            let blob = repo
+                .find_blob(entry.id())
+                .map_err(|e| anyhow!("Failed to read blob: {}", e))?;
+
+            let short_hash = format!("{:.7}", commit.id());
+            Ok((blob.content().to_vec(), short_hash))
+        } else {
+            fs::read(path)
+                .map(|bytes| (bytes, "working-tree".to_string()))
+                .map_err(|e| {
+                    if e.kind() == ErrorKind::NotFound {
+                        anyhow!("File not found: {}", path)
+                    } else {
+                        anyhow!("Failed to read file {}: {}", path, e)
+                    }
+                })
+        }
     }
 }
 
