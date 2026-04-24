@@ -2012,3 +2012,4 @@
 {"type":"gate_passed","id":"ad553a62-dc83-43af-9ddd-60b196cf6532","issue_id":"75b1ccb8-6796-41da-9a96-fa95ed96cc94","timestamp":"2026-04-23T22:40:12.055674036Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
 {"type":"gate_failed","id":"85da36fb-1606-416e-9c60-7c10cef1b28f","issue_id":"75b1ccb8-6796-41da-9a96-fa95ed96cc94","timestamp":"2026-04-23T22:45:14.394468236Z","gate_key":"code-review","updated_by":"auto:executor"}
 {"type":"gate_passed","id":"b292e2ec-b2d4-4d59-a657-322d2e09eed0","issue_id":"75b1ccb8-6796-41da-9a96-fa95ed96cc94","timestamp":"2026-04-24T01:34:31.787135339Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"acc6f21a-eded-46ba-882c-bb1366841d37","issue_id":"75b1ccb8-6796-41da-9a96-fa95ed96cc94","timestamp":"2026-04-24T01:39:40.904941848Z","gate_key":"code-review","updated_by":"auto:executor"}

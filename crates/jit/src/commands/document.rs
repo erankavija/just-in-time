@@ -347,10 +347,31 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// 1. Load the issue and verify that `path` is linked as a `DocumentReference`.
     /// 2. Resolve the effective commit: explicit `at_commit` → doc's pinned commit → `None`.
     /// 3. For working-tree reads, resolve the document path relative to the repo
-    ///    root so callers do not need to know the on-disk layout.
+    ///    root so callers do not need to know the process CWD.
     /// 4. Delegate to `IssueStore::read_path_bytes` with the resolved path and commit.
     ///
     /// Note: Part of public API used by jit-server.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use jit::commands::CommandExecutor;
+    /// use jit::storage::JsonFileStorage;
+    ///
+    /// let storage = JsonFileStorage::new(".jit");
+    /// let executor = CommandExecutor::new(storage);
+    ///
+    /// // Read working-tree bytes for a document linked to issue "abc123":
+    /// let (bytes, label) = executor
+    ///     .read_document_bytes("abc123", "docs/spec.md", None)
+    ///     .unwrap();
+    /// assert_eq!(label, "working-tree");
+    ///
+    /// // Read bytes at a specific git commit:
+    /// // let (bytes, hash) = executor
+    /// //     .read_document_bytes("abc123", "docs/spec.md", Some("HEAD"))
+    /// //     .unwrap();
+    /// ```
     #[allow(dead_code)]
     pub fn read_document_bytes(
         &self,

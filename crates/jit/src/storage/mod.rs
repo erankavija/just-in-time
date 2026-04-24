@@ -255,6 +255,21 @@ pub trait IssueStore: Clone {
     /// # Errors
     ///
     /// Returns an error if the file does not exist or cannot be read.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use jit::storage::{IssueStore, JsonFileStorage};
+    ///
+    /// let store = JsonFileStorage::new(".jit");
+    ///
+    /// // Read from the working tree (path must be absolute or relative to CWD):
+    /// let (bytes, label) = store.read_path_bytes("/repo/README.md", None).unwrap();
+    /// assert_eq!(label, "working-tree");
+    ///
+    /// // Read from a specific git commit:
+    /// // let (bytes, hash) = store.read_path_bytes("README.md", Some("HEAD")).unwrap();
+    /// ```
     fn read_path_bytes(&self, path: &str, at_commit: Option<&str>) -> Result<(Vec<u8>, String)>;
 }
 
