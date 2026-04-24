@@ -288,7 +288,13 @@ impl JsonFileStorage {
     ///
     /// This is used when in a secondary worktree to read uncommitted issues
     /// from the main worktree.
-    fn load_issue_from_main_worktree(&self, id: &str) -> Result<Issue> {
+    /// Load an issue from the main worktree's `.jit/` directory.
+    ///
+    /// Returns `Ok(Some(issue))` when found, `Ok(None)` when the issue is
+    /// absent or this worktree setup does not have an accessible main worktree
+    /// (not in git, already in main worktree, non-standard layout), and `Err`
+    /// for genuine I/O or parse failures on a file that does exist.
+    fn load_issue_from_main_worktree(&self, id: &str) -> Result<Option<Issue>> {
         // self.root is .jit/, we need to go up one level to the repo root
         let repo_root = self
             .root
@@ -302,14 +308,10 @@ impl JsonFileStorage {
             .current_dir(repo_root)
             .output();
 
-        if output.is_err() {
-            bail!("Not in a git repository");
-        }
-
-        let output = output.unwrap();
-        if !output.status.success() {
-            bail!("Not in a git repository");
-        }
+        let output = match output {
+            Ok(o) if o.status.success() => o,
+            _ => return Ok(None), // not in git or git unavailable
+        };
 
         let common_dir = PathBuf::from(String::from_utf8(output.stdout)?.trim());
 
@@ -320,25 +322,23 @@ impl JsonFileStorage {
             .output()?;
 
         if !output.status.success() {
-            bail!("Failed to get worktree root");
+            return Ok(None); // cannot determine worktree layout
         }
 
         let worktree_root = PathBuf::from(String::from_utf8(output.stdout)?.trim());
 
-        // Check if we're in main worktree
+        // Check if we're in main worktree — if so, there's nothing more to try
         let is_main = common_dir == worktree_root.join(".git");
         if is_main {
-            bail!("Already in main worktree");
+            return Ok(None);
         }
 
         // Calculate main worktree path
-        // The common_dir (.git) is shared, so we need to find the main worktree root
-        // Main worktree is typically the parent of the .git directory
         let main_worktree_root = if common_dir.file_name().unwrap() == ".git" {
             common_dir.parent().unwrap().to_path_buf()
         } else {
-            // Bare repo or non-standard setup
-            bail!("Cannot determine main worktree location");
+            // Bare repo or non-standard setup — cannot locate main worktree
+            return Ok(None);
         };
 
         let main_issue_path = main_worktree_root
@@ -346,11 +346,11 @@ impl JsonFileStorage {
             .join(format!("{}.json", id));
 
         if !main_issue_path.exists() {
-            bail!("Issue not in main worktree");
+            return Ok(None); // issue absent from main worktree
         }
 
-        // Read directly from main worktree (no lock needed for read-only access)
-        self.read_json(&main_issue_path)
+        // File exists — read it; any I/O or parse error is a real failure.
+        self.read_json(&main_issue_path).map(Some)
     }
 
     /// Check if the current worktree is a secondary git worktree.
@@ -452,8 +452,10 @@ impl IssueStore for JsonFileStorage {
         }
 
         // Fallback 2: Try reading from main worktree (if in secondary)
-        if let Ok(issue) = self.load_issue_from_main_worktree(id) {
-            return Ok(issue);
+        match self.load_issue_from_main_worktree(id) {
+            Ok(Some(issue)) => return Ok(issue),
+            Ok(None) => {} // absent from main worktree or not applicable; continue
+            Err(e) => return Err(e), // genuine I/O/parse failure
         }
 
         // Issue not found in any source
@@ -488,11 +490,13 @@ impl IssueStore for JsonFileStorage {
             Err(e) => return Err(PathReadError::Other(e)),
         }
 
-        // Main-worktree fallback: still anyhow-based.  Any failure here is
-        // treated as "not available" — we don't return Other because the worktree
-        // check is optional (only applies in secondary-worktree setups).
-        if let Ok(issue) = self.load_issue_from_main_worktree(id) {
-            return Ok(issue);
+        // Main-worktree fallback (only meaningful in secondary-worktree setups).
+        // Now returns Ok(Option) so we can distinguish real I/O failures from
+        // "not applicable / not present".
+        match self.load_issue_from_main_worktree(id) {
+            Ok(Some(issue)) => return Ok(issue),
+            Ok(None) => {} // absent or not applicable; fall through to NotFound
+            Err(e) => return Err(PathReadError::Other(e)), // genuine I/O failure → 500
         }
 
         Err(PathReadError::NotFound(format!(

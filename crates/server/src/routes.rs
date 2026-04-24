@@ -1585,4 +1585,138 @@ pattern = '^v\d+\.\d+$'
             "reading a directory via get_document_raw_by_path should return 500"
         );
     }
+
+    /// `GET /issues/:id/documents/:path/content` must return 500 when reading
+    /// the document file fails with a genuine I/O error (e.g. EISDIR).
+    ///
+    /// The document is linked to a relative path with `skip_scan=true` so the
+    /// reference is stored without any read being attempted during linking.
+    /// When the route handler subsequently calls `read_document_content` →
+    /// `read_path_text` → `read_path_bytes`, the relative path is resolved
+    /// against the repo root.  Since that path is a directory, trying to read
+    /// it yields EISDIR, which maps to `PathReadError::Other` → HTTP 500.
+    #[tokio::test]
+    async fn test_get_document_content_io_error_returns_500() {
+        use jit::domain::Priority;
+        use jit::storage::JsonFileStorage;
+        use std::fs;
+
+        let temp = tempfile::tempdir().unwrap();
+        let jit_dir = temp.path().join(".jit");
+        fs::create_dir_all(&jit_dir).unwrap();
+        fs::write(
+            jit_dir.join("config.toml"),
+            "[worktree]\nenforce_leases = \"off\"\n",
+        )
+        .unwrap();
+
+        // Create a subdirectory at repo_root/broken-doc.  read_document_content
+        // resolves relative paths against repo_root, so reading "broken-doc"
+        // will attempt to read a directory → EISDIR → PathReadError::Other.
+        let dir_path = temp.path().join("broken-doc");
+        fs::create_dir_all(&dir_path).unwrap();
+        // Use a relative path so the URL stays clean (no slashes in the segment).
+        let doc_rel = "broken-doc";
+
+        let storage = JsonFileStorage::new(&jit_dir);
+        storage.init().unwrap();
+        let executor = Arc::new(CommandExecutor::new(storage));
+
+        let (id, _) = executor
+            .create_issue(
+                "IO error test".to_string(),
+                "desc".to_string(),
+                Priority::Normal,
+                vec![],
+                vec![],
+            )
+            .unwrap();
+
+        // Link the directory path as a document (skip_scan=true avoids the read
+        // during registration so we can store the bad reference).
+        executor
+            .add_document_reference(&id, doc_rel, None, None, None, true)
+            .unwrap();
+
+        Box::leak(Box::new(temp));
+
+        let tracker = Arc::new(ChangeTracker::new(16));
+        let state = AppState {
+            executor,
+            tracker,
+            project_name: "test-project".to_string(),
+        };
+        let server = TestServer::new(create_routes(state)).unwrap();
+
+        let url = format!("/issues/{}/documents/{}/content", id, doc_rel);
+        let response = server.get(&url).await;
+        assert_eq!(
+            response.status_code(),
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "reading a directory via get_document_content should return 500"
+        );
+    }
+
+    /// `GET /issues/:id/documents/:path/raw` must return 500 when reading
+    /// the document file fails with a genuine I/O error (e.g. EISDIR).
+    ///
+    /// Same EISDIR trigger as `test_get_document_content_io_error_returns_500`
+    /// but exercises the `get_document_raw` handler path through
+    /// `read_document_bytes` → `read_path_bytes` → `PathReadError::Other`.
+    #[tokio::test]
+    async fn test_get_document_raw_io_error_returns_500() {
+        use jit::domain::Priority;
+        use jit::storage::JsonFileStorage;
+        use std::fs;
+
+        let temp = tempfile::tempdir().unwrap();
+        let jit_dir = temp.path().join(".jit");
+        fs::create_dir_all(&jit_dir).unwrap();
+        fs::write(
+            jit_dir.join("config.toml"),
+            "[worktree]\nenforce_leases = \"off\"\n",
+        )
+        .unwrap();
+
+        // Directory → EISDIR when read → PathReadError::Other → 500.
+        let dir_path = temp.path().join("broken-raw-doc");
+        fs::create_dir_all(&dir_path).unwrap();
+        let doc_rel = "broken-raw-doc";
+
+        let storage = JsonFileStorage::new(&jit_dir);
+        storage.init().unwrap();
+        let executor = Arc::new(CommandExecutor::new(storage));
+
+        let (id, _) = executor
+            .create_issue(
+                "IO error raw test".to_string(),
+                "desc".to_string(),
+                Priority::Normal,
+                vec![],
+                vec![],
+            )
+            .unwrap();
+
+        executor
+            .add_document_reference(&id, doc_rel, None, None, None, true)
+            .unwrap();
+
+        Box::leak(Box::new(temp));
+
+        let tracker = Arc::new(ChangeTracker::new(16));
+        let state = AppState {
+            executor,
+            tracker,
+            project_name: "test-project".to_string(),
+        };
+        let server = TestServer::new(create_routes(state)).unwrap();
+
+        let url = format!("/issues/{}/documents/{}/raw", id, doc_rel);
+        let response = server.get(&url).await;
+        assert_eq!(
+            response.status_code(),
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "reading a directory via get_document_raw should return 500"
+        );
+    }
 }
