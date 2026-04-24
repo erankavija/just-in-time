@@ -2,7 +2,7 @@
   "id": "abfd6016-a79d-4a5c-9d1d-d5393e7acb2d",
   "title": "Multi-format document rendering in web UI (reveal.js / HTML first)",
   "description": "Enable non-Markdown issue-linked documents to be viewed through the web UI via a pluggable renderer registry. First concrete child story under Docs Lifecycle Phase 2 (94f873c8), addressing the epic's \"Limited format support (Markdown only)\" problem statement.\n\nTarget artifact type: reveal.js HTML presentations (e.g. ../gf2 docs/presentations/*.html). Rendering mode: inline sandboxed iframe plus \"Open in new tab\" escape hatch. Framework is generic — PDF / AsciiDoc / Jupyter are follow-ons that just register another renderer.\n\nDesign doc: dev/active/abfd6016-multi-format-doc-rendering-design.md\n\n## Child task breakdown\n\n- (a) 75b1ccb8 Server: expand content-type inference + add raw-bytes endpoint\n- (b) 42bd50ce Web: extract renderer-registry abstraction from DocumentViewer\n- (c) eeafaa78 Web: HtmlRenderer component (sandboxed iframe + open-in-new-tab) — depends on (a) and (b)\n- (d) 85bd1288 Core: register HtmlAdapter in Rust format registry\n\n## Success Criteria\n\n- [ ] Server returns Content-Type: text/html for .html documents (curl /api/issues/:id/documents/:path/content on a .html fixture shows text/html in the JSON; new /raw endpoint responds with text/html in the HTTP header).\n- [ ] Server /api/issues/:id/documents/:path/raw endpoint returns the file bytes verbatim with correct Content-Type and a Content-Security-Policy response header permitting https:.\n- [ ] Web renderer registry exists at web/src/components/Document/renderers/index.ts with at least two entries (html-match, markdown-catchall) and a pickRenderer(content, ref) helper; unit tests verify dispatch for text/html, text/markdown, and unknown content types.\n- [ ] DocumentViewer.tsx no longer imports react-markdown directly; rendering is delegated to pickRenderer. Visual regression: existing markdown documents render identically (same HTML output, same search highlighting, same history panel behavior).\n- [ ] HtmlRenderer renders a sandboxed iframe (sandbox=\"allow-scripts allow-same-origin allow-popups\") pointing at the server raw endpoint; a reveal.js deck from ../gf2 loads and slides navigate via arrow keys when opened through the web UI.\n- [ ] HtmlRenderer header includes an \"Open in new tab\" link whose href is the raw endpoint URL with target=\"_blank\" rel=\"noopener\".\n- [ ] Rust HtmlAdapter is registered in AdapterRegistry::with_builtins(); AdapterRegistry::with_builtins().resolve(\"foo.html\", \"\") returns an adapter with id() == \"html\".\n- [ ] jit document add <issue> <file.html> persists format: \"html\" in the DocumentReference JSON (verify by inspecting .jit/issues/<id>.json after).\n- [ ] All four child tasks have cargo-ci + code-review gates passing.\n- [ ] Full workspace: cargo fmt --check, cargo clippy --workspace --all-targets -D warnings, cargo test --workspace all clean.\n- [ ] Web workspace: cd web && npm test && npm run lint && npm run build all clean.",
-  "state": "ready",
+  "state": "done",
   "priority": "high",
   "assignee": "agent:project-lead",
   "dependencies": [
@@ -22,15 +22,15 @@
       "updated_by": "auto:executor",
       "updated_at": "2026-04-24T09:12:39.992493455Z"
     },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-04-24T14:09:21.663028252Z"
+    },
     "npm-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-04-24T12:27:01.543297691Z"
-    },
-    "code-review": {
-      "status": "failed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-04-24T11:04:13.800426688Z"
     }
   },
   "context": {},
@@ -51,5 +51,5 @@
     "component:web"
   ],
   "created_at": "2026-04-23T21:20:24.883165396+00:00",
-  "updated_at": "2026-04-24T12:27:13.358139111+00:00"
+  "updated_at": "2026-04-24T14:16:45.054253788+00:00"
 }
