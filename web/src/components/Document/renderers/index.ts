@@ -18,6 +18,12 @@ export interface DocumentRenderer {
   id: string;
   match: (content: DocumentContent, ref?: DocumentReference) => boolean;
   Component: React.FC<DocumentRendererProps>;
+  /**
+   * When true, DocumentViewer should suppress the history panel and history
+   * button for this renderer (e.g. HtmlRenderer renders in an iframe, so
+   * commit history navigation is not meaningful).
+   */
+  noHistory?: boolean;
 }
 
 export const rendererRegistry: DocumentRenderer[] = [
@@ -25,6 +31,7 @@ export const rendererRegistry: DocumentRenderer[] = [
     id: 'html',
     match: (c) => c.content_type === 'text/html',
     Component: HtmlRenderer,
+    noHistory: true,
   },
   {
     id: 'markdown',

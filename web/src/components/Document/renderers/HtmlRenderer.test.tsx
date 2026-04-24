@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import HtmlRenderer from './HtmlRenderer';
+import { rendererRegistry } from './index';
 import type { DocumentContent, DocumentReference } from '../../../types/models';
 
 // Mock getRawDocumentUrl so tests are deterministic and don't rely on window.location.
@@ -100,6 +101,7 @@ describe('HtmlRenderer', () => {
     // rel must include both tokens (order may vary)
     const rel = link.getAttribute('rel') ?? '';
     expect(rel).toContain('noopener');
+    expect(rel).toContain('noreferrer');
   });
 
   it('does NOT render search highlights', () => {
@@ -151,5 +153,11 @@ describe('HtmlRenderer', () => {
       />,
     );
     expect(screen.getByText('no-ref.html')).toBeDefined();
+  });
+
+  it('html renderer registry entry has noHistory: true (history panel suppressed)', () => {
+    const htmlEntry = rendererRegistry.find((r) => r.id === 'html');
+    expect(htmlEntry).toBeDefined();
+    expect(htmlEntry?.noHistory).toBe(true);
   });
 });

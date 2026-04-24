@@ -90,7 +90,9 @@ export function DocumentViewer({ issueId, documentRef, documentPath, searchQuery
     return null;
   }
 
-  const Renderer = pickRenderer(content, documentRef).Component;
+  const activeRenderer = pickRenderer(content, documentRef);
+  const Renderer = activeRenderer.Component;
+  const showHistoryControls = !activeRenderer.noHistory;
 
   return (
     <div className="document-viewer">
@@ -110,7 +112,7 @@ export function DocumentViewer({ issueId, documentRef, documentPath, searchQuery
           )}
         </div>
         <div className="document-actions">
-          {issueId && documentRef && (
+          {showHistoryControls && issueId && documentRef && (
             <button
               className="history-btn"
               onClick={() => setShowHistory(!showHistory)}
@@ -127,7 +129,7 @@ export function DocumentViewer({ issueId, documentRef, documentPath, searchQuery
         </div>
       </div>
 
-      {showHistory && issueId && documentRef && (
+      {showHistoryControls && showHistory && issueId && documentRef && (
         <div className="document-history-panel">
           <DocumentHistory
             issueId={issueId}

@@ -26,6 +26,15 @@ vi.mock('../../api/client', () => ({
     get getDocumentByPath() { return mockGetDocumentByPath; },
     get getDocumentHistory() { return mockGetDocumentHistory; },
   },
+  getRawDocumentUrl: (issueId: string | null | undefined, path: string, commit?: string) => {
+    if (issueId) {
+      const base = `/api/issues/${issueId}/documents/${encodeURIComponent(path)}/raw`;
+      return commit ? `${base}?commit=${encodeURIComponent(commit)}` : base;
+    }
+    const params = new URLSearchParams({ path });
+    if (commit) params.set('commit', commit);
+    return `/api/documents/raw?${params.toString()}`;
+  },
 }));
 
 function makeContent(content: string, content_type = 'text/markdown'): DocumentContent {
@@ -93,5 +102,35 @@ describe('DocumentViewer — renderer dispatch smoke test (fixture-backed)', () 
     await waitFor(() => {
       expect(screen.getByText(/Commit:/)).toBeDefined();
     });
+  });
+});
+
+describe('DocumentViewer — HTML renderer suppresses history panel', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetDocumentHistory.mockResolvedValue({ path: 'deck.html', commits: [] });
+    mockGetDocumentContent.mockResolvedValue(
+      makeContent('<!doctype html><html></html>', 'text/html'),
+    );
+    mockGetDocumentByPath.mockResolvedValue(
+      makeContent('<!doctype html><html></html>', 'text/html'),
+    );
+  });
+
+  it('does not render a History button for text/html documents', async () => {
+    render(
+      <DocumentViewer
+        documentPath="deck.html"
+        issueId="html-issue"
+        documentRef={{ path: 'deck.html', label: 'My Deck' }}
+      />,
+    );
+    await waitFor(() => {
+      // The iframe (rendered by HtmlRenderer) should be present
+      expect(document.querySelector('iframe')).toBeTruthy();
+    });
+    // No history button should be in the DOM
+    const historyBtn = document.querySelector('.history-btn');
+    expect(historyBtn).toBeNull();
   });
 });
