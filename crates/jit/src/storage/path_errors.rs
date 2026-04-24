@@ -25,6 +25,17 @@ pub enum PathReadError {
     /// The supplied git commit reference could not be resolved.
     #[error("Commit not found: {0}")]
     CommitNotFound(String),
+    /// The supplied path is not a valid repo-relative path.
+    ///
+    /// Raised when the path is empty, absolute (leading `/`), or contains
+    /// a `..` segment used for traversal.  Route handlers should map this
+    /// to HTTP 400.
+    #[error("Invalid path: {0}")]
+    InvalidPath(String),
+    /// The resolved path escapes the repository root (e.g. via a symlink
+    /// pointing outside the repo).  Route handlers should map this to HTTP 400.
+    #[error("Path resolves outside repo root: {0}")]
+    OutsideRepoRoot(String),
     /// Any other storage or I/O error.
     #[error("Storage error: {0}")]
     Other(#[from] anyhow::Error),

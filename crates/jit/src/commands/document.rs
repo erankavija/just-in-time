@@ -315,22 +315,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         // None (working-tree read).
         let effective_commit = at_commit.or(doc.commit.as_deref());
 
-        // For working-tree reads, resolve the document path relative to the
-        // repo root so the caller does not depend on the process CWD.
-        let resolved_path =
-            if effective_commit.is_none() && !std::path::Path::new(&doc.path).is_absolute() {
-                let repo_root = self
-                    .storage
-                    .root()
-                    .parent()
-                    .ok_or_else(|| PathReadError::Other(anyhow!("Invalid storage path")))?;
-                repo_root.join(&doc.path).to_string_lossy().into_owned()
-            } else {
-                doc.path.clone()
-            };
-
-        self.storage
-            .read_path_text(&resolved_path, effective_commit)
+        // The storage layer now enforces repo-relative paths and canonicalizes
+        // working-tree reads against the repo root (see
+        // `JsonFileStorage::read_path_bytes`), so we pass the stored path
+        // through unchanged.
+        self.storage.read_path_text(&doc.path, effective_commit)
     }
 
     /// Read raw document bytes for an issue-scoped path (byte-faithful variant).
@@ -393,23 +382,14 @@ impl<S: IssueStore> CommandExecutor<S> {
         // None (working-tree read).
         let effective_commit = at_commit.or(doc.commit.as_deref());
 
-        // For git reads the path is always relative (passed to tree.get_path).
-        // For working-tree reads, resolve relative paths against the repo root
-        // so the caller does not depend on the process CWD.
-        let resolved_path =
-            if effective_commit.is_none() && !std::path::Path::new(&doc.path).is_absolute() {
-                let repo_root = self
-                    .storage
-                    .root()
-                    .parent()
-                    .ok_or_else(|| PathReadError::Other(anyhow!("Invalid storage path")))?;
-                repo_root.join(&doc.path).to_string_lossy().into_owned()
-            } else {
-                doc.path.clone()
-            };
-
-        self.storage
-            .read_path_bytes(&resolved_path, effective_commit)
+        // The storage layer now enforces repo-relative paths uniformly (see
+        // `JsonFileStorage::read_path_bytes`): empty, absolute, or `..`-bearing
+        // paths are rejected with `PathReadError::InvalidPath`, and working-tree
+        // reads are canonicalized + containment-checked against the repo root.
+        // That makes pre-resolving to an absolute path here both unnecessary
+        // and actively harmful, so we simply pass the stored repo-relative path
+        // through.
+        self.storage.read_path_bytes(&doc.path, effective_commit)
     }
 
     /// Get document history from git.
@@ -1278,11 +1258,13 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::document::{AdapterRegistry, AssetScanner};
         use std::path::Path;
 
-        let full_path = repo_root.join(doc_path);
-        let full_path_str = full_path.to_string_lossy();
+        // Storage owns the repo-root resolution + containment check now; pass
+        // the repo-relative `doc_path` through rather than pre-joining with
+        // `repo_root` (which would produce an absolute path that the storage
+        // layer rejects as `PathReadError::InvalidPath`).
         let (content, _) = self
             .storage
-            .read_path_text(&full_path_str, None)
+            .read_path_text(doc_path, None)
             .map_err(|e| anyhow::anyhow!("Failed to read document {}: {}", doc_path, e))?;
 
         // Scan for assets
@@ -1345,18 +1327,16 @@ impl<S: IssueStore> CommandExecutor<S> {
         use std::collections::HashSet;
         use std::path::Path;
 
-        let full_path = repo_root.join(doc_path);
-        let full_path_str = full_path.to_string_lossy();
-        let (content, _) = self
-            .storage
-            .read_path_text(&full_path_str, None)
-            .map_err(|e| {
-                anyhow!(
-                    "Failed to read document for link validation {}: {}",
-                    doc_path,
-                    e
-                )
-            })?;
+        // Storage owns the repo-root resolution + containment check; pass
+        // the repo-relative `doc_path` directly rather than pre-joining with
+        // `repo_root`.
+        let (content, _) = self.storage.read_path_text(doc_path, None).map_err(|e| {
+            anyhow!(
+                "Failed to read document for link validation {}: {}",
+                doc_path,
+                e
+            )
+        })?;
 
         // Scan for all assets
         let registry = AdapterRegistry::with_builtins();
@@ -1606,12 +1586,14 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::document::{AdapterRegistry, AssetScanner};
         use std::collections::HashSet;
 
-        // Read archived document content
-        let full_path = repo_root.join(dest_doc);
-        let full_path_str = full_path.to_string_lossy();
+        // Storage resolves repo-relative paths against the repo root (and
+        // enforces containment), so pass `dest_doc` directly rather than
+        // pre-joining it with `repo_root`.  `repo_root` is still used below
+        // for the downstream `AssetScanner` and for asset-existence checks.
+        let dest_doc_str = dest_doc.to_string_lossy();
         let (content, _) = self
             .storage
-            .read_path_text(&full_path_str, None)
+            .read_path_text(&dest_doc_str, None)
             .map_err(|e| {
                 anyhow::anyhow!(
                     "Failed to read archived document for verification {}: {}",

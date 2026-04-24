@@ -273,6 +273,9 @@ struct DocumentByPathQuery {
 fn path_read_error_status(e: &PathReadError) -> StatusCode {
     match e {
         PathReadError::NotFound(_) | PathReadError::CommitNotFound(_) => StatusCode::NOT_FOUND,
+        PathReadError::InvalidPath(_) | PathReadError::OutsideRepoRoot(_) => {
+            StatusCode::BAD_REQUEST
+        }
         PathReadError::Other(_) => StatusCode::INTERNAL_SERVER_ERROR,
     }
 }
@@ -330,26 +333,6 @@ pub(crate) fn infer_content_type(path: &str) -> String {
         "text/plain"
     }
     .to_string()
-}
-
-/// Validate that a path is safe to use as a repo-relative path.
-///
-/// Rejects: empty paths, absolute paths (leading `/`), and paths containing
-/// `..` as a whole segment (e.g. `../etc/passwd`, `a/../b`, `foo/..`).
-/// Allows dots *inside* a segment name (e.g. `foo..bar.txt`).
-fn validate_repo_relative_path(path: &str) -> Result<(), StatusCode> {
-    if path.is_empty() {
-        return Err(StatusCode::BAD_REQUEST);
-    }
-    if path.starts_with('/') {
-        return Err(StatusCode::BAD_REQUEST);
-    }
-    for segment in path.split('/') {
-        if segment == ".." {
-            return Err(StatusCode::BAD_REQUEST);
-        }
-    }
-    Ok(())
 }
 
 /// URL-encode a single path segment (percent-encode non-unreserved chars).
@@ -610,42 +593,16 @@ async fn get_document_raw<S: IssueStore>(
 /// HTML responses get a `<base href>` injected so sibling assets resolve via
 /// the wildcard `/api/raw/*path` route.
 ///
-/// For repo-relative working-tree reads, the resolved path is canonicalized to
-/// ensure symlinks cannot escape the repository root.
+/// Repo-root containment (rejecting empty/absolute/`..` paths and symlink
+/// escapes) is enforced by `JsonFileStorage::read_path_bytes`, which is
+/// invariant-owning for this concern.  Invalid paths and out-of-repo escapes
+/// surface as `PathReadError::InvalidPath` / `PathReadError::OutsideRepoRoot`,
+/// both mapped to HTTP 400 by `path_read_error_status`.
 async fn get_document_raw_by_path<S: IssueStore>(
     Query(query): Query<DocumentByPathQuery>,
     State(state): State<AppState<S>>,
 ) -> Result<Response<Body>, StatusCode> {
     let at_commit = query.commit.as_deref();
-
-    // For repo-relative working-tree reads, canonicalize to catch symlink escapes.
-    if at_commit.is_none() && !query.path.starts_with('/') {
-        if let Some(repo_root) = state.executor.storage().root().parent() {
-            let resolved = repo_root.join(&query.path);
-            match resolved.canonicalize() {
-                Ok(canonical) => {
-                    let canonical_root = repo_root
-                        .canonicalize()
-                        .unwrap_or_else(|_| repo_root.to_path_buf());
-                    if !canonical.starts_with(&canonical_root) {
-                        tracing::warn!(
-                            "Path traversal via symlink rejected: {} → {}",
-                            query.path,
-                            canonical.display()
-                        );
-                        return Err(StatusCode::BAD_REQUEST);
-                    }
-                }
-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                    // File not found — let read_path_bytes return a proper 404.
-                }
-                Err(e) => {
-                    tracing::error!("Failed to canonicalize path {}: {:?}", query.path, e);
-                    return Err(StatusCode::INTERNAL_SERVER_ERROR);
-                }
-            }
-        }
-    }
 
     let (bytes, _commit_hash) = state
         .executor
@@ -656,12 +613,11 @@ async fn get_document_raw_by_path<S: IssueStore>(
         })?;
     let content_type = infer_content_type(&query.path);
 
-    // Inject <base href> into HTML responses where the path is repo-relative
-    // (not an absolute filesystem path).  Absolute paths (e.g. `/tmp/slide.html`)
-    // can't be re-served through `/api/raw/*path`, so injecting a base href there
-    // would produce a broken base URL.  Applied for both working-tree and
-    // commit-pinned reads.
-    let body_bytes = if content_type == "text/html" && !query.path.starts_with('/') {
+    // Inject <base href> into HTML responses.  The storage layer rejects
+    // absolute paths (`PathReadError::InvalidPath`) before we get here, so
+    // every path that reaches this point is repo-relative and re-servable
+    // through `/api/raw/*path`.
+    let body_bytes = if content_type == "text/html" {
         let html = String::from_utf8_lossy(&bytes);
         let base_href = compute_base_href(&query.path);
         inject_base_href(&html, &base_href).into_bytes()
@@ -691,48 +647,16 @@ async fn get_document_raw_by_path<S: IssueStore>(
 /// (SVG figures, CSS, JS) via relative paths — the browser resolves those
 /// paths against the `<base href>` injected by the HTML handlers above.
 ///
-/// Security: path is validated by `validate_repo_relative_path` before I/O.
+/// Security: repo-root containment (rejecting empty/absolute/`..` paths and
+/// symlink escapes) is enforced by `JsonFileStorage::read_path_bytes`.  The
+/// resulting `PathReadError::InvalidPath` / `PathReadError::OutsideRepoRoot`
+/// variants map to HTTP 400 via `path_read_error_status`.
 async fn get_raw_wildcard<S: IssueStore>(
     Path(path): Path<String>,
     Query(query): Query<DocumentContentQuery>,
     State(state): State<AppState<S>>,
 ) -> Result<Response<Body>, StatusCode> {
-    // Validate the path (string-level checks) before any I/O.
-    validate_repo_relative_path(&path)?;
-
     let at_commit = query.commit.as_deref();
-
-    // For working-tree reads, canonicalize the resolved path to catch symlinks
-    // that might escape the repository root (e.g. a symlink to /etc/passwd).
-    // This is skipped for git-pinned reads because they never touch the
-    // filesystem for the blob content itself.
-    if at_commit.is_none() {
-        if let Some(repo_root) = state.executor.storage().root().parent() {
-            let resolved = repo_root.join(&path);
-            match resolved.canonicalize() {
-                Ok(canonical) => {
-                    let canonical_root = repo_root
-                        .canonicalize()
-                        .unwrap_or_else(|_| repo_root.to_path_buf());
-                    if !canonical.starts_with(&canonical_root) {
-                        tracing::warn!(
-                            "Path traversal via symlink rejected: {} → {}",
-                            path,
-                            canonical.display()
-                        );
-                        return Err(StatusCode::BAD_REQUEST);
-                    }
-                }
-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                    // File not found — let read_path_bytes return a proper 404.
-                }
-                Err(e) => {
-                    tracing::error!("Failed to canonicalize path {}: {:?}", path, e);
-                    return Err(StatusCode::INTERNAL_SERVER_ERROR);
-                }
-            }
-        }
-    }
 
     let (bytes, _commit_hash) = state
         .executor
@@ -1703,21 +1627,42 @@ pattern = '^v\d+\.\d+$'
 
     #[tokio::test]
     async fn test_get_document_raw_by_path_html_returns_correct_content_type() {
+        use jit::storage::JsonFileStorage;
         use std::fs;
 
-        // Write a temp HTML file into a tempdir.  Pass the absolute path via
-        // add_query_param so axum_test properly URL-encodes any special chars
-        // (e.g. the slashes in the path on Linux/macOS).
+        // Build a JsonFileStorage-backed server rooted at a tempdir and write
+        // the fixture HTML at a repo-relative path.  Absolute paths are no
+        // longer accepted by the storage layer (they surface as
+        // PathReadError::InvalidPath → 400), so every test must use a
+        // repo-relative path.
         let temp = tempfile::tempdir().unwrap();
-        let doc_path = temp.path().join("slide.html");
-        let html_body = "<p>test</p>";
-        fs::write(&doc_path, html_body).unwrap();
-        let path_str = doc_path.to_string_lossy().into_owned();
+        let jit_dir = temp.path().join(".jit");
+        fs::create_dir_all(&jit_dir).unwrap();
+        fs::write(
+            jit_dir.join("config.toml"),
+            "[worktree]\nenforce_leases = \"off\"\n",
+        )
+        .unwrap();
 
-        let server = create_test_app();
+        let doc_rel = "slide.html";
+        let html_body = "<p>test</p>";
+        fs::write(temp.path().join(doc_rel), html_body).unwrap();
+
+        let storage = JsonFileStorage::new(&jit_dir);
+        storage.init().unwrap();
+        let executor = Arc::new(CommandExecutor::new(storage));
+        Box::leak(Box::new(temp));
+
+        let tracker = Arc::new(ChangeTracker::new(16));
+        let state = AppState {
+            executor,
+            tracker,
+            project_name: "test-project".to_string(),
+        };
+        let server = TestServer::new(create_routes(state)).unwrap();
         let response = server
             .get("/documents/raw")
-            .add_query_param("path", &path_str)
+            .add_query_param("path", doc_rel)
             .await;
         response.assert_status_ok();
         // Verify Content-Type.
@@ -1816,9 +1761,10 @@ pattern = '^v\d+\.\d+$'
     #[tokio::test]
     async fn test_get_document_by_path_not_found_returns_404() {
         let server = create_test_app();
+        // Repo-relative path (absolute paths are rejected as InvalidPath → 400).
         let response = server
             .get("/documents")
-            .add_query_param("path", "/absolute/path/does_not_exist.md")
+            .add_query_param("path", "does_not_exist.md")
             .await;
         assert_eq!(response.status_code(), StatusCode::NOT_FOUND);
     }
@@ -1828,9 +1774,10 @@ pattern = '^v\d+\.\d+$'
     #[tokio::test]
     async fn test_get_document_raw_by_path_returns_404_for_missing() {
         let server = create_test_app();
+        // Repo-relative path (absolute paths are rejected as InvalidPath → 400).
         let response = server
             .get("/documents/raw")
-            .add_query_param("path", "/absolute/path/does_not_exist.bin")
+            .add_query_param("path", "does_not_exist.bin")
             .await;
         assert_eq!(response.status_code(), StatusCode::NOT_FOUND);
     }
@@ -1838,10 +1785,11 @@ pattern = '^v\d+\.\d+$'
     /// Verify that `get_document_by_path` returns HTTP 500 when the storage
     /// layer returns `PathReadError::Other` (i.e., a non-NotFound I/O error).
     ///
-    /// We trigger this by pointing the endpoint at a path that is a directory
-    /// rather than a regular file. `fs::read` on a directory returns `EISDIR`,
-    /// which is neither `io::ErrorKind::NotFound` nor a missing-commit error,
-    /// so `JsonFileStorage::read_path_bytes` maps it to `PathReadError::Other`.
+    /// We trigger this by pointing the endpoint at a repo-relative path that
+    /// resolves to a directory inside the repo root.  `fs::canonicalize`
+    /// succeeds on a directory (so the containment check passes), but the
+    /// subsequent `fs::read` returns `EISDIR`, which maps to
+    /// `PathReadError::Other`.
     #[tokio::test]
     async fn test_get_document_by_path_io_error_returns_500() {
         use jit::storage::JsonFileStorage;
@@ -1856,11 +1804,11 @@ pattern = '^v\d+\.\d+$'
         )
         .unwrap();
 
-        // Create a subdirectory at the path we will request — fs::read on a
-        // directory yields EISDIR, which maps to PathReadError::Other → 500.
-        let dir_path = temp.path().join("not-a-file");
-        fs::create_dir_all(&dir_path).unwrap();
-        let path_str = dir_path.to_string_lossy().into_owned();
+        // Create a subdirectory at repo-root-relative "not-a-file".  The
+        // storage layer joins this against the repo root, canonicalizes it,
+        // then fs::read returns EISDIR → PathReadError::Other → 500.
+        let dir_rel = "not-a-file";
+        fs::create_dir_all(temp.path().join(dir_rel)).unwrap();
 
         let storage = JsonFileStorage::new(&jit_dir);
         storage.init().unwrap();
@@ -1878,7 +1826,7 @@ pattern = '^v\d+\.\d+$'
 
         let response = server
             .get("/documents")
-            .add_query_param("path", &path_str)
+            .add_query_param("path", dir_rel)
             .await;
         assert_eq!(
             response.status_code(),
@@ -1902,9 +1850,8 @@ pattern = '^v\d+\.\d+$'
         )
         .unwrap();
 
-        let dir_path = temp.path().join("also-not-a-file");
-        fs::create_dir_all(&dir_path).unwrap();
-        let path_str = dir_path.to_string_lossy().into_owned();
+        let dir_rel = "also-not-a-file";
+        fs::create_dir_all(temp.path().join(dir_rel)).unwrap();
 
         let storage = JsonFileStorage::new(&jit_dir);
         storage.init().unwrap();
@@ -1921,7 +1868,7 @@ pattern = '^v\d+\.\d+$'
 
         let response = server
             .get("/documents/raw")
-            .add_query_param("path", &path_str)
+            .add_query_param("path", dir_rel)
             .await;
         assert_eq!(
             response.status_code(),
@@ -2172,52 +2119,24 @@ pattern = '^v\d+\.\d+$'
         );
     }
 
-    // ── validate_repo_relative_path unit tests ────────────────────────────────
+    // ── PathReadError → InvalidPath / OutsideRepoRoot mapping ─────────────────
 
+    /// `PathReadError::InvalidPath` must map to HTTP 400.  The storage layer
+    /// raises this for empty paths, absolute paths, and `..` traversal
+    /// attempts, and route handlers must surface those as client errors.
     #[test]
-    fn test_validate_repo_relative_path_accepts_valid_paths() {
-        assert!(validate_repo_relative_path("docs/deck.html").is_ok());
-        assert!(validate_repo_relative_path("a/b/c.svg").is_ok());
-        // Dots INSIDE a segment name are fine — only `..` as a whole segment is forbidden.
-        assert!(validate_repo_relative_path("foo..bar.txt").is_ok());
-        assert!(validate_repo_relative_path("file.html").is_ok());
+    fn test_path_read_error_status_invalid_path_returns_400() {
+        let err = PathReadError::InvalidPath("../etc/passwd".to_string());
+        assert_eq!(path_read_error_status(&err), StatusCode::BAD_REQUEST);
     }
 
+    /// `PathReadError::OutsideRepoRoot` must map to HTTP 400.  The storage
+    /// layer raises this when canonicalization shows the path escapes the
+    /// repo root (e.g. via a symlink).
     #[test]
-    fn test_validate_repo_relative_path_rejects_empty() {
-        assert_eq!(
-            validate_repo_relative_path(""),
-            Err(StatusCode::BAD_REQUEST)
-        );
-    }
-
-    #[test]
-    fn test_validate_repo_relative_path_rejects_absolute() {
-        assert_eq!(
-            validate_repo_relative_path("/abs/path"),
-            Err(StatusCode::BAD_REQUEST)
-        );
-    }
-
-    #[test]
-    fn test_validate_repo_relative_path_rejects_dotdot_segment() {
-        assert_eq!(
-            validate_repo_relative_path("../etc/passwd"),
-            Err(StatusCode::BAD_REQUEST)
-        );
-        assert_eq!(
-            validate_repo_relative_path("a/../b"),
-            Err(StatusCode::BAD_REQUEST)
-        );
-        assert_eq!(
-            validate_repo_relative_path("foo/.."),
-            Err(StatusCode::BAD_REQUEST)
-        );
-        // Multi-level traversal attempts are also rejected.
-        assert_eq!(
-            validate_repo_relative_path("a/../../b"),
-            Err(StatusCode::BAD_REQUEST)
-        );
+    fn test_path_read_error_status_outside_repo_root_returns_400() {
+        let err = PathReadError::OutsideRepoRoot("docs/secret.txt".to_string());
+        assert_eq!(path_read_error_status(&err), StatusCode::BAD_REQUEST);
     }
 
     // ── GET /raw/*path integration tests ─────────────────────────────────────
@@ -2318,13 +2237,13 @@ pattern = '^v\d+\.\d+$'
     async fn test_get_raw_wildcard_rejects_path_traversal_dotdot() {
         // Axum normalizes `..` segments in the URL path before routing, so
         // `/raw/foo/../bar` becomes `/raw/bar` at the routing layer — the `..`
-        // never reaches our handler.  Our `validate_repo_relative_path` guard
-        // acts as defence-in-depth for any `..` that does arrive; the HTTP-level
-        // invariant is already enforced by Axum.
+        // never reaches our handler.  The storage layer's repo-relative path
+        // validation acts as defence-in-depth for any `..` that does arrive;
+        // the HTTP-level invariant is already enforced by Axum.
         //
         // The normalised path `bar` doesn't exist, so the expected status is
-        // 404 (not 400).  Any 4xx response is acceptable; 400 from our validator
-        // would also be fine.
+        // 404 (not 400).  Any 4xx response is acceptable; 400 from the storage
+        // validator would also be fine.
         let server = create_test_app();
         let response = server.get("/raw/foo/../bar").await;
         assert!(
@@ -2515,6 +2434,128 @@ pattern = '^v\d+\.\d+$'
             response.status_code(),
             StatusCode::BAD_REQUEST,
             "symlink escaping repo root must be rejected with 400"
+        );
+    }
+
+    /// A document linked at a path that is (or resolves through) a symlink to
+    /// a file outside the repo root must be rejected with 400 through the
+    /// issue-scoped raw endpoint.  The invariant lives in
+    /// `JsonFileStorage::read_path_bytes` so every handler inherits it.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn test_get_document_raw_rejects_symlink_escape() {
+        use jit::domain::Priority;
+        use jit::storage::JsonFileStorage;
+        use std::fs;
+        use std::os::unix::fs as unix_fs;
+
+        let temp = tempfile::tempdir().unwrap();
+        let jit_dir = temp.path().join(".jit");
+        fs::create_dir_all(&jit_dir).unwrap();
+        fs::write(
+            jit_dir.join("config.toml"),
+            "[worktree]\nenforce_leases = \"off\"\n",
+        )
+        .unwrap();
+
+        // File outside the repo the attacker wants to read.
+        let outside = tempfile::NamedTempFile::new().unwrap();
+        fs::write(outside.path(), b"secret outside repo").unwrap();
+
+        // Symlink at a repo-root-level path (the issue-scoped route
+        // `/issues/:id/documents/:path/raw` treats `:path` as a single URL
+        // segment, so we use a non-nested doc path here).  Link the symlink
+        // as a document to an issue so the issue-scoped raw handler accepts
+        // the path lookup.
+        let doc_rel = "secret.txt";
+        let link_path = temp.path().join(doc_rel);
+        unix_fs::symlink(outside.path(), &link_path).unwrap();
+
+        let storage = JsonFileStorage::new(&jit_dir);
+        storage.init().unwrap();
+        let executor = Arc::new(CommandExecutor::new(storage));
+        let (id, _) = executor
+            .create_issue(
+                "Symlink escape repro".to_string(),
+                "desc".to_string(),
+                Priority::Normal,
+                vec![],
+                vec![],
+            )
+            .unwrap();
+        executor
+            .add_document_reference(&id, doc_rel, None, None, None, true)
+            .unwrap();
+
+        let tracker = Arc::new(ChangeTracker::new(16));
+        let state = AppState {
+            executor,
+            tracker,
+            project_name: "test-project".to_string(),
+        };
+        let server = TestServer::new(create_routes(state)).unwrap();
+        Box::leak(Box::new(temp));
+        Box::leak(Box::new(outside));
+
+        let url = format!("/issues/{}/documents/{}/raw", id, doc_rel);
+        let response = server.get(&url).await;
+        assert_eq!(
+            response.status_code(),
+            StatusCode::BAD_REQUEST,
+            "symlink escaping repo root must be rejected on issue-scoped raw endpoint"
+        );
+    }
+
+    /// Same invariant for the path-only `/documents/raw?path=...` handler:
+    /// if the query path resolves through a symlink to a file outside the
+    /// repo root, the storage layer must reject it with 400.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn test_get_document_raw_by_path_rejects_symlink_escape() {
+        use jit::storage::JsonFileStorage;
+        use std::fs;
+        use std::os::unix::fs as unix_fs;
+
+        let temp = tempfile::tempdir().unwrap();
+        let jit_dir = temp.path().join(".jit");
+        fs::create_dir_all(&jit_dir).unwrap();
+        fs::write(
+            jit_dir.join("config.toml"),
+            "[worktree]\nenforce_leases = \"off\"\n",
+        )
+        .unwrap();
+
+        let outside = tempfile::NamedTempFile::new().unwrap();
+        fs::write(outside.path(), b"secret outside repo").unwrap();
+
+        // Symlink inside the repo pointing to the outside file.
+        let link_rel = "docs/escape.txt";
+        let link_path = temp.path().join(link_rel);
+        fs::create_dir_all(link_path.parent().unwrap()).unwrap();
+        unix_fs::symlink(outside.path(), &link_path).unwrap();
+
+        let storage = JsonFileStorage::new(&jit_dir);
+        storage.init().unwrap();
+        let executor = Arc::new(CommandExecutor::new(storage));
+
+        let tracker = Arc::new(ChangeTracker::new(16));
+        let state = AppState {
+            executor,
+            tracker,
+            project_name: "test-project".to_string(),
+        };
+        let server = TestServer::new(create_routes(state)).unwrap();
+        Box::leak(Box::new(temp));
+        Box::leak(Box::new(outside));
+
+        let response = server
+            .get("/documents/raw")
+            .add_query_param("path", link_rel)
+            .await;
+        assert_eq!(
+            response.status_code(),
+            StatusCode::BAD_REQUEST,
+            "symlink escaping repo root must be rejected on path-only raw endpoint"
         );
     }
 }

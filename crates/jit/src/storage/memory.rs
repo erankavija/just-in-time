@@ -254,10 +254,36 @@ impl IssueStore for InMemoryStorage {
         _at_commit: Option<&str>,
     ) -> Result<(Vec<u8>, String), crate::storage::PathReadError> {
         use crate::storage::PathReadError;
-        // InMemoryStorage has no filesystem or git backing; read directly from
-        // disk using the supplied absolute path (used by server tests that
-        // write fixture files to a tempdir and pass the absolute path).
-        std::fs::read(path)
+        // InMemoryStorage has no filesystem or git backing of its own, but it
+        // must enforce the same repo-relative path contract as JsonFileStorage
+        // so that every IssueStore implementation uniformly rejects empty,
+        // absolute, or `..`-bearing paths.  Containment against a real repo
+        // root is not meaningful here (the synthetic root doesn't correspond
+        // to an on-disk directory), but the shape-level checks still apply.
+        if path.is_empty() {
+            return Err(PathReadError::InvalidPath(
+                "path must not be empty".to_string(),
+            ));
+        }
+        if path.starts_with('/') {
+            return Err(PathReadError::InvalidPath(format!(
+                "absolute paths are not permitted: {}",
+                path
+            )));
+        }
+        for segment in path.split('/') {
+            if segment == ".." {
+                return Err(PathReadError::InvalidPath(format!(
+                    "'..' segment not permitted: {}",
+                    path
+                )));
+            }
+        }
+        // The InMemoryStorage root is a synthetic path and usually does not
+        // exist on disk, so reads will normally fail with NotFound.  Tests
+        // that need real file I/O use `JsonFileStorage` pointed at a tempdir.
+        let joined = self.root_path.join(path);
+        std::fs::read(&joined)
             .map(|bytes| (bytes, "working-tree".to_string()))
             .map_err(|e| {
                 if e.kind() == std::io::ErrorKind::NotFound {
@@ -495,8 +521,10 @@ mod tests {
         let storage = InMemoryStorage::new();
         storage.init().unwrap();
 
-        // Pass a path that does not exist on disk.
-        let result = storage.read_path_bytes("/nonexistent/path/file.md", None);
+        // Pass a repo-relative path that does not exist on disk.  The synthetic
+        // root points at `/tmp/jit-test-{uuid}` which normally doesn't exist,
+        // so the read fails with NotFound.
+        let result = storage.read_path_bytes("nonexistent/path/file.md", None);
         assert!(
             result.is_err(),
             "reading a missing file should return an error"
@@ -504,6 +532,48 @@ mod tests {
         assert!(
             matches!(result.unwrap_err(), PathReadError::NotFound(_)),
             "missing file should yield PathReadError::NotFound, not Other"
+        );
+    }
+
+    #[test]
+    fn test_read_path_bytes_rejects_absolute_path() {
+        use crate::storage::PathReadError;
+
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+
+        let result = storage.read_path_bytes("/etc/passwd", None);
+        assert!(
+            matches!(result, Err(PathReadError::InvalidPath(_))),
+            "absolute path must be rejected as InvalidPath"
+        );
+    }
+
+    #[test]
+    fn test_read_path_bytes_rejects_dotdot_segment() {
+        use crate::storage::PathReadError;
+
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+
+        let result = storage.read_path_bytes("../etc/passwd", None);
+        assert!(
+            matches!(result, Err(PathReadError::InvalidPath(_))),
+            "`..` traversal must be rejected as InvalidPath"
+        );
+    }
+
+    #[test]
+    fn test_read_path_bytes_rejects_empty_path() {
+        use crate::storage::PathReadError;
+
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+
+        let result = storage.read_path_bytes("", None);
+        assert!(
+            matches!(result, Err(PathReadError::InvalidPath(_))),
+            "empty path must be rejected as InvalidPath"
         );
     }
 }

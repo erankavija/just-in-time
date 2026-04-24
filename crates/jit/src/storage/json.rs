@@ -765,14 +765,21 @@ impl IssueStore for JsonFileStorage {
     ) -> Result<(Vec<u8>, String), crate::storage::PathReadError> {
         use crate::storage::PathReadError;
 
+        // Uniform repo-relative path validation (applied for both git-commit
+        // reads and working-tree reads): reject empty paths, absolute paths,
+        // and any `..` segment used for traversal.  This moves the invariant
+        // out of individual route handlers and into the storage boundary so
+        // every caller inherits it.
+        validate_repo_relative_input(path)?;
+
+        // Resolve repo root: parent of the .jit directory.
+        let repo_root = self
+            .root
+            .parent()
+            .ok_or_else(|| PathReadError::Other(anyhow!("Invalid storage path")))?;
+
         if let Some(commit_ref) = at_commit {
             use git2::Repository;
-
-            // Resolve repo root: parent of the .jit directory.
-            let repo_root = self
-                .root
-                .parent()
-                .ok_or_else(|| PathReadError::Other(anyhow!("Invalid storage path")))?;
 
             let repo = Repository::open(repo_root).map_err(|e| {
                 PathReadError::Other(anyhow!("Failed to open git repository: {}", e))
@@ -801,11 +808,35 @@ impl IssueStore for JsonFileStorage {
             let short_hash = format!("{:.7}", commit.id());
             Ok((blob.content().to_vec(), short_hash))
         } else {
-            let repo_root = self
-                .root
-                .parent()
-                .ok_or_else(|| PathReadError::Other(anyhow!("Invalid storage path")))?;
-            fs::read(repo_root.join(path))
+            // Working-tree read.  Canonicalize both the joined path and the
+            // repo root, then verify containment.  This catches symlinks that
+            // point outside the repo root (e.g. `docs/secret -> /etc/passwd`).
+            let joined = repo_root.join(path);
+            let canonical_joined = match std::fs::canonicalize(&joined) {
+                Ok(p) => p,
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                    return Err(PathReadError::NotFound(path.to_string()));
+                }
+                Err(e) => {
+                    return Err(PathReadError::Other(anyhow!(
+                        "Failed to canonicalize {}: {}",
+                        path,
+                        e
+                    )));
+                }
+            };
+            let canonical_root = std::fs::canonicalize(repo_root).map_err(|e| {
+                PathReadError::Other(anyhow!(
+                    "Failed to canonicalize repo root {}: {}",
+                    repo_root.display(),
+                    e
+                ))
+            })?;
+            if !canonical_joined.starts_with(&canonical_root) {
+                return Err(PathReadError::OutsideRepoRoot(path.to_string()));
+            }
+
+            fs::read(&canonical_joined)
                 .map(|bytes| (bytes, "working-tree".to_string()))
                 .map_err(|e| {
                     if e.kind() == std::io::ErrorKind::NotFound {
@@ -816,6 +847,42 @@ impl IssueStore for JsonFileStorage {
                 })
         }
     }
+}
+
+/// Validate that `path` is a safe repo-relative input before any I/O.
+///
+/// Rejects:
+/// - empty paths (`""`)
+/// - absolute paths (leading `/`) — every caller must pass a repo-relative path
+/// - any `..` segment used for traversal (e.g. `../etc/passwd`, `a/../b`, `foo/..`)
+///
+/// Allows dots *inside* a segment (e.g. `foo..bar.txt`) because those are
+/// legitimate filenames and cannot traverse upward.
+///
+/// Returned as `PathReadError::InvalidPath` so route handlers can map to 400.
+fn validate_repo_relative_input(path: &str) -> Result<(), crate::storage::PathReadError> {
+    use crate::storage::PathReadError;
+
+    if path.is_empty() {
+        return Err(PathReadError::InvalidPath(
+            "path must not be empty".to_string(),
+        ));
+    }
+    if path.starts_with('/') {
+        return Err(PathReadError::InvalidPath(format!(
+            "absolute paths are not permitted: {}",
+            path
+        )));
+    }
+    for segment in path.split('/') {
+        if segment == ".." {
+            return Err(PathReadError::InvalidPath(format!(
+                "'..' segment not permitted: {}",
+                path
+            )));
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -1768,6 +1835,109 @@ mod tests {
         assert!(
             matches!(result.unwrap_err(), PathReadError::NotFound(_)),
             "missing file should yield PathReadError::NotFound, not Other"
+        );
+    }
+
+    #[test]
+    fn test_read_path_bytes_rejects_empty_path() {
+        use crate::storage::PathReadError;
+
+        let repo_root = TempDir::new().unwrap();
+        let jit_dir = repo_root.path().join(".jit");
+        fs::create_dir_all(&jit_dir).unwrap();
+        let storage = JsonFileStorage::new(&jit_dir);
+
+        let result = storage.read_path_bytes("", None);
+        assert!(
+            matches!(result, Err(PathReadError::InvalidPath(_))),
+            "empty path must be rejected with InvalidPath"
+        );
+    }
+
+    #[test]
+    fn test_read_path_bytes_rejects_absolute_path() {
+        use crate::storage::PathReadError;
+
+        let repo_root = TempDir::new().unwrap();
+        let jit_dir = repo_root.path().join(".jit");
+        fs::create_dir_all(&jit_dir).unwrap();
+        let storage = JsonFileStorage::new(&jit_dir);
+
+        let result = storage.read_path_bytes("/etc/passwd", None);
+        assert!(
+            matches!(result, Err(PathReadError::InvalidPath(_))),
+            "absolute path must be rejected with InvalidPath (both at working-tree and git-commit read paths)"
+        );
+    }
+
+    #[test]
+    fn test_read_path_bytes_rejects_dotdot_traversal() {
+        use crate::storage::PathReadError;
+
+        let repo_root = TempDir::new().unwrap();
+        let jit_dir = repo_root.path().join(".jit");
+        fs::create_dir_all(&jit_dir).unwrap();
+        let storage = JsonFileStorage::new(&jit_dir);
+
+        for bad in &["../etc/passwd", "a/../b", "foo/..", "a/../../b"] {
+            let result = storage.read_path_bytes(bad, None);
+            assert!(
+                matches!(result, Err(PathReadError::InvalidPath(_))),
+                "`..` traversal must be rejected with InvalidPath: {bad}"
+            );
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_read_path_bytes_accepts_symlink_inside_repo() {
+        use std::os::unix::fs as unix_fs;
+
+        let repo_root = TempDir::new().unwrap();
+        let jit_dir = repo_root.path().join(".jit");
+        fs::create_dir_all(&jit_dir).unwrap();
+
+        // Target file inside the repo.
+        let target = repo_root.path().join("target.md");
+        let expected = b"hello from target";
+        fs::write(&target, expected).unwrap();
+
+        // Symlink inside the repo pointing to another file inside the repo.
+        let link = repo_root.path().join("link.md");
+        unix_fs::symlink(&target, &link).unwrap();
+
+        let storage = JsonFileStorage::new(&jit_dir);
+        let (bytes, label) = storage
+            .read_path_bytes("link.md", None)
+            .expect("symlink inside repo must resolve and read successfully");
+        assert_eq!(bytes, expected);
+        assert_eq!(label, "working-tree");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_read_path_bytes_rejects_symlink_escape() {
+        use crate::storage::PathReadError;
+        use std::os::unix::fs as unix_fs;
+
+        let repo_root = TempDir::new().unwrap();
+        let jit_dir = repo_root.path().join(".jit");
+        fs::create_dir_all(&jit_dir).unwrap();
+
+        // File outside the repo we try to reach via the symlink.
+        let outside = tempfile::NamedTempFile::new().unwrap();
+        fs::write(outside.path(), b"secret outside repo").unwrap();
+
+        // Symlink inside the repo pointing to the outside file.
+        let link = repo_root.path().join("docs").join("escape.txt");
+        fs::create_dir_all(link.parent().unwrap()).unwrap();
+        unix_fs::symlink(outside.path(), &link).unwrap();
+
+        let storage = JsonFileStorage::new(&jit_dir);
+        let result = storage.read_path_bytes("docs/escape.txt", None);
+        assert!(
+            matches!(result, Err(PathReadError::OutsideRepoRoot(_))),
+            "symlink pointing outside repo root must be rejected with OutsideRepoRoot, got: {result:?}"
         );
     }
 }
