@@ -14,7 +14,7 @@ use std::sync::Arc;
 use jit::commands::CommandExecutor;
 use jit::domain::{Gate, GateRunResult, Issue, Priority, State as IssueState};
 use jit::search::{SearchOptions, SearchResult};
-use jit::storage::IssueStore;
+use jit::storage::{IssueStore, PathReadError};
 
 use crate::sse;
 use crate::watcher::ChangeTracker;
@@ -268,6 +268,14 @@ struct DocumentByPathQuery {
     commit: Option<String>,
 }
 
+/// Map a typed `PathReadError` to an HTTP status code.
+fn path_read_error_status(e: &PathReadError) -> StatusCode {
+    match e {
+        PathReadError::NotFound(_) | PathReadError::CommitNotFound(_) => StatusCode::NOT_FOUND,
+        PathReadError::Other(_) => StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
+
 /// Get document content by path (without requiring issue ID)
 ///
 /// This endpoint allows accessing documents directly by their filesystem path,
@@ -285,7 +293,7 @@ async fn get_document_by_path<S: IssueStore>(
         .read_path_bytes(&query.path, query.commit.as_deref())
         .map_err(|e| {
             tracing::error!("Failed to read path {}: {:?}", query.path, e);
-            document_error_status(&e)
+            path_read_error_status(&e)
         })?;
     // Convert bytes to String for the JSON response (lossy for binary files).
     let content = String::from_utf8_lossy(&bytes).into_owned();
@@ -349,11 +357,7 @@ async fn get_document_content<S: IssueStore>(
         .read_document_content(&id, &path, at_commit)
         .map_err(|e| {
             tracing::error!("Failed to read document content: {:?}", e);
-            if e.to_string().contains("not found") {
-                StatusCode::NOT_FOUND
-            } else {
-                StatusCode::INTERNAL_SERVER_ERROR
-            }
+            path_read_error_status(&e)
         })?;
 
     Ok(Json(DocumentContentResponse {
@@ -362,31 +366,6 @@ async fn get_document_content<S: IssueStore>(
         content,
         content_type: infer_content_type(&path),
     }))
-}
-
-/// Map an anyhow error from document operations to an HTTP status code.
-///
-/// Document-layer errors contain literal "not found" in their message when a
-/// document reference or file is missing; all other errors are internal faults.
-/// This mirrors the same mapping used in `get_document_content` and
-/// `get_document_history`.
-fn document_error_status(e: &anyhow::Error) -> StatusCode {
-    use std::io::ErrorKind;
-    // Try typed IO error first for precision.
-    if let Some(io_err) = e.downcast_ref::<std::io::Error>() {
-        return if io_err.kind() == ErrorKind::NotFound {
-            StatusCode::NOT_FOUND
-        } else {
-            StatusCode::INTERNAL_SERVER_ERROR
-        };
-    }
-    // Fallback: anyhow errors from read_document_content embed "not found" in
-    // their message for missing document references and missing files.
-    if e.to_string().contains("not found") {
-        StatusCode::NOT_FOUND
-    } else {
-        StatusCode::INTERNAL_SERVER_ERROR
-    }
 }
 
 /// Get raw document bytes (issue-scoped variant)
@@ -407,7 +386,7 @@ async fn get_document_raw<S: IssueStore>(
         .read_document_bytes(&id, &path, at_commit)
         .map_err(|e| {
             tracing::error!("Failed to read raw document bytes: {:?}", e);
-            document_error_status(&e)
+            path_read_error_status(&e)
         })?;
 
     let content_type = infer_content_type(&path);
@@ -438,7 +417,7 @@ async fn get_document_raw_by_path<S: IssueStore>(
         .read_path_bytes(&query.path, query.commit.as_deref())
         .map_err(|e| {
             tracing::error!("Failed to read path {}: {:?}", query.path, e);
-            document_error_status(&e)
+            path_read_error_status(&e)
         })?;
     let content_type = infer_content_type(&query.path);
     let mut response = Response::new(Body::from(bytes));
@@ -480,11 +459,7 @@ async fn get_document_history<S: IssueStore>(
         .get_document_history(&id, &path)
         .map_err(|e| {
             tracing::error!("Failed to get document history: {:?}", e);
-            if e.to_string().contains("not found") {
-                StatusCode::NOT_FOUND
-            } else {
-                StatusCode::INTERNAL_SERVER_ERROR
-            }
+            path_read_error_status(&e)
         })?;
 
     let commits_response = commits
@@ -532,11 +507,7 @@ async fn get_document_diff<S: IssueStore>(
         .get_document_diff(&id, &path, &query.from, to)
         .map_err(|e| {
             tracing::error!("Failed to get document diff: {:?}", e);
-            if e.to_string().contains("not found") {
-                StatusCode::NOT_FOUND
-            } else {
-                StatusCode::INTERNAL_SERVER_ERROR
-            }
+            path_read_error_status(&e)
         })?;
 
     let to_ref = to.unwrap_or("HEAD");

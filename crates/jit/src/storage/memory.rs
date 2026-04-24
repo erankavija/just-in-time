@@ -237,7 +237,12 @@ impl IssueStore for InMemoryStorage {
         ))
     }
 
-    fn read_path_bytes(&self, path: &str, _at_commit: Option<&str>) -> Result<(Vec<u8>, String)> {
+    fn read_path_bytes(
+        &self,
+        path: &str,
+        _at_commit: Option<&str>,
+    ) -> Result<(Vec<u8>, String), crate::storage::PathReadError> {
+        use crate::storage::PathReadError;
         // InMemoryStorage has no filesystem or git backing; read directly from
         // disk using the supplied absolute path (used by server tests that
         // write fixture files to a tempdir and pass the absolute path).
@@ -245,9 +250,9 @@ impl IssueStore for InMemoryStorage {
             .map(|bytes| (bytes, "working-tree".to_string()))
             .map_err(|e| {
                 if e.kind() == std::io::ErrorKind::NotFound {
-                    anyhow!("File not found: {}", path)
+                    PathReadError::NotFound(path.to_string())
                 } else {
-                    anyhow!("Failed to read file {}: {}", path, e)
+                    PathReadError::Other(anyhow!("Failed to read file {}: {}", path, e))
                 }
             })
     }
@@ -470,5 +475,24 @@ mod tests {
         assert_eq!(loaded.dependencies.len(), 2);
         assert_eq!(loaded.gates_required.len(), 1);
         assert_eq!(loaded.context.get("key").unwrap(), "value");
+    }
+
+    #[test]
+    fn test_read_path_bytes_missing_file_returns_not_found() {
+        use crate::storage::PathReadError;
+
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+
+        // Pass a path that does not exist on disk.
+        let result = storage.read_path_bytes("/nonexistent/path/file.md", None);
+        assert!(
+            result.is_err(),
+            "reading a missing file should return an error"
+        );
+        assert!(
+            matches!(result.unwrap_err(), PathReadError::NotFound(_)),
+            "missing file should yield PathReadError::NotFound, not Other"
+        );
     }
 }

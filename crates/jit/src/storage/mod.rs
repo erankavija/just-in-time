@@ -19,6 +19,7 @@ pub mod lease;
 pub mod lock;
 pub mod lock_cleanup;
 pub mod memory;
+pub mod path_errors;
 pub mod temp_cleanup;
 pub mod worktree_identity;
 pub mod worktree_paths;
@@ -27,6 +28,7 @@ pub mod worktree_paths;
 pub use claim_coordinator::{ClaimCoordinator, Lease};
 pub use json::JsonFileStorage;
 pub use lock::FileLocker;
+pub use path_errors::PathReadError;
 
 #[allow(unused_imports)] // Public API used only in tests, not in binary
 pub use memory::InMemoryStorage;
@@ -271,7 +273,34 @@ pub trait IssueStore: Clone {
     /// // Read from a specific git commit:
     /// // let (bytes, hash) = store.read_path_bytes("README.md", Some("HEAD")).unwrap();
     /// ```
-    fn read_path_bytes(&self, path: &str, at_commit: Option<&str>) -> Result<(Vec<u8>, String)>;
+    fn read_path_bytes(
+        &self,
+        path: &str,
+        at_commit: Option<&str>,
+    ) -> Result<(Vec<u8>, String), PathReadError>;
+
+    /// Read file content as UTF-8 text, optionally at a specific git commit.
+    ///
+    /// Delegates to [`IssueStore::read_path_bytes`] and decodes the result as
+    /// UTF-8.  Bytes that are not valid UTF-8 are replaced with the Unicode
+    /// replacement character (U+FFFD) so that text-oriented callers receive a
+    /// `String` without an extra error path for encoding failures.
+    ///
+    /// Returns `(text, commit_label)` with the same commit-label semantics as
+    /// `read_path_bytes`.
+    ///
+    /// # Errors
+    ///
+    /// Propagates `PathReadError::NotFound`, `PathReadError::CommitNotFound`,
+    /// and `PathReadError::Other` from the underlying `read_path_bytes` call.
+    fn read_path_text(
+        &self,
+        path: &str,
+        at_commit: Option<&str>,
+    ) -> Result<(String, String), PathReadError> {
+        let (bytes, label) = self.read_path_bytes(path, at_commit)?;
+        Ok((String::from_utf8_lossy(&bytes).into_owned(), label))
+    }
 }
 
 #[cfg(test)]

@@ -1,0 +1,31 @@
+{
+  "id": "9393cb08-feeb-40e2-9175-a472d1a83abf",
+  "title": "Bug: storage read_path_bytes uses stringly-typed errors; route layer falls back to string-matching",
+  "description": "## Summary\n\n`JsonFileStorage::read_path_bytes` (crates/jit/src/storage/json.rs:752) erases a real `io::ErrorKind::NotFound` into `anyhow!(\\\"File not found: {}\\\", path)` — a string-tagged anyhow error. The server routes then reconstruct HTTP status by doing `e.to_string().contains(\\\"not found\\\")` (`crates/server/src/routes.rs:350-356` and sibling handlers). This is brittle error classification; a refactor of either the error string or a new error message elsewhere could silently change HTTP status codes.\n\nCLAUDE.md states: \"Result-based errors — thiserror custom types with descriptive messages. No panics in library code.\" The rest of the project uses typed errors; this code path is an outlier.\n\n## Acceptance criteria\n\n- [ ] A typed error enum (e.g. `PathReadError` in `crates/jit/src/storage/` or a dedicated `errors` submodule) exists with at least `NotFound(String)` and a catch-all `Other(anyhow::Error)` (or equivalent).\n- [ ] `IssueStore::read_path_bytes` trait signature returns `Result<(Vec<u8>, String), PathReadError>` (or the chosen error type).\n- [ ] Both `JsonFileStorage` and `InMemoryStorage` return `PathReadError::NotFound` for missing files (for both git-commit and working-tree branches, as appropriate).\n- [ ] Route handlers in `crates/server/src/routes.rs` that currently use `e.to_string().contains(\\\"not found\\\")` for path-based document endpoints are replaced with typed `match`/`if let` dispatch on the new error variant. No string-matching remains in the document-raw / document-content / document-by-path paths.\n- [ ] Route handlers still return HTTP 404 for NotFound and 500 for Other errors — covered by tests for each code path.\n- [ ] No new clippy warnings. All tests pass.\n- [ ] cargo-ci + code-review gates both pass.\n\n## Scope\n\nLimit to: the `read_path_bytes` trait and its direct call sites. Do NOT refactor the broader anyhow-based error handling in the rest of the codebase — that's separate technical debt tracked elsewhere.\n\n## Context\n\nSurfaced during task 42bd50ce's code-review gate re-run after wave-1 work. Reviewer's finding has been flagged in three consecutive rounds in different phrasings but same root cause. User explicitly approved fixing this before closing wave 1 (per escalation rule 5a).",
+  "state": "in_progress",
+  "priority": "high",
+  "assignee": "agent:claude",
+  "dependencies": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-04-24T07:22:25.898140478Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:bug",
+    "component:core",
+    "component:server",
+    "epic:docs-lifecycle-p2",
+    "milestone:v1.1"
+  ],
+  "created_at": "2026-04-24T07:07:52.472622639+00:00",
+  "updated_at": "2026-04-24T07:22:56.250037862+00:00"
+}

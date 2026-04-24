@@ -2032,3 +2032,8 @@
 {"type":"gate_passed","id":"8df3533b-4c8f-496c-be0c-674854d3fd44","issue_id":"047a235e-eaa7-4e6d-b12b-08fca4d3672b","timestamp":"2026-04-24T02:20:44.048100089Z","gate_key":"code-review","updated_by":"auto:executor"}
 {"type":"issue_state_changed","id":"f96cffc5-3e42-4f7c-9321-df8b2ab7c1a4","issue_id":"047a235e-eaa7-4e6d-b12b-08fca4d3672b","timestamp":"2026-04-24T02:23:53.171153467Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"0dd206f1-6b09-4787-81dd-2d5b18752b15","issue_id":"047a235e-eaa7-4e6d-b12b-08fca4d3672b","timestamp":"2026-04-24T02:23:53.171202417Z"}
+{"type":"gate_failed","id":"ef8394b8-cb87-4c26-96c4-c29c619f0fcc","issue_id":"42bd50ce-7cd9-47e6-993f-2b9bb7c16a35","timestamp":"2026-04-24T02:32:19.448447164Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"issue_created","id":"0e146f38-9889-4b9a-aaa8-401f872f9aa2","issue_id":"9393cb08-feeb-40e2-9175-a472d1a83abf","timestamp":"2026-04-24T07:07:52.473733979Z","title":"Bug: storage read_path_bytes uses stringly-typed errors; route layer falls back to string-matching","priority":"high"}
+{"type":"issue_state_changed","id":"03a93326-6d9a-408c-84d4-afbe550c35de","issue_id":"9393cb08-feeb-40e2-9175-a472d1a83abf","timestamp":"2026-04-24T07:08:01.320080260Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"289e1245-4d6e-4c3c-bf99-d3a6ec37d417","issue_id":"9393cb08-feeb-40e2-9175-a472d1a83abf","timestamp":"2026-04-24T07:08:01.320449380Z","assignee":"agent:claude"}
+{"type":"gate_passed","id":"3084b0f1-263c-4866-b7e9-65abaa1996e2","issue_id":"9393cb08-feeb-40e2-9175-a472d1a83abf","timestamp":"2026-04-24T07:22:56.250408122Z","gate_key":"cargo-ci","updated_by":"auto:executor"}

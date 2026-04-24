@@ -705,8 +705,12 @@ impl IssueStore for JsonFileStorage {
         Ok(preset_path)
     }
 
-    fn read_path_bytes(&self, path: &str, at_commit: Option<&str>) -> Result<(Vec<u8>, String)> {
-        use std::io::ErrorKind;
+    fn read_path_bytes(
+        &self,
+        path: &str,
+        at_commit: Option<&str>,
+    ) -> Result<(Vec<u8>, String), crate::storage::PathReadError> {
+        use crate::storage::PathReadError;
 
         if let Some(commit_ref) = at_commit {
             use git2::Repository;
@@ -715,30 +719,31 @@ impl IssueStore for JsonFileStorage {
             let repo_root = self
                 .root
                 .parent()
-                .ok_or_else(|| anyhow!("Invalid storage path"))?;
+                .ok_or_else(|| PathReadError::Other(anyhow!("Invalid storage path")))?;
 
-            let repo = Repository::open(repo_root)
-                .map_err(|e| anyhow!("Failed to open git repository: {}", e))?;
+            let repo = Repository::open(repo_root).map_err(|e| {
+                PathReadError::Other(anyhow!("Failed to open git repository: {}", e))
+            })?;
 
             let commit_obj = repo
                 .revparse_single(commit_ref)
-                .map_err(|e| anyhow!("Commit {} not found: {}", commit_ref, e))?;
+                .map_err(|_| PathReadError::CommitNotFound(commit_ref.to_string()))?;
 
             let commit = commit_obj
                 .peel_to_commit()
-                .map_err(|e| anyhow!("Failed to peel to commit: {}", e))?;
+                .map_err(|e| PathReadError::Other(anyhow!("Failed to peel to commit: {}", e)))?;
 
             let tree = commit
                 .tree()
-                .map_err(|e| anyhow!("Failed to get commit tree: {}", e))?;
+                .map_err(|e| PathReadError::Other(anyhow!("Failed to get commit tree: {}", e)))?;
 
             let entry = tree
                 .get_path(std::path::Path::new(path))
-                .map_err(|_| anyhow!("File {} not found in commit {}", path, commit_ref))?;
+                .map_err(|_| PathReadError::NotFound(path.to_string()))?;
 
             let blob = repo
                 .find_blob(entry.id())
-                .map_err(|e| anyhow!("Failed to read blob: {}", e))?;
+                .map_err(|e| PathReadError::Other(anyhow!("Failed to read blob: {}", e)))?;
 
             let short_hash = format!("{:.7}", commit.id());
             Ok((blob.content().to_vec(), short_hash))
@@ -746,14 +751,14 @@ impl IssueStore for JsonFileStorage {
             let repo_root = self
                 .root
                 .parent()
-                .ok_or_else(|| anyhow!("Invalid storage path"))?;
+                .ok_or_else(|| PathReadError::Other(anyhow!("Invalid storage path")))?;
             fs::read(repo_root.join(path))
                 .map(|bytes| (bytes, "working-tree".to_string()))
                 .map_err(|e| {
-                    if e.kind() == ErrorKind::NotFound {
-                        anyhow!("File not found: {}", path)
+                    if e.kind() == std::io::ErrorKind::NotFound {
+                        PathReadError::NotFound(path.to_string())
                     } else {
-                        anyhow!("Failed to read file {}: {}", path, e)
+                        PathReadError::Other(anyhow!("Failed to read file {}: {}", path, e))
                     }
                 })
         }
@@ -1690,5 +1695,26 @@ mod tests {
             result.expect("read_path_bytes should succeed even when CWD != repo root");
         assert_eq!(bytes, expected, "file contents should match");
         assert_eq!(label, "working-tree");
+    }
+
+    #[test]
+    fn test_read_path_bytes_missing_file_returns_not_found() {
+        use crate::storage::PathReadError;
+
+        let repo_root = TempDir::new().unwrap();
+        let jit_dir = repo_root.path().join(".jit");
+        fs::create_dir_all(&jit_dir).unwrap();
+
+        let storage = JsonFileStorage::new(&jit_dir);
+
+        let result = storage.read_path_bytes("does_not_exist.md", None);
+        assert!(
+            result.is_err(),
+            "reading a missing file should return an error"
+        );
+        assert!(
+            matches!(result.unwrap_err(), PathReadError::NotFound(_)),
+            "missing file should yield PathReadError::NotFound, not Other"
+        );
     }
 }

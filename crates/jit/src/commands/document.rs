@@ -16,7 +16,6 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::document::{AdapterRegistry, AssetScanner};
         use crate::domain::DocumentReference;
         use anyhow::anyhow;
-        use std::fs;
         use std::path::Path;
 
         let mut warnings = Vec::new();
@@ -31,12 +30,10 @@ impl<S: IssueStore> CommandExecutor<S> {
             .parent()
             .ok_or_else(|| anyhow!("Invalid storage path"))?;
 
-        let doc_path = repo_root.join(path);
-
         // Detect format and scan assets unless --skip-scan
         let (format, assets) = if skip_scan {
             (None, Vec::new())
-        } else if let Ok(content) = fs::read_to_string(&doc_path) {
+        } else if let Ok((content, _)) = self.storage.read_path_text(path, None) {
             // Detect format using adapter registry
             let registry = AdapterRegistry::with_builtins();
             let format = registry
@@ -170,9 +167,13 @@ impl<S: IssueStore> CommandExecutor<S> {
                         .with_context(|| format!("Failed to read {} from git", doc.path))?
                 }
                 Err(_) => {
-                    // Git not available - read from filesystem
-                    std::fs::read_to_string(&doc.path)
-                        .with_context(|| format!("Failed to read {} from filesystem", doc.path))?
+                    // Git not available - read from filesystem via storage layer
+                    self.storage
+                        .read_path_text(&doc.path, None)
+                        .map(|(text, _)| text)
+                        .map_err(|e| {
+                            anyhow!("Failed to read {} from filesystem: {}", doc.path, e)
+                        })?
                 }
             }
         };
@@ -268,74 +269,78 @@ impl<S: IssueStore> CommandExecutor<S> {
         })
     }
 
+    /// Map an `anyhow` error from `IssueStore::load_issue` to a typed
+    /// [`PathReadError`].
+    ///
+    /// `load_issue` still returns `anyhow::Error` because refactoring the full
+    /// `IssueStore` trait is out of scope for this bug.  At this adapter
+    /// boundary we do a single string-check on the error message to distinguish
+    /// "issue not found" (→ HTTP 404) from other storage failures (→ HTTP 500).
+    fn load_issue_typed(
+        &self,
+        issue_id: &str,
+    ) -> Result<crate::domain::Issue, crate::storage::PathReadError> {
+        use crate::storage::PathReadError;
+        self.storage.load_issue(issue_id).map_err(|e| {
+            let msg = e.to_string();
+            if msg.contains("not found") || msg.contains("Issue") && msg.contains("not") {
+                PathReadError::NotFound(msg)
+            } else {
+                PathReadError::Other(e)
+            }
+        })
+    }
+
     /// Read document content from git or filesystem.
     ///
     /// Note: This method is part of the public API used by jit-server.
     /// It's not called from the CLI binary, hence the dead_code warning.
+    ///
+    /// Returns typed [`PathReadError`] so route handlers can distinguish 404
+    /// (file or document reference not found) from 500 (storage failure)
+    /// without string-matching on error messages.
     #[allow(dead_code)]
     pub fn read_document_content(
         &self,
         issue_id: &str,
         path: &str,
         at_commit: Option<&str>,
-    ) -> Result<(String, String)> {
-        use git2::Repository;
+    ) -> Result<(String, String), crate::storage::PathReadError> {
+        use crate::storage::PathReadError;
 
-        let issue = self.storage.load_issue(issue_id)?;
+        let issue = self.load_issue_typed(issue_id)?;
 
         let doc = issue
             .documents
             .iter()
             .find(|d| d.path == path)
             .ok_or_else(|| {
-                anyhow!(
+                PathReadError::NotFound(format!(
                     "Document reference {} not found in issue {}",
-                    path,
-                    issue_id
-                )
+                    path, issue_id
+                ))
             })?;
 
-        // Get repository root (parent of .jit directory)
-        let repo_root = self
-            .storage
-            .root()
-            .parent()
-            .ok_or_else(|| anyhow!("Invalid storage path"))?;
+        // Prefer explicit at_commit; fall back to the doc's pinned commit; then
+        // None (working-tree read).
+        let effective_commit = at_commit.or(doc.commit.as_deref());
 
-        // Try git first if available
-        if let Ok(repo) = Repository::open(repo_root) {
-            // Determine which commit to view
-            let reference = if let Some(at) = at_commit {
-                at
-            } else if let Some(ref commit) = doc.commit {
-                commit.as_str()
+        // For working-tree reads, resolve the document path relative to the
+        // repo root so the caller does not depend on the process CWD.
+        let resolved_path =
+            if effective_commit.is_none() && !std::path::Path::new(&doc.path).is_absolute() {
+                let repo_root = self
+                    .storage
+                    .root()
+                    .parent()
+                    .ok_or_else(|| PathReadError::Other(anyhow!("Invalid storage path")))?;
+                repo_root.join(&doc.path).to_string_lossy().into_owned()
             } else {
-                "HEAD"
+                doc.path.clone()
             };
 
-            // Try to read content from git
-            if let Ok(content) = self.read_file_from_git(&repo, &doc.path, reference) {
-                // Resolve the actual commit hash
-                if let Ok(obj) = repo.revparse_single(reference) {
-                    if let Ok(commit) = obj.peel_to_commit() {
-                        let commit_hash = format!("{}", commit.id());
-                        return Ok((content, commit_hash));
-                    }
-                }
-            }
-        }
-
-        // Fallback: read directly from filesystem
-        let file_path = repo_root.join(&doc.path);
-        if !file_path.exists() {
-            return Err(anyhow!("Document file not found: {}", path));
-        }
-
-        let content = std::fs::read_to_string(file_path)
-            .map_err(|e| anyhow!("Failed to read document file: {}", e))?;
-
-        // Return "working-tree" as commit hash to indicate non-git content
-        Ok((content, "working-tree".to_string()))
+        self.storage
+            .read_path_text(&resolved_path, effective_commit)
     }
 
     /// Read raw document bytes for an issue-scoped path (byte-faithful variant).
@@ -378,19 +383,20 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue_id: &str,
         path: &str,
         at_commit: Option<&str>,
-    ) -> Result<(Vec<u8>, String)> {
-        let issue = self.storage.load_issue(issue_id)?;
+    ) -> Result<(Vec<u8>, String), crate::storage::PathReadError> {
+        use crate::storage::PathReadError;
+
+        let issue = self.load_issue_typed(issue_id)?;
 
         let doc = issue
             .documents
             .iter()
             .find(|d| d.path == path)
             .ok_or_else(|| {
-                anyhow!(
+                PathReadError::NotFound(format!(
                     "Document reference {} not found in issue {}",
-                    path,
-                    issue_id
-                )
+                    path, issue_id
+                ))
             })?;
 
         // Prefer explicit at_commit; fall back to the doc's pinned commit; then
@@ -406,7 +412,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     .storage
                     .root()
                     .parent()
-                    .ok_or_else(|| anyhow!("Invalid storage path"))?;
+                    .ok_or_else(|| PathReadError::Other(anyhow!("Invalid storage path")))?;
                 repo_root.join(&doc.path).to_string_lossy().into_owned()
             } else {
                 doc.path.clone()
@@ -419,11 +425,20 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Get document history from git.
     ///
     /// Note: Part of public API used by jit-server.
+    ///
+    /// Returns [`PathReadError::NotFound`] when the document reference does not
+    /// exist on the issue so that route handlers can return HTTP 404 without
+    /// string-matching on the error message.
     #[allow(dead_code)]
-    pub fn get_document_history(&self, issue_id: &str, path: &str) -> Result<Vec<CommitInfo>> {
+    pub fn get_document_history(
+        &self,
+        issue_id: &str,
+        path: &str,
+    ) -> Result<Vec<CommitInfo>, crate::storage::PathReadError> {
+        use crate::storage::PathReadError;
         use git2::Repository;
 
-        let issue = self.storage.load_issue(issue_id)?;
+        let issue = self.load_issue_typed(issue_id)?;
 
         // Verify document reference exists
         issue
@@ -431,11 +446,10 @@ impl<S: IssueStore> CommandExecutor<S> {
             .iter()
             .find(|d| d.path == path)
             .ok_or_else(|| {
-                anyhow!(
+                PathReadError::NotFound(format!(
                     "Document reference {} not found in issue {}",
-                    path,
-                    issue_id
-                )
+                    path, issue_id
+                ))
             })?;
 
         // Get repository root (parent of .jit directory)
@@ -443,7 +457,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .storage
             .root()
             .parent()
-            .ok_or_else(|| anyhow!("Invalid storage path"))?;
+            .ok_or_else(|| PathReadError::Other(anyhow!("Invalid storage path")))?;
 
         // Try to get history from git, return empty list if not available
         if let Ok(repo) = Repository::open(repo_root) {
@@ -459,6 +473,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Get diff between document versions.
     ///
     /// Note: Part of public API used by jit-server.
+    ///
+    /// Returns [`PathReadError::NotFound`] when the document reference does not
+    /// exist on the issue so that route handlers can return HTTP 404 without
+    /// string-matching on the error message.
     #[allow(dead_code)]
     pub fn get_document_diff(
         &self,
@@ -466,11 +484,12 @@ impl<S: IssueStore> CommandExecutor<S> {
         path: &str,
         from: &str,
         to: Option<&str>,
-    ) -> Result<String> {
+    ) -> Result<String, crate::storage::PathReadError> {
+        use crate::storage::PathReadError;
         use git2::Repository;
         use similar::{ChangeTag, TextDiff};
 
-        let issue = self.storage.load_issue(issue_id)?;
+        let issue = self.load_issue_typed(issue_id)?;
 
         // Verify document reference exists
         issue
@@ -478,11 +497,10 @@ impl<S: IssueStore> CommandExecutor<S> {
             .iter()
             .find(|d| d.path == path)
             .ok_or_else(|| {
-                anyhow!(
+                PathReadError::NotFound(format!(
                     "Document reference {} not found in issue {}",
-                    path,
-                    issue_id
-                )
+                    path, issue_id
+                ))
             })?;
 
         // Get repository root (parent of .jit directory)
@@ -490,7 +508,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .storage
             .root()
             .parent()
-            .ok_or_else(|| anyhow!("Invalid storage path"))?;
+            .ok_or_else(|| PathReadError::Other(anyhow!("Invalid storage path")))?;
 
         // Try to get diff from git, return error message if not available
         if let Ok(repo) = Repository::open(repo_root) {
@@ -522,9 +540,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         // No git or diff not available
-        Err(anyhow!(
+        Err(PathReadError::Other(anyhow!(
             "Document diff not available (requires git repository with history)"
-        ))
+        )))
     }
 
     /// Get all document paths referenced by issues.
@@ -576,7 +594,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         &self,
         path: &str,
         at_commit: Option<&str>,
-    ) -> Result<(Vec<u8>, String)> {
+    ) -> Result<(Vec<u8>, String), crate::storage::PathReadError> {
         self.storage.read_path_bytes(path, at_commit)
     }
 
@@ -656,7 +674,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     ) -> Result<crate::commands::AssetListResult> {
         use crate::document::{AdapterRegistry, AssetScanner, AssetType};
         use anyhow::anyhow;
-        use std::fs;
         use std::path::Path;
 
         let mut warnings = Vec::new();
@@ -678,11 +695,9 @@ impl<S: IssueStore> CommandExecutor<S> {
             .parent()
             .ok_or_else(|| anyhow!("Invalid storage path"))?;
 
-        let doc_path = repo_root.join(path);
-
         // Rescan if requested
         let assets = if rescan {
-            if let Ok(content) = fs::read_to_string(&doc_path) {
+            if let Ok((content, _)) = self.storage.read_path_text(path, None) {
                 let registry = AdapterRegistry::with_builtins();
                 let scanner = AssetScanner::new(registry, repo_root);
                 let scanned_assets = scanner
@@ -1271,13 +1286,14 @@ impl<S: IssueStore> CommandExecutor<S> {
         repo_root: &std::path::Path,
     ) -> Result<Vec<std::path::PathBuf>> {
         use crate::document::{AdapterRegistry, AssetScanner};
-        use anyhow::Context;
-        use std::fs;
         use std::path::Path;
 
         let full_path = repo_root.join(doc_path);
-        let content = fs::read_to_string(&full_path)
-            .with_context(|| format!("Failed to read document: {}", doc_path))?;
+        let full_path_str = full_path.to_string_lossy();
+        let (content, _) = self
+            .storage
+            .read_path_text(&full_path_str, None)
+            .map_err(|e| anyhow::anyhow!("Failed to read document {}: {}", doc_path, e))?;
 
         // Scan for assets
         let registry = AdapterRegistry::with_builtins();
@@ -1335,15 +1351,22 @@ impl<S: IssueStore> CommandExecutor<S> {
         repo_root: &std::path::Path,
     ) -> Result<()> {
         use crate::document::{AdapterRegistry, AssetScanner};
-        use anyhow::{anyhow, Context};
+        use anyhow::anyhow;
         use std::collections::HashSet;
-        use std::fs;
         use std::path::Path;
 
         let full_path = repo_root.join(doc_path);
-        let content = fs::read_to_string(&full_path).with_context(|| {
-            format!("Failed to read document for link validation: {}", doc_path)
-        })?;
+        let full_path_str = full_path.to_string_lossy();
+        let (content, _) = self
+            .storage
+            .read_path_text(&full_path_str, None)
+            .map_err(|e| {
+                anyhow!(
+                    "Failed to read document for link validation {}: {}",
+                    doc_path,
+                    e
+                )
+            })?;
 
         // Scan for all assets
         let registry = AdapterRegistry::with_builtins();
@@ -1591,18 +1614,21 @@ impl<S: IssueStore> CommandExecutor<S> {
         repo_root: &std::path::Path,
     ) -> Result<()> {
         use crate::document::{AdapterRegistry, AssetScanner};
-        use anyhow::Context;
         use std::collections::HashSet;
-        use std::fs;
 
         // Read archived document content
         let full_path = repo_root.join(dest_doc);
-        let content = fs::read_to_string(&full_path).with_context(|| {
-            format!(
-                "Failed to read archived document for verification: {}",
-                dest_doc.display()
-            )
-        })?;
+        let full_path_str = full_path.to_string_lossy();
+        let (content, _) = self
+            .storage
+            .read_path_text(&full_path_str, None)
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "Failed to read archived document for verification {}: {}",
+                    dest_doc.display(),
+                    e
+                )
+            })?;
 
         // Scan for asset references in archived document
         let registry = AdapterRegistry::with_builtins();
