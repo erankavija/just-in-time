@@ -263,8 +263,9 @@ pub trait IssueStore: Clone {
     ///
     /// let store = JsonFileStorage::new(".jit");
     ///
-    /// // Read from the working tree (path must be absolute or relative to CWD):
-    /// let (bytes, label) = store.read_path_bytes("/repo/README.md", None).unwrap();
+    /// // Read from the working tree (path is resolved relative to the repo root,
+    /// // i.e. the parent of the .jit directory, regardless of process CWD):
+    /// let (bytes, label) = store.read_path_bytes("README.md", None).unwrap();
     /// assert_eq!(label, "working-tree");
     ///
     /// // Read from a specific git commit:
