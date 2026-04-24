@@ -577,14 +577,18 @@ async fn get_document_raw_by_path<S: IssueStore>(
         })?;
     let content_type = infer_content_type(&query.path);
 
-    // Inject <base href> into HTML working-tree responses.
-    let body_bytes = if content_type == "text/html" && at_commit.is_none() {
-        let html = String::from_utf8_lossy(&bytes);
-        let base_href = compute_base_href(&query.path);
-        inject_base_href(&html, &base_href).into_bytes()
-    } else {
-        bytes
-    };
+    // Inject <base href> only for HTML working-tree responses where the path
+    // is repo-relative (not an absolute filesystem path).  Absolute paths
+    // (e.g. `/tmp/slide.html`) can't be re-served through `/api/raw/*path`, so
+    // injecting a base href there would produce a broken base URL.
+    let body_bytes =
+        if content_type == "text/html" && at_commit.is_none() && !query.path.starts_with('/') {
+            let html = String::from_utf8_lossy(&bytes);
+            let base_href = compute_base_href(&query.path);
+            inject_base_href(&html, &base_href).into_bytes()
+        } else {
+            bytes
+        };
 
     let mut response = Response::new(Body::from(body_bytes));
     response.headers_mut().insert(
@@ -614,10 +618,42 @@ async fn get_raw_wildcard<S: IssueStore>(
     Query(query): Query<DocumentContentQuery>,
     State(state): State<AppState<S>>,
 ) -> Result<Response<Body>, StatusCode> {
-    // Validate the path before any I/O.
+    // Validate the path (string-level checks) before any I/O.
     validate_repo_relative_path(&path)?;
 
     let at_commit = query.commit.as_deref();
+
+    // For working-tree reads, canonicalize the resolved path to catch symlinks
+    // that might escape the repository root (e.g. a symlink to /etc/passwd).
+    // This is skipped for git-pinned reads because they never touch the
+    // filesystem for the blob content itself.
+    if at_commit.is_none() {
+        if let Some(repo_root) = state.executor.storage().root().parent() {
+            let resolved = repo_root.join(&path);
+            match resolved.canonicalize() {
+                Ok(canonical) => {
+                    let canonical_root = repo_root
+                        .canonicalize()
+                        .unwrap_or_else(|_| repo_root.to_path_buf());
+                    if !canonical.starts_with(&canonical_root) {
+                        tracing::warn!(
+                            "Path traversal via symlink rejected: {} → {}",
+                            path,
+                            canonical.display()
+                        );
+                        return Err(StatusCode::BAD_REQUEST);
+                    }
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                    // File not found — let read_path_bytes return a proper 404.
+                }
+                Err(e) => {
+                    tracing::error!("Failed to canonicalize path {}: {:?}", path, e);
+                    return Err(StatusCode::INTERNAL_SERVER_ERROR);
+                }
+            }
+        }
+    }
 
     let (bytes, _commit_hash) = state
         .executor
@@ -2313,5 +2349,55 @@ pattern = '^v\d+\.\d+$'
     #[test]
     fn test_compute_base_href_single_dir() {
         assert_eq!(compute_base_href("docs/index.html"), "/api/raw/docs/");
+    }
+
+    /// Symlinks inside the repository that point outside the repo root must be
+    /// rejected with 400.  This guards against a scenario where an attacker or
+    /// misconfigured repo contains a symlink like `docs/secret -> /etc/passwd`.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn test_get_raw_wildcard_rejects_symlink_escape() {
+        use jit::storage::JsonFileStorage;
+        use std::fs;
+        use std::os::unix::fs as unix_fs;
+
+        let temp = tempfile::tempdir().unwrap();
+        let jit_dir = temp.path().join(".jit");
+        fs::create_dir_all(&jit_dir).unwrap();
+        fs::write(
+            jit_dir.join("config.toml"),
+            "[worktree]\nenforce_leases = \"off\"\n",
+        )
+        .unwrap();
+
+        // Create a file outside the repo that we'll try to reach via symlink.
+        let outside = tempfile::NamedTempFile::new().unwrap();
+        fs::write(outside.path(), b"secret outside repo").unwrap();
+
+        // Create a symlink inside the repo pointing to the outside file.
+        let link_path = temp.path().join("docs").join("secret.txt");
+        fs::create_dir_all(link_path.parent().unwrap()).unwrap();
+        unix_fs::symlink(outside.path(), &link_path).unwrap();
+
+        let storage = JsonFileStorage::new(&jit_dir);
+        storage.init().unwrap();
+        let executor = Arc::new(CommandExecutor::new(storage));
+        let tracker = Arc::new(ChangeTracker::new(16));
+        let state = AppState {
+            executor,
+            tracker,
+            project_name: "test-project".to_string(),
+        };
+        let server = TestServer::new(create_routes(state)).unwrap();
+        // Keep tempdir + outside file alive.
+        Box::leak(Box::new(temp));
+        Box::leak(Box::new(outside));
+
+        let response = server.get("/raw/docs/secret.txt").await;
+        assert_eq!(
+            response.status_code(),
+            StatusCode::BAD_REQUEST,
+            "symlink escaping repo root must be rejected with 400"
+        );
     }
 }

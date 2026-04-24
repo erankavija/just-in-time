@@ -12,15 +12,20 @@
     "npm-ci"
   ],
   "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-04-24T21:03:21.381164111Z"
+    },
     "npm-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-04-24T21:04:00.162696106Z"
     },
-    "cargo-ci": {
-      "status": "passed",
+    "code-review": {
+      "status": "failed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-04-24T21:03:21.381164111Z"
+      "updated_at": "2026-04-24T21:05:49.058489182Z"
     }
   },
   "context": {},
@@ -41,5 +46,5 @@
     "milestone:v1.1"
   ],
   "created_at": "2026-04-24T20:50:25.452331386+00:00",
-  "updated_at": "2026-04-24T21:04:12.477529190+00:00"
+  "updated_at": "2026-04-24T21:15:25.340707757+00:00"
 }
