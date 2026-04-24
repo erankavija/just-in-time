@@ -89,40 +89,39 @@ pub trait IssueStore: Clone {
     ///
     /// This is the typed-error variant of [`IssueStore::load_issue`] used by
     /// document command operations that surface HTTP status codes.  Backends
-    /// should override this default to return [`PathReadError::NotFound`] for
-    /// missing issues and [`PathReadError::Other`] for genuine I/O failures,
-    /// without relying on error-message string inspection.
+    /// **must** override this default to return [`PathReadError::NotFound`] for
+    /// missing issues and [`PathReadError::Other`] for genuine I/O failures.
     ///
-    /// The default implementation delegates to [`load_issue`] and classifies
-    /// errors by message content as a last-resort fallback; backends that can
-    /// distinguish "not found" from "I/O error" structurally should override.
+    /// The default implementation maps every error to [`PathReadError::Other`].
+    /// This is deliberately conservative: an unknown backend that forgets to
+    /// override will return HTTP 500 for all errors rather than risk silently
+    /// hiding errors behind a wrong 404.  Any backend that can structurally
+    /// distinguish "issue not found" from "I/O failure" **should** override.
     ///
     /// # Errors
     ///
-    /// - [`PathReadError::NotFound`] when the issue does not exist.
-    /// - [`PathReadError::Other`] for storage or deserialization failures.
+    /// - [`PathReadError::NotFound`] when the issue does not exist (backend must
+    ///   override to produce this).
+    /// - [`PathReadError::Other`] for storage or deserialization failures (and
+    ///   for any error from a backend that uses the default implementation).
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```
     /// use jit::storage::{IssueStore, InMemoryStorage};
     /// use jit::storage::PathReadError;
     ///
     /// let store = InMemoryStorage::new();
     /// store.init().unwrap();
     ///
+    /// // InMemoryStorage overrides this method, so NotFound is returned:
     /// let result = store.load_issue_or_not_found("nonexistent");
     /// assert!(matches!(result, Err(PathReadError::NotFound(_))));
     /// ```
     fn load_issue_or_not_found(&self, id: &str) -> Result<Issue, PathReadError> {
-        self.load_issue(id).map_err(|e| {
-            let msg = e.to_string().to_lowercase();
-            if msg.contains("not found") {
-                PathReadError::NotFound(e.to_string())
-            } else {
-                PathReadError::Other(e)
-            }
-        })
+        // Conservative fallback: map every anyhow error to Other.
+        // Backends that can distinguish NotFound structurally must override.
+        self.load_issue(id).map_err(PathReadError::Other)
     }
 
     /// Resolve a partial issue ID to its full UUID.

@@ -1490,4 +1490,99 @@ pattern = '^v\d+\.\d+$'
             .await;
         assert_eq!(response.status_code(), StatusCode::NOT_FOUND);
     }
+
+    /// Verify that `get_document_by_path` returns HTTP 500 when the storage
+    /// layer returns `PathReadError::Other` (i.e., a non-NotFound I/O error).
+    ///
+    /// We trigger this by pointing the endpoint at a path that is a directory
+    /// rather than a regular file. `fs::read` on a directory returns `EISDIR`,
+    /// which is neither `io::ErrorKind::NotFound` nor a missing-commit error,
+    /// so `JsonFileStorage::read_path_bytes` maps it to `PathReadError::Other`.
+    #[tokio::test]
+    async fn test_get_document_by_path_io_error_returns_500() {
+        use jit::storage::JsonFileStorage;
+        use std::fs;
+
+        let temp = tempfile::tempdir().unwrap();
+        let jit_dir = temp.path().join(".jit");
+        fs::create_dir_all(&jit_dir).unwrap();
+        fs::write(
+            jit_dir.join("config.toml"),
+            "[worktree]\nenforce_leases = \"off\"\n",
+        )
+        .unwrap();
+
+        // Create a subdirectory at the path we will request — fs::read on a
+        // directory yields EISDIR, which maps to PathReadError::Other → 500.
+        let dir_path = temp.path().join("not-a-file");
+        fs::create_dir_all(&dir_path).unwrap();
+        let path_str = dir_path.to_string_lossy().into_owned();
+
+        let storage = JsonFileStorage::new(&jit_dir);
+        storage.init().unwrap();
+        let executor = Arc::new(CommandExecutor::new(storage));
+        // Keep tempdir alive.
+        Box::leak(Box::new(temp));
+
+        let tracker = Arc::new(ChangeTracker::new(16));
+        let state = AppState {
+            executor,
+            tracker,
+            project_name: "test-project".to_string(),
+        };
+        let server = TestServer::new(create_routes(state)).unwrap();
+
+        let response = server
+            .get("/documents")
+            .add_query_param("path", &path_str)
+            .await;
+        assert_eq!(
+            response.status_code(),
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "reading a directory via get_document_by_path should return 500"
+        );
+    }
+
+    /// Same invariant for the raw endpoint.
+    #[tokio::test]
+    async fn test_get_document_raw_by_path_io_error_returns_500() {
+        use jit::storage::JsonFileStorage;
+        use std::fs;
+
+        let temp = tempfile::tempdir().unwrap();
+        let jit_dir = temp.path().join(".jit");
+        fs::create_dir_all(&jit_dir).unwrap();
+        fs::write(
+            jit_dir.join("config.toml"),
+            "[worktree]\nenforce_leases = \"off\"\n",
+        )
+        .unwrap();
+
+        let dir_path = temp.path().join("also-not-a-file");
+        fs::create_dir_all(&dir_path).unwrap();
+        let path_str = dir_path.to_string_lossy().into_owned();
+
+        let storage = JsonFileStorage::new(&jit_dir);
+        storage.init().unwrap();
+        let executor = Arc::new(CommandExecutor::new(storage));
+        Box::leak(Box::new(temp));
+
+        let tracker = Arc::new(ChangeTracker::new(16));
+        let state = AppState {
+            executor,
+            tracker,
+            project_name: "test-project".to_string(),
+        };
+        let server = TestServer::new(create_routes(state)).unwrap();
+
+        let response = server
+            .get("/documents/raw")
+            .add_query_param("path", &path_str)
+            .await;
+        assert_eq!(
+            response.status_code(),
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "reading a directory via get_document_raw_by_path should return 500"
+        );
+    }
 }
