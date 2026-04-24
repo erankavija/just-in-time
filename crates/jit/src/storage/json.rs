@@ -254,7 +254,12 @@ impl JsonFileStorage {
     ///
     /// This is used as a fallback when an issue doesn't exist in local storage
     /// but may be committed in git (e.g., reading from a secondary worktree).
-    fn load_issue_from_git(&self, id: &str) -> Result<Issue> {
+    /// Load an issue from `HEAD:.jit/issues/<id>.json`.
+    ///
+    /// Returns `Ok(Some(issue))` when found, `Ok(None)` when absent from git
+    /// (git ran successfully but reported the path is missing), and `Err` for
+    /// genuine failures (git not available, repo corrupt, parse error, etc.).
+    fn load_issue_from_git(&self, id: &str) -> Result<Option<Issue>> {
         // Run git from repository root, not from .jit directory
         let repo_root = self
             .root
@@ -270,11 +275,13 @@ impl JsonFileStorage {
             .context("Failed to execute git command")?;
 
         if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            bail!("Issue not in git: {}", stderr.trim());
+            // git ran but the path is absent — structurally "not found".
+            return Ok(None);
         }
 
-        serde_json::from_slice(&output.stdout).context("Failed to parse issue from git")
+        let issue =
+            serde_json::from_slice(&output.stdout).context("Failed to parse issue from git")?;
+        Ok(Some(issue))
     }
 
     /// Load an issue from the main worktree's .jit/ directory.
@@ -435,9 +442,13 @@ impl IssueStore for JsonFileStorage {
             return self.read_json(&issue_path);
         }
 
-        // Fallback 1: Try reading from git HEAD
-        if let Ok(issue) = self.load_issue_from_git(id) {
-            return Ok(issue);
+        // Fallback 1: Try reading from git HEAD.
+        // load_issue_from_git returns Ok(Some(issue)), Ok(None) (absent),
+        // or Err (git infrastructure failure).
+        match self.load_issue_from_git(id) {
+            Ok(Some(issue)) => return Ok(issue),
+            Ok(None) => {} // file absent from git; continue
+            Err(_) => {}   // git unavailable or broken; continue to next source
         }
 
         // Fallback 2: Try reading from main worktree (if in secondary)
@@ -455,27 +466,39 @@ impl IssueStore for JsonFileStorage {
     fn load_issue_or_not_found(&self, id: &str) -> Result<Issue, crate::storage::PathReadError> {
         use crate::storage::PathReadError;
 
-        // Fast path: if the local issue file doesn't exist and git/worktree
-        // fallbacks also fail, we know it's a genuine NotFound without any
-        // I/O error (the file simply isn't there).
         let issue_path = self.issue_path(id);
-        if !issue_path.exists() {
-            // Try git and main-worktree fallbacks before giving up.
-            if let Ok(issue) = self.load_issue_from_git(id) {
-                return Ok(issue);
-            }
-            if let Ok(issue) = self.load_issue_from_main_worktree(id) {
-                return Ok(issue);
-            }
-            return Err(PathReadError::NotFound(format!(
-                "Issue {} not found in local storage, git, or main worktree",
-                id
-            )));
+
+        if issue_path.exists() {
+            // File exists — delegate to load_issue which handles locking and
+            // deserialization; any remaining error is a genuine I/O/parse
+            // failure → PathReadError::Other.
+            return self.load_issue(id).map_err(PathReadError::Other);
         }
 
-        // File exists — delegate to load_issue which handles locking and
-        // deserialization; any remaining error is a genuine I/O/parse failure.
-        self.load_issue(id).map_err(PathReadError::Other)
+        // Local file is absent.  Try git and main-worktree fallbacks.
+        //
+        // load_issue_from_git now returns Ok(Some(issue)), Ok(None) (absent),
+        // or Err (infrastructure failure).  We can branch without string-matching:
+        //   Ok(Some(…)) → found, return it.
+        //   Ok(None)    → absent from git, continue to next source.
+        //   Err(…)      → git is broken or the object is corrupt → Other.
+        match self.load_issue_from_git(id) {
+            Ok(Some(issue)) => return Ok(issue),
+            Ok(None) => {} // absent from git; continue
+            Err(e) => return Err(PathReadError::Other(e)),
+        }
+
+        // Main-worktree fallback: still anyhow-based.  Any failure here is
+        // treated as "not available" — we don't return Other because the worktree
+        // check is optional (only applies in secondary-worktree setups).
+        if let Ok(issue) = self.load_issue_from_main_worktree(id) {
+            return Ok(issue);
+        }
+
+        Err(PathReadError::NotFound(format!(
+            "Issue {} not found in local storage, git, or main worktree",
+            id
+        )))
     }
 
     fn resolve_issue_id(&self, partial_id: &str) -> Result<String> {
