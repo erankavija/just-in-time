@@ -136,6 +136,21 @@ export const apiClient = {
  *   /api/issues/<id>/documents/<encoded-path>/raw[?commit=…]
  * When `issueId` is omitted it falls back to the path-only endpoint:
  *   /api/documents/raw?path=<encoded>[&commit=…]
+ *
+ * @example
+ * // Issue-scoped, latest commit:
+ * getRawDocumentUrl('abc123', 'docs/presentations/deck.html');
+ * // → '/api/issues/abc123/documents/docs%2Fpresentations%2Fdeck.html/raw'
+ *
+ * @example
+ * // Issue-scoped pinned to a commit:
+ * getRawDocumentUrl('abc123', 'docs/deck.html', 'a1b2c3d');
+ * // → '/api/issues/abc123/documents/docs%2Fdeck.html/raw?commit=a1b2c3d'
+ *
+ * @example
+ * // Path-only (no issue context):
+ * getRawDocumentUrl(undefined, 'README.md');
+ * // → '/api/documents/raw?path=README.md'
  */
 export function getRawDocumentUrl(issueId: string, path: string, commit?: string): string;
 export function getRawDocumentUrl(issueId: undefined | null, path: string, commit?: string): string;
