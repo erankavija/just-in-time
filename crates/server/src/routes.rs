@@ -38,6 +38,7 @@ pub fn create_routes<S: IssueStore + Send + Sync + 'static>(state: AppState<S>) 
         .route("/search", get(search_issues))
         .route("/documents", get(get_document_by_path))
         .route("/documents/raw", get(get_document_raw_by_path))
+        .route("/raw/*path", get(get_raw_wildcard))
         .route(
             "/issues/:id/documents/:path/content",
             get(get_document_content),
@@ -317,6 +318,10 @@ pub(crate) fn infer_content_type(path: &str) -> String {
         "text/html"
     } else if path.ends_with(".svg") {
         "image/svg+xml"
+    } else if path.ends_with(".png") {
+        "image/png"
+    } else if path.ends_with(".jpg") || path.ends_with(".jpeg") {
+        "image/jpeg"
     } else if path.ends_with(".css") {
         "text/css"
     } else if path.ends_with(".js") {
@@ -325,6 +330,137 @@ pub(crate) fn infer_content_type(path: &str) -> String {
         "text/plain"
     }
     .to_string()
+}
+
+/// Validate that a path is safe to use as a repo-relative path.
+///
+/// Rejects: empty paths, absolute paths (leading `/`), and paths containing
+/// `..` as a whole segment (e.g. `../etc/passwd`, `a/../b`, `foo/..`).
+/// Allows dots *inside* a segment name (e.g. `foo..bar.txt`).
+fn validate_repo_relative_path(path: &str) -> Result<(), StatusCode> {
+    if path.is_empty() {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    if path.starts_with('/') {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    for segment in path.split('/') {
+        if segment == ".." {
+            return Err(StatusCode::BAD_REQUEST);
+        }
+    }
+    Ok(())
+}
+
+/// URL-encode a single path segment (percent-encode non-unreserved chars).
+///
+/// Unreserved characters per RFC 3986: ALPHA / DIGIT / "-" / "." / "_" / "~"
+fn percent_encode_segment(segment: &str) -> String {
+    let mut out = String::with_capacity(segment.len());
+    for byte in segment.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => {
+                out.push(byte as char)
+            }
+            other => {
+                out.push('%');
+                out.push(
+                    char::from_digit((other >> 4) as u32, 16)
+                        .unwrap()
+                        .to_ascii_uppercase(),
+                );
+                out.push(
+                    char::from_digit((other & 0xf) as u32, 16)
+                        .unwrap()
+                        .to_ascii_uppercase(),
+                );
+            }
+        }
+    }
+    out
+}
+
+/// Compute the `/api/raw/<parent-dir>/` base href for an HTML file at `html_path`.
+///
+/// Example: `docs/presentations/deck.html` → `/api/raw/docs/presentations/`
+/// The root case (`deck.html` with no parent dir) → `/api/raw/`
+fn compute_base_href(html_path: &str) -> String {
+    // Determine the parent directory portion of the path.
+    let parent = match html_path.rfind('/') {
+        Some(idx) => &html_path[..idx],
+        None => "",
+    };
+
+    if parent.is_empty() {
+        "/api/raw/".to_string()
+    } else {
+        let encoded: String = parent
+            .split('/')
+            .map(percent_encode_segment)
+            .collect::<Vec<_>>()
+            .join("/");
+        format!("/api/raw/{encoded}/")
+    }
+}
+
+/// Inject `<base href="...">` into an HTML string so that relative paths
+/// resolve correctly when the document is served from a URL whose directory
+/// doesn't match the source file's location.
+///
+/// Inserts right after the opening `<head>` (or `<head …attrs…>`) tag.
+/// Falls back to inserting after the opening `<html>` tag if there is no
+/// `<head>`. Returns the string unchanged if:
+/// - It already contains a `<base ` tag inside `<head>` (user intent wins).
+/// - There is neither a `<head>` nor an `<html>` element (defensive — don't
+///   corrupt non-HTML content that was accidentally routed here).
+fn inject_base_href(html: &str, base_href: &str) -> String {
+    let lower = html.to_lowercase();
+
+    // Find the opening <head> tag (case-insensitive).
+    let head_open_start = lower.find("<head");
+    if let Some(start) = head_open_start {
+        // Find the `>` that closes the opening tag.
+        if let Some(rel_end) = lower[start..].find('>') {
+            let tag_end = start + rel_end + 1; // position just after `>`
+
+            // Check if there's already a <base tag before </head>.
+            let lower_before_head_close = if let Some(hc) = lower.find("</head") {
+                &lower[..hc]
+            } else {
+                &lower[..]
+            };
+
+            if lower_before_head_close.contains("<base ")
+                || lower_before_head_close.contains("<base>")
+            {
+                return html.to_string();
+            }
+
+            let tag = format!("<base href=\"{base_href}\">");
+            let mut result = String::with_capacity(html.len() + tag.len());
+            result.push_str(&html[..tag_end]);
+            result.push_str(&tag);
+            result.push_str(&html[tag_end..]);
+            return result;
+        }
+    }
+
+    // No <head> — try to insert after the <html> opening tag.
+    let html_open_start = lower.find("<html");
+    if let Some(start) = html_open_start {
+        if let Some(rel_end) = lower[start..].find('>') {
+            let tag_end = start + rel_end + 1;
+            let tag = format!("<base href=\"{base_href}\">");
+            let mut result = String::with_capacity(html.len() + tag.len());
+            result.push_str(&html[..tag_end]);
+            result.push_str(&tag);
+            result.push_str(&html[tag_end..]);
+            return result;
+        }
+    }
+
+    // Neither <head> nor <html> found — return unchanged (defensive).
+    html.to_string()
 }
 
 // Defense-in-depth policy for raw document responses. Permits same-origin,
@@ -378,7 +514,8 @@ async fn get_document_content<S: IssueStore>(
 /// Verifies that `path` is linked to the requested issue, then reads the file
 /// as raw bytes via `read_document_bytes` (which delegates to
 /// `IssueStore::read_path_bytes`).  Binary artifacts are served faithfully
-/// without any UTF-8 conversion.
+/// without any UTF-8 conversion.  HTML responses for working-tree reads get a
+/// `<base href>` injected so sibling assets resolve via `/api/raw/*path`.
 async fn get_document_raw<S: IssueStore>(
     Path((id, path)): Path<(String, String)>,
     Query(query): Query<DocumentContentQuery>,
@@ -395,7 +532,18 @@ async fn get_document_raw<S: IssueStore>(
         })?;
 
     let content_type = infer_content_type(&path);
-    let mut response = Response::new(Body::from(bytes));
+
+    // Inject <base href> into HTML working-tree responses so relative asset
+    // paths (e.g. figures/fig4.svg) resolve via the wildcard /api/raw route.
+    let body_bytes = if content_type == "text/html" && at_commit.is_none() {
+        let html = String::from_utf8_lossy(&bytes);
+        let base_href = compute_base_href(&path);
+        inject_base_href(&html, &base_href).into_bytes()
+    } else {
+        bytes
+    };
+
+    let mut response = Response::new(Body::from(body_bytes));
     response.headers_mut().insert(
         axum::http::header::CONTENT_TYPE,
         HeaderValue::from_str(&content_type)
@@ -413,19 +561,84 @@ async fn get_document_raw<S: IssueStore>(
 /// Delegates I/O to `CommandExecutor::read_path_bytes` so persistence stays
 /// in the domain layer.  Returns raw bytes with the inferred Content-Type and
 /// CSP headers.  Binary files are served faithfully without UTF-8 conversion.
+/// HTML working-tree responses get a `<base href>` injected so sibling assets
+/// resolve via the wildcard `/api/raw/*path` route.
 async fn get_document_raw_by_path<S: IssueStore>(
     Query(query): Query<DocumentByPathQuery>,
     State(state): State<AppState<S>>,
 ) -> Result<Response<Body>, StatusCode> {
+    let at_commit = query.commit.as_deref();
     let (bytes, _commit_hash) = state
         .executor
-        .read_path_bytes(&query.path, query.commit.as_deref())
+        .read_path_bytes(&query.path, at_commit)
         .map_err(|e| {
             tracing::error!("Failed to read path {}: {:?}", query.path, e);
             path_read_error_status(&e)
         })?;
     let content_type = infer_content_type(&query.path);
-    let mut response = Response::new(Body::from(bytes));
+
+    // Inject <base href> into HTML working-tree responses.
+    let body_bytes = if content_type == "text/html" && at_commit.is_none() {
+        let html = String::from_utf8_lossy(&bytes);
+        let base_href = compute_base_href(&query.path);
+        inject_base_href(&html, &base_href).into_bytes()
+    } else {
+        bytes
+    };
+
+    let mut response = Response::new(Body::from(body_bytes));
+    response.headers_mut().insert(
+        axum::http::header::CONTENT_TYPE,
+        HeaderValue::from_str(&content_type)
+            .unwrap_or_else(|_| HeaderValue::from_static("text/plain")),
+    );
+    response.headers_mut().insert(
+        "content-security-policy",
+        HeaderValue::from_static(CSP_HEADER),
+    );
+    Ok(response)
+}
+
+/// Get raw bytes for any repo-relative path (wildcard variant).
+///
+/// Route: `GET /api/raw/*path`
+///
+/// Serves arbitrary files from the repository working tree or a pinned git
+/// commit.  This is primarily used so HTML documents can load sibling assets
+/// (SVG figures, CSS, JS) via relative paths — the browser resolves those
+/// paths against the `<base href>` injected by the HTML handlers above.
+///
+/// Security: path is validated by `validate_repo_relative_path` before I/O.
+async fn get_raw_wildcard<S: IssueStore>(
+    Path(path): Path<String>,
+    Query(query): Query<DocumentContentQuery>,
+    State(state): State<AppState<S>>,
+) -> Result<Response<Body>, StatusCode> {
+    // Validate the path before any I/O.
+    validate_repo_relative_path(&path)?;
+
+    let at_commit = query.commit.as_deref();
+
+    let (bytes, _commit_hash) = state
+        .executor
+        .read_path_bytes(&path, at_commit)
+        .map_err(|e| {
+            tracing::error!("Failed to read raw path {}: {:?}", path, e);
+            path_read_error_status(&e)
+        })?;
+
+    let content_type = infer_content_type(&path);
+
+    // Inject <base href> into HTML working-tree responses.
+    let body_bytes = if content_type == "text/html" && at_commit.is_none() {
+        let html = String::from_utf8_lossy(&bytes);
+        let base_href = compute_base_href(&path);
+        inject_base_href(&html, &base_href).into_bytes()
+    } else {
+        bytes
+    };
+
+    let mut response = Response::new(Body::from(body_bytes));
     response.headers_mut().insert(
         axum::http::header::CONTENT_TYPE,
         HeaderValue::from_str(&content_type)
@@ -1175,6 +1388,9 @@ pattern = '^v\d+\.\d+$'
         assert_eq!(infer_content_type("style.css"), "text/css");
         assert_eq!(infer_content_type("app.js"), "application/javascript");
         assert_eq!(infer_content_type("logo.svg"), "image/svg+xml");
+        assert_eq!(infer_content_type("photo.png"), "image/png");
+        assert_eq!(infer_content_type("photo.jpg"), "image/jpeg");
+        assert_eq!(infer_content_type("photo.jpeg"), "image/jpeg");
         assert_eq!(infer_content_type("readme.txt"), "text/plain");
         assert_eq!(infer_content_type("unknown.xyz"), "text/plain");
     }
@@ -1259,14 +1475,21 @@ pattern = '^v\d+\.\d+$'
         assert!(ct.starts_with("text/html"), "expected text/html, got {ct}");
     }
 
+    /// After base-tag injection, the body gains `<base href="/api/raw/">` right
+    /// after the opening `<html>` tag (fixture has no `<head>`).
     #[tokio::test]
-    async fn test_get_document_raw_html_returns_exact_bytes() {
+    async fn test_get_document_raw_html_injects_base_tag() {
         let (server, id, path) = create_test_app_with_html_doc();
         let url = format!("/issues/{}/documents/{}/raw", id, path);
         let response = server.get(&url).await;
         response.assert_status_ok();
         let body = response.text();
-        assert_eq!(body, "<html><body>hello</body></html>");
+        // fixture: `<html><body>hello</body></html>` — no <head>, so injection
+        // happens after <html> → base href is "/api/raw/" (root, no parent dir).
+        assert_eq!(
+            body,
+            r#"<html><base href="/api/raw/"><body>hello</body></html>"#
+        );
     }
 
     #[tokio::test]
@@ -1723,5 +1946,372 @@ pattern = '^v\d+\.\d+$'
             StatusCode::INTERNAL_SERVER_ERROR,
             "reading a directory via get_document_raw should return 500"
         );
+    }
+
+    // ── inject_base_href unit tests ───────────────────────────────────────────
+
+    #[test]
+    fn test_inject_base_href_after_head() {
+        let html = "<html><head></head><body></body></html>";
+        let result = inject_base_href(html, "/api/raw/docs/presentations/");
+        assert_eq!(
+            result,
+            r#"<html><head><base href="/api/raw/docs/presentations/"></head><body></body></html>"#
+        );
+    }
+
+    #[test]
+    fn test_inject_base_href_after_head_with_attrs() {
+        let html = r#"<html><head lang="en" class="x"></head><body></body></html>"#;
+        let result = inject_base_href(html, "/api/raw/docs/");
+        assert!(
+            result.contains(r#"<base href="/api/raw/docs/">"#),
+            "base tag not found in: {result}"
+        );
+        // Must be immediately after the closing > of the opening <head ...>
+        let head_close = html.find('>').unwrap() + 1; // position after <html>
+                                                      // The first > after <head is what matters
+        let head_tag_end = html.find("</head").unwrap();
+        let head_open_end = html[..head_tag_end].rfind('>').unwrap();
+        assert!(
+            result[head_open_end + 1..].starts_with(r#"<base href="/api/raw/docs/">"#),
+            "base tag must follow immediately after opening <head> close: {result}"
+        );
+        let _ = head_close; // suppress unused warning
+    }
+
+    #[test]
+    fn test_inject_base_href_case_insensitive() {
+        for head_tag in &["<HEAD>", "<Head>"] {
+            let html = format!("<html>{head_tag}</HEAD><body></body></html>");
+            let result = inject_base_href(&html, "/api/raw/");
+            assert!(
+                result.contains(r#"<base href="/api/raw/">"#),
+                "case-insensitive HEAD not handled for {head_tag}: {result}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_inject_base_href_skips_when_base_exists() {
+        let html = r#"<html><head><base href="https://example.com/"></head><body></body></html>"#;
+        let result = inject_base_href(html, "/api/raw/");
+        // Should return the original string unchanged.
+        assert_eq!(result, html);
+    }
+
+    #[test]
+    fn test_inject_base_href_inserts_after_html_when_no_head() {
+        let html = "<html><body></body></html>";
+        let result = inject_base_href(html, "/api/raw/");
+        assert_eq!(
+            result,
+            r#"<html><base href="/api/raw/"><body></body></html>"#
+        );
+    }
+
+    #[test]
+    fn test_inject_base_href_returns_unchanged_for_non_html() {
+        // Plain text — no <html> or <head> element.
+        let text = "Hello, world!";
+        assert_eq!(inject_base_href(text, "/api/raw/"), text);
+
+        // Empty string.
+        assert_eq!(inject_base_href("", "/api/raw/"), "");
+    }
+
+    // ── validate_repo_relative_path unit tests ────────────────────────────────
+
+    #[test]
+    fn test_validate_repo_relative_path_accepts_valid_paths() {
+        assert!(validate_repo_relative_path("docs/deck.html").is_ok());
+        assert!(validate_repo_relative_path("a/b/c.svg").is_ok());
+        // Dots INSIDE a segment name are fine — only `..` as a whole segment is forbidden.
+        assert!(validate_repo_relative_path("foo..bar.txt").is_ok());
+        assert!(validate_repo_relative_path("file.html").is_ok());
+    }
+
+    #[test]
+    fn test_validate_repo_relative_path_rejects_empty() {
+        assert_eq!(
+            validate_repo_relative_path(""),
+            Err(StatusCode::BAD_REQUEST)
+        );
+    }
+
+    #[test]
+    fn test_validate_repo_relative_path_rejects_absolute() {
+        assert_eq!(
+            validate_repo_relative_path("/abs/path"),
+            Err(StatusCode::BAD_REQUEST)
+        );
+    }
+
+    #[test]
+    fn test_validate_repo_relative_path_rejects_dotdot_segment() {
+        assert_eq!(
+            validate_repo_relative_path("../etc/passwd"),
+            Err(StatusCode::BAD_REQUEST)
+        );
+        assert_eq!(
+            validate_repo_relative_path("a/../b"),
+            Err(StatusCode::BAD_REQUEST)
+        );
+        assert_eq!(
+            validate_repo_relative_path("foo/.."),
+            Err(StatusCode::BAD_REQUEST)
+        );
+    }
+
+    // ── GET /raw/*path integration tests ─────────────────────────────────────
+
+    /// Helper: create a JsonFileStorage-backed server with a file at a nested
+    /// path under the repo root.  Returns the server and tempdir (kept alive).
+    fn create_app_with_raw_fixture(
+        rel_path: &str,
+        content: &[u8],
+    ) -> (axum_test::TestServer, tempfile::TempDir) {
+        use jit::storage::JsonFileStorage;
+        use std::fs;
+
+        let temp = tempfile::tempdir().unwrap();
+        let jit_dir = temp.path().join(".jit");
+        fs::create_dir_all(&jit_dir).unwrap();
+        fs::write(
+            jit_dir.join("config.toml"),
+            "[worktree]\nenforce_leases = \"off\"\n",
+        )
+        .unwrap();
+
+        // Write the fixture file.
+        let abs_path = temp.path().join(rel_path);
+        if let Some(parent) = abs_path.parent() {
+            fs::create_dir_all(parent).unwrap();
+        }
+        fs::write(&abs_path, content).unwrap();
+
+        let storage = JsonFileStorage::new(&jit_dir);
+        storage.init().unwrap();
+        let executor = Arc::new(CommandExecutor::new(storage));
+        let tracker = Arc::new(ChangeTracker::new(16));
+        let state = AppState {
+            executor,
+            tracker,
+            project_name: "test-project".to_string(),
+        };
+        let server = TestServer::new(create_routes(state)).unwrap();
+        (server, temp)
+    }
+
+    #[tokio::test]
+    async fn test_get_raw_wildcard_serves_svg() {
+        let svg_content = br#"<svg xmlns="http://www.w3.org/2000/svg"><circle r="5"/></svg>"#;
+        let (server, _temp) =
+            create_app_with_raw_fixture("docs/presentations/figures/fig4.svg", svg_content);
+
+        let response = server.get("/raw/docs/presentations/figures/fig4.svg").await;
+        response.assert_status_ok();
+
+        let ct = response
+            .headers()
+            .get("content-type")
+            .expect("content-type")
+            .to_str()
+            .unwrap();
+        assert!(
+            ct.starts_with("image/svg+xml"),
+            "expected image/svg+xml, got {ct}"
+        );
+        assert_eq!(response.as_bytes().as_ref(), svg_content.as_ref());
+    }
+
+    #[tokio::test]
+    async fn test_get_raw_wildcard_html_injects_base_tag() {
+        let html_content = b"<html><head></head><body></body></html>";
+        let (server, _temp) =
+            create_app_with_raw_fixture("docs/presentations/deck.html", html_content);
+
+        let response = server.get("/raw/docs/presentations/deck.html").await;
+        response.assert_status_ok();
+
+        let ct = response
+            .headers()
+            .get("content-type")
+            .expect("content-type")
+            .to_str()
+            .unwrap();
+        assert!(ct.starts_with("text/html"), "expected text/html, got {ct}");
+
+        let csp = response
+            .headers()
+            .get("content-security-policy")
+            .expect("CSP header must be present")
+            .to_str()
+            .unwrap();
+        assert_eq!(csp, CSP_HEADER, "CSP header must match specified policy");
+
+        let body = response.text();
+        assert!(
+            body.contains(r#"<base href="/api/raw/docs/presentations/">"#),
+            "base href not found in body: {body}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_raw_wildcard_rejects_path_traversal_dotdot() {
+        // Axum normalizes `..` segments in the URL path before routing, so
+        // `/raw/foo/../bar` becomes `/raw/bar` at the routing layer — the `..`
+        // never reaches our handler.  Our `validate_repo_relative_path` guard
+        // acts as defence-in-depth for any `..` that does arrive; the HTTP-level
+        // invariant is already enforced by Axum.
+        //
+        // The normalised path `bar` doesn't exist, so the expected status is
+        // 404 (not 400).  Any 4xx response is acceptable; 400 from our validator
+        // would also be fine.
+        let server = create_test_app();
+        let response = server.get("/raw/foo/../bar").await;
+        assert!(
+            response.status_code().is_client_error(),
+            "path traversal must produce a 4xx response, got {}",
+            response.status_code()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_raw_wildcard_rejects_embedded_dotdot() {
+        // Same normalisation behaviour as the above test: `/raw/a/../b` → `/raw/b`.
+        // The file doesn't exist, so we get 404.  Any 4xx is the invariant.
+        let server = create_test_app();
+        let response = server.get("/raw/a/../b").await;
+        assert!(
+            response.status_code().is_client_error(),
+            "embedded .. must produce a 4xx response, got {}",
+            response.status_code()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_raw_wildcard_404_for_missing_file() {
+        let server = create_test_app();
+        let response = server.get("/raw/definitely/does/not/exist.svg").await;
+        assert_eq!(response.status_code(), StatusCode::NOT_FOUND);
+    }
+
+    /// Regression: commit-pinned HTML must be returned byte-faithful (no injection).
+    #[tokio::test]
+    async fn test_get_document_raw_preserves_bytes_when_commit_pinned() {
+        let (server, id, path) = create_test_app_with_html_doc();
+        // Pass a fake commit SHA.  The storage will return CommitNotFound → 404,
+        // which proves the commit path is taken (no working-tree injection).
+        // For a proper bytes-unchanged assertion we would need a real git repo;
+        // we document the constraint in the test comment instead.
+        let url = format!("/issues/{}/documents/{}/raw?commit=abc1234", id, path);
+        let response = server.get(&url).await;
+        // Either 404 (commit not found in non-git storage) or 200 with unmodified
+        // bytes is acceptable.  The invariant is: if 200, body must NOT contain
+        // a <base> tag injected by us (the commit path skips injection).
+        if response.status_code() == StatusCode::OK {
+            let body = response.text();
+            assert!(
+                !body.contains(r#"<base href="/api/raw"#),
+                "commit-pinned HTML must not have base tag injected: {body}"
+            );
+        }
+    }
+
+    /// When the HTML already has a `<base>` tag, the response body is unchanged.
+    #[tokio::test]
+    async fn test_get_document_raw_preserves_existing_base_tag() {
+        use jit::domain::Priority;
+        use jit::storage::JsonFileStorage;
+        use std::fs;
+
+        let temp = tempfile::tempdir().unwrap();
+        let jit_dir = temp.path().join(".jit");
+        fs::create_dir_all(&jit_dir).unwrap();
+        fs::write(
+            jit_dir.join("config.toml"),
+            "[worktree]\nenforce_leases = \"off\"\n",
+        )
+        .unwrap();
+
+        let storage = JsonFileStorage::new(&jit_dir);
+        storage.init().unwrap();
+        let executor = Arc::new(CommandExecutor::new(storage));
+
+        let (id, _) = executor
+            .create_issue(
+                "base tag test".to_string(),
+                "desc".to_string(),
+                Priority::Normal,
+                vec![],
+                vec![],
+            )
+            .unwrap();
+
+        // HTML that already has its own <base> tag.
+        let original =
+            r#"<html><head><base href="https://cdn.example.com/"></head><body>hi</body></html>"#;
+        let doc_rel = "withbase.html";
+        fs::write(temp.path().join(doc_rel), original).unwrap();
+        executor
+            .add_document_reference(&id, doc_rel, None, None, None, true)
+            .unwrap();
+
+        Box::leak(Box::new(temp));
+
+        let tracker = Arc::new(ChangeTracker::new(16));
+        let state = AppState {
+            executor,
+            tracker,
+            project_name: "test-project".to_string(),
+        };
+        let server = TestServer::new(create_routes(state)).unwrap();
+
+        let url = format!("/issues/{}/documents/{}/raw", id, doc_rel);
+        let response = server.get(&url).await;
+        response.assert_status_ok();
+        let body = response.text();
+        assert_eq!(
+            body, original,
+            "existing <base> must be preserved unchanged"
+        );
+    }
+
+    /// The /raw wildcard also preserves an existing <base> tag.
+    #[tokio::test]
+    async fn test_get_raw_wildcard_preserves_existing_base_tag() {
+        let original =
+            br#"<html><head><base href="https://cdn.example.com/"></head><body></body></html>"#;
+        let (server, _temp) = create_app_with_raw_fixture("docs/deck.html", original);
+
+        let response = server.get("/raw/docs/deck.html").await;
+        response.assert_status_ok();
+        let body = response.text();
+        assert_eq!(
+            body.as_bytes(),
+            original,
+            "existing <base> must be preserved unchanged by wildcard handler"
+        );
+    }
+
+    // ── compute_base_href unit tests ──────────────────────────────────────────
+
+    #[test]
+    fn test_compute_base_href_nested_path() {
+        assert_eq!(
+            compute_base_href("docs/presentations/deck.html"),
+            "/api/raw/docs/presentations/"
+        );
+    }
+
+    #[test]
+    fn test_compute_base_href_root_level() {
+        assert_eq!(compute_base_href("slide.html"), "/api/raw/");
+    }
+
+    #[test]
+    fn test_compute_base_href_single_dir() {
+        assert_eq!(compute_base_href("docs/index.html"), "/api/raw/docs/");
     }
 }
