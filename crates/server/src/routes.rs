@@ -1118,30 +1118,70 @@ pattern = '^v\d+\.\d+$'
 
     #[tokio::test]
     async fn test_get_document_by_path_success() {
+        use jit::storage::JsonFileStorage;
+        use serde_json::Value;
         use std::fs;
-        let temp_dir = tempfile::tempdir().unwrap();
-        let jit_dir = temp_dir.path().join(".jit");
+
+        // Set up a real tempdir acting as repo root with a .jit subdir.
+        let temp = tempfile::tempdir().unwrap();
+        let jit_dir = temp.path().join(".jit");
         fs::create_dir_all(&jit_dir).unwrap();
 
-        let storage = InMemoryStorage::new();
+        // Write a permissive config so the executor is happy.
+        fs::write(
+            jit_dir.join("config.toml"),
+            "[worktree]\nenforce_leases = \"off\"\n",
+        )
+        .unwrap();
+
+        // Write the fixture document at a subdirectory path relative to repo root.
+        // This exercises the path-resolution fix: storage must resolve against
+        // `self.root.parent()` (repo root), not process CWD.
+        let doc_rel = "docs/readme.md";
+        let doc_content = "# Fixture document\n\nSome content.";
+        let doc_abs = temp.path().join(doc_rel);
+        fs::create_dir_all(doc_abs.parent().unwrap()).unwrap();
+        fs::write(&doc_abs, doc_content).unwrap();
+
+        let storage = JsonFileStorage::new(&jit_dir);
+        storage.init().unwrap();
+
         let executor = Arc::new(CommandExecutor::new(storage));
         let tracker = Arc::new(ChangeTracker::new(16));
 
-        // Create a test document file
-        let doc_path = temp_dir.path().join("test.md");
-        fs::write(&doc_path, "# Test Document\n\nSome content.").unwrap();
+        // Keep tempdir alive for the duration of the test.
+        Box::leak(Box::new(temp));
 
         let state = AppState {
             executor,
             tracker,
             project_name: "test-project".to_string(),
         };
-        let app = create_routes(state);
-        let _server = TestServer::new(app).unwrap();
+        let server = TestServer::new(create_routes(state)).unwrap();
 
-        // Note: This test will fail because we can't easily change working directory
-        // in async tests. We'll test this manually or with integration tests.
-        // For now, we just verify the route exists.
+        // Use add_query_param so axum-test sends the query string correctly.
+        // Embedding `?key=val` directly in the URL string causes axum-test to
+        // percent-encode the `?`, which breaks route matching.
+        let response = server
+            .get("/documents")
+            .add_query_param("path", doc_rel)
+            .await;
+
+        // Assert 200 OK with matching content and content_type fields.
+        response.assert_status_ok();
+
+        let body: Value = serde_json::from_slice(response.as_bytes()).expect("valid JSON body");
+        assert_eq!(
+            body["content"].as_str().unwrap(),
+            doc_content,
+            "response content field must match fixture file"
+        );
+        let expected_ct = infer_content_type(doc_rel);
+        assert_eq!(
+            body["content_type"].as_str().unwrap(),
+            expected_ct,
+            "response content_type field must match infer_content_type"
+        );
     }
 
     // ── infer_content_type unit tests ────────────────────────────────────────

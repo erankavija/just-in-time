@@ -743,7 +743,11 @@ impl IssueStore for JsonFileStorage {
             let short_hash = format!("{:.7}", commit.id());
             Ok((blob.content().to_vec(), short_hash))
         } else {
-            fs::read(path)
+            let repo_root = self
+                .root
+                .parent()
+                .ok_or_else(|| anyhow!("Invalid storage path"))?;
+            fs::read(repo_root.join(path))
                 .map(|bytes| (bytes, "working-tree".to_string()))
                 .map_err(|e| {
                     if e.kind() == ErrorKind::NotFound {
@@ -1653,5 +1657,38 @@ mod tests {
             // Should detect as main worktree
             assert!(!main_storage.is_secondary_worktree());
         }
+    }
+
+    #[test]
+    fn test_read_path_bytes_working_tree_resolves_against_repo_root() {
+        use std::env;
+
+        // Create a temp dir that acts as the repo root, with a .jit subdir.
+        let repo_root = TempDir::new().unwrap();
+        let jit_dir = repo_root.path().join(".jit");
+        fs::create_dir_all(&jit_dir).unwrap();
+
+        // Write a fixture file inside the repo root.
+        let file_name = "test-doc.md";
+        let expected = b"# Hello from repo root";
+        fs::write(repo_root.path().join(file_name), expected).unwrap();
+
+        // Build storage rooted at .jit (root = .jit dir, repo root = its parent).
+        let storage = JsonFileStorage::new(&jit_dir);
+
+        // Change CWD to a completely unrelated directory so that a naive
+        // fs::read(path) using process CWD would fail to find the file.
+        let original_cwd = env::current_dir().unwrap();
+        env::set_current_dir(env::temp_dir()).unwrap();
+
+        let result = storage.read_path_bytes(file_name, None);
+
+        // Restore CWD regardless of outcome.
+        let _ = env::set_current_dir(&original_cwd);
+
+        let (bytes, label) =
+            result.expect("read_path_bytes should succeed even when CWD != repo root");
+        assert_eq!(bytes, expected, "file contents should match");
+        assert_eq!(label, "working-tree");
     }
 }

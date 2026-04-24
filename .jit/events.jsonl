@@ -2017,3 +2017,12 @@
 {"type":"gate_passed","id":"f599a000-a98e-4469-a06c-f4706d189a47","issue_id":"75b1ccb8-6796-41da-9a96-fa95ed96cc94","timestamp":"2026-04-24T01:44:31.526758626Z","gate_key":"code-review","updated_by":"auto:executor"}
 {"type":"issue_state_changed","id":"6c70e518-3f37-41f7-a47a-10cfdea1700e","issue_id":"75b1ccb8-6796-41da-9a96-fa95ed96cc94","timestamp":"2026-04-24T01:45:37.629149708Z","from":"ready","to":"done"}
 {"type":"issue_completed","id":"4b40a266-4487-4cab-9a7e-feb6c37ebd8b","issue_id":"75b1ccb8-6796-41da-9a96-fa95ed96cc94","timestamp":"2026-04-24T01:45:37.629198988Z"}
+{"type":"gate_failed","id":"de23180b-2114-41fd-b8d9-848a9edc129a","issue_id":"42bd50ce-7cd9-47e6-993f-2b9bb7c16a35","timestamp":"2026-04-24T01:52:17.482841457Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"issue_created","id":"bdd70fd3-8c55-4a2b-8012-333ddfedb5cc","issue_id":"047a235e-eaa7-4e6d-b12b-08fca4d3672b","timestamp":"2026-04-24T01:54:11.052895959Z","title":"Bug: path-only /documents endpoint reads relative to process CWD instead of repo root","priority":"high"}
+{"type":"issue_state_changed","id":"bb16d011-565e-402b-b860-e570e9a8d5dd","issue_id":"047a235e-eaa7-4e6d-b12b-08fca4d3672b","timestamp":"2026-04-24T01:54:17.110953232Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"24d8eacc-15fb-485a-a9f6-96e639724def","issue_id":"047a235e-eaa7-4e6d-b12b-08fca4d3672b","timestamp":"2026-04-24T01:54:17.111296113Z","assignee":"agent:claude"}
+{"type":"issue_state_changed","id":"e9bcc564-e5f8-41e0-9aa3-31fe2a7098f2","issue_id":"1012e1af-cf13-460a-90b9-be209417f798","timestamp":"2026-04-24T01:54:21.679635510Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"bb6ca596-ae28-40fa-8f68-c05c17264945","issue_id":"1012e1af-cf13-460a-90b9-be209417f798","timestamp":"2026-04-24T01:54:21.680150090Z","assignee":"agent:claude-opus-session"}
+{"type":"gate_passed","id":"51960897-8321-43c7-8086-9674a150d101","issue_id":"047a235e-eaa7-4e6d-b12b-08fca4d3672b","timestamp":"2026-04-24T02:08:22.264566723Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"issue_state_changed","id":"a38dd1b2-cba0-41d5-8c93-5a92e582347d","issue_id":"1012e1af-cf13-460a-90b9-be209417f798","timestamp":"2026-04-24T02:08:23.051937888Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"ce1f02ac-142c-4476-8229-bf68d6d17e4e","issue_id":"1012e1af-cf13-460a-90b9-be209417f798","timestamp":"2026-04-24T02:08:23.051959828Z"}
