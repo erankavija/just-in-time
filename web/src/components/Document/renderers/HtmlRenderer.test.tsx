@@ -145,6 +145,18 @@ describe('HtmlRenderer', () => {
     expect(screen.getByText('docs/deck.html')).toBeDefined();
   });
 
+  it('shows path alongside label when both are distinct', () => {
+    render(
+      <HtmlRenderer
+        content={makeContent({ path: 'docs/deck.html' })}
+        issueId="issue-1"
+        documentRef={{ path: 'docs/deck.html', label: 'My Presentation' }}
+      />,
+    );
+    expect(screen.getByText('My Presentation')).toBeDefined();
+    expect(screen.getByText('docs/deck.html')).toBeDefined();
+  });
+
   it('uses content.path as label when documentRef is absent', () => {
     render(
       <HtmlRenderer

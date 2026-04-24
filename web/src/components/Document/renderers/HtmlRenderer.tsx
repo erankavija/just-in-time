@@ -8,10 +8,12 @@ const HtmlRenderer: FC<DocumentRendererProps> = ({
   issueId,
   documentRef,
   // searchTerm, highlightsActive, and onHighlightsCleared are intentionally
-  // unused: search highlighting and the history panel are not meaningful
-  // through an iframe boundary.
+  // unused: search highlighting is not meaningful through an iframe boundary.
+  // History panel is suppressed via noHistory: true in the registry entry.
 }) => {
   const label = documentRef?.label ?? content.path;
+  // Show the path separately only when a distinct label exists.
+  const showPath = documentRef?.label != null && documentRef.label !== content.path;
   const rawUrl = issueId
     ? getRawDocumentUrl(issueId, content.path, content.commit ?? undefined)
     : getRawDocumentUrl(null, content.path, content.commit ?? undefined);
@@ -22,6 +24,9 @@ const HtmlRenderer: FC<DocumentRendererProps> = ({
         <div className={styles.toolbarTitle}>
           <span className={styles.icon}>🌐</span>
           <span className={styles.label}>{label}</span>
+          {showPath && (
+            <span className={styles.path}>{content.path}</span>
+          )}
         </div>
         <div className={styles.toolbarActions}>
           <span className={styles.contentTypeBadge}>{content.content_type}</span>

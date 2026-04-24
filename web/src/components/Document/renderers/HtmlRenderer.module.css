@@ -32,6 +32,12 @@
   font-family: var(--font-mono);
 }
 
+.path {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
 .toolbarActions {
   display: flex;
   align-items: center;

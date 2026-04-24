@@ -105,15 +105,32 @@ describe('DocumentViewer — renderer dispatch smoke test (fixture-backed)', () 
   });
 });
 
+// A minimal reveal.js-style HTML fixture (stripped to the structural essentials).
+// reveal.js presentations are served with content_type: text/html — we verify
+// that DocumentViewer routes them to HtmlRenderer (iframe) rather than markdown.
+const REVEAL_JS_FIXTURE = [
+  '<!doctype html>',
+  '<html>',
+  '<head><title>Modem Framework</title></head>',
+  '<body class="reveal-viewport">',
+  '<div class="reveal"><div class="slides">',
+  '<section><h1>GF2 Modem Framework</h1></section>',
+  '<section><h2>Architecture</h2></section>',
+  '</div></div>',
+  '<script src="dist/reveal.js"></script>',
+  '<script>Reveal.initialize();</script>',
+  '</body></html>',
+].join('\n');
+
 describe('DocumentViewer — HTML renderer suppresses history panel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetDocumentHistory.mockResolvedValue({ path: 'deck.html', commits: [] });
     mockGetDocumentContent.mockResolvedValue(
-      makeContent('<!doctype html><html></html>', 'text/html'),
+      makeContent(REVEAL_JS_FIXTURE, 'text/html'),
     );
     mockGetDocumentByPath.mockResolvedValue(
-      makeContent('<!doctype html><html></html>', 'text/html'),
+      makeContent(REVEAL_JS_FIXTURE, 'text/html'),
     );
   });
 
@@ -132,5 +149,73 @@ describe('DocumentViewer — HTML renderer suppresses history panel', () => {
     // No history button should be in the DOM
     const historyBtn = document.querySelector('.history-btn');
     expect(historyBtn).toBeNull();
+  });
+});
+
+describe('DocumentViewer — reveal.js smoke test (fixture-backed)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetDocumentContent.mockResolvedValue(
+      makeContent(REVEAL_JS_FIXTURE, 'text/html'),
+    );
+    mockGetDocumentByPath.mockResolvedValue(
+      makeContent(REVEAL_JS_FIXTURE, 'text/html'),
+    );
+  });
+
+  it('routes reveal.js deck (text/html) to HtmlRenderer — renders an iframe', async () => {
+    render(
+      <DocumentViewer
+        documentPath="docs/presentations/deck.html"
+        issueId="d4851c3d"
+        documentRef={{
+          path: 'docs/presentations/deck.html',
+          label: 'GF2 Modem Framework',
+        }}
+      />,
+    );
+    await waitFor(() => {
+      const iframe = document.querySelector('iframe') as HTMLIFrameElement | null;
+      expect(iframe).toBeTruthy();
+      // iframe src must point at the raw endpoint, not attempt to render HTML text
+      expect(iframe?.getAttribute('src')).toContain('/raw');
+    });
+  });
+
+  it('reveal.js iframe has full sandbox permissions required for presentation playback', async () => {
+    render(
+      <DocumentViewer
+        documentPath="docs/presentations/deck.html"
+        issueId="d4851c3d"
+        documentRef={{ path: 'docs/presentations/deck.html', label: 'Modem Framework' }}
+      />,
+    );
+    await waitFor(() => {
+      const iframe = document.querySelector('iframe') as HTMLIFrameElement | null;
+      expect(iframe).toBeTruthy();
+      const sandbox = iframe?.getAttribute('sandbox') ?? '';
+      // allow-scripts enables reveal.js initialisation
+      expect(sandbox).toContain('allow-scripts');
+      // allow-same-origin lets the deck fetch co-located CSS/JS assets
+      expect(sandbox).toContain('allow-same-origin');
+      // allow-popups lets in-deck links open
+      expect(sandbox).toContain('allow-popups');
+    });
+  });
+
+  it('does NOT render any reveal.js content as HTML text (no slide class in DOM)', async () => {
+    render(
+      <DocumentViewer
+        documentPath="docs/presentations/deck.html"
+        issueId="d4851c3d"
+        documentRef={{ path: 'docs/presentations/deck.html', label: 'Modem Framework' }}
+      />,
+    );
+    await waitFor(() => {
+      expect(document.querySelector('iframe')).toBeTruthy();
+    });
+    // The raw HTML content should NOT be injected into the host document
+    expect(document.querySelector('.reveal')).toBeNull();
+    expect(document.querySelector('.slides')).toBeNull();
   });
 });
