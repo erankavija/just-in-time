@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "5588a2c1-dfcc-4136-ba75-b25feccc525a",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "abfd6016-a79d-4a5c-9d1d-d5393e7acb2d",
+  "commit": "e62453cdc21273837c95e30507dae16a49358fbf",
+  "branch": "main",
+  "status": "error",
+  "started_at": "2026-04-24T09:24:46.432878571Z",
+  "completed_at": "2026-04-24T09:34:46.514144016Z",
+  "duration_ms": 600081,
+  "exit_code": null,
+  "stdout": "",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

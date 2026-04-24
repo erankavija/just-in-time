@@ -1,25 +1,5 @@
 {
   "gates": {
-    "clippy": {
-      "version": 1,
-      "key": "clippy",
-      "title": "Clippy Lints Pass",
-      "description": "Zero clippy warnings allowed",
-      "stage": "postcheck",
-      "mode": "auto",
-      "checker": {
-        "type": "exec",
-        "command": "cargo clippy --lib -- -D warnings",
-        "timeout_seconds": 120,
-        "working_dir": null,
-        "env": {},
-        "pass_context": false
-      },
-      "priority": 100,
-      "reserved": {},
-      "auto": true,
-      "example_integration": null
-    },
     "code-review": {
       "version": 1,
       "key": "code-review",
@@ -30,7 +10,7 @@
       "checker": {
         "type": "exec",
         "command": "./scripts/ai-review.sh",
-        "timeout_seconds": 600,
+        "timeout_seconds": 1800,
         "working_dir": null,
         "env": {
           "REVIEWER_AGENT": "copilot -s --model gpt-5.4 --allow-tool \"shell(cargo test)\" --allow-tool \"shell(cargo clippy)\" --allow-tool \"shell(cargo fmt)\" --allow-tool \"shell(npm test)\" --allow-tool \"shell(npm run lint)\" --allow-tool \"shell(npm run build)\" --allow-tool \"shell(./scripts/jit-validate.sh)\""
@@ -63,6 +43,66 @@
       "auto": true,
       "example_integration": null
     },
+    "npm-ci": {
+      "version": 1,
+      "key": "npm-ci",
+      "title": "NPM CI (test + lint + build)",
+      "description": "Web workspace checks: vitest suite, ESLint, and production build all clean. Web-side equivalent of cargo-ci.",
+      "stage": "postcheck",
+      "mode": "auto",
+      "checker": {
+        "type": "exec",
+        "command": "cd web && npm test -- --run && npm run lint && npm run build",
+        "timeout_seconds": 600,
+        "working_dir": null,
+        "env": {},
+        "pass_context": false
+      },
+      "priority": 100,
+      "reserved": {},
+      "auto": true,
+      "example_integration": null
+    },
+    "clippy": {
+      "version": 1,
+      "key": "clippy",
+      "title": "Clippy Lints Pass",
+      "description": "Zero clippy warnings allowed",
+      "stage": "postcheck",
+      "mode": "auto",
+      "checker": {
+        "type": "exec",
+        "command": "cargo clippy --lib -- -D warnings",
+        "timeout_seconds": 120,
+        "working_dir": null,
+        "env": {},
+        "pass_context": false
+      },
+      "priority": 100,
+      "reserved": {},
+      "auto": true,
+      "example_integration": null
+    },
+    "cargo-ci": {
+      "version": 1,
+      "key": "cargo-ci",
+      "title": "Cargo CI (fmt + clippy + tests)",
+      "description": "Full Rust CI pipeline: formatting check, zero-warning clippy, and the workspace test suite must all pass.",
+      "stage": "postcheck",
+      "mode": "auto",
+      "checker": {
+        "type": "exec",
+        "command": "cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace",
+        "timeout_seconds": 900,
+        "working_dir": null,
+        "env": {},
+        "pass_context": false
+      },
+      "priority": 100,
+      "reserved": {},
+      "auto": true,
+      "example_integration": null
+    },
     "tdd-reminder": {
       "version": 1,
       "key": "tdd-reminder",
@@ -86,26 +126,6 @@
         "type": "exec",
         "command": "cargo fmt -- --check",
         "timeout_seconds": 30,
-        "working_dir": null,
-        "env": {},
-        "pass_context": false
-      },
-      "priority": 100,
-      "reserved": {},
-      "auto": true,
-      "example_integration": null
-    },
-    "cargo-ci": {
-      "version": 1,
-      "key": "cargo-ci",
-      "title": "Cargo CI (fmt + clippy + tests)",
-      "description": "Full Rust CI pipeline: formatting check, zero-warning clippy, and the workspace test suite must all pass.",
-      "stage": "postcheck",
-      "mode": "auto",
-      "checker": {
-        "type": "exec",
-        "command": "cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace",
-        "timeout_seconds": 900,
         "working_dir": null,
         "env": {},
         "pass_context": false

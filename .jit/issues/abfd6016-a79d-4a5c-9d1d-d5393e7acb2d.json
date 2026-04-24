@@ -13,7 +13,8 @@
   ],
   "gates_required": [
     "cargo-ci",
-    "code-review"
+    "code-review",
+    "npm-ci"
   ],
   "gates_status": {
     "cargo-ci": {
@@ -21,10 +22,15 @@
       "updated_by": "auto:executor",
       "updated_at": "2026-04-24T09:12:39.992493455Z"
     },
+    "npm-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-04-24T12:27:01.543297691Z"
+    },
     "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-04-23T21:32:04.888260699Z"
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-04-24T11:04:13.800426688Z"
     }
   },
   "context": {},
@@ -45,5 +51,5 @@
     "component:web"
   ],
   "created_at": "2026-04-23T21:20:24.883165396+00:00",
-  "updated_at": "2026-04-24T09:13:16.747649431+00:00"
+  "updated_at": "2026-04-24T12:27:13.358139111+00:00"
 }
