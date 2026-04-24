@@ -2,7 +2,7 @@
   "id": "5c060496-f33e-4a70-9414-ec9436b84b1e",
   "title": "Bug: relative asset paths in HTML decks fail to resolve (figures, styles, sub-slides)",
   "description": "## Summary\n\nHTML documents served through the web UI break on any relative asset reference. Observed in gf2's Epic-closeout deck (`docs/presentations/6efb756b-grand-sogrand.html`): `<img src=\"figures/fig4_crc_25_15_comparison.svg\">` (and fig5, fig6) render as broken images because the browser resolves `figures/…svg` against the iframe URL `/api/issues/<id>/documents/<encoded-html-path>/raw` — producing `/api/issues/<id>/documents/<encoded-html-path>/raw/figures/…svg` which matches no route and returns 404.\n\nThe same problem affects any relative `<link rel=\"stylesheet\">`, `<script src=\"…\">`, `url(…)` in inline CSS, or sub-slide `<section data-markdown=\"./slides/partA.md\">`. Only decks that are fully self-contained (inline CSS/JS, HTTPS-absolute CDN sources) render correctly today.\n\n## Root cause\n\nThe existing `/raw` endpoints expose only the single file linked to the issue. Sibling files in the same directory aren't reachable through any route, and the served HTML has no hint about where to resolve relative paths.\n\nWhen opened directly from disk (file://) relative paths resolve naturally to the sibling directory — that's why this only surfaces through the server.\n\n## Fix\n\nTwo changes needed, both server-side:\n\n1. **New wildcard route** `GET /api/raw/*path` that serves any repo-relative file via bytes + inferred Content-Type + CSP. Same machinery as existing `/raw` endpoints but accepts any path (with security guards). Also supports `?commit=` to stay consistent with other /raw variants.\n\n2. **Inject a `<base href=\"…\">` tag** into HTML responses from `/raw` endpoints, pointing at the parent directory of the served HTML under `/api/raw/<parent-dir>/`. With the base tag, the browser resolves `figures/fig4.svg` to `/api/raw/docs/presentations/figures/fig4.svg` — which the new wildcard route serves.\n\n## Acceptance criteria\n\n- [ ] New route `GET /api/raw/*path` serves any repo-relative file with the correct Content-Type inferred from extension. `?commit=<sha>` resolves to that commit's blob; omitted = working tree.\n- [ ] Path-traversal guard: paths containing `..` segments, absolute paths (leading `/`), or paths resolving outside repo root are rejected with 400. Covered by tests including `../etc/passwd`, `a/../../b`, and legit paths with `..` as part of a filename like `foo..bar`.\n- [ ] Symlinks that resolve outside the repo root are rejected. Covered by a test.\n- [ ] HTML responses from all `/raw` endpoints include an injected `<base href=\"/api/raw/<parent-dir>/\">` tag immediately after `<head>` (or at the start of `<html>` if no `<head>` element). Parent-dir is URL-encoded per segment.\n- [ ] If the document already contains a `<base>` tag in `<head>`, the server does NOT inject another — user intent preserved. Covered by a test.\n- [ ] The base tag is only injected for responses with `Content-Type: text/html`; other types pass through unchanged. Covered by a test.\n- [ ] Existing `/raw` endpoints remain byte-faithful for non-HTML content; HTML responses get the `<base>` tag injection (documented, covered by a test that bytes match source + base tag insertion).\n- [ ] End-to-end: opening `../gf2` issue `6efb756b` deck in the web UI shows fig4/fig5/fig6 rendered (not broken images). Verified manually and captured in the PR description.\n- [ ] Unit tests for `inject_base_tag(html, href)` helper covering: `<head>`, `<head …attrs…>`, missing `<head>`, empty HTML, existing `<base>`, HTML with only comments/DOCTYPE.\n- [ ] `cargo-ci`, `code-review`, `npm-ci` gates all pass.\n\n## Out of scope\n\n- Rewriting relative paths inline in served HTML (regex-based approach discarded; fragile and misses CSS `url(…)` and JS-loaded assets).\n- Cross-directory navigation (following a link from one deck to another deck — works trivially once wildcard route exists).\n- Document author tooling to bundle decks into self-contained HTML (separate feature).\n\n## Plan\n\nSee `dev/active/<short-id>-raw-assets-design.md` (will be written before implementation).",
-  "state": "in_progress",
+  "state": "done",
   "priority": "high",
   "assignee": "agent:claude",
   "dependencies": [],
@@ -12,15 +12,15 @@
     "npm-ci"
   ],
   "gates_status": {
-    "npm-ci": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-04-24T22:22:44.126692323Z"
-    },
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-04-24T22:22:02.566413422Z"
+    },
+    "npm-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-04-24T22:22:44.126692323Z"
     },
     "code-review": {
       "status": "passed",
@@ -46,5 +46,5 @@
     "milestone:v1.1"
   ],
   "created_at": "2026-04-24T20:50:25.452331386+00:00",
-  "updated_at": "2026-04-24T22:28:59.965177851+00:00"
+  "updated_at": "2026-04-24T22:30:03.882455318+00:00"
 }
