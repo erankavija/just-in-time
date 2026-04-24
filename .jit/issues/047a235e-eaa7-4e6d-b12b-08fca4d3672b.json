@@ -2,7 +2,7 @@
   "id": "047a235e-eaa7-4e6d-b12b-08fca4d3672b",
   "title": "Bug: path-only /documents endpoint reads relative to process CWD instead of repo root",
   "description": "## Summary\n\n`JsonFileStorage::read_path_bytes` (crates/jit/src/storage/json.rs:745-754, working-tree branch) calls `fs::read(path)` directly. Path is repo-root-relative (server/UI/search all pass repo-root-relative paths), but `fs::read` resolves against the process's current working directory.\n\nResult: when the jit server is started from anywhere other than the repo root, `/documents?path=foo/bar.md` and `/documents/raw?path=foo/bar.md` fail to find files that exist in the repo.\n\nThe git-commit branch of the same function (lines 712-744) correctly resolves against `self.root.parent()` (the repo root, parent of `.jit/`). The working-tree branch should use the same root.\n\n## Reproduction\n\n```bash\ncd /tmp && /path/to/target/release/jit serve --root /home/user/some-repo\n# In another terminal:\ncurl http://localhost:3000/api/documents?path=README.md\n# 404 — but README.md exists in /home/user/some-repo\n```\n\n## Acceptance criteria\n\n- [ ] `JsonFileStorage::read_path_bytes` working-tree branch resolves `path` against the repo root (parent of `self.root`), matching the behavior of the git-commit branch — covered by a unit test that opens a JsonFileStorage with a non-CWD root and confirms the read succeeds.\n- [ ] The `/documents?path=...` success-path test in `crates/server/src/routes.rs` (currently a stub at lines 1120-1145 that the agent self-acknowledged was not meaningfully testing the success case) is replaced with a real assertion: writes a fixture file at a path inside the repo root, hits the endpoint, and asserts both the response status and the response body bytes.\n- [ ] `cargo-ci` gate passes.\n- [ ] `code-review` gate passes.\n\n## Related\n\nStory abfd6016 (multi-format doc rendering). Surfaced during task 42bd50ce code-review re-run after task 75b1ccb8 was marked done. The finding actually belongs to task 75b1ccb8's storage refactor; tracked as a separate bug rather than re-opening 75b1ccb8.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "high",
   "assignee": "agent:claude",
   "dependencies": [],
@@ -11,15 +11,15 @@
     "code-review"
   ],
   "gates_status": {
-    "cargo-ci": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-04-24T02:14:58.122790129Z"
-    },
     "code-review": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-04-24T02:15:43.149512381Z"
+    },
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-04-24T02:14:58.122790129Z"
     }
   },
   "context": {},
@@ -32,5 +32,5 @@
     "milestone:v1.1"
   ],
   "created_at": "2026-04-24T01:54:11.051856469+00:00",
-  "updated_at": "2026-04-24T02:20:44.047769319+00:00"
+  "updated_at": "2026-04-24T02:23:53.171221037+00:00"
 }
