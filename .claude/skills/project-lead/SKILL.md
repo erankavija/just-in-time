@@ -68,7 +68,11 @@ Hold all discovered context in working memory for the duration of the session.
 
 1. **Fetch the epic.** `jit issue show <epic-id> --json`. Validate:
    - It's a strategic-level type (from the discovered hierarchy).
-   - It has a `## Success Criteria` section in its description.
+   - It has a success-criteria section in its description. Match
+     case-insensitively (`## Success Criteria`, `## Success criteria`,
+     etc.) and accept the equivalents documented in jit-manage Workflow
+     B2 (`## Acceptance Criteria`, `## Definition of Done`). Reject only
+     if no such section exists at all.
    - Its state is `backlog`, `ready`, or `in_progress`.
 
 2. **Check existing children.** `jit graph deps <epic-id>`.
@@ -218,11 +222,17 @@ Per jit-parallel's conflict heuristics, if two issues in the wave may touch the 
 
 ## Section 7: Lead Review
 
-For each completed sub-agent, follow `references/lead-review-protocol.md`:
+For each completed sub-agent, follow `references/lead-review-protocol.md` — which defines six tiers (1, 1.5, 2, 2.5, 2.75, 3). In summary:
 
 **Tier 1 — Gate verification:** Check that all gates on the issue show `passed`. If any gate is unpassed, automatic FAIL.
 
+**Tier 1.5 — Prior-findings regression check** (re-reviews only): Extract every finding from every prior failed `code-review` run and verify each is still closed at HEAD. A regression outranks any new finding.
+
 **Tier 2 — Success criteria:** Read each criterion. Verify the work genuinely satisfies it by inspecting the artifacts (diffs, files, documents). Do not rely on the agent's self-assessment alone.
+
+**Tier 2.5 — Stale-narrative sweep:** grep for forward-looking narrative about the work that just landed.
+
+**Tier 2.75 — Deferred-items audit:** Open every design doc linked to the issue and grep for "deferred", "TODO", "open question", "future work", etc. Every match must be either closed in the current commit or explicitly cited as out-of-scope per the issue's Non-goals section.
 
 **Tier 3 — Holistic coherence:** Assess fit with the rest of the epic:
 - Cross-issue naming and style consistency
@@ -231,6 +241,8 @@ For each completed sub-agent, follow `references/lead-review-protocol.md`:
 - No out-of-scope changes
 
 Record a structured verdict (PASS or FAIL with specific findings). If FAIL, the verdict is passed to the rework protocol.
+
+**Before dispatching any rework**, the lead must have completed Tiers 1.5 and 2.75 in addition to the other tiers. The 6-cycle loop pattern observed in practice (each round surfacing a different subset of findings) is preventable only if the lead audits holistically on every round — reviewers have no memory across rounds, so the lead must supply it.
 
 ## Section 8: Rework
 

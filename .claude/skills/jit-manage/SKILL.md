@@ -33,6 +33,14 @@ These rules apply across **all** workflows. Never violate them.
    `epic:auth` for filtering, but containment is expressed via dependency
    edges (parent depends on children).
 
+3a. **Story-as-checkpoint over leaf fan-out.** When N downstream tasks
+    share a prerequisite cluster of M tasks (e.g., M setup tasks under
+    one story, N implementation tasks all blocked by the cluster), wire
+    the implementations to depend on the *parent story* — not on each
+    setup task individually. Story completion = M-cluster done + lead
+    review. Edge count drops from N×M to N+M and the UI dependency
+    graph stays readable.
+
 4. **Claims before work.** An issue must be claimed before any work begins.
 
 5. **Gates before completion.** All quality gates must pass before an issue
@@ -243,10 +251,13 @@ Create issues with proper DAG wiring, labels, and success criteria.
 ### C2. Create a single issue
 
 1. Gather from the user:
-   - **Title** — concise, action-oriented
+   - **Title** — concise, action-oriented; no metadata prefix (no `<id>/Tn:`,
+     no `feat(jit:abc):`). See content-standards "Issue Titles".
    - **Description** — follow `.claude/skills/jit-manage/references/content-standards.md`:
      standalone markdown document, `## Success Criteria` with verifiable items,
-     Mermaid for diagrams, LaTeX for math
+     Mermaid for diagrams, LaTeX for math. **Use the template verbatim. Do NOT
+     pattern-match against existing repo issues — content-standards is canonical
+     when they conflict.**
    - **Type** — from configured hierarchy
    - **Priority** — critical / high / normal / low
 
