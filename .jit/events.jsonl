@@ -2107,3 +2107,5 @@
 {"type":"issue_created","id":"a7a3deae-e00b-4c51-ba04-820fbb1a3c8f","issue_id":"b158e18d-f348-4ca2-89a2-e1a1feebc119","timestamp":"2026-04-27T22:07:50.502086988Z","title":"Update CLI UX documentation for provenance and JSON contracts","priority":"high"}
 {"type":"issue_state_changed","id":"487e714e-bafe-48ca-b8ed-fc81711f89c3","issue_id":"afe30eeb-1963-490d-9dad-d819485b5f2a","timestamp":"2026-04-27T22:07:50.516958933Z","from":"ready","to":"backlog"}
 {"type":"issue_state_changed","id":"59042554-e502-41f3-ba88-64f45ea0c198","issue_id":"b158e18d-f348-4ca2-89a2-e1a1feebc119","timestamp":"2026-04-27T22:07:50.567377797Z","from":"ready","to":"backlog"}
+{"type":"issue_state_changed","id":"9f6c1a03-ba9c-47e2-bd1a-c16ba1b053c1","issue_id":"2b82c12c-1f63-45b3-a123-d652719fbd3c","timestamp":"2026-04-27T22:08:16.778934926Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"77f593fe-8713-4fb5-8697-2d531b6f76a9","issue_id":"2b82c12c-1f63-45b3-a123-d652719fbd3c","timestamp":"2026-04-27T22:08:16.779207096Z","assignee":"agent:copilot"}
