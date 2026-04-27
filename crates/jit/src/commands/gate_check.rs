@@ -213,7 +213,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .into_iter()
             .filter(|r| r.gate_key == gate_key)
             .collect();
-        run_history.sort_by(|a, b| a.started_at.cmp(&b.started_at));
+        run_history.sort_by_key(|run| run.started_at);
         if run_history.len() > Self::MAX_RUN_HISTORY {
             run_history = run_history.split_off(run_history.len() - Self::MAX_RUN_HISTORY);
         }

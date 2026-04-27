@@ -821,7 +821,7 @@ impl ClaimCoordinator {
             .collect();
 
         // 4. Sort by acquired_at (most recent first)
-        leases.sort_by(|a, b| b.acquired_at.cmp(&a.acquired_at));
+        leases.sort_by_key(|lease| std::cmp::Reverse(lease.acquired_at));
 
         Ok(leases)
     }

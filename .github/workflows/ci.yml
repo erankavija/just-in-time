@@ -79,6 +79,59 @@ jobs:
           cd crates/jit
           cargo test --test '*' --verbose
 
+  coverage:
+    name: Coverage Badges
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Install ripgrep (for search tests)
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
+
+      - name: Configure git default branch
+        run: git config --global init.defaultBranch main
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Generate coverage data
+        run: cargo llvm-cov --workspace --json --summary-only --output-path coverage.json
+
+      - name: Generate coverage badges
+        run: bash scripts/generate-coverage-badges.sh coverage.json badges
+
+      - name: Deploy badges to badges branch
+        run: |
+          cd badges
+          git init
+          git checkout -b badges
+          git add -A
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -m "Update coverage badges [skip ci]"
+          git push --force "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" badges
+
   test-mcp-server:
     name: Test MCP Server
     runs-on: ubuntu-latest

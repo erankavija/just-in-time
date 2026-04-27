@@ -532,7 +532,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             runs.retain(|r| r.gate_key == key);
         }
 
-        runs.sort_by(|a, b| b.started_at.cmp(&a.started_at));
+        runs.sort_by_key(|run| std::cmp::Reverse(run.started_at));
         Ok(runs)
     }
 

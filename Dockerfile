@@ -17,13 +17,12 @@ COPY Cargo.toml Cargo.lock ./
 COPY crates/ ./crates/
 COPY scripts/ ./scripts/
 
-# Build all Rust binaries (CLI, server, dispatch)
+# Build all Rust binaries (CLI and server)
 RUN cargo build --release --workspace
 
 # Strip binaries to reduce size
 RUN strip target/release/jit && \
-    strip target/release/jit-server && \
-    strip target/release/jit-dispatch
+    strip target/release/jit-server
 
 # Stage 2: Build Web UI
 FROM node:20-slim as web-builder
@@ -55,7 +54,6 @@ RUN apt-get update && \
 # Copy Rust binaries from builder
 COPY --from=rust-builder /build/target/release/jit /usr/local/bin/
 COPY --from=rust-builder /build/target/release/jit-server /usr/local/bin/
-COPY --from=rust-builder /build/target/release/jit-dispatch /usr/local/bin/
 
 # Copy MCP server
 COPY mcp-server/package*.json ./mcp-server/

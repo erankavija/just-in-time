@@ -2,6 +2,9 @@
 
 [![CI](https://github.com/erankavija/just-in-time/actions/workflows/ci.yml/badge.svg)](https://github.com/erankavija/just-in-time/actions/workflows/ci.yml)
 [![Docker](https://github.com/erankavija/just-in-time/actions/workflows/docker.yml/badge.svg)](https://github.com/erankavija/just-in-time/actions/workflows/docker.yml)
+[![jit coverage](https://raw.githubusercontent.com/erankavija/just-in-time/badges/jit.svg)](https://github.com/erankavija/just-in-time/actions/workflows/ci.yml)
+[![jit-server coverage](https://raw.githubusercontent.com/erankavija/just-in-time/badges/jit-server.svg)](https://github.com/erankavija/just-in-time/actions/workflows/ci.yml)
+[![workspace coverage](https://raw.githubusercontent.com/erankavija/just-in-time/badges/workspace.svg)](https://github.com/erankavija/just-in-time/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
 
 **Orchestrate, automate and supervise the work of AI agents.** A repository-local CLI issue tracker that enables defining complex workflows, quality control and project planning with AI agents.
