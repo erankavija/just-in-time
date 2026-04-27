@@ -2110,3 +2110,5 @@
 {"type":"issue_state_changed","id":"9f6c1a03-ba9c-47e2-bd1a-c16ba1b053c1","issue_id":"2b82c12c-1f63-45b3-a123-d652719fbd3c","timestamp":"2026-04-27T22:08:16.778934926Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"77f593fe-8713-4fb5-8697-2d531b6f76a9","issue_id":"2b82c12c-1f63-45b3-a123-d652719fbd3c","timestamp":"2026-04-27T22:08:16.779207096Z","assignee":"agent:copilot"}
 {"type":"issue_created","id":"0bb71bf4-9f9a-414e-95a5-09ab599196ee","issue_id":"2d6705a8-47b4-4f0d-bb8d-bcd77386c866","timestamp":"2026-04-27T22:15:52.409656893Z","title":"Fix gate pass success reporting for failed automated gates","priority":"critical"}
+{"type":"gate_passed","id":"5d76de44-b93a-4d45-a72f-6e50f648bcc1","issue_id":"2b82c12c-1f63-45b3-a123-d652719fbd3c","timestamp":"2026-04-27T22:17:43.666433624Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"f1eff8df-d7b1-4784-99b6-a12aad019c12","issue_id":"2b82c12c-1f63-45b3-a123-d652719fbd3c","timestamp":"2026-04-27T22:28:04.437533788Z","gate_key":"code-review","updated_by":"auto:executor"}
