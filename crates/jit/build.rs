@@ -18,11 +18,8 @@ fn main() {
         env_override("JIT_BUILD_GIT_HASH").or_else(|| git_output(&["rev-parse", "HEAD"]));
     let git_short_hash = env_override("JIT_BUILD_GIT_SHORT_HASH")
         .or_else(|| git_output(&["rev-parse", "--short=8", "HEAD"]));
-    let git_dirty = env_override("JIT_BUILD_GIT_DIRTY").unwrap_or_else(|| {
-        git_output(&["status", "--short", "--untracked-files=no"])
-            .map(|status| (!status.is_empty()).to_string())
-            .unwrap_or_else(|| "unknown".to_string())
-    });
+    let git_dirty = env_override("JIT_BUILD_GIT_DIRTY")
+        .unwrap_or_else(|| git_dirty().unwrap_or_else(|| "unknown".to_string()));
 
     println!(
         "cargo:rustc-env=JIT_GIT_HASH={}",
@@ -57,6 +54,16 @@ fn git_output(args: &[&str]) -> Option<String> {
         .and_then(|output| String::from_utf8(output.stdout).ok())
         .map(|stdout| stdout.trim().to_string())
         .filter(|stdout| !stdout.is_empty())
+}
+
+fn git_dirty() -> Option<String> {
+    Command::new("git")
+        .args(["status", "--short", "--untracked-files=no"])
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .and_then(|output| String::from_utf8(output.stdout).ok())
+        .map(|stdout| (!stdout.trim().is_empty()).to_string())
 }
 
 fn build_timestamp() -> String {
