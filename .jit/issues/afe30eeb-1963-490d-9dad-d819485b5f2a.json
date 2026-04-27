@@ -2,12 +2,13 @@
   "id": "afe30eeb-1963-490d-9dad-d819485b5f2a",
   "title": "CLI usability improvements",
   "description": "Identify and implement usability improvements for the JIT CLI experience — better output formatting, help text, error messages, command ergonomics, and discoverability.",
-  "state": "ready",
+  "state": "backlog",
   "priority": "high",
   "assignee": null,
   "dependencies": [
-    "3a7caca1-8126-4b02-b94e-435d5b679fbe",
-    "8d97547d-f88e-4066-9dde-0afa08b260ab"
+    "b158e18d-f348-4ca2-89a2-e1a1feebc119",
+    "8d97547d-f88e-4066-9dde-0afa08b260ab",
+    "3a7caca1-8126-4b02-b94e-435d5b679fbe"
   ],
   "gates_required": [],
   "gates_status": {},
@@ -20,5 +21,5 @@
     "component:cli"
   ],
   "created_at": "2026-03-09T19:54:54.318605199+00:00",
-  "updated_at": "2026-03-11T21:30:36.587898528+00:00"
+  "updated_at": "2026-04-27T22:08:05.403475392+00:00"
 }

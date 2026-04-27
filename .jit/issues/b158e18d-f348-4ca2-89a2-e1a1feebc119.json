@@ -1,0 +1,28 @@
+{
+  "id": "b158e18d-f348-4ca2-89a2-e1a1feebc119",
+  "title": "Update CLI UX documentation for provenance and JSON contracts",
+  "description": "Update only the documentation and command help touched by the first CLI UX slice so users can discover version provenance, improved remediation output, and standardized JSON contracts.\n\n## Background\n\nThis task is intentionally scoped to the changed CLI surfaces. It does not include the broader documentation site/tooling decision or a new Web UI feature.\n\n## Success Criteria\n\n- [ ] CLI reference documentation includes `jit --version` and `jit version` usage, including JSON output.\n- [ ] Documentation or help examples explain the improved state/gate remediation output.\n- [ ] JSON response contract documentation matches the standardized output shapes.\n- [ ] No unrelated docs site/tooling changes are included.",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "5c581575-bef8-4ee6-be83-7598fd22b557",
+    "7af944ca-eac9-4ba8-883b-3bda654f7a03",
+    "2b82c12c-1f63-45b3-a123-d652719fbd3c"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:usability",
+    "milestone:v1.0",
+    "component:cli"
+  ],
+  "created_at": "2026-04-27T22:07:50.501260898+00:00",
+  "updated_at": "2026-04-27T22:07:50.583576252+00:00"
+}

@@ -2101,3 +2101,9 @@
 {"type":"issue_state_changed","id":"1f047abb-4de0-4706-bad2-283bc9f1cc8d","issue_id":"5c060496-f33e-4a70-9414-ec9436b84b1e","timestamp":"2026-04-24T22:30:03.882359538Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"10b6d3c1-0dbc-4ec6-bd97-ec874b4a810f","issue_id":"5c060496-f33e-4a70-9414-ec9436b84b1e","timestamp":"2026-04-24T22:30:03.882426098Z"}
 {"type":"issue_state_changed","id":"3151de2e-66cf-4433-972e-1763779b041a","issue_id":"94f873c8-8508-44b0-b036-ff61c2a9716d","timestamp":"2026-04-24T22:30:03.977335575Z","from":"backlog","to":"ready"}
+{"type":"issue_created","id":"722b0f97-9888-45a8-9cc9-b0704e262663","issue_id":"2b82c12c-1f63-45b3-a123-d652719fbd3c","timestamp":"2026-04-27T22:07:50.489640395Z","title":"Add local CLI version provenance","priority":"high"}
+{"type":"issue_created","id":"933d5244-2645-401a-864e-6102f5757427","issue_id":"5c581575-bef8-4ee6-be83-7598fd22b557","timestamp":"2026-04-27T22:07:50.493924726Z","title":"Improve state and gate blocking remediation","priority":"high"}
+{"type":"issue_created","id":"9c1439c9-511d-455b-811b-90aa167bfe7f","issue_id":"7af944ca-eac9-4ba8-883b-3bda654f7a03","timestamp":"2026-04-27T22:07:50.497810647Z","title":"Standardize CLI JSON output contracts","priority":"high"}
+{"type":"issue_created","id":"a7a3deae-e00b-4c51-ba04-820fbb1a3c8f","issue_id":"b158e18d-f348-4ca2-89a2-e1a1feebc119","timestamp":"2026-04-27T22:07:50.502086988Z","title":"Update CLI UX documentation for provenance and JSON contracts","priority":"high"}
+{"type":"issue_state_changed","id":"487e714e-bafe-48ca-b8ed-fc81711f89c3","issue_id":"afe30eeb-1963-490d-9dad-d819485b5f2a","timestamp":"2026-04-27T22:07:50.516958933Z","from":"ready","to":"backlog"}
+{"type":"issue_state_changed","id":"59042554-e502-41f3-ba88-64f45ea0c198","issue_id":"b158e18d-f348-4ca2-89a2-e1a1feebc119","timestamp":"2026-04-27T22:07:50.567377797Z","from":"ready","to":"backlog"}

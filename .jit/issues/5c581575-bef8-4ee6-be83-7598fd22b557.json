@@ -1,0 +1,24 @@
+{
+  "id": "5c581575-bef8-4ee6-be83-7598fd22b557",
+  "title": "Improve state and gate blocking remediation",
+  "description": "Make state-transition and gate-blocking failures actionable so users and agents know what prevented progress and exactly what to run next.\n\n## Background\n\nCLI usability planning identified gate and state-transition failures as the highest-value error UX target after version provenance. The goal is to improve blocked completion, claim, and state-change flows before broadening to validation, document, or ID-resolution errors.\n\n## Success Criteria\n\n- [ ] State-transition failures caused by pending dependencies or gates identify each blocker clearly.\n- [ ] Human-readable errors include concrete next commands for inspecting or resolving blockers.\n- [ ] JSON error output includes structured blocker/remediation fields suitable for MCP and agent consumers.\n- [ ] Existing successful transition behavior is unchanged.\n- [ ] Tests cover at least one gate-blocked transition and one dependency-blocked transition.",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:usability",
+    "milestone:v1.0",
+    "component:cli"
+  ],
+  "created_at": "2026-04-27T22:07:50.493669096+00:00",
+  "updated_at": "2026-04-27T22:07:50.493699416+00:00"
+}
