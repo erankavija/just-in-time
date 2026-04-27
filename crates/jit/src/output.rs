@@ -351,6 +351,7 @@ impl ErrorCode {
     pub const ALREADY_EXISTS: &'static str = "ALREADY_EXISTS";
     pub const INVALID_STATE: &'static str = "INVALID_STATE";
     pub const BLOCKED: &'static str = "BLOCKED";
+    pub const GATE_FAILED: &'static str = "GATE_FAILED";
     pub const IO_ERROR: &'static str = "IO_ERROR";
     pub const PARSE_ERROR: &'static str = "PARSE_ERROR";
 }
@@ -360,7 +361,9 @@ impl ErrorCode {
     pub fn to_exit_code(code: &str) -> ExitCode {
         match code {
             Self::ISSUE_NOT_FOUND | Self::GATE_NOT_FOUND => ExitCode::NotFound,
-            Self::CYCLE_DETECTED | Self::VALIDATION_FAILED => ExitCode::ValidationFailed,
+            Self::CYCLE_DETECTED | Self::VALIDATION_FAILED | Self::GATE_FAILED => {
+                ExitCode::ValidationFailed
+            }
             Self::INVALID_ARGUMENT | Self::INVALID_STATE => ExitCode::InvalidArgument,
             Self::ALREADY_EXISTS => ExitCode::AlreadyExists,
             Self::IO_ERROR => ExitCode::ExternalError,
@@ -872,6 +875,14 @@ mod tests {
         // Should NOT have envelope fields
         assert!(!json_str.contains("\"success\""));
         assert!(!json_str.contains("\"metadata\""));
+    }
+
+    #[test]
+    fn test_gate_failed_error_code_is_validation_failure() {
+        assert_eq!(
+            ErrorCode::to_exit_code(ErrorCode::GATE_FAILED),
+            ExitCode::ValidationFailed
+        );
     }
 
     // ========================================================================

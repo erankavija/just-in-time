@@ -29,6 +29,13 @@ use std::str::FromStr;
 
 /// Helper to determine exit code from error message
 fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
+    if error
+        .downcast_ref::<jit::commands::GatePassFailed>()
+        .is_some()
+    {
+        return ExitCode::ValidationFailed;
+    }
+
     let error_msg = error.to_string().to_lowercase();
 
     // Check root cause for IO errors

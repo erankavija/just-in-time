@@ -220,6 +220,7 @@ fn test_gate_pass_json_failure_matches_persisted_status() {
         .args(["gate", "pass", &issue_id, "test-gate", "--json"])
         .assert()
         .failure()
+        .code(4)
         .get_output()
         .stdout
         .clone();
