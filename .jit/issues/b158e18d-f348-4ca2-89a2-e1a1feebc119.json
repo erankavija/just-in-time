@@ -7,8 +7,9 @@
   "assignee": null,
   "dependencies": [
     "5c581575-bef8-4ee6-be83-7598fd22b557",
+    "2b82c12c-1f63-45b3-a123-d652719fbd3c",
     "7af944ca-eac9-4ba8-883b-3bda654f7a03",
-    "2b82c12c-1f63-45b3-a123-d652719fbd3c"
+    "2d6705a8-47b4-4f0d-bb8d-bcd77386c866"
   ],
   "gates_required": [
     "cargo-ci",
@@ -24,5 +25,5 @@
     "component:cli"
   ],
   "created_at": "2026-04-27T22:07:50.501260898+00:00",
-  "updated_at": "2026-04-27T22:07:50.583576252+00:00"
+  "updated_at": "2026-04-27T22:15:52.424384537+00:00"
 }
