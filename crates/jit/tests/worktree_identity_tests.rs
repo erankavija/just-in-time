@@ -221,7 +221,7 @@ fn test_init_removes_copied_worktree_json_with_wrong_path() {
 
     // Run init - should detect and remove the copied file
     let jit = jit_binary();
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .arg("init")
         .current_dir(temp_dir.path())
         .output()
@@ -257,7 +257,7 @@ fn test_init_preserves_correct_worktree_json() {
 
     // Run init - should NOT delete the file
     let jit = jit_binary();
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .arg("init")
         .current_dir(temp_dir.path())
         .output()
@@ -280,7 +280,7 @@ fn test_init_is_idempotent() {
     let jit = jit_binary();
 
     // First init
-    Command::new(&jit)
+    Command::new(jit)
         .arg("init")
         .current_dir(temp_dir.path())
         .output()
@@ -302,7 +302,7 @@ fn test_init_is_idempotent() {
     fs::write(&wt_file, json).unwrap();
 
     // Second init - should not change anything
-    Command::new(&jit)
+    Command::new(jit)
         .arg("init")
         .current_dir(temp_dir.path())
         .output()

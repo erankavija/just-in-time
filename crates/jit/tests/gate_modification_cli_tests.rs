@@ -13,7 +13,7 @@ fn setup_test_repo() -> TempDir {
     let temp = TempDir::new().unwrap();
     let jit = jit_binary();
 
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .arg("init")
         .current_dir(temp.path())
         .output()
@@ -25,7 +25,7 @@ fn setup_test_repo() -> TempDir {
 
 fn create_issue(temp: &TempDir, title: &str) -> String {
     let jit = jit_binary();
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["issue", "create", "-t", title])
         .current_dir(temp.path())
         .output()
@@ -45,7 +45,7 @@ fn create_issue(temp: &TempDir, title: &str) -> String {
 
 fn define_gate(temp: &TempDir, key: &str, title: &str) {
     let jit = jit_binary();
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args([
             "gate",
             "define",
@@ -68,7 +68,7 @@ fn define_gate(temp: &TempDir, key: &str, title: &str) {
 
 fn get_issue_json(temp: &TempDir, id: &str) -> serde_json::Value {
     let jit = jit_binary();
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["issue", "show", id, "--json"])
         .current_dir(temp.path())
         .output()
@@ -86,7 +86,7 @@ fn test_add_single_gate() {
     let id = create_issue(&temp, "Test issue");
 
     let jit = jit_binary();
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["issue", "update", &id, "--add-gate", "tests"])
         .current_dir(temp.path())
         .output()
@@ -111,7 +111,7 @@ fn test_add_multiple_gates_multiple_flags() {
     let id = create_issue(&temp, "Test issue");
 
     let jit = jit_binary();
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args([
             "issue",
             "update",
@@ -145,7 +145,7 @@ fn test_add_multiple_gates_comma_separated() {
     let id = create_issue(&temp, "Test issue");
 
     let jit = jit_binary();
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["issue", "update", &id, "--add-gate", "tests,clippy"])
         .current_dir(temp.path())
         .output()
@@ -171,7 +171,7 @@ fn test_remove_gate() {
     let jit = jit_binary();
 
     // Create issue with gates
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args([
             "issue",
             "create",
@@ -193,7 +193,7 @@ fn test_remove_gate() {
         .unwrap();
 
     // Remove one gate
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["issue", "update", id, "--remove-gate", "tests"])
         .current_dir(temp.path())
         .output()
@@ -220,7 +220,7 @@ fn test_add_and_remove_gates_combined() {
     let jit = jit_binary();
 
     // Create issue with one gate
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["issue", "create", "-t", "Test issue", "--gate", "tests"])
         .current_dir(temp.path())
         .output()
@@ -235,7 +235,7 @@ fn test_add_and_remove_gates_combined() {
         .unwrap();
 
     // Add clippy and fmt, remove tests
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args([
             "issue",
             "update",
@@ -268,7 +268,7 @@ fn test_add_gate_invalid_key_error() {
     let id = create_issue(&temp, "Test issue");
 
     let jit = jit_binary();
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["issue", "update", &id, "--add-gate", "nonexistent"])
         .current_dir(temp.path())
         .output()
@@ -292,7 +292,7 @@ fn test_add_gate_idempotent() {
     let jit = jit_binary();
 
     // Add gate first time
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["issue", "update", &id, "--add-gate", "tests"])
         .current_dir(temp.path())
         .output()
@@ -300,7 +300,7 @@ fn test_add_gate_idempotent() {
     assert!(output.status.success());
 
     // Add same gate again (should be no-op)
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["issue", "update", &id, "--add-gate", "tests"])
         .current_dir(temp.path())
         .output()
@@ -325,7 +325,7 @@ fn test_batch_add_gates() {
 
     // Update issues by setting label first (new issues start in ready state)
     let jit = jit_binary();
-    Command::new(&jit)
+    Command::new(jit)
         .args([
             "issue",
             "update",
@@ -339,7 +339,7 @@ fn test_batch_add_gates() {
         .unwrap();
 
     // Batch add gate using filter
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args([
             "issue",
             "update",
@@ -359,7 +359,7 @@ fn test_batch_add_gates() {
     );
 
     // Verify both issues have the gate
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["query", "all", "--label", "type:task", "--full", "--json"])
         .current_dir(temp.path())
         .output()
@@ -382,7 +382,7 @@ fn test_gates_in_json_output() {
     let id = create_issue(&temp, "Test issue");
 
     let jit = jit_binary();
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["issue", "update", &id, "--add-gate", "tests", "--json"])
         .current_dir(temp.path())
         .output()
@@ -402,7 +402,7 @@ fn test_combine_with_other_updates() {
     let id = create_issue(&temp, "Test issue");
 
     let jit = jit_binary();
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args([
             "issue",
             "update",
@@ -443,7 +443,7 @@ fn test_remove_nonexistent_gate_is_noop() {
     let id = create_issue(&temp, "Test issue");
 
     let jit = jit_binary();
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["issue", "update", &id, "--remove-gate", "tests"])
         .current_dir(temp.path())
         .output()
@@ -466,7 +466,7 @@ fn test_batch_remove_gates() {
     let jit = jit_binary();
 
     // Create issues with gates
-    Command::new(&jit)
+    Command::new(jit)
         .args([
             "issue",
             "create",
@@ -481,7 +481,7 @@ fn test_batch_remove_gates() {
         .output()
         .unwrap();
 
-    Command::new(&jit)
+    Command::new(jit)
         .args([
             "issue",
             "create",
@@ -497,7 +497,7 @@ fn test_batch_remove_gates() {
         .unwrap();
 
     // Batch remove gate
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args([
             "issue",
             "update",
@@ -517,7 +517,7 @@ fn test_batch_remove_gates() {
     );
 
     // Verify gates removed
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["query", "all", "--label", "type:task", "--full", "--json"])
         .current_dir(temp.path())
         .output()

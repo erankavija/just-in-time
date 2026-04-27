@@ -8,7 +8,7 @@ fn jit_binary() -> &'static str {
 fn setup_test_repo() -> TempDir {
     let temp = TempDir::new().unwrap();
     let jit = jit_binary();
-    Command::new(&jit)
+    Command::new(jit)
         .args(["init"])
         .current_dir(temp.path())
         .output()
@@ -22,12 +22,12 @@ fn test_graph_deps_depth_default() {
     let jit = jit_binary();
 
     // Create a 3-level dependency chain: A -> B -> C
-    let c = create_issue(&jit, &temp, "Task C", "Leaf");
-    let b = create_issue_with_dep(&jit, &temp, "Task B", "Middle", &c);
-    let a = create_issue_with_dep(&jit, &temp, "Task A", "Root", &b);
+    let c = create_issue(jit, &temp, "Task C", "Leaf");
+    let b = create_issue_with_dep(jit, &temp, "Task B", "Middle", &c);
+    let a = create_issue_with_dep(jit, &temp, "Task A", "Root", &b);
 
     // Default behavior (no --depth flag) should show immediate deps only (depth 1)
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["graph", "deps", &a, "--json"])
         .current_dir(temp.path())
         .output()
@@ -51,12 +51,12 @@ fn test_graph_deps_depth_2() {
     let jit = jit_binary();
 
     // Create: A -> B -> C
-    let c = create_issue(&jit, &temp, "Task C", "Leaf");
-    let b = create_issue_with_dep(&jit, &temp, "Task B", "Middle", &c);
-    let a = create_issue_with_dep(&jit, &temp, "Task A", "Root", &b);
+    let c = create_issue(jit, &temp, "Task C", "Leaf");
+    let b = create_issue_with_dep(jit, &temp, "Task B", "Middle", &c);
+    let a = create_issue_with_dep(jit, &temp, "Task A", "Root", &b);
 
     // --depth 2 should show B and C
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["graph", "deps", &a, "--depth", "2", "--json"])
         .current_dir(temp.path())
         .output()
@@ -94,13 +94,13 @@ fn test_graph_deps_depth_unlimited() {
     let jit = jit_binary();
 
     // Create: A -> B -> C -> D
-    let d = create_issue(&jit, &temp, "Task D", "Deep");
-    let c = create_issue_with_dep(&jit, &temp, "Task C", "Level 3", &d);
-    let b = create_issue_with_dep(&jit, &temp, "Task B", "Level 2", &c);
-    let a = create_issue_with_dep(&jit, &temp, "Task A", "Root", &b);
+    let d = create_issue(jit, &temp, "Task D", "Deep");
+    let c = create_issue_with_dep(jit, &temp, "Task C", "Level 3", &d);
+    let b = create_issue_with_dep(jit, &temp, "Task B", "Level 2", &c);
+    let a = create_issue_with_dep(jit, &temp, "Task A", "Root", &b);
 
     // --depth 0 should show all transitive dependencies
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["graph", "deps", &a, "--depth", "0", "--json"])
         .current_dir(temp.path())
         .output()
@@ -183,13 +183,13 @@ fn test_graph_deps_tree_structure() {
 
     // Create tree: A -> B -> C
     //                -> D
-    let c = create_issue(&jit, &temp, "Task C", "Leaf");
-    let d = create_issue(&jit, &temp, "Task D", "Another leaf");
-    let b = create_issue_with_dep(&jit, &temp, "Task B", "Middle", &c);
-    let a = create_issue_with_deps(&jit, &temp, "Task A", "Root", &[&b, &d]);
+    let c = create_issue(jit, &temp, "Task C", "Leaf");
+    let d = create_issue(jit, &temp, "Task D", "Another leaf");
+    let b = create_issue_with_dep(jit, &temp, "Task B", "Middle", &c);
+    let a = create_issue_with_deps(jit, &temp, "Task A", "Root", &[&b, &d]);
 
     // Test tree output with depth 2
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["graph", "deps", &a, "--depth", "2", "--json"])
         .current_dir(temp.path())
         .output()
@@ -226,12 +226,12 @@ fn test_graph_deps_diamond_detection() {
 
     // Create diamond: A -> B -> D
     //                   -> C -> D
-    let d = create_issue(&jit, &temp, "Task D", "Shared");
-    let b = create_issue_with_dep(&jit, &temp, "Task B", "Path 1", &d);
-    let c = create_issue_with_dep(&jit, &temp, "Task C", "Path 2", &d);
-    let a = create_issue_with_deps(&jit, &temp, "Task A", "Root", &[&b, &c]);
+    let d = create_issue(jit, &temp, "Task D", "Shared");
+    let b = create_issue_with_dep(jit, &temp, "Task B", "Path 1", &d);
+    let c = create_issue_with_dep(jit, &temp, "Task C", "Path 2", &d);
+    let a = create_issue_with_deps(jit, &temp, "Task A", "Root", &[&b, &c]);
 
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["graph", "deps", &a, "--depth", "2", "--json"])
         .current_dir(temp.path())
         .output()
@@ -261,25 +261,25 @@ fn test_graph_deps_summary_stats() {
     let jit = jit_binary();
 
     // Create issues with different states
-    let done1 = create_issue(&jit, &temp, "Done 1", "Complete");
-    Command::new(&jit)
+    let done1 = create_issue(jit, &temp, "Done 1", "Complete");
+    Command::new(jit)
         .args(["issue", "update", &done1, "--state", "done"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
-    let done2 = create_issue(&jit, &temp, "Done 2", "Also complete");
-    Command::new(&jit)
+    let done2 = create_issue(jit, &temp, "Done 2", "Also complete");
+    Command::new(jit)
         .args(["issue", "update", &done2, "--state", "done"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
-    let ready = create_issue(&jit, &temp, "Ready", "To do");
+    let ready = create_issue(jit, &temp, "Ready", "To do");
 
-    let a = create_issue_with_deps(&jit, &temp, "Task A", "Root", &[&done1, &done2, &ready]);
+    let a = create_issue_with_deps(jit, &temp, "Task A", "Root", &[&done1, &done2, &ready]);
 
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["graph", "deps", &a, "--depth", "1", "--json"])
         .current_dir(temp.path())
         .output()

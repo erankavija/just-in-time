@@ -58,7 +58,7 @@ fn git_output(args: &[&str]) -> Option<String> {
 
 fn git_dirty() -> Option<String> {
     Command::new("git")
-        .args(["status", "--short", "--untracked-files=no"])
+        .args(["status", "--short", "--untracked-files=normal"])
         .output()
         .ok()
         .filter(|output| output.status.success())

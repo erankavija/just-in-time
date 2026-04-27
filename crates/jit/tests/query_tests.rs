@@ -19,7 +19,7 @@ fn jit_binary_old() -> String {
 fn setup_test_repo() -> TempDir {
     let temp = TempDir::new().unwrap();
     let jit = jit_binary();
-    Command::new(&jit)
+    Command::new(jit)
         .args(["init"])
         .current_dir(temp.path())
         .output()
@@ -33,7 +33,7 @@ fn test_query_ready_returns_unblocked_issues() {
     let jit = jit_binary();
 
     // Create multiple issues with different states
-    let output1 = Command::new(&jit)
+    let output1 = Command::new(jit)
         .args(["issue", "create", "-t", "Task 1", "-d", "Ready task"])
         .current_dir(temp.path())
         .output()
@@ -44,7 +44,7 @@ fn test_query_ready_returns_unblocked_issues() {
         .unwrap()
         .to_string();
 
-    let output2 = Command::new(&jit)
+    let output2 = Command::new(jit)
         .args(["issue", "create", "-t", "Task 2", "-d", "In progress task"])
         .current_dir(temp.path())
         .output()
@@ -56,7 +56,7 @@ fn test_query_ready_returns_unblocked_issues() {
         .to_string();
 
     // Create task 3 with a gate to keep it in Open state
-    Command::new(&jit)
+    Command::new(jit)
         .args([
             "registry",
             "add",
@@ -70,7 +70,7 @@ fn test_query_ready_returns_unblocked_issues() {
         .output()
         .unwrap();
 
-    let output3 = Command::new(&jit)
+    let output3 = Command::new(jit)
         .args([
             "issue",
             "create",
@@ -91,14 +91,14 @@ fn test_query_ready_returns_unblocked_issues() {
         .to_string();
 
     // id1 is auto-ready (no blockers), id2 move to in_progress, id3 is also ready (gates don't block Ready)
-    Command::new(&jit)
+    Command::new(jit)
         .args(["issue", "update", &id2, "--state", "in_progress"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     // Query ready issues
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["query", "available", "--json"])
         .current_dir(temp.path())
         .output()
@@ -118,7 +118,7 @@ fn test_query_ready_excludes_assigned_issues() {
     let jit = jit_binary();
 
     // Add gate for blocking
-    Command::new(&jit)
+    Command::new(jit)
         .args([
             "registry", "add", "block", "--title", "Block", "--desc", "Block",
         ])
@@ -128,7 +128,7 @@ fn test_query_ready_excludes_assigned_issues() {
     let jit = jit_binary();
 
     // Create two ready issues
-    let output1 = Command::new(&jit)
+    let output1 = Command::new(jit)
         .args(["issue", "create", "-t", "Task 1", "-d", "Unassigned"])
         .current_dir(temp.path())
         .output()
@@ -139,7 +139,7 @@ fn test_query_ready_excludes_assigned_issues() {
         .unwrap()
         .to_string();
 
-    let output2 = Command::new(&jit)
+    let output2 = Command::new(jit)
         .args(["issue", "create", "-t", "Task 2", "-d", "Assigned"])
         .current_dir(temp.path())
         .output()
@@ -153,14 +153,14 @@ fn test_query_ready_excludes_assigned_issues() {
     // Both auto-transition to ready since no blockers
 
     // Claim id2
-    Command::new(&jit)
+    Command::new(jit)
         .args(["issue", "claim", &id2, "agent:worker-1"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     // Query ready issues
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["query", "available", "--json"])
         .current_dir(temp.path())
         .output()
@@ -181,7 +181,7 @@ fn test_query_blocked_returns_issues_with_reasons() {
     let jit = jit_binary();
 
     // Create parent and child issues
-    let output1 = Command::new(&jit)
+    let output1 = Command::new(jit)
         .args(["issue", "create", "-t", "Parent", "-d", "Dependency"])
         .current_dir(temp.path())
         .output()
@@ -192,7 +192,7 @@ fn test_query_blocked_returns_issues_with_reasons() {
         .unwrap()
         .to_string();
 
-    let output2 = Command::new(&jit)
+    let output2 = Command::new(jit)
         .args(["issue", "create", "-t", "Child", "-d", "Depends on parent"])
         .current_dir(temp.path())
         .output()
@@ -204,14 +204,14 @@ fn test_query_blocked_returns_issues_with_reasons() {
         .to_string();
 
     // Add dependency
-    Command::new(&jit)
+    Command::new(jit)
         .args(["dep", "add", &child_id, &parent_id])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     // Query blocked issues
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["query", "blocked", "--json"])
         .current_dir(temp.path())
         .output()
@@ -245,7 +245,7 @@ fn test_query_by_assignee() {
     let jit = jit_binary();
 
     // Create issues with different assignees
-    let output1 = Command::new(&jit)
+    let output1 = Command::new(jit)
         .args(["issue", "create", "-t", "Task 1", "-d", "For worker 1"])
         .current_dir(temp.path())
         .output()
@@ -256,7 +256,7 @@ fn test_query_by_assignee() {
         .unwrap()
         .to_string();
 
-    let output2 = Command::new(&jit)
+    let output2 = Command::new(jit)
         .args(["issue", "create", "-t", "Task 2", "-d", "For worker 2"])
         .current_dir(temp.path())
         .output()
@@ -268,20 +268,20 @@ fn test_query_by_assignee() {
         .to_string();
 
     // Assign to different agents
-    Command::new(&jit)
+    Command::new(jit)
         .args(["issue", "claim", &id1, "agent:worker-1"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
-    Command::new(&jit)
+    Command::new(jit)
         .args(["issue", "claim", &id2, "agent:worker-2"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     // Query by assignee (use --full to get assignee field in response)
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args([
             "query",
             "all",
@@ -309,7 +309,7 @@ fn test_issue_release() {
     let jit = jit_binary();
 
     // Create and assign issue
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["issue", "create", "-t", "Task", "-d", "Test release"])
         .current_dir(temp.path())
         .output()
@@ -320,14 +320,14 @@ fn test_issue_release() {
         .unwrap()
         .to_string();
 
-    Command::new(&jit)
+    Command::new(jit)
         .args(["issue", "claim", &id, "agent:worker-1"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     // Release the issue
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["issue", "release", &id, "timeout"])
         .current_dir(temp.path())
         .output()
@@ -336,7 +336,7 @@ fn test_issue_release() {
     assert!(output.status.success());
 
     // Verify issue is unassigned
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["issue", "show", &id, "--json"])
         .current_dir(temp.path())
         .output()
@@ -353,7 +353,7 @@ fn test_query_by_state() {
     let jit = jit_binary();
 
     // Create issues with different states
-    let output1 = Command::new(&jit)
+    let output1 = Command::new(jit)
         .args(["issue", "create", "-t", "Task 1", "-d", "Open"])
         .current_dir(temp.path())
         .output()
@@ -364,7 +364,7 @@ fn test_query_by_state() {
         .unwrap()
         .to_string();
 
-    let output2 = Command::new(&jit)
+    let output2 = Command::new(jit)
         .args(["issue", "create", "-t", "Task 2", "-d", "Done"])
         .current_dir(temp.path())
         .output()
@@ -375,14 +375,14 @@ fn test_query_by_state() {
         .unwrap()
         .to_string();
 
-    Command::new(&jit)
+    Command::new(jit)
         .args(["issue", "update", &id2, "--state", "done"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     // Query by state
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["query", "all", "--state", "done", "--json"])
         .current_dir(temp.path())
         .output()
@@ -403,7 +403,7 @@ fn test_query_by_priority() {
     let jit = jit_binary();
 
     // Create issues with different priorities
-    Command::new(&jit)
+    Command::new(jit)
         .args([
             "issue",
             "create",
@@ -418,7 +418,7 @@ fn test_query_by_priority() {
         .output()
         .unwrap();
 
-    Command::new(&jit)
+    Command::new(jit)
         .args([
             "issue",
             "create",
@@ -434,7 +434,7 @@ fn test_query_by_priority() {
         .unwrap();
 
     // Query by priority
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["query", "all", "--priority", "critical", "--json"])
         .current_dir(temp.path())
         .output()
@@ -454,7 +454,7 @@ fn test_query_closed_returns_done_and_rejected() {
     let jit = jit_binary();
 
     // Create issues with different states
-    let output1 = Command::new(&jit)
+    let output1 = Command::new(jit)
         .args(["issue", "create", "-t", "Completed", "-d", "Done task"])
         .current_dir(temp.path())
         .output()
@@ -465,7 +465,7 @@ fn test_query_closed_returns_done_and_rejected() {
         .unwrap()
         .to_string();
 
-    let output2 = Command::new(&jit)
+    let output2 = Command::new(jit)
         .args(["issue", "create", "-t", "Rejected", "-d", "Won't do"])
         .current_dir(temp.path())
         .output()
@@ -476,7 +476,7 @@ fn test_query_closed_returns_done_and_rejected() {
         .unwrap()
         .to_string();
 
-    let output3 = Command::new(&jit)
+    let output3 = Command::new(jit)
         .args(["issue", "create", "-t", "Ready", "-d", "Still open"])
         .current_dir(temp.path())
         .output()
@@ -488,20 +488,20 @@ fn test_query_closed_returns_done_and_rejected() {
         .to_string();
 
     // Set states
-    Command::new(&jit)
+    Command::new(jit)
         .args(["issue", "update", &id1, "--state", "done"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
-    Command::new(&jit)
+    Command::new(jit)
         .args(["issue", "reject", &id2])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     // Query closed issues
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["query", "closed", "--json"])
         .current_dir(temp.path())
         .output()
@@ -531,7 +531,7 @@ fn test_query_available_sorts_by_priority() {
     let jit = jit_binary();
 
     // Create issues with different priorities (in reverse order)
-    let output_low = Command::new(&jit)
+    let output_low = Command::new(jit)
         .args([
             "issue",
             "create",
@@ -551,7 +551,7 @@ fn test_query_available_sorts_by_priority() {
         .unwrap()
         .to_string();
 
-    let output_normal = Command::new(&jit)
+    let output_normal = Command::new(jit)
         .args([
             "issue",
             "create",
@@ -571,7 +571,7 @@ fn test_query_available_sorts_by_priority() {
         .unwrap()
         .to_string();
 
-    let output_high = Command::new(&jit)
+    let output_high = Command::new(jit)
         .args([
             "issue",
             "create",
@@ -591,7 +591,7 @@ fn test_query_available_sorts_by_priority() {
         .unwrap()
         .to_string();
 
-    let output_critical = Command::new(&jit)
+    let output_critical = Command::new(jit)
         .args([
             "issue",
             "create",
@@ -612,7 +612,7 @@ fn test_query_available_sorts_by_priority() {
         .to_string();
 
     // Query available issues with JSON output
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["query", "available", "--json"])
         .current_dir(temp.path())
         .output()
@@ -648,14 +648,14 @@ fn test_query_all_no_filters_returns_all() {
     let jit = jit_binary();
 
     for title in &["Task A", "Task B", "Task C"] {
-        Command::new(&jit)
+        Command::new(jit)
             .args(["issue", "create", "-t", title, "-d", "desc"])
             .current_dir(temp.path())
             .output()
             .unwrap();
     }
 
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["query", "all", "--json"])
         .current_dir(temp.path())
         .output()
@@ -673,7 +673,7 @@ fn test_query_all_combined_state_and_priority() {
     let jit = jit_binary();
 
     // high + done
-    let out = Command::new(&jit)
+    let out = Command::new(jit)
         .args([
             "issue",
             "create",
@@ -694,7 +694,7 @@ fn test_query_all_combined_state_and_priority() {
         .to_string();
 
     // high + ready (should not appear)
-    Command::new(&jit)
+    Command::new(jit)
         .args([
             "issue",
             "create",
@@ -710,7 +710,7 @@ fn test_query_all_combined_state_and_priority() {
         .unwrap();
 
     // low + done (should not appear)
-    let out = Command::new(&jit)
+    let out = Command::new(jit)
         .args([
             "issue",
             "create",
@@ -730,18 +730,18 @@ fn test_query_all_combined_state_and_priority() {
         .unwrap()
         .to_string();
 
-    Command::new(&jit)
+    Command::new(jit)
         .args(["issue", "update", &id_high_done, "--state", "done"])
         .current_dir(temp.path())
         .output()
         .unwrap();
-    Command::new(&jit)
+    Command::new(jit)
         .args(["issue", "update", &id_low_done, "--state", "done"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args([
             "query",
             "all",
@@ -767,7 +767,7 @@ fn test_query_all_combined_state_and_assignee() {
     let temp = setup_test_repo();
     let jit = jit_binary();
 
-    let out = Command::new(&jit)
+    let out = Command::new(jit)
         .args(["issue", "create", "-t", "Task A", "-d", "d"])
         .current_dir(temp.path())
         .output()
@@ -778,7 +778,7 @@ fn test_query_all_combined_state_and_assignee() {
         .unwrap()
         .to_string();
 
-    let out = Command::new(&jit)
+    let out = Command::new(jit)
         .args(["issue", "create", "-t", "Task B", "-d", "d"])
         .current_dir(temp.path())
         .output()
@@ -791,7 +791,7 @@ fn test_query_all_combined_state_and_assignee() {
 
     // Assign both to the same agent without changing state
     for id in &[&id_a, &id_b] {
-        Command::new(&jit)
+        Command::new(jit)
             .args(["issue", "update", id, "--assignee", "agent:worker-1"])
             .current_dir(temp.path())
             .output()
@@ -799,13 +799,13 @@ fn test_query_all_combined_state_and_assignee() {
     }
 
     // Move only id_a to in_progress
-    Command::new(&jit)
+    Command::new(jit)
         .args(["issue", "update", &id_a, "--state", "in_progress"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args([
             "query",
             "all",
@@ -832,7 +832,7 @@ fn test_query_all_combined_state_and_label() {
     let temp = setup_test_repo();
     let jit = jit_binary();
 
-    let out = Command::new(&jit)
+    let out = Command::new(jit)
         .args([
             "issue",
             "create",
@@ -853,14 +853,14 @@ fn test_query_all_combined_state_and_label() {
         .to_string();
 
     // ready but no label — should not appear
-    Command::new(&jit)
+    Command::new(jit)
         .args(["issue", "create", "-t", "Untagged Ready", "-d", "d"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     // tagged but done — should not appear
-    let out = Command::new(&jit)
+    let out = Command::new(jit)
         .args([
             "issue",
             "create",
@@ -879,13 +879,13 @@ fn test_query_all_combined_state_and_label() {
         .last()
         .unwrap()
         .to_string();
-    Command::new(&jit)
+    Command::new(jit)
         .args(["issue", "update", &id_tagged_done, "--state", "done"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args([
             "query",
             "all",
@@ -911,7 +911,7 @@ fn test_query_all_returns_empty_when_no_match() {
     let temp = setup_test_repo();
     let jit = jit_binary();
 
-    Command::new(&jit)
+    Command::new(jit)
         .args([
             "issue",
             "create",
@@ -927,7 +927,7 @@ fn test_query_all_returns_empty_when_no_match() {
         .unwrap();
 
     // Filter for critical — nothing matches
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["query", "all", "--priority", "critical", "--json"])
         .current_dir(temp.path())
         .output()
@@ -947,7 +947,7 @@ fn test_query_by_assignee_no_match() {
     let temp = setup_test_repo();
     let jit = jit_binary();
 
-    let out = Command::new(&jit)
+    let out = Command::new(jit)
         .args(["issue", "create", "-t", "Task", "-d", "d"])
         .current_dir(temp.path())
         .output()
@@ -958,13 +958,13 @@ fn test_query_by_assignee_no_match() {
         .unwrap()
         .to_string();
 
-    Command::new(&jit)
+    Command::new(jit)
         .args(["issue", "claim", &id, "agent:worker-1"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["query", "all", "--assignee", "agent:nobody", "--json"])
         .current_dir(temp.path())
         .output()
@@ -983,7 +983,7 @@ fn test_query_by_assignee_multiple_issues_same_agent() {
 
     let mut ids = vec![];
     for title in &["Task 1", "Task 2", "Task 3"] {
-        let out = Command::new(&jit)
+        let out = Command::new(jit)
             .args(["issue", "create", "-t", title, "-d", "d"])
             .current_dir(temp.path())
             .output()
@@ -999,19 +999,19 @@ fn test_query_by_assignee_multiple_issues_same_agent() {
 
     // Assign first two to agent:worker-1, third to agent:worker-2
     for id in &ids[..2] {
-        Command::new(&jit)
+        Command::new(jit)
             .args(["issue", "claim", id, "agent:worker-1"])
             .current_dir(temp.path())
             .output()
             .unwrap();
     }
-    Command::new(&jit)
+    Command::new(jit)
         .args(["issue", "claim", &ids[2], "agent:worker-2"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args([
             "query",
             "all",
@@ -1047,7 +1047,7 @@ fn test_query_by_priority_empty_results() {
     let temp = setup_test_repo();
     let jit = jit_binary();
 
-    Command::new(&jit)
+    Command::new(jit)
         .args([
             "issue",
             "create",
@@ -1062,7 +1062,7 @@ fn test_query_by_priority_empty_results() {
         .output()
         .unwrap();
 
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["query", "all", "--priority", "critical", "--json"])
         .current_dir(temp.path())
         .output()
@@ -1083,7 +1083,7 @@ fn test_query_by_priority_all_levels() {
     let mut ids = std::collections::HashMap::new();
 
     for p in &priorities {
-        let out = Command::new(&jit)
+        let out = Command::new(jit)
             .args(["issue", "create", "-t", p, "-d", "d", "--priority", p])
             .current_dir(temp.path())
             .output()
@@ -1099,7 +1099,7 @@ fn test_query_by_priority_all_levels() {
     }
 
     for p in &priorities {
-        let output = Command::new(&jit)
+        let output = Command::new(jit)
             .args(["query", "all", "--priority", p, "--json"])
             .current_dir(temp.path())
             .output()

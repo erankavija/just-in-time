@@ -8,7 +8,7 @@ fn jit_binary() -> &'static str {
 fn setup_test_repo() -> TempDir {
     let temp = TempDir::new().unwrap();
     let jit = jit_binary();
-    Command::new(&jit)
+    Command::new(jit)
         .args(["init"])
         .current_dir(temp.path())
         .output()
@@ -22,14 +22,14 @@ fn test_query_ready_json_output() {
     let jit = jit_binary();
 
     // Create a ready issue
-    Command::new(&jit)
+    Command::new(jit)
         .args(["issue", "create", "-t", "Ready Task", "-d", "Test"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     // Query ready with --json
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["query", "available", "--json"])
         .current_dir(temp.path())
         .output()
@@ -51,7 +51,7 @@ fn test_query_blocked_json_output() {
     let jit = jit_binary();
 
     // Create two issues with dependency
-    let output1 = Command::new(&jit)
+    let output1 = Command::new(jit)
         .args(["issue", "create", "-t", "Task A", "-d", "First"])
         .current_dir(temp.path())
         .output()
@@ -62,7 +62,7 @@ fn test_query_blocked_json_output() {
         .unwrap()
         .to_string();
 
-    let output2 = Command::new(&jit)
+    let output2 = Command::new(jit)
         .args(["issue", "create", "-t", "Task B", "-d", "Second"])
         .current_dir(temp.path())
         .output()
@@ -74,14 +74,14 @@ fn test_query_blocked_json_output() {
         .to_string();
 
     // Add dependency: id2 depends on id1
-    Command::new(&jit)
+    Command::new(jit)
         .args(["dep", "add", &id2, &id1])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     // Query blocked with --json
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["query", "blocked", "--json"])
         .current_dir(temp.path())
         .output()
@@ -110,7 +110,7 @@ fn test_query_assignee_json_output() {
     let jit = jit_binary();
 
     // Create and assign an issue
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["issue", "create", "-t", "Task", "-d", "Test"])
         .current_dir(temp.path())
         .output()
@@ -121,14 +121,14 @@ fn test_query_assignee_json_output() {
         .unwrap()
         .to_string();
 
-    Command::new(&jit)
+    Command::new(jit)
         .args(["issue", "assign", &id, "copilot:test"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     // Query by assignee with --json
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["query", "all", "--assignee", "copilot:test", "--json"])
         .current_dir(temp.path())
         .output()
@@ -150,14 +150,14 @@ fn test_query_state_json_output() {
     let jit = jit_binary();
 
     // Create an issue (will be in ready state since no dependencies)
-    Command::new(&jit)
+    Command::new(jit)
         .args(["issue", "create", "-t", "Task", "-d", "Test"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     // Query by state with --json (issues default to ready when unblocked)
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["query", "all", "--state", "ready", "--json"])
         .current_dir(temp.path())
         .output()
@@ -179,7 +179,7 @@ fn test_query_priority_json_output() {
     let jit = jit_binary();
 
     // Create an issue with high priority
-    Command::new(&jit)
+    Command::new(jit)
         .args([
             "issue", "create", "-t", "Urgent", "-d", "Test", "-p", "high",
         ])
@@ -188,7 +188,7 @@ fn test_query_priority_json_output() {
         .unwrap();
 
     // Query by priority with --json
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["query", "all", "--priority", "high", "--json"])
         .current_dir(temp.path())
         .output()

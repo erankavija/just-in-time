@@ -103,6 +103,41 @@ fn test_version_build_without_git_metadata_reports_unknowns() {
 #[test]
 fn test_version_build_from_clean_git_checkout_reports_not_dirty() {
     let temp_dir = tempfile::TempDir::new().unwrap();
+    let source_dir = clean_git_checkout(&temp_dir);
+
+    let output = run_version_json_from_source(&temp_dir, &source_dir, "target-clean-git");
+
+    assert!(
+        output.status.success(),
+        "cargo run from clean Git checkout should succeed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let json: Value = serde_json::from_slice(&output.stdout).expect("version output is JSON");
+    assert_eq!(json["git_dirty"].as_bool(), Some(false));
+}
+
+#[test]
+fn test_version_build_from_untracked_dirty_checkout_reports_dirty() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let source_dir = clean_git_checkout(&temp_dir);
+    std::fs::write(source_dir.join("untracked-version-provenance.txt"), "dirty").unwrap();
+
+    let output = run_version_json_from_source(&temp_dir, &source_dir, "target-dirty-git");
+
+    assert!(
+        output.status.success(),
+        "cargo run from dirty Git checkout should succeed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let json: Value = serde_json::from_slice(&output.stdout).expect("version output is JSON");
+    assert_eq!(json["git_dirty"].as_bool(), Some(true));
+}
+
+fn clean_git_checkout(temp_dir: &tempfile::TempDir) -> std::path::PathBuf {
     let workspace_root = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
@@ -138,21 +173,19 @@ fn test_version_build_from_clean_git_checkout_reports_not_dirty() {
         assert!(status.success(), "git setup command should succeed");
     }
 
-    let output = Command::new("cargo")
-        .current_dir(&source_dir)
-        .env("CARGO_TARGET_DIR", temp_dir.path().join("target-clean-git"))
+    source_dir
+}
+
+fn run_version_json_from_source(
+    temp_dir: &tempfile::TempDir,
+    source_dir: &Path,
+    target_name: &str,
+) -> std::process::Output {
+    Command::new("cargo")
+        .current_dir(source_dir)
+        .env("CARGO_TARGET_DIR", temp_dir.path().join(target_name))
         .env("SOURCE_DATE_EPOCH", "0")
         .args(["run", "-p", "jit", "--quiet", "--", "version", "--json"])
         .output()
-        .unwrap();
-
-    assert!(
-        output.status.success(),
-        "cargo run from clean Git checkout should succeed\nstdout:\n{}\nstderr:\n{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
-
-    let json: Value = serde_json::from_slice(&output.stdout).expect("version output is JSON");
-    assert_eq!(json["git_dirty"].as_bool(), Some(false));
+        .unwrap()
 }

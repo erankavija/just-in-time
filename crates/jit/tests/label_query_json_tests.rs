@@ -10,7 +10,7 @@ fn jit_binary() -> &'static str {
 fn setup_test_repo() -> TempDir {
     let temp = TempDir::new().unwrap();
     let jit = jit_binary();
-    Command::new(&jit)
+    Command::new(jit)
         .args(["init"])
         .current_dir(temp.path())
         .output()
@@ -24,7 +24,7 @@ fn test_query_label_json_exact_match() {
     let jit = jit_binary();
 
     // Create issue with label
-    Command::new(&jit)
+    Command::new(jit)
         .args([
             "issue",
             "create",
@@ -38,7 +38,7 @@ fn test_query_label_json_exact_match() {
         .unwrap();
 
     // Query with JSON
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args([
             "query",
             "all",
@@ -74,7 +74,7 @@ fn test_query_label_json_wildcard() {
     let jit = jit_binary();
 
     // Create multiple issues with milestone labels
-    Command::new(&jit)
+    Command::new(jit)
         .args([
             "issue",
             "create",
@@ -87,7 +87,7 @@ fn test_query_label_json_wildcard() {
         .output()
         .unwrap();
 
-    Command::new(&jit)
+    Command::new(jit)
         .args([
             "issue",
             "create",
@@ -101,7 +101,7 @@ fn test_query_label_json_wildcard() {
         .unwrap();
 
     // Query with wildcard
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["query", "all", "--label", "milestone:*", "--json"])
         .current_dir(temp.path())
         .output()
@@ -122,14 +122,14 @@ fn test_query_label_json_no_matches() {
     let jit = jit_binary();
 
     // Create issue without the queried label
-    Command::new(&jit)
+    Command::new(jit)
         .args(["issue", "create", "-t", "Task", "--label", "milestone:v1.0"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     // Query for different label
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["query", "all", "--label", "epic:auth", "--json"])
         .current_dir(temp.path())
         .output()
@@ -150,7 +150,7 @@ fn test_query_label_json_invalid_pattern() {
     let jit = jit_binary();
 
     // Query with invalid pattern (no colon)
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["query", "all", "--label", "invalidlabel", "--json"])
         .current_dir(temp.path())
         .output()
@@ -184,7 +184,7 @@ fn test_query_label_text_output() {
     let jit = jit_binary();
 
     // Create issue with label
-    Command::new(&jit)
+    Command::new(jit)
         .args([
             "issue",
             "create",
@@ -198,7 +198,7 @@ fn test_query_label_text_output() {
         .unwrap();
 
     // Query without --json flag
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["query", "all", "--label", "milestone:v1.0"])
         .current_dir(temp.path())
         .output()
@@ -218,7 +218,7 @@ fn test_query_label_with_uppercase_namespace() {
     let jit = jit_binary();
 
     // Query with uppercase namespace (should fail validation)
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["query", "all", "--label", "Milestone:v1.0", "--json"])
         .current_dir(temp.path())
         .output()
@@ -244,14 +244,14 @@ fn test_query_label_wildcard_with_no_matches() {
     let jit = jit_binary();
 
     // Create issue with different namespace
-    Command::new(&jit)
+    Command::new(jit)
         .args(["issue", "create", "-t", "Task", "--label", "epic:auth"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     // Query wildcard that doesn't match
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["query", "all", "--label", "milestone:*", "--json"])
         .current_dir(temp.path())
         .output()

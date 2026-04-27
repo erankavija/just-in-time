@@ -16,14 +16,14 @@ fn setup_test_repo() -> TempDir {
 
     // Initialize jit repo properly
     let jit = jit_binary();
-    Command::new(&jit)
+    Command::new(jit)
         .current_dir(temp.path())
         .arg("init")
         .output()
         .unwrap();
 
     // Create first test issue via CLI (ensures proper indexing)
-    Command::new(&jit)
+    Command::new(jit)
         .current_dir(temp.path())
         .args([
             "issue", "create",
@@ -38,7 +38,7 @@ fn setup_test_repo() -> TempDir {
         .unwrap();
 
     // Create second test issue
-    Command::new(&jit)
+    Command::new(jit)
         .current_dir(temp.path())
         .args([
             "issue",
@@ -63,7 +63,7 @@ fn test_search_returns_compact_by_default() {
     let temp = setup_test_repo();
     let jit = jit_binary();
 
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .current_dir(temp.path())
         .arg("issue")
         .arg("search")
@@ -124,7 +124,7 @@ fn test_search_returns_full_with_flag() {
     let temp = setup_test_repo();
     let jit = jit_binary();
 
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .current_dir(temp.path())
         .arg("issue")
         .arg("search")
@@ -183,7 +183,7 @@ fn test_search_compact_has_short_id() {
     let temp = setup_test_repo();
     let jit = jit_binary();
 
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .current_dir(temp.path())
         .arg("issue")
         .arg("search")
@@ -214,7 +214,7 @@ fn test_search_compact_preserves_count() {
     let temp = setup_test_repo();
     let jit = jit_binary();
 
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .current_dir(temp.path())
         .arg("issue")
         .arg("search")

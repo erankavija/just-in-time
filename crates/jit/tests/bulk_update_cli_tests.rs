@@ -13,7 +13,7 @@ fn setup_test_repo() -> TempDir {
     let temp = TempDir::new().unwrap();
     let jit = jit_binary();
 
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .arg("init")
         .current_dir(temp.path())
         .output()
@@ -37,7 +37,7 @@ fn create_issue(temp: &TempDir, title: &str, labels: &[&str]) -> String {
         args.push(label);
     }
 
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(&args)
         .current_dir(temp.path())
         .output()
@@ -61,7 +61,7 @@ fn test_bulk_update_requires_id_or_filter() {
     let jit = jit_binary();
 
     // No ID and no --filter should fail
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["issue", "update", "--state", "done"])
         .current_dir(temp.path())
         .output()
@@ -83,7 +83,7 @@ fn test_bulk_update_rejects_both_id_and_filter() {
     create_issue(&temp, "Test", &["type:task"]);
 
     // Both ID and --filter should fail
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args([
             "issue",
             "update",
@@ -117,7 +117,7 @@ fn test_bulk_update_add_labels() {
     create_issue(&temp, "Epic 1", &["type:epic"]);
 
     // Add milestone label to all tasks
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args([
             "issue",
             "update",
@@ -153,20 +153,20 @@ fn test_bulk_update_state_transition() {
     let id2 = create_issue(&temp, "Task 2", &["type:task"]);
 
     // Transition to ready first
-    Command::new(&jit)
+    Command::new(jit)
         .args(["issue", "update", &id1, "--state", "ready"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
-    Command::new(&jit)
+    Command::new(jit)
         .args(["issue", "update", &id2, "--state", "ready"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     // Bulk update to in_progress
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args([
             "issue",
             "update",
@@ -197,7 +197,7 @@ fn test_bulk_update_assignee() {
     create_issue(&temp, "Task 2", &["type:task"]);
 
     // Assign all tasks
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args([
             "issue",
             "update",
@@ -227,7 +227,7 @@ fn test_bulk_update_validation_errors() {
     let id = create_issue(&temp, "Task with gates", &["type:task"]);
 
     // Define a gate
-    Command::new(&jit)
+    Command::new(jit)
         .args([
             "gate",
             "define",
@@ -242,14 +242,14 @@ fn test_bulk_update_validation_errors() {
         .unwrap();
 
     // Add gate to issue
-    Command::new(&jit)
+    Command::new(jit)
         .args(["gate", "add", &id, "tests"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     // Try to transition to done without passing gates
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args([
             "issue",
             "update",
@@ -282,7 +282,7 @@ fn test_bulk_update_complex_query() {
     create_issue(&temp, "High priority epic", &["type:epic", "priority:high"]);
 
     // Update only high-priority tasks using AND query
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args([
             "issue",
             "update",
@@ -315,7 +315,7 @@ fn test_bulk_update_remove_labels() {
     create_issue(&temp, "Task 2", &["type:task", "milestone:v0.9"]);
 
     // Remove old milestone label
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args([
             "issue",
             "update",
@@ -344,7 +344,7 @@ fn test_bulk_update_no_matches() {
     create_issue(&temp, "Task 1", &["type:task"]);
 
     // Filter that matches nothing
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args([
             "issue",
             "update",

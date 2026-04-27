@@ -8,7 +8,7 @@ fn jit_binary() -> &'static str {
 fn setup_test_repo() -> TempDir {
     let temp = TempDir::new().unwrap();
     let jit = jit_binary();
-    Command::new(&jit)
+    Command::new(jit)
         .args(["init"])
         .current_dir(temp.path())
         .output()
@@ -22,7 +22,7 @@ fn test_registry_list_json_output() {
     let jit = jit_binary();
 
     // Add a gate definition
-    Command::new(&jit)
+    Command::new(jit)
         .args([
             "registry",
             "add",
@@ -38,7 +38,7 @@ fn test_registry_list_json_output() {
         .unwrap();
 
     // List gates with JSON
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["registry", "list", "--json"])
         .current_dir(temp.path())
         .output()
@@ -63,7 +63,7 @@ fn test_registry_show_json_output() {
     let jit = jit_binary();
 
     // Add a gate definition
-    Command::new(&jit)
+    Command::new(jit)
         .args([
             "registry",
             "add",
@@ -81,7 +81,7 @@ fn test_registry_show_json_output() {
         .unwrap();
 
     // Show gate with JSON
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["registry", "show", "test-gate", "--json"])
         .current_dir(temp.path())
         .output()
@@ -106,7 +106,7 @@ fn test_registry_list_empty_json_output() {
     let jit = jit_binary();
 
     // List gates when empty
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["registry", "list", "--json"])
         .current_dir(temp.path())
         .output()
@@ -128,7 +128,7 @@ fn test_registry_add_with_stage_option() {
     let jit = jit_binary();
 
     // Add a precheck gate using --stage option
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args([
             "registry",
             "add",
@@ -150,7 +150,7 @@ fn test_registry_add_with_stage_option() {
     );
 
     // Verify the gate was created with precheck stage
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["registry", "show", "tdd-reminder", "--json"])
         .current_dir(temp.path())
         .output()
@@ -171,7 +171,7 @@ fn test_registry_add_defaults_to_postcheck() {
     let jit = jit_binary();
 
     // Add gate without --stage option (should default to postcheck)
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args([
             "registry",
             "add",
@@ -188,7 +188,7 @@ fn test_registry_add_defaults_to_postcheck() {
     assert!(output.status.success());
 
     // Verify it defaulted to postcheck
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["registry", "show", "code-review", "--json"])
         .current_dir(temp.path())
         .output()
@@ -208,7 +208,7 @@ fn test_registry_add_with_invalid_stage() {
     let jit = jit_binary();
 
     // Try to add gate with invalid stage value
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args([
             "registry",
             "add",

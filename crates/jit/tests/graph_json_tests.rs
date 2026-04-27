@@ -8,7 +8,7 @@ fn jit_binary() -> &'static str {
 fn setup_test_repo() -> TempDir {
     let temp = TempDir::new().unwrap();
     let jit = jit_binary();
-    Command::new(&jit)
+    Command::new(jit)
         .args(["init"])
         .current_dir(temp.path())
         .output()
@@ -22,7 +22,7 @@ fn test_graph_downstream_json_output() {
     let jit = jit_binary();
 
     // Create two issues with dependency
-    let output1 = Command::new(&jit)
+    let output1 = Command::new(jit)
         .args(["issue", "create", "-t", "Task A", "-d", "First"])
         .current_dir(temp.path())
         .output()
@@ -33,7 +33,7 @@ fn test_graph_downstream_json_output() {
         .unwrap()
         .to_string();
 
-    let output2 = Command::new(&jit)
+    let output2 = Command::new(jit)
         .args(["issue", "create", "-t", "Task B", "-d", "Second"])
         .current_dir(temp.path())
         .output()
@@ -45,14 +45,14 @@ fn test_graph_downstream_json_output() {
         .to_string();
 
     // Add dependency: id2 depends on id1
-    Command::new(&jit)
+    Command::new(jit)
         .args(["dep", "add", &id2, &id1])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     // Query downstream dependents
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["graph", "downstream", &id1, "--json"])
         .current_dir(temp.path())
         .output()
@@ -75,7 +75,7 @@ fn test_graph_roots_json_output() {
     let jit = jit_binary();
 
     // Create two issues with dependency
-    let output1 = Command::new(&jit)
+    let output1 = Command::new(jit)
         .args(["issue", "create", "-t", "Root Task", "-d", "First"])
         .current_dir(temp.path())
         .output()
@@ -86,7 +86,7 @@ fn test_graph_roots_json_output() {
         .unwrap()
         .to_string();
 
-    let output2 = Command::new(&jit)
+    let output2 = Command::new(jit)
         .args(["issue", "create", "-t", "Dependent Task", "-d", "Second"])
         .current_dir(temp.path())
         .output()
@@ -98,14 +98,14 @@ fn test_graph_roots_json_output() {
         .to_string();
 
     // Add dependency: id2 depends on id1
-    Command::new(&jit)
+    Command::new(jit)
         .args(["dep", "add", &id2, &id1])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     // Query root issues
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["graph", "roots", "--json"])
         .current_dir(temp.path())
         .output()

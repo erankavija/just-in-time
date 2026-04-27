@@ -13,7 +13,7 @@ fn setup_test_repo() -> TempDir {
     let temp = TempDir::new().unwrap();
     let jit = jit_binary();
 
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .arg("init")
         .current_dir(temp.path())
         .output()
@@ -29,26 +29,26 @@ fn test_search_by_title() {
     let jit = jit_binary();
 
     // Create issues
-    Command::new(&jit)
+    Command::new(jit)
         .args(["issue", "create", "-t", "Fix bug in parser", "-d", "Desc"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
-    Command::new(&jit)
+    Command::new(jit)
         .args(["issue", "create", "-t", "Add feature", "-d", "Desc"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
-    Command::new(&jit)
+    Command::new(jit)
         .args(["issue", "create", "-t", "Fix bug in lexer", "-d", "Desc"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     // Search for "bug"
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["issue", "search", "bug"])
         .current_dir(temp.path())
         .output()
@@ -67,7 +67,7 @@ fn test_search_by_description() {
     let temp = setup_test_repo();
     let jit = jit_binary();
 
-    Command::new(&jit)
+    Command::new(jit)
         .args([
             "issue",
             "create",
@@ -80,13 +80,13 @@ fn test_search_by_description() {
         .output()
         .unwrap();
 
-    Command::new(&jit)
+    Command::new(jit)
         .args(["issue", "create", "-t", "Task 2", "-d", "Regular task"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["issue", "search", "security"])
         .current_dir(temp.path())
         .output()
@@ -103,13 +103,13 @@ fn test_search_case_insensitive() {
     let temp = setup_test_repo();
     let jit = jit_binary();
 
-    Command::new(&jit)
+    Command::new(jit)
         .args(["issue", "create", "-t", "Fix BUG", "-d", "Desc"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["issue", "search", "bug"])
         .current_dir(temp.path())
         .output()
@@ -126,7 +126,7 @@ fn test_search_with_priority_filter() {
     let temp = setup_test_repo();
     let jit = jit_binary();
 
-    Command::new(&jit)
+    Command::new(jit)
         .args([
             "issue",
             "create",
@@ -141,7 +141,7 @@ fn test_search_with_priority_filter() {
         .output()
         .unwrap();
 
-    Command::new(&jit)
+    Command::new(jit)
         .args([
             "issue",
             "create",
@@ -156,7 +156,7 @@ fn test_search_with_priority_filter() {
         .output()
         .unwrap();
 
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["issue", "search", "bug", "--priority", "critical"])
         .current_dir(temp.path())
         .output()
@@ -174,13 +174,13 @@ fn test_search_no_results() {
     let temp = setup_test_repo();
     let jit = jit_binary();
 
-    Command::new(&jit)
+    Command::new(jit)
         .args(["issue", "create", "-t", "Task", "-d", "Desc"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["issue", "search", "nonexistent"])
         .current_dir(temp.path())
         .output()
@@ -197,7 +197,7 @@ fn test_export_dot_format() {
     let jit = jit_binary();
 
     // Create issues with dependencies
-    let output1 = Command::new(&jit)
+    let output1 = Command::new(jit)
         .args(["issue", "create", "-t", "API", "-d", "Design API"])
         .current_dir(temp.path())
         .output()
@@ -205,7 +205,7 @@ fn test_export_dot_format() {
     let stdout1 = String::from_utf8_lossy(&output1.stdout);
     let id1 = stdout1.split_whitespace().last().unwrap();
 
-    let output2 = Command::new(&jit)
+    let output2 = Command::new(jit)
         .args(["issue", "create", "-t", "Backend", "-d", "Implement"])
         .current_dir(temp.path())
         .output()
@@ -213,13 +213,13 @@ fn test_export_dot_format() {
     let stdout2 = String::from_utf8_lossy(&output2.stdout);
     let id2 = stdout2.split_whitespace().last().unwrap();
 
-    Command::new(&jit)
+    Command::new(jit)
         .args(["dep", "add", id2, id1])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["graph", "export", "--format", "dot"])
         .current_dir(temp.path())
         .output()
@@ -237,13 +237,13 @@ fn test_export_mermaid_format() {
     let temp = setup_test_repo();
     let jit = jit_binary();
 
-    Command::new(&jit)
+    Command::new(jit)
         .args(["issue", "create", "-t", "Task", "-d", "Desc"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["graph", "export", "--format", "mermaid"])
         .current_dir(temp.path())
         .output()
@@ -261,7 +261,7 @@ fn test_issue_create_list_show() {
     let temp = setup_test_repo();
     let jit = jit_binary();
 
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args([
             "issue",
             "create",
@@ -282,7 +282,7 @@ fn test_issue_create_list_show() {
     let id = stdout.split_whitespace().last().unwrap();
 
     // List issues
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["query", "all"])
         .current_dir(temp.path())
         .output()
@@ -293,7 +293,7 @@ fn test_issue_create_list_show() {
     assert!(stdout.contains("Test Issue"));
 
     // Show issue details
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["issue", "show", id])
         .current_dir(temp.path())
         .output()
@@ -310,7 +310,7 @@ fn test_issue_update_and_delete() {
     let temp = setup_test_repo();
     let jit = jit_binary();
 
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["issue", "create", "-t", "Old Title", "-d", "Desc"])
         .current_dir(temp.path())
         .output()
@@ -323,13 +323,13 @@ fn test_issue_update_and_delete() {
         .to_string();
 
     // Update issue
-    Command::new(&jit)
+    Command::new(jit)
         .args(["issue", "update", &id, "-t", "New Title"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["issue", "show", &id])
         .current_dir(temp.path())
         .output()
@@ -339,14 +339,14 @@ fn test_issue_update_and_delete() {
     assert!(stdout.contains("Title: New Title"));
 
     // Delete issue (requires env var)
-    Command::new(&jit)
+    Command::new(jit)
         .args(["issue", "delete", &id])
         .env("JIT_ALLOW_DELETION", "1")
         .current_dir(temp.path())
         .output()
         .unwrap();
 
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["issue", "list"])
         .current_dir(temp.path())
         .output()
@@ -361,7 +361,7 @@ fn test_dependencies() {
     let temp = setup_test_repo();
     let jit = jit_binary();
 
-    let output1 = Command::new(&jit)
+    let output1 = Command::new(jit)
         .args(["issue", "create", "-t", "Dependency", "-d", "Desc"])
         .current_dir(temp.path())
         .output()
@@ -372,7 +372,7 @@ fn test_dependencies() {
         .unwrap()
         .to_string();
 
-    let output2 = Command::new(&jit)
+    let output2 = Command::new(jit)
         .args(["issue", "create", "-t", "Dependent", "-d", "Desc"])
         .current_dir(temp.path())
         .output()
@@ -384,7 +384,7 @@ fn test_dependencies() {
         .to_string();
 
     // Add dependency
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["dep", "add", &id2, &id1])
         .current_dir(temp.path())
         .output()
@@ -393,7 +393,7 @@ fn test_dependencies() {
     assert!(output.status.success());
 
     // Show dependencies (use graph deps instead of removed graph show)
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["graph", "deps", &id2])
         .current_dir(temp.path())
         .output()
@@ -405,7 +405,7 @@ fn test_dependencies() {
     assert!(stdout.contains(id1_short));
 
     // Show downstream
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["graph", "downstream", &id1])
         .current_dir(temp.path())
         .output()
@@ -420,7 +420,7 @@ fn test_cycle_detection() {
     let temp = setup_test_repo();
     let jit = jit_binary();
 
-    let output1 = Command::new(&jit)
+    let output1 = Command::new(jit)
         .args(["issue", "create", "-t", "Issue 1", "-d", "Desc"])
         .current_dir(temp.path())
         .output()
@@ -431,7 +431,7 @@ fn test_cycle_detection() {
         .unwrap()
         .to_string();
 
-    let output2 = Command::new(&jit)
+    let output2 = Command::new(jit)
         .args(["issue", "create", "-t", "Issue 2", "-d", "Desc"])
         .current_dir(temp.path())
         .output()
@@ -443,14 +443,14 @@ fn test_cycle_detection() {
         .to_string();
 
     // Add dependency: id2 depends on id1
-    Command::new(&jit)
+    Command::new(jit)
         .args(["dep", "add", &id2, &id1])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     // Try to create cycle: id1 depends on id2 (should fail)
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["dep", "add", &id1, &id2])
         .current_dir(temp.path())
         .output()
@@ -467,7 +467,7 @@ fn test_gates() {
     let jit = jit_binary();
 
     // Add gate definition
-    Command::new(&jit)
+    Command::new(jit)
         .args([
             "registry",
             "add",
@@ -482,7 +482,7 @@ fn test_gates() {
         .unwrap();
 
     // List gates
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["registry", "list"])
         .current_dir(temp.path())
         .output()
@@ -493,7 +493,7 @@ fn test_gates() {
     assert!(stdout.contains("Unit Tests"));
 
     // Create issue with gate
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args([
             "issue", "create", "-t", "Task", "-d", "Desc", "--gate", "tests",
         ])
@@ -508,7 +508,7 @@ fn test_gates() {
         .to_string();
 
     // Pass gate
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["gate", "pass", &id, "tests", "-b", "ci"])
         .current_dir(temp.path())
         .output()
@@ -517,7 +517,7 @@ fn test_gates() {
     assert!(output.status.success());
 
     // Verify gate status
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["issue", "show", &id])
         .current_dir(temp.path())
         .output()
@@ -532,7 +532,7 @@ fn test_assignment_workflow() {
     let temp = setup_test_repo();
     let jit = jit_binary();
 
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["issue", "create", "-t", "Task", "-d", "Desc"])
         .current_dir(temp.path())
         .output()
@@ -545,13 +545,13 @@ fn test_assignment_workflow() {
         .to_string();
 
     // Assign issue
-    Command::new(&jit)
+    Command::new(jit)
         .args(["issue", "assign", &id, "alice"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["issue", "show", &id])
         .current_dir(temp.path())
         .output()
@@ -561,13 +561,13 @@ fn test_assignment_workflow() {
     assert!(stdout.contains("alice"));
 
     // Unassign issue
-    Command::new(&jit)
+    Command::new(jit)
         .args(["issue", "unassign", &id])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["issue", "show", &id])
         .current_dir(temp.path())
         .output()
@@ -583,20 +583,20 @@ fn test_events() {
     let jit = jit_binary();
 
     // Create issues to generate events
-    Command::new(&jit)
+    Command::new(jit)
         .args(["issue", "create", "-t", "Task 1", "-d", "Desc"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
-    Command::new(&jit)
+    Command::new(jit)
         .args(["issue", "create", "-t", "Task 2", "-d", "Desc"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     // Tail events
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["events", "tail", "-n", "2"])
         .current_dir(temp.path())
         .output()
@@ -608,7 +608,7 @@ fn test_events() {
     assert!(stdout.contains("issue_created") || stdout.contains("{"));
 
     // Query events
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["events", "query", "-e", "issue_created"])
         .current_dir(temp.path())
         .output()
@@ -622,7 +622,7 @@ fn test_validate_repository() {
     let temp = setup_test_repo();
     let jit = jit_binary();
 
-    let output1 = Command::new(&jit)
+    let output1 = Command::new(jit)
         .args(["issue", "create", "-t", "Task 1", "-d", "Desc"])
         .current_dir(temp.path())
         .output()
@@ -633,7 +633,7 @@ fn test_validate_repository() {
         .unwrap()
         .to_string();
 
-    let output2 = Command::new(&jit)
+    let output2 = Command::new(jit)
         .args(["issue", "create", "-t", "Task 2", "-d", "Desc"])
         .current_dir(temp.path())
         .output()
@@ -645,14 +645,14 @@ fn test_validate_repository() {
         .to_string();
 
     // Add dependency to connect the issues
-    Command::new(&jit)
+    Command::new(jit)
         .args(["dep", "add", &id2, &id1])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     // Validate should succeed
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["validate"])
         .current_dir(temp.path())
         .output()
@@ -666,7 +666,7 @@ fn test_graph_roots() {
     let temp = setup_test_repo();
     let jit = jit_binary();
 
-    let output1 = Command::new(&jit)
+    let output1 = Command::new(jit)
         .args(["issue", "create", "-t", "Root", "-d", "Desc"])
         .current_dir(temp.path())
         .output()
@@ -677,7 +677,7 @@ fn test_graph_roots() {
         .unwrap()
         .to_string();
 
-    let output2 = Command::new(&jit)
+    let output2 = Command::new(jit)
         .args(["issue", "create", "-t", "Child", "-d", "Desc"])
         .current_dir(temp.path())
         .output()
@@ -689,14 +689,14 @@ fn test_graph_roots() {
         .to_string();
 
     // Add dependency
-    Command::new(&jit)
+    Command::new(jit)
         .args(["dep", "add", &id2, &id1])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     // Get roots
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["graph", "roots"])
         .current_dir(temp.path())
         .output()
@@ -733,7 +733,7 @@ fn test_bug_5dbc3548_deleted_issue_not_in_query() {
         .unwrap();
 
     // Create an issue
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["issue", "create", "-t", "Test Issue", "-d", "desc"])
         .current_dir(temp.path())
         .output()
@@ -759,7 +759,7 @@ fn test_bug_5dbc3548_deleted_issue_not_in_query() {
         .unwrap();
 
     // Verify issue is visible
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["query", "all"])
         .current_dir(temp.path())
         .output()
@@ -771,7 +771,7 @@ fn test_bug_5dbc3548_deleted_issue_not_in_query() {
     );
 
     // Delete the issue (requires JIT_ALLOW_DELETION=1)
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["issue", "delete", &id])
         .env("JIT_ALLOW_DELETION", "1")
         .current_dir(temp.path())
@@ -782,7 +782,7 @@ fn test_bug_5dbc3548_deleted_issue_not_in_query() {
     // THE BUG TEST: Issue should NOT appear in queries
     // Before fix: it would reappear because it's still in git
     // After fix: it's filtered out via deleted_ids in index
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["query", "all"])
         .current_dir(temp.path())
         .output()
@@ -802,7 +802,7 @@ fn test_issue_timestamps_on_create() {
     let jit = jit_binary();
 
     // Create an issue
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args([
             "issue",
             "create",
@@ -820,7 +820,7 @@ fn test_issue_timestamps_on_create() {
     let id = stdout.split_whitespace().last().unwrap();
 
     // Show issue as JSON to check timestamps
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["issue", "show", id, "--json"])
         .current_dir(temp.path())
         .output()
@@ -856,7 +856,7 @@ fn test_issue_timestamps_persist() {
     let jit = jit_binary();
 
     // Create an issue
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["issue", "create", "-t", "Persist Test", "-d", "Description"])
         .current_dir(temp.path())
         .output()
@@ -866,7 +866,7 @@ fn test_issue_timestamps_persist() {
     let id = stdout.split_whitespace().last().unwrap();
 
     // Get initial timestamps
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["issue", "show", id, "--json"])
         .current_dir(temp.path())
         .output()
@@ -879,7 +879,7 @@ fn test_issue_timestamps_persist() {
     // Update the issue (this will change updated_at)
     std::thread::sleep(std::time::Duration::from_millis(10)); // Ensure timestamp difference
 
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["issue", "update", id, "--state", "ready"])
         .current_dir(temp.path())
         .output()
@@ -888,7 +888,7 @@ fn test_issue_timestamps_persist() {
     assert!(output.status.success());
 
     // Get timestamps after update
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["issue", "show", id, "--json"])
         .current_dir(temp.path())
         .output()

@@ -8,7 +8,7 @@ fn jit_binary() -> &'static str {
 fn setup_test_repo() -> TempDir {
     let temp = TempDir::new().unwrap();
     let jit = jit_binary();
-    Command::new(&jit)
+    Command::new(jit)
         .args(["init"])
         .current_dir(temp.path())
         .output()
@@ -22,7 +22,7 @@ fn test_issue_show_enriched_dependencies() {
     let jit = jit_binary();
 
     // Create dependency issues with different states
-    let output_dep1 = Command::new(&jit)
+    let output_dep1 = Command::new(jit)
         .args([
             "issue",
             "create",
@@ -42,7 +42,7 @@ fn test_issue_show_enriched_dependencies() {
         .unwrap()
         .to_string();
 
-    let output_dep2 = Command::new(&jit)
+    let output_dep2 = Command::new(jit)
         .args([
             "issue",
             "create",
@@ -63,14 +63,14 @@ fn test_issue_show_enriched_dependencies() {
         .to_string();
 
     // Mark dep1 as done
-    Command::new(&jit)
+    Command::new(jit)
         .args(["issue", "update", &dep1_id, "--state", "done"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     // Create main issue with dependencies
-    let output_main = Command::new(&jit)
+    let output_main = Command::new(jit)
         .args([
             "issue",
             "create",
@@ -89,14 +89,14 @@ fn test_issue_show_enriched_dependencies() {
         .to_string();
 
     // Add dependencies
-    Command::new(&jit)
+    Command::new(jit)
         .args(["dep", "add", &main_id, &dep1_id, &dep2_id])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
     // Test JSON output
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["issue", "show", &main_id, "--json"])
         .current_dir(temp.path())
         .output()
@@ -131,7 +131,7 @@ fn test_issue_show_enriched_dependencies() {
     assert_eq!(dep2["priority"], "normal");
 
     // Test human-readable output
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["issue", "show", &main_id])
         .current_dir(temp.path())
         .output()
@@ -159,7 +159,7 @@ fn test_issue_show_no_dependencies() {
     let jit = jit_binary();
 
     // Create issue without dependencies
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["issue", "create", "-t", "Standalone", "-d", "No deps"])
         .current_dir(temp.path())
         .output()
@@ -171,7 +171,7 @@ fn test_issue_show_no_dependencies() {
         .to_string();
 
     // Test JSON output
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["issue", "show", &id, "--json"])
         .current_dir(temp.path())
         .output()
@@ -184,7 +184,7 @@ fn test_issue_show_no_dependencies() {
     assert_eq!(deps.len(), 0);
 
     // Test human output
-    let output = Command::new(&jit)
+    let output = Command::new(jit)
         .args(["issue", "show", &id])
         .current_dir(temp.path())
         .output()
