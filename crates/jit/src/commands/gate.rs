@@ -1,7 +1,40 @@
 //! Quality gate operations
 
 use super::*;
-use crate::domain::GateMode;
+use crate::domain::{GateMode, GateRunResult, GateRunStatus};
+
+/// Error returned when `jit gate pass` runs an automated checker that does not pass.
+///
+/// The checker result is preserved so CLI callers can report the failed status
+/// without disagreeing with the persisted `gates_status` value.
+///
+/// # Examples
+///
+/// ```rust
+/// use jit::commands::GatePassFailed;
+///
+/// fn remediation(error: &GatePassFailed) -> String {
+///     format!("jit gate check {} {}", error.issue_id, error.gate_key)
+/// }
+/// ```
+#[derive(Debug, thiserror::Error)]
+#[error(
+    "Gate '{gate_key}' failed for issue {issue_id}. Checker status: {status:?}, exit code: {exit_code:?}. Inspect details with: jit gate check {issue_id} {gate_key}"
+)]
+pub struct GatePassFailed {
+    /// Issue whose gate was checked.
+    pub issue_id: String,
+    /// Gate key that failed.
+    pub gate_key: String,
+    /// Raw checker status.
+    pub status: GateRunStatus,
+    /// Checker process exit code, when available.
+    pub exit_code: Option<i32>,
+    /// Full checker result persisted under `.jit/gate-runs/`.
+    pub result: GateRunResult,
+    /// Warnings gathered before running the checker.
+    pub warnings: Vec<String>,
+}
 
 /// Result of adding multiple gates
 #[derive(Debug, Serialize)]
@@ -198,7 +231,18 @@ impl<S: IssueStore> CommandExecutor<S> {
         if let Some(gate) = registry.gates.get(&gate_key) {
             if gate.mode == GateMode::Auto {
                 // Smart behavior: auto-run the checker
-                self.check_gate(&full_id, &gate_key)?;
+                let result = self.check_gate(&full_id, &gate_key)?;
+                if result.status != GateRunStatus::Passed {
+                    return Err(GatePassFailed {
+                        issue_id: full_id,
+                        gate_key,
+                        status: result.status,
+                        exit_code: result.exit_code,
+                        result,
+                        warnings,
+                    }
+                    .into());
+                }
                 return Ok(warnings);
             }
         }
@@ -724,7 +768,10 @@ enforce_leases = "off"
             Some("human:test".to_string()),
         );
 
-        assert!(result.is_ok(), "Pass should succeed even if checker fails");
+        assert!(
+            result.is_err(),
+            "Pass should fail when the automated checker fails"
+        );
 
         // Verify gate is marked as failed (checker failed)
         let issue = executor.storage.load_issue(&issue_id).unwrap();

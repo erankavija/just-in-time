@@ -1475,8 +1475,27 @@ fn run() -> Result<()> {
                     Err(e) => {
                         if json {
                             use jit::output::JsonError;
-                            let json_error =
-                                JsonError::new("GATE_ERROR", e.to_string(), "gate pass");
+                            let json_error = if let Some(gate_failure) =
+                                e.downcast_ref::<jit::commands::GatePassFailed>()
+                            {
+                                JsonError::new("GATE_FAILED", e.to_string(), "gate pass")
+                                    .with_details(serde_json::json!({
+                                        "issue_id": gate_failure.issue_id,
+                                        "gate_key": gate_failure.gate_key,
+                                        "status": "failed",
+                                        "checker_result": gate_failure.result,
+                                    }))
+                                    .with_suggestion(format!(
+                                        "Inspect the checker result with: jit gate check {} {}",
+                                        gate_failure.issue_id, gate_failure.gate_key
+                                    ))
+                                    .with_suggestion(format!(
+                                        "Fix the failing gate and rerun: jit gate pass {} {}",
+                                        gate_failure.issue_id, gate_failure.gate_key
+                                    ))
+                            } else {
+                                JsonError::new("GATE_ERROR", e.to_string(), "gate pass")
+                            };
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
                         } else {

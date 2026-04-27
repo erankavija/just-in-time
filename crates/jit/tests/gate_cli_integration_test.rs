@@ -178,7 +178,10 @@ fn test_gate_check_shows_last_run_after_failure() {
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
         .args(["gate", "pass", &issue_id, "test-gate"])
-        .assert(); // don't assert success — gate fails but command itself is ok
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Gate 'test-gate' failed"))
+        .stderr(predicate::str::contains("jit gate check"));
 
     // gate check shows the failure
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
@@ -204,6 +207,54 @@ fn test_gate_check_shows_last_run_after_failure() {
     assert!(
         gate_status.to_lowercase() == "failed",
         "Expected Failed, got: {gate_status}"
+    );
+}
+
+#[test]
+fn test_gate_pass_json_failure_matches_persisted_status() {
+    let (temp, issue_id) =
+        setup_auto_gate_issue("printf checker-out && printf checker-err >&2 && exit 1");
+
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["gate", "pass", &issue_id, "test-gate", "--json"])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    assert_eq!(json["error"]["code"], "GATE_FAILED");
+    assert_eq!(json["error"]["details"]["gate_key"], "test-gate");
+    assert_eq!(json["error"]["details"]["status"], "failed");
+    assert_eq!(
+        json["error"]["details"]["checker_result"]["status"],
+        "failed"
+    );
+    assert_eq!(json["error"]["details"]["checker_result"]["exit_code"], 1);
+    assert!(
+        json["error"]["suggestions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|suggestion| suggestion.as_str().unwrap().contains("jit gate check")),
+        "expected remediation suggestion in JSON: {json}"
+    );
+
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["issue", "show", &issue_id, "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let issue: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    assert_eq!(issue["gates_status"]["test-gate"]["status"], "failed");
+    assert_eq!(
+        json["error"]["details"]["status"],
+        issue["gates_status"]["test-gate"]["status"]
     );
 }
 

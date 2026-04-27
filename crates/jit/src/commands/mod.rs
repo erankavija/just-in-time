@@ -40,6 +40,7 @@ pub mod worktree;
 pub mod test_helpers;
 
 pub use bulk_update::{BulkUpdatePreview, BulkUpdateResult, UpdateOperations};
+pub use gate::GatePassFailed;
 
 // Re-export WorktreeIdentity for init return type
 pub use crate::storage::worktree_identity::WorktreeIdentity;
