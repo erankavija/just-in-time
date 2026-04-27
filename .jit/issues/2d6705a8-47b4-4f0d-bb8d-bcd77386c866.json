@@ -1,7 +1,7 @@
 {
   "id": "2d6705a8-47b4-4f0d-bb8d-bcd77386c866",
   "title": "Fix gate pass success reporting for failed automated gates",
-  "description": "Fix confusing `jit gate pass` behavior so a failed automated gate cannot look like a successful operation.\n\n## Background\n\nA critical CLI UX confusion was reported: `jit gate pass` can appear successful even when the underlying gate outcome, such as an AI code review gate, is failed. Users and agents need command success/failure, human output, and JSON output to distinguish “the command ran” from “the gate passed.”\n\n## Success Criteria\n\n- [ ] `jit gate pass` for an automated gate with a failing checker exits non-zero.\n- [ ] Human-readable output clearly states that the gate failed and does not use success-shaped wording.\n- [ ] JSON output includes the gate key, failed status, checker result details, and an actionable remediation hint.\n- [ ] Manual gate pass behavior remains successful when the manual attestation is accepted.\n- [ ] Tests cover a failed automated gate and confirm the command does not appear successful.",
+  "description": "Fix confusing `jit gate pass` behavior so a failed automated gate cannot look like a successful operation.\n\n## Background\n\nA critical CLI UX confusion was reported: `jit gate pass` can appear successful even when the underlying gate outcome, such as an AI code review gate, is failed. Users and agents need command success/failure, human output, and JSON output to distinguish “the command ran” from “the gate passed.”\n\nThis was reproduced during issue `2b82c12c`:\n\n```bash\njit gate pass 2b82c12c code-review --json\n```\n\nThe command exited successfully and printed:\n\n```json\n{\n  \"gate_key\": \"code-review\",\n  \"issue_id\": \"2b82c12c\",\n  \"message\": \"Passed gate 'code-review' for issue 2b82c12c\",\n  \"status\": \"passed\"\n}\n```\n\nImmediately after, persisted issue state showed the opposite result:\n\n```json\n{\n  \"state\": \"gated\",\n  \"gates_status\": {\n    \"code-review\": {\n      \"status\": \"failed\",\n      \"updated_by\": \"auto:executor\"\n    }\n  }\n}\n```\n\nThe issue could not be completed because the gate was actually failed. This makes the command output actively misleading for both humans and agents.\n\n## Success Criteria\n\n- [ ] `jit gate pass` for an automated gate with a failing checker exits non-zero.\n- [ ] Human-readable output clearly states that the gate failed and does not use success-shaped wording.\n- [ ] JSON output includes the gate key, failed status, checker result details, and an actionable remediation hint.\n- [ ] The persisted `gates_status` value and command response always agree.\n- [ ] Manual gate pass behavior remains successful when the manual attestation is accepted.\n- [ ] Tests cover a failed automated gate and confirm the command does not appear successful.",
   "state": "ready",
   "priority": "critical",
   "assignee": null,
@@ -21,5 +21,5 @@
     "component:gates"
   ],
   "created_at": "2026-04-27T22:15:52.405999622+00:00",
-  "updated_at": "2026-04-27T22:15:52.406032032+00:00"
+  "updated_at": "2026-04-27T22:45:35.157328951+00:00"
 }
