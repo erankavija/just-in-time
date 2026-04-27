@@ -6,16 +6,8 @@ use std::fs;
 use std::process::Command;
 use tempfile::TempDir;
 
-fn jit_binary() -> String {
-    let manifest_dir = env!("CARGO_MANIFEST_DIR");
-    std::path::Path::new(manifest_dir)
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .join("target/debug/jit")
-        .to_string_lossy()
-        .to_string()
+fn jit_binary() -> &'static str {
+    env!("CARGO_BIN_EXE_jit")
 }
 
 /// Helper to create a test environment with jit initialized
