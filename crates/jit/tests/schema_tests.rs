@@ -20,6 +20,7 @@ fn test_schema_has_all_top_level_commands() {
     assert!(schema.commands.contains_key("events"));
     assert!(schema.commands.contains_key("graph"));
     assert!(schema.commands.contains_key("query"));
+    assert!(schema.commands.contains_key("version"));
     assert!(schema.commands.contains_key("status"));
     assert!(schema.commands.contains_key("validate"));
 }

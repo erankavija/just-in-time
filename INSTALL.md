@@ -28,6 +28,7 @@ sudo mv jit jit-server /usr/local/bin/
 
 # Verify installation
 jit --version
+jit version
 jit-server --version
 ```
 
@@ -43,6 +44,7 @@ export PATH="$HOME/.local/bin:$PATH"
 
 # Verify
 jit --version
+jit version --json
 ```
 
 ### Verify Checksums
@@ -165,6 +167,7 @@ cargo build --release --workspace
 
 # Binaries are in target/release/
 ./target/release/jit --version
+./target/release/jit version
 ./target/release/jit-server --version
 
 # Optional: Install to system

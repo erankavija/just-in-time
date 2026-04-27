@@ -825,7 +825,14 @@ impl MergedEventsConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Mutex, MutexGuard};
     use tempfile::TempDir;
+
+    static ENV_MUTEX: Mutex<()> = Mutex::new(());
+
+    fn env_lock() -> MutexGuard<'static, ()> {
+        ENV_MUTEX.lock().expect("environment test mutex poisoned")
+    }
 
     #[test]
     fn test_parse_minimal_config() {
@@ -1576,6 +1583,7 @@ enforce_leases = "warn"
 
     #[test]
     fn test_env_override_worktree_mode() {
+        let _guard = env_lock();
         std::env::set_var("JIT_WORKTREE_MODE", "off");
         let config = ConfigLoader::new().build();
         assert_eq!(config.worktree_mode().unwrap(), WorktreeMode::Off);
@@ -1584,6 +1592,7 @@ enforce_leases = "warn"
 
     #[test]
     fn test_env_override_enforce_leases() {
+        let _guard = env_lock();
         std::env::set_var("JIT_ENFORCE_LEASES", "warn");
         let config = ConfigLoader::new().build();
         assert_eq!(config.enforcement_mode().unwrap(), EnforcementMode::Warn);
@@ -1592,6 +1601,7 @@ enforce_leases = "warn"
 
     #[test]
     fn test_env_override_agent_id() {
+        let _guard = env_lock();
         std::env::set_var("JIT_AGENT_ID", "agent:env-test");
         let config = ConfigLoader::new().build();
         assert_eq!(config.agent_id(), Some("agent:env-test".to_string()));
@@ -1600,6 +1610,7 @@ enforce_leases = "warn"
 
     #[test]
     fn test_env_overrides_config_file() {
+        let _guard = env_lock();
         let temp_dir = TempDir::new().unwrap();
         let config_toml = r#"
 [worktree]
@@ -1620,6 +1631,7 @@ enforce_leases = "strict"
 
     #[test]
     fn test_env_invalid_value_returns_error() {
+        let _guard = env_lock();
         std::env::set_var("JIT_WORKTREE_MODE", "invalid");
         let config = ConfigLoader::new().build();
         assert!(config.worktree_mode().is_err());

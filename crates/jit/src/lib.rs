@@ -4,6 +4,7 @@
 //! It is primarily used for testing, but can also be embedded in other applications.
 
 pub mod agent_config;
+pub mod build_info;
 pub mod cli;
 pub mod commands;
 pub mod config;

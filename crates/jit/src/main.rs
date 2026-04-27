@@ -223,6 +223,26 @@ fn run() -> Result<()> {
         .command
         .ok_or_else(|| anyhow::anyhow!("No command provided. Use --help for usage."))?;
 
+    if let Commands::Version { json } = &command {
+        let info = jit::build_info::version_info();
+        if *json {
+            let output = JsonOutput::success(&info, "version");
+            println!("{}", output.to_json_string()?);
+        } else {
+            println!("Version: {}", info.version);
+            println!("Commit: {} ({})", info.git_short_commit, info.git_commit);
+            let dirty = info
+                .git_dirty
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "unknown".to_string());
+            println!("Dirty: {}", dirty);
+            println!("Profile: {}", info.build_profile);
+            println!("Built: {}", info.build_timestamp);
+            println!("Target: {}", info.target);
+        }
+        return Ok(());
+    }
+
     let current_dir = env::current_dir()?;
 
     // Determine jit data directory: JIT_DATA_DIR env var or default to .jit/
@@ -291,6 +311,7 @@ fn run() -> Result<()> {
         Commands::Init { .. } => {
             // Already handled above
         }
+        Commands::Version { .. } => unreachable!("version is handled before repository validation"),
         Commands::Issue(issue_cmd) => {
             match issue_cmd {
                 IssueCommands::Create {

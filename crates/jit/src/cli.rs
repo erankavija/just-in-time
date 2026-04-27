@@ -2,6 +2,8 @@
 
 use clap::{Parser, Subcommand};
 
+use crate::build_info;
+
 /// Just-In-Time Issue Tracker
 ///
 /// A repository-local CLI issue tracker with dependency graph enforcement and quality gating.
@@ -19,6 +21,7 @@ use clap::{Parser, Subcommand};
 #[derive(Parser)]
 #[command(name = "jit")]
 #[command(about = "Just-In-Time issue tracker", long_about = None)]
+#[command(version = build_info::VERSION_TEXT)]
 pub struct Cli {
     /// Suppress non-essential output (for scripting)
     #[arg(short, long, global = true)]
@@ -136,6 +139,13 @@ pub enum Commands {
         #[arg(short = 'g', long)]
         glob: Option<String>,
 
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Show CLI version and local build provenance
+    Version {
         /// Output as JSON
         #[arg(long)]
         json: bool,

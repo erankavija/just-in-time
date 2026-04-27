@@ -370,6 +370,12 @@ impl CommandSchema {
         }
 
         let (schema, type_name) = match cmd_path {
+            // Version command
+            "version" => (
+                Some(schema_to_value::<crate::build_info::VersionInfo>()),
+                "VersionInfo",
+            ),
+
             // Status command
             "status" => (Some(schema_to_value::<StatusResponse>()), "StatusResponse"),
 

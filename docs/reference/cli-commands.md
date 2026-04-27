@@ -696,6 +696,58 @@ Suppress non-essential output (success messages, headers, warnings). Preserves d
 - Essential data output
 - Errors (always shown to stderr)
 
+### `--version`
+Print the CLI package version plus local build provenance:
+
+```bash
+jit --version
+# jit 0.2.1 (commit 44ee4610, dirty=false, profile release)
+```
+
+Use `jit version` when you need the full provenance record.
+
+## Version and Provenance
+
+### `jit version`
+
+Show the running `jit` binary's local build metadata. This command does not
+require a `.jit/` repository and does not contact GitHub or compare against the
+current checkout.
+
+```bash
+jit version
+```
+
+Human-readable output includes:
+
+- `Version` — crate package version
+- `Commit` — short and full Git commit hash, or `unknown` when unavailable
+- `Dirty` — whether the source tree was dirty at build time, or `unknown`
+- `Profile` — Cargo build profile such as `debug` or `release`
+- `Built` — build timestamp as Unix epoch seconds, or `unknown`
+- `Target` — Cargo target triple
+
+### `jit version --json`
+
+Return the same provenance as machine-readable JSON:
+
+```bash
+jit version --json
+```
+
+```json
+{
+  "package": "jit",
+  "version": "0.2.1",
+  "git_commit": "44ee4610bf33e7f35f4c87056c46a6cff3d13f5a",
+  "git_short_commit": "44ee4610",
+  "git_dirty": false,
+  "build_profile": "release",
+  "build_timestamp": "1777327815",
+  "target": "x86_64-unknown-linux-gnu"
+}
+```
+
 ## Issue Commands
 
 ### Bulk Operations
