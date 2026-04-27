@@ -8,6 +8,11 @@ fn main() {
     println!("cargo:rerun-if-env-changed=JIT_BUILD_GIT_DIRTY");
     println!("cargo:rerun-if-env-changed=SOURCE_DATE_EPOCH");
     println!("cargo:rerun-if-changed=../../.git/HEAD");
+    println!("cargo:rerun-if-changed=../../.git/index");
+    println!("cargo:rerun-if-changed=../../.git/packed-refs");
+    if let Some(head_ref) = git_output(&["symbolic-ref", "-q", "HEAD"]) {
+        println!("cargo:rerun-if-changed=../../.git/{}", head_ref);
+    }
 
     let git_hash =
         env_override("JIT_BUILD_GIT_HASH").or_else(|| git_output(&["rev-parse", "HEAD"]));

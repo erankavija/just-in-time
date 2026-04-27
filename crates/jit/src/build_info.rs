@@ -4,6 +4,13 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 /// Version and build provenance reported by `jit version`.
+///
+/// # Examples
+///
+/// ```
+/// let info = jit::build_info::version_info();
+/// assert_eq!(info.package, "jit");
+/// ```
 #[derive(Debug, Clone, Serialize, JsonSchema, PartialEq, Eq)]
 pub struct VersionInfo {
     /// Package name.
@@ -25,6 +32,12 @@ pub struct VersionInfo {
 }
 
 /// Concise version text used by Clap for `jit --version`.
+///
+/// # Examples
+///
+/// ```
+/// assert!(jit::build_info::VERSION_TEXT.contains("commit"));
+/// ```
 pub const VERSION_TEXT: &str = concat!(
     env!("CARGO_PKG_VERSION"),
     " (commit ",
@@ -37,6 +50,13 @@ pub const VERSION_TEXT: &str = concat!(
 );
 
 /// Return compile-time version and provenance metadata.
+///
+/// # Examples
+///
+/// ```
+/// let info = jit::build_info::version_info();
+/// assert!(!info.version.is_empty());
+/// ```
 pub fn version_info() -> VersionInfo {
     VersionInfo {
         package: env!("CARGO_PKG_NAME"),

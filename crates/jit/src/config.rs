@@ -1560,6 +1560,7 @@ default_ttl_secs = 1200
 
     #[test]
     fn test_effective_config_worktree_mode() {
+        let _guard = env_lock();
         let temp_dir = TempDir::new().unwrap();
         let config_toml = r#"
 [worktree]

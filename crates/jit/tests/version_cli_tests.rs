@@ -1,5 +1,6 @@
 use assert_cmd::Command;
 use serde_json::Value;
+use std::path::Path;
 
 #[test]
 fn test_global_version_flag_reports_local_provenance() {
@@ -64,4 +65,36 @@ fn test_version_command_reports_json_provenance_without_repo() {
     assert!(json.get("build_profile").is_some());
     assert!(json.get("build_timestamp").is_some());
     assert!(json.get("target").is_some());
+}
+
+#[test]
+fn test_version_build_without_git_metadata_reports_unknowns() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let workspace_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap();
+
+    let output = Command::new("cargo")
+        .current_dir(workspace_root)
+        .env("CARGO_TARGET_DIR", temp_dir.path().join("target-no-git"))
+        .env("GIT_DIR", temp_dir.path().join("missing-git-dir"))
+        .env("SOURCE_DATE_EPOCH", "0")
+        .args(["run", "-p", "jit", "--quiet", "--", "version", "--json"])
+        .output()
+        .unwrap();
+
+    assert!(
+        output.status.success(),
+        "cargo run without Git metadata should succeed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let json: Value = serde_json::from_slice(&output.stdout).expect("version output is JSON");
+    assert_eq!(json["git_commit"].as_str(), Some("unknown"));
+    assert_eq!(json["git_short_commit"].as_str(), Some("unknown"));
+    assert!(json["git_dirty"].is_null());
+    assert_eq!(json["build_timestamp"].as_str(), Some("0"));
 }
