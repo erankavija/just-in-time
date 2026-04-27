@@ -2,7 +2,7 @@
   "id": "2b82c12c-1f63-45b3-a123-d652719fbd3c",
   "title": "Add local CLI version provenance",
   "description": "Add local build provenance to the CLI so humans and agents can identify exactly which `jit` binary they are running without relying on shell inspection.\n\n## Background\n\nThe current CLI rejects both `jit --version` and `jit version`, which makes installed binary provenance opaque. The first slice intentionally stays local and deterministic: it does not check GitHub releases, PATH conflicts, or whether the binary matches the current repository checkout.\n\n## Success Criteria\n\n- [ ] `jit --version` prints the package version and local build provenance in a concise human-readable form.\n- [ ] `jit version` prints crate version, short commit hash, full commit hash, dirty flag, build profile, build timestamp, and target metadata when available.\n- [ ] `jit version --json` returns the same provenance in a stable machine-readable structure.\n- [ ] Builds outside a Git checkout still succeed and report explicit unknown/unavailable provenance values rather than failing.\n- [ ] Tests cover human output, JSON output, and missing Git metadata behavior.",
-  "state": "gated",
+  "state": "done",
   "priority": "high",
   "assignee": "agent:copilot",
   "dependencies": [],
@@ -11,15 +11,15 @@
     "code-review"
   ],
   "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-04-27T23:06:09.651605853Z"
+    },
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-04-27T22:48:52.789395434Z"
-    },
-    "code-review": {
-      "status": "failed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-04-27T22:50:02.246284656Z"
+      "updated_at": "2026-04-27T23:04:56.408706208Z"
     }
   },
   "context": {},
@@ -31,5 +31,5 @@
     "component:cli"
   ],
   "created_at": "2026-04-27T22:07:50.489167825+00:00",
-  "updated_at": "2026-04-27T23:00:11.741222584+00:00"
+  "updated_at": "2026-04-27T23:32:18.199139138+00:00"
 }
