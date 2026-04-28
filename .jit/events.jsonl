@@ -2132,3 +2132,5 @@
 {"type":"gate_passed","id":"d916b15c-fe58-4dca-8e7a-3ad317c834dd","issue_id":"2d6705a8-47b4-4f0d-bb8d-bcd77386c866","timestamp":"2026-04-28T00:16:28.479967059Z","gate_key":"code-review","updated_by":"auto:executor"}
 {"type":"issue_state_changed","id":"75fce5da-84ab-4737-94fc-0f3079b60f7b","issue_id":"2d6705a8-47b4-4f0d-bb8d-bcd77386c866","timestamp":"2026-04-28T00:16:36.828139477Z","from":"gated","to":"done"}
 {"type":"issue_completed","id":"c8f76c3d-70c4-45cb-b670-9e44c3bc94b8","issue_id":"2d6705a8-47b4-4f0d-bb8d-bcd77386c866","timestamp":"2026-04-28T00:16:36.828191437Z"}
+{"type":"issue_state_changed","id":"5d1c60ef-fbe5-4db3-9c2b-e4e7f1bec75f","issue_id":"7af944ca-eac9-4ba8-883b-3bda654f7a03","timestamp":"2026-04-28T09:46:59.308179825Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"56ccb8ff-2d84-4aec-9dc2-1f4e2ce79b10","issue_id":"7af944ca-eac9-4ba8-883b-3bda654f7a03","timestamp":"2026-04-28T09:46:59.311040036Z","assignee":"agent:copilot"}
