@@ -1185,11 +1185,11 @@ fn run() -> Result<()> {
                 match executor.list_gates() {
                     Ok(gates) => {
                         if json {
-                            use jit::output::{GateDefinition, JsonOutput, RegistryListResponse};
+                            use jit::output::{GateDefinition, GateListResponse, JsonOutput};
                             let gate_defs: Vec<GateDefinition> =
                                 gates.into_iter().map(GateDefinition::from).collect();
                             let count = gate_defs.len();
-                            let response = RegistryListResponse {
+                            let response = GateListResponse {
                                 count,
                                 gates: gate_defs,
                             };
@@ -3397,19 +3397,15 @@ fn run() -> Result<()> {
             match search(&jit_dir, &query, options) {
                 Ok(results) => {
                     if json {
-                        use jit::output::JsonOutput;
-                        use serde_json::json;
+                        use jit::output::{JsonOutput, SearchResponse};
 
                         let msg = format!("Found {} result(s)", results.len());
-                        let output = JsonOutput::success(
-                            json!({
-                                "query": query,
-                                "count": results.len(),
-                                "results": results
-                            }),
-                            "search",
-                        )
-                        .with_message(msg);
+                        let response = SearchResponse {
+                            query,
+                            count: results.len(),
+                            results,
+                        };
+                        let output = JsonOutput::success(response, "search").with_message(msg);
                         println!("{}", output.to_json_string()?);
                     } else if results.is_empty() {
                         let _ =
@@ -4440,17 +4436,15 @@ fn run() -> Result<()> {
             }
             jit::cli::WorktreeCommands::List { json } => {
                 use jit::commands::worktree::execute_worktree_list;
-                use jit::output::{JsonError, JsonOutput};
+                use jit::output::{JsonError, JsonOutput, WorktreeListResponse};
 
                 match execute_worktree_list() {
                     Ok(worktrees) => {
                         if json {
-                            let response = serde_json::json!({
-                                "worktrees": worktrees,
-                                "count": worktrees.len(),
-                            });
+                            let count = worktrees.len();
+                            let response = WorktreeListResponse { count, worktrees };
                             let output = JsonOutput::success(response, "worktree list")
-                                .with_message(format!("{} worktree(s)", worktrees.len()));
+                                .with_message(format!("{} worktree(s)", count));
                             println!("{}", output.to_json_string()?);
                         } else {
                             // Human-readable table format

@@ -410,9 +410,22 @@ impl CommandSchema {
             ),
 
             // Registry commands
-            "registry_list" | "gate_list" => (
+            "registry_list" => (
                 Some(schema_to_value::<RegistryListResponse>()),
                 "RegistryListResponse",
+            ),
+            "gate_list" => (
+                Some(schema_to_value::<GateListResponse>()),
+                "GateListResponse",
+            ),
+            "label_namespaces" => (
+                Some(schema_to_value::<NamespacesResponse>()),
+                "NamespacesResponse",
+            ),
+            "search" => (Some(schema_to_value::<SearchResponse>()), "SearchResponse"),
+            "worktree_list" => (
+                Some(schema_to_value::<WorktreeListResponse>()),
+                "WorktreeListResponse",
             ),
 
             // Default: no specific schema

@@ -2,6 +2,7 @@
 
 use jit::search::{search, SearchOptions};
 use std::fs;
+use std::process::Command;
 use tempfile::TempDir;
 
 fn create_test_repo() -> TempDir {
@@ -57,6 +58,10 @@ fn create_test_repo() -> TempDir {
     .unwrap();
 
     temp
+}
+
+fn jit_binary() -> &'static str {
+    env!("CARGO_BIN_EXE_jit")
 }
 
 #[test]
@@ -225,4 +230,50 @@ fn test_search_extracts_issue_ids() {
         let id = result.issue_id.as_ref().unwrap();
         assert!(result.path.contains(id));
     }
+}
+
+#[test]
+fn test_search_json_uses_count_not_total() {
+    let temp = TempDir::new().unwrap();
+    let init = Command::new(jit_binary())
+        .current_dir(temp.path())
+        .arg("init")
+        .output()
+        .unwrap();
+    assert!(init.status.success());
+
+    let create = Command::new(jit_binary())
+        .current_dir(temp.path())
+        .args([
+            "issue",
+            "create",
+            "--title",
+            "Implement user authentication",
+            "--description",
+            "Add JWT authentication middleware",
+        ])
+        .output()
+        .unwrap();
+    assert!(create.status.success());
+
+    let output = Command::new(jit_binary())
+        .current_dir(temp.path())
+        .args(["search", "authentication", "--json"])
+        .output()
+        .unwrap();
+
+    assert!(
+        output.status.success(),
+        "search failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let results = json["results"].as_array().unwrap();
+    assert_eq!(json["count"].as_u64(), Some(results.len() as u64));
+    assert!(
+        json.get("total").is_none(),
+        "top-level search JSON should use count, not total: {json}"
+    );
 }

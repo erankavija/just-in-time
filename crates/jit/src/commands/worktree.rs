@@ -6,11 +6,12 @@ use crate::storage::claim_coordinator::ClaimsIndex;
 use crate::storage::worktree_identity::load_or_create_worktree_identity;
 use crate::storage::worktree_paths::WorktreePaths;
 use anyhow::{Context, Result};
+use schemars::JsonSchema;
 use serde::Serialize;
 use std::process::Command;
 
 /// Worktree information for display
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct WorktreeInfo {
     /// Stable worktree identifier
     pub worktree_id: String,
@@ -25,7 +26,7 @@ pub struct WorktreeInfo {
 }
 
 /// Entry in worktree list
-#[derive(Debug, Serialize, PartialEq)]
+#[derive(Debug, Serialize, PartialEq, JsonSchema)]
 pub struct WorktreeListEntry {
     /// Stable worktree identifier
     pub worktree_id: String,

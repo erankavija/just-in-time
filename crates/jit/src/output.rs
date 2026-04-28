@@ -729,6 +729,13 @@ pub struct RegistryListResponse {
     pub count: usize,
 }
 
+/// Response for `gate list` command
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct GateListResponse {
+    pub gates: Vec<GateDefinition>,
+    pub count: usize,
+}
+
 /// Gate definition structure (for registry responses)
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct GateDefinition {
@@ -763,6 +770,21 @@ impl From<crate::domain::Gate> for GateDefinition {
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct NamespacesResponse {
     pub namespaces: Vec<String>,
+    pub count: usize,
+}
+
+/// Response for top-level `search` command
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct SearchResponse {
+    pub query: String,
+    pub results: Vec<crate::search::SearchResult>,
+    pub count: usize,
+}
+
+/// Response for `worktree list` command
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct WorktreeListResponse {
+    pub worktrees: Vec<crate::commands::worktree::WorktreeListEntry>,
     pub count: usize,
 }
 

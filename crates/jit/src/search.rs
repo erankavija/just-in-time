@@ -20,12 +20,13 @@
 //! If not found, search operations return a helpful error message with installation instructions.
 
 use anyhow::{bail, Result};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::process::{Command, Stdio};
 
 /// Search result from ripgrep
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct SearchResult {
     /// Issue ID extracted from filename (None for non-issue files like documents)
     pub issue_id: Option<String>,
@@ -40,7 +41,7 @@ pub struct SearchResult {
 }
 
 /// Individual match within a search result
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct SearchMatch {
     /// Matched text
     pub text: String,

@@ -949,6 +949,24 @@ Gates:
   tdd-reminder - TDD Reminder (Precheck, Manual)
 ```
 
+**JSON output:**
+```json
+{
+  "gates": [
+    {
+      "key": "tests",
+      "title": "All Tests Pass",
+      "description": "Full test suite must pass",
+      "auto": true,
+      "stage": "postcheck",
+      "mode": "auto"
+    }
+  ],
+  "count": 1,
+  "message": "1 gate definition(s)"
+}
+```
+
 ### `jit gate show`
 
 Show detailed information about a specific gate definition.
@@ -1474,6 +1492,21 @@ jit query available --json --quiet | jq -r 'issues[0].id'
 # Get status counts
 jit status --json --quiet | jq -r 'summary.by_state'
 ```
+
+List-style JSON responses use a named collection plus `count` at the top level:
+
+```json
+{
+  "issues": [],
+  "count": 0,
+  "message": "Found 0 issue(s)"
+}
+```
+
+The standardized collection names are command-specific: `issues`, `gates`,
+`namespaces`, `results`, or `worktrees`. Top-level `search` uses `count` rather
+than `total`, and `label namespaces --json` returns only `namespaces`, `count`,
+and the optional `message` field instead of internal configuration details.
 
 ### Graceful Pipe Handling
 

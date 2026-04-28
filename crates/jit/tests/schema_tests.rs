@@ -88,6 +88,56 @@ fn test_schema_has_json_flags() {
 }
 
 #[test]
+fn test_schema_has_standardized_json_output_types() {
+    let schema = CommandSchema::generate();
+
+    let gate_list = schema
+        .commands
+        .get("gate")
+        .unwrap()
+        .subcommands
+        .as_ref()
+        .unwrap()
+        .get("list")
+        .unwrap();
+    assert_eq!(
+        gate_list.output.as_ref().unwrap().success,
+        "GateListResponse"
+    );
+
+    let label_namespaces = schema
+        .commands
+        .get("label")
+        .unwrap()
+        .subcommands
+        .as_ref()
+        .unwrap()
+        .get("namespaces")
+        .unwrap();
+    assert_eq!(
+        label_namespaces.output.as_ref().unwrap().success,
+        "NamespacesResponse"
+    );
+
+    let search = schema.commands.get("search").unwrap();
+    assert_eq!(search.output.as_ref().unwrap().success, "SearchResponse");
+
+    let worktree_list = schema
+        .commands
+        .get("worktree")
+        .unwrap()
+        .subcommands
+        .as_ref()
+        .unwrap()
+        .get("list")
+        .unwrap();
+    assert_eq!(
+        worktree_list.output.as_ref().unwrap().success,
+        "WorktreeListResponse"
+    );
+}
+
+#[test]
 fn test_schema_serializes_to_valid_json() {
     let schema = CommandSchema::generate();
     let json = serde_json::to_string_pretty(&schema).unwrap();

@@ -252,6 +252,7 @@ fn test_worktree_list_json_output() {
     assert!(json["worktrees"].is_array());
 
     let worktrees = json["worktrees"].as_array().unwrap();
+    assert_eq!(json["count"].as_u64(), Some(worktrees.len() as u64));
     assert!(!worktrees.is_empty(), "Should have at least one worktree");
 
     // Check first worktree has expected fields
