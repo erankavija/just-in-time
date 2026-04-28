@@ -1491,6 +1491,7 @@ fn run() -> Result<()> {
                                         "gate_key": gate_failure.gate_key,
                                         "status": "failed",
                                         "checker_result": gate_failure.result,
+                                        "warnings": gate_failure.warnings,
                                     }))
                                     .with_suggestion(format!(
                                         "Inspect the checker result with: jit gate check {} {}",
@@ -1506,6 +1507,13 @@ fn run() -> Result<()> {
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
                         } else {
+                            if let Some(gate_failure) =
+                                e.downcast_ref::<jit::commands::GatePassFailed>()
+                            {
+                                for warning in &gate_failure.warnings {
+                                    output_ctx.print_warning(warning)?;
+                                }
+                            }
                             return Err(e);
                         }
                     }

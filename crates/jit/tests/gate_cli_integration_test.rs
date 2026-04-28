@@ -4,6 +4,7 @@
 
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
+use std::fs;
 use std::process::Command;
 use tempfile::TempDir;
 
@@ -63,6 +64,13 @@ fn setup_auto_gate_issue(checker_command: &str) -> (TempDir, String) {
         .unwrap()
         .to_string();
     (temp, issue_id)
+}
+
+fn enable_warn_leases(temp: &TempDir) {
+    let config_path = temp.path().join(".jit").join("config.toml");
+    let mut config = fs::read_to_string(&config_path).unwrap();
+    config.push_str("\n[worktree]\nenforce_leases = \"warn\"\n");
+    fs::write(config_path, config).unwrap();
 }
 
 /// Define multiple auto gates and create an issue that requires all of them.
@@ -257,6 +265,45 @@ fn test_gate_pass_json_failure_matches_persisted_status() {
         json["error"]["details"]["status"],
         issue["gates_status"]["test-gate"]["status"]
     );
+}
+
+#[test]
+fn test_gate_pass_json_failure_includes_lease_warnings() {
+    let (temp, issue_id) = setup_auto_gate_issue("exit 1");
+    enable_warn_leases(&temp);
+
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["gate", "pass", &issue_id, "test-gate", "--json"])
+        .assert()
+        .failure()
+        .code(4)
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    let warnings = json["error"]["details"]["warnings"].as_array().unwrap();
+    assert!(
+        warnings
+            .iter()
+            .any(|warning| warning.as_str().unwrap().contains("No active lease")),
+        "expected lease warning in JSON details: {json}"
+    );
+}
+
+#[test]
+fn test_gate_pass_human_failure_prints_lease_warnings() {
+    let (temp, issue_id) = setup_auto_gate_issue("exit 1");
+    enable_warn_leases(&temp);
+
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["gate", "pass", &issue_id, "test-gate"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Warning: No active lease"))
+        .stderr(predicate::str::contains("Gate 'test-gate' failed"));
 }
 
 #[test]
