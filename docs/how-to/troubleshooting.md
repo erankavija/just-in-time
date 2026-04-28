@@ -25,6 +25,61 @@ jit worktree list
 
 ## Lease and Claim Issues
 
+### Issue Blocked by Dependencies or Gates
+
+**Symptom:**
+```text
+Error: Cannot transition to 'ready': issue blocked by 1 incomplete dependencies
+
+Blockers:
+  - abc12345 Blocked prerequisite [ready]
+
+To fix:
+  - jit graph deps def67890
+  - jit issue show abc12345
+```
+
+Or, when completing work with pending gates:
+
+```text
+Error: Gate validation failed: Cannot transition to 'done': 1 gate(s) not passed
+
+Blockers:
+  - code-review [pending]
+
+To fix:
+  - jit gate check-all def67890
+  - jit gate pass def67890 code-review
+
+Issue automatically transitioned to 'gated' and will move to 'done' when all gates pass.
+```
+
+**Cause:** JIT enforces dependency and gate blockers before state transitions.
+Dependencies must be terminal (`done` or `rejected`) before dependent work can
+become ready or complete. Required gates must pass before an issue can become
+`done`.
+
+**Solutions:**
+
+1. **Inspect dependency blockers:**
+   ```bash
+   jit graph deps <issue-id>
+   jit issue show <blocking-issue-id>
+   ```
+2. **Inspect gate blockers:**
+   ```bash
+   jit gate check-all <issue-id>
+   ```
+3. **Resolve the blocker:** complete/reject dependency issues, or pass required
+   gates:
+   ```bash
+   jit gate pass <issue-id> <gate-key>
+   ```
+
+For scripts and MCP clients, use `--json` on `issue update`, `issue claim`, or
+`issue claim-next`. Blocked transitions include structured `details.blockers`
+and `details.remediation` fields so agents do not need to parse prose.
+
 ### Issue Already Claimed
 
 **Symptom:**

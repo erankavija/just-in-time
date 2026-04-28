@@ -2,6 +2,122 @@
 
 > **Diátaxis Type:** Reference
 
+## CLI JSON contracts
+
+CLI commands that accept `--json` print machine-readable JSON to stdout. Success
+responses are the command payload itself, not a `{ "success": true, "data": ... }`
+envelope. Commands that return objects may include a top-level `message` field
+for human-readable context.
+
+Example successful issue update (abbreviated):
+
+```json
+{
+  "id": "5c581575-bef8-4ee6-be83-7598fd22b557",
+  "title": "Improve state and gate blocking remediation",
+  "state": "done",
+  "priority": "high",
+  "assignee": "agent:copilot",
+  "dependencies": [],
+  "gates_required": ["cargo-ci", "code-review"],
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-04-28T18:25:16.699033997Z"
+    }
+  },
+  "labels": ["type:task", "epic:usability"],
+  "message": "Updated issue 5c581575 to Done"
+}
+```
+
+Error responses use a stable top-level `error` object:
+
+```json
+{
+  "error": {
+    "code": "ISSUE_NOT_FOUND",
+    "message": "Issue not found: abc123",
+    "details": {
+      "issue_id": "abc123"
+    },
+    "suggestions": [
+      "Run 'jit query all' to see available issues",
+      "Check if the issue ID is correct"
+    ]
+  }
+}
+```
+
+Blocked state transitions use the same error envelope and add structured blocker
+and remediation fields in `error.details`. This applies to `issue update --json`,
+`issue claim --json`, and `issue claim-next --json`.
+
+Dependency-blocked example:
+
+```json
+{
+  "error": {
+    "code": "BLOCKED",
+    "message": "Cannot transition to 'ready': issue blocked by 1 incomplete dependencies",
+    "details": {
+      "issue_id": "blocked-work-id",
+      "requested_state": "ready",
+      "actual_state": "backlog",
+      "blockers": [
+        {
+          "type": "dependency",
+          "issue_id": "prerequisite-id",
+          "short_id": "prereq12",
+          "title": "Blocked prerequisite",
+          "state": "ready"
+        }
+      ],
+      "remediation": [
+        "jit graph deps blocked-work-id",
+        "jit issue show prerequisite-id"
+      ]
+    },
+    "suggestions": [
+      "jit graph deps blocked-work-id",
+      "jit issue show prerequisite-id"
+    ]
+  }
+}
+```
+
+Gate-blocked example:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_FAILED",
+    "message": "Gate validation failed: Cannot transition to 'done': 1 gate(s) not passed",
+    "details": {
+      "issue_id": "work-id",
+      "requested_state": "done",
+      "actual_state": "gated",
+      "blockers": [
+        {
+          "type": "gate",
+          "gate_key": "code-review",
+          "status": "pending"
+        }
+      ],
+      "remediation": [
+        "jit gate check-all work-id",
+        "jit gate pass work-id code-review"
+      ]
+    },
+    "suggestions": [
+      "jit gate check-all work-id",
+      "jit gate pass work-id code-review"
+    ]
+  }
+}
+```
+
 ## MCP Tools Reference
 
 JIT provides Model Context Protocol (MCP) tools for AI agent integration. These tools wrap CLI commands with standardized interfaces.
@@ -427,6 +543,17 @@ jit_issue_create({
 }
 ```
 
+**`jit_version`** - Show CLI version and local build provenance
+```javascript
+{
+  json?: boolean
+}
+```
+
+When `json` is true, the response includes `package`, `version`,
+`git_commit`, `git_short_commit`, `git_dirty`, `build_profile`,
+`build_timestamp`, and `target`.
+
 #### Search
 
 **`jit_search`** - Full-text search across issues and documents
@@ -444,7 +571,8 @@ jit_issue_create({
 
 ### MCP Response Format
 
-All MCP tools return structured responses:
+MCP tools wrap CLI payloads in a transport envelope. The `data` field contains
+the same payload shape the corresponding CLI command prints with `--json`.
 
 **Success response:**
 ```javascript
@@ -464,8 +592,30 @@ All MCP tools return structured responses:
 {
   success: false,
   error: {
-    message: "Issue not found",
-    code: "NOT_FOUND"
+    code: "BLOCKED",
+    message: "Cannot transition to 'ready': issue blocked by 1 incomplete dependencies",
+    details: {
+      issue_id: "blocked-work-id",
+      requested_state: "ready",
+      actual_state: "backlog",
+      blockers: [
+        {
+          type: "dependency",
+          issue_id: "prerequisite-id",
+          short_id: "prereq12",
+          title: "Blocked prerequisite",
+          state: "ready"
+        }
+      ],
+      remediation: [
+        "jit graph deps blocked-work-id",
+        "jit issue show prerequisite-id"
+      ]
+    },
+    suggestions: [
+      "jit graph deps blocked-work-id",
+      "jit issue show prerequisite-id"
+    ]
   }
 }
 ```
@@ -747,6 +897,9 @@ jit version --json
   "target": "x86_64-unknown-linux-gnu"
 }
 ```
+
+`git_dirty` is `true` or `false` when known, and `null` when build-time Git
+state could not be determined.
 
 ## Issue Commands
 
