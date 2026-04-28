@@ -486,6 +486,10 @@ pub enum IssueCommands {
 
         #[arg(short, long)]
         filter: Option<String>,
+
+        /// Output JSON format
+        #[arg(long)]
+        json: bool,
     },
 }
 

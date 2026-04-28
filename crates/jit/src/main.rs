@@ -35,6 +35,12 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
     {
         return ExitCode::ValidationFailed;
     }
+    if error
+        .downcast_ref::<jit::errors::TransitionBlockedError>()
+        .is_some()
+    {
+        return ExitCode::ValidationFailed;
+    }
 
     let error_msg = error.to_string().to_lowercase();
 
@@ -50,7 +56,7 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
     // Check error message patterns
     if error_msg.contains("not found") || error_msg.contains("no such file") {
         ExitCode::NotFound
-    } else if error_msg.contains("gate validation failed") {
+    } else if error_msg.contains("gate validation failed") || error_msg.contains("blocked by") {
         // Gate blocking should return validation failed
         ExitCode::ValidationFailed
     } else if error_msg.contains("cycle") || error_msg.contains("invalid dependency") {
@@ -623,15 +629,12 @@ fn run() -> Result<()> {
                                 }
                             }
                             Err(e) => {
-                                // Check if this is a gate validation error
                                 let error_msg = e.to_string();
-                                let json_error = if error_msg.contains("Gate validation failed") {
-                                    // Reload issue to get unpassed gates
-                                    let issue = storage.load_issue(&full_id)?;
-                                    let unpassed = issue.get_unpassed_gates();
-                                    jit::output::JsonError::gate_validation_failed(
-                                        &unpassed,
-                                        &full_id,
+                                let json_error = if let Some(blocked) =
+                                    e.downcast_ref::<jit::errors::TransitionBlockedError>()
+                                {
+                                    jit::output::JsonError::transition_blocked(
+                                        blocked,
                                         "issue update",
                                     )
                                 } else if error_msg.contains("not found") {
@@ -842,7 +845,21 @@ fn run() -> Result<()> {
                 IssueCommands::Claim { id, assignee, json } => {
                     let output_ctx = OutputContext::new(quiet, json);
                     let full_id = storage.resolve_issue_id(&id)?;
-                    executor.claim_issue(&full_id, assignee)?;
+                    if let Err(e) = executor.claim_issue(&full_id, assignee) {
+                        if json {
+                            if let Some(blocked) =
+                                e.downcast_ref::<jit::errors::TransitionBlockedError>()
+                            {
+                                let json_error = jit::output::JsonError::transition_blocked(
+                                    blocked,
+                                    "issue claim",
+                                );
+                                println!("{}", json_error.to_json_string()?);
+                                std::process::exit(json_error.exit_code().code());
+                            }
+                        }
+                        return Err(e);
+                    }
 
                     if json {
                         let issue = storage.load_issue(&full_id)?;
@@ -923,10 +940,40 @@ fn run() -> Result<()> {
                         ));
                     }
                 }
-                IssueCommands::ClaimNext { assignee, filter } => {
-                    let output_ctx = OutputContext::new(quiet, false);
-                    let id = executor.claim_next(assignee, filter)?;
-                    let _ = output_ctx.print_success(format!("Claimed issue: {}", id));
+                IssueCommands::ClaimNext {
+                    assignee,
+                    filter,
+                    json,
+                } => {
+                    let output_ctx = OutputContext::new(quiet, json);
+                    let id = match executor.claim_next(assignee, filter) {
+                        Ok(id) => id,
+                        Err(e) => {
+                            if json {
+                                if let Some(blocked) =
+                                    e.downcast_ref::<jit::errors::TransitionBlockedError>()
+                                {
+                                    let json_error = jit::output::JsonError::transition_blocked(
+                                        blocked,
+                                        "issue claim-next",
+                                    );
+                                    println!("{}", json_error.to_json_string()?);
+                                    std::process::exit(json_error.exit_code().code());
+                                }
+                            }
+                            return Err(e);
+                        }
+                    };
+
+                    if json {
+                        let issue = storage.load_issue(&id)?;
+                        let msg = format!("Claimed issue {}", issue.short_id());
+                        let output =
+                            JsonOutput::success(issue, "issue claim-next").with_message(msg);
+                        println!("{}", output.to_json_string()?);
+                    } else {
+                        let _ = output_ctx.print_success(format!("Claimed issue: {}", id));
+                    }
                 }
             }
         }

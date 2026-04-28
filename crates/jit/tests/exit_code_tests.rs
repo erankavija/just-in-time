@@ -22,6 +22,16 @@ fn setup_test_env() -> TempDir {
     temp_dir
 }
 
+fn json_issue_id(output: &std::process::Output) -> String {
+    assert!(
+        output.status.success(),
+        "command failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    json["id"].as_str().expect("id should exist").to_string()
+}
+
 #[test]
 fn test_exit_code_success() {
     let temp_dir = setup_test_env();
@@ -300,6 +310,8 @@ fn test_exit_code_state_transition_blocked_by_gates() {
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("gate") || stderr.contains("tests"));
     assert!(stderr.contains("gated") || stderr.contains("not passed"));
+    assert!(stderr.contains("jit gate pass"));
+    assert!(stderr.contains(id));
 
     // Verify issue is in gated state (auto-transition happened)
     let output = Command::new(jit_binary())
@@ -384,4 +396,397 @@ fn test_exit_code_state_transition_blocked_by_gates_json() {
     // Error should mention gate blocking
     let error_msg = json["error"]["message"].as_str().unwrap();
     assert!(error_msg.contains("gate") || error_msg.contains("tests"));
+
+    let details = &json["error"]["details"];
+    assert_eq!(details["issue_id"], id);
+    assert_eq!(details["requested_state"], "done");
+    assert_eq!(details["actual_state"], "gated");
+    assert_eq!(details["blockers"][0]["type"], "gate");
+    assert_eq!(details["blockers"][0]["gate_key"], "tests");
+    assert_eq!(details["blockers"][0]["status"], "pending");
+
+    let remediation = details["remediation"].as_array().unwrap();
+    assert!(remediation.iter().any(|cmd| cmd
+        .as_str()
+        .unwrap()
+        .contains(&format!("jit gate pass {} tests", id))));
+    assert!(remediation.iter().any(|cmd| cmd
+        .as_str()
+        .unwrap()
+        .contains(&format!("jit gate check-all {}", id))));
+}
+
+#[test]
+fn test_exit_code_state_transition_blocked_by_dependencies_json() {
+    let temp_dir = setup_test_env();
+
+    let dependency = json_issue_id(
+        &Command::new(jit_binary())
+            .current_dir(&temp_dir)
+            .args([
+                "issue",
+                "create",
+                "--title",
+                "Blocked prerequisite",
+                "--json",
+            ])
+            .output()
+            .unwrap(),
+    );
+    let dependent = json_issue_id(
+        &Command::new(jit_binary())
+            .current_dir(&temp_dir)
+            .args(["issue", "create", "--title", "Blocked work", "--json"])
+            .output()
+            .unwrap(),
+    );
+
+    let status = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["dep", "add", &dependent, &dependency])
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let output = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["issue", "update", &dependent, "--state", "ready", "--json"])
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(4));
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "BLOCKED");
+    assert!(json["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("dependencies"));
+
+    let details = &json["error"]["details"];
+    assert_eq!(details["issue_id"], dependent);
+    assert_eq!(details["requested_state"], "ready");
+    assert_eq!(details["actual_state"], "backlog");
+    assert_eq!(details["blockers"][0]["type"], "dependency");
+    assert_eq!(details["blockers"][0]["issue_id"], dependency);
+    assert_eq!(details["blockers"][0]["title"], "Blocked prerequisite");
+    assert_eq!(details["blockers"][0]["state"], "ready");
+
+    let remediation = details["remediation"].as_array().unwrap();
+    assert!(remediation.iter().any(|cmd| cmd
+        .as_str()
+        .unwrap()
+        .contains(&format!("jit graph deps {}", dependent))));
+    assert!(remediation.iter().any(|cmd| cmd
+        .as_str()
+        .unwrap()
+        .contains(&format!("jit issue show {}", dependency))));
+}
+
+#[test]
+fn test_exit_code_state_transition_blocked_by_dependencies_human_remediation() {
+    let temp_dir = setup_test_env();
+
+    let dependency = json_issue_id(
+        &Command::new(jit_binary())
+            .current_dir(&temp_dir)
+            .args([
+                "issue",
+                "create",
+                "--title",
+                "Blocked prerequisite",
+                "--json",
+            ])
+            .output()
+            .unwrap(),
+    );
+    let dependent = json_issue_id(
+        &Command::new(jit_binary())
+            .current_dir(&temp_dir)
+            .args(["issue", "create", "--title", "Blocked work", "--json"])
+            .output()
+            .unwrap(),
+    );
+
+    let status = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["dep", "add", &dependent, &dependency])
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let output = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["issue", "update", &dependent, "--state", "ready"])
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(4));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("Blocked prerequisite"));
+    assert!(stderr.contains(&dependency[..8]));
+    assert!(stderr.contains("jit graph deps"));
+    assert!(stderr.contains("jit issue show"));
+}
+
+#[test]
+fn test_exit_code_state_transition_blocked_by_missing_dependency_json() {
+    let temp_dir = setup_test_env();
+    let dependent = json_issue_id(
+        &Command::new(jit_binary())
+            .current_dir(&temp_dir)
+            .args(["issue", "create", "--title", "Dangling work", "--json"])
+            .output()
+            .unwrap(),
+    );
+
+    let missing_id = "missing-dependency";
+    let issue_path = temp_dir
+        .path()
+        .join(".jit")
+        .join("issues")
+        .join(format!("{}.json", dependent));
+    let mut issue_data: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&issue_path).unwrap()).unwrap();
+    issue_data["state"] = serde_json::json!("backlog");
+    issue_data["dependencies"] = serde_json::json!([missing_id]);
+    fs::write(
+        &issue_path,
+        serde_json::to_string_pretty(&issue_data).unwrap(),
+    )
+    .unwrap();
+
+    let output = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["issue", "update", &dependent, "--state", "ready", "--json"])
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(4));
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "BLOCKED");
+    assert_eq!(
+        json["error"]["details"]["blockers"][0]["type"],
+        "dependency"
+    );
+    assert_eq!(
+        json["error"]["details"]["blockers"][0]["issue_id"],
+        missing_id
+    );
+    assert_eq!(json["error"]["details"]["blockers"][0]["state"], "missing");
+}
+
+#[test]
+fn test_exit_code_claim_blocked_by_dependencies_json() {
+    let temp_dir = setup_test_env();
+
+    let dependency = json_issue_id(
+        &Command::new(jit_binary())
+            .current_dir(&temp_dir)
+            .args(["issue", "create", "--title", "Claim prerequisite", "--json"])
+            .output()
+            .unwrap(),
+    );
+    let dependent = json_issue_id(
+        &Command::new(jit_binary())
+            .current_dir(&temp_dir)
+            .args(["issue", "create", "--title", "Claim work", "--json"])
+            .output()
+            .unwrap(),
+    );
+
+    let status = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["dep", "add", &dependent, &dependency])
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let output = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["issue", "claim", &dependent, "agent:test", "--json"])
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(4));
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "BLOCKED");
+    assert_eq!(json["error"]["details"]["issue_id"], dependent);
+    assert_eq!(json["error"]["details"]["requested_state"], "in_progress");
+    assert_eq!(json["error"]["details"]["actual_state"], "backlog");
+    assert_eq!(
+        json["error"]["details"]["blockers"][0]["issue_id"],
+        dependency
+    );
+
+    let remediation = json["error"]["details"]["remediation"].as_array().unwrap();
+    assert!(remediation.iter().any(|cmd| cmd
+        .as_str()
+        .unwrap()
+        .contains(&format!("jit graph deps {}", dependent))));
+}
+
+#[test]
+fn test_exit_code_claim_blocked_by_precheck_gate_json() {
+    let temp_dir = setup_test_env();
+
+    let status = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args([
+            "gate",
+            "define",
+            "tdd-reminder",
+            "--title",
+            "TDD Reminder",
+            "-d",
+            "Write tests first",
+            "--stage",
+            "precheck",
+            "--mode",
+            "manual",
+        ])
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let issue = json_issue_id(
+        &Command::new(jit_binary())
+            .current_dir(&temp_dir)
+            .args([
+                "issue",
+                "create",
+                "--title",
+                "Precheck work",
+                "--gate",
+                "tdd-reminder",
+                "--json",
+            ])
+            .output()
+            .unwrap(),
+    );
+
+    let output = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["issue", "claim", &issue, "agent:test", "--json"])
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(4));
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "VALIDATION_FAILED");
+    assert_eq!(json["error"]["details"]["requested_state"], "in_progress");
+    assert_eq!(json["error"]["details"]["actual_state"], "ready");
+    assert_eq!(json["error"]["details"]["blockers"][0]["type"], "gate");
+    assert_eq!(
+        json["error"]["details"]["blockers"][0]["gate_key"],
+        "tdd-reminder"
+    );
+
+    let remediation = json["error"]["details"]["remediation"].as_array().unwrap();
+    assert!(remediation.iter().any(|cmd| cmd
+        .as_str()
+        .unwrap()
+        .contains(&format!("jit gate pass {} tdd-reminder", issue))));
+}
+
+#[test]
+fn test_exit_code_claim_next_blocked_by_precheck_gate_json() {
+    let temp_dir = setup_test_env();
+
+    let status = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args([
+            "gate",
+            "define",
+            "tdd-reminder",
+            "--title",
+            "TDD Reminder",
+            "-d",
+            "Write tests first",
+            "--stage",
+            "precheck",
+            "--mode",
+            "manual",
+        ])
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let issue = json_issue_id(
+        &Command::new(jit_binary())
+            .current_dir(&temp_dir)
+            .args([
+                "issue",
+                "create",
+                "--title",
+                "Claim-next precheck work",
+                "--gate",
+                "tdd-reminder",
+                "--json",
+            ])
+            .output()
+            .unwrap(),
+    );
+
+    let output = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["issue", "claim-next", "agent:test", "--json"])
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(4));
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "VALIDATION_FAILED");
+    assert_eq!(json["error"]["details"]["issue_id"], issue);
+    assert_eq!(
+        json["error"]["details"]["blockers"][0]["gate_key"],
+        "tdd-reminder"
+    );
+}
+
+#[test]
+fn test_claim_next_json_skips_non_ready_issues() {
+    let temp_dir = setup_test_env();
+
+    let done_issue = json_issue_id(
+        &Command::new(jit_binary())
+            .current_dir(&temp_dir)
+            .args(["issue", "create", "--title", "Already done", "--json"])
+            .output()
+            .unwrap(),
+    );
+    let ready_issue = json_issue_id(
+        &Command::new(jit_binary())
+            .current_dir(&temp_dir)
+            .args(["issue", "create", "--title", "Ready work", "--json"])
+            .output()
+            .unwrap(),
+    );
+
+    let status = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["issue", "update", &done_issue, "--state", "done"])
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let output = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["issue", "claim-next", "agent:test", "--json"])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["id"], ready_issue);
+    assert_eq!(json["state"], "in_progress");
+    assert_eq!(json["assignee"], "agent:test");
+
+    let done_output = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["issue", "show", &done_issue, "--json"])
+        .output()
+        .unwrap();
+    assert!(done_output.status.success());
+    let done_json: serde_json::Value = serde_json::from_slice(&done_output.stdout).unwrap();
+    assert!(done_json["assignee"].is_null());
 }

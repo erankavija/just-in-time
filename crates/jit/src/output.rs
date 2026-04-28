@@ -11,6 +11,9 @@ use std::fmt::Display;
 use std::io::{self, Write};
 
 use crate::domain::{MinimalBlockedIssue, MinimalIssue, Priority, State};
+use crate::errors::{
+    gate_status_name, short_id, state_name, TransitionBlockedError, TransitionBlocker,
+};
 
 // ============================================================================
 // Output Context for Quiet Mode
@@ -361,7 +364,7 @@ impl ErrorCode {
     pub fn to_exit_code(code: &str) -> ExitCode {
         match code {
             Self::ISSUE_NOT_FOUND | Self::GATE_NOT_FOUND => ExitCode::NotFound,
-            Self::CYCLE_DETECTED | Self::VALIDATION_FAILED | Self::GATE_FAILED => {
+            Self::CYCLE_DETECTED | Self::VALIDATION_FAILED | Self::BLOCKED | Self::GATE_FAILED => {
                 ExitCode::ValidationFailed
             }
             Self::INVALID_ARGUMENT | Self::INVALID_STATE => ExitCode::InvalidArgument,
@@ -454,6 +457,60 @@ impl JsonError {
             "To complete: jit gate pass {} <gate_key>",
             issue_id
         ))
+    }
+
+    /// Build a JSON error for a blocked state transition.
+    ///
+    /// This keeps machine-readable error shaping in the output layer while the
+    /// command layer returns typed blocker data.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let error = JsonError::transition_blocked(&blocked, "issue update");
+    /// assert_eq!(error.exit_code().code(), 4);
+    /// ```
+    pub fn transition_blocked(
+        blocked: &TransitionBlockedError,
+        command: impl Into<String>,
+    ) -> Self {
+        Self::new(blocked.error_code(), blocked.summary(), command)
+            .with_details(serde_json::json!({
+                "issue_id": blocked.issue_id(),
+                "requested_state": state_name(blocked.requested_state()),
+                "actual_state": state_name(blocked.actual_state()),
+                "blockers": blocked.blockers().iter().map(transition_blocker_json).collect::<Vec<_>>(),
+                "remediation": blocked.remediation_commands(),
+            }))
+            .with_suggestions(blocked.remediation_commands())
+    }
+}
+
+fn transition_blocker_json(blocker: &TransitionBlocker) -> serde_json::Value {
+    match blocker {
+        TransitionBlocker::Dependency {
+            issue_id,
+            title,
+            state,
+        } => serde_json::json!({
+            "type": "dependency",
+            "issue_id": issue_id,
+            "short_id": short_id(issue_id),
+            "title": title,
+            "state": state_name(*state),
+        }),
+        TransitionBlocker::MissingDependency { issue_id } => serde_json::json!({
+            "type": "dependency",
+            "issue_id": issue_id,
+            "short_id": short_id(issue_id),
+            "title": "(missing issue)",
+            "state": "missing",
+        }),
+        TransitionBlocker::Gate { gate_key, status } => serde_json::json!({
+            "type": "gate",
+            "gate_key": gate_key,
+            "status": gate_status_name(*status),
+        }),
     }
 }
 

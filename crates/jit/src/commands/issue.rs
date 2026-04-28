@@ -1,6 +1,7 @@
 //! Issue CRUD operations and lifecycle management
 
 use super::*;
+use crate::errors::{TransitionBlockedError, TransitionBlocker};
 
 impl<S: IssueStore> CommandExecutor<S> {
     pub fn create_issue(
@@ -138,6 +139,22 @@ impl<S: IssueStore> CommandExecutor<S> {
             .collect()
     }
 
+    fn blocking_dependencies(
+        &self,
+        issue: &Issue,
+        resolved_issues: &std::collections::HashMap<String, &Issue>,
+    ) -> Vec<TransitionBlocker> {
+        issue
+            .dependencies
+            .iter()
+            .filter_map(|dep_id| match resolved_issues.get(dep_id).copied() {
+                Some(dependency) if dependency.state.is_terminal() => None,
+                Some(dependency) => Some(TransitionBlocker::dependency(dependency.clone())),
+                None => Some(TransitionBlocker::missing_dependency(dep_id.clone())),
+            })
+            .collect()
+    }
+
     /// Update issue fields.
     ///
     /// Note: This function has 8 parameters (exceeds clippy's 7-parameter guideline).
@@ -209,10 +226,15 @@ impl<S: IssueStore> CommandExecutor<S> {
                 let issues = self.storage.list_issues()?;
                 let resolved = crate::domain::queries::build_issue_map(&issues);
 
-                if issue.is_blocked(&resolved) {
-                    return Err(anyhow!(
-                        "Cannot transition to Ready: issue blocked by incomplete dependencies"
-                    ));
+                let blockers = self.blocking_dependencies(&issue, &resolved);
+                if !blockers.is_empty() {
+                    return Err(TransitionBlockedError::dependencies(
+                        issue.id.clone(),
+                        State::Ready,
+                        issue.state,
+                        blockers,
+                    )
+                    .into());
                 }
 
                 issue.state = State::Ready;
@@ -221,10 +243,15 @@ impl<S: IssueStore> CommandExecutor<S> {
                 let issues = self.storage.list_issues()?;
                 let resolved = crate::domain::queries::build_issue_map(&issues);
 
-                if issue.is_blocked(&resolved) {
-                    return Err(anyhow!(
-                        "Cannot transition to Done: issue blocked by incomplete dependencies"
-                    ));
+                let blockers = self.blocking_dependencies(&issue, &resolved);
+                if !blockers.is_empty() {
+                    return Err(TransitionBlockedError::dependencies(
+                        issue.id.clone(),
+                        State::Done,
+                        issue.state,
+                        blockers,
+                    )
+                    .into());
                 }
 
                 // If gates not passed, transition to Gated and return error
@@ -313,10 +340,15 @@ impl<S: IssueStore> CommandExecutor<S> {
                 let issues = self.storage.list_issues()?;
                 let resolved = crate::domain::queries::build_issue_map(&issues);
 
-                if issue.is_blocked(&resolved) {
-                    return Err(anyhow!(
-                        "Cannot transition to Ready: issue blocked by incomplete dependencies"
-                    ));
+                let blockers = self.blocking_dependencies(&issue, &resolved);
+                if !blockers.is_empty() {
+                    return Err(TransitionBlockedError::dependencies(
+                        issue.id.clone(),
+                        State::Ready,
+                        issue.state,
+                        blockers,
+                    )
+                    .into());
                 }
 
                 issue.state = State::Ready;
@@ -326,10 +358,15 @@ impl<S: IssueStore> CommandExecutor<S> {
                 let issues = self.storage.list_issues()?;
                 let resolved = crate::domain::queries::build_issue_map(&issues);
 
-                if issue.is_blocked(&resolved) {
-                    return Err(anyhow!(
-                        "Cannot transition to Done: issue blocked by incomplete dependencies"
-                    ));
+                let blockers = self.blocking_dependencies(&issue, &resolved);
+                if !blockers.is_empty() {
+                    return Err(TransitionBlockedError::dependencies(
+                        issue.id.clone(),
+                        State::Done,
+                        issue.state,
+                        blockers,
+                    )
+                    .into());
                 }
 
                 // If gates not passed, transition to Gated and return error
@@ -438,9 +475,23 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let old_state = issue.state;
 
-        // If Ready, try to transition to InProgress first (this enforces prechecks)
+        // If Ready, try to transition to InProgress first (this enforces prechecks).
+        // Backlog issues remain blocked until their dependencies are terminal.
         if old_state == State::Ready {
             self.update_issue_state(&full_id, State::InProgress)?;
+        } else if old_state == State::Backlog {
+            let issues = self.storage.list_issues()?;
+            let resolved = crate::domain::queries::build_issue_map(&issues);
+            let blockers = self.blocking_dependencies(&issue, &resolved);
+            if !blockers.is_empty() {
+                return Err(TransitionBlockedError::dependencies(
+                    issue.id.clone(),
+                    State::InProgress,
+                    issue.state,
+                    blockers,
+                )
+                .into());
+            }
         }
 
         // If we get here, prechecks passed (or issue wasn't Ready)
@@ -516,7 +567,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Find first ready, unassigned issue with highest priority
         let mut candidates: Vec<&Issue> = issues
             .iter()
-            .filter(|i| i.assignee.is_none() && !i.is_blocked(&resolved))
+            .filter(|i| i.state == State::Ready && i.assignee.is_none() && !i.is_blocked(&resolved))
             .collect();
 
         candidates.sort_by_key(|i| match i.priority {
@@ -607,6 +658,17 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Transitions issue to Gated, saves, logs, and returns error with clear feedback
     fn handle_gate_blocking(&self, issue: &mut Issue, old_state: State) -> Result<Vec<String>> {
         let unpassed = issue.get_unpassed_gates();
+        let gate_blockers = unpassed
+            .into_iter()
+            .map(|gate_key| {
+                let status = issue
+                    .gates_status
+                    .get(&gate_key)
+                    .map(|gate| gate.status)
+                    .unwrap_or(GateStatus::Pending);
+                (gate_key, status)
+            })
+            .collect();
         issue.state = State::Gated;
 
         // Clone issue before moving it to save
@@ -620,13 +682,13 @@ impl<S: IssueStore> CommandExecutor<S> {
         let event = Event::new_issue_state_changed(issue_id, old_state, State::Gated);
         self.storage.append_event(&event)?;
 
-        Err(anyhow!(
-            "Gate validation failed: Cannot transition to 'done' - {} gate(s) not passed: {}\n\
-             → Issue automatically transitioned to 'gated' (awaiting gate approval)\n\
-             The issue will auto-transition to 'done' when all gates pass.",
-            unpassed.len(),
-            unpassed.join(", ")
-        ))
+        Err(TransitionBlockedError::gates(
+            issue.id.clone(),
+            State::Done,
+            State::Gated,
+            gate_blockers,
+        )
+        .into())
     }
 }
 

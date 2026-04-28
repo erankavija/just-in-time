@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::domain::{GateContext, GateMode, GateRunResult, GateRunStatus, GateStage};
+use crate::errors::TransitionBlockedError;
 use crate::gate_execution;
 use crate::output::IssueShowResponse;
 use std::collections::HashMap;
@@ -312,39 +313,32 @@ impl<S: IssueStore> CommandExecutor<S> {
                     // Check if manual precheck already passed
                     let gate_status = issue.gates_status.get(gate_key);
                     if !matches!(gate_status, Some(state) if state.status == GateStatus::Passed) {
-                        anyhow::bail!(
-                            "Manual precheck '{}' has not been passed. Pass it first with: jit gate pass {} {}",
-                            gate_key, full_id, gate_key
-                        );
+                        let status = gate_status
+                            .map(|state| state.status)
+                            .unwrap_or(GateStatus::Pending);
+                        return Err(TransitionBlockedError::gates(
+                            full_id.clone(),
+                            State::InProgress,
+                            issue.state,
+                            vec![(gate_key.clone(), status)],
+                        )
+                        .into());
                     }
                 }
             }
         }
 
         if !failed_gates.is_empty() {
-            let failures: Vec<String> = failed_gates
-                .iter()
-                .map(|(key, result)| {
-                    format!(
-                        "  ✗ {} (exit {}): {}",
-                        key,
-                        result
-                            .exit_code
-                            .map(|c| c.to_string())
-                            .unwrap_or_else(|| "timeout".to_string()),
-                        result.stderr.lines().next().unwrap_or_else(|| result
-                            .stdout
-                            .lines()
-                            .next()
-                            .unwrap_or(""))
-                    )
-                })
-                .collect();
-
-            anyhow::bail!(
-                "Prechecks failed:\n{}\n\nFix the issues and try again",
-                failures.join("\n")
-            );
+            return Err(TransitionBlockedError::gates(
+                full_id,
+                State::InProgress,
+                issue.state,
+                failed_gates
+                    .into_iter()
+                    .map(|(key, _)| (key, GateStatus::Failed))
+                    .collect(),
+            )
+            .into());
         }
 
         Ok(())

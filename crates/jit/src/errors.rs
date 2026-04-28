@@ -9,6 +9,8 @@
 
 use std::fmt;
 
+use crate::domain::{GateStatus, Issue, State, SHORT_ID_LENGTH};
+
 /// An error with diagnostic context and remediation steps.
 ///
 /// This struct wraps an error message with additional context to help users
@@ -92,6 +94,239 @@ impl fmt::Display for ActionableError {
 }
 
 impl std::error::Error for ActionableError {}
+
+/// A state-transition failure with structured blocker details.
+///
+/// Command logic uses this error to report why an issue cannot move to the
+/// requested lifecycle state without embedding CLI or JSON rendering in the
+/// command layer. Human-readable formatting is provided through `Display`, while
+/// JSON serialization is handled by `crate::output`.
+///
+/// # Examples
+///
+/// ```ignore
+/// // Returned by issue transition commands when blockers prevent progress.
+/// let error = transition_result.unwrap_err();
+/// assert!(error.to_string().contains("To fix:"));
+/// ```
+#[derive(Debug, Clone)]
+pub struct TransitionBlockedError {
+    issue_id: String,
+    requested_state: State,
+    actual_state: State,
+    blockers: Vec<TransitionBlocker>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum TransitionBlocker {
+    Dependency {
+        issue_id: String,
+        title: String,
+        state: State,
+    },
+    MissingDependency {
+        issue_id: String,
+    },
+    Gate {
+        gate_key: String,
+        status: GateStatus,
+    },
+}
+
+impl TransitionBlockedError {
+    pub(crate) fn dependencies(
+        issue_id: String,
+        requested_state: State,
+        actual_state: State,
+        blockers: Vec<TransitionBlocker>,
+    ) -> Self {
+        Self {
+            issue_id,
+            requested_state,
+            actual_state,
+            blockers,
+        }
+    }
+
+    pub(crate) fn gates(
+        issue_id: String,
+        requested_state: State,
+        actual_state: State,
+        gates: Vec<(String, GateStatus)>,
+    ) -> Self {
+        Self {
+            issue_id,
+            requested_state,
+            actual_state,
+            blockers: gates
+                .into_iter()
+                .map(|(gate_key, status)| TransitionBlocker::Gate { gate_key, status })
+                .collect(),
+        }
+    }
+
+    pub(crate) fn issue_id(&self) -> &str {
+        &self.issue_id
+    }
+
+    pub(crate) fn requested_state(&self) -> State {
+        self.requested_state
+    }
+
+    pub(crate) fn actual_state(&self) -> State {
+        self.actual_state
+    }
+
+    pub(crate) fn blockers(&self) -> &[TransitionBlocker] {
+        &self.blockers
+    }
+
+    pub(crate) fn error_code(&self) -> &'static str {
+        if self.blockers.iter().all(|blocker| {
+            matches!(
+                blocker,
+                TransitionBlocker::Dependency { .. } | TransitionBlocker::MissingDependency { .. }
+            )
+        }) {
+            crate::output::ErrorCode::BLOCKED
+        } else {
+            crate::output::ErrorCode::VALIDATION_FAILED
+        }
+    }
+
+    pub(crate) fn summary(&self) -> String {
+        let requested = state_name(self.requested_state);
+        if self
+            .blockers
+            .iter()
+            .any(|blocker| matches!(blocker, TransitionBlocker::Gate { .. }))
+        {
+            format!(
+                "Gate validation failed: Cannot transition to '{}': {} gate(s) not passed",
+                requested,
+                self.blockers.len()
+            )
+        } else {
+            format!(
+                "Cannot transition to '{}': issue blocked by {} incomplete dependencies",
+                requested,
+                self.blockers.len()
+            )
+        }
+    }
+
+    pub(crate) fn remediation_commands(&self) -> Vec<String> {
+        let inspect_command = match self.blockers.first() {
+            Some(TransitionBlocker::Gate { .. }) => {
+                format!("jit gate check-all {}", self.issue_id)
+            }
+            _ => format!("jit graph deps {}", self.issue_id),
+        };
+
+        std::iter::once(inspect_command)
+            .chain(self.blockers.iter().map(|blocker| match blocker {
+                TransitionBlocker::Dependency { issue_id, .. } => {
+                    format!("jit issue show {}", issue_id)
+                }
+                TransitionBlocker::MissingDependency { issue_id } => {
+                    format!("jit validate --json  # missing dependency: {}", issue_id)
+                }
+                TransitionBlocker::Gate { gate_key, .. } => {
+                    format!("jit gate pass {} {}", self.issue_id, gate_key)
+                }
+            }))
+            .collect()
+    }
+}
+
+impl TransitionBlocker {
+    pub(crate) fn dependency(issue: Issue) -> Self {
+        Self::Dependency {
+            issue_id: issue.id,
+            title: issue.title,
+            state: issue.state,
+        }
+    }
+
+    pub(crate) fn missing_dependency(issue_id: String) -> Self {
+        Self::MissingDependency { issue_id }
+    }
+}
+
+impl fmt::Display for TransitionBlockedError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "{}", self.summary())?;
+
+        writeln!(f, "\nBlockers:")?;
+        for blocker in &self.blockers {
+            writeln!(f, "  - {}", blocker)?;
+        }
+
+        writeln!(f, "\nTo fix:")?;
+        for command in self.remediation_commands() {
+            writeln!(f, "  - {}", command)?;
+        }
+
+        if self.actual_state == State::Gated {
+            writeln!(
+                f,
+                "\nIssue automatically transitioned to 'gated' and will move to 'done' when all gates pass."
+            )?;
+        }
+
+        Ok(())
+    }
+}
+
+impl std::error::Error for TransitionBlockedError {}
+
+impl fmt::Display for TransitionBlocker {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Dependency {
+                issue_id,
+                title,
+                state,
+            } => write!(
+                f,
+                "{} {} [{}]",
+                short_id(issue_id),
+                title,
+                state_name(*state)
+            ),
+            Self::MissingDependency { issue_id } => {
+                write!(f, "{} (missing issue) [missing]", short_id(issue_id))
+            }
+            Self::Gate { gate_key, status } => {
+                write!(f, "{} [{}]", gate_key, gate_status_name(*status))
+            }
+        }
+    }
+}
+
+pub(crate) fn state_name(state: State) -> &'static str {
+    match state {
+        State::Backlog => "backlog",
+        State::Ready => "ready",
+        State::InProgress => "in_progress",
+        State::Gated => "gated",
+        State::Done => "done",
+        State::Rejected => "rejected",
+        State::Archived => "archived",
+    }
+}
+
+pub(crate) fn gate_status_name(status: GateStatus) -> &'static str {
+    match status {
+        GateStatus::Pending => "pending",
+        GateStatus::Passed => "passed",
+        GateStatus::Failed => "failed",
+    }
+}
+
+pub(crate) fn short_id(issue_id: &str) -> String {
+    issue_id.chars().take(SHORT_ID_LENGTH).collect()
+}
 
 /// Helper to create lease not found errors with standard remediation.
 pub fn lease_not_found(lease_id: &str) -> ActionableError {
