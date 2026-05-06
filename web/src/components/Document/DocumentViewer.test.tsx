@@ -5,6 +5,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { DocumentContent } from '../../types/models';
 
 // Mock MermaidDiagram before importing DocumentViewer so the module graph
@@ -37,8 +38,17 @@ vi.mock('../../api/client', () => ({
   },
 }));
 
-function makeContent(content: string, content_type = 'text/markdown'): DocumentContent {
-  return { path: 'README.md', commit: 'abc1234def5678', content, content_type };
+Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+  value: vi.fn(),
+  writable: true,
+});
+
+function makeContent(
+  content: string,
+  content_type = 'text/markdown',
+  path = 'README.md',
+): DocumentContent {
+  return { path, commit: 'abc1234def5678', content, content_type };
 }
 
 // A single fixture that represents an existing linked markdown document with
@@ -217,5 +227,98 @@ describe('DocumentViewer — reveal.js smoke test (fixture-backed)', () => {
     // The raw HTML content should NOT be injected into the host document
     expect(document.querySelector('.reveal')).toBeNull();
     expect(document.querySelector('.slides')).toBeNull();
+  });
+});
+
+describe('DocumentViewer — viewer-shell capabilities for text-like renderers', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetDocumentHistory.mockResolvedValue({ path: 'results.csv', commits: [] });
+  });
+
+  it('shows a raw-view toggle for CSV documents and switches to the generic raw view', async () => {
+    const user = userEvent.setup();
+    const csv = [
+      'prime,n,kernel_path',
+      '7,256,C',
+      '31,1024,F',
+    ].join('\n');
+
+    mockGetDocumentContent.mockResolvedValue(makeContent(csv, 'text/plain', 'results.csv'));
+    mockGetDocumentByPath.mockResolvedValue(makeContent(csv, 'text/plain', 'results.csv'));
+
+    render(
+      <DocumentViewer
+        documentPath="results.csv"
+        issueId="csv-issue"
+        documentRef={{ path: 'results.csv', label: 'Prime sweep' }}
+      />,
+    );
+
+    const rawToggle = await screen.findByRole('button', { name: 'Raw view' });
+    await user.click(rawToggle);
+
+    expect(screen.getByTestId('raw-document-view')).toHaveTextContent('prime,n,kernel_path');
+    expect(screen.getByRole('button', { name: 'Rich view' })).toBeDefined();
+  });
+
+  it('shows a capped-preview notice for large text-like documents in rich view', async () => {
+    const largeCsv = [
+      'col_a,col_b',
+      ...Array.from({ length: 220 }, (_, idx) => `row-${idx},value-${idx}`),
+    ].join('\n');
+
+    mockGetDocumentContent.mockResolvedValue(makeContent(largeCsv, 'text/plain', 'large.csv'));
+    mockGetDocumentByPath.mockResolvedValue(makeContent(largeCsv, 'text/plain', 'large.csv'));
+
+    render(
+      <DocumentViewer
+        documentPath="large.csv"
+        issueId="csv-issue"
+        documentRef={{ path: 'large.csv', label: 'Large CSV' }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('preview-cap-notice')).toHaveTextContent('Preview capped at 200 lines');
+    });
+  });
+
+  it('propagates search highlighting to text-code renderers selected by extension', async () => {
+    const source = [
+      'pub fn render_results() {',
+      '    let needle_value = "important";',
+      '}',
+    ].join('\n');
+
+    mockGetDocumentContent.mockResolvedValue(makeContent(source, 'text/plain', 'src/lib.rs'));
+    mockGetDocumentByPath.mockResolvedValue(makeContent(source, 'text/plain', 'src/lib.rs'));
+
+    render(
+      <DocumentViewer
+        documentPath="src/lib.rs"
+        issueId="text-issue"
+        documentRef={{ path: 'src/lib.rs', label: 'Renderer source' }}
+        searchQuery="needle_value"
+      />,
+    );
+
+    await waitFor(() => {
+      const marks = document.querySelectorAll('mark');
+      expect(marks.length).toBeGreaterThan(0);
+    });
+  });
+
+  it('does not show a raw-view toggle for markdown documents', async () => {
+    mockGetDocumentContent.mockResolvedValue(makeContent(LINKED_DOC_FIXTURE));
+    mockGetDocumentByPath.mockResolvedValue(makeContent(LINKED_DOC_FIXTURE));
+
+    render(<DocumentViewer documentPath="README.md" issueId="markdown-issue" />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Project Overview');
+    });
+
+    expect(screen.queryByRole('button', { name: 'Raw view' })).toBeNull();
   });
 });

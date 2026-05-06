@@ -14,6 +14,44 @@ interface DocumentViewerProps {
   onClose?: () => void;
 }
 
+const RICH_PREVIEW_MAX_LINES = 200;
+
+interface PreviewState {
+  isCapped: boolean;
+  maxLines: number;
+  totalLines: number;
+}
+
+function getPreviewState(
+  content: DocumentContent,
+  supportsPreviewCap: boolean,
+): PreviewState {
+  if (!supportsPreviewCap) {
+    return { isCapped: false, maxLines: RICH_PREVIEW_MAX_LINES, totalLines: 0 };
+  }
+
+  const totalLines = content.content.split('\n').length;
+  return {
+    isCapped: totalLines > RICH_PREVIEW_MAX_LINES,
+    maxLines: RICH_PREVIEW_MAX_LINES,
+    totalLines,
+  };
+}
+
+function buildRichViewContent(
+  content: DocumentContent,
+  previewState: PreviewState,
+): DocumentContent {
+  if (!previewState.isCapped) {
+    return content;
+  }
+
+  return {
+    ...content,
+    content: content.content.split('\n').slice(0, previewState.maxLines).join('\n'),
+  };
+}
+
 export function DocumentViewer({ issueId, documentRef, documentPath, searchQuery, onClose }: DocumentViewerProps) {
   const [content, setContent] = useState<DocumentContent | null>(null);
   const [selectedCommit, setSelectedCommit] = useState<string | undefined>(
@@ -24,6 +62,7 @@ export function DocumentViewer({ issueId, documentRef, documentPath, searchQuery
   const [showHistory, setShowHistory] = useState(false);
   // Owned here so the ESC hint in the header stays in sync with renderer state.
   const [highlightsActive, setHighlightsActive] = useState(true);
+  const [viewMode, setViewMode] = useState<'raw' | 'rich'>('rich');
 
   const loadContent = useCallback(async (path: string, commit?: string) => {
     try {
@@ -59,6 +98,10 @@ export function DocumentViewer({ issueId, documentRef, documentPath, searchQuery
     setHighlightsActive(true);
   }, [searchQuery]);
 
+  useEffect(() => {
+    setViewMode('rich');
+  }, [content?.path, documentRef?.path, documentPath]);
+
   if (loading) {
     return (
       <div className="document-viewer">
@@ -91,8 +134,18 @@ export function DocumentViewer({ issueId, documentRef, documentPath, searchQuery
   }
 
   const activeRenderer = pickRenderer(content, documentRef);
+  const supportsRawToggle = activeRenderer.capabilities.supportsRawToggle;
+  const supportsSearchHighlight = activeRenderer.capabilities.supportsSearchHighlight;
+  const previewState = getPreviewState(content, activeRenderer.capabilities.supportsPreviewCap);
+  const rendererContent = viewMode === 'raw'
+    ? content
+    : buildRichViewContent(content, previewState);
   const Renderer = activeRenderer.Component;
   const showHistoryControls = activeRenderer.capabilities.showsHistory;
+  const showSearchHint = Boolean(searchQuery)
+    && supportsSearchHighlight
+    && viewMode === 'rich'
+    && highlightsActive;
 
   return (
     <div className="document-viewer">
@@ -103,7 +156,7 @@ export function DocumentViewer({ issueId, documentRef, documentPath, searchQuery
           {searchQuery && (
             <span style={{ marginLeft: '1rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
               Searching: "{searchQuery}"
-              {highlightsActive && (
+              {showSearchHint && (
                 <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', opacity: 0.7 }}>
                   (ESC to clear)
                 </span>
@@ -112,6 +165,15 @@ export function DocumentViewer({ issueId, documentRef, documentPath, searchQuery
           )}
         </div>
         <div className="document-actions">
+          {supportsRawToggle && (
+            <button
+              className="history-btn"
+              onClick={() => setViewMode((current) => current === 'rich' ? 'raw' : 'rich')}
+              title={viewMode === 'rich' ? 'Switch to raw view' : 'Switch to rich view'}
+            >
+              {viewMode === 'rich' ? 'Raw view' : 'Rich view'}
+            </button>
+          )}
           {showHistoryControls && issueId && documentRef && (
             <button
               className="history-btn"
@@ -129,6 +191,20 @@ export function DocumentViewer({ issueId, documentRef, documentPath, searchQuery
         </div>
       </div>
 
+      {previewState.isCapped && viewMode === 'rich' && (
+        <div
+          data-testid="preview-cap-notice"
+          style={{
+            padding: '0.75rem 1rem',
+            borderBottom: '1px solid var(--border-color)',
+            color: 'var(--text-muted)',
+            fontSize: '0.875rem',
+          }}
+        >
+          Preview capped at {previewState.maxLines} lines ({previewState.totalLines} total). Switch to raw view for the full document.
+        </div>
+      )}
+
       {showHistoryControls && showHistory && issueId && documentRef && (
         <div className="document-history-panel">
           <DocumentHistory
@@ -144,14 +220,31 @@ export function DocumentViewer({ issueId, documentRef, documentPath, searchQuery
       )}
 
       <div className="document-content markdown-content" style={{ position: 'relative' }}>
-        <Renderer
-          content={content}
-          issueId={issueId}
-          documentRef={documentRef}
-          searchTerm={searchQuery}
-          highlightsActive={highlightsActive}
-          onHighlightsCleared={() => setHighlightsActive(false)}
-        />
+        {viewMode === 'raw' && supportsRawToggle ? (
+          <pre
+            data-testid="raw-document-view"
+            style={{
+              margin: 0,
+              padding: '1rem',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+              fontFamily: 'var(--font-mono)',
+              fontSize: '13px',
+              lineHeight: 1.5,
+            }}
+          >
+            {content.content}
+          </pre>
+        ) : (
+          <Renderer
+            content={rendererContent}
+            issueId={issueId}
+            documentRef={documentRef}
+            searchTerm={supportsSearchHighlight ? searchQuery : undefined}
+            highlightsActive={supportsSearchHighlight ? highlightsActive : false}
+            onHighlightsCleared={() => setHighlightsActive(false)}
+          />
+        )}
       </div>
 
       <div className="document-footer">
