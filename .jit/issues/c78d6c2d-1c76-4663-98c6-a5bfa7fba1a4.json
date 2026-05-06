@@ -1,0 +1,24 @@
+{
+  "id": "c78d6c2d-1c76-4663-98c6-a5bfa7fba1a4",
+  "title": "Create issue structure and design doc for modular document rendering",
+  "description": "Set up the tracked work for modular document rendering in the Web UI. This task creates the design document, child issue breakdown, gate assignments, and dependency wiring so implementation can proceed in a clear and reviewable order.\n\n## Background\n\nThe feature slice adds modular rendering for CSV, plain-text, Rust, and C++ documents attached to issues. Before implementation starts, the work needs a dedicated story, a design document in `dev/active/`, and child tasks with explicit success criteria and reasonable gates.\n\n## Success Criteria\n\n- [ ] A dedicated child story exists under `6d0128ae` for modular document rendering and describes the agreed product behavior for CSV, TXT, Rust, and C++ documents.\n- [ ] A design document exists in `dev/active/` and is linked to the child story.\n- [ ] Child tasks exist with standalone markdown descriptions and explicit `## Success Criteria` sections for renderer-contract work, CSV rendering, text/code rendering, viewer-shell integration, server MIME work, and regression coverage.\n- [ ] DAG wiring expresses containment and sequencing for the planned work, with the setup/design task blocking the implementation tasks that depend on it.\n- [ ] Gate assignments are applied consistently, always including `code-review`, with `npm-ci` on web implementation tasks and `cargo-ci` on the server MIME task.\n- [ ] `jit validate` succeeds after the structure is created.\n\n## Notes\n\nThis task is coordination-only. It should not expand the implementation scope beyond the approved plan.",
+  "state": "in_progress",
+  "priority": "high",
+  "assignee": "agent:claude",
+  "dependencies": [],
+  "gates_required": [
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:usability",
+    "milestone:v1.0",
+    "component:web",
+    "story:modular-document-rendering"
+  ],
+  "created_at": "2026-05-06T13:08:56.649035286+00:00",
+  "updated_at": "2026-05-06T13:09:08.513516630+00:00"
+}

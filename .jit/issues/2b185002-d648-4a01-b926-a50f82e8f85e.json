@@ -1,0 +1,28 @@
+{
+  "id": "2b185002-d648-4a01-b926-a50f82e8f85e",
+  "title": "Implement CSV renderer for issue-linked benchmark data",
+  "description": "Add a dedicated CSV renderer for issue-linked benchmark and scorecard artifacts in the Web UI.\n\n## Background\n\nThe agreed v1 behavior for `.csv` documents is a sortable table with a sticky header, inline rich/raw switching, search highlighting, and capped rich preview behavior for large files. The referenced `../gf2` issues include benchmark CSVs that are easier to inspect in tabular form than as raw text.\n\n## Success Criteria\n\n- [ ] `.csv` documents render in a dedicated rich view that shows parsed rows and columns instead of raw text by default.\n- [ ] The rich CSV view supports sortable columns and a sticky header.\n- [ ] The CSV renderer supports inline switching between rich and raw views.\n- [ ] Search queries highlight matching CSV cells in the rich view.\n- [ ] Large CSV files cap the rich preview and keep the full content available through the raw view.\n- [ ] Renderer-specific tests cover CSV parsing, table rendering, sorting, search highlighting, and capped-preview behavior.\n\n## Notes\n\nUse a small CSV parsing dependency for v1 rather than a narrow custom parser.",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "d2fe467c-fa62-4797-9032-874f2ab3c52c"
+  ],
+  "gates_required": [
+    "tdd-reminder",
+    "npm-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:usability",
+    "milestone:v1.0",
+    "component:web",
+    "story:modular-document-rendering"
+  ],
+  "created_at": "2026-05-06T13:10:52.363534142+00:00",
+  "updated_at": "2026-05-06T13:11:24.117757177+00:00"
+}
