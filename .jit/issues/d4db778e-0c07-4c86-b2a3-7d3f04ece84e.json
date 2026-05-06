@@ -2,7 +2,7 @@
   "id": "d4db778e-0c07-4c86-b2a3-7d3f04ece84e",
   "title": "Add regression coverage for Markdown, HTML, and unknown text fallback",
   "description": "Add regression coverage proving the new modular renderers do not break existing document-viewer behavior.\n\n## Background\n\nThis feature expands the renderer surface area, so the final task should lock down behavior that already works: Markdown rendering, HTML rendering, and graceful fallback for text-like formats that do not get a specialized renderer.\n\n## Success Criteria\n\n- [ ] Tests prove Markdown rendering still supports the current heading, code-block, Mermaid, search-highlighting, and history behavior.\n- [ ] Tests prove HTML rendering still routes through the iframe-based renderer with the current history suppression behavior.\n- [ ] Tests prove unknown text-like formats still degrade gracefully instead of crashing or being misrouted.\n- [ ] The final web-side test suite covering the new renderer matrix runs cleanly under the configured CI gate.\n\n## Notes\n\nThis task lands after the renderer and viewer-shell changes so it can validate the final integrated behavior.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "high",
   "assignee": "agent:claude",
   "dependencies": [
@@ -21,6 +21,16 @@
       "status": "passed",
       "updated_by": null,
       "updated_at": "2026-05-06T14:54:39.932151983Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-05-06T15:12:10.052538435Z"
+    },
+    "npm-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-05-06T15:11:56.702903296Z"
     }
   },
   "context": {},
@@ -33,5 +43,5 @@
     "story:modular-document-rendering"
   ],
   "created_at": "2026-05-06T13:10:52.369189924+00:00",
-  "updated_at": "2026-05-06T14:54:39.947615728+00:00"
+  "updated_at": "2026-05-06T15:17:51.951300223+00:00"
 }

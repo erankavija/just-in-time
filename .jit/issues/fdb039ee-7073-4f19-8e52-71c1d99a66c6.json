@@ -2,7 +2,7 @@
   "id": "fdb039ee-7073-4f19-8e52-71c1d99a66c6",
   "title": "Modular document rendering for CSV and source files in Web UI",
   "description": "Improve the Web UI document viewer so issue-linked CSV and source-oriented artifacts render in a richer, format-aware way. The implementation must stay modular so future formats can be added by registering a renderer instead of adding format-specific branching to the viewer shell.\n\n## Background\n\nThe current Web UI document pipeline supports HTML and Markdown rendering, but the `../gf2` issues used for real-world review also attach `.csv`, `.txt`, `.rs`, and `.cpp` documents. Those files currently fall back to generic text handling even when the data would be easier to inspect through format-aware rendering.\n\nThe agreed v1 behavior is:\n- `.csv`: sortable table, sticky header, inline rich/raw toggle, search highlighting, capped rich preview for large files\n- `.rs` / `.cpp`: syntax highlighting, line numbers, inline rich/raw toggle, search highlighting, capped rich preview for large files\n- `.txt`: plain-text mode with wrapping controls, line numbers, inline rich/raw toggle, search highlighting, capped rich preview for large files\n\n## Success Criteria\n\n- [ ] Issue-linked `.csv` documents render through a dedicated modular renderer with sortable columns, a sticky header, inline rich/raw switching, search highlighting, and capped rich preview behavior for large files.\n- [ ] Issue-linked `.txt`, `.rs`, and `.cpp` documents render through modular text/code presentation with the agreed per-format behavior and inline raw fallback.\n- [ ] Renderer dispatch remains data-driven through registry metadata and path/content matching rather than hardcoded per-format branching in `DocumentViewer`.\n- [ ] Existing Markdown and HTML document rendering behavior remains intact, and unknown text-like formats still degrade gracefully.\n- [ ] The work is broken into child issues with explicit success criteria and gates so implementation can proceed in an auditable order.\n\n## Notes\n\nThis work is tracked under `6d0128ae` as a focused usability slice for issue-linked documents in the Web UI. The design and task breakdown are created as part of the first child task.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "high",
   "assignee": null,
   "dependencies": [
@@ -30,5 +30,5 @@
     "story:modular-document-rendering"
   ],
   "created_at": "2026-05-06T13:08:56.649016226+00:00",
-  "updated_at": "2026-05-06T13:12:43.341332673+00:00"
+  "updated_at": "2026-05-06T15:17:52.042156789+00:00"
 }
