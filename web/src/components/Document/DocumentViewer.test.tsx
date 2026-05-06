@@ -327,8 +327,8 @@ describe('DocumentViewer — viewer-shell capabilities for text-like renderers',
     );
 
     await waitFor(() => {
-      const marks = document.querySelectorAll('mark');
-      expect(marks.length).toBeGreaterThan(0);
+      const highlightedLines = document.querySelectorAll('[data-highlighted="true"]');
+      expect(highlightedLines.length).toBeGreaterThan(0);
     });
   });
 
