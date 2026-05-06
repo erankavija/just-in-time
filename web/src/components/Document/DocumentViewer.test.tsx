@@ -113,6 +113,49 @@ describe('DocumentViewer — renderer dispatch smoke test (fixture-backed)', () 
       expect(screen.getByText(/Commit:/)).toBeDefined();
     });
   });
+
+  it('propagates search highlighting to markdown renderers', async () => {
+    const searchableMarkdown = [
+      '# Project Overview',
+      '',
+      'The important keyword appears in markdown text.',
+    ].join('\n');
+
+    mockGetDocumentContent.mockResolvedValue(makeContent(searchableMarkdown));
+    mockGetDocumentByPath.mockResolvedValue(makeContent(searchableMarkdown));
+
+    render(
+      <DocumentViewer
+        documentPath="README.md"
+        issueId="markdown-search-issue"
+        searchQuery="important"
+      />,
+    );
+
+    await waitFor(() => {
+      const marks = document.querySelectorAll('mark');
+      expect(marks.length).toBeGreaterThan(0);
+    });
+  });
+
+  it('shows history controls for markdown documents when a document reference is provided', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <DocumentViewer
+        documentPath="README.md"
+        issueId="markdown-history-issue"
+        documentRef={{ path: 'README.md', label: 'Project Overview' }}
+      />,
+    );
+
+    const historyButton = await screen.findByRole('button', { name: /History/i });
+    await user.click(historyButton);
+
+    await waitFor(() => {
+      expect(screen.getByText('No history available')).toBeDefined();
+    });
+  });
 });
 
 // A minimal reveal.js-style HTML fixture (stripped to the structural essentials).
