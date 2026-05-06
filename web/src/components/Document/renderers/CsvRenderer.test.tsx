@@ -33,7 +33,7 @@ describe('CsvRenderer', () => {
 
     render(<CsvRenderer content={content} />);
 
-    expect(screen.getByRole('table')).toHaveStyle({ fontSize: '1rem' });
+    expect(screen.getByRole('table')).toHaveStyle({ fontSize: '13px' });
     expect(screen.getByText('prime')).toBeDefined();
     expect(screen.getByText('1024')).toBeDefined();
     expect(screen.getByText('F')).toBeDefined();

@@ -1,2 +1,2 @@
-export const DEFAULT_DOCUMENT_FONT_SIZE = '1rem';
+export const DEFAULT_DOCUMENT_FONT_SIZE = '13px';
 export const DEFAULT_PREVIEW_MAX_ITEMS = 1000;

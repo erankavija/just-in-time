@@ -1,8 +1,8 @@
-import { useEffect, useState, useCallback } from 'react';
+import { memo, useEffect, useState, useCallback } from 'react';
 import { apiClient } from '../../api/client';
 import type { DocumentReference, DocumentContent, DocumentHistory } from '../../types/models';
 import type { DocumentPreviewState } from './renderers/index';
-import { DEFAULT_PREVIEW_MAX_ITEMS } from './renderers/constants';
+import { DEFAULT_DOCUMENT_FONT_SIZE, DEFAULT_PREVIEW_MAX_ITEMS } from './renderers/constants';
 import { pickRenderer } from './renderers/index';
 import './Document.css';
 
@@ -56,7 +56,26 @@ function buildRichViewContent(
   };
 }
 
-export function DocumentViewer({ issueId, documentRef, documentPath, searchQuery, onClose }: DocumentViewerProps) {
+function areDocumentRefsEqual(
+  left?: DocumentReference,
+  right?: DocumentReference,
+): boolean {
+  return left?.path === right?.path
+    && left?.commit === right?.commit
+    && left?.label === right?.label;
+}
+
+function areDocumentViewerPropsEqual(
+  previous: Readonly<DocumentViewerProps>,
+  next: Readonly<DocumentViewerProps>,
+): boolean {
+  return previous.issueId === next.issueId
+    && previous.documentPath === next.documentPath
+    && previous.searchQuery === next.searchQuery
+    && areDocumentRefsEqual(previous.documentRef, next.documentRef);
+}
+
+function DocumentViewerInner({ issueId, documentRef, documentPath, searchQuery, onClose }: DocumentViewerProps) {
   const [content, setContent] = useState<DocumentContent | null>(null);
   const [selectedCommit, setSelectedCommit] = useState<string | undefined>(
     documentRef?.commit || undefined
@@ -235,7 +254,7 @@ export function DocumentViewer({ issueId, documentRef, documentPath, searchQuery
               whiteSpace: 'pre-wrap',
               wordBreak: 'break-word',
               fontFamily: 'var(--font-mono)',
-              fontSize: '13px',
+              fontSize: DEFAULT_DOCUMENT_FONT_SIZE,
               lineHeight: 1.5,
             }}
           >
@@ -267,6 +286,9 @@ export function DocumentViewer({ issueId, documentRef, documentPath, searchQuery
     </div>
   );
 }
+
+export const DocumentViewer = memo(DocumentViewerInner, areDocumentViewerPropsEqual);
+DocumentViewer.displayName = 'DocumentViewer';
 
 // DocumentHistory component - will be in separate file
 interface DocumentHistoryProps {

@@ -45,7 +45,7 @@ describe('TextCodeRenderer', () => {
 
     expect(screen.getByTestId('source-code-scroll-region')).toHaveStyle({
       overflowX: 'auto',
-      fontSize: '1rem',
+      fontSize: '13px',
     });
   });
 
@@ -58,7 +58,7 @@ describe('TextCodeRenderer', () => {
     expect(screen.getByRole('button', { name: 'Wrap off' })).toBeDefined();
     expect(screen.getByTestId('plain-text-line-content')).toHaveStyle({
       whiteSpace: 'pre-wrap',
-      fontSize: '1rem',
+      fontSize: '13px',
     });
 
     await user.click(screen.getByRole('button', { name: 'Wrap off' }));
