@@ -2202,3 +2202,7 @@
 {"type":"gate_passed","id":"bf83bfa0-9b20-4bf1-bf0a-0e4b8e537e89","issue_id":"b2beca29-7bb9-4be6-a942-d6569d363a91","timestamp":"2026-05-06T13:46:04.791995583Z","gate_key":"tdd-reminder","updated_by":null}
 {"type":"issue_state_changed","id":"2e48c5b3-e5ba-4492-a883-825fa97a348a","issue_id":"b2beca29-7bb9-4be6-a942-d6569d363a91","timestamp":"2026-05-06T13:46:04.806913457Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"64e2f582-d90e-428a-8622-44b7bae33c77","issue_id":"b2beca29-7bb9-4be6-a942-d6569d363a91","timestamp":"2026-05-06T13:46:04.807127707Z","assignee":"agent:claude"}
+{"type":"gate_passed","id":"16a5a1ab-4bf1-45fa-b90f-ee0dead06c55","issue_id":"b2beca29-7bb9-4be6-a942-d6569d363a91","timestamp":"2026-05-06T13:49:50.347853035Z","gate_key":"npm-ci","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"438bc679-8688-4d4e-88d8-9241686cafae","issue_id":"b2beca29-7bb9-4be6-a942-d6569d363a91","timestamp":"2026-05-06T13:53:43.737191488Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"issue_state_changed","id":"4b907082-592f-4610-a875-73892c28db80","issue_id":"b2beca29-7bb9-4be6-a942-d6569d363a91","timestamp":"2026-05-06T13:53:43.752677712Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"264e05e3-60ce-4a70-94c0-74292bb23656","issue_id":"b2beca29-7bb9-4be6-a942-d6569d363a91","timestamp":"2026-05-06T13:53:43.752706122Z"}
