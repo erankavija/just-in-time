@@ -1,20 +1,12 @@
 import { useEffect, useMemo, useState, type FC, type ReactNode } from 'react';
-import Papa from 'papaparse';
 import type { DocumentRendererProps } from './index';
+import { parseCsv } from './CsvRenderer.helpers';
 
 type SortDirection = 'asc' | 'desc';
 
 interface SortState {
   columnIndex: number;
   direction: SortDirection;
-}
-
-function parseCsv(content: string): string[][] {
-  const parsed = Papa.parse<string[]>(content, {
-    skipEmptyLines: false,
-  });
-
-  return parsed.data.map((row) => row.map((cell) => cell ?? ''));
 }
 
 function escapeRegex(value: string): string {

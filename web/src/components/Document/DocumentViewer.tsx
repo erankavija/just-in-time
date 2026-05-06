@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { apiClient } from '../../api/client';
 import type { DocumentReference, DocumentContent, DocumentHistory } from '../../types/models';
+import type { DocumentPreviewState } from './renderers/index';
 import { pickRenderer } from './renderers/index';
 import './Document.css';
 
@@ -18,8 +19,9 @@ const RICH_PREVIEW_MAX_LINES = 200;
 
 interface PreviewState {
   isCapped: boolean;
-  maxLines: number;
-  totalLines: number;
+  kind: 'lines' | 'rows';
+  maxItems: number;
+  totalItems: number;
 }
 
 function getPreviewState(
@@ -27,14 +29,15 @@ function getPreviewState(
   supportsPreviewCap: boolean,
 ): PreviewState {
   if (!supportsPreviewCap) {
-    return { isCapped: false, maxLines: RICH_PREVIEW_MAX_LINES, totalLines: 0 };
+    return { isCapped: false, kind: 'lines', maxItems: RICH_PREVIEW_MAX_LINES, totalItems: 0 };
   }
 
   const totalLines = content.content.split('\n').length;
   return {
     isCapped: totalLines > RICH_PREVIEW_MAX_LINES,
-    maxLines: RICH_PREVIEW_MAX_LINES,
-    totalLines,
+    kind: 'lines',
+    maxItems: RICH_PREVIEW_MAX_LINES,
+    totalItems: totalLines,
   };
 }
 
@@ -48,7 +51,7 @@ function buildRichViewContent(
 
   return {
     ...content,
-    content: content.content.split('\n').slice(0, previewState.maxLines).join('\n'),
+    content: content.content.split('\n').slice(0, previewState.maxItems).join('\n'),
   };
 }
 
@@ -136,10 +139,12 @@ export function DocumentViewer({ issueId, documentRef, documentPath, searchQuery
   const activeRenderer = pickRenderer(content, documentRef);
   const supportsRawToggle = activeRenderer.capabilities.supportsRawToggle;
   const supportsSearchHighlight = activeRenderer.capabilities.supportsSearchHighlight;
-  const previewState = getPreviewState(content, activeRenderer.capabilities.supportsPreviewCap);
+  const previewState: DocumentPreviewState = activeRenderer.getPreviewState?.(content)
+    ?? getPreviewState(content, activeRenderer.capabilities.supportsPreviewCap);
   const rendererContent = viewMode === 'raw'
     ? content
-    : buildRichViewContent(content, previewState);
+    : activeRenderer.prepareRichContent?.(content, previewState)
+      ?? buildRichViewContent(content, previewState);
   const Renderer = activeRenderer.Component;
   const showHistoryControls = activeRenderer.capabilities.showsHistory;
   const showSearchHint = Boolean(searchQuery)
@@ -201,7 +206,7 @@ export function DocumentViewer({ issueId, documentRef, documentPath, searchQuery
             fontSize: '0.875rem',
           }}
         >
-          Preview capped at {previewState.maxLines} lines ({previewState.totalLines} total). Switch to raw view for the full document.
+          Preview capped at {previewState.maxItems} {previewState.kind} ({previewState.totalItems} total). Switch to raw view for the full document.
         </div>
       )}
 
@@ -240,6 +245,7 @@ export function DocumentViewer({ issueId, documentRef, documentPath, searchQuery
             content={rendererContent}
             issueId={issueId}
             documentRef={documentRef}
+            previewState={previewState}
             searchTerm={supportsSearchHighlight ? searchQuery : undefined}
             highlightsActive={supportsSearchHighlight ? highlightsActive : false}
             onHighlightsCleared={() => setHighlightsActive(false)}

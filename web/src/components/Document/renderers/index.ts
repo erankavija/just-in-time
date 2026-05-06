@@ -1,6 +1,10 @@
 import type React from 'react';
 import type { DocumentContent, DocumentReference } from '../../../types/models';
 import CsvRenderer from './CsvRenderer';
+import {
+  buildCsvPreviewContent,
+  buildCsvPreviewState,
+} from './CsvRenderer.helpers';
 import HtmlRenderer from './HtmlRenderer';
 import MarkdownRenderer from './MarkdownRenderer';
 import TextCodeRenderer from './TextCodeRenderer';
@@ -10,10 +14,18 @@ export interface DocumentRendererProps {
   issueId?: string;
   documentRef?: DocumentReference;
   searchTerm?: string;
+  previewState?: DocumentPreviewState;
   /** Whether search highlights are currently active. Passed from DocumentViewer. */
   highlightsActive?: boolean;
   /** Called by the renderer when the user clears highlights (e.g. via ESC). */
   onHighlightsCleared?: () => void;
+}
+
+export interface DocumentPreviewState {
+  isCapped: boolean;
+  kind: 'lines' | 'rows';
+  maxItems: number;
+  totalItems: number;
 }
 
 export interface DocumentRendererCapabilities {
@@ -28,6 +40,11 @@ export interface DocumentRenderer {
   match: (content: DocumentContent, ref?: DocumentReference) => boolean;
   Component: React.FC<DocumentRendererProps>;
   capabilities: DocumentRendererCapabilities;
+  getPreviewState?: (content: DocumentContent) => DocumentPreviewState;
+  prepareRichContent?: (
+    content: DocumentContent,
+    previewState: DocumentPreviewState,
+  ) => DocumentContent;
 }
 
 function resolvePath(content: DocumentContent, ref?: DocumentReference): string {
@@ -65,6 +82,8 @@ export const rendererRegistry: DocumentRenderer[] = [
       supportsRawToggle: true,
       supportsSearchHighlight: true,
     },
+    getPreviewState: buildCsvPreviewState,
+    prepareRichContent: buildCsvPreviewContent,
   },
   {
     id: 'text-code',

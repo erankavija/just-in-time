@@ -280,8 +280,31 @@ describe('DocumentViewer — viewer-shell capabilities for text-like renderers',
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('preview-cap-notice')).toHaveTextContent('Preview capped at 200 lines');
+      expect(screen.getByTestId('preview-cap-notice')).toHaveTextContent('Preview capped at 200 rows');
     });
+  });
+
+  it('keeps the full CSV content available through the raw view when rich preview is capped', async () => {
+    const user = userEvent.setup();
+    const largeCsv = [
+      'col_a,col_b',
+      ...Array.from({ length: 220 }, (_, idx) => `row-${idx},value-${idx}`),
+    ].join('\n');
+
+    mockGetDocumentContent.mockResolvedValue(makeContent(largeCsv, 'text/plain', 'large.csv'));
+    mockGetDocumentByPath.mockResolvedValue(makeContent(largeCsv, 'text/plain', 'large.csv'));
+
+    render(
+      <DocumentViewer
+        documentPath="large.csv"
+        issueId="csv-issue"
+        documentRef={{ path: 'large.csv', label: 'Large CSV' }}
+      />,
+    );
+
+    await user.click(await screen.findByRole('button', { name: 'Raw view' }));
+
+    expect(screen.getByTestId('raw-document-view')).toHaveTextContent('row-219,value-219');
   });
 
   it('propagates search highlighting to text-code renderers selected by extension', async () => {
