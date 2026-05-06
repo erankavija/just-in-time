@@ -2247,3 +2247,6 @@
 {"type":"issue_state_changed","id":"6afde4f9-763a-48b3-a340-4eeca988218c","issue_id":"fdb039ee-7073-4f19-8e52-71c1d99a66c6","timestamp":"2026-05-06T15:27:27.795574303Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"67f4d8ff-5156-4447-9fa6-4cba0d54867d","issue_id":"fdb039ee-7073-4f19-8e52-71c1d99a66c6","timestamp":"2026-05-06T15:27:27.795602853Z"}
 {"type":"issue_state_changed","id":"a3b53ff0-b788-41d3-8cb1-f6ad9cfbf342","issue_id":"6d0128ae-38cf-48a6-9dbb-5fd962aef470","timestamp":"2026-05-06T15:27:27.844464747Z","from":"backlog","to":"ready"}
+{"type":"issue_created","id":"b0de3ef0-2d4b-4055-b4c9-56c1996b5353","issue_id":"3323ceb5-c5c6-4c10-a322-bbb8b979b96c","timestamp":"2026-05-06T15:54:56.480986526Z","title":"Polish modular document viewer typography and source scrolling","priority":"high"}
+{"type":"issue_state_changed","id":"434cb12d-a4a9-45ad-aca9-03ce3680d37f","issue_id":"6d0128ae-38cf-48a6-9dbb-5fd962aef470","timestamp":"2026-05-06T15:55:11.801064699Z","from":"ready","to":"backlog"}
+{"type":"gate_passed","id":"152c2c7d-6b78-43e5-8936-ece933861138","issue_id":"3323ceb5-c5c6-4c10-a322-bbb8b979b96c","timestamp":"2026-05-06T15:55:11.808592961Z","gate_key":"tdd-reminder","updated_by":null}
