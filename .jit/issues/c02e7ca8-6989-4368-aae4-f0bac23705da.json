@@ -1,0 +1,32 @@
+{
+  "id": "c02e7ca8-6989-4368-aae4-f0bac23705da",
+  "title": "Prevent document viewer SSE rerenders and restore viewer font sizing",
+  "description": "Fix follow-up regressions in the Web UI document viewer.\n\n## Background\n\nAfter the modular renderer rollout, two more issues remain:\n- The source-code viewer scrolls jerkily because the file viewer re-renders during unrelated live issue refreshes.\n- CSV, TXT, and rich source viewers no longer match the original markdown viewer's code-view font sizing.\n\n## Success Criteria\n\n- [ ] The document viewer does not re-render its loaded document content during unrelated parent live-refresh updates when its own effective props have not changed.\n- [ ] CSV, TXT, and rich source renderers use the same default content font size as the original markdown code-view baseline.\n- [ ] Existing renderer/viewer tests cover the stabilized behavior and the configured web CI gate passes cleanly.\n\n## Notes\n\nThis is a focused follow-up to the modular document rendering slice and the immediate viewer polish fix.",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "tdd-reminder",
+    "npm-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-05-06T16:10:19.471182916Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:usability",
+    "milestone:v1.0",
+    "component:web",
+    "story:modular-document-rendering"
+  ],
+  "created_at": "2026-05-06T16:10:12.055810214+00:00",
+  "updated_at": "2026-05-06T16:10:19.471183686+00:00"
+}

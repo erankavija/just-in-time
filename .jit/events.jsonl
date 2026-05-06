@@ -2257,3 +2257,6 @@
 {"type":"issue_state_changed","id":"d2a44223-884f-4c75-a47c-26a8201ec0f5","issue_id":"3323ceb5-c5c6-4c10-a322-bbb8b979b96c","timestamp":"2026-05-06T16:05:01.903159159Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"19281fd8-ffa2-4f87-b030-7b9a785c5a4b","issue_id":"3323ceb5-c5c6-4c10-a322-bbb8b979b96c","timestamp":"2026-05-06T16:05:01.903188189Z"}
 {"type":"issue_state_changed","id":"90e0e37f-af3c-4cca-9c86-980b29610d1b","issue_id":"6d0128ae-38cf-48a6-9dbb-5fd962aef470","timestamp":"2026-05-06T16:05:01.953107753Z","from":"backlog","to":"ready"}
+{"type":"issue_created","id":"35b67974-3b1a-4942-8132-b5da121b1da6","issue_id":"c02e7ca8-6989-4368-aae4-f0bac23705da","timestamp":"2026-05-06T16:10:12.056635534Z","title":"Prevent document viewer SSE rerenders and restore viewer font sizing","priority":"high"}
+{"type":"issue_state_changed","id":"d908aa9a-08e3-48e4-b1f5-e50fbf9f82ac","issue_id":"6d0128ae-38cf-48a6-9dbb-5fd962aef470","timestamp":"2026-05-06T16:10:19.464381584Z","from":"ready","to":"backlog"}
+{"type":"gate_passed","id":"681910c4-60d4-4dab-822a-c45d30ebf42c","issue_id":"c02e7ca8-6989-4368-aae4-f0bac23705da","timestamp":"2026-05-06T16:10:19.471355756Z","gate_key":"tdd-reminder","updated_by":null}
