@@ -43,8 +43,14 @@ describe('TextCodeRenderer', () => {
 
     render(<TextCodeRenderer content={content} documentRef={{ path: 'src/lib.rs' }} />);
 
-    expect(screen.getByTestId('source-code-scroll-region')).toHaveStyle({
+    const scrollRegion = screen.getByTestId('source-code-scroll-region');
+    const codeElement = scrollRegion.querySelector('code');
+
+    expect(scrollRegion).toHaveStyle({
       overflowX: 'auto',
+      fontSize: '13px',
+    });
+    expect(codeElement).toHaveStyle({
       fontSize: '13px',
     });
   });

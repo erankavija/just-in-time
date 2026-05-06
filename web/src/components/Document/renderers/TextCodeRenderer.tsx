@@ -182,13 +182,19 @@ const TextCodeRenderer: FC<DocumentRendererProps> = ({
             style={vscDarkPlus}
             showLineNumbers={true}
             wrapLines={true}
+            codeTagProps={{
+              style: {
+                fontSize: DEFAULT_DOCUMENT_FONT_SIZE,
+                fontFamily: 'var(--font-mono)',
+              },
+            }}
             lineNumberStyle={{
               minWidth: '3.5rem',
               paddingRight: '0.75rem',
               textAlign: 'right',
               color: 'var(--text-muted)',
               userSelect: 'none',
-              fontSize: '0.875rem',
+              fontSize: '12px',
             }}
             lineProps={(lineNumber) => {
               const lineText = lines[lineNumber - 1]?.text ?? '';
@@ -206,7 +212,7 @@ const TextCodeRenderer: FC<DocumentRendererProps> = ({
               margin: 0,
               padding: 0,
               background: 'transparent',
-              fontSize: 'inherit',
+              fontSize: DEFAULT_DOCUMENT_FONT_SIZE,
               lineHeight: 1.5,
               minWidth: 'max-content',
             }}
