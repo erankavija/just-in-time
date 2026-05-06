@@ -2,9 +2,9 @@
   "id": "984cb1fa-85af-474a-b64c-d21e3ec6cd0c",
   "title": "Add low-risk CSV content-type inference on the server",
   "description": "Add low-risk server-side MIME inference for CSV so issue-linked CSV documents advertise a more specific content type.\n\n## Background\n\nThe Web UI renderer selection should remain robust even when the server returns generic text-like content types, but `.csv` is a low-risk case where better MIME inference improves debuggability and keeps the server contract more expressive.\n\n## Success Criteria\n\n- [ ] `infer_content_type()` returns `text/csv` for `.csv` paths and existing recognized extensions keep their current mappings.\n- [ ] Issue-scoped and path-only document-content endpoints expose `text/csv` for CSV documents.\n- [ ] Focused server tests cover the new CSV mapping without widening the scope to unrelated MIME work.\n- [ ] The Web UI feature does not depend on adding source-code MIME mappings beyond what is proven necessary.\n\n## Notes\n\nKeep this task intentionally narrow; source-code path matching in the client remains the main dispatch mechanism for `.rs` and `.cpp`.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [
     "c78d6c2d-1c76-4663-98c6-a5bfa7fba1a4"
   ],
@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-05-06T14:16:28.354905368Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -25,5 +31,5 @@
     "story:modular-document-rendering"
   ],
   "created_at": "2026-05-06T13:10:52.368216684+00:00",
-  "updated_at": "2026-05-06T13:32:12.612033644+00:00"
+  "updated_at": "2026-05-06T14:16:28.370184402+00:00"
 }
