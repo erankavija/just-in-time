@@ -2225,3 +2225,8 @@
 {"type":"gate_passed","id":"8e66c82a-a11d-4fe7-8fc4-90f878a25187","issue_id":"99368918-6915-4e6d-930a-eb853507c8fb","timestamp":"2026-05-06T14:40:02.056704621Z","gate_key":"tdd-reminder","updated_by":null}
 {"type":"issue_state_changed","id":"2817e31c-235d-401a-b46c-0821f3f239f7","issue_id":"99368918-6915-4e6d-930a-eb853507c8fb","timestamp":"2026-05-06T14:40:02.071287475Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"995cd327-a4d7-49fd-9f15-225f85bd8b58","issue_id":"99368918-6915-4e6d-930a-eb853507c8fb","timestamp":"2026-05-06T14:40:02.071545275Z","assignee":"agent:claude"}
+{"type":"gate_passed","id":"bfc76304-5b9a-4271-95c4-4aadee0bfb91","issue_id":"99368918-6915-4e6d-930a-eb853507c8fb","timestamp":"2026-05-06T14:44:45.787954677Z","gate_key":"npm-ci","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"5aec24d8-b2e5-4905-885a-93fcee872af6","issue_id":"99368918-6915-4e6d-930a-eb853507c8fb","timestamp":"2026-05-06T14:53:49.203955910Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"issue_state_changed","id":"2d3e8423-1a90-4c03-9f91-d21a89c8ab5b","issue_id":"99368918-6915-4e6d-930a-eb853507c8fb","timestamp":"2026-05-06T14:53:49.224016646Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"d5b9522e-c6fa-4dd1-8c48-609142072460","issue_id":"99368918-6915-4e6d-930a-eb853507c8fb","timestamp":"2026-05-06T14:53:49.224061136Z"}
+{"type":"issue_state_changed","id":"9d7f2d73-425e-4a6a-b3b4-edc99fc7706c","issue_id":"d4db778e-0c07-4c86-b2a3-7d3f04ece84e","timestamp":"2026-05-06T14:53:49.283666993Z","from":"backlog","to":"ready"}
