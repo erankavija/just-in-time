@@ -344,4 +344,28 @@ describe('DocumentViewer — viewer-shell capabilities for text-like renderers',
 
     expect(screen.queryByRole('button', { name: 'Raw view' })).toBeNull();
   });
+
+  it('falls back gracefully for unknown text-like paths', async () => {
+    const unknownText = [
+      'log line one',
+      'log line two',
+    ].join('\n');
+
+    mockGetDocumentContent.mockResolvedValue(makeContent(unknownText, 'text/plain', 'logs/run.log'));
+    mockGetDocumentByPath.mockResolvedValue(makeContent(unknownText, 'text/plain', 'logs/run.log'));
+
+    render(
+      <DocumentViewer
+        documentPath="logs/run.log"
+        issueId="unknown-text-issue"
+        documentRef={{ path: 'logs/run.log', label: 'Run log' }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(document.querySelector('.document-content')?.textContent).toContain('log line one');
+    });
+
+    expect(screen.queryByRole('button', { name: 'Raw view' })).toBeNull();
+  });
 });

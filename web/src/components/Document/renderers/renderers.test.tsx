@@ -54,6 +54,11 @@ describe('rendererRegistry / pickRenderer', () => {
     expect(result.id).toBe('text-code');
   });
 
+  it('falls back to markdown for unknown text-like extensions', () => {
+    const result = pickRenderer(makeContent('text/plain', '', 'logs/run.log'));
+    expect(result.id).toBe('markdown');
+  });
+
   it('uses documentRef.path for matching when it differs from content.path', () => {
     const result = pickRenderer(
       makeContent('text/plain', '', 'README.md'),
