@@ -2199,3 +2199,6 @@
 {"type":"issue_state_changed","id":"d5cbb7fb-85c5-4b4d-aed7-967a1e349978","issue_id":"2b185002-d648-4a01-b926-a50f82e8f85e","timestamp":"2026-05-06T13:45:16.727725501Z","from":"backlog","to":"ready"}
 {"type":"issue_state_changed","id":"e872f86c-801e-4dbe-9e2d-3777f5628667","issue_id":"99368918-6915-4e6d-930a-eb853507c8fb","timestamp":"2026-05-06T13:45:16.767054923Z","from":"backlog","to":"ready"}
 {"type":"issue_state_changed","id":"6c5ee8c6-aa67-4005-a0d0-9b0635f4222b","issue_id":"b2beca29-7bb9-4be6-a942-d6569d363a91","timestamp":"2026-05-06T13:45:16.782371637Z","from":"backlog","to":"ready"}
+{"type":"gate_passed","id":"bf83bfa0-9b20-4bf1-bf0a-0e4b8e537e89","issue_id":"b2beca29-7bb9-4be6-a942-d6569d363a91","timestamp":"2026-05-06T13:46:04.791995583Z","gate_key":"tdd-reminder","updated_by":null}
+{"type":"issue_state_changed","id":"2e48c5b3-e5ba-4492-a883-825fa97a348a","issue_id":"b2beca29-7bb9-4be6-a942-d6569d363a91","timestamp":"2026-05-06T13:46:04.806913457Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"64e2f582-d90e-428a-8622-44b7bae33c77","issue_id":"b2beca29-7bb9-4be6-a942-d6569d363a91","timestamp":"2026-05-06T13:46:04.807127707Z","assignee":"agent:claude"}

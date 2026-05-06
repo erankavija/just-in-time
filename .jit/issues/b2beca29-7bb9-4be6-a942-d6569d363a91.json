@@ -2,9 +2,9 @@
   "id": "b2beca29-7bb9-4be6-a942-d6569d363a91",
   "title": "Add viewer-shell support for rich/raw toggles, search highlighting, and preview caps",
   "description": "Add the shared `DocumentViewer` shell behavior needed by the new modular renderers without turning the viewer into a format-specific implementation layer.\n\n## Background\n\nThe new CSV and text/code renderers need some shared viewer behavior: inline rich/raw switching, consistent search-query propagation, and capped-preview UX for large files. That behavior should be driven by renderer capabilities so the viewer shell stays generic and existing Markdown and HTML renderers remain stable.\n\n## Success Criteria\n\n- [ ] `DocumentViewer` supports inline rich/raw toggling for renderers that advertise that capability.\n- [ ] Search queries propagate correctly to the new renderers without regressing existing Markdown behavior.\n- [ ] Preview-cap behavior is wired through the viewer shell in a renderer-agnostic way.\n- [ ] Existing HTML behavior remains intact, including the current history suppression and iframe-based rendering path.\n- [ ] Integration tests cover viewer-shell behavior across Markdown, HTML, CSV, and text/code renderers.\n\n## Notes\n\nThis task should focus on shared shell behavior rather than implementing CSV parsing or source rendering details directly in `DocumentViewer`.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [
     "d2fe467c-fa62-4797-9032-874f2ab3c52c"
   ],
@@ -13,7 +13,13 @@
     "npm-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-05-06T13:46:04.791785143Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -24,5 +30,5 @@
     "story:modular-document-rendering"
   ],
   "created_at": "2026-05-06T13:10:52.366213513+00:00",
-  "updated_at": "2026-05-06T13:45:16.782229027+00:00"
+  "updated_at": "2026-05-06T13:46:04.806974177+00:00"
 }
