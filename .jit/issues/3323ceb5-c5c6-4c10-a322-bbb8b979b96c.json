@@ -2,9 +2,9 @@
   "id": "3323ceb5-c5c6-4c10-a322-bbb8b979b96c",
   "title": "Polish modular document viewer typography and source scrolling",
   "description": "Address follow-up usability issues in the modular document-rendering slice.\n\n## Background\n\nThe first delivery added dedicated renderers for CSV and text/code content, but there are still a few presentation issues in the rich viewers:\n- CSV/text/code content uses a smaller default font than the original markdown viewer.\n- Rich source-code rendering creates a separate horizontally scrollable block per line, which looks fragmented and makes wide lines awkward to inspect.\n- Rich preview caps still default to 200 items instead of the requested 1000-item default.\n\n## Success Criteria\n\n- [ ] CSV and text/code rich viewers use the same default content font sizing as the original markdown viewer while preserving their existing formatting affordances.\n- [ ] Rich source-code rendering uses a single horizontally scrollable code block rather than per-line scroll regions, while preserving line numbers and line-level search highlighting.\n- [ ] Default rich preview caps increase from 200 to 1000 items for text-like previews, with renderer-specific notices remaining accurate.\n- [ ] Existing web-side renderer tests cover the new behavior and the configured web CI gate passes cleanly.\n\n## Notes\n\nThis is a focused follow-up to the completed modular document rendering story.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [],
   "gates_required": [
     "tdd-reminder",
@@ -28,5 +28,5 @@
     "story:modular-document-rendering"
   ],
   "created_at": "2026-05-06T15:54:56.479231635+00:00",
-  "updated_at": "2026-05-06T15:55:11.808458261+00:00"
+  "updated_at": "2026-05-06T15:55:18.522353532+00:00"
 }
