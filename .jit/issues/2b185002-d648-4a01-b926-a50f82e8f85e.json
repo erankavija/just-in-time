@@ -2,7 +2,7 @@
   "id": "2b185002-d648-4a01-b926-a50f82e8f85e",
   "title": "Implement CSV renderer for issue-linked benchmark data",
   "description": "Add a dedicated CSV renderer for issue-linked benchmark and scorecard artifacts in the Web UI.\n\n## Background\n\nThe agreed v1 behavior for `.csv` documents is a sortable table with a sticky header, inline rich/raw switching, search highlighting, and capped rich preview behavior for large files. The referenced `../gf2` issues include benchmark CSVs that are easier to inspect in tabular form than as raw text.\n\n## Success Criteria\n\n- [ ] `.csv` documents render in a dedicated rich view that shows parsed rows and columns instead of raw text by default.\n- [ ] The rich CSV view supports sortable columns and a sticky header.\n- [ ] The CSV renderer supports inline switching between rich and raw views.\n- [ ] Search queries highlight matching CSV cells in the rich view.\n- [ ] Large CSV files cap the rich preview and keep the full content available through the raw view.\n- [ ] Renderer-specific tests cover CSV parsing, table rendering, sorting, search highlighting, and capped-preview behavior.\n\n## Notes\n\nUse a small CSV parsing dependency for v1 rather than a narrow custom parser.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "high",
   "assignee": "agent:claude",
   "dependencies": [
@@ -18,6 +18,16 @@
       "status": "passed",
       "updated_by": null,
       "updated_at": "2026-05-06T13:54:08.013539503Z"
+    },
+    "npm-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-05-06T14:06:33.943487966Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-05-06T14:06:46.502004479Z"
     }
   },
   "context": {},
@@ -30,5 +40,5 @@
     "story:modular-document-rendering"
   ],
   "created_at": "2026-05-06T13:10:52.363534142+00:00",
-  "updated_at": "2026-05-06T13:54:08.029275348+00:00"
+  "updated_at": "2026-05-06T14:15:40.324216606+00:00"
 }
