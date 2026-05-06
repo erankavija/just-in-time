@@ -2,9 +2,9 @@
   "id": "d2fe467c-fa62-4797-9032-874f2ab3c52c",
   "title": "Extend renderer contract for modular rich/raw document formats",
   "description": "Extend the Web UI document renderer contract so new document formats can register themselves cleanly without adding per-format branching to `DocumentViewer`.\n\n## Background\n\nThe existing registry abstraction selects between Markdown and HTML renderers, but the current contract is still too narrow for the next formats. CSV and source-oriented files need matching by path/extension as well as content type, and the viewer shell needs a renderer-driven way to learn whether a renderer supports shared behaviors such as inline raw mode and preview caps.\n\n## Success Criteria\n\n- [ ] Renderer selection can match `.csv`, `.txt`, `.rs`, and `.cpp` documents even when the server falls back to generic text-like content types, and this behavior is covered by unit tests.\n- [ ] The renderer contract exposes capability metadata needed for modular rich/raw behavior and preview-cap handling without pushing new format-specific branching into `DocumentViewer`.\n- [ ] Existing Markdown and HTML renderer selection behavior remains unchanged and is covered by regression tests.\n- [ ] `DocumentViewer` remains a renderer-agnostic shell for shared document chrome rather than a switchboard for CSV, TXT, Rust, or C++ behavior.\n\n## Notes\n\nThis task establishes the contract and registry foundation that the later renderer tasks build on.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [
     "c78d6c2d-1c76-4663-98c6-a5bfa7fba1a4"
   ],
@@ -13,7 +13,13 @@
     "npm-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-05-06T13:33:27.745418560Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -24,5 +30,5 @@
     "story:modular-document-rendering"
   ],
   "created_at": "2026-05-06T13:10:52.362423192+00:00",
-  "updated_at": "2026-05-06T13:32:12.641513013+00:00"
+  "updated_at": "2026-05-06T13:33:27.763595015+00:00"
 }
