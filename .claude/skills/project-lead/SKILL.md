@@ -137,6 +137,7 @@ Convert the epic's children into ordered execution waves.
    - If two issues are likely to touch the same files, serialize them (move one to a sub-wave).
    - If the wave has 4+ parallel issues, consider worktree mode (see `.claude/skills/jit-parallel/references/worktree-mode.md`).
    - **CRITICAL**: Initialize the worktree with the current repository state at the start of each wave. Failure to do so will cause workers to operate on stale code and produce invalid output.
+   - **Use `references/worktree-dispatch-protocol.md` for any parallel worktree dispatch.** Do NOT use Agent's `isolation: "worktree"` parameter — it has been observed to branch from a stale ancestor. Instead, run `scripts/dispatch-worker-worktree.sh <short-id>...` (project-agnostic; anchors on whatever repo your cwd belongs to) to create worktrees anchored to current `main` HEAD with verification, dispatch the Agent without `isolation`, and run `scripts/check-leak-into-main.sh` after completion to catch any worker file leakage into main's tree. Both guards are mandatory — eyeballing main's `git status` after a wave is what missed the leak the first time.
 
 6. **Persist the wave plan.** Save to `dev/active/<short-id>-progress.json`:
    ```json
@@ -218,7 +219,12 @@ Per jit-parallel's conflict heuristics, if two issues in the wave may touch the 
 
 ### Claim and dispatch
 1. Claim each issue: `jit issue claim <id> agent:claude`. Commit in batch.
-2. Send a **single message** with one Agent/Task tool call per issue for concurrent execution.
+2. **For any parallel dispatch that needs filesystem isolation (multiple workers editing the same crate / module / source tree), follow `references/worktree-dispatch-protocol.md`.** In summary:
+   - Run `scripts/dispatch-worker-worktree.sh <short-id>...` to manually create worktrees anchored to current `main` HEAD with SHA verification. The script is project-agnostic and anchors on whatever repo your cwd belongs to. Do NOT use Agent's `isolation: "worktree"` parameter — it was observed to branch from a stale ancestor.
+   - Prefix each Agent prompt with the boilerplate emitted by the dispatch script (worktree path + path-discipline rules forbidding absolute `/home/...` paths that leak into main).
+   - Dispatch with `subagent_type: "general-purpose"` and **no** `isolation` parameter.
+3. Send a **single message** with one Agent/Task tool call per issue for concurrent execution.
+4. **After every parallel-dispatch wave completes**, run `scripts/check-leak-into-main.sh` to verify no worker wrote files into main's tree. This is the only guard against worker file leakage; eyeballing main's `git status` is not sufficient and is what missed the leak originally.
 
 ## Section 7: Lead Review
 
@@ -243,6 +249,8 @@ For each completed sub-agent, follow `references/lead-review-protocol.md` — wh
 Record a structured verdict (PASS or FAIL with specific findings). If FAIL, the verdict is passed to the rework protocol.
 
 **Before dispatching any rework**, the lead must have completed Tiers 1.5 and 2.75 in addition to the other tiers. The 6-cycle loop pattern observed in practice (each round surfacing a different subset of findings) is preventable only if the lead audits holistically on every round — reviewers have no memory across rounds, so the lead must supply it.
+
+**No-argue discipline.** When a reviewer cites a contract document (acceptance protocol, design doc, project CLAUDE.md, any governance file) and says the artifact violates it, the lead has exactly two responses: (a) change the artifact to satisfy the contract literally, or (b) escalate. The lead may not soften the contract's reading by argument. Wording such as "non-blocking marker", "redundant witness", "two independent witnesses already satisfy criterion N", "the contract doesn't really require this for our case", or "the marker is diagnostic rather than blocking" indicates the lead is in argue mode and must stop — argue-mode rework rounds will fail the next review and the cycle is wasted. If the contract is genuinely wrong for the project's needs, amend the contract; if it's right, comply. There is no soft middle. This rule applies even when the reviewer's reading appears to overstate a literal-vs-spirit interpretation: the reviewer is a contract enforcer, not an obstacle to argue past.
 
 ## Section 8: Rework
 
