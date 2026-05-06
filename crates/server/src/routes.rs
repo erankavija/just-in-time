@@ -313,6 +313,8 @@ async fn get_document_by_path<S: IssueStore>(
 pub(crate) fn infer_content_type(path: &str) -> String {
     if path.ends_with(".md") {
         "text/markdown"
+    } else if path.ends_with(".csv") {
+        "text/csv"
     } else if path.ends_with(".txt") {
         "text/plain"
     } else if path.ends_with(".json") {
@@ -1350,7 +1352,6 @@ pattern = '^v\d+\.\d+$'
     #[tokio::test]
     async fn test_get_document_by_path_success() {
         use jit::storage::JsonFileStorage;
-        use serde_json::Value;
         use std::fs;
 
         // Set up a real tempdir acting as repo root with a .jit subdir.
@@ -1401,7 +1402,8 @@ pattern = '^v\d+\.\d+$'
         // Assert 200 OK with matching content and content_type fields.
         response.assert_status_ok();
 
-        let body: Value = serde_json::from_slice(response.as_bytes()).expect("valid JSON body");
+        let body: serde_json::Value =
+            serde_json::from_slice(response.as_bytes()).expect("valid JSON body");
         assert_eq!(
             body["content"].as_str().unwrap(),
             doc_content,
@@ -1426,6 +1428,7 @@ pattern = '^v\d+\.\d+$'
     #[test]
     fn test_infer_content_type_other_extensions() {
         assert_eq!(infer_content_type("doc.md"), "text/markdown");
+        assert_eq!(infer_content_type("data.csv"), "text/csv");
         assert_eq!(infer_content_type("data.json"), "application/json");
         assert_eq!(infer_content_type("style.css"), "text/css");
         assert_eq!(infer_content_type("app.js"), "application/javascript");
@@ -1941,13 +1944,73 @@ pattern = '^v\d+\.\d+$'
         };
         let server = TestServer::new(create_routes(state)).unwrap();
 
-        let url = format!("/issues/{}/documents/{}/content", id, doc_rel);
+        let encoded = percent_encode_segment(doc_rel);
+        let url = format!("/issues/{}/documents/{}/content", id, encoded);
         let response = server.get(&url).await;
         assert_eq!(
             response.status_code(),
             StatusCode::INTERNAL_SERVER_ERROR,
             "reading a directory via get_document_content should return 500"
         );
+    }
+
+    #[tokio::test]
+    async fn test_get_document_content_csv_returns_text_csv() {
+        use jit::domain::Priority;
+        use jit::storage::JsonFileStorage;
+        use std::fs;
+
+        let temp = tempfile::tempdir().unwrap();
+        let jit_dir = temp.path().join(".jit");
+        fs::create_dir_all(&jit_dir).unwrap();
+        fs::write(
+            jit_dir.join("config.toml"),
+            "[worktree]\nenforce_leases = \"off\"\n",
+        )
+        .unwrap();
+
+        let storage = JsonFileStorage::new(&jit_dir);
+        storage.init().unwrap();
+        let executor = Arc::new(CommandExecutor::new(storage));
+
+        let doc_rel = "bench/results.csv";
+        let doc_content = "prime,n,kernel\n31,1024,C\n";
+        let doc_path = temp.path().join(doc_rel);
+        fs::create_dir_all(doc_path.parent().unwrap()).unwrap();
+        fs::write(&doc_path, doc_content).unwrap();
+
+        let (id, _) = executor
+            .create_issue(
+                "CSV content test".to_string(),
+                "desc".to_string(),
+                Priority::Normal,
+                vec![],
+                vec![],
+            )
+            .unwrap();
+        executor
+            .add_document_reference(&id, doc_rel, None, None, None, false)
+            .unwrap();
+
+        Box::leak(Box::new(temp));
+
+        let tracker = Arc::new(ChangeTracker::new(16));
+        let state = AppState {
+            executor,
+            tracker,
+            project_name: "test-project".to_string(),
+        };
+        let server = TestServer::new(create_routes(state)).unwrap();
+
+        let encoded = percent_encode_segment(doc_rel);
+        let url = format!("/issues/{}/documents/{}/content", id, encoded);
+        let response = server.get(&url).await;
+        response.assert_status_ok();
+
+        let body: serde_json::Value =
+            serde_json::from_slice(response.as_bytes()).expect("valid JSON body");
+        assert_eq!(body["content"].as_str().unwrap(), doc_content);
+        assert_eq!(body["content_type"].as_str().unwrap(), "text/csv");
     }
 
     /// `GET /issues/:id/documents/:path/raw` must return 500 when reading
@@ -2011,6 +2074,52 @@ pattern = '^v\d+\.\d+$'
             StatusCode::INTERNAL_SERVER_ERROR,
             "reading a directory via get_document_raw should return 500"
         );
+    }
+
+    #[tokio::test]
+    async fn test_get_document_by_path_csv_returns_text_csv() {
+        use jit::storage::JsonFileStorage;
+        use std::fs;
+
+        let temp = tempfile::tempdir().unwrap();
+        let jit_dir = temp.path().join(".jit");
+        fs::create_dir_all(&jit_dir).unwrap();
+        fs::write(
+            jit_dir.join("config.toml"),
+            "[worktree]\nenforce_leases = \"off\"\n",
+        )
+        .unwrap();
+
+        let storage = JsonFileStorage::new(&jit_dir);
+        storage.init().unwrap();
+        let executor = Arc::new(CommandExecutor::new(storage));
+
+        let doc_rel = "bench/results.csv";
+        let doc_content = "prime,n,kernel\n7,256,F\n";
+        let doc_path = temp.path().join(doc_rel);
+        fs::create_dir_all(doc_path.parent().unwrap()).unwrap();
+        fs::write(&doc_path, doc_content).unwrap();
+
+        Box::leak(Box::new(temp));
+
+        let tracker = Arc::new(ChangeTracker::new(16));
+        let state = AppState {
+            executor,
+            tracker,
+            project_name: "test-project".to_string(),
+        };
+        let server = TestServer::new(create_routes(state)).unwrap();
+
+        let response = server
+            .get("/documents")
+            .add_query_param("path", doc_rel)
+            .await;
+        response.assert_status_ok();
+
+        let body: serde_json::Value =
+            serde_json::from_slice(response.as_bytes()).expect("valid JSON body");
+        assert_eq!(body["content"].as_str().unwrap(), doc_content);
+        assert_eq!(body["content_type"].as_str().unwrap(), "text/csv");
     }
 
     // ── inject_base_href unit tests ───────────────────────────────────────────
