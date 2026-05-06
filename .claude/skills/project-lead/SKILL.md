@@ -207,9 +207,8 @@ For each issue in the wave, select the prompt template based on its classificati
 
 Fill each template with:
 - Full issue context from `jit issue show` (title, description, success criteria, linked docs)
-- Project conventions discovered in Section 1 (from CLAUDE.md)
-- The gates defined on the issue and the explicit requirement to pass them all
-- This instruction: **"Do NOT mark the issue as done. Do NOT modify `.jit/` state. The project lead handles all state transitions."**
+- The gates defined on the issue and the explicit requirement that the implementation be sufficient to pass them
+- This instruction: **"Do NOT mark the issue as done. Do NOT modify `.jit/` state or pass the gates. The project lead handles all state transitions."**
 
 ### Agent type
 All dispatched agents are `general-purpose` (they need write access to produce artifacts).

@@ -16,15 +16,9 @@ You are [implementing / planning / reviewing] issue [SHORT-ID] in the JIT reposi
 ## [For implementation tasks] What to do
 
 1. [Derive concrete steps from the issue description and acceptance criteria.]
-2. Write tests first (TDD). Run `cargo test <feature> -- --nocapture` to confirm they fail, then implement.
-3. Ensure that the full test suite passes when done:
-   ```bash
-   cargo test --workspace --quiet
-   cargo clippy --workspace --all-targets
-   cargo fmt --all
-   ```
-4. Check the automated quality gates.
-
+2. Write tests first (TDD). Run them to confirm they fail, then implement.
+3. Ensure that the full test suite passes when done (per the project's testing conventions).
+4. Check that the implementation is sufficient to meet all acceptance criteria and that it can pass all the quality gates defined in the issue.
 
 ## [For planning tasks] What to do
 
@@ -37,16 +31,12 @@ You are [implementing / planning / reviewing] issue [SHORT-ID] in the JIT reposi
    - TDD approach: concrete test names to write first
    - Acceptance criteria (refine or define if missing from the issue)
    - Any risks or unknowns that need resolution before implementation begins
-3. Link the document to the issue:
-   ```
-   mcp__jit__jit_doc_add(id="[SHORT-ID]", path="dev/plans/[SHORT-ID]-[slug].md",
-       doc_type="implementation-plan", label="Implementation Plan")
-   ```
-4. Commit the plan file (and any updated `.jit/` files) so the document has a commit hash:
-   ```bash
-   git add dev/plans/[SHORT-ID]-[slug].md .jit/
-   git commit -m "jit: [SHORT-ID] add implementation plan for [slug]"
-   ```
+3. Link the document to the issue using `jit doc add`:
+   - id: "[SHORT-ID]"
+   - path: "dev/plans/[SHORT-ID]-[slug].md"
+   - doc_type: "implementation-plan"
+   - label: "Implementation Plan"
+4. Commit the plan file (and any updated `.jit/` files) so the document has a commit hash. Use a commit message that references the issue and the plan adhering to the project's commit message conventions.
 5. Do NOT write implementation code. Return the plan path and a summary of key decisions.
 6. The saved plan will be reviewed and fed into a subsequent implementation agent.
 
@@ -54,22 +44,13 @@ You are [implementing / planning / reviewing] issue [SHORT-ID] in the JIT reposi
 
 1. Locate the relevant code (search for key symbols from the issue description).
 2. Verify each acceptance/success criterion is met.
-3. Run `cargo test --workspace --quiet` and `cargo clippy --workspace --all-targets`.
-4. If complete: pass the `code-review` gate with `mcp__jit__jit_gate_pass` (id="[SHORT-ID]", gate_key="code-review", by="agent:claude"), then set state=done with `mcp__jit__jit_issue_update`.
-5. If incomplete: do NOT pass the gate. Return a detailed description of what is missing.
-
-## Coding conventions (from CLAUDE.md)
-
-- Functional style, no unsafe code, `Result`-based errors with `thiserror`
-- Test naming: `test_<function>_<scenario>`
-- Use `TestHarness` from `crates/jit/tests/harness/` for in-process command tests
-- Add tests to an existing related test file where one exists
-- Zero clippy warnings — fix any warnings you encounter, even pre-existing ones in files you touch
+3. Run testing, linting, and formatting checks per the project's coding conventions.
+4. If complete: return just a confirmation that the issue is complete and ready to close. If incomplete: return a detailed description of what is missing or incorrect, referencing specific code locations and test results.
 
 ## Return
 
 Return a summary of:
 - Files modified or created
 - Tests added (names)
-- Output of `cargo test --test <file>` confirming they pass
+- Confirmation of passing testing, linting, and formatting checks
 - Any issues encountered
