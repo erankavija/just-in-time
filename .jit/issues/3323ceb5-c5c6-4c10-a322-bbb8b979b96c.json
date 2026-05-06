@@ -2,7 +2,7 @@
   "id": "3323ceb5-c5c6-4c10-a322-bbb8b979b96c",
   "title": "Polish modular document viewer typography and source scrolling",
   "description": "Address follow-up usability issues in the modular document-rendering slice.\n\n## Background\n\nThe first delivery added dedicated renderers for CSV and text/code content, but there are still a few presentation issues in the rich viewers:\n- CSV/text/code content uses a smaller default font than the original markdown viewer.\n- Rich source-code rendering creates a separate horizontally scrollable block per line, which looks fragmented and makes wide lines awkward to inspect.\n- Rich preview caps still default to 200 items instead of the requested 1000-item default.\n\n## Success Criteria\n\n- [ ] CSV and text/code rich viewers use the same default content font sizing as the original markdown viewer while preserving their existing formatting affordances.\n- [ ] Rich source-code rendering uses a single horizontally scrollable code block rather than per-line scroll regions, while preserving line numbers and line-level search highlighting.\n- [ ] Default rich preview caps increase from 200 to 1000 items for text-like previews, with renderer-specific notices remaining accurate.\n- [ ] Existing web-side renderer tests cover the new behavior and the configured web CI gate passes cleanly.\n\n## Notes\n\nThis is a focused follow-up to the completed modular document rendering story.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "high",
   "assignee": "agent:claude",
   "dependencies": [],
@@ -12,10 +12,20 @@
     "code-review"
   ],
   "gates_status": {
+    "npm-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-05-06T15:59:34.114347768Z"
+    },
     "tdd-reminder": {
       "status": "passed",
       "updated_by": null,
       "updated_at": "2026-05-06T15:55:11.808457591Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-05-06T15:59:47.584928191Z"
     }
   },
   "context": {},
@@ -28,5 +38,5 @@
     "story:modular-document-rendering"
   ],
   "created_at": "2026-05-06T15:54:56.479231635+00:00",
-  "updated_at": "2026-05-06T15:55:18.522353532+00:00"
+  "updated_at": "2026-05-06T16:05:01.903204069+00:00"
 }
