@@ -2,7 +2,7 @@
   "id": "6d0128ae-38cf-48a6-9dbb-5fd962aef470",
   "title": "Web UI usability improvements",
   "description": "Identify and implement usability improvements for the JIT Web UI — layout, navigation, interactivity, visual feedback, and overall user experience.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "high",
   "assignee": null,
   "dependencies": [
@@ -20,5 +20,5 @@
     "component:web"
   ],
   "created_at": "2026-03-09T19:54:54.327560962+00:00",
-  "updated_at": "2026-05-06T13:09:08.513717341+00:00"
+  "updated_at": "2026-05-06T15:27:27.844174347+00:00"
 }
