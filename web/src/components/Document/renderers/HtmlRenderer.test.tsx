@@ -167,9 +167,9 @@ describe('HtmlRenderer', () => {
     expect(screen.getByText('no-ref.html')).toBeDefined();
   });
 
-  it('html renderer registry entry has noHistory: true (history panel suppressed)', () => {
+  it('html renderer registry entry hides history via capability metadata', () => {
     const htmlEntry = rendererRegistry.find((r) => r.id === 'html');
     expect(htmlEntry).toBeDefined();
-    expect(htmlEntry?.noHistory).toBe(true);
+    expect(htmlEntry?.capabilities.showsHistory).toBe(false);
   });
 });

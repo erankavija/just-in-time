@@ -92,7 +92,7 @@ export function DocumentViewer({ issueId, documentRef, documentPath, searchQuery
 
   const activeRenderer = pickRenderer(content, documentRef);
   const Renderer = activeRenderer.Component;
-  const showHistoryControls = !activeRenderer.noHistory;
+  const showHistoryControls = activeRenderer.capabilities.showsHistory;
 
   return (
     <div className="document-viewer">

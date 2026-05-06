@@ -9,7 +9,7 @@ const HtmlRenderer: FC<DocumentRendererProps> = ({
   documentRef,
   // searchTerm, highlightsActive, and onHighlightsCleared are intentionally
   // unused: search highlighting is not meaningful through an iframe boundary.
-  // History panel is suppressed via noHistory: true in the registry entry.
+  // History panel visibility is controlled by registry capability metadata.
 }) => {
   const label = documentRef?.label ?? content.path;
   // Show the path separately only when a distinct label exists.

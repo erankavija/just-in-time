@@ -1,11 +1,19 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { pickRenderer, rendererRegistry } from './index';
-import type { DocumentContent } from '../../../types/models';
+import type { DocumentContent, DocumentReference } from '../../../types/models';
 import MarkdownRenderer from './MarkdownRenderer';
 
-function makeContent(content_type: string, content = ''): DocumentContent {
-  return { path: 'test.md', commit: 'abc1234', content, content_type };
+function makeContent(
+  content_type: string,
+  content = '',
+  path = 'test.md',
+): DocumentContent {
+  return { path, commit: 'abc1234', content, content_type };
+}
+
+function makeRef(path: string): DocumentReference {
+  return { path };
 }
 
 // Mock MermaidDiagram to avoid mermaid init in jsdom
@@ -26,14 +34,54 @@ describe('rendererRegistry / pickRenderer', () => {
     expect(result.id).toBe('html');
   });
 
+  it('returns the csv renderer for .csv paths even when content-type is text/plain', () => {
+    const result = pickRenderer(makeContent('text/plain', '', 'results.csv'));
+    expect(result.id).toBe('csv');
+  });
+
+  it('returns the text-code renderer for .txt paths even when content-type is text/plain', () => {
+    const result = pickRenderer(makeContent('text/plain', '', 'notes.txt'));
+    expect(result.id).toBe('text-code');
+  });
+
+  it('returns the text-code renderer for .rs paths even when content-type is text/plain', () => {
+    const result = pickRenderer(makeContent('text/plain', '', 'src/lib.rs'));
+    expect(result.id).toBe('text-code');
+  });
+
+  it('returns the text-code renderer for .cpp paths even when content-type is text/plain', () => {
+    const result = pickRenderer(makeContent('text/plain', '', 'benchmarks/reference/smoke.cpp'));
+    expect(result.id).toBe('text-code');
+  });
+
+  it('uses documentRef.path for matching when it differs from content.path', () => {
+    const result = pickRenderer(
+      makeContent('text/plain', '', 'README.md'),
+      makeRef('fixtures/report.csv'),
+    );
+    expect(result.id).toBe('csv');
+  });
+
   it('falls back to markdown for an unknown content-type', () => {
     const result = pickRenderer(makeContent('application/unknown'));
     expect(result.id).toBe('markdown');
   });
 
-  it('registry has html before markdown (html first, markdown catch-all last)', () => {
+  it('registry keeps markdown as the last catch-all renderer', () => {
     const ids = rendererRegistry.map((r) => r.id);
-    expect(ids.indexOf('html')).toBeLessThan(ids.indexOf('markdown'));
+    expect(ids.at(-1)).toBe('markdown');
+  });
+
+  it('exposes capability metadata for rich/raw and preview-cap features', () => {
+    const csvEntry = rendererRegistry.find((r) => r.id === 'csv');
+    const textCodeEntry = rendererRegistry.find((r) => r.id === 'text-code');
+    const htmlEntry = rendererRegistry.find((r) => r.id === 'html');
+
+    expect(csvEntry?.capabilities.supportsRawToggle).toBe(true);
+    expect(csvEntry?.capabilities.supportsPreviewCap).toBe(true);
+    expect(textCodeEntry?.capabilities.supportsRawToggle).toBe(true);
+    expect(textCodeEntry?.capabilities.supportsSearchHighlight).toBe(true);
+    expect(htmlEntry?.capabilities.showsHistory).toBe(false);
   });
 });
 
