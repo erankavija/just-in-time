@@ -1,8 +1,9 @@
 import Papa from 'papaparse';
 import type { DocumentContent } from '../../../types/models';
 import type { DocumentPreviewState } from './index';
+import { DEFAULT_PREVIEW_MAX_ITEMS } from './constants';
 
-export const CSV_PREVIEW_MAX_ROWS = 200;
+export const CSV_PREVIEW_MAX_ROWS = DEFAULT_PREVIEW_MAX_ITEMS;
 
 export function parseCsv(content: string): string[][] {
   const parsed = Papa.parse<string[]>(content, {

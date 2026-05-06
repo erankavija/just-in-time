@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { apiClient } from '../../api/client';
 import type { DocumentReference, DocumentContent, DocumentHistory } from '../../types/models';
 import type { DocumentPreviewState } from './renderers/index';
+import { DEFAULT_PREVIEW_MAX_ITEMS } from './renderers/constants';
 import { pickRenderer } from './renderers/index';
 import './Document.css';
 
@@ -15,7 +16,7 @@ interface DocumentViewerProps {
   onClose?: () => void;
 }
 
-const RICH_PREVIEW_MAX_LINES = 200;
+const RICH_PREVIEW_MAX_LINES = DEFAULT_PREVIEW_MAX_ITEMS;
 
 interface PreviewState {
   isCapped: boolean;

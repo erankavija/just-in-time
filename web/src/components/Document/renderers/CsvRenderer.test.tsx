@@ -33,7 +33,7 @@ describe('CsvRenderer', () => {
 
     render(<CsvRenderer content={content} />);
 
-    expect(screen.getByRole('table')).toBeDefined();
+    expect(screen.getByRole('table')).toHaveStyle({ fontSize: '1rem' });
     expect(screen.getByText('prime')).toBeDefined();
     expect(screen.getByText('1024')).toBeDefined();
     expect(screen.getByText('F')).toBeDefined();
@@ -94,7 +94,7 @@ describe('CsvRenderer', () => {
     const content = makeContent([
       'prime,notes',
       '7,"line one\nline two"',
-      ...Array.from({ length: 205 }, (_, idx) => `${idx + 10},value-${idx}`),
+      ...Array.from({ length: 1005 }, (_, idx) => `${idx + 10},value-${idx}`),
     ].join('\n'));
 
     const previewState = buildCsvPreviewState(content);
@@ -111,6 +111,6 @@ describe('CsvRenderer', () => {
     expect(previewState.kind).toBe('rows');
     expect(previewState.maxItems).toBe(CSV_PREVIEW_MAX_ROWS);
     expect(screen.getByText('line one line two')).toBeDefined();
-    expect(screen.queryByText('value-204')).toBeNull();
+    expect(screen.queryByText('value-1004')).toBeNull();
   });
 });

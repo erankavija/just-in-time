@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FC, type ReactNode } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import type { DocumentRendererProps } from './index';
+import { DEFAULT_DOCUMENT_FONT_SIZE } from './constants';
 
 type TextCodeMode = 'plain-text' | 'source-code';
 
@@ -124,34 +125,33 @@ const TextCodeRenderer: FC<DocumentRendererProps> = ({
         </div>
       )}
 
-      <div>
-        {lines.map((line) => {
-          const isHighlighted = highlightsActive && lineMatchesSearch(line.text, searchTerm);
+      {mode === 'plain-text' ? (
+        <div>
+          {lines.map((line) => {
+            const isHighlighted = highlightsActive && lineMatchesSearch(line.text, searchTerm);
 
-          return (
-            <div
-              key={line.lineNumber}
-              data-highlighted={isHighlighted ? 'true' : 'false'}
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '56px minmax(0, 1fr)',
-                alignItems: 'stretch',
-                backgroundColor: isHighlighted ? 'rgba(255, 215, 0, 0.08)' : 'transparent',
-              }}
-            >
+            return (
               <div
+                key={line.lineNumber}
+                data-highlighted={isHighlighted ? 'true' : 'false'}
                 style={{
-                  padding: '0.125rem 0.75rem 0.125rem 0',
-                  textAlign: 'right',
-                  color: 'var(--text-muted)',
-                  userSelect: 'none',
-                  fontSize: '12px',
+                  display: 'grid',
+                  gridTemplateColumns: '56px minmax(0, 1fr)',
+                  alignItems: 'stretch',
+                  backgroundColor: isHighlighted ? 'rgba(255, 215, 0, 0.08)' : 'transparent',
                 }}
               >
-                {line.lineNumber}
-              </div>
-
-              {mode === 'plain-text' ? (
+                <div
+                  style={{
+                    padding: '0.125rem 0.75rem 0.125rem 0',
+                    textAlign: 'right',
+                    color: 'var(--text-muted)',
+                    userSelect: 'none',
+                    fontSize: '0.875rem',
+                  }}
+                >
+                  {line.lineNumber}
+                </div>
                 <div
                   data-testid={line.lineNumber === 1 ? 'plain-text-line-content' : undefined}
                   style={{
@@ -159,34 +159,62 @@ const TextCodeRenderer: FC<DocumentRendererProps> = ({
                     overflowX: wrapPlainText ? 'visible' : 'auto',
                     wordBreak: wrapPlainText ? 'break-word' : 'normal',
                     fontFamily: 'var(--font-mono)',
-                    fontSize: '13px',
+                    fontSize: DEFAULT_DOCUMENT_FONT_SIZE,
                     lineHeight: 1.5,
                   }}
                 >
                   {renderHighlightedPlainText(line.text, searchTerm, highlightsActive)}
                 </div>
-              ) : (
-                <div style={{ minWidth: 0 }}>
-                  <SyntaxHighlighter
-                    language={language}
-                    style={vscDarkPlus}
-                    PreTag="div"
-                    customStyle={{
-                      margin: 0,
-                      padding: 0,
-                      background: 'transparent',
-                      fontSize: '13px',
-                      minHeight: '1.5rem',
-                    }}
-                  >
-                    {line.text.length > 0 ? line.text : ' '}
-                  </SyntaxHighlighter>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div
+          data-testid="source-code-scroll-region"
+          style={{
+            overflowX: 'auto',
+            fontSize: DEFAULT_DOCUMENT_FONT_SIZE,
+          }}
+        >
+          <SyntaxHighlighter
+            language={language}
+            style={vscDarkPlus}
+            showLineNumbers={true}
+            wrapLines={true}
+            lineNumberStyle={{
+              minWidth: '3.5rem',
+              paddingRight: '0.75rem',
+              textAlign: 'right',
+              color: 'var(--text-muted)',
+              userSelect: 'none',
+              fontSize: '0.875rem',
+            }}
+            lineProps={(lineNumber) => {
+              const lineText = lines[lineNumber - 1]?.text ?? '';
+              const isHighlighted = highlightsActive && lineMatchesSearch(lineText, searchTerm);
+
+              return {
+                'data-highlighted': isHighlighted ? 'true' : 'false',
+                style: {
+                  display: 'block',
+                  backgroundColor: isHighlighted ? 'rgba(255, 215, 0, 0.08)' : 'transparent',
+                },
+              };
+            }}
+            customStyle={{
+              margin: 0,
+              padding: 0,
+              background: 'transparent',
+              fontSize: 'inherit',
+              lineHeight: 1.5,
+              minWidth: 'max-content',
+            }}
+          >
+            {content.content}
+          </SyntaxHighlighter>
+        </div>
+      )}
     </div>
   );
 };

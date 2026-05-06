@@ -308,7 +308,7 @@ describe('DocumentViewer — viewer-shell capabilities for text-like renderers',
   it('shows a capped-preview notice for large text-like documents in rich view', async () => {
     const largeCsv = [
       'col_a,col_b',
-      ...Array.from({ length: 220 }, (_, idx) => `row-${idx},value-${idx}`),
+      ...Array.from({ length: 1020 }, (_, idx) => `row-${idx},value-${idx}`),
     ].join('\n');
 
     mockGetDocumentContent.mockResolvedValue(makeContent(largeCsv, 'text/plain', 'large.csv'));
@@ -323,7 +323,7 @@ describe('DocumentViewer — viewer-shell capabilities for text-like renderers',
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('preview-cap-notice')).toHaveTextContent('Preview capped at 200 rows');
+      expect(screen.getByTestId('preview-cap-notice')).toHaveTextContent('Preview capped at 1000 rows');
     });
   });
 
@@ -331,7 +331,7 @@ describe('DocumentViewer — viewer-shell capabilities for text-like renderers',
     const user = userEvent.setup();
     const largeCsv = [
       'col_a,col_b',
-      ...Array.from({ length: 220 }, (_, idx) => `row-${idx},value-${idx}`),
+      ...Array.from({ length: 1020 }, (_, idx) => `row-${idx},value-${idx}`),
     ].join('\n');
 
     mockGetDocumentContent.mockResolvedValue(makeContent(largeCsv, 'text/plain', 'large.csv'));
@@ -347,7 +347,7 @@ describe('DocumentViewer — viewer-shell capabilities for text-like renderers',
 
     await user.click(await screen.findByRole('button', { name: 'Raw view' }));
 
-    expect(screen.getByTestId('raw-document-view')).toHaveTextContent('row-219,value-219');
+    expect(screen.getByTestId('raw-document-view')).toHaveTextContent('row-1019,value-1019');
   });
 
   it('propagates search highlighting to text-code renderers selected by extension', async () => {

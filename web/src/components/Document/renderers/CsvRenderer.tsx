@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FC, type ReactNode } from 'react';
 import type { DocumentRendererProps } from './index';
 import { parseCsv } from './CsvRenderer.helpers';
+import { DEFAULT_DOCUMENT_FONT_SIZE } from './constants';
 
 type SortDirection = 'asc' | 'desc';
 
@@ -128,7 +129,7 @@ const CsvRenderer: FC<DocumentRendererProps> = ({
           style={{
             width: '100%',
             borderCollapse: 'collapse',
-            fontSize: '13px',
+            fontSize: DEFAULT_DOCUMENT_FONT_SIZE,
             tableLayout: 'auto',
           }}
         >

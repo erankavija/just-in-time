@@ -34,6 +34,21 @@ describe('TextCodeRenderer', () => {
     expect(screen.getByText('2')).toBeDefined();
   });
 
+  it('renders source code inside a single horizontally scrollable block', () => {
+    const content = makeContent('src/lib.rs', [
+      'pub fn demo() {',
+      '    let very_long_identifier_name_that_should_scroll = "value";',
+      '}',
+    ].join('\n'));
+
+    render(<TextCodeRenderer content={content} documentRef={{ path: 'src/lib.rs' }} />);
+
+    expect(screen.getByTestId('source-code-scroll-region')).toHaveStyle({
+      overflowX: 'auto',
+      fontSize: '1rem',
+    });
+  });
+
   it('renders plain text with wrapping controls and line numbers', async () => {
     const user = userEvent.setup();
     const content = makeContent('notes.txt', 'alpha beta gamma');
@@ -41,7 +56,10 @@ describe('TextCodeRenderer', () => {
     render(<TextCodeRenderer content={content} documentRef={{ path: 'notes.txt' }} />);
 
     expect(screen.getByRole('button', { name: 'Wrap off' })).toBeDefined();
-    expect(screen.getByTestId('plain-text-line-content')).toHaveStyle({ whiteSpace: 'pre-wrap' });
+    expect(screen.getByTestId('plain-text-line-content')).toHaveStyle({
+      whiteSpace: 'pre-wrap',
+      fontSize: '1rem',
+    });
 
     await user.click(screen.getByRole('button', { name: 'Wrap off' }));
 
@@ -89,18 +107,18 @@ describe('TextCodeRenderer', () => {
   it('renders only the capped preview content provided by the viewer shell', () => {
     const content = makeContent(
       'notes.txt',
-      Array.from({ length: 200 }, (_, idx) => `line-${idx}`).join('\n'),
+      Array.from({ length: 1000 }, (_, idx) => `line-${idx}`).join('\n'),
     );
 
     render(
       <TextCodeRenderer
         content={content}
         documentRef={{ path: 'notes.txt' }}
-        previewState={{ isCapped: true, kind: 'lines', maxItems: 200, totalItems: 220 }}
+        previewState={{ isCapped: true, kind: 'lines', maxItems: 1000, totalItems: 1020 }}
       />,
     );
 
-    expect(screen.getByText('line-199')).toBeDefined();
-    expect(screen.queryByText('line-219')).toBeNull();
+    expect(screen.getByText('line-999')).toBeDefined();
+    expect(screen.queryByText('line-1019')).toBeNull();
   });
 });
