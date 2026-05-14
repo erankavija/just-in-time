@@ -2269,3 +2269,4 @@
 {"type":"issue_state_changed","id":"f709b228-6d2e-4db3-8035-2df893ab5a53","issue_id":"c02e7ca8-6989-4368-aae4-f0bac23705da","timestamp":"2026-05-06T16:27:19.809373507Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"448393d6-006a-4f82-bdec-03e2bcef267f","issue_id":"c02e7ca8-6989-4368-aae4-f0bac23705da","timestamp":"2026-05-06T16:27:19.809517757Z"}
 {"type":"issue_state_changed","id":"bc9b2028-fe22-4b37-8f4d-2c13a385a74a","issue_id":"6d0128ae-38cf-48a6-9dbb-5fd962aef470","timestamp":"2026-05-06T16:27:19.945076975Z","from":"backlog","to":"ready"}
+{"type":"issue_created","id":"4d762366-5271-48e7-b80b-802e96d8fbc5","issue_id":"34f45da2-2dbc-4ba4-b9a8-40fd79526931","timestamp":"2026-05-14T21:33:34.556371652Z","title":"Reduce MCP tool response verbosity to cut token usage","priority":"normal"}
