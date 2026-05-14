@@ -13,6 +13,7 @@ use std::sync::Arc;
 
 use jit::commands::CommandExecutor;
 use jit::domain::{Gate, GateRunResult, Issue, Priority, State as IssueState};
+use jit::output::GateRunSummary;
 use jit::search::{SearchOptions, SearchResult};
 use jit::storage::{IssueStore, PathReadError};
 
@@ -813,45 +814,7 @@ struct GateRunsQuery {
     gate_key: Option<String>,
 }
 
-/// Summary of a gate run (excludes stdout/stderr for size)
-#[derive(Debug, Serialize)]
-struct GateRunSummary {
-    run_id: String,
-    gate_key: String,
-    stage: jit::domain::GateStage,
-    status: jit::domain::GateRunStatus,
-    started_at: String,
-    completed_at: Option<String>,
-    duration_ms: Option<u64>,
-    exit_code: Option<i32>,
-    command: String,
-    commit: Option<String>,
-    branch: Option<String>,
-    by: Option<String>,
-    message: Option<String>,
-}
-
-impl From<GateRunResult> for GateRunSummary {
-    fn from(r: GateRunResult) -> Self {
-        Self {
-            run_id: r.run_id,
-            gate_key: r.gate_key,
-            stage: r.stage,
-            status: r.status,
-            started_at: r.started_at.to_rfc3339(),
-            completed_at: r.completed_at.map(|t| t.to_rfc3339()),
-            duration_ms: r.duration_ms,
-            exit_code: r.exit_code,
-            command: r.command,
-            commit: r.commit,
-            branch: r.branch,
-            by: r.by,
-            message: r.message,
-        }
-    }
-}
-
-/// List gate run results for an issue (summaries without stdout/stderr)
+/// List gate run results for an issue (summaries without stdout/stderr for passing runs).
 async fn list_gate_runs<S: IssueStore>(
     Path(id): Path<String>,
     Query(params): Query<GateRunsQuery>,
@@ -865,7 +828,7 @@ async fn list_gate_runs<S: IssueStore>(
             StatusCode::NOT_FOUND
         })?;
 
-    Ok(Json(runs.into_iter().map(GateRunSummary::from).collect()))
+    Ok(Json(runs.iter().map(GateRunSummary::lean).collect()))
 }
 
 /// Get a single gate run result with full stdout/stderr

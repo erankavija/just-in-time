@@ -10,7 +10,10 @@ use serde_json::Value;
 use std::fmt::Display;
 use std::io::{self, Write};
 
-use crate::domain::{MinimalBlockedIssue, MinimalIssue, Priority, State};
+use crate::domain::{
+    GateRunResult, GateRunStatus, GateStage, GateState, Issue, MinimalBlockedIssue, MinimalIssue,
+    Priority, State,
+};
 use crate::errors::{
     gate_status_name, short_id, state_name, TransitionBlockedError, TransitionBlocker,
 };
@@ -773,6 +776,148 @@ impl IssueShowResponse {
             updated_at: issue.updated_at,
         }
     }
+}
+
+// ============================================================================
+// Lean Issue Update / Show Summary Responses
+// ============================================================================
+
+/// Lightweight confirmation returned by `jit issue update --json`.
+///
+/// Mutating an issue does not need to echo the full body back; agents that
+/// need it can call `jit issue show`.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct IssueUpdateResponse {
+    pub id: String,
+    pub short_id: String,
+    pub state: State,
+    pub updated_at: String,
+}
+
+impl From<&Issue> for IssueUpdateResponse {
+    fn from(issue: &Issue) -> Self {
+        Self {
+            id: issue.id.clone(),
+            short_id: issue.short_id(),
+            state: issue.state,
+            updated_at: issue.updated_at.clone(),
+        }
+    }
+}
+
+/// Compact response returned by `jit issue show --summary --json`.
+///
+/// Carries the `MinimalIssue` fields plus `gates_status`, but omits the
+/// description and enriched dependency list.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct IssueShowSummaryResponse {
+    pub id: String,
+    pub short_id: String,
+    pub title: String,
+    pub state: State,
+    pub priority: Priority,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub assignee: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub labels: Vec<String>,
+    pub gates_required: Vec<String>,
+    pub gates_status: std::collections::HashMap<String, GateState>,
+}
+
+impl From<&Issue> for IssueShowSummaryResponse {
+    fn from(issue: &Issue) -> Self {
+        Self {
+            id: issue.id.clone(),
+            short_id: issue.short_id(),
+            title: issue.title.clone(),
+            state: issue.state,
+            priority: issue.priority,
+            assignee: issue.assignee.clone(),
+            labels: issue.labels.clone(),
+            gates_required: issue.gates_required.clone(),
+            gates_status: issue.gates_status.clone(),
+        }
+    }
+}
+
+// ============================================================================
+// Lean Gate Run Summary
+// ============================================================================
+
+/// Summary of a single gate run.
+///
+/// `stdout` and `stderr` are optional so the same shape can carry either a
+/// lean (passing) record or a full (failing or `--full`) record. Build via
+/// [`GateRunSummary::lean`] or [`GateRunSummary::full`].
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct GateRunSummary {
+    pub run_id: String,
+    pub gate_key: String,
+    pub stage: GateStage,
+    pub status: GateRunStatus,
+    pub started_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub completed_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub duration_ms: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exit_code: Option<i32>,
+    pub command: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub commit: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub branch: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub by: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stdout: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stderr: Option<String>,
+}
+
+impl GateRunSummary {
+    /// Build a summary that drops stdout/stderr for passing runs but keeps
+    /// them for failed/error runs so diagnostics survive.
+    pub fn lean(r: &GateRunResult) -> Self {
+        let include_output = !matches!(r.status, GateRunStatus::Passed);
+        Self::build(r, include_output)
+    }
+
+    /// Build a summary that always includes stdout/stderr.
+    pub fn full(r: &GateRunResult) -> Self {
+        Self::build(r, true)
+    }
+
+    fn build(r: &GateRunResult, include_output: bool) -> Self {
+        Self {
+            run_id: r.run_id.clone(),
+            gate_key: r.gate_key.clone(),
+            stage: r.stage,
+            status: r.status,
+            started_at: r.started_at.to_rfc3339(),
+            completed_at: r.completed_at.map(|t| t.to_rfc3339()),
+            duration_ms: r.duration_ms,
+            exit_code: r.exit_code,
+            command: r.command.clone(),
+            commit: r.commit.clone(),
+            branch: r.branch.clone(),
+            by: r.by.clone(),
+            message: r.message.clone(),
+            stdout: include_output.then(|| r.stdout.clone()),
+            stderr: include_output.then(|| r.stderr.clone()),
+        }
+    }
+}
+
+/// JSON payload of `jit gate check-all --json`.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct GateCheckAllResponse {
+    pub results: Vec<GateRunSummary>,
+    pub passed: usize,
+    pub total: usize,
+    pub not_run: Vec<String>,
 }
 
 // ============================================================================

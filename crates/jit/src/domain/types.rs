@@ -515,7 +515,7 @@ fn default_gate_priority() -> u32 {
 }
 
 /// Gate execution stage
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum GateStage {
     /// Runs before work starts (ready → in_progress)
@@ -619,7 +619,7 @@ pub struct GateRunResult {
 }
 
 /// Gate run status
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum GateRunStatus {
     /// Check succeeded

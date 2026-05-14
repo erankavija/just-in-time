@@ -382,15 +382,24 @@ fn test_gates_in_json_output() {
     let id = create_issue(&temp, "Test issue");
 
     let jit = jit_binary();
-    let output = Command::new(jit)
+    let update = Command::new(jit)
         .args(["issue", "update", &id, "--add-gate", "tests", "--json"])
         .current_dir(temp.path())
         .output()
         .unwrap();
 
-    assert!(output.status.success());
+    assert!(update.status.success());
 
-    let result: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    // `issue update --json` returns a lean confirmation; verify the gate was
+    // attached by reading it back via `issue show --json`.
+    let show = Command::new(jit)
+        .args(["issue", "show", &id, "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert!(show.status.success());
+    let result: serde_json::Value = serde_json::from_slice(&show.stdout).unwrap();
     let gates = result["gates_required"].as_array().unwrap();
     assert!(gates.contains(&serde_json::json!("tests")));
 }

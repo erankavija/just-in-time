@@ -98,8 +98,17 @@ fn test_issue_update_supports_json() {
 
     let json: Value = serde_json::from_slice(&output.stdout).expect("Output should be valid JSON");
 
+    // `issue update --json` returns a lean confirmation (id, short_id,
+    // state, updated_at). Verify the mutation took effect via `issue show`.
     assert_eq!(json["id"].as_str().unwrap(), id);
-    assert_eq!(json["title"].as_str().unwrap(), "Updated");
+
+    let show = Command::new(jit_binary())
+        .args(["issue", "show", id, "--json"])
+        .current_dir(repo.path())
+        .output()
+        .unwrap();
+    let show_json: Value = serde_json::from_slice(&show.stdout).unwrap();
+    assert_eq!(show_json["title"].as_str().unwrap(), "Updated");
 }
 
 // ============================================================================

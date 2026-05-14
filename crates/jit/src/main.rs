@@ -453,8 +453,23 @@ fn run() -> Result<()> {
                         }
                     }
                 }
-                IssueCommands::Show { id, json } => match executor.show_issue(&id) {
+                IssueCommands::Show { id, summary, json } => match executor.show_issue(&id) {
                     Ok(issue) => {
+                        if summary && json {
+                            let summary_response =
+                                jit::output::IssueShowSummaryResponse::from(&issue);
+                            let msg = format!(
+                                "Issue {}: {} [{:?}]",
+                                summary_response.short_id,
+                                summary_response.title,
+                                summary_response.state
+                            );
+                            let output =
+                                jit::output::JsonOutput::success(summary_response, "issue show")
+                                    .with_message(msg);
+                            println!("{}", output.to_json_string()?);
+                            return Ok(());
+                        }
                         let enriched_deps = executor.get_dependencies_enriched(&issue);
                         let response = jit::output::IssueShowResponse::from_issue(
                             issue,
@@ -620,7 +635,8 @@ fn run() -> Result<()> {
                                         issue.short_id(),
                                         issue.state
                                     );
-                                    let output = JsonOutput::success(issue, "issue update")
+                                    let response = jit::output::IssueUpdateResponse::from(&issue);
+                                    let output = JsonOutput::success(response, "issue update")
                                         .with_message(msg);
                                     println!("{}", output.to_json_string()?);
                                 } else {
@@ -1381,13 +1397,12 @@ fn run() -> Result<()> {
                     }
                 }
             }
-            GateCommands::CheckAll { id, json } => {
+            GateCommands::CheckAll { id, full, json } => {
                 let output_ctx = OutputContext::new(quiet, json);
                 let (results, not_run) = executor.get_last_gate_runs_for_issue(&id)?;
 
                 if json {
-                    use jit::output::JsonOutput;
-                    use serde_json::json;
+                    use jit::output::{GateCheckAllResponse, GateRunSummary, JsonOutput};
                     let passed_count = results
                         .iter()
                         .filter(|r| r.status == jit::domain::GateRunStatus::Passed)
@@ -1403,16 +1418,23 @@ fn run() -> Result<()> {
                             not_run.len()
                         )
                     };
-                    let output = JsonOutput::success(
-                        json!({
-                            "results": results,
-                            "passed": passed_count,
-                            "total": total,
-                            "not_run": not_run,
-                        }),
-                        "gate check-all",
-                    )
-                    .with_message(msg);
+                    let summaries: Vec<GateRunSummary> = results
+                        .iter()
+                        .map(|r| {
+                            if full {
+                                GateRunSummary::full(r)
+                            } else {
+                                GateRunSummary::lean(r)
+                            }
+                        })
+                        .collect();
+                    let response = GateCheckAllResponse {
+                        results: summaries,
+                        passed: passed_count,
+                        total,
+                        not_run,
+                    };
+                    let output = JsonOutput::success(response, "gate check-all").with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else if results.is_empty() && not_run.is_empty() {
                     let _ = output_ctx

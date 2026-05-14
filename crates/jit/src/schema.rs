@@ -382,7 +382,16 @@ impl CommandSchema {
             // Issue commands
             "issue_show" => (Some(schema_to_value::<Issue>()), "Issue"),
             "issue_create" => (Some(schema_to_value::<Issue>()), "Issue"),
-            "issue_update" => (Some(schema_to_value::<Issue>()), "Issue"),
+            "issue_update" => (
+                Some(schema_to_value::<IssueUpdateResponse>()),
+                "IssueUpdateResponse",
+            ),
+
+            // Gate commands
+            "gate_check-all" => (
+                Some(schema_to_value::<GateCheckAllResponse>()),
+                "GateCheckAllResponse",
+            ),
 
             // Query commands
             "query_available" | "query_all" | "query_ready" | "query_strategic"

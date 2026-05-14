@@ -298,15 +298,23 @@ pub enum IssueCommands {
         json: bool,
     },
 
-    /// Show issue details
+    /// Show issue details. Use `--summary` for a compact response without the description field.
     Show {
         id: String,
+
+        /// Return a compact response (id, short_id, title, state, priority,
+        /// labels, gates_required, gates_status) without the description or
+        /// enriched dependencies. Affects --json output only.
+        #[arg(long)]
+        summary: bool,
 
         #[arg(long)]
         json: bool,
     },
 
-    /// Update an issue or multiple issues
+    /// Update an issue or multiple issues. Returns a lightweight confirmation
+    /// (id, short_id, state, updated_at); run `jit issue show` to fetch the
+    /// full updated body.
     Update {
         /// Issue ID (for single issue mode, mutually exclusive with --filter)
         id: Option<String>,
@@ -651,10 +659,18 @@ pub enum GateCommands {
         json: bool,
     },
 
-    /// Show the last run result for all automated gates on an issue (inspection only, non-mutating)
+    /// Show the last run result for all automated gates on an issue
+    /// (inspection only, non-mutating). With `--json`, stdout/stderr are
+    /// omitted from passing runs by default; pass `--full` to include them.
+    /// Failing runs always include stdout/stderr.
     CheckAll {
         /// Issue ID
         id: String,
+
+        /// Include stdout/stderr for every run in the --json response
+        /// (default behaviour omits them for passing runs).
+        #[arg(long)]
+        full: bool,
 
         #[arg(long)]
         json: bool,
