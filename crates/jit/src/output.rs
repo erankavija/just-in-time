@@ -786,6 +786,18 @@ impl IssueShowResponse {
 ///
 /// Mutating an issue does not need to echo the full body back; agents that
 /// need it can call `jit issue show`.
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::Issue;
+/// use jit::output::IssueUpdateResponse;
+///
+/// let issue = Issue::new("Refactor".into(), "Body".into());
+/// let response = IssueUpdateResponse::from(&issue);
+/// assert_eq!(response.id, issue.id);
+/// assert_eq!(response.short_id.len(), 8);
+/// ```
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct IssueUpdateResponse {
     pub id: String,
@@ -809,6 +821,19 @@ impl From<&Issue> for IssueUpdateResponse {
 ///
 /// Carries the `MinimalIssue` fields plus `gates_status`, but omits the
 /// description and enriched dependency list.
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::Issue;
+/// use jit::output::IssueShowSummaryResponse;
+///
+/// let issue = Issue::new("Title".into(), "Long description body".into());
+/// let summary = IssueShowSummaryResponse::from(&issue);
+/// // Description is intentionally absent from the summary shape.
+/// let json = serde_json::to_string(&summary).unwrap();
+/// assert!(!json.contains("Long description body"));
+/// ```
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct IssueShowSummaryResponse {
     pub id: String,
@@ -849,6 +874,40 @@ impl From<&Issue> for IssueShowSummaryResponse {
 /// `stdout` and `stderr` are optional so the same shape can carry either a
 /// lean (passing) record or a full (failing or `--full`) record. Build via
 /// [`GateRunSummary::lean`] or [`GateRunSummary::full`].
+///
+/// # Examples
+///
+/// ```
+/// use chrono::Utc;
+/// use jit::domain::{GateRunResult, GateRunStatus, GateStage};
+/// use jit::output::GateRunSummary;
+///
+/// let run = GateRunResult {
+///     schema_version: 1,
+///     run_id: "r1".into(),
+///     gate_key: "tests".into(),
+///     stage: GateStage::Postcheck,
+///     issue_id: "i1".into(),
+///     commit: None,
+///     branch: None,
+///     status: GateRunStatus::Passed,
+///     started_at: Utc::now(),
+///     completed_at: None,
+///     duration_ms: None,
+///     exit_code: Some(0),
+///     stdout: "lots of output".into(),
+///     stderr: String::new(),
+///     command: "cargo test".into(),
+///     by: None,
+///     message: None,
+/// };
+/// // Lean form drops stdout/stderr for passing runs.
+/// let lean = GateRunSummary::lean(&run);
+/// assert!(lean.stdout.is_none());
+/// // Full form keeps everything.
+/// let full = GateRunSummary::full(&run);
+/// assert_eq!(full.stdout.as_deref(), Some("lots of output"));
+/// ```
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct GateRunSummary {
     pub run_id: String,
@@ -912,6 +971,23 @@ impl GateRunSummary {
 }
 
 /// JSON payload of `jit gate check-all --json`.
+///
+/// `results` contains one [`GateRunSummary`] per recorded run; `not_run`
+/// lists gate keys configured on the issue that have not executed yet.
+///
+/// # Examples
+///
+/// ```
+/// use jit::output::GateCheckAllResponse;
+///
+/// let payload = GateCheckAllResponse {
+///     results: vec![],
+///     passed: 0,
+///     total: 2,
+///     not_run: vec!["tests".into(), "clippy".into()],
+/// };
+/// assert_eq!(payload.not_run.len(), 2);
+/// ```
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct GateCheckAllResponse {
     pub results: Vec<GateRunSummary>,

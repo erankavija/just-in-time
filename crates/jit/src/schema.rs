@@ -380,7 +380,10 @@ impl CommandSchema {
             "status" => (Some(schema_to_value::<StatusResponse>()), "StatusResponse"),
 
             // Issue commands
-            "issue_show" => (Some(schema_to_value::<Issue>()), "Issue"),
+            "issue_show" => (
+                Some(schema_to_value::<IssueShowResponse>()),
+                "IssueShowResponse",
+            ),
             "issue_create" => (Some(schema_to_value::<Issue>()), "Issue"),
             "issue_update" => (
                 Some(schema_to_value::<IssueUpdateResponse>()),
