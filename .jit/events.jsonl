@@ -2270,3 +2270,6 @@
 {"type":"issue_completed","id":"448393d6-006a-4f82-bdec-03e2bcef267f","issue_id":"c02e7ca8-6989-4368-aae4-f0bac23705da","timestamp":"2026-05-06T16:27:19.809517757Z"}
 {"type":"issue_state_changed","id":"bc9b2028-fe22-4b37-8f4d-2c13a385a74a","issue_id":"6d0128ae-38cf-48a6-9dbb-5fd962aef470","timestamp":"2026-05-06T16:27:19.945076975Z","from":"backlog","to":"ready"}
 {"type":"issue_created","id":"4d762366-5271-48e7-b80b-802e96d8fbc5","issue_id":"34f45da2-2dbc-4ba4-b9a8-40fd79526931","timestamp":"2026-05-14T21:33:34.556371652Z","title":"Reduce MCP tool response verbosity to cut token usage","priority":"normal"}
+{"type":"gate_passed","id":"07229df4-722e-44d9-a2b1-0692ad412eb3","issue_id":"34f45da2-2dbc-4ba4-b9a8-40fd79526931","timestamp":"2026-05-14T21:47:02.549949471Z","gate_key":"tdd-reminder","updated_by":"agent:claude"}
+{"type":"issue_state_changed","id":"a3470bcb-b98c-4ef9-96fd-112bdea58f5c","issue_id":"34f45da2-2dbc-4ba4-b9a8-40fd79526931","timestamp":"2026-05-14T21:47:05.011922485Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"132b2ceb-6f80-4ed6-a625-c82d76c39c8a","issue_id":"34f45da2-2dbc-4ba4-b9a8-40fd79526931","timestamp":"2026-05-14T21:47:05.014881076Z","assignee":"agent:claude"}
