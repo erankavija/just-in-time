@@ -380,10 +380,20 @@ impl CommandSchema {
             "status" => (Some(schema_to_value::<StatusResponse>()), "StatusResponse"),
 
             // Issue commands
-            "issue_show" => (
-                Some(schema_to_value::<IssueShowResponse>()),
-                "IssueShowResponse",
-            ),
+            //
+            // `issue show --json` returns `IssueShowResponse` by default and
+            // `IssueShowSummaryResponse` when `--summary` is set. Expose both
+            // shapes via a JSON Schema `oneOf` so MCP clients see an honest
+            // contract.
+            "issue_show" => {
+                let union = json!({
+                    "oneOf": [
+                        schema_to_value::<IssueShowResponse>(),
+                        schema_to_value::<IssueShowSummaryResponse>(),
+                    ]
+                });
+                (Some(union), "IssueShowResponse")
+            }
             "issue_create" => (Some(schema_to_value::<Issue>()), "Issue"),
             "issue_update" => (
                 Some(schema_to_value::<IssueUpdateResponse>()),
