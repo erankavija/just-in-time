@@ -2286,3 +2286,5 @@
 {"type":"issue_completed","id":"0a7b751a-18a6-47db-897b-f0c6b33e379c","issue_id":"34f45da2-2dbc-4ba4-b9a8-40fd79526931","timestamp":"2026-05-14T22:23:01.690549036Z"}
 {"type":"issue_created","id":"a7631db7-104a-4049-a88f-bf1dcbbac7dc","issue_id":"815d2ab7-5b29-40e4-8f54-01f9399b9727","timestamp":"2026-05-15T20:55:38.682443031Z","title":"Support figure and implementation document types in Web UI document viewer","priority":"high"}
 {"type":"issue_state_changed","id":"1d25a15d-60d4-477e-863b-f4686f6f1224","issue_id":"6d0128ae-38cf-48a6-9dbb-5fd962aef470","timestamp":"2026-05-15T20:55:41.108784355Z","from":"ready","to":"backlog"}
+{"type":"issue_state_changed","id":"e59157e8-3ae1-4348-941a-9d7ece8b087a","issue_id":"815d2ab7-5b29-40e4-8f54-01f9399b9727","timestamp":"2026-05-15T20:56:16.229381083Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"3937cb59-840e-4bbf-9abd-9b730263561d","issue_id":"815d2ab7-5b29-40e4-8f54-01f9399b9727","timestamp":"2026-05-15T20:56:16.232324184Z","assignee":"agent:claude"}
