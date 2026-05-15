@@ -6,6 +6,7 @@ import {
   buildCsvPreviewState,
 } from './CsvRenderer.helpers';
 import HtmlRenderer from './HtmlRenderer';
+import ImageRenderer from './ImageRenderer';
 import MarkdownRenderer from './MarkdownRenderer';
 import TextCodeRenderer from './TextCodeRenderer';
 
@@ -73,6 +74,17 @@ export const rendererRegistry: DocumentRenderer[] = [
     },
   },
   {
+    id: 'image',
+    match: (content, ref) => matchesExtension(content, ref, ['png', 'svg', 'jpg', 'jpeg', 'gif', 'webp']),
+    Component: ImageRenderer,
+    capabilities: {
+      showsHistory: false,
+      supportsPreviewCap: false,
+      supportsRawToggle: false,
+      supportsSearchHighlight: false,
+    },
+  },
+  {
     id: 'csv',
     match: (content, ref) => matchesExtension(content, ref, ['csv']),
     Component: CsvRenderer,
@@ -87,7 +99,7 @@ export const rendererRegistry: DocumentRenderer[] = [
   },
   {
     id: 'text-code',
-    match: (content, ref) => matchesExtension(content, ref, ['txt', 'rs', 'cpp']),
+    match: (content, ref) => matchesExtension(content, ref, ['txt', 'rs', 'cpp', 'py', 'sh', 'js', 'ts']),
     Component: TextCodeRenderer,
     capabilities: {
       showsHistory: true,

@@ -59,6 +59,49 @@ describe('rendererRegistry / pickRenderer', () => {
     expect(result.id).toBe('markdown');
   });
 
+  it('returns the image renderer for .png paths', () => {
+    const result = pickRenderer(makeContent('image/png', '', 'figures/result.png'));
+    expect(result.id).toBe('image');
+  });
+
+  it('returns the image renderer for .svg paths', () => {
+    const result = pickRenderer(makeContent('image/svg+xml', '', 'figures/diagram.svg'));
+    expect(result.id).toBe('image');
+  });
+
+  it('returns the image renderer for .jpg paths', () => {
+    const result = pickRenderer(makeContent('image/jpeg', '', 'photos/chart.jpg'));
+    expect(result.id).toBe('image');
+  });
+
+  it('returns the text-code renderer for .py paths', () => {
+    const result = pickRenderer(makeContent('text/plain', '', 'scripts/plot_benchmarks.py'));
+    expect(result.id).toBe('text-code');
+  });
+
+  it('returns the text-code renderer for .sh paths', () => {
+    const result = pickRenderer(makeContent('text/plain', '', 'scripts/run.sh'));
+    expect(result.id).toBe('text-code');
+  });
+
+  it('returns the text-code renderer for .js paths', () => {
+    const result = pickRenderer(makeContent('text/plain', '', 'scripts/helper.js'));
+    expect(result.id).toBe('text-code');
+  });
+
+  it('returns the text-code renderer for .ts paths', () => {
+    const result = pickRenderer(makeContent('text/plain', '', 'scripts/util.ts'));
+    expect(result.id).toBe('text-code');
+  });
+
+  it('image renderer entry hides history via capability metadata', () => {
+    const imageEntry = rendererRegistry.find((r) => r.id === 'image');
+    expect(imageEntry).toBeDefined();
+    expect(imageEntry?.capabilities.showsHistory).toBe(false);
+    expect(imageEntry?.capabilities.supportsRawToggle).toBe(false);
+    expect(imageEntry?.capabilities.supportsSearchHighlight).toBe(false);
+  });
+
   it('uses documentRef.path for matching when it differs from content.path', () => {
     const result = pickRenderer(
       makeContent('text/plain', '', 'README.md'),

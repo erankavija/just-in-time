@@ -24,14 +24,12 @@ function resolveMode(path: string): TextCodeMode {
 }
 
 function resolveLanguage(path: string): string | undefined {
-  if (path.endsWith('.rs')) {
-    return 'rust';
-  }
-
-  if (path.endsWith('.cpp')) {
-    return 'cpp';
-  }
-
+  if (path.endsWith('.rs')) return 'rust';
+  if (path.endsWith('.cpp')) return 'cpp';
+  if (path.endsWith('.py')) return 'python';
+  if (path.endsWith('.sh')) return 'bash';
+  if (path.endsWith('.js')) return 'javascript';
+  if (path.endsWith('.ts')) return 'typescript';
   return undefined;
 }
 
