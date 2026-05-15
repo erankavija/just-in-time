@@ -74,6 +74,21 @@ describe('rendererRegistry / pickRenderer', () => {
     expect(result.id).toBe('image');
   });
 
+  it('returns the image renderer for .jpeg paths', () => {
+    const result = pickRenderer(makeContent('image/jpeg', '', 'photos/photo.jpeg'));
+    expect(result.id).toBe('image');
+  });
+
+  it('returns the image renderer for .gif paths', () => {
+    const result = pickRenderer(makeContent('image/gif', '', 'assets/anim.gif'));
+    expect(result.id).toBe('image');
+  });
+
+  it('returns the image renderer for .webp paths', () => {
+    const result = pickRenderer(makeContent('image/webp', '', 'assets/frame.webp'));
+    expect(result.id).toBe('image');
+  });
+
   it('returns the text-code renderer for .py paths', () => {
     const result = pickRenderer(makeContent('text/plain', '', 'scripts/plot_benchmarks.py'));
     expect(result.id).toBe('text-code');
