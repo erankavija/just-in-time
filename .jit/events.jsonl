@@ -2333,3 +2333,5 @@
 {"type":"gate_removed","id":"f14dff4c-f2af-4a8e-b730-c9cb2df6c703","issue_id":"5fe00921-6548-4263-b428-f1e839f68c74","timestamp":"2026-06-01T23:00:20.801125617Z","gate_key":"code-review"}
 {"type":"issue_state_changed","id":"35f418c3-7d4d-43d6-bb79-8512ef171105","issue_id":"5fe00921-6548-4263-b428-f1e839f68c74","timestamp":"2026-06-01T23:00:20.819367502Z","from":"ready","to":"done"}
 {"type":"issue_completed","id":"ad221a1b-5fe2-4172-bc8c-2d31dc50901f","issue_id":"5fe00921-6548-4263-b428-f1e839f68c74","timestamp":"2026-06-01T23:00:20.819395003Z"}
+{"type":"issue_state_changed","id":"f318d9ad-dc40-403e-904c-bc63f06dff25","issue_id":"41d07c6b-24ff-4d4d-8f7f-56daba93bfd7","timestamp":"2026-06-01T23:01:04.686842963Z","from":"ready","to":"done"}
+{"type":"issue_completed","id":"f732d014-76eb-4b0d-ae5a-141aa852ed89","issue_id":"41d07c6b-24ff-4d4d-8f7f-56daba93bfd7","timestamp":"2026-06-01T23:01:04.686874113Z"}
