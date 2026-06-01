@@ -97,6 +97,47 @@ fn create_worktree(base_repo: &Path, worktree_name: &str) -> std::path::PathBuf 
     worktree_path
 }
 
+/// Create an issue in `repo` and return its full id.
+fn create_issue(repo: &Path, title: &str) -> String {
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(repo)
+        .args(["issue", "create", "--title", title, "--json"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    json["id"].as_str().unwrap().to_string()
+}
+
+/// Sum of `active_claims` across all worktrees from `jit worktree list --json`.
+fn worktree_active_claims_total(repo: &Path) -> u64 {
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(repo)
+        .args(["worktree", "list", "--json"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    json["worktrees"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|w| w["active_claims"].as_u64().unwrap())
+        .sum()
+}
+
+/// Number of active leases from `jit claim list --json`.
+fn claim_list_count(repo: &Path) -> u64 {
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(repo)
+        .args(["claim", "list", "--json"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    json["count"].as_u64().unwrap()
+}
+
 // === jit worktree info tests ===
 
 #[test]
@@ -258,6 +299,68 @@ fn test_worktree_list_json_output() {
     // Check first worktree has expected fields
     assert!(worktrees[0]["path"].is_string());
     assert!(worktrees[0]["branch"].is_string());
+}
+
+/// Regression for the reported bug: `jit worktree list` showed stale
+/// `active_claims` after a lease TTL expired, while `jit claim list` (which
+/// evicts expired leases) correctly returned 0. The two views must agree.
+#[test]
+fn test_worktree_list_excludes_expired_leases() {
+    let temp = setup_repo();
+
+    let short_id = create_issue(temp.path(), "short-lived");
+    let long_id = create_issue(temp.path(), "long-lived");
+
+    // Acquire a 1-second lease and a long-lived lease from the main worktree.
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args([
+            "claim",
+            "acquire",
+            &short_id,
+            "--ttl",
+            "1",
+            "--agent-id",
+            "agent:test",
+        ])
+        .assert()
+        .success();
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args([
+            "claim",
+            "acquire",
+            &long_id,
+            "--ttl",
+            "600",
+            "--agent-id",
+            "agent:test",
+        ])
+        .assert()
+        .success();
+
+    // Both leases are live initially, so they are both counted.
+    assert_eq!(
+        worktree_active_claims_total(temp.path()),
+        2,
+        "both live leases should be counted before expiry"
+    );
+
+    // Let the 1-second lease's TTL elapse.
+    std::thread::sleep(std::time::Duration::from_millis(1600));
+
+    // The expired lease must no longer be counted, and `worktree list` must
+    // agree with `claim list` (the divergence this bug was about).
+    let active = worktree_active_claims_total(temp.path());
+    let claims = claim_list_count(temp.path());
+    assert_eq!(
+        active, 1,
+        "expired lease must be excluded from active_claims"
+    );
+    assert_eq!(
+        active, claims,
+        "worktree list active_claims must agree with claim list count"
+    );
 }
 
 // === jit validate tests ===

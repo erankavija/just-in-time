@@ -131,10 +131,11 @@ fn parse_git_worktree_porcelain(output: &str) -> Result<Vec<GitWorktreeEntry>> {
 /// # Returns
 /// Number of active claims (leases) for the worktree
 fn count_claims_for_worktree(index: &ClaimsIndex, worktree_id: &str) -> usize {
+    let now = chrono::Utc::now();
     index
         .leases
         .iter()
-        .filter(|lease| lease.worktree_id == worktree_id)
+        .filter(|lease| lease.worktree_id == worktree_id && !lease.is_expired(now))
         .count()
 }
 
@@ -500,6 +501,47 @@ mod tests {
         assert_eq!(count_abc, 2);
         assert_eq!(count_def, 1);
         assert_eq!(count_xyz, 0);
+    }
+
+    #[test]
+    fn test_count_claims_excludes_expired_leases() {
+        use crate::storage::claim_coordinator::{ClaimsIndex, Lease};
+        use chrono::{Duration, Utc};
+
+        let now = Utc::now();
+        let make_lease =
+            |id: &str, ttl_secs: u64, expires_at: Option<chrono::DateTime<Utc>>| Lease {
+                lease_id: id.to_string(),
+                issue_id: format!("issue-{id}"),
+                agent_id: "agent:1".to_string(),
+                worktree_id: "wt:abc123".to_string(),
+                branch: Some("main".to_string()),
+                ttl_secs,
+                acquired_at: now,
+                expires_at,
+                last_beat: now,
+                stale: false,
+            };
+
+        let index = ClaimsIndex {
+            schema_version: 1,
+            generated_at: now,
+            last_seq: 3,
+            stale_threshold_secs: 3600,
+            sequence_gaps: Vec::new(),
+            leases: vec![
+                // Live: finite TTL, expiry in the future
+                make_lease("live", 600, Some(now + Duration::seconds(300))),
+                // Expired: finite TTL, expiry in the past -> must not be counted
+                make_lease("expired", 600, Some(now - Duration::seconds(1))),
+                // Indefinite: ttl_secs == 0, no expiry -> always live
+                make_lease("indefinite", 0, None),
+            ],
+        };
+
+        // Only the live and indefinite leases count; the expired one is excluded,
+        // matching `claim list` which evicts expired leases before reporting.
+        assert_eq!(count_claims_for_worktree(&index, "wt:abc123"), 2);
     }
 
     #[test]

@@ -51,6 +51,53 @@ pub struct Lease {
     pub stale: bool,
 }
 
+impl Lease {
+    /// Returns whether this lease has expired as of `now`.
+    ///
+    /// Only finite leases expire: a lease counts as expired when it has a
+    /// positive TTL (`ttl_secs > 0`) and its `expires_at` instant has passed.
+    /// Indefinite leases (`ttl_secs == 0`) and leases without an `expires_at`
+    /// never expire. This is the single source of truth for lease liveness,
+    /// shared by index eviction, index rebuild, and read-only callers (e.g.
+    /// `worktree list`) so their views cannot drift.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::storage::Lease;
+    /// use chrono::{Duration, Utc};
+    ///
+    /// let now = Utc::now();
+    /// let mut lease = Lease {
+    ///     lease_id: "l1".into(),
+    ///     issue_id: "i1".into(),
+    ///     agent_id: "agent:demo".into(),
+    ///     worktree_id: "wt:demo".into(),
+    ///     branch: None,
+    ///     ttl_secs: 600,
+    ///     acquired_at: now,
+    ///     expires_at: Some(now - Duration::seconds(1)),
+    ///     last_beat: now,
+    ///     stale: false,
+    /// };
+    /// // A finite lease past its expiry instant is expired.
+    /// assert!(lease.is_expired(now));
+    ///
+    /// // Indefinite leases (ttl_secs == 0) never expire.
+    /// lease.ttl_secs = 0;
+    /// lease.expires_at = None;
+    /// assert!(!lease.is_expired(now));
+    /// ```
+    pub fn is_expired(&self, now: DateTime<Utc>) -> bool {
+        if self.ttl_secs > 0 {
+            if let Some(expires_at) = self.expires_at {
+                return now > expires_at;
+            }
+        }
+        false
+    }
+}
+
 /// Claim operation types for audit log
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "op", rename_all = "kebab-case")]
@@ -507,15 +554,7 @@ impl ClaimCoordinator {
         let expired: Vec<_> = index
             .leases
             .iter()
-            .filter(|l| {
-                // Only evict finite leases that are expired
-                if l.ttl_secs > 0 {
-                    if let Some(expires_at) = l.expires_at {
-                        return now > expires_at;
-                    }
-                }
-                false
-            })
+            .filter(|l| l.is_expired(now))
             .cloned()
             .collect();
 
@@ -916,18 +955,12 @@ impl ClaimCoordinator {
             }
         }
 
-        // Filter out expired finite leases
+        // Filter out expired finite leases. Uses the same single source of
+        // truth (`Lease::is_expired`) as eviction and `worktree list`, so the
+        // rebuilt index cannot diverge from those views at the TTL boundary.
         let now = Utc::now();
         let stale_threshold_secs = 3600u64; // 1 hour default
-        active.retain(|_, lease| {
-            if lease.ttl_secs > 0 {
-                // Finite lease - check expiration
-                lease.expires_at.is_some_and(|exp| exp > now)
-            } else {
-                // Indefinite lease - keep it (staleness doesn't remove, just warns)
-                true
-            }
-        });
+        active.retain(|_, lease| !lease.is_expired(now));
 
         // Compute staleness for each lease
         let leases: Vec<Lease> = active
@@ -1038,6 +1071,35 @@ mod tests {
     use std::thread;
     use std::time::Duration as StdDuration;
     use tempfile::TempDir;
+
+    fn make_lease(ttl_secs: u64, expires_at: Option<DateTime<Utc>>) -> Lease {
+        let now = Utc::now();
+        Lease {
+            lease_id: "lease-x".to_string(),
+            issue_id: "issue-x".to_string(),
+            agent_id: "agent:1".to_string(),
+            worktree_id: "wt:abc123".to_string(),
+            branch: Some("main".to_string()),
+            ttl_secs,
+            acquired_at: now,
+            expires_at,
+            last_beat: now,
+            stale: false,
+        }
+    }
+
+    #[test]
+    fn test_lease_is_expired_predicate() {
+        let now = Utc::now();
+        // Finite TTL, expiry in the past -> expired
+        assert!(make_lease(600, Some(now - Duration::seconds(1))).is_expired(now));
+        // Finite TTL, expiry in the future -> not expired
+        assert!(!make_lease(600, Some(now + Duration::seconds(300))).is_expired(now));
+        // Indefinite lease (ttl_secs == 0) -> never expired
+        assert!(!make_lease(0, None).is_expired(now));
+        // Finite TTL but no expires_at recorded -> not expired
+        assert!(!make_lease(600, None).is_expired(now));
+    }
 
     fn setup_coordinator(temp_dir: &TempDir) -> ClaimCoordinator {
         let paths = WorktreePaths {
