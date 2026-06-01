@@ -2,7 +2,7 @@
   "id": "0587a73a-be52-465c-a2f2-dcac1cb4ebe6",
   "title": "Implement comprehensive error recovery",
   "description": "Conduct systematic audit and improvement of error handling across all I/O operations to ensure graceful recovery from all common failure modes. Implement detection and recovery for partial writes, corrupted JSON, lock timeouts, missing file references, and network errors. Add comprehensive validation command (jit validate) with auto-fix capability for common issues like orphaned locks, broken references, and schema violations. Implement failure injection tests for each error category to verify recovery mechanisms. Add detailed error logging with context and create operator runbook for error recovery procedures. This work is critical for production stability and ensuring no data loss or corruption under adverse conditions.",
-  "state": "ready",
+  "state": "rejected",
   "priority": "high",
   "assignee": null,
   "dependencies": [],
@@ -13,10 +13,10 @@
     "code-review"
   ],
   "gates_status": {
-    "tests": {
+    "clippy": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-04-10T00:23:18.852440069Z"
+      "updated_at": "2026-04-10T00:24:02.938816768Z"
     },
     "code-review": {
       "status": "failed",
@@ -28,10 +28,10 @@
       "updated_by": "auto:executor",
       "updated_at": "2026-04-10T00:24:10.609024515Z"
     },
-    "clippy": {
+    "tests": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-04-10T00:24:02.938816768Z"
+      "updated_at": "2026-04-10T00:23:18.852440069Z"
     }
   },
   "context": {},
@@ -51,5 +51,5 @@
     "component:core"
   ],
   "created_at": "2025-12-19T23:03:19.319199080Z",
-  "updated_at": "2026-04-10T00:28:39.639145158+00:00"
+  "updated_at": "2026-06-01T21:53:01.399737076+00:00"
 }
