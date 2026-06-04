@@ -142,8 +142,11 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
-        // Save issue
-        self.storage.save_issue(issue)?;
+        // Save only if at least one gate was actually added. Re-adding gates
+        // that already exist is a no-op and must not bump `updated_at`.
+        if !added.is_empty() {
+            self.storage.save_issue(issue)?;
+        }
 
         Ok((
             GateAddResult {
@@ -194,8 +197,11 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
-        // Save issue
-        self.storage.save_issue(issue)?;
+        // Save only if at least one gate was actually removed. Removing gates
+        // that are not present is a no-op and must not bump `updated_at`.
+        if !removed.is_empty() {
+            self.storage.save_issue(issue)?;
+        }
 
         Ok((GateRemoveResult { removed, not_found }, warnings))
     }
@@ -718,6 +724,76 @@ enforce_leases = "off"
         assert_eq!(
             issue.gates_status.get("auto-gate").unwrap().status,
             crate::domain::GateStatus::Passed
+        );
+    }
+
+    /// Register a simple manual gate so it can be added to issues in tests.
+    fn define_manual_gate(executor: &CommandExecutor<InMemoryStorage>, key: &str) {
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        registry.gates.insert(
+            key.to_string(),
+            Gate {
+                version: 1,
+                key: key.to_string(),
+                title: key.to_string(),
+                description: String::new(),
+                stage: GateStage::Postcheck,
+                mode: GateMode::Manual,
+                checker: None,
+                priority: 100,
+                reserved: HashMap::new(),
+                auto: false,
+                example_integration: None,
+            },
+        );
+        executor.storage.save_gate_registry(&registry).unwrap();
+    }
+
+    #[test]
+    fn test_add_existing_gate_is_noop() {
+        let executor = setup();
+        define_manual_gate(&executor, "g1");
+
+        let issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(issue).unwrap();
+
+        // Add the gate for real, then snapshot updated_at.
+        let (res1, _) = executor.add_gates(&issue_id, &["g1".to_string()]).unwrap();
+        assert_eq!(res1.added, vec!["g1".to_string()]);
+        let updated_after_add = executor.storage.load_issue(&issue_id).unwrap().updated_at;
+
+        // Re-adding the same gate is a no-op: it must not bump updated_at.
+        let (res2, _) = executor.add_gates(&issue_id, &["g1".to_string()]).unwrap();
+        assert!(res2.added.is_empty());
+        assert_eq!(res2.already_exist, vec!["g1".to_string()]);
+        assert_eq!(
+            executor.storage.load_issue(&issue_id).unwrap().updated_at,
+            updated_after_add,
+            "re-adding an existing gate must not bump updated_at"
+        );
+    }
+
+    #[test]
+    fn test_remove_absent_gate_is_noop() {
+        let executor = setup();
+        define_manual_gate(&executor, "g1");
+
+        let issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(issue).unwrap();
+        let updated_before = executor.storage.load_issue(&issue_id).unwrap().updated_at;
+
+        // Removing a gate the issue does not have is a no-op.
+        let (res, _) = executor
+            .remove_gates(&issue_id, &["g1".to_string()])
+            .unwrap();
+        assert!(res.removed.is_empty());
+        assert_eq!(res.not_found, vec!["g1".to_string()]);
+        assert_eq!(
+            executor.storage.load_issue(&issue_id).unwrap().updated_at,
+            updated_before,
+            "removing an absent gate must not bump updated_at"
         );
     }
 

@@ -184,6 +184,16 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let mut issue = self.storage.load_issue(&full_id)?;
 
+        // Snapshot the editable fields so we can later tell whether the edits
+        // actually changed anything. Idempotent flags (re-setting the same
+        // title, adding an existing label, removing a missing one) must not
+        // count as a change, otherwise a gate-blocked `--state done` retry
+        // would still bump `updated_at` and emit a false progress signal.
+        let original_title = issue.title.clone();
+        let original_description = issue.description.clone();
+        let original_priority = issue.priority;
+        let original_labels = issue.labels.clone();
+
         if let Some(t) = title {
             issue.title = t;
         }
@@ -204,6 +214,14 @@ impl<S: IssueStore> CommandExecutor<S> {
         for label in &remove_labels {
             issue.labels.retain(|l| l != label);
         }
+
+        // Whether the edits actually changed the issue (not merely whether
+        // edit flags were provided). Drives whether a gate-blocked `--state
+        // done` must still persist the issue to keep real edits.
+        let has_field_edits = issue.title != original_title
+            || issue.description != original_description
+            || issue.priority != original_priority
+            || issue.labels != original_labels;
 
         // Validate the updated issue with configured rules
         let config = self.config_manager.load()?;
@@ -254,10 +272,12 @@ impl<S: IssueStore> CommandExecutor<S> {
                     .into());
                 }
 
-                // If gates not passed, transition to Gated and return error
+                // If gates not passed, transition to Gated and return error.
+                // Persist when there are field edits to keep, or when this is a
+                // genuine transition into Gated (not a pure already-gated retry).
                 if issue.has_unpassed_gates() {
-                    self.handle_gate_blocking(&mut issue, old_state)?;
-                    return Ok(Vec::new());
+                    let persist = has_field_edits || old_state != State::Gated;
+                    return self.handle_gate_blocking(&mut issue, old_state, persist);
                 } else {
                     issue.state = State::Done;
                 }
@@ -279,7 +299,13 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
-        self.storage.save_issue(issue)?;
+        // Persist only when something actually changed: real field edits or a
+        // genuine state transition. A pure no-op `issue update` (e.g. only
+        // idempotent gate/assignee flags, already handled upstream) must not
+        // bump `updated_at` and emit a false progress signal.
+        if has_field_edits || old_state != issue.state {
+            self.storage.save_issue(issue)?;
+        }
 
         // Check if any dependent issues can now transition to ready (after save!)
         if let Some(s) = state {
@@ -369,9 +395,12 @@ impl<S: IssueStore> CommandExecutor<S> {
                     .into());
                 }
 
-                // If gates not passed, transition to Gated and return error
+                // If gates not passed, transition to Gated and return error.
+                // This path never carries field edits, so a retry on an
+                // already-gated issue is a pure no-op (no save, no event).
                 if issue.has_unpassed_gates() {
-                    return self.handle_gate_blocking(&mut issue, old_state);
+                    let persist = old_state != State::Gated;
+                    return self.handle_gate_blocking(&mut issue, old_state, persist);
                 } else {
                     issue.state = State::Done;
                 }
@@ -438,6 +467,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         let mut issue = self.storage.load_issue(&full_id)?;
+        // No-op if already assigned to the same assignee: don't bump updated_at.
+        if issue.assignee.as_deref() == Some(assignee.as_str()) {
+            return Ok(warnings);
+        }
         issue.assignee = Some(assignee);
         self.storage.save_issue(issue)?;
         Ok(warnings)
@@ -522,6 +555,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         let mut issue = self.storage.load_issue(&full_id)?;
+        // No-op if already unassigned: don't bump updated_at.
+        if issue.assignee.is_none() {
+            return Ok(warnings);
+        }
         issue.assignee = None;
         self.storage.save_issue(issue)?;
         Ok(warnings)
@@ -653,10 +690,27 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(())
     }
 
-    /// Helper to handle gate blocking when transitioning to Done
+    /// Helper to handle gate blocking when transitioning to Done.
     ///
-    /// Transitions issue to Gated, saves, logs, and returns error with clear feedback
-    fn handle_gate_blocking(&self, issue: &mut Issue, old_state: State) -> Result<Vec<String>> {
+    /// Moves the issue to `Gated` and returns a gate-blocking error with clear
+    /// feedback. Persistence and audit logging are conditional:
+    ///
+    /// - `persist` is the caller's decision about whether anything actually
+    ///   changed (a genuine transition into `Gated`, or accompanying field
+    ///   edits that must not be lost). When false, the call is a pure no-op —
+    ///   e.g. retrying `--state done` on an already-`Gated` issue with no other
+    ///   edits — and the issue is neither saved (no `updated_at` bump) nor
+    ///   logged.
+    /// - The `issue_state_changed` event is only appended for a real transition
+    ///   (`old_state != Gated`); a `gated -> gated` no-op must never be logged,
+    ///   as it would corrupt the audit log for metrics and stalled-work
+    ///   detection that read `events.jsonl`.
+    fn handle_gate_blocking(
+        &self,
+        issue: &mut Issue,
+        old_state: State,
+        persist: bool,
+    ) -> Result<Vec<String>> {
         let unpassed = issue.get_unpassed_gates();
         let gate_blockers = unpassed
             .into_iter()
@@ -671,16 +725,17 @@ impl<S: IssueStore> CommandExecutor<S> {
             .collect();
         issue.state = State::Gated;
 
-        // Clone issue before moving it to save
-        let issue_id = issue.id.clone();
-        let issue_to_save = issue.clone();
+        if persist {
+            let issue_id = issue.id.clone();
+            // Save the state change (and any field edits) before returning error
+            self.storage.save_issue(issue.clone())?;
 
-        // Save the state change before returning error
-        self.storage.save_issue(issue_to_save)?;
-
-        // Log state change event
-        let event = Event::new_issue_state_changed(issue_id, old_state, State::Gated);
-        self.storage.append_event(&event)?;
+            // Log the state change only for a genuine transition into Gated.
+            if old_state != State::Gated {
+                let event = Event::new_issue_state_changed(issue_id, old_state, State::Gated);
+                self.storage.append_event(&event)?;
+            }
+        }
 
         Err(TransitionBlockedError::gates(
             issue.id.clone(),
@@ -904,6 +959,275 @@ enforce_leases = "off"
         // Verify state transitioned to Gated (not Done)
         let issue = executor.storage.load_issue(&issue_id).unwrap();
         assert_eq!(issue.state, State::Gated);
+    }
+
+    #[test]
+    fn test_retry_done_on_gated_issue_is_event_log_noop() {
+        let executor = setup();
+
+        // Issue in progress with an unpassed gate.
+        let mut issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        issue.state = State::InProgress;
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(issue).unwrap();
+        executor.add_gate(&issue_id, "tests".to_string()).unwrap();
+
+        // First `--state done`: a genuine InProgress -> Gated transition, which
+        // should persist and emit exactly one state-change event.
+        let first = executor.update_issue_state(&issue_id, State::Done);
+        assert!(first.is_err(), "unpassed gates should block done");
+        let gated = executor.storage.load_issue(&issue_id).unwrap();
+        assert_eq!(gated.state, State::Gated);
+
+        let events_after_first = executor.storage.read_events().unwrap().len();
+        let updated_after_first = gated.updated_at;
+
+        // Retry `--state done` on the already-gated issue. It must still report
+        // the blocking gates, but must NOT append another state-change event or
+        // bump updated_at (the no-op gated -> gated audit-log corruption).
+        let retry = executor.update_issue_state(&issue_id, State::Done);
+        assert!(retry.is_err(), "retry should still report blocking gates");
+
+        let after = executor.storage.load_issue(&issue_id).unwrap();
+        assert_eq!(after.state, State::Gated);
+        assert_eq!(
+            executor.storage.read_events().unwrap().len(),
+            events_after_first,
+            "retrying done on a gated issue must not append a state-change event"
+        );
+        assert_eq!(
+            after.updated_at, updated_after_first,
+            "retrying done on a gated issue must not bump updated_at"
+        );
+    }
+
+    /// The CLI path `jit issue update <id> --state done` goes through
+    /// `update_issue`. A pure retry (no field edits) on an already-gated issue
+    /// must be a no-op for the audit log and timestamp.
+    #[test]
+    fn test_update_issue_pure_done_retry_on_gated_is_noop() {
+        let executor = setup();
+
+        let mut issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        issue.state = State::InProgress;
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(issue).unwrap();
+        executor.add_gate(&issue_id, "tests".to_string()).unwrap();
+
+        // First done attempt: genuine transition to Gated.
+        assert!(executor
+            .update_issue(
+                &issue_id,
+                None,
+                None,
+                None,
+                Some(State::Done),
+                vec![],
+                vec![]
+            )
+            .is_err());
+        let gated = executor.storage.load_issue(&issue_id).unwrap();
+        assert_eq!(gated.state, State::Gated);
+        let events_after_first = executor.storage.read_events().unwrap().len();
+        let updated_after_first = gated.updated_at;
+
+        // Pure retry via update_issue (all fields None) must not save or log.
+        assert!(executor
+            .update_issue(
+                &issue_id,
+                None,
+                None,
+                None,
+                Some(State::Done),
+                vec![],
+                vec![]
+            )
+            .is_err());
+        let after = executor.storage.load_issue(&issue_id).unwrap();
+        assert_eq!(after.state, State::Gated);
+        assert_eq!(
+            executor.storage.read_events().unwrap().len(),
+            events_after_first,
+            "pure done retry must not append an event"
+        );
+        assert_eq!(
+            after.updated_at, updated_after_first,
+            "pure done retry must not bump updated_at"
+        );
+    }
+
+    /// A gate-blocked `--state done` that *also* carries field edits must still
+    /// persist those edits (they must not be silently dropped), while not
+    /// logging a spurious `gated -> gated` state-change event.
+    #[test]
+    fn test_update_issue_field_edits_persist_when_done_blocked_on_gated() {
+        let executor = setup();
+
+        let mut issue = crate::domain::Issue::new("Old Title".to_string(), "Test".to_string());
+        issue.state = State::InProgress;
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(issue).unwrap();
+        executor.add_gate(&issue_id, "tests".to_string()).unwrap();
+
+        // Move to Gated via a first blocked done attempt.
+        assert!(executor
+            .update_issue(
+                &issue_id,
+                None,
+                None,
+                None,
+                Some(State::Done),
+                vec![],
+                vec![]
+            )
+            .is_err());
+        let events_after_first = executor.storage.read_events().unwrap().len();
+
+        // Retry done together with a title edit on the already-gated issue.
+        let result = executor.update_issue(
+            &issue_id,
+            Some("New Title".to_string()),
+            None,
+            None,
+            Some(State::Done),
+            vec![],
+            vec![],
+        );
+        assert!(result.is_err(), "gates should still block done");
+
+        let after = executor.storage.load_issue(&issue_id).unwrap();
+        assert_eq!(after.state, State::Gated);
+        assert_eq!(
+            after.title, "New Title",
+            "field edits must persist even when done is gate-blocked"
+        );
+        assert_eq!(
+            executor.storage.read_events().unwrap().len(),
+            events_after_first,
+            "no spurious gated -> gated state-change event should be logged"
+        );
+    }
+
+    /// Providing an edit flag whose value matches the current value (e.g.
+    /// `--title <same>`) is a semantic no-op and must not bump `updated_at` or
+    /// emit an event on a gate-blocked `--state done` retry.
+    #[test]
+    fn test_update_issue_idempotent_field_on_gated_retry_is_noop() {
+        let executor = setup();
+
+        let mut issue = crate::domain::Issue::new("Same Title".to_string(), "Test".to_string());
+        issue.state = State::InProgress;
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(issue).unwrap();
+        executor.add_gate(&issue_id, "tests".to_string()).unwrap();
+
+        // First blocked done attempt: transition to Gated.
+        assert!(executor
+            .update_issue(
+                &issue_id,
+                None,
+                None,
+                None,
+                Some(State::Done),
+                vec![],
+                vec![]
+            )
+            .is_err());
+        let gated = executor.storage.load_issue(&issue_id).unwrap();
+        let events_after_first = executor.storage.read_events().unwrap().len();
+        let updated_after_first = gated.updated_at;
+
+        // Retry with the SAME title value: no real change, so it must be a no-op.
+        assert!(executor
+            .update_issue(
+                &issue_id,
+                Some("Same Title".to_string()),
+                None,
+                None,
+                Some(State::Done),
+                vec![],
+                vec![],
+            )
+            .is_err());
+        let after = executor.storage.load_issue(&issue_id).unwrap();
+        assert_eq!(
+            executor.storage.read_events().unwrap().len(),
+            events_after_first,
+            "idempotent edit must not append an event"
+        );
+        assert_eq!(
+            after.updated_at, updated_after_first,
+            "idempotent edit must not bump updated_at"
+        );
+    }
+
+    #[test]
+    fn test_assign_same_assignee_is_noop() {
+        let executor = setup();
+
+        let issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(issue).unwrap();
+
+        executor
+            .assign_issue(&issue_id, "agent:a".to_string())
+            .unwrap();
+        let updated_after_assign = executor.storage.load_issue(&issue_id).unwrap().updated_at;
+
+        // Re-assigning the same assignee is a no-op.
+        executor
+            .assign_issue(&issue_id, "agent:a".to_string())
+            .unwrap();
+        assert_eq!(
+            executor.storage.load_issue(&issue_id).unwrap().updated_at,
+            updated_after_assign,
+            "re-assigning the same assignee must not bump updated_at"
+        );
+    }
+
+    #[test]
+    fn test_unassign_already_unassigned_is_noop() {
+        let executor = setup();
+
+        let issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(issue).unwrap();
+        let updated_before = executor.storage.load_issue(&issue_id).unwrap().updated_at;
+
+        // Unassigning an issue that has no assignee is a no-op.
+        executor.unassign_issue(&issue_id).unwrap();
+        assert_eq!(
+            executor.storage.load_issue(&issue_id).unwrap().updated_at,
+            updated_before,
+            "unassigning an already-unassigned issue must not bump updated_at"
+        );
+    }
+
+    #[test]
+    fn test_update_issue_with_no_changes_is_noop() {
+        let executor = setup();
+
+        let mut issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        issue.state = State::InProgress;
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(issue).unwrap();
+        let updated_before = executor.storage.load_issue(&issue_id).unwrap().updated_at;
+        let events_before = executor.storage.read_events().unwrap().len();
+
+        // No fields and no state change: pure no-op.
+        executor
+            .update_issue(&issue_id, None, None, None, None, vec![], vec![])
+            .unwrap();
+        let after = executor.storage.load_issue(&issue_id).unwrap();
+        assert_eq!(
+            after.updated_at, updated_before,
+            "a no-change issue update must not bump updated_at"
+        );
+        assert_eq!(
+            executor.storage.read_events().unwrap().len(),
+            events_before,
+            "a no-change issue update must not append events"
+        );
     }
 
     #[test]
