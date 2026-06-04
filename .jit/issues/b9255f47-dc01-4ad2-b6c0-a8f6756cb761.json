@@ -1,8 +1,8 @@
 {
   "id": "b9255f47-dc01-4ad2-b6c0-a8f6756cb761",
   "title": "Bug: no-op --state done on a gated issue records spurious gated->gated event",
-  "description": "## Problem\n\nRe-running `jit issue update <id> --state done` on an issue that is already in the `gated` state (because it has pending/failed gates) records a spurious `gated -> gated` entry in `events.jsonl` and bumps the issue's `updated_at` timestamp, even though no real state transition occurred.\n\nThis corrupts the audit log: any consumer reading `events.jsonl` or `updated_at` (metrics, velocity, stalled-work detection, validation analysis) will treat a no-op retry as genuine progress.\n\n## Steps to Reproduce\n\n1. Take an issue with a pending gate (e.g. `code-review`).\n2. Run `jit issue update <id> --state done`. It transitions `ready -> gated` (correct) and reports the blocking gate.\n3. Run `jit issue update <id> --state done` again (a retry).\n4. Inspect `events.jsonl`: a second `issue_state_changed` event with `{\"from\":\"gated\",\"to\":\"gated\"}` is appended, and `updated_at` advances.\n\n## Expected Behavior\n\nWhen an issue is already `gated` and remains blocked by the same gates, the retry should be a no-op for the event log: do not append an `issue_state_changed` event and do not bump `updated_at`. The blocking-gate message may still be shown.\n\n## Root Cause\n\n`handle_gate_blocking` in `crates/jit/src/commands/issue.rs:659-683` unconditionally emits `new_issue_state_changed(..., old_state, State::Gated)` even when `old_state` is already `Gated`, producing the synthetic `gated -> gated` event.\n\n## Success Criteria\n\n- [ ] Retrying `--state done` on an already-`gated` issue (still gate-blocked) appends no `issue_state_changed` event to `events.jsonl`.\n- [ ] `updated_at` is not advanced by such a no-op retry.\n- [ ] The blocking-gate guidance is still surfaced to the user on the retry.\n- [ ] A regression test covers retrying `--state done` on an already-gated issue and asserts no new state-change event is emitted.\n- [ ] A genuine `ready -> gated` (or any real) transition still emits its event as before.",
-  "state": "in_progress",
+  "description": "## Problem\n\nRe-running `jit issue update <id> --state done` on an issue that is already in the `gated` state (because it has pending/failed gates) records a spurious `gated -> gated` entry in `events.jsonl` and bumps the issue's `updated_at` timestamp, even though no real state transition occurred.\n\nThis corrupts the audit log: any consumer reading `events.jsonl` or `updated_at` (metrics, velocity, stalled-work detection, validation analysis) will treat a no-op retry as genuine progress.\n\n## Steps to Reproduce\n\n1. Take an issue with a pending gate (e.g. `code-review`).\n2. Run `jit issue update <id> --state done`. It transitions `ready -> gated` (correct) and reports the blocking gate.\n3. Run `jit issue update <id> --state done` again (a retry).\n4. Inspect `events.jsonl`: a second `issue_state_changed` event with `{\"from\":\"gated\",\"to\":\"gated\"}` is appended, and `updated_at` advances.\n\n## Expected Behavior\n\nWhen an issue is already `gated` and remains blocked by the same gates, the retry should be a no-op for the event log: do not append an `issue_state_changed` event and do not bump `updated_at`. The blocking-gate message may still be shown.\n\n## Root Cause\n\n`handle_gate_blocking` in `crates/jit/src/commands/issue.rs:659-683` unconditionally emits `new_issue_state_changed(..., old_state, State::Gated)` even when `old_state` is already `Gated`, producing the synthetic `gated -> gated` event.\n\n## Success Criteria\n\n- [ ] Retrying `--state done` on an already-`gated` issue (still gate-blocked) appends no `issue_state_changed` event to `events.jsonl`.\n- [ ] `updated_at` is not advanced by such a no-op retry.\n- [ ] The blocking-gate guidance is still surfaced to the user on the retry.\n- [ ] A regression test covers retrying `--state done` on an already-gated issue and asserts no new state-change event is emitted.\n- [ ] A genuine `ready -> gated` (or any real) transition still emits its event as before.\n\n## Extended Scope (broadened 2026-06-05 during review)\n\nCode review surfaced that the spurious-progress signal is not unique to the `--state done` retry: `jit issue update` also routes `--add-gate`, `--remove-gate`, `--assignee`, and `--unassign` through helpers that saved unconditionally, and `update_issue`'s final save was unconditional. Any of these as a semantic no-op (re-adding an existing gate, removing an absent gate, re-assigning the same assignee, unassigning an already-unassigned issue, or an `issue update` whose flag values match the current values) still bumped `updated_at`. Scope expanded to make all of these idempotent.\n\n### Additional Success Criteria\n\n- [ ] Re-adding a gate that already exists does not bump `updated_at`.\n- [ ] Removing a gate that is not present does not bump `updated_at`.\n- [ ] Re-assigning the same assignee does not bump `updated_at`.\n- [ ] Unassigning an already-unassigned issue does not bump `updated_at`.\n- [ ] `issue update` with field flags whose values equal the current values (idempotent edit) does not bump `updated_at`, while a real edit still persists.\n- [ ] Regression tests cover each idempotent no-op path.",
+  "state": "done",
   "priority": "normal",
   "assignee": "agent:claude",
   "dependencies": [],
@@ -11,15 +11,15 @@
     "cargo-ci"
   ],
   "gates_status": {
-    "cargo-ci": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-06-04T17:09:28.409680735Z"
-    },
     "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-06-04T17:09:28.409632245Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-04T21:52:28.229383789Z"
+    },
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-04T21:51:21.759632512Z"
     }
   },
   "context": {},
@@ -30,5 +30,5 @@
     "component:core"
   ],
   "created_at": "2026-06-01T22:34:35.049197784+00:00",
-  "updated_at": "2026-06-04T17:09:28.409701215+00:00"
+  "updated_at": "2026-06-04T22:00:31.388320382+00:00"
 }
