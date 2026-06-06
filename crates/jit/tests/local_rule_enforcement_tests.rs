@@ -233,6 +233,85 @@ fn test_update_enforce_rule_blocks_and_force_logs() {
 }
 
 #[test]
+fn test_update_force_noop_logs_bypass_for_each_violated_rule() {
+    // Regression: a forced no-op update (force = true, no field edits, no state
+    // arg) against an issue that ALREADY violates an enforce rule must still log
+    // one LocalRuleBypassed event per bypassed rule. The user explicitly forced
+    // the override; dropping the audit entry just because no other field changed
+    // would lose that signal. Two enforce rules are violated, so exactly two
+    // bypass events must be appended.
+    let executor = executor_with_rules(
+        r#"
+[[rules]]
+name = "epic-needs-req"
+when = { type = "epic" }
+severity = "error"
+enforce = true
+assert = { require-label = { label = "req:*", min = 1 } }
+
+[[rules]]
+name = "epic-needs-owner"
+when = { type = "epic" }
+severity = "error"
+enforce = true
+assert = { require-label = { label = "owner:*", min = 1 } }
+"#,
+    );
+
+    // Seed an epic that violates BOTH enforce rules (no req:, no owner:),
+    // bypassing create-time enforcement by writing through storage directly.
+    let mut issue = Issue::new("An epic".to_string(), String::new());
+    issue.labels = vec!["type:epic".to_string()];
+    issue.state = State::Ready;
+    let id = issue.id.clone();
+    executor.storage().save_issue(issue).unwrap();
+
+    let updated_at_before = executor.storage().load_issue(&id).unwrap().updated_at;
+    let events_before = executor.storage().read_events().unwrap().len();
+
+    // A pure no-op forced update: no title/description/priority/state change and
+    // no label edits. force = true makes the still-violated enforce rules a
+    // bypass rather than a rejection.
+    executor
+        .update_issue(&id, None, None, None, None, vec![], vec![], true)
+        .expect("a forced no-op update must not be rejected by enforce rules");
+
+    // Exactly one bypass event per violated enforce rule.
+    let events = bypass_events(&executor);
+    assert_eq!(
+        events.len(),
+        2,
+        "one LocalRuleBypassed event per bypassed enforce rule"
+    );
+    let mut rules: Vec<String> = events
+        .iter()
+        .map(|e| match e {
+            Event::LocalRuleBypassed { rule, issue_id, .. } => {
+                assert_eq!(issue_id, &id);
+                rule.clone()
+            }
+            other => panic!("expected LocalRuleBypassed, got {other:?}"),
+        })
+        .collect();
+    rules.sort();
+    assert_eq!(rules, vec!["epic-needs-owner", "epic-needs-req"]);
+
+    // The bypass events are the ONLY new events: a no-op write must not bump
+    // updated_at or emit a state-change/progress event.
+    let events_after = executor.storage().read_events().unwrap().len();
+    assert_eq!(
+        events_after - events_before,
+        2,
+        "a no-op forced override appends only the bypass events"
+    );
+    assert_eq!(
+        executor.storage().load_issue(&id).unwrap().updated_at,
+        updated_at_before,
+        "a no-op forced update must not bump updated_at"
+    );
+}
+
+#[test]
 fn test_bulk_update_enforce_rule_blocks() {
     // The batch path must enforce too: `--filter` cannot slip past enforce rules.
     let mut executor = executor_with_rules(
