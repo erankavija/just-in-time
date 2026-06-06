@@ -1,7 +1,7 @@
 {
   "id": "b8ba1b10-09f3-4807-90cb-95b91258347d",
   "title": "Extend `jit validate` and gate-checker integration",
-  "description": "Implements decision record (dev/active/f6a704d0-validation-engine.md) section 9.\n\n## Success Criteria\n\n- [hard] jit validate [<id>] [--json] runs local and graph rules, whole-repo or single issue.\n- [hard] Output reports rule name, severity, and message; non-zero exit on error findings.\n- [hard] A gate can invoke validation via --checker-command \"jit validate {issue} --json\".\n",
+  "description": "Implements decision record (dev/active/f6a704d0-validation-engine.md) section 9.\n\n## Success Criteria\n\n- [hard] `jit validate` accepts a positional [<id>] (net-new surface) plus --json; runs local and graph rules for one issue or whole-repo.\n- [hard] --explain lists matched selectors -> rule names -> outcomes for an issue (the debugging path replacing jit rule subcommands).\n- [hard] Gates invoke validation via the JIT_ISSUE_ID env var: --checker-command 'jit validate \"$JIT_ISSUE_ID\" --json'. No {issue} placeholder is assumed.\n- [hard] Output reports rule name, severity, and message; non-zero exit on error findings.\n",
   "state": "backlog",
   "priority": "high",
   "assignee": null,
@@ -21,5 +21,5 @@
     "epic:validation-engine"
   ],
   "created_at": "2026-06-06T15:51:20.560156313+00:00",
-  "updated_at": "2026-06-06T15:51:20.720291839+00:00"
+  "updated_at": "2026-06-06T16:05:03.243686105+00:00"
 }
