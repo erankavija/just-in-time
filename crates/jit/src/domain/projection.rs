@@ -52,6 +52,20 @@ use std::collections::BTreeMap;
 /// The canonical JSON shape an [`Issue`] normalizes to before validation.
 ///
 /// See the module docs for the documented contract and laziness rules.
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::{project, Issue};
+///
+/// let mut issue = Issue::new("Title".to_string(), String::new());
+/// issue.labels = vec!["type:epic".to_string(), "req:REQ-01".to_string()];
+/// let projection = project(&issue);
+/// assert_eq!(projection.type_, Some("epic".to_string()));
+/// assert_eq!(projection.labels.get("req"), Some(&vec!["REQ-01".to_string()]));
+/// // `project` is lazy: it never parses the body, so `sections` starts unset.
+/// assert!(projection.sections.is_none());
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct Projection {
     /// The issue's primary type, taken from its `type:*` label (e.g. `"epic"`).
@@ -82,6 +96,23 @@ pub struct Projection {
 }
 
 /// One section of the parsed body in the projection shape.
+///
+/// # Examples
+///
+/// ```
+/// use jit::document::MarkdownContentParser;
+/// use jit::domain::{project, Issue};
+///
+/// let issue = Issue::new(
+///     "Title".to_string(),
+///     "## Success Criteria\n\n- [hard] REQ-01\n".to_string(),
+/// );
+/// let projection = project(&issue).with_sections(&issue.description, &MarkdownContentParser);
+/// let section = &projection.sections.as_ref().unwrap()["success_criteria"];
+/// assert_eq!(section.heading, "Success Criteria");
+/// assert_eq!(section.level, 2);
+/// assert_eq!(section.items, vec!["[hard] REQ-01".to_string()]);
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct ProjectedSection {
     /// The original heading text (e.g. `"Success Criteria"`).
@@ -142,6 +173,19 @@ fn collect_doc_types(issue: &Issue) -> Vec<String> {
 /// directly off the issue. `sections` is left `None`; call
 /// [`Projection::ensure_sections`] or [`Projection::with_sections`] to populate
 /// it lazily only when a body assertion needs it (DR §6.1).
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::{project, Issue};
+///
+/// let mut issue = Issue::new("Title".to_string(), String::new());
+/// issue.labels = vec!["type:task".to_string()];
+/// let projection = project(&issue);
+/// assert_eq!(projection.type_, Some("task".to_string()));
+/// assert_eq!(projection.state, "backlog");
+/// assert!(projection.sections.is_none());
+/// ```
 pub fn project(issue: &Issue) -> Projection {
     let labels = group_labels(&issue.labels);
     let type_ = labels
@@ -360,7 +404,8 @@ mod tests {
     fn test_projection_schema_is_stable_contract() {
         let schema = serde_json::to_value(schemars::schema_for!(Projection)).unwrap();
         let props = &schema["properties"];
-        // Top-level contract fields must be present.
+
+        // --- Top-level contract fields are all present. ---
         for field in [
             "type",
             "state",
@@ -374,16 +419,98 @@ mod tests {
                 "projection contract missing field `{field}`"
             );
         }
-        // labels is an object whose values are arrays of strings.
-        assert_eq!(props["labels"]["type"], "object");
+
+        // --- Required-vs-optional semantics of the top-level fields. ---
+        // schemars 0.8 lists required (non-Option) fields in `required`; Option
+        // fields are absent from it and carry a nullable type union instead.
+        let required: std::collections::BTreeSet<&str> = schema["required"]
+            .as_array()
+            .expect("required must be an array")
+            .iter()
+            .map(|v| v.as_str().expect("required entries are strings"))
+            .collect();
+        for field in ["state", "priority", "labels", "doc_types"] {
+            assert!(
+                required.contains(field),
+                "`{field}` must be a required projection field"
+            );
+        }
+        for field in ["type", "sections"] {
+            assert!(
+                !required.contains(field),
+                "`{field}` must be optional/nullable, not required"
+            );
+        }
+        // Optional fields advertise a nullable type union, pinning their
+        // nullability (a breaking change to required-ness would flip this).
         assert_eq!(
-            props["labels"]["additionalProperties"]["type"], "array",
-            "labels namespace values must be arrays"
+            props["type"]["type"],
+            serde_json::json!(["string", "null"]),
+            "`type` must be a nullable string"
         );
-        // doc_types is an array of strings.
-        assert_eq!(props["doc_types"]["type"], "array");
-        // state and priority are strings.
+        assert_eq!(
+            props["sections"]["type"],
+            serde_json::json!(["object", "null"]),
+            "`sections` must be a nullable object"
+        );
+
+        // --- Scalar top-level shapes. ---
         assert_eq!(props["state"]["type"], "string");
         assert_eq!(props["priority"]["type"], "string");
+
+        // labels is an object whose values are arrays of strings.
+        assert_eq!(props["labels"]["type"], "object");
+        assert_eq!(props["labels"]["additionalProperties"]["type"], "array");
+        assert_eq!(
+            props["labels"]["additionalProperties"]["items"]["type"], "string",
+            "labels namespace values must be arrays of strings"
+        );
+
+        // doc_types is an array of strings.
+        assert_eq!(props["doc_types"]["type"], "array");
+        assert_eq!(props["doc_types"]["items"]["type"], "string");
+
+        // --- Nested ProjectedSection shape (the part the shallow test missed). ---
+        // `sections` values reference the ProjectedSection definition.
+        assert_eq!(
+            props["sections"]["additionalProperties"]["$ref"], "#/definitions/ProjectedSection",
+            "section values must be ProjectedSection objects"
+        );
+        let section = &schema["definitions"]["ProjectedSection"];
+        assert_eq!(
+            section["type"], "object",
+            "ProjectedSection must be an object"
+        );
+        // All three nested fields are required (none are Option).
+        let section_required: std::collections::BTreeSet<&str> = section["required"]
+            .as_array()
+            .expect("ProjectedSection.required must be an array")
+            .iter()
+            .map(|v| v.as_str().expect("required entries are strings"))
+            .collect();
+        for field in ["heading", "level", "items"] {
+            assert!(
+                section_required.contains(field),
+                "ProjectedSection must require `{field}`"
+            );
+        }
+        let section_props = &section["properties"];
+        // heading is a string, level an integer, items an array of strings.
+        assert_eq!(
+            section_props["heading"]["type"], "string",
+            "ProjectedSection.heading must be a string"
+        );
+        assert_eq!(
+            section_props["level"]["type"], "integer",
+            "ProjectedSection.level must be an integer"
+        );
+        assert_eq!(
+            section_props["items"]["type"], "array",
+            "ProjectedSection.items must be an array"
+        );
+        assert_eq!(
+            section_props["items"]["items"]["type"], "string",
+            "ProjectedSection.items must be an array of strings"
+        );
     }
 }

@@ -28,6 +28,15 @@ pub use markdown::MarkdownContentParser;
 /// Sections are keyed by a normalized heading slug (lowercased, spaces ->
 /// underscores) so that callers can address them stably regardless of the source
 /// heading text casing. A [`BTreeMap`] keeps the serialized order deterministic.
+///
+/// # Examples
+///
+/// ```
+/// use jit::document::{ContentParser, MarkdownContentParser, ParsedContent};
+///
+/// let parsed: ParsedContent = MarkdownContentParser.parse("## Plan\n\n- step\n");
+/// assert!(parsed.sections.contains_key("plan"));
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Default)]
 pub struct ParsedContent {
     /// Sections keyed by normalized heading slug (e.g. `"success_criteria"`).
@@ -35,6 +44,18 @@ pub struct ParsedContent {
 }
 
 /// One section of a document, identified by a heading.
+///
+/// # Examples
+///
+/// ```
+/// use jit::document::{ContentParser, MarkdownContentParser, Section};
+///
+/// let parsed = MarkdownContentParser.parse("## Notes\n\n- a\n- b\n");
+/// let section: &Section = parsed.sections.get("notes").unwrap();
+/// assert_eq!(section.heading, "Notes");
+/// assert_eq!(section.level, 2);
+/// assert_eq!(section.items, vec!["a".to_string(), "b".to_string()]);
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Default)]
 pub struct Section {
     /// The original heading text as written (e.g. `"Success Criteria"`).
@@ -51,6 +72,15 @@ pub struct Section {
 /// Lowercases, trims, and replaces runs of non-alphanumeric characters with a
 /// single underscore. `"## Success Criteria"` text `"Success Criteria"` becomes
 /// `"success_criteria"`.
+///
+/// # Examples
+///
+/// ```
+/// use jit::document::slugify_heading;
+///
+/// assert_eq!(slugify_heading("Success Criteria"), "success_criteria");
+/// assert_eq!(slugify_heading("  Plan (v2)!  "), "plan_v2");
+/// ```
 pub fn slugify_heading(heading: &str) -> String {
     let mut slug = String::with_capacity(heading.len());
     let mut prev_underscore = false;
@@ -76,6 +106,26 @@ pub fn slugify_heading(heading: &str) -> String {
 /// alone, with no I/O. `detect` mirrors
 /// [`DocFormatAdapter::detect`](crate::document::DocFormatAdapter::detect) and is
 /// expected to delegate to the matching adapter.
+///
+/// # Examples
+///
+/// ```
+/// use jit::document::{ContentParser, MarkdownContentParser};
+///
+/// fn first_heading(parser: &dyn ContentParser, body: &str) -> Option<String> {
+///     parser
+///         .parse(body)
+///         .sections
+///         .into_values()
+///         .next()
+///         .map(|s| s.heading)
+/// }
+///
+/// assert_eq!(
+///     first_heading(&MarkdownContentParser, "## Plan\n\n- step\n"),
+///     Some("Plan".to_string())
+/// );
+/// ```
 pub trait ContentParser {
     /// The parser identifier (e.g. `"markdown"`); matches the adapter id.
     fn id(&self) -> &str;

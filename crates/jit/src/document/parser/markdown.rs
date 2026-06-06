@@ -14,8 +14,37 @@ use pulldown_cmark::{Event, HeadingLevel, Parser, Tag, TagEnd};
 /// Markdown content parser.
 ///
 /// Pure: [`ContentParser::parse`] is a deterministic function of the input.
+///
+/// # Examples
+///
+/// ```
+/// use jit::document::{ContentParser, MarkdownContentParser};
+///
+/// let parsed = MarkdownContentParser.parse("## Notes\n\n- first\n- second\n");
+/// let notes = parsed.sections.get("notes").unwrap();
+/// assert_eq!(notes.heading, "Notes");
+/// assert_eq!(notes.items, vec!["first".to_string(), "second".to_string()]);
+/// ```
 #[derive(Debug, Default, Clone, Copy)]
 pub struct MarkdownContentParser;
+
+/// Insert a parsed section, MERGING it with any existing section that normalizes
+/// to the same slug.
+///
+/// Two headings that slugify identically (e.g. two `## Success Criteria`, or
+/// `Success Criteria` vs `Success-Criteria`) address the same canonical section,
+/// so their list items are concatenated in document order rather than the later
+/// section silently overwriting (or being dropped by) the earlier one. The first
+/// section's `heading` text and `level` are kept; only `items` are appended.
+fn merge_section(result: &mut ParsedContent, mut section: Section) {
+    let slug = slugify_heading(&section.heading);
+    match result.sections.get_mut(&slug) {
+        Some(existing) => existing.items.append(&mut section.items),
+        None => {
+            result.sections.insert(slug, section);
+        }
+    }
+}
 
 fn heading_level_to_u8(level: HeadingLevel) -> u8 {
     match level {
@@ -57,10 +86,7 @@ impl ContentParser for MarkdownContentParser {
                 Event::Start(Tag::Heading { level, .. }) => {
                     // Flush any section in progress before starting a new one.
                     if let Some(section) = current.take() {
-                        result
-                            .sections
-                            .entry(slugify_heading(&section.heading))
-                            .or_insert(section);
+                        merge_section(&mut result, section);
                     }
                     in_heading = true;
                     text_buf.clear();
@@ -102,16 +128,22 @@ impl ContentParser for MarkdownContentParser {
                 {
                     text_buf.push_str(&t);
                 }
+                // A wrapped line in a heading or item (e.g. `- foo\n  bar`)
+                // arrives as a soft/hard break. Map it to a single space so word
+                // boundaries survive (`foo bar`, not `foobar`). Trimming on flush
+                // removes any leading/trailing space this introduces.
+                Event::SoftBreak | Event::HardBreak
+                    if in_heading || (capturing_item && list_depth == 1) =>
+                {
+                    text_buf.push(' ');
+                }
                 _ => {}
             }
         }
 
         // Flush the trailing section.
         if let Some(section) = current.take() {
-            result
-                .sections
-                .entry(slugify_heading(&section.heading))
-                .or_insert(section);
+            merge_section(&mut result, section);
         }
 
         result
@@ -199,6 +231,56 @@ mod tests {
         let first = MarkdownContentParser.parse(md);
         let second = MarkdownContentParser.parse(md);
         assert_eq!(first, second);
+    }
+
+    #[test]
+    fn test_parse_multiline_list_item_keeps_word_boundary() {
+        // A wrapped list item must not collapse `foo` and `bar` into `foobar`.
+        let md = "## S\n\n- foo\n  bar\n";
+        let parsed = MarkdownContentParser.parse(md);
+        let section = parsed.sections.get("s").unwrap();
+        assert_eq!(section.items, vec!["foo bar".to_string()]);
+    }
+
+    #[test]
+    fn test_parse_multiline_heading_keeps_word_boundary() {
+        // A wrapped Setext heading emits a SoftBreak between its lines; that
+        // break must become a space so the heading reads `Success Criteria`,
+        // not `SuccessCriteria` (which would also slugify differently).
+        let md = "Success\nCriteria\n===============\n\n- x\n";
+        let parsed = MarkdownContentParser.parse(md);
+        let section = parsed
+            .sections
+            .get("success_criteria")
+            .expect("section present");
+        assert_eq!(section.heading, "Success Criteria");
+        assert_eq!(section.level, 1);
+    }
+
+    #[test]
+    fn test_parse_colliding_slugs_merge_items_in_order() {
+        // Two headings normalizing to the same slug must merge their items in
+        // document order rather than the later section being dropped.
+        let md = "## Success Criteria\n\n- one\n- two\n\n\
+            ## Success-Criteria\n\n- three\n- four\n";
+        let parsed = MarkdownContentParser.parse(md);
+        assert_eq!(parsed.sections.len(), 1);
+        let section = parsed
+            .sections
+            .get("success_criteria")
+            .expect("merged section present");
+        // First section's heading text and level are kept.
+        assert_eq!(section.heading, "Success Criteria");
+        assert_eq!(section.level, 2);
+        assert_eq!(
+            section.items,
+            vec![
+                "one".to_string(),
+                "two".to_string(),
+                "three".to_string(),
+                "four".to_string(),
+            ]
+        );
     }
 
     #[test]
