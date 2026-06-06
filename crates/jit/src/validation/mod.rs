@@ -9,6 +9,7 @@
 //! [`engine`] compiles and caches JSON Schema validators and evaluates a
 //! projection against a rule, producing [`engine::Finding`]s.
 
+pub mod desugar;
 pub mod engine;
 pub mod rules;
 
