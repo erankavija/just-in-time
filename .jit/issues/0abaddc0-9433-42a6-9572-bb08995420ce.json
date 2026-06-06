@@ -1,0 +1,24 @@
+{
+  "id": "0abaddc0-9433-42a6-9572-bb08995420ce",
+  "title": "jit init default ruleset scaffolding and existing-repo migration",
+  "description": "Implements decision record (dev/active/f6a704d0-validation-engine.md) section 8.2, 8.4.\n\n## Success Criteria\n\n- [hard] jit init scaffolds a default .jit/rules.toml reproducing the default checks.\n- [hard] Existing repos have a one-time path to obtain defaults without silently losing validation.\n",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "a0f0f342-5147-4775-b002-3c28d363460e"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:validation-engine"
+  ],
+  "created_at": "2026-06-06T15:51:20.566825385+00:00",
+  "updated_at": "2026-06-06T15:51:20.773346454+00:00"
+}

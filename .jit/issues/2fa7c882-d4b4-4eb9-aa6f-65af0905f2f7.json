@@ -1,0 +1,22 @@
+{
+  "id": "2fa7c882-d4b4-4eb9-aa6f-65af0905f2f7",
+  "title": "Rule model and config loader (.jit/rules.toml)",
+  "description": "Implements decision record (dev/active/f6a704d0-validation-engine.md) section 3, 8.\n\n## Success Criteria\n\n- [hard] Rule = selector + assertion + severity parsed from .jit/rules.toml.\n- [hard] Selector matrix (type, label, state, has_doc_type) AND-combinable; matching returns the union of applicable rules.\n- [hard] Schemas load inline or from .jit/schemas/*.json; severity off/warn/error and per-rule enforce (default enforce) parsed.\n",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:validation-engine"
+  ],
+  "created_at": "2026-06-06T15:51:20.542999879+00:00",
+  "updated_at": "2026-06-06T15:51:20.543027639+00:00"
+}

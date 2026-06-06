@@ -1,0 +1,24 @@
+{
+  "id": "6297d67b-93f0-4448-ba6a-5bd37128e418",
+  "title": "Shorthand rule kinds desugaring to JSON Schema",
+  "description": "Implements decision record (dev/active/f6a704d0-validation-engine.md) section 4.1, 5.2.\n\n## Success Criteria\n\n- [hard] require-label, require-section, and require-doc-type desugar to JSON Schema over the projection.\n- [hard] Desugaring is unit-tested against equivalent hand-written schemas.\n",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "7df61f62-2a79-450b-9959-9e46c16f6912"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:validation-engine"
+  ],
+  "created_at": "2026-06-06T15:51:20.549980611+00:00",
+  "updated_at": "2026-06-06T15:51:20.629042793+00:00"
+}
