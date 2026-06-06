@@ -10,6 +10,7 @@
 //! projection against a rule, producing [`engine::Finding`]s.
 
 pub mod engine;
+pub mod graph;
 pub mod rules;
 
 pub use engine::{Finding, SchemaCompileError, SchemaEngine};
