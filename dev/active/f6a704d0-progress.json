@@ -1,7 +1,7 @@
 {
   "epic_id": "f6a704d0-1f01-447b-a8aa-42251fa7c3eb",
   "epic_short_id": "f6a704d0",
-  "current_wave": 2,
+  "current_wave": 3,
   "waves": [
     {
       "wave_number": 1,
@@ -30,14 +30,14 @@
           "short_id": "7df61f62",
           "title": "JSON Schema validation core and custom-keyword extension point",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "00525fe0",
           "short_id": "00525fe0",
           "title": "HTML and XML content parsers",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -125,8 +125,20 @@
   ],
   "created_during_execution": [],
   "escalations": [
-    {"wave": 2, "issue": "00525fe0", "topic": "feature-gated html/xml parity test not exercised by default-only cargo-ci gate", "decision": "Add a separate features gate (user choice)", "resolution": "Defined gate cargo-ci-features (cargo clippy+test -p jit --features html,xml); added as required gate on 00525fe0"},
-    {"wave": 2, "issue": "7df61f62", "topic": "validator-cache keying: contradictory review rounds (no-alias vs literal 'once per rule'); exceeded rework attempts", "decision": "Keep schema-identity keying; amend decision record AND issue success criterion (user approved both)", "resolution": "DR 5.2 + plan + issue 7df61f62 criterion revised from 'once per rule' to 'once per distinct schema (schema identity)'; code unchanged"}
+    {
+      "wave": 2,
+      "issue": "00525fe0",
+      "topic": "feature-gated html/xml parity test not exercised by default-only cargo-ci gate",
+      "decision": "Add a separate features gate (user choice)",
+      "resolution": "Defined gate cargo-ci-features (cargo clippy+test -p jit --features html,xml); added as required gate on 00525fe0"
+    },
+    {
+      "wave": 2,
+      "issue": "7df61f62",
+      "topic": "validator-cache keying: contradictory review rounds (no-alias vs literal 'once per rule'); exceeded rework attempts",
+      "decision": "Keep schema-identity keying; amend decision record AND issue success criterion (user approved both)",
+      "resolution": "DR 5.2 + plan + issue 7df61f62 criterion revised from 'once per rule' to 'once per distinct schema (schema identity)'; code unchanged"
+    }
   ],
   "rework_counts": {
     "2f50a3b0": 1,
