@@ -2,6 +2,7 @@
 //!
 //! This module provides the domain layer containing:
 //! - **types**: Core data structures (Issue, State, Priority, Gate, Event, etc.)
+//! - **projection**: Pure normalization of an Issue into the canonical validation shape
 //! - **queries**: Pure query operations on issue collections
 //! - **graph**: Dependency graph algorithms (cycle detection, topological sort, transitive reduction)
 //! - **validation**: Issue validation against configuration rules
@@ -10,11 +11,15 @@
 //! The domain layer is independent of CLI orchestration and can be used
 //! directly for library integration.
 
+pub mod projection;
 pub mod queries;
 pub mod types;
 
 // Re-export all types for backward compatibility
 pub use types::*;
+
+// Re-export the projection layer for `use jit::domain::*` ergonomics.
+pub use projection::{project, ProjectedSection, Projection};
 
 // Re-export domain operations from sibling modules so that
 // `use jit::domain::*` gives access to types AND key operations.

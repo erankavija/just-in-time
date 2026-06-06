@@ -29,7 +29,7 @@ impl LinkValidator {
     /// Skips links inside code blocks (fenced and indented).
     /// Note: Inline code cannot contain links in Markdown, so we don't need to track it.
     pub fn scan_document_links(&self, doc_path: &Path) -> Result<Vec<InternalLink>> {
-        use pulldown_cmark::{Event, Parser, Tag};
+        use pulldown_cmark::{Event, Parser, Tag, TagEnd};
 
         let content = std::fs::read_to_string(self.repo_root.join(doc_path))?;
         let mut links = Vec::new();
@@ -45,13 +45,13 @@ impl LinkValidator {
                 Event::Start(Tag::CodeBlock(_)) => {
                     in_code_block = true;
                 }
-                Event::End(Tag::CodeBlock(_)) => {
+                Event::End(TagEnd::CodeBlock) => {
                     in_code_block = false;
                 }
                 // Process links only if not in code block
                 // Note: Inline code (`...`) cannot contain Markdown links, so no need to track it
-                Event::Start(Tag::Link(_, dest, _)) if !in_code_block => {
-                    let url = dest.as_ref().trim();
+                Event::Start(Tag::Link { dest_url, .. }) if !in_code_block => {
+                    let url = dest_url.as_ref().trim();
 
                     // Skip external URLs
                     if url.starts_with("http://") || url.starts_with("https://") {

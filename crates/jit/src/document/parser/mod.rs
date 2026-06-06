@@ -1,0 +1,114 @@
+//! Content parsers for document bodies.
+//!
+//! This module defines the [`ContentParser`] trait and the canonical structure
+//! it produces. Unlike [`DocFormatAdapter`](crate::document::DocFormatAdapter) —
+//! which is an asset/link tool — a `ContentParser` parses a document body into a
+//! single canonical structure of sections, headings, and list items that the
+//! validation engine projects over.
+//!
+//! Each parser yields ONE canonical [`ParsedContent`] regardless of source
+//! format, so the projection layer and validation rules are genuinely
+//! format-agnostic. The **Markdown** parser ([`markdown::MarkdownContentParser`])
+//! is in the default build; HTML/XML parsers live behind optional cargo features
+//! (added by a later task).
+//!
+//! Format detection reuses [`DocFormatAdapter::detect`](crate::document::DocFormatAdapter::detect)
+//! rather than duplicating heuristics: a `ContentParser` is expected to wrap (or
+//! delegate to) the matching adapter for content-based detection.
+
+pub mod markdown;
+
+use serde::Serialize;
+use std::collections::BTreeMap;
+
+pub use markdown::MarkdownContentParser;
+
+/// A canonical parsed document body.
+///
+/// Sections are keyed by a normalized heading slug (lowercased, spaces ->
+/// underscores) so that callers can address them stably regardless of the source
+/// heading text casing. A [`BTreeMap`] keeps the serialized order deterministic.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Default)]
+pub struct ParsedContent {
+    /// Sections keyed by normalized heading slug (e.g. `"success_criteria"`).
+    pub sections: BTreeMap<String, Section>,
+}
+
+/// One section of a document, identified by a heading.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Default)]
+pub struct Section {
+    /// The original heading text as written (e.g. `"Success Criteria"`).
+    pub heading: String,
+    /// The heading level (1 for `#`, 2 for `##`, ...).
+    pub level: u8,
+    /// The raw text runs of list entries directly under this heading, in order.
+    /// Each item is the flattened text of one top-level list entry.
+    pub items: Vec<String>,
+}
+
+/// Normalize a heading into a stable slug used as the section key.
+///
+/// Lowercases, trims, and replaces runs of non-alphanumeric characters with a
+/// single underscore. `"## Success Criteria"` text `"Success Criteria"` becomes
+/// `"success_criteria"`.
+pub fn slugify_heading(heading: &str) -> String {
+    let mut slug = String::with_capacity(heading.len());
+    let mut prev_underscore = false;
+    for ch in heading.trim().chars() {
+        if ch.is_alphanumeric() {
+            slug.extend(ch.to_lowercase());
+            prev_underscore = false;
+        } else if !prev_underscore && !slug.is_empty() {
+            slug.push('_');
+            prev_underscore = true;
+        }
+    }
+    // Trim a possible trailing underscore.
+    while slug.ends_with('_') {
+        slug.pop();
+    }
+    slug
+}
+
+/// A parser that turns a document body into a canonical [`ParsedContent`].
+///
+/// Implementations are pure: `parse` is a deterministic function of `content`
+/// alone, with no I/O. `detect` mirrors
+/// [`DocFormatAdapter::detect`](crate::document::DocFormatAdapter::detect) and is
+/// expected to delegate to the matching adapter.
+pub trait ContentParser {
+    /// The parser identifier (e.g. `"markdown"`); matches the adapter id.
+    fn id(&self) -> &str;
+
+    /// Content-based format detection, reusing the format adapter heuristics.
+    fn detect(&self, content: &str) -> bool;
+
+    /// Parse a document body into the canonical structure.
+    fn parse(&self, content: &str) -> ParsedContent;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_slugify_heading_basic() {
+        assert_eq!(slugify_heading("Success Criteria"), "success_criteria");
+    }
+
+    #[test]
+    fn test_slugify_heading_collapses_punctuation() {
+        assert_eq!(
+            slugify_heading("  Success / Criteria!  "),
+            "success_criteria"
+        );
+        assert_eq!(slugify_heading("Plan (v2)"), "plan_v2");
+    }
+
+    #[test]
+    fn test_slugify_heading_empty() {
+        assert_eq!(slugify_heading(""), "");
+        assert_eq!(slugify_heading("   "), "");
+        assert_eq!(slugify_heading("---"), "");
+    }
+}

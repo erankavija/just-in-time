@@ -263,8 +263,9 @@ impl DocFormatAdapter for MarkdownAdapter {
 
         for event in parser {
             match event {
-                Event::Start(Tag::Image(_, dest, _)) | Event::Start(Tag::Link(_, dest, _)) => {
-                    let path = dest.as_ref().trim();
+                Event::Start(Tag::Image { dest_url, .. })
+                | Event::Start(Tag::Link { dest_url, .. }) => {
+                    let path = dest_url.as_ref().trim();
 
                     // Skip anchor-only links
                     if path.starts_with('#') {

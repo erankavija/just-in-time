@@ -7,7 +7,9 @@
 mod adapter;
 mod assets;
 mod link_validator;
+pub mod parser;
 
 pub use adapter::{AdapterRegistry, DocFormatAdapter, HtmlAdapter, MarkdownAdapter};
 pub use assets::{Asset, AssetScanner, AssetType};
 pub use link_validator::{InternalLink, LinkType, LinkValidationResult, LinkValidator};
+pub use parser::{slugify_heading, ContentParser, MarkdownContentParser, ParsedContent, Section};
