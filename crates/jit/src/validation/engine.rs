@@ -18,8 +18,8 @@
 //! Compiling a schema is the documented perf pitfall; validating is cheap. The
 //! compiled [`jsonschema::Validator`] (which is `Clone + Send + Sync`) is
 //! therefore compiled at most ONCE per distinct schema and cached behind an
-//! [`Arc`]. The cache is keyed by the **schema's identity** (a stable hash of the
-//! schema's canonical serialized form), never by rule name. This makes validator
+//! [`Arc`]. The cache is keyed by the **schema's identity** (the schema's
+//! canonical serialized form itself, not a lossy hash), never by rule name. This makes validator
 //! aliasing impossible regardless of how a [`Rule`] is constructed: two rules
 //! that share the same schema correctly reuse one compiled validator (so the same
 //! rule never recompiles), while two rules carrying different schemas NEVER share
@@ -36,7 +36,6 @@
 
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
 use jsonschema::{Draft, Validator};
@@ -115,8 +114,8 @@ pub struct SchemaCompileError {
 /// Compiles and caches JSON Schema validators, then evaluates projections.
 ///
 /// The engine owns a cache of compiled [`jsonschema::Validator`]s keyed by
-/// **schema identity** — a stable hash of each schema's canonical serialized
-/// form — rather than by rule name. Compilation happens lazily on first use of a
+/// **schema identity** — each schema's canonical serialized form itself (not a
+/// lossy hash) — rather than by rule name. Compilation happens lazily on first use of a
 /// given schema and the resulting validator is reused on every subsequent call
 /// for that same schema, so the documented per-write recompilation pitfall (DR
 /// §5.2) is avoided. Because the key is the schema itself, two distinct schemas
@@ -158,11 +157,12 @@ pub struct SchemaCompileError {
 /// ```
 #[derive(Debug, Default)]
 pub struct SchemaEngine {
-    /// Compiled validators keyed by schema identity (a stable hash of the
-    /// schema's canonical serialized form). Keying by the schema rather than the
-    /// rule name makes validator aliasing impossible. Interior mutability lets
-    /// evaluation populate the cache behind a shared `&self`.
-    cache: RefCell<HashMap<u64, Arc<Validator>>>,
+    /// Compiled validators keyed by schema identity — the schema's canonical
+    /// serialized form itself (not a lossy hash), so two distinct schemas can
+    /// never collide onto one cached validator. Keying by the schema rather than
+    /// the rule name makes validator aliasing impossible. Interior mutability
+    /// lets evaluation populate the cache behind a shared `&self`.
+    cache: RefCell<HashMap<String, Arc<Validator>>>,
 }
 
 impl SchemaEngine {
@@ -252,7 +252,7 @@ impl SchemaEngine {
         // sharing a name but carrying different schemas can never alias onto one
         // compiled validator.
         let key = schema_key(schema);
-        let validator = self.validator_for(key, &rule.name, schema)?;
+        let validator = self.validator_for(&key, &rule.name, schema)?;
 
         let findings = validator
             .iter_errors(projection)
@@ -270,14 +270,16 @@ impl SchemaEngine {
     /// compiling `schema` and caching it on first request and reusing the cached
     /// [`Arc`] thereafter.
     ///
-    /// This is the caching primitive. The cache is keyed by `schema_key` — a
-    /// stable hash of the schema's canonical form, obtained from
+    /// This is the caching primitive. The cache is keyed by `schema_key` — the
+    /// schema's canonical serialized form, obtained from
     /// [`schema_key`](crate::validation::engine::schema_key) — so the returned
     /// `Arc<Validator>` is pointer-identical across calls for the **same schema**,
-    /// and the schema is compiled at most once (DR §5.2). The validator is built
-    /// with the 2020-12 draft pinned explicitly. `rule_name` is used only to
-    /// attribute a [`SchemaCompileError`] to a rule; it does NOT affect caching,
-    /// so two rules sharing a name but different schemas never alias.
+    /// and the schema is compiled at most once (DR §5.2). Because the key is the
+    /// full serialized schema (not a lossy hash), two distinct schemas can never
+    /// collide onto one validator. The validator is built with the 2020-12 draft
+    /// pinned explicitly. `rule_name` is used only to attribute a
+    /// [`SchemaCompileError`] to a rule; it does NOT affect caching, so two rules
+    /// sharing a name but different schemas never alias.
     ///
     /// # Examples
     ///
@@ -287,18 +289,18 @@ impl SchemaEngine {
     /// let engine = SchemaEngine::new();
     /// let schema = serde_json::json!({ "type": "object" });
     /// let key = schema_key(&schema);
-    /// let first = engine.validator_for(key, "r", &schema).unwrap();
-    /// let second = engine.validator_for(key, "r", &schema).unwrap();
+    /// let first = engine.validator_for(&key, "r", &schema).unwrap();
+    /// let second = engine.validator_for(&key, "r", &schema).unwrap();
     /// // Same schema => same cached validator (no recompilation).
     /// assert!(std::sync::Arc::ptr_eq(&first, &second));
     /// ```
     pub fn validator_for(
         &self,
-        schema_key: u64,
+        schema_key: &str,
         rule_name: &str,
         schema: &serde_json::Value,
     ) -> Result<Arc<Validator>, SchemaCompileError> {
-        if let Some(cached) = self.cache.borrow().get(&schema_key) {
+        if let Some(cached) = self.cache.borrow().get(schema_key) {
             return Ok(Arc::clone(cached));
         }
 
@@ -313,19 +315,21 @@ impl SchemaEngine {
 
         self.cache
             .borrow_mut()
-            .insert(schema_key, Arc::clone(&validator));
+            .insert(schema_key.to_string(), Arc::clone(&validator));
         Ok(validator)
     }
 }
 
 /// Compute a stable cache key from a JSON Schema's identity.
 ///
-/// The key is a `u64` hash of the schema's canonical serialized form
+/// The key is the schema's canonical serialized form itself
 /// (`serde_json::to_string`, which emits object keys in insertion order — stable
-/// for a given parsed [`serde_json::Value`]). Two schemas that serialize to the
-/// same string share a key (and therefore a compiled validator); any difference
-/// in content yields a different key, so distinct schemas never collide on the
-/// cache regardless of the rule names that carry them.
+/// for a given parsed [`serde_json::Value`]). Returning the full serialized
+/// schema rather than a hash means the key is a true identity: two schemas that
+/// serialize identically share a key (and therefore a compiled validator), and
+/// any difference in content yields a different key. There is no hash, so
+/// distinct schemas can never collide on the cache regardless of the rule names
+/// that carry them.
 ///
 /// # Examples
 ///
@@ -335,15 +339,12 @@ impl SchemaEngine {
 /// let a = serde_json::json!({ "type": "object" });
 /// let b = serde_json::json!({ "type": "object" });
 /// let c = serde_json::json!({ "type": "array" });
-/// // Equal schemas hash equal; different schemas hash differently.
+/// // Equal schemas share a key; different schemas have different keys.
 /// assert_eq!(schema_key(&a), schema_key(&b));
 /// assert_ne!(schema_key(&a), schema_key(&c));
 /// ```
-pub fn schema_key(schema: &serde_json::Value) -> u64 {
-    let canonical = serde_json::to_string(schema).unwrap_or_default();
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    canonical.hash(&mut hasher);
-    hasher.finish()
+pub fn schema_key(schema: &serde_json::Value) -> String {
+    serde_json::to_string(schema).unwrap_or_default()
 }
 
 /// Extract the JSON Schema a rule validates against, if it carries one.
@@ -485,8 +486,8 @@ assert = { require-label = { label = "type:*" } }
         assert!(engine.is_empty(), "engine starts with an empty cache");
 
         let key = schema_key(schema);
-        let first = engine.validator_for(key, "cached", schema).unwrap();
-        let second = engine.validator_for(key, "cached", schema).unwrap();
+        let first = engine.validator_for(&key, "cached", schema).unwrap();
+        let second = engine.validator_for(&key, "cached", schema).unwrap();
         // Pointer identity proves the same compiled validator was reused.
         assert!(
             Arc::ptr_eq(&first, &second),
@@ -503,7 +504,7 @@ assert = { require-label = { label = "type:*" } }
             1,
             "exactly one validator should ever be compiled for one rule"
         );
-        let after = engine.validator_for(key, "cached", schema).unwrap();
+        let after = engine.validator_for(&key, "cached", schema).unwrap();
         assert!(
             Arc::ptr_eq(&first, &after),
             "validator must remain the same instance after many validations"
