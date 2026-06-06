@@ -27,21 +27,73 @@
 //! [`SchemaEngine::validator_for`] and the `test_validator_is_cached_not_recompiled`
 //! and `test_same_name_different_schema_does_not_alias` unit tests.
 //!
-//! # Custom keywords are out of scope
+//! # Custom keywords (`x-jit-*`) extension point
 //!
-//! This core does NOT implement `x-jit-*` custom keywords (a separate task,
-//! 33f23ec7). Unknown keywords are treated as annotations — the `jsonschema`
-//! 0.46 default — so schemas that use them validate without error here. No
-//! strict-keyword rejection is added.
+//! By default the engine registers NO custom keywords, so unknown `x-jit-*`
+//! keywords are treated as annotations — the `jsonschema` 0.46 default — and
+//! schemas using them validate without error (graceful degradation). To attach
+//! domain-specific behavior, register a keyword via
+//! [`SchemaEngine::with_keyword`] (task 33f23ec7); the supplied [`Keyword`]
+//! factory is threaded into the `options()` builder on every compile. Keywords
+//! are fixed for the engine instance, so the schema-identity cache key stays
+//! correct. See the `test_degradation_x_jit_keyword_validates_under_standard_validator`
+//! regression guard.
 
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use jsonschema::{Draft, Validator};
+use jsonschema::paths::Location;
+use jsonschema::{Draft, Keyword, ValidationError, Validator};
 use thiserror::Error;
 
 use crate::validation::rules::{Rule, Severity};
+
+/// Factory closure that constructs a custom-keyword [`Keyword`] validator.
+///
+/// This mirrors the signature accepted by
+/// [`jsonschema::ValidationOptions::with_keyword`]: given the parent schema
+/// object, the keyword's own schema value, and its [`Location`], it returns a
+/// boxed [`Keyword`] implementation (or a [`ValidationError`] if the keyword's
+/// schema is itself malformed). Stored behind an [`Arc`] so the same factory can
+/// be re-applied every time a schema is (re)compiled for a fresh validator.
+///
+/// Used to register `x-jit-*` custom keywords on a [`SchemaEngine`] via
+/// [`SchemaEngine::with_keyword`].
+///
+/// # Examples
+///
+/// ```
+/// use jit::validation::engine::KeywordFactory;
+/// use jsonschema::{Keyword, ValidationError};
+/// use std::sync::Arc;
+///
+/// struct AlwaysOk;
+/// impl Keyword for AlwaysOk {
+///     fn validate<'i>(&self, _i: &'i serde_json::Value) -> Result<(), ValidationError<'i>> {
+///         Ok(())
+///     }
+///     fn is_valid(&self, _i: &serde_json::Value) -> bool {
+///         true
+///     }
+/// }
+///
+/// // A factory matching the `KeywordFactory` alias.
+/// let factory: Arc<KeywordFactory> =
+///     Arc::new(|_parent, _schema, _location| Ok(Box::new(AlwaysOk) as Box<dyn Keyword>));
+/// // It can be invoked like the closure it wraps.
+/// let parent = serde_json::Map::new();
+/// let schema = serde_json::json!(true);
+/// let result = factory(&parent, &schema, jsonschema::paths::Location::new());
+/// assert!(result.is_ok());
+/// ```
+pub type KeywordFactory = dyn for<'a> Fn(
+        &'a serde_json::Map<String, serde_json::Value>,
+        &'a serde_json::Value,
+        Location,
+    ) -> Result<Box<dyn Keyword>, ValidationError<'a>>
+    + Send
+    + Sync;
 
 /// A single validation failure, ready to surface to a user or machine.
 ///
@@ -155,7 +207,7 @@ pub struct SchemaCompileError {
 /// let ok = serde_json::json!({ "state": "ready" });
 /// assert!(engine.validate(&set.rules[0], &ok).unwrap().is_empty());
 /// ```
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct SchemaEngine {
     /// Compiled validators keyed by schema identity — the schema's canonical
     /// serialized form itself (not a lossy hash), so two distinct schemas can
@@ -163,6 +215,26 @@ pub struct SchemaEngine {
     /// the rule name makes validator aliasing impossible. Interior mutability
     /// lets evaluation populate the cache behind a shared `&self`.
     cache: RefCell<HashMap<String, Arc<Validator>>>,
+    /// Custom `x-jit-*` keyword factories registered via
+    /// [`SchemaEngine::with_keyword`], in registration order. These are FIXED for
+    /// the lifetime of the engine instance and applied to every validator the
+    /// engine compiles, so the schema-identity cache key remains correct: a given
+    /// schema always compiles to the same validator under one engine. An empty
+    /// vec (the default) means the engine behaves as a standard validator.
+    keywords: Vec<(String, Arc<KeywordFactory>)>,
+}
+
+impl std::fmt::Debug for SchemaEngine {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Keyword factories are closures and cannot be `Debug`; show their names.
+        f.debug_struct("SchemaEngine")
+            .field("cached_validators", &self.cache.borrow().len())
+            .field(
+                "keywords",
+                &self.keywords.iter().map(|(n, _)| n).collect::<Vec<_>>(),
+            )
+            .finish()
+    }
 }
 
 impl SchemaEngine {
@@ -194,6 +266,106 @@ impl SchemaEngine {
     /// ```
     pub fn is_empty(&self) -> bool {
         self.cache.borrow().is_empty()
+    }
+
+    /// Register an `x-jit-*` custom keyword, returning the engine for chaining.
+    ///
+    /// This is the engine's extension point (DR §5.3, task 33f23ec7). The
+    /// `factory` is threaded into the `jsonschema` `options()` builder via
+    /// [`jsonschema::ValidationOptions::with_keyword`] every time the engine
+    /// compiles a schema, so any schema referencing `name` is validated by the
+    /// supplied [`Keyword`] implementation. Keywords are FIXED once the engine is
+    /// built (this is a consuming builder), which keeps the schema-identity cache
+    /// correct: under a given engine a schema always compiles to the same
+    /// validator, so caching by schema alone remains valid.
+    ///
+    /// The default [`SchemaEngine::new`] registers no keywords and behaves as a
+    /// standard validator; unknown `x-jit-*` keywords then degrade to annotations
+    /// (see the degradation regression test).
+    ///
+    /// By convention `name` should start with `x-jit-`, but no naming check is
+    /// imposed here — `jsonschema` accepts any keyword name.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::validation::engine::SchemaEngine;
+    /// use jit::validation::rules::RuleSet;
+    /// use jsonschema::{Keyword, ValidationError};
+    ///
+    /// // A custom keyword: the annotated string must not be empty.
+    /// struct NonEmpty;
+    /// impl Keyword for NonEmpty {
+    ///     fn validate<'i>(&self, i: &'i serde_json::Value) -> Result<(), ValidationError<'i>> {
+    ///         if self.is_valid(i) {
+    ///             Ok(())
+    ///         } else {
+    ///             Err(ValidationError::custom("string must not be empty"))
+    ///         }
+    ///     }
+    ///     fn is_valid(&self, i: &serde_json::Value) -> bool {
+    ///         i.as_str().is_none_or(|s| !s.is_empty())
+    ///     }
+    /// }
+    ///
+    /// let engine = SchemaEngine::new()
+    ///     .with_keyword("x-jit-non-empty", |_p, _s, _l| Ok(Box::new(NonEmpty)));
+    /// assert_eq!(engine.registered_keywords(), vec!["x-jit-non-empty".to_string()]);
+    ///
+    /// let dir = tempfile::tempdir().unwrap();
+    /// let schemas = dir.path().join("schemas");
+    /// std::fs::create_dir_all(&schemas).unwrap();
+    /// std::fs::write(
+    ///     schemas.join("t.json"),
+    ///     r#"{ "type": "object",
+    ///          "properties": { "title": { "type": "string", "x-jit-non-empty": true } } }"#,
+    /// )
+    /// .unwrap();
+    /// let toml = r#"
+    /// [[rules]]
+    /// name = "title-non-empty"
+    /// assert = { json-schema = "schemas/t.json" }
+    /// "#;
+    /// let set = RuleSet::from_toml_str(toml, dir.path()).unwrap();
+    ///
+    /// // An empty title now violates the registered keyword.
+    /// let bad = serde_json::json!({ "title": "" });
+    /// assert_eq!(engine.validate(&set.rules[0], &bad).unwrap().len(), 1);
+    /// // A non-empty title passes.
+    /// let ok = serde_json::json!({ "title": "hello" });
+    /// assert!(engine.validate(&set.rules[0], &ok).unwrap().is_empty());
+    /// ```
+    #[must_use]
+    pub fn with_keyword<N, F>(mut self, name: N, factory: F) -> Self
+    where
+        N: Into<String>,
+        F: for<'a> Fn(
+                &'a serde_json::Map<String, serde_json::Value>,
+                &'a serde_json::Value,
+                Location,
+            ) -> Result<Box<dyn Keyword>, ValidationError<'a>>
+            + Send
+            + Sync
+            + 'static,
+    {
+        self.keywords.push((name.into(), Arc::new(factory)));
+        self
+    }
+
+    /// Names of the custom keywords registered on this engine, in registration
+    /// order.
+    ///
+    /// A standard engine ([`SchemaEngine::new`]) returns an empty `Vec`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::validation::engine::SchemaEngine;
+    ///
+    /// assert!(SchemaEngine::new().registered_keywords().is_empty());
+    /// ```
+    pub fn registered_keywords(&self) -> Vec<String> {
+        self.keywords.iter().map(|(name, _)| name.clone()).collect()
     }
 
     /// Validate a serialized [`Projection`](crate::domain::Projection) against a
@@ -304,13 +476,24 @@ impl SchemaEngine {
             return Ok(Arc::clone(cached));
         }
 
-        let validator = jsonschema::options()
-            .with_draft(Draft::Draft202012)
-            .build(schema)
-            .map_err(|error| SchemaCompileError {
-                rule: rule_name.to_string(),
-                message: error.to_string(),
-            })?;
+        // Apply any registered `x-jit-*` custom keywords. Each factory is cloned
+        // (cheap `Arc` clone) into an owned `'static` closure so every compiled
+        // validator carries its own handle; the keyword set is fixed for the
+        // engine, so this does not affect schema-identity caching. The builder
+        // consumes and returns `self`, so it is folded over the keyword list.
+        let options = self.keywords.iter().fold(
+            jsonschema::options().with_draft(Draft::Draft202012),
+            |options, (name, factory)| {
+                let factory = Arc::clone(factory);
+                options.with_keyword(name.clone(), move |parent, schema, location| {
+                    factory(parent, schema, location)
+                })
+            },
+        );
+        let validator = options.build(schema).map_err(|error| SchemaCompileError {
+            rule: rule_name.to_string(),
+            message: error.to_string(),
+        })?;
         let validator = Arc::new(validator);
 
         self.cache
@@ -759,5 +942,170 @@ assert = { json-schema = "schemas/b.json" }
             findings.is_empty(),
             "unknown keyword must not fail, got {findings:?}"
         );
+    }
+
+    // --- x-jit-* custom keyword extension point (task 33f23ec7) -------------
+
+    /// Sample custom keyword: the annotated string value must be non-empty when
+    /// present. The keyword's own schema value is ignored; it exists only to opt a
+    /// location into the check. Exercised end-to-end (success criterion 3).
+    struct NonEmpty;
+    impl jsonschema::Keyword for NonEmpty {
+        fn validate<'i>(
+            &self,
+            instance: &'i serde_json::Value,
+        ) -> Result<(), jsonschema::ValidationError<'i>> {
+            if self.is_valid(instance) {
+                Ok(())
+            } else {
+                Err(jsonschema::ValidationError::custom(
+                    "x-jit-non-empty: string must not be empty",
+                ))
+            }
+        }
+        fn is_valid(&self, instance: &serde_json::Value) -> bool {
+            instance.as_str().is_none_or(|s| !s.is_empty())
+        }
+    }
+
+    /// Factory matching the [`with_keyword`](SchemaEngine::with_keyword) HRTB
+    /// signature exactly (a free `fn`, so the `for<'a>` bound is satisfied
+    /// without lifetime pinning).
+    fn non_empty_string_factory<'a>(
+        _parent: &'a serde_json::Map<String, serde_json::Value>,
+        _schema: &'a serde_json::Value,
+        _location: jsonschema::paths::Location,
+    ) -> Result<Box<dyn jsonschema::Keyword>, jsonschema::ValidationError<'a>> {
+        Ok(Box::new(NonEmpty))
+    }
+
+    #[test]
+    fn test_degradation_x_jit_keyword_validates_under_standard_validator() {
+        // GRACEFUL-DEGRADATION REGRESSION GUARD (success criterion 2):
+        //
+        // A schema that uses an `x-jit-*` custom keyword must still compile and
+        // validate STRUCTURALLY under a STANDARD validator that has NOT registered
+        // that keyword. jsonschema 0.46 treats unknown keywords as annotations
+        // (never errors), so the custom keyword degrades to a no-op rather than a
+        // hard failure. If a future crate bump flipped to strict-keyword rejection
+        // this test would fail, alerting us before it reaches users.
+        let schema = serde_json::json!({
+            "type": "object",
+            "properties": {
+                "title": { "type": "string", "x-jit-non-empty": true }
+            }
+        });
+
+        // A STANDARD engine: no custom keywords registered at all.
+        let standard = SchemaEngine::new();
+        assert!(
+            standard.registered_keywords().is_empty(),
+            "the default engine must register no custom keywords"
+        );
+
+        // Compiling the schema under the standard engine must succeed: the unknown
+        // `x-jit-non-empty` keyword is an annotation, not a compile error.
+        let key = schema_key(&schema);
+        let validator = standard
+            .validator_for(&key, "degradation", &schema)
+            .expect("schema using x-jit-* must compile under a standard validator");
+
+        // And it must still enforce the STANDARD keywords (`type: string`). The
+        // custom keyword silently does nothing, but `title: 7` violates `string`.
+        let structurally_bad = serde_json::json!({ "title": 7 });
+        assert!(
+            validator.iter_errors(&structurally_bad).next().is_some(),
+            "standard keywords must still be enforced even with an x-jit-* annotation present"
+        );
+
+        // An EMPTY string would violate the custom keyword, but under the standard
+        // validator (no registration) it must PASS — proving the keyword degraded
+        // to a no-op rather than being enforced or erroring.
+        let empty_title = serde_json::json!({ "title": "" });
+        assert!(
+            validator.iter_errors(&empty_title).next().is_none(),
+            "unregistered x-jit-* keyword must degrade to a no-op, not reject"
+        );
+    }
+
+    #[test]
+    fn test_with_keyword_registers_named_keyword() {
+        // The registration point records the keyword name on the engine instance.
+        let engine = SchemaEngine::new().with_keyword("x-jit-non-empty", non_empty_string_factory);
+        assert_eq!(
+            engine.registered_keywords(),
+            vec!["x-jit-non-empty".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_custom_keyword_enforced_end_to_end() {
+        // SAMPLE CUSTOM KEYWORD END-TO-END (success criterion 3):
+        //
+        // With the `x-jit-non-empty` keyword REGISTERED, a schema using it must now
+        // actually enforce the rule: an empty string fails, a non-empty string
+        // passes, and a non-string is left to the standard `type` keyword.
+        let schema = serde_json::json!({
+            "type": "object",
+            "properties": {
+                "title": { "type": "string", "x-jit-non-empty": true }
+            },
+            "required": ["title"]
+        });
+        let rule = Rule {
+            name: "title-non-empty".to_string(),
+            when: crate::validation::rules::Selector::default(),
+            severity: Severity::Error,
+            enforce: false,
+            assert: crate::validation::rules::Assertion::JsonSchema(
+                crate::validation::rules::SchemaSource {
+                    reference: "inline".to_string(),
+                    path: std::path::PathBuf::from("inline"),
+                    schema,
+                },
+            ),
+            scope: crate::validation::rules::Scope::Local,
+        };
+        let set = RuleSet { rules: vec![rule] };
+
+        let engine = SchemaEngine::new().with_keyword("x-jit-non-empty", non_empty_string_factory);
+
+        // Non-empty title: passes.
+        let ok = serde_json::json!({ "title": "Ship it" });
+        assert!(
+            engine.validate(&set.rules[0], &ok).unwrap().is_empty(),
+            "a non-empty title must satisfy the custom keyword"
+        );
+
+        // Empty title: the custom keyword fires.
+        let bad = serde_json::json!({ "title": "" });
+        let findings = engine.validate(&set.rules[0], &bad).unwrap();
+        assert_eq!(
+            findings.len(),
+            1,
+            "an empty title must violate the registered custom keyword, got {findings:?}"
+        );
+        assert_eq!(findings[0].rule, "title-non-empty");
+        assert!(findings[0].message.contains("must not be empty"));
+    }
+
+    #[test]
+    fn test_custom_keyword_engine_still_caches_by_schema() {
+        // Registering custom keywords must not break schema-identity caching: the
+        // keywords are fixed for the engine instance, so each distinct schema is
+        // still compiled at most once.
+        let engine = SchemaEngine::new().with_keyword("x-jit-non-empty", non_empty_string_factory);
+        let schema = serde_json::json!({
+            "type": "object",
+            "properties": { "title": { "type": "string", "x-jit-non-empty": true } }
+        });
+        let key = schema_key(&schema);
+        let first = engine.validator_for(&key, "r", &schema).unwrap();
+        let second = engine.validator_for(&key, "r", &schema).unwrap();
+        assert!(
+            Arc::ptr_eq(&first, &second),
+            "a custom-keyword engine must still cache validators by schema identity"
+        );
+        assert_eq!(engine.cache.borrow().len(), 1);
     }
 }

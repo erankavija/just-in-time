@@ -14,7 +14,7 @@ pub mod engine;
 pub mod graph;
 pub mod rules;
 
-pub use engine::{Finding, SchemaCompileError, SchemaEngine};
+pub use engine::{Finding, KeywordFactory, SchemaCompileError, SchemaEngine};
 
 use crate::config::ValidationConfig;
 use crate::domain::{Issue, LabelNamespaces};
