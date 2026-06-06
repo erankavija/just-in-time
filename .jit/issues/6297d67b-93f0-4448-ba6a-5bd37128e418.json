@@ -1,7 +1,7 @@
 {
   "id": "6297d67b-93f0-4448-ba6a-5bd37128e418",
   "title": "Shorthand rule kinds desugaring to JSON Schema",
-  "description": "Desugar the shorthand rule kinds (require-label, require-section, require-doc-type) into JSON Schema over the projection.\n\n## Background\n\nShorthands keep common rules to one line while the engine retains a single validator underneath. Each shorthand must compile to equivalent JSON Schema. See `dev/active/f6a704d0-validation-engine-plan.md` (step 4) and decision record sections 4.1 and 5.2.\n\n## Success Criteria\n\n- [ ] [hard] `validation/desugar.rs` converts `require-label {label, min, max}` into a JSON Schema constraining `labels.<ns>` cardinality.\n- [ ] [hard] `require-section {heading}` desugars to a schema asserting `sections.<heading>` exists and is non-empty.\n- [ ] [hard] `require-doc-type {doc_type}` desugars to a schema asserting `doc_types` contains the value.\n- [ ] [hard] Each desugaring is unit-tested against an equivalent hand-written JSON Schema (identical accept/reject behavior).\n\n## Notes\n\nBuilds on the projection shape and the validation core's evaluation primitive.\n",
+  "description": "Desugar the shorthand rule kinds into JSON Schema over the projection.\n\n## Background\n\nShorthands keep common rules to one line while the engine retains a single validator. Each compiles to equivalent JSON Schema. See `dev/active/f6a704d0-validation-engine-plan.md` (step 4) and decision record sections 4.1 and 5.2.\n\n## Success Criteria\n\n- [ ] [hard] `validation/desugar.rs` converts `require-label {label, min, max}` into a JSON Schema constraining `labels.<ns>` cardinality.\n- [ ] [hard] `label-value-pattern {namespace, regex}` desugars to a JSON Schema `pattern` constraint on the items of `labels.<ns>`.\n- [ ] [hard] `require-section {heading}` desugars to a schema asserting `sections.<heading>` exists and is non-empty.\n- [ ] [hard] `require-doc-type {doc_type}` desugars to a schema asserting `doc_types` contains the value.\n- [ ] [hard] Each desugaring is unit-tested against an equivalent hand-written JSON Schema (identical accept/reject behavior).\n\n## Notes\n\nBuilds on the projection shape and the validation core's evaluation primitive. These four shorthands are the complete v1 local kind set (decision record 4.1).\n",
   "state": "backlog",
   "priority": "normal",
   "assignee": null,
@@ -20,5 +20,5 @@
     "epic:validation-engine"
   ],
   "created_at": "2026-06-06T15:51:20.549980611+00:00",
-  "updated_at": "2026-06-06T17:00:14.562964741+00:00"
+  "updated_at": "2026-06-06T17:51:46.436722773+00:00"
 }

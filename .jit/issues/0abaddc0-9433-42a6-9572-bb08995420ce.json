@@ -1,7 +1,7 @@
 {
   "id": "0abaddc0-9433-42a6-9572-bb08995420ce",
   "title": "jit init default ruleset scaffolding and existing-repo migration",
-  "description": "Scaffold a default `.jit/rules.toml` on `jit init` and migrate existing repos' legacy config into rules, removing old keys without hard-erroring.\n\n## Background\n\nSince nothing is hard-coded, repos obtain their checks from `rules.toml`: new repos via `init`, existing repos via a one-time migration. A git-synced stale config carrying removed keys must not break. See `dev/active/f6a704d0-validation-engine-plan.md` (step 9) and decision record sections 8.2 and 8.4.\n\n## Success Criteria\n\n- [ ] [hard] `jit init` scaffolds a default `.jit/rules.toml` reproducing the default checks.\n- [ ] [hard] A one-time migration converts existing `[validation]` and `[namespaces].{values,pattern,required}` config into `rules.toml`, then removes the old enforcement keys.\n- [ ] [hard] When a config still carrying removed keys is loaded before migration has run, the loader warns and ignores the unknown keys and prompts to migrate; it does not hard-error.\n- [ ] [hard] Existing repos obtain defaults without silently losing validation.\n\n## Notes\n\nAnchors: init path at `main.rs:272` and `executor.init` in `commands/mod.rs`; config load in `config_manager.rs`.\n",
+  "description": "Scaffold a default `.jit/rules.toml` on `jit init` and migrate existing repos' legacy config into rules when init is re-run.\n\n## Background\n\nRepos obtain their checks from `rules.toml`: new repos via `init`, existing repos by re-running `init`, which performs the one-time migration. Stale configs must not break before migration. See `dev/active/f6a704d0-validation-engine-plan.md` (step 9) and decision record sections 8.2 and 8.4.\n\n## Success Criteria\n\n- [ ] [hard] `jit init` scaffolds a default `.jit/rules.toml` reproducing the default checks.\n- [ ] [hard] Re-running `jit init` on an existing repo migrates `[validation]` and `[namespaces].{values,pattern,required}` config into `rules.toml` and strips the old enforcement keys.\n- [ ] [hard] A pre-parse `toml::Value` scan in `JitConfig::load` warns when deprecated keys are present (top-level `validation`; nested `namespaces.*.{values,pattern,required}`) and prompts to re-run `jit init`; no `deny_unknown_fields` is added, so stale configs never hard-error.\n- [ ] [hard] Existing repos obtain defaults without silently losing validation; a test covers an old config carrying removed keys (it warns, parses, and does not error).\n\n## Notes\n\nAnchors: init path `main.rs:272` + `executor.init` in `commands/mod.rs`; config load `config.rs:405-430`, `config_manager.rs:51-53`. There is currently no `#[serde(deny_unknown_fields)]`, so serde ignores unknown fields by default.\n",
   "state": "backlog",
   "priority": "normal",
   "assignee": null,
@@ -20,5 +20,5 @@
     "epic:validation-engine"
   ],
   "created_at": "2026-06-06T15:51:20.566825385+00:00",
-  "updated_at": "2026-06-06T17:00:14.597343351+00:00"
+  "updated_at": "2026-06-06T17:51:46.457451029+00:00"
 }
