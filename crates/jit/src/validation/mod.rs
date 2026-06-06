@@ -11,6 +11,7 @@
 
 pub mod desugar;
 pub mod engine;
+pub mod graph;
 pub mod rules;
 
 pub use engine::{Finding, SchemaCompileError, SchemaEngine};
