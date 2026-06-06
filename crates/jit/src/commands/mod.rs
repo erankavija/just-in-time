@@ -51,10 +51,12 @@ use crate::domain::{Event, Gate, GateState, GateStatus, Issue, Priority, State};
 use crate::graph::DependencyGraph;
 use crate::labels as label_utils;
 use crate::storage::IssueStore;
+use crate::validation::rules::RuleSet;
 // Type hierarchy validation (currently only validates type labels)
 use anyhow::{anyhow, Context, Result};
 use chrono::Utc;
 use serde::Serialize;
+use std::sync::OnceLock;
 
 /// Information about a git commit
 #[derive(Debug, Clone, Serialize)]
@@ -207,6 +209,10 @@ pub enum DependencyAddResult {
 pub struct CommandExecutor<S: IssueStore> {
     storage: S,
     pub config_manager: ConfigManager,
+    /// Lazily-parsed `.jit/rules.toml`, cached for the lifetime of the
+    /// executor so the validation ruleset is read at most once per process
+    /// rather than re-parsed on every write.
+    rules: OnceLock<RuleSet>,
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
@@ -216,12 +222,29 @@ impl<S: IssueStore> CommandExecutor<S> {
         Self {
             storage,
             config_manager,
+            rules: OnceLock::new(),
         }
     }
 
     /// Get reference to the storage backend
     pub fn storage(&self) -> &S {
         &self.storage
+    }
+
+    /// Return the parsed validation ruleset, loading `.jit/rules.toml` on first
+    /// access and caching it for subsequent calls.
+    ///
+    /// Returns an empty ruleset when no `rules.toml` exists. If the file exists
+    /// but is malformed, a warning is logged and an empty ruleset is returned so
+    /// a broken rules file never crashes ordinary commands; `jit validate`
+    /// surfaces the error explicitly via [`RuleSet::load`].
+    pub fn rules(&self) -> &RuleSet {
+        self.rules.get_or_init(|| {
+            RuleSet::load(self.storage.root()).unwrap_or_else(|err| {
+                eprintln!("warning: failed to load .jit/rules.toml: {err}");
+                RuleSet::empty()
+            })
+        })
     }
 
     /// Initialize a new jit repository in the current directory.
@@ -387,6 +410,61 @@ impl<S: IssueStore> CommandExecutor<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_rules_are_parsed_once_and_cached() {
+        use crate::storage::InMemoryStorage;
+        use crate::validation::rules::Assertion;
+
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+        std::fs::create_dir_all(storage.root()).unwrap();
+
+        let rules_path = storage.root().join("rules.toml");
+        std::fs::write(
+            &rules_path,
+            r#"
+[[rules]]
+name = "first"
+assert = { require-section = { heading = "Goals" } }
+"#,
+        )
+        .unwrap();
+
+        let executor = CommandExecutor::new(storage);
+
+        // First access parses and caches the file.
+        let first = executor.rules();
+        assert_eq!(first.rules.len(), 1);
+        assert_eq!(first.rules[0].name, "first");
+        let ptr_first = std::ptr::from_ref(first);
+
+        // Mutate the file on disk AFTER the first parse.
+        std::fs::write(
+            &rules_path,
+            r#"
+[[rules]]
+name = "second"
+assert = { require-section = { heading = "Other" } }
+
+[[rules]]
+name = "third"
+assert = { require-doc-type = { doc-type = "design" } }
+"#,
+        )
+        .unwrap();
+
+        // Second access must return the cached (original) parse, NOT re-read.
+        let second = executor.rules();
+        assert_eq!(second.rules.len(), 1, "ruleset was re-read from disk");
+        assert_eq!(second.rules[0].name, "first");
+        assert!(matches!(
+            second.rules[0].assert,
+            Assertion::RequireSection { .. }
+        ));
+        // Same cached instance is returned each time.
+        assert_eq!(ptr_first, std::ptr::from_ref(second));
+    }
 
     // Enforcement tests
     #[test]

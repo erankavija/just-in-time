@@ -3,6 +3,11 @@
 //! This module provides validation for issues based on config.toml settings,
 //! including type label requirements, label format validation, and namespace
 //! registry enforcement.
+//!
+//! The declarative validation engine (driven by `.jit/rules.toml`) lives in the
+//! submodules of this module. [`rules`] defines the rule data model and loader.
+
+pub mod rules;
 
 use crate::config::ValidationConfig;
 use crate::domain::{Issue, LabelNamespaces};
