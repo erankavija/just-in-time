@@ -5,9 +5,14 @@
 //! registry enforcement.
 //!
 //! The declarative validation engine (driven by `.jit/rules.toml`) lives in the
-//! submodules of this module. [`rules`] defines the rule data model and loader.
+//! submodules of this module. [`rules`] defines the rule data model and loader;
+//! [`engine`] compiles and caches JSON Schema validators and evaluates a
+//! projection against a rule, producing [`engine::Finding`]s.
 
+pub mod engine;
 pub mod rules;
+
+pub use engine::{Finding, SchemaCompileError, SchemaEngine};
 
 use crate::config::ValidationConfig;
 use crate::domain::{Issue, LabelNamespaces};
