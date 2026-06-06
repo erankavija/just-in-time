@@ -349,6 +349,11 @@ impl SchemaEngine {
             + 'static,
     {
         self.keywords.push((name.into(), Arc::new(factory)));
+        // Registering a keyword changes how schemas compile, so any validators
+        // already cached under the previous keyword set are now stale. Clear the
+        // cache so subsequent validations recompile with the full keyword set —
+        // this keeps a warmed engine correct, not just a freshly-built one.
+        self.cache.borrow_mut().clear();
         self
     }
 
@@ -1107,5 +1112,56 @@ assert = { json-schema = "schemas/b.json" }
             "a custom-keyword engine must still cache validators by schema identity"
         );
         assert_eq!(engine.cache.borrow().len(), 1);
+    }
+
+    #[test]
+    fn test_with_keyword_invalidates_warm_cache() {
+        // A keyword registered AFTER the engine has already compiled a validator
+        // for a schema must still take effect: `with_keyword` clears the cache so
+        // the schema recompiles with the new keyword set (warm-engine
+        // correctness — the gap a prior review flagged).
+        let schema = serde_json::json!({
+            "type": "object",
+            "properties": { "title": { "type": "string", "x-jit-non-empty": true } },
+            "required": ["title"]
+        });
+        let rule = Rule {
+            name: "title-non-empty".to_string(),
+            when: crate::validation::rules::Selector::default(),
+            severity: Severity::Error,
+            enforce: false,
+            assert: crate::validation::rules::Assertion::JsonSchema(
+                crate::validation::rules::SchemaSource {
+                    reference: "inline".to_string(),
+                    path: std::path::PathBuf::from("inline"),
+                    schema,
+                },
+            ),
+            scope: crate::validation::rules::Scope::Local,
+        };
+
+        // Warm the cache on an engine with NO custom keyword: the unknown
+        // `x-jit-*` keyword degrades to an annotation, so an empty title passes.
+        let engine = SchemaEngine::new();
+        let bad = serde_json::json!({ "title": "" });
+        assert!(
+            engine.validate(&rule, &bad).unwrap().is_empty(),
+            "without the keyword the empty title is accepted (annotation only)"
+        );
+        assert_eq!(engine.cache.borrow().len(), 1, "cache is warm");
+
+        // Register the keyword on the SAME (warmed) engine. The stale validator
+        // must be discarded so the schema recompiles with the keyword active.
+        let engine = engine.with_keyword("x-jit-non-empty", non_empty_string_factory);
+        assert!(
+            engine.cache.borrow().is_empty(),
+            "with_keyword must clear the warm cache"
+        );
+        let findings = engine.validate(&rule, &bad).unwrap();
+        assert_eq!(
+            findings.len(),
+            1,
+            "after registration the warmed engine enforces the keyword, got {findings:?}"
+        );
     }
 }

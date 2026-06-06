@@ -130,16 +130,17 @@ fn desugar_require_label(label: &str, min: Option<u32>, max: Option<u32>) -> Val
 
 /// Build a schema bounding the size of `labels.<namespace>` (the `ns:*` form).
 fn label_size_schema(namespace: &str, min: u32, max: Option<u32>) -> Value {
-    let mut array_schema = json!({ "type": "array" });
-    let obj = array_schema
-        .as_object_mut()
-        .expect("array_schema is a JSON object");
+    // Build the array sub-schema directly as a JSON object so no fallible
+    // downcast (and therefore no panic path) is needed in library code.
+    let mut obj = serde_json::Map::new();
+    obj.insert("type".to_string(), json!("array"));
     if min > 0 {
         obj.insert("minItems".to_string(), json!(min));
     }
     if let Some(max) = max {
         obj.insert("maxItems".to_string(), json!(max));
     }
+    let array_schema = Value::Object(obj);
 
     let mut schema = json!({
         "type": "object",
@@ -161,15 +162,13 @@ fn label_size_schema(namespace: &str, min: u32, max: Option<u32>) -> Value {
 /// (the exact `ns:value` form), using Draft 2020-12 `contains`/`minContains`/
 /// `maxContains`.
 fn label_count_schema(namespace: &str, value: &str, min: u32, max: Option<u32>) -> Value {
-    let mut array_schema = json!({
-        "type": "array",
-        "contains": { "const": value },
-    });
-    let obj = array_schema
-        .as_object_mut()
-        .expect("array_schema is a JSON object");
-    // `minContains: 0` would make `contains` vacuously satisfied, so only emit
-    // it when a positive minimum is actually required.
+    // Build the array sub-schema directly as a JSON object so no fallible
+    // downcast (and therefore no panic path) is needed in library code.
+    let mut obj = serde_json::Map::new();
+    obj.insert("type".to_string(), json!("array"));
+    obj.insert("contains".to_string(), json!({ "const": value }));
+    // `minContains: 0` would make `contains` vacuously satisfied, so only a
+    // positive minimum actually constrains presence.
     if min > 0 {
         obj.insert("minContains".to_string(), json!(min));
     } else {
@@ -178,6 +177,7 @@ fn label_count_schema(namespace: &str, value: &str, min: u32, max: Option<u32>) 
     if let Some(max) = max {
         obj.insert("maxContains".to_string(), json!(max));
     }
+    let array_schema = Value::Object(obj);
 
     let mut schema = json!({
         "type": "object",
