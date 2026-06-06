@@ -1,7 +1,7 @@
 {
   "epic_id": "f6a704d0-1f01-447b-a8aa-42251fa7c3eb",
   "epic_short_id": "f6a704d0",
-  "current_wave": 3,
+  "current_wave": 4,
   "waves": [
     {
       "wave_number": 1,
@@ -49,21 +49,21 @@
           "short_id": "6297d67b",
           "title": "Shorthand rule kinds desugaring to JSON Schema",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "33f23ec7",
           "short_id": "33f23ec7",
           "title": "Custom-keyword extension point (x-jit-*)",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "a7176f28",
           "short_id": "a7176f28",
           "title": "Graph rules: coverage, reference-integrity, dependency-shape",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -144,7 +144,10 @@
     "2f50a3b0": 1,
     "2fa7c882": 2,
     "7df61f62": 2,
-    "00525fe0": 1
+    "00525fe0": 1,
+    "6297d67b": 1,
+    "33f23ec7": 1,
+    "a7176f28": 1
   },
   "started_at": "2026-06-06T00:00:00Z"
 }

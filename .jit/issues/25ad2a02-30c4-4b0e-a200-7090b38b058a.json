@@ -2,7 +2,7 @@
   "id": "25ad2a02-30c4-4b0e-a200-7090b38b058a",
   "title": "Local rule evaluation with write-time enforcement",
   "description": "Evaluate local rules on every issue mutation path (create, update, batch), enforce blocking rules, and log `--force` bypasses.\n\n## Background\n\nIssue-scoped rules must run wherever an issue is written, including the separate batch path, or `enforce` rules are bypassable. Graph-scope rules are skipped on write, and the description is parsed only when a matching rule needs it. See `dev/active/f6a704d0-validation-engine-plan.md` (step 5) and decision record sections 7.5, 7.6, and 6.1.\n\n## Success Criteria\n\n- [ ] [hard] Local rules evaluate in `issue.rs` create and update, replacing the current IssueValidator call site.\n- [ ] [hard] Local rules ALSO evaluate in `bulk_update.rs` `validate_update()` (the batch path), so `jit issue update --filter` cannot bypass enforce rules.\n- [ ] [hard] An `error` finding from an `enforce=true` rule blocks the write; `--force` bypasses it.\n- [ ] [hard] A `--force` bypass of an enforce rule appends a new `Event` variant to `events.jsonl` (rule name, issue id); ordinary rejections and read-only validate runs are not logged.\n- [ ] [hard] Graph-scope rules are skipped on the write path; selectors pre-filter on cheap fields so the description is parsed only when a matching local rule needs body content; the parsed config is cached (not re-read per write).\n\n## Notes\n\nAnchors: `issue.rs` create 54-63, update 227-236; `bulk_update.rs` `validate_update` 416-468; `Event` enum `domain/types.rs:640-791` (+ helpers ~795); append via `storage.append_event`. Config is currently re-read ~2x per write (`issue.rs:16-17`, `227-228`).\n",
-  "state": "backlog",
+  "state": "ready",
   "priority": "high",
   "assignee": null,
   "dependencies": [
@@ -20,5 +20,5 @@
     "epic:validation-engine"
   ],
   "created_at": "2026-06-06T15:51:20.553405041+00:00",
-  "updated_at": "2026-06-06T17:51:46.450721997+00:00"
+  "updated_at": "2026-06-06T21:47:26.302279580+00:00"
 }
