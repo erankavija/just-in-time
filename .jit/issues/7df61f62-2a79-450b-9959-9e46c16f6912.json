@@ -1,7 +1,7 @@
 {
   "id": "7df61f62-2a79-450b-9959-9e46c16f6912",
   "title": "JSON Schema validation core and custom-keyword extension point",
-  "description": "Implements decision record (dev/active/f6a704d0-validation-engine.md) section 5.1-5.2.\n\n## Success Criteria\n\n- [hard] The jsonschema crate (~0.46) validates a projection against a rule's JSON Schema.\n- [hard] Findings carry rule name, severity, and message.\n- [hard] The validator is the fan-in for desugaring and graph rules; it does NOT include the deferred custom-keyword API (separate task).\n",
+  "description": "Implements decision record (dev/active/f6a704d0-validation-engine.md) section 5.1-5.2.\n\n## Success Criteria\n\n- [hard] The jsonschema crate (~0.46, Draft 2020-12) validates a projection against a rule's JSON Schema.\n- [hard] Compiled schemas are cached (compiled once per rule, lazily), never recompiled per write.\n- [hard] Findings carry rule name, severity, and message.\n- [hard] The validator is the fan-in for desugaring and graph rules; it does NOT include the deferred custom-keyword API (separate task 33f23ec7).\n",
   "state": "backlog",
   "priority": "high",
   "assignee": null,
@@ -21,5 +21,5 @@
     "epic:validation-engine"
   ],
   "created_at": "2026-06-06T15:51:20.546430439+00:00",
-  "updated_at": "2026-06-06T16:05:03.250766467+00:00"
+  "updated_at": "2026-06-06T16:41:07.530033182+00:00"
 }
