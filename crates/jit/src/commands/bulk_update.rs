@@ -157,6 +157,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         &mut self,
         filter: &QueryFilter,
         operations: &UpdateOperations,
+        force: bool,
     ) -> Result<BulkUpdateResult> {
         let all_issues = self.storage.list_issues()?;
         let matched = filter.filter_issues(&all_issues)?;
@@ -165,7 +166,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         result.matched = matched.iter().map(|i| i.id.clone()).collect();
 
         for issue in matched {
-            match self.apply_operations_to_issue(issue, operations) {
+            match self.apply_operations_to_issue(issue, operations, force) {
                 Ok(modified) => {
                     if modified {
                         result.modified.push(issue.id.clone());
@@ -198,9 +199,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         &mut self,
         issue: &Issue,
         operations: &UpdateOperations,
+        force: bool,
     ) -> Result<bool> {
-        // Validate first
-        self.validate_update(issue, operations)?;
+        // Validate first (includes local rule enforcement on the post-update
+        // shape, so `jit issue update --filter` cannot bypass enforce rules).
+        self.validate_update(issue, operations, force)?;
 
         // Check if any changes needed
         let changes = self.compute_changes(issue, operations)?;
@@ -329,8 +332,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         for issue in matched {
             let changes = self.compute_changes(issue, operations)?;
 
-            // Check for validation errors
-            if let Err(e) = self.validate_update(issue, operations) {
+            // Check for validation errors. Preview is read-only: pass force=false
+            // so blocking rules surface as would-fail and nothing is logged.
+            if let Err(e) = self.validate_update(issue, operations, false) {
                 preview.would_fail.push((issue.id.clone(), e.to_string()));
             } else if changes.is_empty() {
                 // No changes - would be skipped
@@ -412,8 +416,45 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(changes)
     }
 
+    /// Apply the label/state operations to a clone of `issue`, returning the
+    /// shape the issue would have AFTER the bulk update. Used to evaluate local
+    /// validation rules against the result of the write (not the pre-update
+    /// state), so `--filter` updates cannot slip past `enforce` rules.
+    ///
+    /// Only the fields that local rules read (labels, state) are projected;
+    /// gate/assignee/priority changes are applied too for completeness but do not
+    /// affect the validation projection.
+    fn projected_after_update(issue: &Issue, operations: &UpdateOperations) -> Issue {
+        let mut updated = issue.clone();
+        if let Some(new_state) = operations.state {
+            updated.state = new_state;
+        }
+        for label in &operations.add_labels {
+            if !updated.labels.contains(label) {
+                updated.labels.push(label.clone());
+            }
+        }
+        for label in &operations.remove_labels {
+            updated.labels.retain(|l| l != label);
+        }
+        if let Some(ref assignee) = operations.assignee {
+            updated.assignee = Some(assignee.clone());
+        } else if operations.unassign {
+            updated.assignee = None;
+        }
+        if let Some(new_priority) = operations.priority {
+            updated.priority = new_priority;
+        }
+        updated
+    }
+
     /// Validate that update can be applied to issue
-    fn validate_update(&self, issue: &Issue, operations: &UpdateOperations) -> Result<()> {
+    fn validate_update(
+        &self,
+        issue: &Issue,
+        operations: &UpdateOperations,
+        force: bool,
+    ) -> Result<()> {
         // Validate label operations
         if !operations.add_labels.is_empty() || !operations.remove_labels.is_empty() {
             let label_namespaces = self.config_manager.get_namespaces()?;
@@ -463,6 +504,12 @@ impl<S: IssueStore> CommandExecutor<S> {
                 ));
             }
         }
+
+        // Enforce declarative local rules against the POST-update shape so the
+        // batch path (`jit issue update --filter`) cannot bypass enforce rules.
+        // On `--force`, the bypass is logged per rule; otherwise it blocks.
+        let projected = Self::projected_after_update(issue, operations);
+        self.enforce_local_rules(&projected, &issue.id, force)?;
 
         Ok(())
     }
@@ -618,7 +665,7 @@ mod tests {
             ..Default::default()
         };
 
-        let result = executor.apply_bulk_update(&filter, &ops).unwrap();
+        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
 
         assert_eq!(result.summary.total_matched, 1);
         assert_eq!(result.summary.total_modified, 1);
@@ -656,7 +703,7 @@ mod tests {
             ..Default::default()
         };
 
-        let result = executor.apply_bulk_update(&filter, &ops).unwrap();
+        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
 
         assert_eq!(result.summary.total_matched, 2);
         assert_eq!(result.summary.total_modified, 2);
@@ -688,7 +735,7 @@ mod tests {
             ..Default::default()
         };
 
-        let result = executor.apply_bulk_update(&filter, &ops).unwrap();
+        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
 
         assert_eq!(result.summary.total_matched, 1);
         assert_eq!(result.summary.total_modified, 0);
@@ -716,7 +763,7 @@ mod tests {
             ..Default::default()
         };
 
-        let result = executor.apply_bulk_update(&filter, &ops).unwrap();
+        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
 
         assert_eq!(result.summary.total_matched, 1);
         assert_eq!(result.summary.total_modified, 0);
@@ -753,7 +800,7 @@ mod tests {
             ..Default::default()
         };
 
-        let result = executor.apply_bulk_update(&filter, &ops).unwrap();
+        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
 
         // Should succeed for 2, fail for 1
         assert_eq!(result.summary.total_matched, 3);
@@ -785,7 +832,7 @@ mod tests {
             ..Default::default()
         };
 
-        let result = executor.apply_bulk_update(&filter, &ops).unwrap();
+        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
 
         // Should reject with error
         assert_eq!(result.summary.total_matched, 1);
@@ -815,7 +862,7 @@ mod tests {
             ..Default::default()
         };
 
-        let result = executor.apply_bulk_update(&filter, &ops).unwrap();
+        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
 
         // Should reject with error
         assert_eq!(result.summary.total_matched, 1);
@@ -843,7 +890,7 @@ mod tests {
             ..Default::default()
         };
 
-        let result = executor.apply_bulk_update(&filter, &ops).unwrap();
+        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
 
         // Should reject with error
         assert_eq!(result.summary.total_matched, 1);
@@ -871,7 +918,7 @@ mod tests {
             ..Default::default()
         };
 
-        let result = executor.apply_bulk_update(&filter, &ops).unwrap();
+        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
 
         // Should succeed
         assert_eq!(result.summary.total_matched, 1);
@@ -902,7 +949,7 @@ mod tests {
             ..Default::default()
         };
 
-        let result = executor.apply_bulk_update(&filter, &ops).unwrap();
+        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
 
         // Should succeed
         assert_eq!(result.summary.total_matched, 1);

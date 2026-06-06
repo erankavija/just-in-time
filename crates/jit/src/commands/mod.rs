@@ -261,6 +261,64 @@ impl<S: IssueStore> CommandExecutor<S> {
             .as_ref()
     }
 
+    /// Evaluate the local validation rules against `issue` and enforce them.
+    ///
+    /// This is the single write-path enforcement entry point shared by issue
+    /// create, update, and the batch path (DR §7.5). It loads the cached ruleset
+    /// (`self.rules()`), runs [`evaluate_local`](crate::validation::evaluate_local)
+    /// (which skips graph-scope rules and parses the description only when a
+    /// matching rule needs body content), then applies blocking semantics:
+    ///
+    /// - If any `error` finding comes from an `enforce = true` rule and `force`
+    ///   is `false`, the write is REJECTED with a message listing the offending
+    ///   rules (DR §7.2).
+    /// - If `force` is `true`, the write is allowed and one
+    ///   [`Event::LocalRuleBypassed`](crate::domain::Event::LocalRuleBypassed)
+    ///   is appended per bypassed enforce rule (the audit-sensitive override,
+    ///   DR §7.6).
+    /// - `warn` and non-`enforce` findings never block; their messages are
+    ///   returned as warnings for the caller to surface.
+    ///
+    /// A genuinely misconfigured `.jit/rules.toml` (parse/load error) is
+    /// surfaced as an error rather than silently disabling enforcement.
+    ///
+    /// `issue_id` is the id used to attribute any bypass event; pass the issue's
+    /// own id.
+    fn enforce_local_rules(
+        &self,
+        issue: &Issue,
+        issue_id: &str,
+        force: bool,
+    ) -> Result<Vec<String>> {
+        let rules = match self.rules() {
+            Ok(rules) => rules,
+            Err(err) => return Err(anyhow!("invalid .jit/rules.toml: {err}")),
+        };
+
+        let evaluation = crate::validation::evaluate_local(issue, rules)
+            .map_err(|err| anyhow!("rule evaluation failed: {err}"))?;
+
+        let blocking = evaluation.blocking_rules();
+        if !blocking.is_empty() {
+            if !force {
+                // Ordinary rejection: NOT logged (only --force bypasses are).
+                return Err(anyhow!(
+                    "{}",
+                    evaluation
+                        .rejection_message()
+                        .unwrap_or_else(|| "blocked by validation rule(s)".to_string())
+                ));
+            }
+            // --force override: log one bypass event per bypassed enforce rule.
+            for rule in &blocking {
+                let event = Event::new_local_rule_bypassed(issue_id.to_string(), rule.clone());
+                self.storage.append_event(&event)?;
+            }
+        }
+
+        Ok(evaluation.warnings())
+    }
+
     /// Initialize a new jit repository in the current directory.
     /// Returns the worktree identity if in a git repository, None otherwise.
     pub fn init(&self) -> Result<Option<WorktreeIdentity>> {

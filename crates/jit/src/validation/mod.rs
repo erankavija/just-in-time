@@ -12,9 +12,11 @@
 pub mod desugar;
 pub mod engine;
 pub mod graph;
+pub mod local;
 pub mod rules;
 
 pub use engine::{Finding, KeywordFactory, SchemaCompileError, SchemaEngine};
+pub use local::{evaluate_local, LocalEvalError, LocalEvaluation};
 
 use crate::config::ValidationConfig;
 use crate::domain::{Issue, LabelNamespaces};

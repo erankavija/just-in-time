@@ -11,6 +11,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         priority: Priority,
         gates: Vec<String>,
         mut labels: Vec<String>,
+        force: bool,
     ) -> Result<(String, Vec<String>)> {
         // Get configuration for validation
         let config = self.config_manager.load()?;
@@ -51,8 +52,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue.gates_required = gates;
         issue.labels = labels;
 
-        // Validate the issue with configured rules
-        let warnings = if let Some(ref validation_config) = config.validation {
+        // Validate the issue with configured rules (legacy IssueValidator —
+        // retained until its checks migrate to default rules in task a0f0f342).
+        let mut warnings = if let Some(ref validation_config) = config.validation {
             let validator = crate::validation::IssueValidator::new(
                 validation_config.clone(),
                 namespaces.clone(),
@@ -61,6 +63,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         } else {
             Vec::new()
         };
+
+        // Evaluate the declarative local rules (`.jit/rules.toml`). An `error`
+        // finding from an `enforce` rule blocks unless `--force` is passed (and
+        // a bypass is then logged). `warn`/non-enforce findings are surfaced.
+        warnings.extend(self.enforce_local_rules(&issue, &issue.id, force)?);
 
         // Auto-transition to Ready if no dependencies (gates don't block Ready)
         if issue.dependencies.is_empty() {
@@ -157,7 +164,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     /// Update issue fields.
     ///
-    /// Note: This function has 8 parameters (exceeds clippy's 7-parameter guideline).
+    /// Note: This function has 9 parameters (exceeds clippy's 7-parameter guideline).
     /// This is intentional because:
     /// - Each parameter corresponds to a distinct CLI flag (--title, --desc, --priority, etc.)
     /// - Grouping into a struct would obscure the 1:1 CLI mapping
@@ -173,6 +180,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         state: Option<State>,
         add_labels: Vec<String>,
         remove_labels: Vec<String>,
+        force: bool,
     ) -> Result<Vec<String>> {
         let full_id = self.storage.resolve_issue_id(id)?;
 
@@ -223,17 +231,21 @@ impl<S: IssueStore> CommandExecutor<S> {
             || issue.priority != original_priority
             || issue.labels != original_labels;
 
-        // Validate the updated issue with configured rules
+        // Validate the updated issue with configured rules (legacy
+        // IssueValidator — retained until migration in task a0f0f342).
         let config = self.config_manager.load()?;
         let namespaces = self.config_manager.get_namespaces()?;
 
-        let warnings = if let Some(ref validation_config) = config.validation {
+        if let Some(ref validation_config) = config.validation {
             let validator =
                 crate::validation::IssueValidator::new(validation_config.clone(), namespaces);
-            validator.validate(&issue)?
-        } else {
-            Vec::new()
-        };
+            warnings.extend(validator.validate(&issue)?);
+        }
+
+        // Evaluate the declarative local rules; block on enforce failures unless
+        // `--force`, in which case the bypass is logged. Run BEFORE persisting so
+        // a blocked write changes nothing.
+        warnings.extend(self.enforce_local_rules(&issue, &issue.id, force)?);
 
         let old_state = issue.state;
 
@@ -1023,7 +1035,8 @@ enforce_leases = "off"
                 None,
                 Some(State::Done),
                 vec![],
-                vec![]
+                vec![],
+                false
             )
             .is_err());
         let gated = executor.storage.load_issue(&issue_id).unwrap();
@@ -1040,7 +1053,8 @@ enforce_leases = "off"
                 None,
                 Some(State::Done),
                 vec![],
-                vec![]
+                vec![],
+                false
             )
             .is_err());
         let after = executor.storage.load_issue(&issue_id).unwrap();
@@ -1078,7 +1092,8 @@ enforce_leases = "off"
                 None,
                 Some(State::Done),
                 vec![],
-                vec![]
+                vec![],
+                false
             )
             .is_err());
         let events_after_first = executor.storage.read_events().unwrap().len();
@@ -1092,6 +1107,7 @@ enforce_leases = "off"
             Some(State::Done),
             vec![],
             vec![],
+            false,
         );
         assert!(result.is_err(), "gates should still block done");
 
@@ -1130,7 +1146,8 @@ enforce_leases = "off"
                 None,
                 Some(State::Done),
                 vec![],
-                vec![]
+                vec![],
+                false
             )
             .is_err());
         let gated = executor.storage.load_issue(&issue_id).unwrap();
@@ -1147,6 +1164,7 @@ enforce_leases = "off"
                 Some(State::Done),
                 vec![],
                 vec![],
+                false,
             )
             .is_err());
         let after = executor.storage.load_issue(&issue_id).unwrap();
@@ -1216,7 +1234,7 @@ enforce_leases = "off"
 
         // No fields and no state change: pure no-op.
         executor
-            .update_issue(&issue_id, None, None, None, None, vec![], vec![])
+            .update_issue(&issue_id, None, None, None, None, vec![], vec![], false)
             .unwrap();
         let after = executor.storage.load_issue(&issue_id).unwrap();
         assert_eq!(
@@ -1256,6 +1274,7 @@ enforce_leases = "off"
             Some(State::Ready), // state
             vec![],             // add_labels
             vec![],             // remove_labels
+            false,              // force
         );
 
         assert!(
