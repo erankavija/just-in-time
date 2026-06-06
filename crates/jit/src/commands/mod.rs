@@ -51,7 +51,7 @@ use crate::domain::{Event, Gate, GateState, GateStatus, Issue, Priority, State};
 use crate::graph::DependencyGraph;
 use crate::labels as label_utils;
 use crate::storage::IssueStore;
-use crate::validation::rules::RuleSet;
+use crate::validation::rules::{RuleConfigError, RuleSet};
 // Type hierarchy validation (currently only validates type labels)
 use anyhow::{anyhow, Context, Result};
 use chrono::Utc;
@@ -211,8 +211,10 @@ pub struct CommandExecutor<S: IssueStore> {
     pub config_manager: ConfigManager,
     /// Lazily-parsed `.jit/rules.toml`, cached for the lifetime of the
     /// executor so the validation ruleset is read at most once per process
-    /// rather than re-parsed on every write.
-    rules: OnceLock<RuleSet>,
+    /// rather than re-parsed on every write. The cached value retains any
+    /// load/parse error so callers can surface a misconfigured rules file
+    /// instead of silently treating it as "no rules".
+    rules: OnceLock<Result<RuleSet, RuleConfigError>>,
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
@@ -232,19 +234,31 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     /// Return the parsed validation ruleset, loading `.jit/rules.toml` on first
-    /// access and caching it for subsequent calls.
+    /// access and caching the result for subsequent calls.
     ///
-    /// Returns an empty ruleset when no `rules.toml` exists. If the file exists
-    /// but is malformed, a warning is logged and an empty ruleset is returned so
-    /// a broken rules file never crashes ordinary commands; `jit validate`
-    /// surfaces the error explicitly via [`RuleSet::load`].
-    pub fn rules(&self) -> &RuleSet {
-        self.rules.get_or_init(|| {
-            RuleSet::load(self.storage.root()).unwrap_or_else(|err| {
-                eprintln!("warning: failed to load .jit/rules.toml: {err}");
-                RuleSet::empty()
-            })
-        })
+    /// A MISSING `.jit/rules.toml` is not an error: it yields `Ok(`an empty
+    /// [`RuleSet`]`)`. A genuine parse or load failure (malformed TOML, an
+    /// invalid `assert` table, an unsafe schema reference, etc.) is returned as
+    /// `Err` rather than being swallowed, so a misconfigured repository cannot
+    /// silently disable all rule enforcement. The load is performed at most once
+    /// and the outcome (success or failure) is cached.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use jit::commands::CommandExecutor;
+    /// use jit::storage::JsonFileStorage;
+    ///
+    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
+    /// match executor.rules() {
+    ///     Ok(rules) => println!("loaded {} rule(s)", rules.rules.len()),
+    ///     Err(err) => eprintln!("invalid rules.toml: {err}"),
+    /// }
+    /// ```
+    pub fn rules(&self) -> Result<&RuleSet, &RuleConfigError> {
+        self.rules
+            .get_or_init(|| RuleSet::load(self.storage.root()))
+            .as_ref()
     }
 
     /// Initialize a new jit repository in the current directory.
@@ -434,7 +448,7 @@ assert = { require-section = { heading = "Goals" } }
         let executor = CommandExecutor::new(storage);
 
         // First access parses and caches the file.
-        let first = executor.rules();
+        let first = executor.rules().expect("valid rules");
         assert_eq!(first.rules.len(), 1);
         assert_eq!(first.rules[0].name, "first");
         let ptr_first = std::ptr::from_ref(first);
@@ -455,7 +469,7 @@ assert = { require-doc-type = { doc-type = "design" } }
         .unwrap();
 
         // Second access must return the cached (original) parse, NOT re-read.
-        let second = executor.rules();
+        let second = executor.rules().expect("valid rules");
         assert_eq!(second.rules.len(), 1, "ruleset was re-read from disk");
         assert_eq!(second.rules[0].name, "first");
         assert!(matches!(
@@ -464,6 +478,47 @@ assert = { require-doc-type = { doc-type = "design" } }
         ));
         // Same cached instance is returned each time.
         assert_eq!(ptr_first, std::ptr::from_ref(second));
+    }
+
+    #[test]
+    fn test_rules_missing_file_yields_empty_ok() {
+        use crate::storage::InMemoryStorage;
+
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+        std::fs::create_dir_all(storage.root()).unwrap();
+        // No rules.toml written.
+
+        let executor = CommandExecutor::new(storage);
+        let rules = executor.rules().expect("missing file is not an error");
+        assert!(rules.rules.is_empty());
+    }
+
+    #[test]
+    fn test_rules_malformed_file_yields_err() {
+        use crate::storage::InMemoryStorage;
+
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+        std::fs::create_dir_all(storage.root()).unwrap();
+
+        // A rule whose assert table has no kind is a genuine config error and
+        // must NOT be downgraded to an empty (no-rules) set.
+        std::fs::write(
+            storage.root().join("rules.toml"),
+            r#"
+[[rules]]
+name = "broken"
+assert = {}
+"#,
+        )
+        .unwrap();
+
+        let executor = CommandExecutor::new(storage);
+        assert!(
+            executor.rules().is_err(),
+            "malformed rules.toml must surface an error, not an empty set"
+        );
     }
 
     // Enforcement tests
