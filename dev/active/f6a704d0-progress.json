@@ -1,0 +1,58 @@
+{
+  "epic_id": "f6a704d0-1f01-447b-a8aa-42251fa7c3eb",
+  "epic_short_id": "f6a704d0",
+  "current_wave": 1,
+  "waves": [
+    {
+      "wave_number": 1,
+      "issues": [
+        {"id": "2f50a3b0", "short_id": "2f50a3b0", "title": "Projection layer and Markdown content parser", "classification": "implementation", "status": "pending"},
+        {"id": "2fa7c882", "short_id": "2fa7c882", "title": "Rule model and config loader (.jit/rules.toml)", "classification": "implementation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 2,
+      "issues": [
+        {"id": "7df61f62", "short_id": "7df61f62", "title": "JSON Schema validation core and custom-keyword extension point", "classification": "implementation", "status": "pending"},
+        {"id": "00525fe0", "short_id": "00525fe0", "title": "HTML and XML content parsers", "classification": "implementation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 3,
+      "issues": [
+        {"id": "6297d67b", "short_id": "6297d67b", "title": "Shorthand rule kinds desugaring to JSON Schema", "classification": "implementation", "status": "pending"},
+        {"id": "33f23ec7", "short_id": "33f23ec7", "title": "Custom-keyword extension point (x-jit-*)", "classification": "implementation", "status": "pending"},
+        {"id": "a7176f28", "short_id": "a7176f28", "title": "Graph rules: coverage, reference-integrity, dependency-shape", "classification": "implementation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 4,
+      "issues": [
+        {"id": "25ad2a02", "short_id": "25ad2a02", "title": "Local rule evaluation with write-time enforcement", "classification": "implementation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 5,
+      "issues": [
+        {"id": "b8ba1b10", "short_id": "b8ba1b10", "title": "Extend jit validate and gate-checker integration", "classification": "implementation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 6,
+      "issues": [
+        {"id": "a0f0f342", "short_id": "a0f0f342", "title": "Re-express existing checks as default rules (hard migration)", "classification": "implementation", "status": "pending"},
+        {"id": "a6daa05d", "short_id": "a6daa05d", "title": "SDD example rules, schemas, and documentation", "classification": "implementation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 7,
+      "issues": [
+        {"id": "0abaddc0", "short_id": "0abaddc0", "title": "jit init default ruleset scaffolding and existing-repo migration", "classification": "implementation", "status": "pending"}
+      ]
+    }
+  ],
+  "created_during_execution": [],
+  "escalations": [],
+  "rework_counts": {},
+  "started_at": "2026-06-06T00:00:00Z"
+}
