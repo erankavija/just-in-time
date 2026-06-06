@@ -2349,3 +2349,4 @@
 {"type":"gate_passed","id":"62bb712a-37c0-4c07-bb03-4a4a7fddbf15","issue_id":"b9255f47-dc01-4ad2-b6c0-a8f6756cb761","timestamp":"2026-06-04T22:00:18.133183900Z","gate_key":"code-review","updated_by":"auto:executor"}
 {"type":"issue_state_changed","id":"9122a1b2-8d04-4b9d-bc73-fdba3f962441","issue_id":"b9255f47-dc01-4ad2-b6c0-a8f6756cb761","timestamp":"2026-06-04T22:00:31.388277462Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"1febbdd8-9e74-4dbc-ad75-8c0ba0783a58","issue_id":"b9255f47-dc01-4ad2-b6c0-a8f6756cb761","timestamp":"2026-06-04T22:00:31.388303912Z"}
+{"type":"issue_created","id":"71d377b7-019e-47ee-8780-7ec409b8b6f6","issue_id":"f6a704d0-1f01-447b-a8aa-42251fa7c3eb","timestamp":"2026-06-06T15:48:56.227436910Z","title":"Generic issue & label validation engine (JSON-Schema-based), with SDD as first application","priority":"high"}
