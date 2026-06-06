@@ -103,9 +103,11 @@ pub enum RuleConfigError {
         message: String,
     },
 
-    /// Two or more rules share the same `name`. Rule names MUST be unique: the
-    /// engine caches compiled validators keyed by name, so a duplicate would let
-    /// one rule's validator alias another's schema (DR §5.2).
+    /// Two or more rules share the same `name`. Rule names MUST be unique so
+    /// that every finding attributes unambiguously to exactly one rule: a
+    /// finding naming rule `"foo"` must refer to a single rule. (The engine
+    /// keys its validator cache by schema identity, not by name, so this guard
+    /// is about attribution clarity rather than cache correctness.)
     #[error("duplicate rule name '{name}': rule names must be unique")]
     DuplicateRuleName {
         /// The name that appeared more than once.
@@ -533,10 +535,11 @@ impl RuleSet {
             .map(|r| r.into_rule(jit_root))
             .collect::<Result<Vec<_>, _>>()?;
 
-        // Enforce the documented "Unique" invariant on `Rule::name`: the engine
-        // caches compiled validators keyed by name, so a duplicate would alias
-        // one rule's validator onto another's schema. Detect the first collision
-        // via a `HashSet` insert.
+        // Enforce the documented "Unique" invariant on `Rule::name` so every
+        // finding attributes to exactly one rule. (The engine keys its validator
+        // cache by schema identity, not name, so this is about attribution
+        // clarity, not cache correctness.) Detect the first collision via a
+        // `HashSet` insert.
         let mut seen = std::collections::HashSet::new();
         if let Some(rule) = rules.iter().find(|r| !seen.insert(r.name.as_str())) {
             return Err(RuleConfigError::DuplicateRuleName {
@@ -1100,8 +1103,8 @@ assert = { json-schema = { type = "object" } }
     #[test]
     fn test_duplicate_rule_names_are_rejected() {
         // Two rules sharing a name violate the documented uniqueness invariant
-        // the engine's name-keyed validator cache relies on. The loader rejects
-        // them even when their schemas differ.
+        // that keeps finding attribution unambiguous. The loader rejects them
+        // even when their schemas differ.
         let toml = r#"
 [[rules]]
 name = "dup"
