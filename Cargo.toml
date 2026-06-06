@@ -16,6 +16,7 @@ thiserror = "1.0"
 uuid = { version = "1.10", features = ["v4", "serde"] }
 ulid = "1.1"
 chrono = { version = "0.4", features = ["serde"] }
+pulldown-cmark = "0.13.3"
 tokio = { version = "1.40", features = ["full"] }
 toml = "0.8"
 tempfile = "3.10"

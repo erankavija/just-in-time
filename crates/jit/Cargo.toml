@@ -32,7 +32,7 @@ toml = "0.8"
 toml_edit = "0.22"
 sha2 = "0.10"
 tar = "0.4"
-pulldown-cmark = "0.9"
+pulldown-cmark = { workspace = true }
 ureq = { version = "3", features = ["native-tls"] }
 tempfile = { workspace = true }
 dirs = "5.0"
