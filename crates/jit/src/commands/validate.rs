@@ -273,7 +273,60 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
+        // Evaluate cross-issue graph rules (label-coverage / label-reference /
+        // dependency-shape). An `error`-severity violation fails validation; any
+        // `config-error` finding is also surfaced as an error since the rule
+        // could not be applied. `warn`/`off` findings never fail validation here.
+        let graph_findings = self.evaluate_graph_rules(&issues)?;
+        if let Some(message) = graph_findings_error_message(&graph_findings) {
+            return Err(anyhow!(message));
+        }
+
         Ok(())
+    }
+
+    /// Evaluate every `Scope::Graph` rule from `.jit/rules.toml` over the supplied
+    /// issue set, returning one [`Finding`](crate::validation::engine::Finding)
+    /// per violation (including `config-error` findings for malformed rules).
+    ///
+    /// The ruleset is loaded via [`CommandExecutor::rules`](crate::commands::CommandExecutor::rules);
+    /// a genuine `rules.toml` parse/load failure is surfaced as an `Err` rather
+    /// than silently disabling enforcement. A missing `rules.toml` yields no
+    /// findings. This method performs no filesystem writes; it reads the cached
+    /// ruleset and the issues passed in.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use jit::commands::CommandExecutor;
+    /// use jit::storage::{IssueStore, JsonFileStorage};
+    ///
+    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
+    /// let issues = executor.storage().list_issues().unwrap();
+    /// let findings = executor.evaluate_graph_rules(&issues).unwrap();
+    /// println!("{} graph finding(s)", findings.len());
+    /// ```
+    pub fn evaluate_graph_rules(
+        &self,
+        issues: &[Issue],
+    ) -> Result<Vec<crate::validation::engine::Finding>> {
+        use crate::validation::rules::Scope;
+
+        // Surface a misconfigured rules.toml instead of swallowing it.
+        let ruleset = self
+            .rules()
+            .map_err(|e| anyhow!("Invalid .jit/rules.toml: {}", e))?;
+
+        let graph_rules: Vec<&crate::validation::rules::Rule> = ruleset
+            .rules
+            .iter()
+            .filter(|rule| rule.scope == Scope::Graph)
+            .collect();
+
+        Ok(crate::validation::graph::evaluate_graph(
+            &graph_rules,
+            issues,
+        ))
     }
 
     fn validate_labels(&self, issues: &[Issue]) -> Result<()> {
@@ -1003,6 +1056,37 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         Ok(invalid_leases)
     }
+}
+
+/// Build a human-readable error message from any `error`-severity graph-rule
+/// findings, or `None` if none fail validation.
+///
+/// `warn`/`off` findings are intentionally excluded: only `Severity::Error`
+/// findings (which include `config-error` findings, attributed to a rule with
+/// error severity) make `jit validate` fail.
+fn graph_findings_error_message(findings: &[crate::validation::engine::Finding]) -> Option<String> {
+    use crate::validation::rules::Severity;
+
+    let errors: Vec<&crate::validation::engine::Finding> = findings
+        .iter()
+        .filter(|f| f.severity == Severity::Error)
+        .collect();
+
+    if errors.is_empty() {
+        return None;
+    }
+
+    let body = errors
+        .iter()
+        .map(|f| format!("  [{}] {}", f.rule, f.message))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    Some(format!(
+        "Graph rule validation failed with {} error(s):\n{}",
+        errors.len(),
+        body
+    ))
 }
 
 /// Find the closest match for an unregistered namespace among known ones.
