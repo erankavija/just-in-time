@@ -13,11 +13,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         mut labels: Vec<String>,
         force: bool,
     ) -> Result<(String, Vec<String>)> {
-        // Get configuration for validation
-        let config = self.config_manager.load()?;
-        let namespaces = self.config_manager.get_namespaces()?;
-
-        // Apply default type if configured and missing
+        // Apply default type if configured and missing (uses the cached
+        // config/namespaces consumed by the unified write-validation path).
+        let config = self.cached_config()?;
+        let namespaces = self.cached_namespaces()?;
         if let Some(ref validation_config) = config.validation {
             let validator = crate::validation::IssueValidator::new(
                 validation_config.clone(),
@@ -52,27 +51,17 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue.gates_required = gates;
         issue.labels = labels;
 
-        // Validate the issue with configured rules (legacy IssueValidator —
-        // retained until its checks migrate to default rules in task a0f0f342).
-        let mut warnings = if let Some(ref validation_config) = config.validation {
-            let validator = crate::validation::IssueValidator::new(
-                validation_config.clone(),
-                namespaces.clone(),
-            );
-            validator.validate(&issue)?
-        } else {
-            Vec::new()
-        };
-
-        // Evaluate the declarative local rules (`.jit/rules.toml`). An `error`
-        // finding from an `enforce` rule blocks unless `--force` is passed (and
-        // a bypass is then logged). `warn`/non-enforce findings are surfaced.
-        warnings.extend(self.enforce_local_rules(&issue, &issue.id, force)?);
-
         // Auto-transition to Ready if no dependencies (gates don't block Ready)
+        // BEFORE validating, so rules keyed on the final state (e.g.
+        // `when = { state = "ready" }`) see the shape that will be persisted.
         if issue.dependencies.is_empty() {
             issue.state = State::Ready;
         }
+
+        // Single write-time validation entry point: runs the legacy validator
+        // plus the declarative local rules against the FINAL issue shape, and
+        // defers any `--force` bypass events until after the save succeeds.
+        let validation = self.validate_for_write(&issue, force)?;
 
         // Clone fields needed for event and return value before moving issue
         let issue_id = issue.id.clone();
@@ -91,7 +80,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         };
         self.storage.append_event(&event)?;
 
-        Ok((issue_id, warnings))
+        // Emit bypass events only AFTER the issue write committed.
+        self.log_rule_bypasses(&issue_id, &validation.bypassed_rules)?;
+
+        Ok((issue_id, validation.warnings))
     }
 
     pub fn list_issues(
@@ -231,26 +223,14 @@ impl<S: IssueStore> CommandExecutor<S> {
             || issue.priority != original_priority
             || issue.labels != original_labels;
 
-        // Validate the updated issue with configured rules (legacy
-        // IssueValidator — retained until migration in task a0f0f342).
-        let config = self.config_manager.load()?;
-        let namespaces = self.config_manager.get_namespaces()?;
-
-        if let Some(ref validation_config) = config.validation {
-            let validator =
-                crate::validation::IssueValidator::new(validation_config.clone(), namespaces);
-            warnings.extend(validator.validate(&issue)?);
-        }
-
-        // Evaluate the declarative local rules; block on enforce failures unless
-        // `--force`, in which case the bypass is logged. Run BEFORE persisting so
-        // a blocked write changes nothing.
-        warnings.extend(self.enforce_local_rules(&issue, &issue.id, force)?);
-
         let old_state = issue.state;
 
+        // Resolve the requested state transition into the in-memory issue FIRST
+        // (running dependency/gate guards) so validation sees the FINAL shape.
+        // `gate_blocked` marks the gate-diversion-to-Gated case, which still
+        // persists/returns an error but must validate the projected Gated shape.
+        let mut gate_blocked = false;
         if let Some(s) = state {
-            // Validate state transition
             if s == State::Ready {
                 // Check dependencies only (gates don't block Ready)
                 let issues = self.storage.list_issues()?;
@@ -284,39 +264,65 @@ impl<S: IssueStore> CommandExecutor<S> {
                     .into());
                 }
 
-                // If gates not passed, transition to Gated and return error.
-                // Persist when there are field edits to keep, or when this is a
-                // genuine transition into Gated (not a pure already-gated retry).
+                // If gates not passed, the final shape is Gated, not Done.
                 if issue.has_unpassed_gates() {
-                    let persist = has_field_edits || old_state != State::Gated;
-                    return self.handle_gate_blocking(&mut issue, old_state, persist);
+                    issue.state = State::Gated;
+                    gate_blocked = true;
                 } else {
                     issue.state = State::Done;
                 }
             } else {
                 issue.state = s;
             }
+        }
 
-            // Log state change event
-            if old_state != issue.state {
-                let event =
-                    Event::new_issue_state_changed(issue.id.clone(), old_state, issue.state);
-                self.storage.append_event(&event)?;
+        // Single write-time validation entry point against the FINAL shape
+        // (field edits + resolved state transition applied). Runs BEFORE any
+        // persistence so a blocked write changes nothing; defers `--force`
+        // bypass events until after the save succeeds.
+        let validation = self.validate_for_write(&issue, force)?;
+        warnings.extend(validation.warnings);
 
-                // Log completion event if transitioning to Done
-                if issue.state == State::Done {
-                    let event = Event::new_issue_completed(issue.id.clone());
-                    self.storage.append_event(&event)?;
-                }
-            }
+        // Gate-blocked `--state done`: persist the projected Gated shape (only
+        // when something changed) and return the gate-blocking error. Bypass
+        // events are emitted from inside this path after its save succeeds.
+        if gate_blocked {
+            let persist = has_field_edits || old_state != State::Gated;
+            return self.handle_gate_blocking(
+                &mut issue,
+                old_state,
+                persist,
+                &validation.bypassed_rules,
+            );
         }
 
         // Persist only when something actually changed: real field edits or a
         // genuine state transition. A pure no-op `issue update` (e.g. only
         // idempotent gate/assignee flags, already handled upstream) must not
         // bump `updated_at` and emit a false progress signal.
-        if has_field_edits || old_state != issue.state {
+        let persisted = has_field_edits || old_state != issue.state;
+        if persisted {
+            let new_state = issue.state;
             self.storage.save_issue(issue)?;
+
+            // Log state change event (after the save).
+            if old_state != new_state {
+                let event = Event::new_issue_state_changed(full_id.clone(), old_state, new_state);
+                self.storage.append_event(&event)?;
+
+                // Log completion event if transitioning to Done.
+                if new_state == State::Done {
+                    let event = Event::new_issue_completed(full_id.clone());
+                    self.storage.append_event(&event)?;
+                }
+            }
+        }
+
+        // Emit bypass events only AFTER the write committed. (If nothing was
+        // persisted, there were no blocking rules to bypass either, so this is a
+        // no-op — but guarding keeps the "log only after a real write" invariant.)
+        if persisted {
+            self.log_rule_bypasses(&full_id, &validation.bypassed_rules)?;
         }
 
         // Check if any dependent issues can now transition to ready (after save!)
@@ -412,7 +418,9 @@ impl<S: IssueStore> CommandExecutor<S> {
                 // already-gated issue is a pure no-op (no save, no event).
                 if issue.has_unpassed_gates() {
                     let persist = old_state != State::Gated;
-                    return self.handle_gate_blocking(&mut issue, old_state, persist);
+                    // This path runs no local-rule validation, so there are no
+                    // bypassed rules to log.
+                    return self.handle_gate_blocking(&mut issue, old_state, persist, &[]);
                 } else {
                     issue.state = State::Done;
                 }
@@ -717,11 +725,16 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///   (`old_state != Gated`); a `gated -> gated` no-op must never be logged,
     ///   as it would corrupt the audit log for metrics and stalled-work
     ///   detection that read `events.jsonl`.
+    /// - `bypassed_rules` lists the `enforce` rules a `--force` write overrode;
+    ///   one `LocalRuleBypassed` event is emitted per entry, but only when
+    ///   `persist` is true and AFTER the save commits, so a failed write leaves
+    ///   no false bypass entry.
     fn handle_gate_blocking(
         &self,
         issue: &mut Issue,
         old_state: State,
         persist: bool,
+        bypassed_rules: &[String],
     ) -> Result<Vec<String>> {
         let unpassed = issue.get_unpassed_gates();
         let gate_blockers = unpassed
@@ -744,9 +757,13 @@ impl<S: IssueStore> CommandExecutor<S> {
 
             // Log the state change only for a genuine transition into Gated.
             if old_state != State::Gated {
-                let event = Event::new_issue_state_changed(issue_id, old_state, State::Gated);
+                let event =
+                    Event::new_issue_state_changed(issue_id.clone(), old_state, State::Gated);
                 self.storage.append_event(&event)?;
             }
+
+            // Emit any `--force` bypass events only AFTER the save committed.
+            self.log_rule_bypasses(&issue_id, bypassed_rules)?;
         }
 
         Err(TransitionBlockedError::gates(

@@ -294,6 +294,190 @@ assert = { json-schema = "schemas/no-bad.json" }
     assert_eq!(bypass_events(&executor).len(), 1);
 }
 
+/// An enforce rule keyed on the FINAL state: a `ready` issue must carry a
+/// `req:*` label. This only fires if rules are evaluated against the
+/// post-transition shape (create auto-promotes to Ready; update transitions
+/// into Ready), proving the single-issue paths validate the final shape.
+const READY_NEEDS_REQ_ENFORCE: &str = r#"
+[[rules]]
+name = "ready-needs-req"
+when = { state = "ready" }
+severity = "error"
+enforce = true
+assert = { require-label = { label = "req:*", min = 1 } }
+"#;
+
+#[test]
+fn test_create_evaluates_rules_against_post_autopromote_shape() {
+    // A dependency-free issue auto-promotes Backlog -> Ready on create. A rule
+    // keyed on `state = "ready"` must therefore fire even though the issue was
+    // constructed in Backlog. This fails unless the final (Ready) shape is
+    // validated.
+    let executor = executor_with_rules(READY_NEEDS_REQ_ENFORCE);
+
+    let blocked = executor.create_issue(
+        "A task".to_string(),
+        String::new(),
+        Priority::Normal,
+        vec![],
+        vec!["type:task".to_string()], // no req: label
+        false,
+    );
+    assert!(
+        blocked.is_err(),
+        "a ready-state enforce rule must fire on create auto-promotion"
+    );
+    assert!(blocked.unwrap_err().to_string().contains("ready-needs-req"));
+    assert!(executor.storage().list_issues().unwrap().is_empty());
+
+    // A satisfying issue (carrying req:) is created and promoted to Ready.
+    let (id, _) = executor
+        .create_issue(
+            "A task".to_string(),
+            String::new(),
+            Priority::Normal,
+            vec![],
+            vec!["type:task".to_string(), "req:REQ-1".to_string()],
+            false,
+        )
+        .expect("satisfying issue must be created");
+    assert_eq!(
+        executor.storage().load_issue(&id).unwrap().state,
+        State::Ready
+    );
+}
+
+#[test]
+fn test_update_evaluates_rules_against_post_transition_shape() {
+    // Seed a Backlog issue with NO req: label. While Backlog, the
+    // `state = "ready"` rule does not match. Transitioning it to Ready must
+    // make the rule fire (final-shape evaluation), blocking the transition.
+    let executor = executor_with_rules(READY_NEEDS_REQ_ENFORCE);
+
+    let mut issue = Issue::new("A task".to_string(), String::new());
+    issue.labels = vec!["type:task".to_string()];
+    issue.state = State::Backlog;
+    let id = issue.id.clone();
+    executor.storage().save_issue(issue).unwrap();
+
+    let blocked = executor.update_issue(
+        &id,
+        None,
+        None,
+        None,
+        Some(State::Ready), // transition into the selected state
+        vec![],
+        vec![],
+        false,
+    );
+    assert!(
+        blocked.is_err(),
+        "transitioning to ready must trigger the ready-state enforce rule"
+    );
+    assert!(blocked.unwrap_err().to_string().contains("ready-needs-req"));
+    // The transition must NOT have been persisted.
+    assert_eq!(
+        executor.storage().load_issue(&id).unwrap().state,
+        State::Backlog
+    );
+    assert!(bypass_events(&executor).is_empty());
+
+    // Adding the req: label in the same update unblocks the transition.
+    executor
+        .update_issue(
+            &id,
+            None,
+            None,
+            None,
+            Some(State::Ready),
+            vec!["req:REQ-1".to_string()],
+            vec![],
+            false,
+        )
+        .expect("satisfying the rule unblocks the transition");
+    assert_eq!(
+        executor.storage().load_issue(&id).unwrap().state,
+        State::Ready
+    );
+}
+
+#[test]
+fn test_force_bypass_event_emitted_after_successful_create_save() {
+    // The bypass event must be deferred until after the write commits. On a
+    // forced create, IssueCreated is appended only after save_issue succeeds, so
+    // the LocalRuleBypassed event (now logged after the save) must come AFTER
+    // the IssueCreated event in the log — proving it is not emitted pre-write.
+    let executor = executor_with_rules(EPIC_NEEDS_REQ_ENFORCE);
+
+    executor
+        .create_issue(
+            "An epic".to_string(),
+            String::new(),
+            Priority::Normal,
+            vec![],
+            vec!["type:epic".to_string()],
+            true, // --force
+        )
+        .expect("force must allow the create");
+
+    let events = executor.storage().read_events().unwrap();
+    let created_idx = events
+        .iter()
+        .position(|e| matches!(e, Event::IssueCreated { .. }))
+        .expect("an IssueCreated event must be logged");
+    let bypass_idx = events
+        .iter()
+        .position(|e| matches!(e, Event::LocalRuleBypassed { .. }))
+        .expect("a LocalRuleBypassed event must be logged");
+    assert!(
+        bypass_idx > created_idx,
+        "bypass event must be emitted only after the successful save (and its \
+         IssueCreated event), got bypass at {bypass_idx}, created at {created_idx}"
+    );
+}
+
+#[test]
+fn test_no_bypass_event_when_save_fails() {
+    // A storage whose save_issue always fails. A forced create that bypasses an
+    // enforce rule must NOT leave a LocalRuleBypassed entry when the write fails,
+    // because the bypass event is now emitted only after a successful save.
+    let inner = InMemoryStorage::new();
+    inner.init().unwrap();
+    std::fs::create_dir_all(inner.root()).unwrap();
+    std::fs::write(
+        inner.root().join("config.toml"),
+        "[worktree]\nenforce_leases = \"off\"\n",
+    )
+    .unwrap();
+    std::fs::write(inner.root().join("rules.toml"), EPIC_NEEDS_REQ_ENFORCE).unwrap();
+
+    let storage = FailingSaveStorage::new(inner);
+    let executor = CommandExecutor::new(storage);
+
+    let result = executor.create_issue(
+        "An epic".to_string(),
+        String::new(),
+        Priority::Normal,
+        vec![],
+        vec!["type:epic".to_string()],
+        true, // --force: would bypass, but the save will fail
+    );
+    assert!(result.is_err(), "the failing save must surface an error");
+
+    // No bypass event must have been written, because the save never committed.
+    let bypasses: Vec<_> = executor
+        .storage()
+        .read_events()
+        .unwrap()
+        .into_iter()
+        .filter(|e| matches!(e, Event::LocalRuleBypassed { .. }))
+        .collect();
+    assert!(
+        bypasses.is_empty(),
+        "no bypass event may be logged when the issue write fails"
+    );
+}
+
 #[test]
 fn test_ordinary_rejection_is_not_logged() {
     // A blocked (non-forced) write must NOT append any event at all.
@@ -309,4 +493,105 @@ fn test_ordinary_rejection_is_not_logged() {
     );
     let after = executor.storage().read_events().unwrap().len();
     assert_eq!(before, after, "an ordinary rejection must not log events");
+}
+
+/// A storage backend that delegates every operation to an inner
+/// [`InMemoryStorage`] EXCEPT `save_issue`, which always fails. Used to prove
+/// that a `--force` bypass event is never written when the issue write fails.
+#[derive(Clone)]
+struct FailingSaveStorage {
+    inner: InMemoryStorage,
+}
+
+impl FailingSaveStorage {
+    fn new(inner: InMemoryStorage) -> Self {
+        Self { inner }
+    }
+}
+
+impl IssueStore for FailingSaveStorage {
+    fn init(&self) -> anyhow::Result<()> {
+        self.inner.init()
+    }
+
+    fn save_issue(&self, _issue: Issue) -> anyhow::Result<()> {
+        Err(anyhow::anyhow!("simulated save failure"))
+    }
+
+    fn load_issue(&self, id: &str) -> anyhow::Result<Issue> {
+        self.inner.load_issue(id)
+    }
+
+    fn resolve_issue_id(&self, partial_id: &str) -> anyhow::Result<String> {
+        self.inner.resolve_issue_id(partial_id)
+    }
+
+    fn delete_issue(&self, id: &str) -> anyhow::Result<()> {
+        self.inner.delete_issue(id)
+    }
+
+    fn list_issues(&self) -> anyhow::Result<Vec<Issue>> {
+        self.inner.list_issues()
+    }
+
+    fn load_gate_registry(&self) -> anyhow::Result<jit::storage::GateRegistry> {
+        self.inner.load_gate_registry()
+    }
+
+    fn save_gate_registry(&self, registry: &jit::storage::GateRegistry) -> anyhow::Result<()> {
+        self.inner.save_gate_registry(registry)
+    }
+
+    fn append_event(&self, event: &Event) -> anyhow::Result<()> {
+        self.inner.append_event(event)
+    }
+
+    fn read_events(&self) -> anyhow::Result<Vec<Event>> {
+        self.inner.read_events()
+    }
+
+    fn save_gate_run_result(&self, result: &jit::domain::GateRunResult) -> anyhow::Result<()> {
+        self.inner.save_gate_run_result(result)
+    }
+
+    fn load_gate_run_result(&self, run_id: &str) -> anyhow::Result<jit::domain::GateRunResult> {
+        self.inner.load_gate_run_result(run_id)
+    }
+
+    fn list_gate_runs_for_issue(
+        &self,
+        issue_id: &str,
+    ) -> anyhow::Result<Vec<jit::domain::GateRunResult>> {
+        self.inner.list_gate_runs_for_issue(issue_id)
+    }
+
+    fn root(&self) -> &std::path::Path {
+        self.inner.root()
+    }
+
+    fn list_gate_presets(&self) -> anyhow::Result<Vec<jit::gate_presets::PresetInfo>> {
+        self.inner.list_gate_presets()
+    }
+
+    fn get_gate_preset(
+        &self,
+        name: &str,
+    ) -> anyhow::Result<jit::gate_presets::GatePresetDefinition> {
+        self.inner.get_gate_preset(name)
+    }
+
+    fn save_gate_preset(
+        &self,
+        preset: &jit::gate_presets::GatePresetDefinition,
+    ) -> anyhow::Result<std::path::PathBuf> {
+        self.inner.save_gate_preset(preset)
+    }
+
+    fn read_path_bytes(
+        &self,
+        path: &str,
+        at_commit: Option<&str>,
+    ) -> Result<(Vec<u8>, String), jit::storage::PathReadError> {
+        self.inner.read_path_bytes(path, at_commit)
+    }
 }

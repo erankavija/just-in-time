@@ -203,7 +203,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     ) -> Result<bool> {
         // Validate first (includes local rule enforcement on the post-update
         // shape, so `jit issue update --filter` cannot bypass enforce rules).
-        self.validate_update(issue, operations, force)?;
+        // Bypass events are deferred and only emitted after the save succeeds.
+        let validation = self.validate_update(issue, operations, force)?;
 
         // Check if any changes needed
         let changes = self.compute_changes(issue, operations)?;
@@ -312,6 +313,10 @@ impl<S: IssueStore> CommandExecutor<S> {
                 "bulk-update".to_string(),
                 modified_fields.clone(),
             ))?;
+
+            // Emit any `--force` bypass events only AFTER the save committed, so
+            // a failed write never leaves a false bypass entry in the audit log.
+            self.log_rule_bypasses(&issue.id, &validation.bypassed_rules)?;
         }
 
         Ok(!modified_fields.is_empty())
@@ -448,13 +453,19 @@ impl<S: IssueStore> CommandExecutor<S> {
         updated
     }
 
-    /// Validate that update can be applied to issue
+    /// Validate that update can be applied to issue.
+    ///
+    /// Returns the [`WriteValidation`] outcome (non-blocking warnings plus any
+    /// `--force`-bypassed enforce rules). The caller emits the bypass events only
+    /// AFTER the issue write succeeds, so a failed save leaves no false bypass
+    /// entry. In a read-only preview (`force = false`) blocking rules surface as
+    /// an `Err` and `bypassed_rules` is always empty, so nothing is ever logged.
     fn validate_update(
         &self,
         issue: &Issue,
         operations: &UpdateOperations,
         force: bool,
-    ) -> Result<()> {
+    ) -> Result<WriteValidation> {
         // Validate label operations
         if !operations.add_labels.is_empty() || !operations.remove_labels.is_empty() {
             let label_namespaces = self.config_manager.get_namespaces()?;
@@ -505,13 +516,12 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
-        // Enforce declarative local rules against the POST-update shape so the
-        // batch path (`jit issue update --filter`) cannot bypass enforce rules.
-        // On `--force`, the bypass is logged per rule; otherwise it blocks.
+        // Enforce declarative local rules (and the legacy validator) against the
+        // POST-update shape so the batch path (`jit issue update --filter`)
+        // cannot bypass enforce rules. On `--force` the bypassed rules are
+        // returned for the caller to log AFTER its save; otherwise it blocks.
         let projected = Self::projected_after_update(issue, operations);
-        self.enforce_local_rules(&projected, &issue.id, force)?;
-
-        Ok(())
+        self.validate_for_write(&projected, force)
     }
 }
 
