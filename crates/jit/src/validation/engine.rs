@@ -259,6 +259,12 @@ impl SchemaEngine {
     /// most once per rule (DR §5.2). The validator is built with the 2020-12
     /// draft pinned explicitly.
     ///
+    /// Correctness of the name-keyed cache relies on the loader-enforced
+    /// uniqueness of rule names: [`RuleSet::from_toml_str`](crate::validation::rules::RuleSet::from_toml_str)
+    /// rejects duplicate names with
+    /// [`RuleConfigError::DuplicateRuleName`](crate::validation::rules::RuleConfigError::DuplicateRuleName),
+    /// so a name can never alias two different schemas here.
+    ///
     /// # Examples
     ///
     /// ```

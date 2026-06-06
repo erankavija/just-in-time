@@ -102,6 +102,15 @@ pub enum RuleConfigError {
         /// Human-readable explanation of why the reference was rejected.
         message: String,
     },
+
+    /// Two or more rules share the same `name`. Rule names MUST be unique: the
+    /// engine caches compiled validators keyed by name, so a duplicate would let
+    /// one rule's validator alias another's schema (DR §5.2).
+    #[error("duplicate rule name '{name}': rule names must be unique")]
+    DuplicateRuleName {
+        /// The name that appeared more than once.
+        name: String,
+    },
 }
 
 /// Severity of a rule finding.
@@ -523,6 +532,18 @@ impl RuleSet {
             .into_iter()
             .map(|r| r.into_rule(jit_root))
             .collect::<Result<Vec<_>, _>>()?;
+
+        // Enforce the documented "Unique" invariant on `Rule::name`: the engine
+        // caches compiled validators keyed by name, so a duplicate would alias
+        // one rule's validator onto another's schema. Detect the first collision
+        // via a `HashSet` insert.
+        let mut seen = std::collections::HashSet::new();
+        if let Some(rule) = rules.iter().find(|r| !seen.insert(r.name.as_str())) {
+            return Err(RuleConfigError::DuplicateRuleName {
+                name: rule.name.clone(),
+            });
+        }
+
         Ok(Self { rules })
     }
 
@@ -1074,6 +1095,27 @@ assert = { json-schema = { type = "object" } }
 "#;
         let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
         assert!(matches!(err, RuleConfigError::Toml(_)));
+    }
+
+    #[test]
+    fn test_duplicate_rule_names_are_rejected() {
+        // Two rules sharing a name violate the documented uniqueness invariant
+        // the engine's name-keyed validator cache relies on. The loader rejects
+        // them even when their schemas differ.
+        let toml = r#"
+[[rules]]
+name = "dup"
+assert = { require-section = { heading = "A" } }
+
+[[rules]]
+name = "dup"
+assert = { require-doc-type = { doc-type = "design" } }
+"#;
+        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        match err {
+            RuleConfigError::DuplicateRuleName { name } => assert_eq!(name, "dup"),
+            other => panic!("expected DuplicateRuleName, got {other:?}"),
+        }
     }
 
     #[test]
