@@ -2,9 +2,9 @@
   "id": "a7176f28-7337-4b0f-a88c-c393495c2f36",
   "title": "Graph rules: coverage, reference-integrity, dependency-shape",
   "description": "Implement the graph/aggregate rule kinds (coverage, reference-integrity, dependency-shape) over the whole issue store.\n\n## Background\n\nThese rules need cross-issue context and run only in `jit validate` and gate checkers, never on write. See `dev/active/f6a704d0-validation-engine-plan.md` (step 6) and decision record sections 4.2 and 10.2.\n\n## Success Criteria\n\n- [ ] [hard] `label-coverage` asserts every canonical criterion id (from the description, with derived satisfies links) is satisfied by at least one child in a configurable state.\n- [ ] [hard] `label-reference` asserts a `from` reference (for example `satisfies:X`) resolves to a declared source within a configurable scope.\n- [ ] [hard] `dependency-shape` asserts a selector must or should depend on a target selector, evaluated over the dependency DAG.\n- [ ] [hard] Graph rules operate over `store.list_issues()` and run only in validate/gate-checker contexts.\n\n## Notes\n\nAnchors: `IssueStore::list_issues` in `storage/mod.rs`; `DependencyGraph` in `graph.rs` (already used by `validate.rs`).\n",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [
     "7df61f62-2a79-450b-9959-9e46c16f6912"
   ],
@@ -20,5 +20,5 @@
     "epic:validation-engine"
   ],
   "created_at": "2026-06-06T15:51:20.556751372+00:00",
-  "updated_at": "2026-06-06T20:44:18.585239275+00:00"
+  "updated_at": "2026-06-06T20:55:37.749126176+00:00"
 }
