@@ -18,10 +18,20 @@
 
 pub mod markdown;
 
+#[cfg(feature = "html")]
+pub mod html;
+#[cfg(feature = "xml")]
+pub mod xml;
+
 use serde::Serialize;
 use std::collections::BTreeMap;
 
 pub use markdown::MarkdownContentParser;
+
+#[cfg(feature = "html")]
+pub use html::HtmlContentParser;
+#[cfg(feature = "xml")]
+pub use xml::XmlContentParser;
 
 /// A canonical parsed document body.
 ///
@@ -98,6 +108,50 @@ pub fn slugify_heading(heading: &str) -> String {
         slug.pop();
     }
     slug
+}
+
+/// Collapse all runs of whitespace into single spaces and trim the ends.
+///
+/// This is the canonicalization every parser applies to heading and item text
+/// so that the same logical content yields byte-identical strings regardless of
+/// how the source format wrapped or indented it. It mirrors the Markdown
+/// parser's break handling, where a `SoftBreak`/`HardBreak` between two words
+/// becomes a single space (`foo bar`, never `foobar` or `foo  bar`).
+///
+/// # Examples
+///
+/// ```
+/// # use jit::document::ContentParser;
+/// # use jit::document::MarkdownContentParser;
+/// // `normalize_ws` is exercised indirectly through every parser: a wrapped
+/// // list item collapses to a single-spaced string.
+/// let parsed = MarkdownContentParser.parse("## S\n\n- foo\n  bar\n");
+/// assert_eq!(parsed.sections["s"].items, vec!["foo bar".to_string()]);
+/// ```
+#[cfg(any(feature = "html", feature = "xml"))]
+pub(crate) fn normalize_ws(text: &str) -> String {
+    text.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// Insert a parsed section, MERGING it with any existing section that normalizes
+/// to the same slug.
+///
+/// Two headings that slugify identically (e.g. two `Success Criteria`, or
+/// `Success Criteria` vs `Success-Criteria`) address the same canonical section,
+/// so their list items are concatenated in document order rather than the later
+/// section silently overwriting (or being dropped by) the earlier one. The first
+/// section's `heading` text and `level` are kept; only `items` are appended.
+///
+/// Shared by every [`ContentParser`] implementation so cross-format equality
+/// holds for colliding-slug documents.
+pub(crate) fn merge_section(result: &mut ParsedContent, mut section: Section) {
+    let slug = slugify_heading(&section.heading);
+    match result.sections.get_mut(&slug) {
+        Some(existing) => existing.items.append(&mut section.items),
+        None => {
+            result.sections.insert(slug, section);
+        }
+    }
 }
 
 /// A parser that turns a document body into a canonical [`ParsedContent`].

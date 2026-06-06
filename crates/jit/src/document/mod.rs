@@ -13,3 +13,8 @@ pub use adapter::{AdapterRegistry, DocFormatAdapter, HtmlAdapter, MarkdownAdapte
 pub use assets::{Asset, AssetScanner, AssetType};
 pub use link_validator::{InternalLink, LinkType, LinkValidationResult, LinkValidator};
 pub use parser::{slugify_heading, ContentParser, MarkdownContentParser, ParsedContent, Section};
+
+#[cfg(feature = "html")]
+pub use parser::HtmlContentParser;
+#[cfg(feature = "xml")]
+pub use parser::XmlContentParser;

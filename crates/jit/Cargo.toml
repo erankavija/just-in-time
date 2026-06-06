@@ -38,6 +38,19 @@ ureq = { version = "3", features = ["native-tls"] }
 tempfile = { workspace = true }
 dirs = "5.0"
 nix = { version = "0.31.1", features = ["signal"] }
+# Optional content-parser backends. Each is gated by its own feature and is OFF
+# in the default build (see `[features]`), so the default `cargo build` neither
+# compiles the parser modules nor pulls these crates.
+tl = { version = "0.7", optional = true }
+quick-xml = { version = "0.40", optional = true }
+
+[features]
+# HTML content parser (document/parser/html.rs). Pulls the pure-Rust `tl` HTML
+# parser. OFF by default.
+html = ["dep:tl"]
+# XML content parser (document/parser/xml.rs). Pulls the `quick-xml` reader.
+# OFF by default.
+xml = ["dep:quick-xml"]
 
 [dev-dependencies]
 assert_cmd = { workspace = true }
