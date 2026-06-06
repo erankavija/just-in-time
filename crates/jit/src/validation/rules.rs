@@ -73,12 +73,35 @@ pub enum RuleConfigError {
         /// Human-readable explanation of the problem.
         message: String,
     },
+
+    /// A `json-schema` reference does not name a safe `.jit/schemas/<name>.json`
+    /// file. References MUST be relative paths under `schemas/` ending in
+    /// `.json`, with no `..` traversal and no absolute paths.
+    #[error("rule '{rule}': invalid schema reference '{reference}': {message}")]
+    InvalidSchemaReference {
+        /// Name of the offending rule.
+        rule: String,
+        /// The reference string as authored in `rules.toml`.
+        reference: String,
+        /// Human-readable explanation of why the reference was rejected.
+        message: String,
+    },
 }
 
 /// Severity of a rule finding.
 ///
 /// `off` disables the rule entirely; `warn` reports without blocking; `error`
 /// reports and (when `enforce` is set) can block a write.
+///
+/// # Examples
+///
+/// ```
+/// use jit::validation::rules::Severity;
+///
+/// // `warn` is the default severity when none is authored.
+/// assert_eq!(Severity::default(), Severity::Warn);
+/// assert_ne!(Severity::Off, Severity::Error);
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Severity {
@@ -96,6 +119,21 @@ pub enum Severity {
 /// `Local` rules are pure predicates over a single projected issue and run on
 /// write. `Graph` rules need the whole store and run only in `jit validate` and
 /// gate checkers, never on write.
+///
+/// # Examples
+///
+/// ```
+/// use jit::validation::rules::{RuleSet, Scope};
+/// use std::path::Path;
+///
+/// let toml = r#"
+/// [[rules]]
+/// name = "local"
+/// assert = { require-label = { label = "type:*" } }
+/// "#;
+/// let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+/// assert_eq!(set.rules[0].scope, Scope::Local);
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Scope {
     /// Per-issue, runs on write.
@@ -109,6 +147,21 @@ pub enum Scope {
 /// All present dimensions are AND-combined. Matching reads only cheap `Issue`
 /// fields (labels, state) and never parses the description. The `label`
 /// dimension supports `ns:*` wildcards via [`label_utils::matches_pattern`].
+///
+/// # Examples
+///
+/// ```
+/// use jit::validation::rules::Selector;
+/// use jit::domain::Issue;
+///
+/// let selector = Selector {
+///     type_: Some("epic".to_string()),
+///     ..Default::default()
+/// };
+/// let mut epic = Issue::new("An epic".to_string(), String::new());
+/// epic.labels = vec!["type:epic".to_string()];
+/// assert!(selector.matches(&epic));
+/// ```
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
 pub struct Selector {
     /// Match issues of this `type:*` label value (e.g. `"epic"`).
@@ -131,6 +184,18 @@ impl Selector {
     /// Matching is AND across all present dimensions. An empty selector (no
     /// dimensions) matches every issue. Only cheap fields are read; the
     /// description is never parsed.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::validation::rules::Selector;
+    /// use jit::domain::Issue;
+    ///
+    /// // An empty selector matches every issue.
+    /// let any = Selector::default();
+    /// let issue = Issue::new("title".to_string(), String::new());
+    /// assert!(any.matches(&issue));
+    /// ```
     pub fn matches(&self, issue: &Issue) -> bool {
         self.matches_type(issue)
             && self.matches_label(issue)
@@ -193,6 +258,20 @@ fn state_token(state: crate::domain::State) -> &'static str {
 /// reference and the transcoded schema value are both retained. The `schema`
 /// value is loaded eagerly at parse time so downstream compilation never has to
 /// touch the filesystem.
+///
+/// # Examples
+///
+/// ```
+/// use jit::validation::rules::SchemaSource;
+/// use std::path::PathBuf;
+///
+/// let source = SchemaSource {
+///     reference: "schemas/epic-body.json".to_string(),
+///     path: PathBuf::from("/repo/.jit/schemas/epic-body.json"),
+///     schema: serde_json::json!({ "type": "object" }),
+/// };
+/// assert_eq!(source.reference, "schemas/epic-body.json");
+/// ```
 #[derive(Debug, Clone, PartialEq)]
 pub struct SchemaSource {
     /// The reference string as authored in `rules.toml` (e.g.
@@ -209,6 +288,17 @@ pub struct SchemaSource {
 /// Shorthand kinds carry simple scalars and desugar to JSON Schema downstream.
 /// [`Assertion::JsonSchema`] carries a raw schema loaded from a file. Graph
 /// kinds run only on demand. Payloads are parsed/stored but not yet evaluated.
+///
+/// # Examples
+///
+/// ```
+/// use jit::validation::rules::{Assertion, Scope};
+///
+/// let assertion = Assertion::RequireSection {
+///     heading: "Success Criteria".to_string(),
+/// };
+/// assert_eq!(assertion.scope(), Scope::Local);
+/// ```
 #[derive(Debug, Clone, PartialEq)]
 pub enum Assertion {
     /// Require a label (by exact value or `ns:*` wildcard) with optional
@@ -265,6 +355,20 @@ pub enum Assertion {
 
 impl Assertion {
     /// The evaluation scope implied by this assertion kind.
+    ///
+    /// Shorthand and file-schema kinds are [`Scope::Local`]; the aggregate graph
+    /// kinds are [`Scope::Graph`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::validation::rules::{Assertion, Scope};
+    ///
+    /// let local = Assertion::RequireDocType {
+    ///     doc_type: "design".to_string(),
+    /// };
+    /// assert_eq!(local.scope(), Scope::Local);
+    /// ```
     pub fn scope(&self) -> Scope {
         match self {
             Assertion::LabelCoverage { .. }
@@ -276,6 +380,28 @@ impl Assertion {
 }
 
 /// A fully parsed validation rule.
+///
+/// # Examples
+///
+/// ```
+/// use jit::validation::rules::{RuleSet, Scope, Severity};
+/// use std::path::Path;
+///
+/// let toml = r#"
+/// [[rules]]
+/// name = "epic-needs-req"
+/// when = { type = "epic" }
+/// severity = "error"
+/// enforce = true
+/// assert = { require-label = { label = "req:*", min = 1 } }
+/// "#;
+/// let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+/// let rule = &set.rules[0];
+/// assert_eq!(rule.name, "epic-needs-req");
+/// assert_eq!(rule.severity, Severity::Error);
+/// assert!(rule.enforce);
+/// assert_eq!(rule.scope, Scope::Local);
+/// ```
 #[derive(Debug, Clone, PartialEq)]
 pub struct Rule {
     /// Unique, human-readable rule name.
@@ -293,6 +419,22 @@ pub struct Rule {
 }
 
 /// A parsed set of rules, ready for selector matching.
+///
+/// # Examples
+///
+/// ```
+/// use jit::validation::rules::RuleSet;
+/// use std::path::Path;
+///
+/// let toml = r#"
+/// [[rules]]
+/// name = "ready-needs-criteria"
+/// when = { state = "ready" }
+/// assert = { require-section = { heading = "Success Criteria" } }
+/// "#;
+/// let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+/// assert_eq!(set.rules.len(), 1);
+/// ```
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct RuleSet {
     /// The rules in authored order.
@@ -301,6 +443,15 @@ pub struct RuleSet {
 
 impl RuleSet {
     /// An empty rule set (used when no `rules.toml` exists).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::validation::rules::RuleSet;
+    ///
+    /// let set = RuleSet::empty();
+    /// assert!(set.rules.is_empty());
+    /// ```
     pub fn empty() -> Self {
         Self::default()
     }
@@ -309,6 +460,17 @@ impl RuleSet {
     ///
     /// Returns an empty [`RuleSet`] when the file does not exist. Referenced
     /// schema files are read relative to `jit_root` and transcoded to JSON.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::validation::rules::RuleSet;
+    ///
+    /// // A directory with no `rules.toml` loads as an empty rule set.
+    /// let dir = tempfile::tempdir().unwrap();
+    /// let set = RuleSet::load(dir.path()).unwrap();
+    /// assert!(set.rules.is_empty());
+    /// ```
     pub fn load(jit_root: &Path) -> Result<Self, RuleConfigError> {
         let path = jit_root.join("rules.toml");
         if !path.exists() {
@@ -322,6 +484,22 @@ impl RuleSet {
     }
 
     /// Parse a `rules.toml` string. `jit_root` resolves schema file references.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::validation::rules::RuleSet;
+    /// use std::path::Path;
+    ///
+    /// let toml = r#"
+    /// [[rules]]
+    /// name = "task-needs-design"
+    /// when = { type = "task" }
+    /// assert = { require-doc-type = { doc-type = "design" } }
+    /// "#;
+    /// let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+    /// assert_eq!(set.rules[0].name, "task-needs-design");
+    /// ```
     pub fn from_toml_str(content: &str, jit_root: &Path) -> Result<Self, RuleConfigError> {
         let raw: RawRulesFile = toml::from_str(content)?;
         let rules = raw
@@ -336,6 +514,30 @@ impl RuleSet {
     ///
     /// Only cheap `Issue` fields are read (no description parse). Rules are
     /// returned in authored order.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::validation::rules::RuleSet;
+    /// use jit::domain::Issue;
+    /// use std::path::Path;
+    ///
+    /// let toml = r#"
+    /// [[rules]]
+    /// name = "epic-rule"
+    /// when = { type = "epic" }
+    /// assert = { require-section = { heading = "Goals" } }
+    /// "#;
+    /// let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+    ///
+    /// let mut epic = Issue::new("An epic".to_string(), String::new());
+    /// epic.labels = vec!["type:epic".to_string()];
+    /// assert_eq!(set.matching_rules(&epic).len(), 1);
+    ///
+    /// let mut task = Issue::new("A task".to_string(), String::new());
+    /// task.labels = vec!["type:task".to_string()];
+    /// assert!(set.matching_rules(&task).is_empty());
+    /// ```
     pub fn matching_rules(&self, issue: &Issue) -> Vec<&Rule> {
         self.rules
             .iter()
@@ -543,6 +745,41 @@ impl RawAssert {
     }
 }
 
+/// Validate that a `json-schema` reference names a safe file under `schemas/`.
+///
+/// A reference MUST be a relative path that starts with `schemas/`, ends with
+/// `.json`, and contains no `..` (parent) component. Absolute paths are
+/// rejected because [`Path::join`] would discard the `.jit` root, letting a rule
+/// read an arbitrary file; `..` is rejected to prevent traversal out of
+/// `<jit_root>/schemas/`. After these checks the resolved path is guaranteed to
+/// live under `<jit_root>/schemas/`.
+fn validate_schema_reference(rule: &str, reference: &str) -> Result<(), RuleConfigError> {
+    let reject = |message: &str| RuleConfigError::InvalidSchemaReference {
+        rule: rule.to_string(),
+        reference: reference.to_string(),
+        message: message.to_string(),
+    };
+
+    let ref_path = Path::new(reference);
+
+    if ref_path.is_absolute() {
+        return Err(reject("reference must be a relative path, not absolute"));
+    }
+    if ref_path
+        .components()
+        .any(|c| matches!(c, std::path::Component::ParentDir))
+    {
+        return Err(reject("reference must not contain a '..' path component"));
+    }
+    if !reference.starts_with("schemas/") {
+        return Err(reject("reference must start with 'schemas/'"));
+    }
+    if !reference.ends_with(".json") {
+        return Err(reject("reference must end with '.json'"));
+    }
+    Ok(())
+}
+
 /// Load a `.jit/schemas/<name>.json` file referenced by a `json-schema` rule and
 /// transcode it into a `serde_json::Value`.
 fn load_schema_source(
@@ -550,6 +787,7 @@ fn load_schema_source(
     jit_root: &Path,
     reference: String,
 ) -> Result<SchemaSource, RuleConfigError> {
+    validate_schema_reference(rule, &reference)?;
     let path = jit_root.join(&reference);
     let content = std::fs::read_to_string(&path).map_err(|source| RuleConfigError::SchemaIo {
         rule: rule.to_string(),
@@ -888,6 +1126,80 @@ assert = { json-schema = "schemas/bad.json" }
 "#;
         let err = RuleSet::from_toml_str(toml, dir.path()).unwrap_err();
         assert!(matches!(err, RuleConfigError::SchemaJson { .. }));
+    }
+
+    // --- Schema reference safety -------------------------------------------
+
+    fn schema_rule_toml(reference: &str) -> String {
+        format!("[[rules]]\nname = \"epic-body\"\nassert = {{ json-schema = \"{reference}\" }}\n")
+    }
+
+    #[test]
+    fn test_schema_reference_absolute_path_is_rejected() {
+        let dir = tempfile::tempdir().unwrap();
+        let toml = schema_rule_toml("/etc/passwd.json");
+        let err = RuleSet::from_toml_str(&toml, dir.path()).unwrap_err();
+        match err {
+            RuleConfigError::InvalidSchemaReference {
+                rule, reference, ..
+            } => {
+                assert_eq!(rule, "epic-body");
+                assert_eq!(reference, "/etc/passwd.json");
+            }
+            other => panic!("expected InvalidSchemaReference, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_schema_reference_parent_traversal_is_rejected() {
+        let dir = tempfile::tempdir().unwrap();
+        let toml = schema_rule_toml("schemas/../escape.json");
+        let err = RuleSet::from_toml_str(&toml, dir.path()).unwrap_err();
+        assert!(matches!(
+            err,
+            RuleConfigError::InvalidSchemaReference { .. }
+        ));
+    }
+
+    #[test]
+    fn test_schema_reference_not_under_schemas_is_rejected() {
+        let dir = tempfile::tempdir().unwrap();
+        let toml = schema_rule_toml("other/x.json");
+        let err = RuleSet::from_toml_str(&toml, dir.path()).unwrap_err();
+        match err {
+            RuleConfigError::InvalidSchemaReference { message, .. } => {
+                assert!(message.contains("schemas/"));
+            }
+            other => panic!("expected InvalidSchemaReference, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_schema_reference_non_json_extension_is_rejected() {
+        let dir = tempfile::tempdir().unwrap();
+        let toml = schema_rule_toml("schemas/x.txt");
+        let err = RuleSet::from_toml_str(&toml, dir.path()).unwrap_err();
+        match err {
+            RuleConfigError::InvalidSchemaReference { message, .. } => {
+                assert!(message.contains(".json"));
+            }
+            other => panic!("expected InvalidSchemaReference, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_schema_reference_valid_under_schemas_is_accepted() {
+        let dir = tempfile::tempdir().unwrap();
+        let schemas = dir.path().join("schemas");
+        std::fs::create_dir_all(&schemas).unwrap();
+        std::fs::write(schemas.join("x.json"), r#"{ "type": "object" }"#).unwrap();
+
+        let toml = schema_rule_toml("schemas/x.json");
+        let set = RuleSet::from_toml_str(&toml, dir.path()).unwrap();
+        match &set.rules[0].assert {
+            Assertion::JsonSchema(src) => assert_eq!(src.reference, "schemas/x.json"),
+            other => panic!("expected JsonSchema, got {other:?}"),
+        }
     }
 
     // --- Regex round-trip (TOML literal string -> serde_json) --------------
