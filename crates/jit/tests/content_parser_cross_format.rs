@@ -14,7 +14,10 @@ use jit::document::{
     ContentParser, HtmlContentParser, MarkdownContentParser, ParsedContent, XmlContentParser,
 };
 use jit::domain::{project, Issue};
+use jit::validation::engine::{Finding, SchemaEngine};
+use jit::validation::rules::{Assertion, Rule, SchemaSource, Scope, Selector, Severity};
 use serde_json::Value;
+use std::path::PathBuf;
 
 /// The same document expressed in Markdown.
 const MARKDOWN: &str = "\
@@ -148,13 +151,48 @@ fn test_parsers_produce_identical_parsed_content_across_formats() {
     assert_eq!(md.sections.len(), 3);
 }
 
-/// A single content "finding": the path that failed and a human message. Mirrors
-/// the shape a JSON-Schema validation engine would emit per failed assertion, so
-/// the cross-format comparison is over real findings rather than a bare boolean.
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct Finding {
-    path: String,
-    message: String,
+/// The canonical `[hard]`-criterion content rule, expressed as a real JSON Schema
+/// rule the production [`SchemaEngine`] evaluates: `sections.success_criteria.items`
+/// must `contain` at least one item matching `^\[hard\]` (Draft 2020-12
+/// `contains`/`minContains`). This is the same rule shape exercised in the engine's
+/// own unit tests; here it is run against each format's projection so the
+/// comparison is over REAL engine findings, not a hand-rolled check.
+fn hard_criterion_rule() -> Rule {
+    let schema = serde_json::json!({
+        "type": "object",
+        "properties": {
+            "sections": {
+                "type": "object",
+                "properties": {
+                    "success_criteria": {
+                        "type": "object",
+                        "properties": {
+                            "items": {
+                                "type": "array",
+                                "contains": { "type": "string", "pattern": "^\\[hard\\]" },
+                                "minContains": 1
+                            }
+                        },
+                        "required": ["items"]
+                    }
+                },
+                "required": ["success_criteria"]
+            }
+        },
+        "required": ["sections"]
+    });
+    Rule {
+        name: "success-criteria-has-hard".to_string(),
+        when: Selector::default(),
+        severity: Severity::Error,
+        enforce: false,
+        assert: Assertion::JsonSchema(SchemaSource {
+            reference: "schemas/hard.json".to_string(),
+            path: PathBuf::from("schemas/hard.json"),
+            schema,
+        }),
+        scope: Scope::Local,
+    }
 }
 
 /// Build a real [`Projection`] for a document by running its format-specific
@@ -172,37 +210,15 @@ fn projection_json(parser: &dyn ContentParser, body: &str) -> Value {
 }
 
 /// Evaluate the canonical `[hard]`-criterion content rule against a serialized
-/// [`Projection`] and return its findings.
+/// [`Projection`] using the REAL [`SchemaEngine`], returning its [`Finding`]s.
 ///
-/// This is the JSON-Schema `contains`/`minContains` rule shape applied to
-/// `sections.success_criteria.items`: at least one item must match `^\[hard\]`.
-/// Operating on the projection JSON (not on `ParsedContent` directly) means the
-/// rule sees only the format-agnostic shape, so identical projections must yield
-/// identical findings.
-fn hard_criterion_findings(projection: &Value) -> Vec<Finding> {
-    const PATH: &str = "sections.success_criteria.items";
-    let items = projection
-        .get("sections")
-        .and_then(|s| s.get("success_criteria"))
-        .and_then(|sc| sc.get("items"))
-        .and_then(Value::as_array);
-
-    let has_hard = items
-        .map(|arr| {
-            arr.iter()
-                .filter_map(Value::as_str)
-                .any(|i| i.starts_with("[hard]"))
-        })
-        .unwrap_or(false);
-
-    if has_hard {
-        Vec::new()
-    } else {
-        vec![Finding {
-            path: PATH.to_string(),
-            message: "must contain at least one item matching ^\\[hard\\]".to_string(),
-        }]
-    }
+/// Operating through the production engine (not a hand-rolled check) over the
+/// projection JSON means the rule sees only the format-agnostic shape, so
+/// identical projections must yield identical engine findings.
+fn hard_criterion_findings(engine: &SchemaEngine, rule: &Rule, projection: &Value) -> Vec<Finding> {
+    engine
+        .validate(rule, projection)
+        .expect("the [hard]-criterion schema compiles")
 }
 
 /// Criterion 2 (end-to-end): a content rule produces IDENTICAL findings across
@@ -210,13 +226,21 @@ fn hard_criterion_findings(projection: &Value) -> Vec<Finding> {
 ///
 /// Unlike a shallow `ParsedContent.sections` peek, this drives the REAL pipeline
 /// for each format: format-specific parse -> `Projection::with_sections` ->
-/// evaluate the `[hard]`-criterion `contains` rule over the projection JSON.
+/// evaluate the `[hard]`-criterion `contains` rule through the production
+/// `SchemaEngine` over the projection JSON.
 #[test]
 fn test_content_rule_findings_identical_across_formats() {
+    let engine = SchemaEngine::new();
+    let rule = hard_criterion_rule();
+
     // --- Passing document: the hard criterion is present in all three formats. ---
-    let md = hard_criterion_findings(&projection_json(&MarkdownContentParser, MARKDOWN));
-    let html = hard_criterion_findings(&projection_json(&HtmlContentParser, HTML));
-    let xml = hard_criterion_findings(&projection_json(&XmlContentParser, XML));
+    let md = hard_criterion_findings(
+        &engine,
+        &rule,
+        &projection_json(&MarkdownContentParser, MARKDOWN),
+    );
+    let html = hard_criterion_findings(&engine, &rule, &projection_json(&HtmlContentParser, HTML));
+    let xml = hard_criterion_findings(&engine, &rule, &projection_json(&XmlContentParser, XML));
 
     assert!(
         md.is_empty(),
@@ -228,10 +252,21 @@ fn test_content_rule_findings_identical_across_formats() {
 
     // --- Failing document: the hard criterion is missing in all three formats. ---
     // The rule must produce an IDENTICAL, NON-empty finding set for each format.
-    let md_miss =
-        hard_criterion_findings(&projection_json(&MarkdownContentParser, MARKDOWN_NO_HARD));
-    let html_miss = hard_criterion_findings(&projection_json(&HtmlContentParser, HTML_NO_HARD));
-    let xml_miss = hard_criterion_findings(&projection_json(&XmlContentParser, XML_NO_HARD));
+    let md_miss = hard_criterion_findings(
+        &engine,
+        &rule,
+        &projection_json(&MarkdownContentParser, MARKDOWN_NO_HARD),
+    );
+    let html_miss = hard_criterion_findings(
+        &engine,
+        &rule,
+        &projection_json(&HtmlContentParser, HTML_NO_HARD),
+    );
+    let xml_miss = hard_criterion_findings(
+        &engine,
+        &rule,
+        &projection_json(&XmlContentParser, XML_NO_HARD),
+    );
 
     assert!(
         !md_miss.is_empty(),
