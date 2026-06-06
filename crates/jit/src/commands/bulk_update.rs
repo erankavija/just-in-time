@@ -209,6 +209,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Check if any changes needed
         let changes = self.compute_changes(issue, operations)?;
         if changes.is_empty() {
+            // No field changes to persist, but a `--force` override of an
+            // enforce rule must still be audited even on a no-op write.
+            // (`log_rule_bypasses` is a no-op when `bypassed_rules` is empty.)
+            self.log_rule_bypasses(&issue.id, &validation.bypassed_rules)?;
             return Ok(false);
         }
 
@@ -313,11 +317,13 @@ impl<S: IssueStore> CommandExecutor<S> {
                 "bulk-update".to_string(),
                 modified_fields.clone(),
             ))?;
-
-            // Emit any `--force` bypass events only AFTER the save committed, so
-            // a failed write never leaves a false bypass entry in the audit log.
-            self.log_rule_bypasses(&issue.id, &validation.bypassed_rules)?;
         }
+
+        // Emit any `--force` bypass events after the (conditional) save, so a
+        // failed write never leaves a false bypass entry — but independent of
+        // whether fields changed, so a forced override is always audited even on
+        // a no-op write. No-op on an empty `bypassed_rules`.
+        self.log_rule_bypasses(&issue.id, &validation.bypassed_rules)?;
 
         Ok(!modified_fields.is_empty())
     }

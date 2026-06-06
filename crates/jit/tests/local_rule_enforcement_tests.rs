@@ -373,6 +373,56 @@ assert = { json-schema = "schemas/no-bad.json" }
     assert_eq!(bypass_events(&executor).len(), 1);
 }
 
+#[test]
+fn test_bulk_update_force_noop_logs_bypass() {
+    // A forced bulk update that makes NO effective field change to an issue which
+    // ALREADY violates an enforce rule must still audit the `--force` override
+    // (the bulk path must not gate bypass logging behind persistence).
+    let mut executor = executor_with_rules(
+        r#"
+[[rules]]
+name = "no-bad-label"
+when = { type = "epic" }
+severity = "error"
+enforce = true
+assert = { json-schema = "schemas/no-bad.json" }
+"#,
+    );
+    let schemas = executor.storage().root().join("schemas");
+    std::fs::create_dir_all(&schemas).unwrap();
+    std::fs::write(
+        schemas.join("no-bad.json"),
+        r#"{ "type": "object",
+             "properties": { "labels": { "type": "object", "not": { "required": ["bad"] } } } }"#,
+    )
+    .unwrap();
+
+    // Seed an issue that already violates the rule (it carries a `bad:` label).
+    let mut issue = Issue::new("An epic".to_string(), String::new());
+    issue.labels = vec!["type:epic".to_string(), "bad:value".to_string()];
+    issue.state = State::Ready;
+    executor.storage().save_issue(issue).unwrap();
+
+    // Adding a label the issue already has is a no-op (no field change), but the
+    // issue still violates the enforce rule, so a forced write must log a bypass.
+    let filter = QueryFilter::parse("state:ready").unwrap();
+    let ops = UpdateOperations {
+        add_labels: vec!["bad:value".to_string()],
+        ..Default::default()
+    };
+    let result = executor.apply_bulk_update(&filter, &ops, true).unwrap();
+    assert_eq!(result.summary.total_errors, 0, "force must allow the write");
+    assert_eq!(
+        result.summary.total_modified, 0,
+        "no field actually changed (no-op write)"
+    );
+    assert_eq!(
+        bypass_events(&executor).len(),
+        1,
+        "a forced override on a no-op bulk write must still log exactly one bypass event"
+    );
+}
+
 /// An enforce rule keyed on the FINAL state: a `ready` issue must carry a
 /// `req:*` label. This only fires if rules are evaluated against the
 /// post-transition shape (create auto-promotes to Ready; update transitions
