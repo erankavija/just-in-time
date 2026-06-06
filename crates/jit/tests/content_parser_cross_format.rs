@@ -13,6 +13,8 @@
 use jit::document::{
     ContentParser, HtmlContentParser, MarkdownContentParser, ParsedContent, XmlContentParser,
 };
+use jit::domain::{project, Issue};
+use serde_json::Value;
 
 /// The same document expressed in Markdown.
 const MARKDOWN: &str = "\
@@ -66,6 +68,57 @@ const XML: &str = "\
 </document>
 ";
 
+/// The same document in Markdown, but with NO `[hard]` success criterion. Used to
+/// prove the content rule produces an identical NON-empty finding set across
+/// formats when the hard criterion is absent.
+const MARKDOWN_NO_HARD: &str = "\
+# Plan
+
+some prose
+
+## Success Criteria
+
+- [aspirational] REQ-02: nice docs
+
+## Notes
+
+- first note
+- second note
+";
+
+/// The HTML counterpart of [`MARKDOWN_NO_HARD`].
+const HTML_NO_HARD: &str = "\
+<h1>Plan</h1>
+<p>some prose</p>
+<h2>Success Criteria</h2>
+<ul>
+  <li>[aspirational] REQ-02: nice docs</li>
+</ul>
+<h2>Notes</h2>
+<ul>
+  <li>first note</li>
+  <li>second note</li>
+</ul>
+";
+
+/// The XML counterpart of [`MARKDOWN_NO_HARD`].
+const XML_NO_HARD: &str = "\
+<document>
+  <section>
+    <heading level=\"1\">Plan</heading>
+  </section>
+  <section>
+    <heading level=\"2\">Success Criteria</heading>
+    <item>[aspirational] REQ-02: nice docs</item>
+  </section>
+  <section>
+    <heading level=\"2\">Notes</heading>
+    <item>first note</item>
+    <item>second note</item>
+  </section>
+</document>
+";
+
 #[test]
 fn test_parsers_produce_identical_parsed_content_across_formats() {
     let md: ParsedContent = MarkdownContentParser.parse(MARKDOWN);
@@ -95,20 +148,102 @@ fn test_parsers_produce_identical_parsed_content_across_formats() {
     assert_eq!(md.sections.len(), 3);
 }
 
-/// A content rule (here: "the success_criteria section has at least one `[hard]`
-/// item") produces the SAME finding regardless of source format.
+/// A single content "finding": the path that failed and a human message. Mirrors
+/// the shape a JSON-Schema validation engine would emit per failed assertion, so
+/// the cross-format comparison is over real findings rather than a bare boolean.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Finding {
+    path: String,
+    message: String,
+}
+
+/// Build a real [`Projection`] for a document by running its format-specific
+/// [`ContentParser`] through the SAME public projection pipeline the production
+/// validation path uses: `project(&issue).with_sections(&body, &parser)`.
+///
+/// This is the seam that makes content rules format-agnostic — every format is
+/// normalized into the one canonical [`Projection`] shape before any rule runs.
+fn projection_json(parser: &dyn ContentParser, body: &str) -> Value {
+    // The body is what the projection parses; the issue carries it as its
+    // description, exactly as in production.
+    let issue = Issue::new("Plan".to_string(), body.to_string());
+    let projection = project(&issue).with_sections(&issue.description, parser);
+    serde_json::to_value(&projection).expect("projection serializes")
+}
+
+/// Evaluate the canonical `[hard]`-criterion content rule against a serialized
+/// [`Projection`] and return its findings.
+///
+/// This is the JSON-Schema `contains`/`minContains` rule shape applied to
+/// `sections.success_criteria.items`: at least one item must match `^\[hard\]`.
+/// Operating on the projection JSON (not on `ParsedContent` directly) means the
+/// rule sees only the format-agnostic shape, so identical projections must yield
+/// identical findings.
+fn hard_criterion_findings(projection: &Value) -> Vec<Finding> {
+    const PATH: &str = "sections.success_criteria.items";
+    let items = projection
+        .get("sections")
+        .and_then(|s| s.get("success_criteria"))
+        .and_then(|sc| sc.get("items"))
+        .and_then(Value::as_array);
+
+    let has_hard = items
+        .map(|arr| {
+            arr.iter()
+                .filter_map(Value::as_str)
+                .any(|i| i.starts_with("[hard]"))
+        })
+        .unwrap_or(false);
+
+    if has_hard {
+        Vec::new()
+    } else {
+        vec![Finding {
+            path: PATH.to_string(),
+            message: "must contain at least one item matching ^\\[hard\\]".to_string(),
+        }]
+    }
+}
+
+/// Criterion 2 (end-to-end): a content rule produces IDENTICAL findings across
+/// Markdown, HTML, and XML for semantically equivalent inputs.
+///
+/// Unlike a shallow `ParsedContent.sections` peek, this drives the REAL pipeline
+/// for each format: format-specific parse -> `Projection::with_sections` ->
+/// evaluate the `[hard]`-criterion `contains` rule over the projection JSON.
 #[test]
 fn test_content_rule_findings_identical_across_formats() {
-    fn has_hard_criterion(parser: &dyn ContentParser, body: &str) -> bool {
-        parser
-            .parse(body)
-            .sections
-            .get("success_criteria")
-            .map(|s| s.items.iter().any(|i| i.starts_with("[hard]")))
-            .unwrap_or(false)
-    }
+    // --- Passing document: the hard criterion is present in all three formats. ---
+    let md = hard_criterion_findings(&projection_json(&MarkdownContentParser, MARKDOWN));
+    let html = hard_criterion_findings(&projection_json(&HtmlContentParser, HTML));
+    let xml = hard_criterion_findings(&projection_json(&XmlContentParser, XML));
 
-    assert!(has_hard_criterion(&MarkdownContentParser, MARKDOWN));
-    assert!(has_hard_criterion(&HtmlContentParser, HTML));
-    assert!(has_hard_criterion(&XmlContentParser, XML));
+    assert!(
+        md.is_empty(),
+        "Markdown should satisfy the rule, got {md:?}"
+    );
+    assert_eq!(md, html, "Markdown and HTML findings differ");
+    assert_eq!(md, xml, "Markdown and XML findings differ");
+    assert_eq!(html, xml, "HTML and XML findings differ");
+
+    // --- Failing document: the hard criterion is missing in all three formats. ---
+    // The rule must produce an IDENTICAL, NON-empty finding set for each format.
+    let md_miss =
+        hard_criterion_findings(&projection_json(&MarkdownContentParser, MARKDOWN_NO_HARD));
+    let html_miss = hard_criterion_findings(&projection_json(&HtmlContentParser, HTML_NO_HARD));
+    let xml_miss = hard_criterion_findings(&projection_json(&XmlContentParser, XML_NO_HARD));
+
+    assert!(
+        !md_miss.is_empty(),
+        "a document missing the hard criterion must produce a finding"
+    );
+    assert_eq!(
+        md_miss, html_miss,
+        "missing-criterion findings differ (HTML)"
+    );
+    assert_eq!(md_miss, xml_miss, "missing-criterion findings differ (XML)");
+    assert_eq!(
+        html_miss, xml_miss,
+        "missing-criterion findings differ (HTML vs XML)"
+    );
 }
