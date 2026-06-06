@@ -37,6 +37,7 @@ impl TestHarness {
                 Priority::Normal,
                 vec![],
                 vec![],
+                false,
             )
             .unwrap();
         id
@@ -53,6 +54,7 @@ impl TestHarness {
                 Priority::Normal,
                 vec![],
                 vec![],
+                false,
             )
             .unwrap();
         id
@@ -63,7 +65,14 @@ impl TestHarness {
     pub fn create_issue_with_priority(&self, title: &str, priority: Priority) -> String {
         let (id, _) = self
             .executor
-            .create_issue(title.to_string(), String::new(), priority, vec![], vec![])
+            .create_issue(
+                title.to_string(),
+                String::new(),
+                priority,
+                vec![],
+                vec![],
+                false,
+            )
             .unwrap();
         id
     }
@@ -74,7 +83,16 @@ impl TestHarness {
         let id = self.create_issue(title);
         let _ = self
             .executor
-            .update_issue(&id, None, None, None, Some(State::Ready), vec![], vec![])
+            .update_issue(
+                &id,
+                None,
+                None,
+                None,
+                Some(State::Ready),
+                vec![],
+                vec![],
+                false,
+            )
             .unwrap();
         id
     }
@@ -90,6 +108,7 @@ impl TestHarness {
                 Priority::Normal,
                 gates,
                 vec![],
+                false,
             )
             .unwrap();
         id

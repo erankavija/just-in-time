@@ -339,7 +339,7 @@ fn run() -> Result<()> {
                 } => {
                     let prio = Priority::from_str(&priority)?;
                     let (id, warnings) =
-                        executor.create_issue(title, description, prio, gate, label)?;
+                        executor.create_issue(title, description, prio, gate, label, force)?;
 
                     // Print warnings to stderr
                     for warning in &warnings {
@@ -560,6 +560,7 @@ fn run() -> Result<()> {
                     remove_gate,
                     assignee,
                     unassign,
+                    force,
                     json,
                 } => {
                     let output_ctx = OutputContext::new(quiet, json);
@@ -621,6 +622,7 @@ fn run() -> Result<()> {
                             st,
                             label,
                             remove_label,
+                            force,
                         ) {
                             Ok(warnings) => {
                                 // Print warnings to stderr
@@ -691,7 +693,8 @@ fn run() -> Result<()> {
                         };
 
                         // Execute bulk update
-                        let result = executor.apply_bulk_update(&query_filter, &operations)?;
+                        let result =
+                            executor.apply_bulk_update(&query_filter, &operations, force)?;
 
                         if json {
                             let msg =

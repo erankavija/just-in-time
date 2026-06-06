@@ -53,6 +53,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 parent.priority,
                 vec![], // No gates initially
                 child_labels.clone(),
+                false, // breakdown subtasks are not force-bypassed
             )?;
             subtask_ids.push(subtask_id);
         }

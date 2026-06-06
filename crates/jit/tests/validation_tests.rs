@@ -19,6 +19,7 @@ fn test_validation_detects_broken_dependency() {
             Priority::Normal,
             vec![],
             vec![],
+            false,
         )
         .unwrap();
 
@@ -29,6 +30,7 @@ fn test_validation_detects_broken_dependency() {
             Priority::Normal,
             vec![],
             vec![],
+            false,
         )
         .unwrap();
 
@@ -61,6 +63,7 @@ fn test_validation_detects_cycle() {
             Priority::Normal,
             vec![],
             vec![],
+            false,
         )
         .unwrap();
     let (issue2_id, _) = executor
@@ -70,6 +73,7 @@ fn test_validation_detects_cycle() {
             Priority::Normal,
             vec![],
             vec![],
+            false,
         )
         .unwrap();
 
@@ -101,6 +105,7 @@ fn test_validation_passes_with_valid_graph() {
             Priority::Normal,
             vec![],
             vec![],
+            false,
         )
         .unwrap();
     let (issue_b_id, _) = executor
@@ -110,6 +115,7 @@ fn test_validation_passes_with_valid_graph() {
             Priority::Normal,
             vec![],
             vec![],
+            false,
         )
         .unwrap();
     let (issue_a_id, _) = executor
@@ -119,6 +125,7 @@ fn test_validation_passes_with_valid_graph() {
             Priority::Normal,
             vec![],
             vec![],
+            false,
         )
         .unwrap();
 
@@ -141,6 +148,7 @@ fn test_validation_detects_multiple_broken_dependencies() {
             Priority::Normal,
             vec![],
             vec![],
+            false,
         )
         .unwrap();
 
@@ -179,6 +187,7 @@ fn test_validation_detects_invalid_gate_reference() {
             Priority::Normal,
             vec!["nonexistent-gate".to_string()],
             vec![],
+            false,
         )
         .unwrap();
 
@@ -204,6 +213,7 @@ fn test_validation_detects_isolated_issues() {
             Priority::Normal,
             vec![],
             vec![],
+            false,
         )
         .unwrap();
 
@@ -214,6 +224,7 @@ fn test_validation_detects_isolated_issues() {
             Priority::Normal,
             vec![],
             vec![],
+            false,
         )
         .unwrap();
 
@@ -227,6 +238,7 @@ fn test_validation_detects_isolated_issues() {
             Priority::Normal,
             vec![],
             vec![],
+            false,
         )
         .unwrap();
 
@@ -250,6 +262,7 @@ fn test_validation_passes_with_all_connected_issues() {
             Priority::Normal,
             vec![],
             vec![],
+            false,
         )
         .unwrap();
 
@@ -260,6 +273,7 @@ fn test_validation_passes_with_all_connected_issues() {
             Priority::Normal,
             vec![],
             vec![],
+            false,
         )
         .unwrap();
 
@@ -270,6 +284,7 @@ fn test_validation_passes_with_all_connected_issues() {
             Priority::Normal,
             vec![],
             vec![],
+            false,
         )
         .unwrap();
 
@@ -294,6 +309,7 @@ fn test_validation_passes_with_single_issue() {
             Priority::Normal,
             vec![],
             vec![],
+            false,
         )
         .unwrap();
 

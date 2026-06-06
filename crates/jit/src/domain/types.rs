@@ -788,6 +788,22 @@ pub enum Event {
         /// IDs of the removed (redundant) dependencies
         removed_deps: Vec<String>,
     },
+    /// A blocking validation rule was bypassed via `--force` on a write.
+    ///
+    /// Emitted once per enforce-rule whose `error` finding was overridden by
+    /// `--force` during an issue create/update/bulk write. This is the
+    /// audit-sensitive override (DR §7.6): ordinary rule rejections and
+    /// read-only `jit validate` runs are NOT logged, only the deliberate bypass.
+    LocalRuleBypassed {
+        /// Event ID
+        id: String,
+        /// Issue whose write bypassed the rule
+        issue_id: String,
+        /// When this occurred
+        timestamp: DateTime<Utc>,
+        /// Name of the enforce rule that was bypassed
+        rule: String,
+    },
 }
 
 impl Event {
@@ -930,6 +946,32 @@ impl Event {
         }
     }
 
+    /// Create a local-rule-bypassed event.
+    ///
+    /// Records that a `--force` write deliberately bypassed an `enforce` rule
+    /// whose `error` finding would otherwise have blocked the write (DR §7.6).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::Event;
+    ///
+    /// let event = Event::new_local_rule_bypassed(
+    ///     "issue-123".to_string(),
+    ///     "epic-needs-requirements".to_string(),
+    /// );
+    /// assert_eq!(event.get_issue_id(), "issue-123");
+    /// assert_eq!(event.get_type(), "local_rule_bypassed");
+    /// ```
+    pub fn new_local_rule_bypassed(issue_id: String, rule: String) -> Self {
+        Event::LocalRuleBypassed {
+            id: Uuid::new_v4().to_string(),
+            issue_id,
+            timestamp: Utc::now(),
+            rule,
+        }
+    }
+
     /// Get the issue ID associated with this event
     pub fn get_issue_id(&self) -> &str {
         match self {
@@ -945,6 +987,7 @@ impl Event {
             Event::IssueUpdated { issue_id, .. } => issue_id,
             Event::DocumentArchived { .. } => "", // No associated issue
             Event::DependencyReduced { issue_id, .. } => issue_id,
+            Event::LocalRuleBypassed { issue_id, .. } => issue_id,
         }
     }
 
@@ -963,6 +1006,7 @@ impl Event {
             Event::IssueUpdated { .. } => "issue_updated",
             Event::DocumentArchived { .. } => "document_archived",
             Event::DependencyReduced { .. } => "dependency_reduced",
+            Event::LocalRuleBypassed { .. } => "local_rule_bypassed",
         }
     }
 }

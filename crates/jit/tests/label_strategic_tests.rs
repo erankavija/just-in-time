@@ -18,6 +18,7 @@ fn test_query_strategic_returns_milestone_issues() {
             Priority::High,
             vec![],
             vec!["type:milestone".to_string(), "milestone:v1.0".to_string()],
+            false,
         )
         .unwrap();
 
@@ -28,6 +29,7 @@ fn test_query_strategic_returns_milestone_issues() {
             Priority::Normal,
             vec![],
             vec!["type:bug".to_string()],
+            false,
         )
         .unwrap();
 
@@ -51,6 +53,7 @@ fn test_query_strategic_returns_epic_issues() {
             Priority::High,
             vec![],
             vec!["type:epic".to_string(), "epic:auth".to_string()],
+            false,
         )
         .unwrap();
 
@@ -73,6 +76,7 @@ fn test_query_strategic_returns_both_milestone_and_epic() {
             Priority::High,
             vec![],
             vec!["type:milestone".to_string(), "milestone:v1.0".to_string()],
+            false,
         )
         .unwrap();
 
@@ -83,6 +87,7 @@ fn test_query_strategic_returns_both_milestone_and_epic() {
             Priority::High,
             vec![],
             vec!["type:epic".to_string(), "epic:auth".to_string()],
+            false,
         )
         .unwrap();
 
@@ -93,6 +98,7 @@ fn test_query_strategic_returns_both_milestone_and_epic() {
             Priority::Low,
             vec![],
             vec!["type:bug".to_string()],
+            false,
         )
         .unwrap();
 
@@ -118,6 +124,7 @@ fn test_query_strategic_excludes_tactical_only() {
             Priority::Normal,
             vec![],
             vec!["type:task".to_string()],
+            false,
         )
         .unwrap();
 
@@ -128,6 +135,7 @@ fn test_query_strategic_excludes_tactical_only() {
             Priority::Normal,
             vec![],
             vec!["component:backend".to_string()],
+            false,
         )
         .unwrap();
 
@@ -154,6 +162,7 @@ fn test_query_strategic_includes_mixed_labels() {
                 "milestone:v1.0".to_string(),
                 "component:auth".to_string(),
             ],
+            false,
         )
         .unwrap();
 
@@ -183,6 +192,7 @@ fn test_query_strategic_with_custom_strategic_namespace() {
                 "initiative:cloud-migration".to_string(),
                 "type:task".to_string(),
             ],
+            false,
         )
         .unwrap();
 
@@ -194,6 +204,7 @@ fn test_query_strategic_with_custom_strategic_namespace() {
             Priority::Critical,
             vec![],
             vec!["type:milestone".to_string()],
+            false,
         )
         .unwrap();
 
@@ -233,6 +244,7 @@ fn test_breakdown_copies_labels_to_subtasks() {
                 "epic:auth".to_string(),
                 "component:backend".to_string(),
             ],
+            false,
         )
         .unwrap();
 
@@ -272,6 +284,7 @@ fn test_breakdown_preserves_parent_labels() {
             Priority::High,
             vec![],
             vec!["milestone:v1.0".to_string()],
+            false,
         )
         .unwrap();
 
@@ -303,6 +316,7 @@ fn test_breakdown_with_no_labels() {
             Priority::Normal,
             vec![],
             vec![],
+            false,
         )
         .unwrap();
 
@@ -334,6 +348,7 @@ fn test_breakdown_updates_parent_state() {
             Priority::High,
             vec![],
             vec!["milestone:v1.0".to_string()],
+            false,
         )
         .unwrap();
 
@@ -368,6 +383,7 @@ fn test_breakdown_creates_dependency_edges() {
             Priority::High,
             vec![],
             vec!["epic:feature".to_string()],
+            false,
         )
         .unwrap();
 

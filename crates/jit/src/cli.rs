@@ -359,6 +359,10 @@ pub enum IssueCommands {
         #[arg(long)]
         unassign: bool,
 
+        /// Bypass blocking (`enforce`) validation rules; the bypass is logged
+        #[arg(long)]
+        force: bool,
+
         #[arg(long)]
         json: bool,
     },

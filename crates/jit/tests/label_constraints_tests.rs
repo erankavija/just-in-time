@@ -31,6 +31,7 @@ fn create_labeled(exec: &CommandExecutor<JsonFileStorage>, title: &str, labels: 
             Priority::Normal,
             vec![],
             labels.iter().map(|s| s.to_string()).collect(),
+            false,
         )
         .unwrap();
     id
