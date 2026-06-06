@@ -404,11 +404,13 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     /// Append one [`Event::LocalRuleBypassed`] per bypassed `enforce` rule.
     ///
-    /// Call this ONLY after the corresponding issue write has committed, passing
-    /// the rule names from [`WriteValidation::bypassed_rules`]. Doing so keeps the
-    /// audit log honest: a write that fails before this call leaves no bypass
-    /// entry. A no-op when `rules` is empty (ordinary writes, rejections, and
-    /// read-only/preview runs log nothing).
+    /// Pass the rule names from [`WriteValidation::bypassed_rules`]. A non-empty
+    /// list means the caller explicitly forced an override, which always merits an
+    /// audit entry — including a forced no-op write that changed no other field.
+    /// When the override accompanies an issue write, call this AFTER the write
+    /// commits so a failed save leaves no false bypass entry. A no-op when `rules`
+    /// is empty (ordinary writes, rejections, and read-only/preview runs log
+    /// nothing).
     fn log_rule_bypasses(&self, issue_id: &str, rules: &[String]) -> Result<()> {
         for rule in rules {
             let event = Event::new_local_rule_bypassed(issue_id.to_string(), rule.clone());
@@ -634,6 +636,57 @@ assert = { require-doc-type = { doc-type = "design" } }
         ));
         // Same cached instance is returned each time.
         assert_eq!(ptr_first, std::ptr::from_ref(second));
+    }
+
+    #[test]
+    fn test_namespaces_are_parsed_once_and_cached() {
+        use crate::storage::InMemoryStorage;
+
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+        std::fs::create_dir_all(storage.root()).unwrap();
+
+        let config_path = storage.root().join("config.toml");
+        std::fs::write(
+            &config_path,
+            r#"
+[namespaces.req]
+description = "Requirement tags"
+unique = false
+"#,
+        )
+        .unwrap();
+
+        let executor = CommandExecutor::new(storage);
+
+        // First access parses config.toml and caches the namespace registry.
+        let first = executor.cached_namespaces().expect("valid namespaces");
+        let ptr_first = std::ptr::from_ref(first);
+
+        // Mutate config.toml on disk AFTER the first parse. A re-read would pick
+        // up the new namespace; a cached registry must not.
+        std::fs::write(
+            &config_path,
+            r#"
+[namespaces.req]
+description = "Requirement tags"
+unique = false
+
+[namespaces.owner]
+description = "Ownership tags"
+unique = false
+"#,
+        )
+        .unwrap();
+
+        // Second access must return the SAME cached instance, proving the
+        // namespace config is parsed once per executor and not re-read per write.
+        let second = executor.cached_namespaces().expect("valid namespaces");
+        assert_eq!(
+            ptr_first,
+            std::ptr::from_ref(second),
+            "namespace registry was re-read from disk instead of cached"
+        );
     }
 
     #[test]

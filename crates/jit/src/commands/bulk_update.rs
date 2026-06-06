@@ -466,9 +466,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         operations: &UpdateOperations,
         force: bool,
     ) -> Result<WriteValidation> {
-        // Validate label operations
+        // Validate label operations. Read the namespace registry through the
+        // shared OnceLock cache so an N-issue bulk update parses the config once,
+        // not once per issue (matches the single-issue write path).
         if !operations.add_labels.is_empty() || !operations.remove_labels.is_empty() {
-            let label_namespaces = self.config_manager.get_namespaces()?;
+            let label_namespaces = self.cached_namespaces()?;
             crate::labels::validate_label_operations(
                 &issue.labels,
                 &operations.add_labels,

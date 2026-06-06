@@ -278,14 +278,16 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Single write-time validation entry point against the FINAL shape
         // (field edits + resolved state transition applied). Runs BEFORE any
-        // persistence so a blocked write changes nothing; defers `--force`
-        // bypass events until after the save succeeds.
+        // persistence so a blocked write changes nothing; any `--force` bypass
+        // events are deferred to the caller (emitted after the save in the
+        // persisted case, or unconditionally for a forced no-op override).
         let validation = self.validate_for_write(&issue, force)?;
         warnings.extend(validation.warnings);
 
         // Gate-blocked `--state done`: persist the projected Gated shape (only
         // when something changed) and return the gate-blocking error. Bypass
-        // events are emitted from inside this path after its save succeeds.
+        // events are emitted from inside that path (after its save when it
+        // persists, otherwise for the forced no-op override).
         if gate_blocked {
             let persist = has_field_edits || old_state != State::Gated;
             return self.handle_gate_blocking(
@@ -318,12 +320,16 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
-        // Emit bypass events only AFTER the write committed. (If nothing was
-        // persisted, there were no blocking rules to bypass either, so this is a
-        // no-op — but guarding keeps the "log only after a real write" invariant.)
-        if persisted {
-            self.log_rule_bypasses(&full_id, &validation.bypassed_rules)?;
-        }
+        // Emit bypass events whenever the user explicitly forced an override of an
+        // `enforce` rule, independent of whether other fields/state changed. A
+        // forced no-op write (no field edits, no transition) against an issue that
+        // violates an enforce rule still produces a non-empty `bypassed_rules`, and
+        // dropping those events would lose the audit trail of the deliberate
+        // override. In the persisted case this runs AFTER the save above, preserving
+        // the "log only after the write commits" ordering; in the no-op case there
+        // is no save to order against. Ordinary (non-forced) rejections and previews
+        // yield an empty `bypassed_rules`, so this stays a no-op for them.
+        self.log_rule_bypasses(&full_id, &validation.bypassed_rules)?;
 
         // Check if any dependent issues can now transition to ready (after save!)
         if let Some(s) = state {
@@ -726,9 +732,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///   as it would corrupt the audit log for metrics and stalled-work
     ///   detection that read `events.jsonl`.
     /// - `bypassed_rules` lists the `enforce` rules a `--force` write overrode;
-    ///   one `LocalRuleBypassed` event is emitted per entry, but only when
-    ///   `persist` is true and AFTER the save commits, so a failed write leaves
-    ///   no false bypass entry.
+    ///   one `LocalRuleBypassed` event is emitted per entry whenever the list is
+    ///   non-empty (a deliberate override always merits an audit entry, even on a
+    ///   forced no-op). When `persist` is true the events are emitted AFTER the
+    ///   save commits, so a failed write leaves no false bypass entry.
     fn handle_gate_blocking(
         &self,
         issue: &mut Issue,
@@ -750,8 +757,8 @@ impl<S: IssueStore> CommandExecutor<S> {
             .collect();
         issue.state = State::Gated;
 
+        let issue_id = issue.id.clone();
         if persist {
-            let issue_id = issue.id.clone();
             // Save the state change (and any field edits) before returning error
             self.storage.save_issue(issue.clone())?;
 
@@ -761,10 +768,16 @@ impl<S: IssueStore> CommandExecutor<S> {
                     Event::new_issue_state_changed(issue_id.clone(), old_state, State::Gated);
                 self.storage.append_event(&event)?;
             }
-
-            // Emit any `--force` bypass events only AFTER the save committed.
-            self.log_rule_bypasses(&issue_id, bypassed_rules)?;
         }
+
+        // Emit any `--force` bypass events whenever an enforce rule was overridden,
+        // regardless of whether the gate-blocked write persisted other changes. A
+        // forced no-op `--state done` on an already-`Gated` issue that violates an
+        // enforce rule still carries a deliberate override that must be audited. In
+        // the persisted case this runs AFTER the save above (preserving ordering);
+        // in the no-op case there is no save to order against. An empty
+        // `bypassed_rules` (ordinary writes) keeps this a no-op.
+        self.log_rule_bypasses(&issue_id, bypassed_rules)?;
 
         Err(TransitionBlockedError::gates(
             issue.id.clone(),
