@@ -112,9 +112,9 @@ name = "epic-has-requirements"
 when = { type = "epic" }                 # selector: AND of type/label/state/has_doc_type
 severity = "error"                        # off | warn | error
 enforce = false                           # default false; true blocks writes
-assert = { require-label = { label = "req:*", min = 1 } }   # shorthand OR
-# assert = { json-schema = "schemas/epic-body.json" }       # raw schema (file)
-# assert = { json-schema = { properties = { ... } } }        # raw schema (inline)
+assert = { require-label = { label = "req:*", min = 1 } }   # shorthand (inline scalars OK)
+# assert = { label-value-pattern = { namespace = "req", regex = '^REQ-[0-9]+$' } }  # regex -> TOML literal string
+# assert = { json-schema = "schemas/epic-body.json" }       # raw schema -> .json FILE ONLY (no inline)
 # assert = { checker-command = "..." }                       # escape hatch (DR §4.3)
 ```
 
@@ -214,16 +214,26 @@ Loader tolerates removed keys with a warning + migration prompt; never hard-erro
   `$JIT_ISSUE_ID`; cross-format (md/html/xml) equivalence with features on.
 - Gate: `cargo clippy --workspace --all-targets` clean; `cargo fmt`.
 
-## Risks and Open Questions
+## Risks and Open Questions (resolved by derisking research, rev 4)
 
-- **`jsonschema` unknown-keyword degradation** (DR §5.3) is asserted but must be
-  proven by the keyword task's test; do not let core depend on the assumption.
-- **TOML inline-schema footgun**: regex `pattern` backslashes require TOML literal
-  strings (`'...'`); the loader must round-trip TOML->serde_json faithfully — add
-  a loader unit test.
-- **Performance**: markdown parse + schema validate on every write. Mitigated by
-  the compile cache and a lean projection; budget a unit test asserting no
-  per-call schema recompile.
-- **Migration blast radius**: a git-synced old config carrying removed keys must
-  warn, not error (DR §8.4). Verify with an explicit test.
-- **pulldown-cmark 0.9** is stale; bump and pin during the proj task.
+- **`jsonschema` unknown-keyword degradation** — RESOLVED. Verified the crate
+  treats unknown keywords as annotations with no strict-reject mode (`compiler.rs`).
+  Pin `"0.46"`, build with `with_draft(Draft::Draft202012)`. The keyword task's
+  test stays as a regression guard.
+- **TOML schema fidelity** — RESOLVED by decision: raw JSON Schema lives in
+  `.jit/schemas/*.json` files only (TOML can't express `null`, breaks on native
+  datetimes). Inline TOML carries only shorthand scalars; the one regex-bearing
+  shorthand (`label-value-pattern`) must use a TOML literal string. A loader unit
+  test still verifies TOML->serde_json round-trip for shorthand values.
+- **Performance** — RESOLVED. Executor is one-shot per command; corpus is small;
+  the write path doesn't parse descriptions today. Strategy: selector pre-filter
+  on `type`/`label`/`state` (no parse), build the `sections` projection lazily
+  only when a matching rule needs it, cache the parsed config on the executor,
+  and cache the compiled `Validator`. Unit test asserts no per-call recompile.
+- **Migration blast radius** — RESOLVED. No `deny_unknown_fields` exists, so
+  stale configs already parse (keys ignored, no hard error). Migration runs at
+  `jit init` re-run; a pre-parse `toml::Value` scan WARNS on deprecated keys
+  until then. Explicit test for an old config carrying removed keys.
+- **pulldown-cmark** — DECIDED: bump workspace-wide to 0.13.3 and migrate the
+  existing `document/adapter.rs` / `link_validator.rs` usages (`Event::End` ->
+  `TagEnd`, `Tag::Heading` struct form) as part of the proj task.

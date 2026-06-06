@@ -21,6 +21,15 @@ point here; they do not restate it. Each decision is numbered for traceability.
 > is a documented schemars contract (§6.1); migration tolerates removed keys with
 > a warning, not a hard error (§8.4); MCP `--schema` parity required (§9.3);
 > server/web validation surface deferred post-1.0 (§9.4).
+>
+> Revision 4 (post derisking research, agents ab1d44f3/ac3cd238/a4c709d6).
+> Changes: pinned `jsonschema = "0.46"` with explicit Draft 2020-12 and Validator
+> caching (§5.1, §5.2); unknown-keyword degradation CONFIRMED, keyword test now a
+> regression guard (§5.3); `sections` projection built lazily behind selector
+> pre-filtering (§6.1); pulldown-cmark bumped to 0.13.3 workspace-wide, existing
+> usages migrated (§6.2); raw JSON Schema must be a `.json` file, inline TOML
+> carries shorthands only (§8.1); migration runs at `jit init` re-run, loader
+> warns via a pre-parse scan, no `deny_unknown_fields` (§8.4).
 
 ## 1. Problem & approach
 
@@ -68,19 +77,27 @@ A rule is **selector + assertion + severity**.
 
 ## 5. Formalism: JSON Schema
 
-- **5.1** Validate with the `jsonschema` crate (pin `~0.46` at task start, not
-  "impl time"). `schemars` 0.8 (already a dep) generates schemas for jit's own
-  types. No new schema-generation code needed.
+- **5.1** Validate with `jsonschema = "0.46"` (latest 0.46.5, actively
+  maintained); commit `Cargo.lock` and treat each 0.x minor bump as breaking
+  (consult the crate's MIGRATION.md). Build deterministically via
+  `jsonschema::options().with_draft(Draft::Draft202012).build(&schema)`; leave
+  format validation at its 2020-12 default (annotation-only). `schemars` 0.8
+  (already a dep) generates schemas for jit's own types. Note crate renames in
+  examples: `JSONSchema` -> `Validator`, `compile()` -> `validator_for()`.
 - **5.2** Shorthand kinds (§4.1) desugar to JSON Schema; one validator
-  underneath (consistency) with ergonomic surface on top. Compiled schemas are
-  cached (compiled once per rule, lazily), NEVER recompiled per write.
+  underneath (consistency) with ergonomic surface on top. The compiled
+  `Validator` (which is `Clone + Send + Sync`) is cached once per rule
+  (`OnceLock`/`Arc`), NEVER recompiled per write — compiling is the documented
+  perf pitfall, validating is cheap.
 - **5.3 Long tail**: checker-command (§4.3) now. Future declarative cross-field
-  logic -> `x-jit-*` **custom keywords** registered with the validator
-  (`jsonschema` exposes `with_keyword`). The intent is that unknown keywords
-  degrade gracefully under a standard validator; this follows from JSON Schema's
-  spec-default behavior but is NOT assumed — task 33f23ec7's degradation test
-  MUST confirm it. A keyword MAY embed CEL internally. **No CEL top-level type
-  in v1.** This is a separate task (§11), not part of the core validator.
+  logic -> `x-jit-*` **custom keywords** registered via
+  `ValidationOptions::with_keyword` + the `Keyword` trait. **Confirmed by
+  research**: jsonschema treats unrecognized keywords as annotations and has NO
+  strict-reject mode (verified in `compiler.rs`), so schemas using `x-jit-*`
+  degrade gracefully under a standard validator. Task 33f23ec7's degradation
+  test is therefore a regression guard, not a load-bearing unknown. A keyword
+  MAY embed CEL internally. **No CEL top-level type in v1.** Separate task (§11),
+  not part of the core validator.
 - **5.4 Why not CEL now**: its only marginal value within one issue is value
   comparison / arithmetic / cross-collection predicates — already covered by the
   checker-command hatch. Avoid a second formalism.
@@ -92,15 +109,23 @@ A rule is **selector + assertion + severity**.
   parsed content fields. **The projection shape is a documented, stable contract**
   (generated from a Rust type via `schemars`) that every user-authored schema in
   `.jit/schemas/` depends on; it is versioned and not changed casually.
+  **Lazy + pre-filtered (perf)**: selector fields (`type`/`label`/`state`) are
+  read directly off `Issue` without parsing anything; the `sections` part of the
+  projection (the markdown parse) is built lazily and ONLY when a matching rule
+  needs a body assertion. The parsed `JitConfig`/ruleset is cached on the
+  executor (today config is re-read ~2× per write).
 - **6.2 Per-format parsers**: a NEW content-parser trait (independent of the
   existing `DocFormatAdapter`, which is an asset/link tool and does NOT parse
   content to sections — but the new trait SHOULD reuse `DocFormatAdapter::detect`
   for format detection rather than duplicate it). Each parser yields ONE
   canonical structure (sections -> items, headings, attributes, text). The
-  **Markdown** parser (pulldown-cmark; review/bump the stale 0.9 pin) is in the
-  default build. **HTML and XML parsers are implemented but behind OPTIONAL cargo
-  features** — included to force the architecture to be genuinely
-  format-agnostic (not markdown-coupled), without bloating the default build.
+  **Markdown** parser is in the default build on **pulldown-cmark 0.13.3**
+  (bumped workspace-wide from the stale 0.9; existing usages in
+  `document/adapter.rs` and `link_validator.rs` migrated — `Event::End` now
+  carries `TagEnd`, `Tag::Heading` is a struct). **HTML and XML parsers are
+  implemented but behind OPTIONAL cargo features** — included to force the
+  architecture to be genuinely format-agnostic, without bloating the default
+  build.
 - **6.3** A `- [hard] REQ-01: ...` line projects to a `success_criteria`
   section item with marker + embedded id; JSON Schema asserts
   `contains {pattern:"^\\[hard\\]"}` / `minContains:1`. The **description
@@ -126,9 +151,14 @@ A rule is **selector + assertion + severity**.
 
 ## 8. Configuration & storage
 
-- **8.1** Rules in `.jit/rules.toml`; schemas inline OR in `.jit/schemas/`. A
-  single rule is shorthand XOR raw-schema XOR file-reference — the loader
-  REJECTS mixing shorthand and raw schema in one rule, to keep one definition
+- **8.1** Rules in `.jit/rules.toml`. A raw `json-schema` assertion MUST
+  reference a `.jit/schemas/<name>.json` file — inline raw JSON Schema in TOML is
+  NOT allowed, because TOML cannot express `null`/`"type":"null"`, transcodes
+  native datetimes to broken JSON, and needs literal strings for regex
+  backslashes. Inline TOML carries only the shorthand kinds (§4.1), which are
+  simple scalars; a regex-bearing shorthand field (`label-value-pattern`) must
+  use a TOML literal string (`'^\[hard\]'`, not a basic string). A rule is
+  shorthand XOR file-schema — the loader REJECTS mixing, keeping one definition
   per constraint.
 - **8.2 No hard-coded rules.** `jit init` scaffolds a default `.jit/rules.toml`
   reproducing today's checks, fully editable.
@@ -146,14 +176,17 @@ A rule is **selector + assertion + severity**.
     `warn_strategic_consistency`.
   `rules.toml` becomes the SINGLE source of truth for issue/label validation.
   Default rules preserve today's behavior (warn vs reject) via `enforce` (§7.2).
-- **8.4 Migration**: a one-time migration converts existing `[validation]` and
-  `[namespaces].{values,pattern,required}` config into `.jit/rules.toml`, then
-  drops the old enforcement keys. `jit init` scaffolds defaults for new repos.
-  **Edge case (blast radius)**: when a config still carrying removed keys is
-  loaded before migration has run (e.g. git-synced from a teammate on the old
-  version), the config loader WARNS and ignores the unknown keys and prompts to
-  run the migration — it does NOT hard-error. This prevents a silent loss of
-  enforcement from becoming a hard breakage.
+- **8.4 Migration**: re-running `jit init` on an existing repo performs the
+  one-time migration — it converts existing `[validation]` and
+  `[namespaces].{values,pattern,required}` config into `.jit/rules.toml` and
+  strips the old enforcement keys. `jit init` also scaffolds defaults for new
+  repos. **Until migration runs** (e.g. a config git-synced from an old version):
+  there is NO `#[serde(deny_unknown_fields)]`, so serde already ignores the
+  removed keys and the config never hard-errors. A pre-parse `toml::Value` scan
+  in `JitConfig::load` detects the deprecated keys (top-level `validation` and
+  nested `namespaces.*.{values,pattern,required}`) and WARNS, prompting the user
+  to re-run `jit init`. Do NOT add `deny_unknown_fields` (it would turn the warn
+  into a hard error).
 
 ## 9. CLI surface
 
