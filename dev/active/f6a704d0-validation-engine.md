@@ -6,13 +6,21 @@ Blocks milestone: `9db27a3a` (Version 1.0 Production Release).
 This document is the **single authoritative record** of the design. Issues
 point here; they do not restate it. Each decision is numbered for traceability.
 
-> Revision 2 (post adversarial review, agent a00f98c3). Changes: corrected the
-> invented gate-checker placeholder (§9.2); completed the existing-check
+> Revision 2 (post first adversarial review, agent a00f98c3). Changes: corrected
+> the invented gate-checker placeholder (§9.2); completed the existing-check
 > inventory and switched to hard migration with no backward compatibility
 > (§8.3/§8.4); `enforce` now defaults to false (§7.2); HTML/XML parsers behind
 > optional features (§6.2); description criteria made canonical, labels derived
 > (§6.3/§10); custom-keyword point split out of the core task (§11); added
 > `jit validate --explain` and rejected shorthand+raw-schema mixing (§8.1/§9.1).
+>
+> Revision 3 (post second-pass feasibility review, agent adad1b84). Changes:
+> local rules must cover the batch write path (§7.5); `--force` bypasses logged
+> to events (§7.6); compiled schemas cached, not per-write (§5.2); softened the
+> unknown-keyword degradation claim to a test obligation (§5.3); projection shape
+> is a documented schemars contract (§6.1); migration tolerates removed keys with
+> a warning, not a hard error (§8.4); MCP `--schema` parity required (§9.3);
+> server/web validation surface deferred post-1.0 (§9.4).
 
 ## 1. Problem & approach
 
@@ -64,12 +72,15 @@ A rule is **selector + assertion + severity**.
   "impl time"). `schemars` 0.8 (already a dep) generates schemas for jit's own
   types. No new schema-generation code needed.
 - **5.2** Shorthand kinds (§4.1) desugar to JSON Schema; one validator
-  underneath (consistency) with ergonomic surface on top.
+  underneath (consistency) with ergonomic surface on top. Compiled schemas are
+  cached (compiled once per rule, lazily), NEVER recompiled per write.
 - **5.3 Long tail**: checker-command (§4.3) now. Future declarative cross-field
-  logic -> `x-jit-*` **custom keywords** registered with the validator (unknown
-  keywords are ignored by standard validators, so schemas degrade gracefully);
-  a keyword MAY embed CEL internally. **No CEL top-level type in v1.** This is a
-  separate task (§11), not part of the core validator.
+  logic -> `x-jit-*` **custom keywords** registered with the validator
+  (`jsonschema` exposes `with_keyword`). The intent is that unknown keywords
+  degrade gracefully under a standard validator; this follows from JSON Schema's
+  spec-default behavior but is NOT assumed — task 33f23ec7's degradation test
+  MUST confirm it. A keyword MAY embed CEL internally. **No CEL top-level type
+  in v1.** This is a separate task (§11), not part of the core validator.
 - **5.4 Why not CEL now**: its only marginal value within one issue is value
   comparison / arithmetic / cross-collection predicates — already covered by the
   checker-command hatch. Avoid a second formalism.
@@ -78,7 +89,9 @@ A rule is **selector + assertion + severity**.
 
 - **6.1** Issues normalize to a canonical JSON projection before validation:
   labels grouped by namespace (`labels.req = [...]`), structured fields, plus
-  parsed content fields.
+  parsed content fields. **The projection shape is a documented, stable contract**
+  (generated from a Rust type via `schemars`) that every user-authored schema in
+  `.jit/schemas/` depends on; it is versioned and not changed casually.
 - **6.2 Per-format parsers**: a NEW content-parser trait (independent of the
   existing `DocFormatAdapter`, which is an asset/link tool and does NOT parse
   content to sections — but the new trait SHOULD reuse `DocFormatAdapter::detect`
@@ -103,6 +116,13 @@ A rule is **selector + assertion + severity**.
 - **7.3 Bypass**: `--force` bypasses enforce failures (consistent with today).
 - **7.4 Graph timing**: graph rules run in `jit validate` and gate checkers
   only; never on write.
+- **7.5 Write coverage**: local rules MUST run on every issue mutation path —
+  `issue create`, `issue update`, AND the batch path (`bulk_update.rs`,
+  `jit issue update --filter`), which today has a separate `validate_update()`.
+  Otherwise `enforce` rules are bypassable via batch update.
+- **7.6 Event logging**: a `--force` bypass of an `enforce` rule IS logged to
+  `events.jsonl` (the audit-sensitive override). Ordinary rejections and
+  read-only `jit validate` runs are NOT logged.
 
 ## 8. Configuration & storage
 
@@ -129,6 +149,11 @@ A rule is **selector + assertion + severity**.
 - **8.4 Migration**: a one-time migration converts existing `[validation]` and
   `[namespaces].{values,pattern,required}` config into `.jit/rules.toml`, then
   drops the old enforcement keys. `jit init` scaffolds defaults for new repos.
+  **Edge case (blast radius)**: when a config still carrying removed keys is
+  loaded before migration has run (e.g. git-synced from a teammate on the old
+  version), the config loader WARNS and ignores the unknown keys and prompts to
+  run the migration — it does NOT hard-error. This prevents a silent loss of
+  enforcement from becoming a hard breakage.
 
 ## 9. CLI surface
 
@@ -141,6 +166,13 @@ A rule is **selector + assertion + severity**.
   receives the issue id in the `JIT_ISSUE_ID` env var (no `{issue}`
   substitution exists):
   `jit gate define ... --checker-command 'jit validate "$JIT_ISSUE_ID" --json'`.
+- **9.3 MCP parity**: the new `jit validate [<id>]` positional and `--explain`
+  flag MUST appear in `jit --schema` so the MCP server auto-generates a working
+  tool; a parity test asserts this.
+- **9.4 Server / web UI**: surfacing rule findings via `crates/server/` is
+  **deferred to post-1.0** (today it exposes no rule endpoint; `validate()` there
+  is DAG-integrity only). Recorded as a deliberate scope decision, not an
+  omission.
 
 ## 10. SDD as first application (docs/examples only)
 
