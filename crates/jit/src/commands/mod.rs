@@ -46,8 +46,9 @@ pub use gate::GatePassFailed;
 pub use crate::storage::worktree_identity::WorktreeIdentity;
 
 // Common imports used across modules
+use crate::config::JitConfig;
 use crate::config_manager::ConfigManager;
-use crate::domain::{Event, Gate, GateState, GateStatus, Issue, Priority, State};
+use crate::domain::{Event, Gate, GateState, GateStatus, Issue, LabelNamespaces, Priority, State};
 use crate::graph::DependencyGraph;
 use crate::labels as label_utils;
 use crate::storage::IssueStore;
@@ -202,6 +203,36 @@ pub enum DependencyAddResult {
     AlreadyExists,
 }
 
+/// Outcome of the unified write-time validation pass.
+///
+/// Produced by the executor's `validate_for_write` entry point BEFORE an issue
+/// is persisted. It carries the non-blocking warnings to surface to the caller
+/// and the list of `enforce` rules that a `--force` write is bypassing. The
+/// bypass events are intentionally NOT emitted during validation: the caller
+/// emits them (via `log_rule_bypasses`) only AFTER the write succeeds, so a save
+/// that fails never leaves a false "bypass happened" entry in the audit log.
+///
+/// # Examples
+///
+/// ```
+/// use jit::commands::WriteValidation;
+///
+/// // A default outcome blocks nothing and defers no bypass events.
+/// let outcome = WriteValidation::default();
+/// assert!(outcome.warnings.is_empty());
+/// assert!(outcome.bypassed_rules.is_empty());
+/// ```
+#[derive(Debug, Clone, Default)]
+pub struct WriteValidation {
+    /// Non-blocking warnings (legacy validator + local `warn`/non-enforce
+    /// findings) to surface to the caller.
+    pub warnings: Vec<String>,
+    /// Names of `enforce` rules whose blocking findings were overridden by
+    /// `--force`. One [`Event::LocalRuleBypassed`] must be logged per entry,
+    /// AFTER the write commits.
+    pub bypassed_rules: Vec<String>,
+}
+
 /// Executes CLI commands with business logic and validation.
 ///
 /// Generic over storage backend to support different implementations
@@ -215,6 +246,16 @@ pub struct CommandExecutor<S: IssueStore> {
     /// load/parse error so callers can surface a misconfigured rules file
     /// instead of silently treating it as "no rules".
     rules: OnceLock<Result<RuleSet, RuleConfigError>>,
+    /// Lazily-loaded `.jit/config.toml`, cached so the unified write-time
+    /// validation entry point does not re-read and re-parse `config.toml` on
+    /// every write. The parsed config drives the legacy
+    /// [`IssueValidator`](crate::validation::IssueValidator) until
+    /// task a0f0f342 migrates those checks to default rules. A malformed config
+    /// is retained as an `Err` so it is surfaced rather than swallowed.
+    config: OnceLock<Result<JitConfig, String>>,
+    /// Lazily-built label namespace registry, derived from the cached config and
+    /// cached alongside it for the same reason.
+    namespaces: OnceLock<Result<LabelNamespaces, String>>,
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
@@ -225,6 +266,8 @@ impl<S: IssueStore> CommandExecutor<S> {
             storage,
             config_manager,
             rules: OnceLock::new(),
+            config: OnceLock::new(),
+            namespaces: OnceLock::new(),
         }
     }
 
@@ -261,62 +304,117 @@ impl<S: IssueStore> CommandExecutor<S> {
             .as_ref()
     }
 
-    /// Evaluate the local validation rules against `issue` and enforce them.
+    /// Return the cached parsed `.jit/config.toml`, loading it on first access.
     ///
-    /// This is the single write-path enforcement entry point shared by issue
-    /// create, update, and the batch path (DR §7.5). It loads the cached ruleset
-    /// (`self.rules()`), runs [`evaluate_local`](crate::validation::evaluate_local)
-    /// (which skips graph-scope rules and parses the description only when a
-    /// matching rule needs body content), then applies blocking semantics:
+    /// The config is read at most once per executor (cached in a `OnceLock`) so
+    /// the unified write-validation path does not re-parse `config.toml` on every
+    /// write. A malformed config is surfaced as an error rather than swallowed.
+    fn cached_config(&self) -> Result<&JitConfig> {
+        self.config
+            .get_or_init(|| self.config_manager.load().map_err(|err| err.to_string()))
+            .as_ref()
+            .map_err(|err| anyhow!("invalid .jit/config.toml: {err}"))
+    }
+
+    /// Return the cached label namespace registry, building it on first access.
     ///
-    /// - If any `error` finding comes from an `enforce = true` rule and `force`
-    ///   is `false`, the write is REJECTED with a message listing the offending
-    ///   rules (DR §7.2).
-    /// - If `force` is `true`, the write is allowed and one
-    ///   [`Event::LocalRuleBypassed`](crate::domain::Event::LocalRuleBypassed)
-    ///   is appended per bypassed enforce rule (the audit-sensitive override,
-    ///   DR §7.6).
-    /// - `warn` and non-`enforce` findings never block; their messages are
-    ///   returned as warnings for the caller to surface.
+    /// Cached alongside [`cached_config`](Self::cached_config) so the registry is
+    /// derived at most once per executor.
+    fn cached_namespaces(&self) -> Result<&LabelNamespaces> {
+        self.namespaces
+            .get_or_init(|| {
+                self.config_manager
+                    .get_namespaces()
+                    .map_err(|err| err.to_string())
+            })
+            .as_ref()
+            .map_err(|err| anyhow!("invalid namespace configuration: {err}"))
+    }
+
+    /// The single write-time validation entry point shared by issue create,
+    /// update, and the batch path (DR §7.5).
     ///
-    /// A genuinely misconfigured `.jit/rules.toml` (parse/load error) is
-    /// surfaced as an error rather than silently disabling enforcement.
+    /// `issue` MUST be the FINAL persisted shape — i.e. all field and state
+    /// mutations (create's auto-promotion to `Ready`, update's requested state
+    /// transition, bulk's projected after-update shape) already applied — so that
+    /// rules keyed on the final `state` are evaluated correctly.
     ///
-    /// `issue_id` is the id used to attribute any bypass event; pass the issue's
-    /// own id.
-    fn enforce_local_rules(
-        &self,
-        issue: &Issue,
-        issue_id: &str,
-        force: bool,
-    ) -> Result<Vec<String>> {
+    /// It performs two layers of validation in one place:
+    ///
+    /// 1. The legacy [`IssueValidator`](crate::validation::IssueValidator)
+    ///    (driven by the cached `config.toml`), retained until task a0f0f342
+    ///    migrates its label/type/namespace checks to default rules. Its
+    ///    non-blocking warnings are collected.
+    /// 2. The declarative local rules (`.jit/rules.toml`) via
+    ///    [`evaluate_local`](crate::validation::evaluate_local), with blocking
+    ///    semantics:
+    ///    - An `error` finding from an `enforce = true` rule REJECTS the write
+    ///      unless `force` is set (DR §7.2).
+    ///    - With `force`, the write is allowed and the bypassed rule names are
+    ///      returned in [`WriteValidation::bypassed_rules`] for the CALLER to log
+    ///      AFTER the write commits (DR §7.6) — they are NOT logged here, so a
+    ///      failed save cannot leave a false bypass entry in the audit log.
+    ///    - `warn`/non-`enforce` findings never block; their messages are
+    ///      returned as warnings.
+    ///
+    /// A genuinely misconfigured `.jit/rules.toml` or `config.toml` (parse/load
+    /// error) is surfaced as an error rather than silently disabling enforcement.
+    fn validate_for_write(&self, issue: &Issue, force: bool) -> Result<WriteValidation> {
+        // Layer 1: legacy IssueValidator (config-driven). Retained until a0f0f342.
+        let config = self.cached_config()?;
+        let mut warnings = if let Some(ref validation_config) = config.validation {
+            let validator = crate::validation::IssueValidator::new(
+                validation_config.clone(),
+                self.cached_namespaces()?.clone(),
+            );
+            validator.validate(issue)?
+        } else {
+            Vec::new()
+        };
+
+        // Layer 2: declarative local rules (.jit/rules.toml).
         let rules = match self.rules() {
             Ok(rules) => rules,
             Err(err) => return Err(anyhow!("invalid .jit/rules.toml: {err}")),
         };
-
         let evaluation = crate::validation::evaluate_local(issue, rules)
             .map_err(|err| anyhow!("rule evaluation failed: {err}"))?;
 
         let blocking = evaluation.blocking_rules();
-        if !blocking.is_empty() {
-            if !force {
-                // Ordinary rejection: NOT logged (only --force bypasses are).
-                return Err(anyhow!(
-                    "{}",
-                    evaluation
-                        .rejection_message()
-                        .unwrap_or_else(|| "blocked by validation rule(s)".to_string())
-                ));
-            }
-            // --force override: log one bypass event per bypassed enforce rule.
-            for rule in &blocking {
-                let event = Event::new_local_rule_bypassed(issue_id.to_string(), rule.clone());
-                self.storage.append_event(&event)?;
-            }
+        if !blocking.is_empty() && !force {
+            // Ordinary rejection: NOT logged (only --force bypasses are).
+            return Err(anyhow!(
+                "{}",
+                evaluation
+                    .rejection_message()
+                    .unwrap_or_else(|| "blocked by validation rule(s)".to_string())
+            ));
         }
 
-        Ok(evaluation.warnings())
+        warnings.extend(evaluation.warnings());
+
+        // On a forced write `blocking` names the enforce rules being overridden;
+        // the caller logs them AFTER the write succeeds. When nothing blocks (or
+        // not forced), `blocking` is empty so no events are deferred.
+        Ok(WriteValidation {
+            warnings,
+            bypassed_rules: blocking,
+        })
+    }
+
+    /// Append one [`Event::LocalRuleBypassed`] per bypassed `enforce` rule.
+    ///
+    /// Call this ONLY after the corresponding issue write has committed, passing
+    /// the rule names from [`WriteValidation::bypassed_rules`]. Doing so keeps the
+    /// audit log honest: a write that fails before this call leaves no bypass
+    /// entry. A no-op when `rules` is empty (ordinary writes, rejections, and
+    /// read-only/preview runs log nothing).
+    fn log_rule_bypasses(&self, issue_id: &str, rules: &[String]) -> Result<()> {
+        for rule in rules {
+            let event = Event::new_local_rule_bypassed(issue_id.to_string(), rule.clone());
+            self.storage.append_event(&event)?;
+        }
+        Ok(())
     }
 
     /// Initialize a new jit repository in the current directory.
