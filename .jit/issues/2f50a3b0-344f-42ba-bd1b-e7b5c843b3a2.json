@@ -2,7 +2,7 @@
   "id": "2f50a3b0-344f-42ba-bd1b-e7b5c843b3a2",
   "title": "Projection layer and Markdown content parser",
   "description": "Build the pure projection layer that normalizes an Issue into the canonical JSON shape all rules validate against, plus the content-parser trait and its Markdown implementation.\n\n## Background\n\nJSON Schema rules need a stable, normalized view of an issue. The projection is the foundation every other engine component depends on and must be pure (in `domain/`). This task also bumps the stale pulldown-cmark dependency. See `dev/active/f6a704d0-validation-engine-plan.md` (\"The Projection contract\") and decision record sections 6.1 and 6.2.\n\n## Success Criteria\n\n- [ ] [hard] `domain/projection.rs` defines a `Projection` struct (`#[derive(Serialize, JsonSchema)]`) and a pure `project()`; selector fields (type/state/priority/labels) are read without parsing the description.\n- [ ] [hard] The projection groups labels by namespace (`labels.req = [...]`), exposes `type`/`state`/`priority`, `doc_types`, and a `sections` view parsed from the description.\n- [ ] [hard] The `sections` projection is built LAZILY — only when a caller needs body content — so a write with no body-targeting rule never parses Markdown.\n- [ ] [hard] The projection JSON shape is documented and its schemars-generated schema is asserted by a test as the stable contract user schemas depend on.\n- [ ] [hard] `document/parser/mod.rs` defines a `ContentParser` trait (reusing `DocFormatAdapter::detect`) and `document/parser/markdown.rs` implements it.\n- [ ] [hard] pulldown-cmark is bumped workspace-wide to 0.13.3 and the existing usages in `document/adapter.rs` and `link_validator.rs` are migrated (`Event::End(Tag)` -> `Event::End(TagEnd)`; `Tag::Heading` tuple -> struct); the whole workspace builds clean.\n- [ ] [hard] Unit tests cover label grouping, lazy section/item extraction, and projection determinism.\n\n## Notes\n\nAnchors: `Issue` at `domain/types.rs:124-154`; `DocFormatAdapter` at `document/adapter.rs:24-51`; pulldown-cmark in `crates/jit/Cargo.toml` and `link_validator.rs`. In 0.13: `Tag::Heading { level, id, classes, attrs }`, ids/classes are `CowStr`. Keep the layer pure (decision record section 12).\n",
-  "state": "in_progress",
+  "state": "done",
   "priority": "high",
   "assignee": "agent:claude",
   "dependencies": [],
@@ -10,7 +10,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-06T18:51:23.506428890Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-06T18:53:53.109623952Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -18,5 +29,5 @@
     "epic:validation-engine"
   ],
   "created_at": "2026-06-06T15:51:20.539232857+00:00",
-  "updated_at": "2026-06-06T18:11:47.799315835+00:00"
+  "updated_at": "2026-06-06T19:10:41.458988673+00:00"
 }

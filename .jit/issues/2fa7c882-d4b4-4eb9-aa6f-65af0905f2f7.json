@@ -2,7 +2,7 @@
   "id": "2fa7c882-d4b4-4eb9-aa6f-65af0905f2f7",
   "title": "Rule model and config loader (.jit/rules.toml)",
   "description": "Define the rule data model and the `.jit/rules.toml` loader, including selector matching, the raw-schema-file rule, and the shorthand-vs-file guard.\n\n## Background\n\nA rule is selector + assertion + severity + enforce. The loader parses rules.toml and computes the union of applicable rules for an issue. Raw JSON Schema lives only in files (TOML cannot faithfully express schemas). See `dev/active/f6a704d0-validation-engine-plan.md` (\"The Rule model\") and decision record sections 3, 4, 7.2, 8.1.\n\n## Success Criteria\n\n- [ ] [hard] `validation/rules.rs` defines `Rule { name, when: Selector, severity, enforce, assert, scope }`, `Selector` over `type`/`label`/`state`/`has_doc_type`, and `Severity { off, warn, error }`.\n- [ ] [hard] `.jit/rules.toml` parses into `Vec<Rule>`; an absent `enforce` defaults to false.\n- [ ] [hard] Selector matching is AND across present dimensions; `matching_rules(issue)` returns the union; `label` selectors support `ns:*` wildcards; matching reads only cheap `Issue` fields (no description parse).\n- [ ] [hard] A raw `json-schema` assertion MUST be a `.jit/schemas/<name>.json` file reference; inline raw JSON Schema in TOML is rejected with a clear config error. Inline TOML holds only shorthand kinds.\n- [ ] [hard] A rule is shorthand XOR file-schema; combining them in one rule is a config error.\n- [ ] [hard] Regex-bearing shorthand fields (`label-value-pattern`) authored as TOML literal strings (`'...'`) round-trip to `serde_json` intact, verified by a unit test.\n- [ ] [hard] The parsed ruleset/config is cached on the executor (parsed once per process, not re-read per write).\n\n## Notes\n\nAnchors: config load in `config_manager.rs:51-53` / `config.rs:405-430`; `toml` 0.8. Conversion uses serde transcoding (`serde_json::to_value`) for file schemas; inline shorthands deserialize directly.\n",
-  "state": "in_progress",
+  "state": "done",
   "priority": "high",
   "assignee": "agent:claude",
   "dependencies": [],
@@ -10,7 +10,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-06T19:07:33.449738383Z"
+    },
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-06T19:06:08.476508102Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -18,5 +29,5 @@
     "epic:validation-engine"
   ],
   "created_at": "2026-06-06T15:51:20.542999879+00:00",
-  "updated_at": "2026-06-06T18:11:47.818090781+00:00"
+  "updated_at": "2026-06-06T19:10:41.586633690+00:00"
 }
