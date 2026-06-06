@@ -2373,3 +2373,7 @@
 {"type":"issue_state_changed","id":"c50768e0-380c-4278-aa85-756375f0e786","issue_id":"f6a704d0-1f01-447b-a8aa-42251fa7c3eb","timestamp":"2026-06-06T15:51:20.864687501Z","from":"ready","to":"backlog"}
 {"type":"issue_created","id":"0160654f-aa07-43ba-a6bd-64c2fd6d2f94","issue_id":"33f23ec7-8d51-4640-8529-88ed0d85d669","timestamp":"2026-06-06T16:05:03.295282780Z","title":"Custom-keyword extension point (x-jit-*)","priority":"low"}
 {"type":"issue_state_changed","id":"76c5a56e-3d09-4b61-af9b-0f2997c12d8e","issue_id":"33f23ec7-8d51-4640-8529-88ed0d85d669","timestamp":"2026-06-06T16:05:03.313412975Z","from":"ready","to":"backlog"}
+{"type":"issue_state_changed","id":"091c5e94-7286-4384-863b-d9305a8a7851","issue_id":"2f50a3b0-344f-42ba-bd1b-e7b5c843b3a2","timestamp":"2026-06-06T18:11:47.799270415Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"b326cb14-bc4b-4476-96c3-a732910eff70","issue_id":"2f50a3b0-344f-42ba-bd1b-e7b5c843b3a2","timestamp":"2026-06-06T18:11:47.802068556Z","assignee":"agent:claude"}
+{"type":"issue_state_changed","id":"5eb197d5-c5e3-48d6-825a-a506190ae5e5","issue_id":"2fa7c882-d4b4-4eb9-aa6f-65af0905f2f7","timestamp":"2026-06-06T18:11:47.818035251Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"8b7ae8d8-6d0b-46a3-803d-1b5d7705290b","issue_id":"2fa7c882-d4b4-4eb9-aa6f-65af0905f2f7","timestamp":"2026-06-06T18:11:47.818222481Z","assignee":"agent:claude"}
