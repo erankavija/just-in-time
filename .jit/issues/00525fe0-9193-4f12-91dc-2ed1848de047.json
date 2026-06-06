@@ -1,7 +1,7 @@
 {
   "id": "00525fe0-9193-4f12-91dc-2ed1848de047",
   "title": "HTML and XML content parsers",
-  "description": "Implements decision record (dev/active/f6a704d0-validation-engine.md) section 6.2.\n\n## Success Criteria\n\n- [hard] HTML and XML parsers implement the content-parser trait behind OPTIONAL cargo features (not in the default build).\n- [hard] A content rule works identically across md, html, and xml inputs in tests, proving the projection is genuinely format-agnostic.\n",
+  "description": "Add HTML and XML content parsers behind optional cargo features, proving the projection is genuinely format-agnostic.\n\n## Background\n\nThese parsers are implemented to force the content-parser trait to be format-neutral, but they are feature-gated so the default build stays lean. See `dev/active/f6a704d0-validation-engine-plan.md` (step 10) and decision record section 6.2.\n\n## Success Criteria\n\n- [ ] [hard] HTML and XML parsers implement the `ContentParser` trait behind optional cargo features (off in the default build).\n- [ ] [hard] A content rule (for example a section/item check) produces identical findings across Markdown, HTML, and XML inputs in a test with the features enabled.\n- [ ] [hard] Default-build compilation and binary size are unaffected when the features are disabled.\n\n## Notes\n\nAnchors: `document/parser/` trait; `features` block in `crates/jit/Cargo.toml`.\n",
   "state": "backlog",
   "priority": "normal",
   "assignee": null,
@@ -20,5 +20,5 @@
     "epic:validation-engine"
   ],
   "created_at": "2026-06-06T15:51:20.570066846+00:00",
-  "updated_at": "2026-06-06T16:05:03.284939587+00:00"
+  "updated_at": "2026-06-06T17:00:14.604238863+00:00"
 }

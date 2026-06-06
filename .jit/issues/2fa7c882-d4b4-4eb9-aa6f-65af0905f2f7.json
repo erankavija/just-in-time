@@ -1,7 +1,7 @@
 {
   "id": "2fa7c882-d4b4-4eb9-aa6f-65af0905f2f7",
   "title": "Rule model and config loader (.jit/rules.toml)",
-  "description": "Implements decision record (dev/active/f6a704d0-validation-engine.md) section 3, 7.2, 8.1.\n\n## Success Criteria\n\n- [hard] Rule = selector + assertion + severity parsed from .jit/rules.toml.\n- [hard] Selector matrix (type, label, state, has_doc_type) AND-combinable; matching returns the union of applicable rules.\n- [hard] Schemas load inline or from .jit/schemas/*.json; a rule is shorthand XOR raw-schema and the loader REJECTS mixing shorthand and raw schema in one rule.\n- [hard] severity off/warn/error and per-rule enforce (default false) are parsed.\n",
+  "description": "Define the rule data model and the `.jit/rules.toml` loader, including selector matching and the shorthand-versus-raw-schema guard.\n\n## Background\n\nA rule is the declarative unit the engine evaluates: selector + assertion + severity + enforce flag. The loader parses `.jit/rules.toml` and, for any issue, computes the union of applicable rules. See `dev/active/f6a704d0-validation-engine-plan.md` (\"The Rule model\") and decision record sections 3, 4, 7.2, 8.1.\n\n## Success Criteria\n\n- [ ] [hard] `validation/rules.rs` defines `Rule { name, when: Selector, severity, enforce, assert, scope }`, with `Selector` over `type`/`label`/`state`/`has_doc_type` and `Severity { off, warn, error }`.\n- [ ] [hard] `.jit/rules.toml` parses into `Vec<Rule>`; an absent `enforce` defaults to false.\n- [ ] [hard] Selector matching is AND across present dimensions; a `matching_rules(issue)` returns the union of all rules whose selector matches; `label` selectors support `ns:*` wildcards.\n- [ ] [hard] An `assert` table holds exactly one kind; combining a shorthand kind with `json-schema` in one rule is a config error.\n- [ ] [hard] Schemas load inline (as `serde_json::Value`) or from a `.jit/schemas/<name>.json` path; TOML to serde_json round-trips faithfully (regex backslashes via TOML literal strings), covered by a unit test.\n- [ ] [hard] A rule's `scope` (local vs graph) is derived from its assertion kind.\n\n## Notes\n\nAnchors: config loading in `config_manager.rs` / `config.rs`; `toml` 0.8 dependency. The shorthand-XOR-raw guard implements decision record 8.1.\n",
   "state": "ready",
   "priority": "high",
   "assignee": null,
@@ -18,5 +18,5 @@
     "epic:validation-engine"
   ],
   "created_at": "2026-06-06T15:51:20.542999879+00:00",
-  "updated_at": "2026-06-06T16:05:03.271246613+00:00"
+  "updated_at": "2026-06-06T17:00:14.541928545+00:00"
 }

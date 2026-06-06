@@ -1,7 +1,7 @@
 {
   "id": "25ad2a02-30c4-4b0e-a200-7090b38b058a",
   "title": "Local rule evaluation with write-time enforcement",
-  "description": "Implements decision record (dev/active/f6a704d0-validation-engine.md) section 3.3, 7.2, 7.5, 7.6.\n\n## Success Criteria\n\n- [hard] Local rules evaluate on issue create AND update.\n- [hard] Local rules ALSO run on the batch write path (bulk_update.rs / jit issue update --filter), which today uses a separate validate_update(); enforce rules are not bypassable via batch update.\n- [hard] enforce rules block writes; --force bypasses; a --force bypass of an enforce rule is logged to events.jsonl.\n- [hard] Graph-scope rules are skipped on write.\n",
+  "description": "Evaluate local rules on every issue mutation path (create, update, batch), enforce blocking rules, and log `--force` bypasses.\n\n## Background\n\nIssue-scoped rules must run wherever an issue is written, including the separate batch path, or `enforce` rules are trivially bypassable. Graph-scope rules are skipped on write. See `dev/active/f6a704d0-validation-engine-plan.md` (step 5) and decision record sections 7.5 and 7.6.\n\n## Success Criteria\n\n- [ ] [hard] Local rules evaluate in `issue.rs` create and update, replacing the current IssueValidator call site.\n- [ ] [hard] Local rules ALSO evaluate in `bulk_update.rs` `validate_update()` (the batch path), so `jit issue update --filter` cannot bypass enforce rules.\n- [ ] [hard] An `error` finding from an `enforce=true` rule blocks the write; `--force` bypasses it.\n- [ ] [hard] A `--force` bypass of an enforce rule appends a new `Event` variant to `events.jsonl` (rule name, issue id); ordinary rejections and read-only validate runs are not logged.\n- [ ] [hard] Graph-scope rules are skipped on the write path.\n\n## Notes\n\nAnchors: `issue.rs` create call site 54-63, update 227-236; `bulk_update.rs` `validate_update` 416-468; `Event` enum at `domain/types.rs:640-791` with helpers near 795; append via `storage.append_event`.\n",
   "state": "backlog",
   "priority": "high",
   "assignee": null,
@@ -20,5 +20,5 @@
     "epic:validation-engine"
   ],
   "created_at": "2026-06-06T15:51:20.553405041+00:00",
-  "updated_at": "2026-06-06T16:41:07.522927050+00:00"
+  "updated_at": "2026-06-06T17:00:14.569730253+00:00"
 }

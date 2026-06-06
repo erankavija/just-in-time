@@ -1,7 +1,7 @@
 {
   "id": "2f50a3b0-344f-42ba-bd1b-e7b5c843b3a2",
   "title": "Projection layer and Markdown content parser",
-  "description": "Implements decision record (dev/active/f6a704d0-validation-engine.md) section 6.\n\n## Success Criteria\n\n- [hard] Issues normalize to a canonical JSON projection: labels grouped by namespace plus structured fields.\n- [hard] The projection shape is documented as a stable, schemars-generated contract that user schemas in .jit/schemas/ depend on.\n- [hard] A NEW content-parser trait (reusing DocFormatAdapter::detect for format detection rather than duplicating it) yields one canonical structure.\n- [hard] A Markdown parser (pulldown-cmark; review/bump the 0.9 pin) implements the trait; pure, no I/O; unit-tested.\n",
+  "description": "Build the pure projection layer that normalizes an Issue into the canonical JSON shape all rules validate against, plus the content-parser trait and its Markdown implementation.\n\n## Background\n\nJSON Schema rules need a stable, normalized view of an issue: labels grouped by namespace, attached doc types, and the description parsed into sections/items. This projection is the foundation every other engine component depends on, and it must be pure (in `domain/`) so it is testable without a filesystem. See `dev/active/f6a704d0-validation-engine-plan.md` (\"The Projection contract\") and the decision record `dev/active/f6a704d0-validation-engine.md` section 6.\n\n## Success Criteria\n\n- [ ] [hard] `domain/projection.rs` defines a `Projection` struct (`#[derive(Serialize, JsonSchema)]`) and a pure `project(&Issue, &dyn ContentParser) -> Projection` with no filesystem access.\n- [ ] [hard] The projection groups labels by namespace (`labels.req = [...]`), exposes `type`/`state`/`priority`, `doc_types` (from `documents[].doc_type`), and `sections` parsed from the description.\n- [ ] [hard] The projection JSON shape is documented as a stable contract; its schemars-generated schema is exposed and asserted by a test as the contract user schemas depend on.\n- [ ] [hard] `document/parser/mod.rs` defines a `ContentParser` trait yielding one canonical structure (sections to items, headings, text), reusing `DocFormatAdapter::detect` for format detection rather than duplicating it.\n- [ ] [hard] `document/parser/markdown.rs` implements the trait via pulldown-cmark (bump the stale 0.9 pin); a list item `- [hard] REQ-01: ...` projects deterministically into a `success_criteria` item.\n- [ ] [hard] Unit tests cover label grouping, section/item extraction, and projection determinism.\n\n## Notes\n\nAnchors: `Issue` at `domain/types.rs:124-154`; `DocFormatAdapter` at `document/adapter.rs:24-51`; pulldown-cmark in `crates/jit/Cargo.toml`. Keep the layer pure per decision record section 12.\n",
   "state": "ready",
   "priority": "high",
   "assignee": null,
@@ -18,5 +18,5 @@
     "epic:validation-engine"
   ],
   "created_at": "2026-06-06T15:51:20.539232857+00:00",
-  "updated_at": "2026-06-06T16:41:07.543984146+00:00"
+  "updated_at": "2026-06-06T17:00:14.534750383+00:00"
 }
