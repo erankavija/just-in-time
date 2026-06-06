@@ -12,12 +12,20 @@
   ],
   "gates_status": {},
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "dev/active/f6a704d0-validation-engine.md",
+      "commit": null,
+      "label": "Decision Record",
+      "doc_type": "design",
+      "format": "markdown"
+    }
+  ],
   "labels": [
     "type:epic",
     "epic:validation-engine",
     "milestone:v1.0"
   ],
   "created_at": "2026-06-06T15:48:56.227134229+00:00",
-  "updated_at": "2026-06-06T15:48:56.227162719+00:00"
+  "updated_at": "2026-06-06T15:50:03.590711952+00:00"
 }
