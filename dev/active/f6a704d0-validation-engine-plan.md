@@ -153,9 +153,11 @@ sequenceDiagram
     E-->>V: findings (rule, severity, message)
 ```
 
-- **Schema compilation is cached** (DR §5.2): compile each rule's JSON Schema
-  once (lazy, keyed by rule name / schema hash); never per write. Use a
-  `OnceCell`/`HashMap` cache on the engine, validator built once per command.
+- **Schema compilation is cached** (DR §5.2): compile each distinct JSON Schema
+  once (lazy, keyed by the schema's canonical serialized form — a true identity,
+  not a lossy hash, so distinct schemas can never alias); never per write. Use a
+  `HashMap<String, Arc<Validator>>` cache on the engine, validator built once per
+  command.
 - Pin `jsonschema ~0.46` with `Draft202012` explicitly.
 
 ### Migration (DR §8.3, §8.4)

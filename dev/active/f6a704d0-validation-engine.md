@@ -86,9 +86,16 @@ A rule is **selector + assertion + severity**.
   examples: `JSONSchema` -> `Validator`, `compile()` -> `validator_for()`.
 - **5.2** Shorthand kinds (§4.1) desugar to JSON Schema; one validator
   underneath (consistency) with ergonomic surface on top. The compiled
-  `Validator` (which is `Clone + Send + Sync`) is cached once per rule
-  (`OnceLock`/`Arc`), NEVER recompiled per write — compiling is the documented
-  perf pitfall, validating is cheap.
+  `Validator` (which is `Clone + Send + Sync`) is cached once per distinct
+  schema (keyed by the schema's canonical serialized form, behind an `Arc`),
+  NEVER recompiled per write — compiling is the documented perf pitfall,
+  validating is cheap. (Revised from the original "once per rule" wording: keying
+  by schema identity rather than by rule name makes validator aliasing
+  impossible across all construction paths — two rules that happen to share a
+  name but carry different schemas can never collide on one validator, while two
+  rules with an identical schema correctly reuse a single compiled validator. A
+  rule is still compiled at most once; rule-name uniqueness is separately
+  enforced by the loader for unambiguous finding attribution.)
 - **5.3 Long tail**: checker-command (§4.3) now. Future declarative cross-field
   logic -> `x-jit-*` **custom keywords** registered via
   `ValidationOptions::with_keyword` + the `Keyword` trait. **Confirmed by
