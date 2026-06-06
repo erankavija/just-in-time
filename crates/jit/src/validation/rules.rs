@@ -27,6 +27,22 @@ use crate::domain::Issue;
 use crate::labels as label_utils;
 
 /// Errors that can occur while loading and parsing `.jit/rules.toml`.
+///
+/// # Examples
+///
+/// ```
+/// use jit::validation::rules::{RuleConfigError, RuleSet};
+/// use std::path::Path;
+///
+/// // A rule whose `assert` table names no assertion kind is a config error.
+/// let toml = r#"
+/// [[rules]]
+/// name = "broken"
+/// assert = {}
+/// "#;
+/// let err = RuleSet::from_toml_str(toml, Path::new(".")).unwrap_err();
+/// assert!(matches!(err, RuleConfigError::InvalidAssertion { .. }));
+/// ```
 #[derive(Debug, Error)]
 pub enum RuleConfigError {
     /// The rules file could not be read from disk.
