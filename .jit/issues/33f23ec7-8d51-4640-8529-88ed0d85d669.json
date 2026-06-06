@@ -2,7 +2,7 @@
   "id": "33f23ec7-8d51-4640-8529-88ed0d85d669",
   "title": "Custom-keyword extension point (x-jit-*)",
   "description": "A registration point for `x-jit-*` custom JSON Schema keywords, plus a regression test guarding graceful degradation.\n\n## Background\n\nFuture declarative cross-field logic will be added as custom keywords rather than a second formalism. Research confirmed the `jsonschema` crate treats unknown keywords as annotations (no strict-reject mode), so schemas using `x-jit-*` degrade gracefully under a standard validator; this task guards that property against future bumps. See decision record sections 5.3 and 11.\n\n## Success Criteria\n\n- [ ] [hard] The engine exposes a registration point that registers `x-jit-*` custom keywords via `jsonschema::ValidationOptions::with_keyword` and the `Keyword` trait.\n- [ ] [hard] A regression test confirms a schema using an `x-jit-*` keyword still validates structurally under a standard (no-custom-keyword) validator, i.e. unknown keywords are annotations, not errors.\n- [ ] [aspirational] A sample keyword (optionally CEL-backed) is demonstrated end-to-end.\n\n## Notes\n\nLow priority, off the critical path. Degradation is confirmed (jsonschema `compiler.rs`); the test exists to catch a regression on a future crate bump.\n",
-  "state": "backlog",
+  "state": "ready",
   "priority": "low",
   "assignee": null,
   "dependencies": [
@@ -20,5 +20,5 @@
     "epic:validation-engine"
   ],
   "created_at": "2026-06-06T16:05:03.294988650+00:00",
-  "updated_at": "2026-06-06T17:51:46.443655795+00:00"
+  "updated_at": "2026-06-06T20:44:18.544695104+00:00"
 }

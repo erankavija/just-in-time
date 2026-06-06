@@ -124,10 +124,15 @@
     }
   ],
   "created_during_execution": [],
-  "escalations": [],
+  "escalations": [
+    {"wave": 2, "issue": "00525fe0", "topic": "feature-gated html/xml parity test not exercised by default-only cargo-ci gate", "decision": "Add a separate features gate (user choice)", "resolution": "Defined gate cargo-ci-features (cargo clippy+test -p jit --features html,xml); added as required gate on 00525fe0"},
+    {"wave": 2, "issue": "7df61f62", "topic": "validator-cache keying: contradictory review rounds (no-alias vs literal 'once per rule'); exceeded rework attempts", "decision": "Keep schema-identity keying; amend decision record AND issue success criterion (user approved both)", "resolution": "DR 5.2 + plan + issue 7df61f62 criterion revised from 'once per rule' to 'once per distinct schema (schema identity)'; code unchanged"}
+  ],
   "rework_counts": {
     "2f50a3b0": 1,
-    "2fa7c882": 2
+    "2fa7c882": 2,
+    "7df61f62": 2,
+    "00525fe0": 1
   },
   "started_at": "2026-06-06T00:00:00Z"
 }

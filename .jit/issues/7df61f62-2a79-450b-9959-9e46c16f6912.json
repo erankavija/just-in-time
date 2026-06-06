@@ -1,8 +1,8 @@
 {
   "id": "7df61f62-2a79-450b-9959-9e46c16f6912",
   "title": "JSON Schema validation core and custom-keyword extension point",
-  "description": "The JSON Schema validation core: validate a projection against a rule's schema via the `jsonschema` crate, with cached, draft-pinned compilation.\n\n## Background\n\nThis is the engine's evaluation primitive and the fan-in for shorthand desugaring and graph rules. Compiling a schema is expensive; validating is cheap, so compiled validators are cached. See `dev/active/f6a704d0-validation-engine-plan.md` (\"Validation flow\") and decision record section 5.\n\n## Success Criteria\n\n- [ ] [hard] `jsonschema = \"0.46\"` is added and `Cargo.lock` committed; validators are built via `jsonschema::options().with_draft(Draft::Draft202012).build(&schema)`.\n- [ ] [hard] `validation/engine.rs` validates a `Projection` (as `serde_json::Value`) and returns a `Finding { rule, severity, message }` per failure.\n- [ ] [hard] The compiled `Validator` (which is `Clone + Send + Sync`) is cached once per rule (`OnceLock`/`Arc`); a unit test asserts no per-call recompilation.\n- [ ] [hard] `contains`/`minContains`/`maxContains` validate under Draft 2020-12, covered by a test using the `[hard]` criterion pattern.\n- [ ] [hard] The core does NOT implement custom `x-jit-*` keywords (separate task).\n\n## Notes\n\nAPI note: recent versions renamed `JSONSchema` -> `Validator` and `compile()` -> `validator_for()`; format validation is annotation-only by default under 2020-12 (leave it off). `schemars` 0.8 already present for projection schema generation.\n",
-  "state": "in_progress",
+  "description": "The JSON Schema validation core: validate a projection against a rule's schema via the `jsonschema` crate, with cached, draft-pinned compilation.\n\n## Background\n\nThis is the engine's evaluation primitive and the fan-in for shorthand desugaring and graph rules. Compiling a schema is expensive; validating is cheap, so compiled validators are cached. See `dev/active/f6a704d0-validation-engine-plan.md` (\"Validation flow\") and decision record section 5.\n\n## Success Criteria\n\n- [ ] [hard] `jsonschema = \"0.46\"` is added and `Cargo.lock` committed; validators are built via `jsonschema::options().with_draft(Draft::Draft202012).build(&schema)`.\n- [ ] [hard] `validation/engine.rs` validates a `Projection` (as `serde_json::Value`) and returns a `Finding { rule, severity, message }` per failure.\n- [ ] [hard] The compiled `Validator` (which is `Clone + Send + Sync`) is cached once per distinct schema (keyed by schema identity, behind an `Arc`); a unit test asserts no per-call recompilation. (Revised per lead escalation: schema-identity keying prevents validator aliasing across all construction paths; see decision record 5.2.)\n- [ ] [hard] `contains`/`minContains`/`maxContains` validate under Draft 2020-12, covered by a test using the `[hard]` criterion pattern.\n- [ ] [hard] The core does NOT implement custom `x-jit-*` keywords (separate task).\n\n## Notes\n\nAPI note: recent versions renamed `JSONSchema` -> `Validator` and `compile()` -> `validator_for()`; format validation is annotation-only by default under 2020-12 (leave it off). `schemars` 0.8 already present for projection schema generation.",
+  "state": "done",
   "priority": "high",
   "assignee": "agent:claude",
   "dependencies": [
@@ -13,7 +13,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-06T20:28:58.566864616Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-06T20:41:12.749541147Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -21,5 +32,5 @@
     "epic:validation-engine"
   ],
   "created_at": "2026-06-06T15:51:20.546430439+00:00",
-  "updated_at": "2026-06-06T19:11:57.961637161+00:00"
+  "updated_at": "2026-06-06T20:44:18.505169842+00:00"
 }
