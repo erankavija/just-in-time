@@ -86,10 +86,40 @@ No text may follow the verdict line.
 EOF
 ) || true
 
+# A reviewer agent's stderr can be enormous -- it may echo its entire prompt and
+# context back (observed: thousands of lines per run). jit stores this verbatim
+# in the gate run result, and a --pass-context gate feeds prior runs back into
+# the next review round, so an unbounded dump both bloats .jit/gate-runs/ and
+# drowns the next reviewer. The one durably useful line is the session id, which
+# points at the agent's full transcript -- resume that to see everything. So we
+# keep only through the session id plus a couple lines, and drop the rest.
+#
+# Tunables:
+#   AGENT_STDERR_ID_PATTERN -- grep -i pattern locating the transcript pointer
+#   AGENT_STDERR_AFTER_ID   -- extra lines kept after the matched line
+#   AGENT_STDERR_HEAD_LINES -- fallback head when no pointer line is found
+AGENT_STDERR_ID_PATTERN="${AGENT_STDERR_ID_PATTERN:-session id}"
+AGENT_STDERR_AFTER_ID="${AGENT_STDERR_AFTER_ID:-2}"
+AGENT_STDERR_HEAD_LINES="${AGENT_STDERR_HEAD_LINES:-12}"
+
+# Surface a tight slice of the agent's stderr: through the session id (+ a couple
+# lines), or a small head if no session id is present. Never called on the PASS
+# path -- a passing review's stderr is pure noise.
 show_agent_stderr() {
-  if [ -s "$AGENT_STDERR" ]; then
-    echo "--- agent stderr ---" >&2
-    cat "$AGENT_STDERR" >&2
+  if [ ! -s "$AGENT_STDERR" ]; then
+    return
+  fi
+  total=$(wc -l <"$AGENT_STDERR")
+  id_line=$(grep -in "$AGENT_STDERR_ID_PATTERN" "$AGENT_STDERR" | head -1 | cut -d: -f1 || true)
+  if [ -n "$id_line" ]; then
+    keep=$((id_line + AGENT_STDERR_AFTER_ID))
+  else
+    keep="$AGENT_STDERR_HEAD_LINES"
+  fi
+  echo "--- agent stderr (first ${keep} of ${total} lines; the session id below points to the full agent transcript) ---" >&2
+  head -n "$keep" "$AGENT_STDERR" >&2
+  if [ "$total" -gt "$keep" ]; then
+    echo "--- $((total - keep)) more lines omitted (resume the session for the rest) ---" >&2
   fi
 }
 

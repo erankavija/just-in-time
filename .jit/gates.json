@@ -105,7 +105,7 @@
         "timeout_seconds": 1800,
         "working_dir": null,
         "env": {
-          "REVIEWER_AGENT": "codex review -"
+          "REVIEWER_AGENT": "codex exec"
         },
         "pass_context": true,
         "prompt_file": "./scripts/code-review-prompt.md"

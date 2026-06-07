@@ -219,6 +219,16 @@ impl<S: IssueStore> CommandExecutor<S> {
             run_history = run_history.split_off(run_history.len() - Self::MAX_RUN_HISTORY);
         }
 
+        // stderr is a diagnostic stream (agent banners, echoed prompts, logs),
+        // never review signal -- findings live in stdout. Strip it from the
+        // context handed to the next checker so a verbose reviewer's stderr
+        // cannot drown the prior rounds' findings. Keeping checker output lean
+        // is the checker's job (see scripts/ai-review.sh); this is the jit-side
+        // guarantee that diagnostics never re-enter a review prompt.
+        for run in &mut run_history {
+            run.stderr.clear();
+        }
+
         Ok(Some(GateContext {
             schema_version: 1,
             prompt: resolved_prompt,
@@ -961,8 +971,10 @@ enforce_leases = "off"
                 stage: GateStage::Postcheck,
                 mode: GateMode::Auto,
                 checker: Some(GateChecker::Exec {
-                    // Output context then fail
-                    command: "cat $JIT_CONTEXT_FILE; exit 1".to_string(),
+                    // Output context to stdout, emit noise to stderr, then fail.
+                    // The stderr noise must NOT reappear in the next run's context.
+                    command: "cat $JIT_CONTEXT_FILE; echo 'noisy diagnostic' >&2; exit 1"
+                        .to_string(),
                     timeout_seconds: 10,
                     working_dir: None,
                     env: HashMap::new(),
@@ -988,6 +1000,12 @@ enforce_leases = "off"
         // First run - should have empty history
         let result1 = executor.check_gate(&issue_id, "review").unwrap();
         assert_eq!(result1.status, GateRunStatus::Failed);
+        // The checker really did emit stderr (so the strip below is meaningful).
+        assert!(
+            result1.stderr.contains("noisy diagnostic"),
+            "checker should produce stderr, got {:?}",
+            result1.stderr
+        );
 
         // stdout contains the context JSON (before the exit 1)
         let ctx1: serde_json::Value = serde_json::from_str(&result1.stdout).unwrap();
@@ -999,6 +1017,11 @@ enforce_leases = "off"
         let history2 = ctx2["run_history"].as_array().unwrap();
         assert_eq!(history2.len(), 1);
         assert_eq!(history2[0]["status"], "failed");
+        // stderr is stripped from the context handed to the next checker.
+        assert_eq!(
+            history2[0]["stderr"], "",
+            "stderr must be stripped from run_history context"
+        );
 
         // Third run - should include both previous runs
         let result3 = executor.check_gate(&issue_id, "review").unwrap();
