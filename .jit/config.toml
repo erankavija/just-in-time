@@ -41,18 +41,6 @@ strictness = "loose"
 # Default type when none specified
 default_type = "task"
 
-# Require exactly one type:* label per issue
-require_type_label = false
-
-# Label format validation
-label_regex = '^[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9._-]*$'
-reject_malformed_labels = false
-enforce_namespace_registry = false
-
-# Enable/disable specific validation warnings
-warn_orphaned_leaves = true
-warn_strategic_consistency = true
-
 # Label namespace registry (replaces labels.json)
 # NO "strategic" flags - strategic is derived from type labels only
 

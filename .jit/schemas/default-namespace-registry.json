@@ -1,0 +1,12 @@
+{
+  "properties": {
+    "raw_labels": {
+      "items": {
+        "pattern": "^(story|type|epic|resolution|component|milestone|team):",
+        "type": "string"
+      },
+      "type": "array"
+    }
+  },
+  "type": "object"
+}

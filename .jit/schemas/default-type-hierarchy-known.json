@@ -1,0 +1,23 @@
+{
+  "properties": {
+    "labels": {
+      "properties": {
+        "type": {
+          "items": {
+            "enum": [
+              "bug",
+              "enhancement",
+              "epic",
+              "milestone",
+              "story",
+              "task"
+            ]
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "type": "object"
+}
