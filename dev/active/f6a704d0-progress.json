@@ -1,7 +1,7 @@
 {
   "epic_id": "f6a704d0-1f01-447b-a8aa-42251fa7c3eb",
   "epic_short_id": "f6a704d0",
-  "current_wave": 4,
+  "current_wave": 5,
   "waves": [
     {
       "wave_number": 1,
@@ -75,7 +75,7 @@
           "short_id": "25ad2a02",
           "title": "Local rule evaluation with write-time enforcement",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -138,6 +138,13 @@
       "topic": "validator-cache keying: contradictory review rounds (no-alias vs literal 'once per rule'); exceeded rework attempts",
       "decision": "Keep schema-identity keying; amend decision record AND issue success criterion (user approved both)",
       "resolution": "DR 5.2 + plan + issue 7df61f62 criterion revised from 'once per rule' to 'once per distinct schema (schema identity)'; code unchanged"
+    },
+    {
+      "wave": 4,
+      "issue": "25ad2a02",
+      "topic": "6 review rounds; adversarial review used; pre-existing httpbin.org network test blocked gates",
+      "decision": "User: continue+be careful+adversarial reviewer; then point flaky test at local mock",
+      "resolution": "All findings fixed; check_links external-URL test now uses an in-process loopback mock; 25ad2a02 done"
     }
   ],
   "rework_counts": {
@@ -147,7 +154,8 @@
     "00525fe0": 1,
     "6297d67b": 1,
     "33f23ec7": 1,
-    "a7176f28": 1
+    "a7176f28": 1,
+    "25ad2a02": 2
   },
   "started_at": "2026-06-06T00:00:00Z"
 }
