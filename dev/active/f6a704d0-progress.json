@@ -1,7 +1,7 @@
 {
   "epic_id": "f6a704d0-1f01-447b-a8aa-42251fa7c3eb",
   "epic_short_id": "f6a704d0",
-  "current_wave": 5,
+  "current_wave": 6,
   "waves": [
     {
       "wave_number": 1,
@@ -87,7 +87,7 @@
           "short_id": "b8ba1b10",
           "title": "Extend jit validate and gate-checker integration",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -155,7 +155,8 @@
     "6297d67b": 1,
     "33f23ec7": 1,
     "a7176f28": 1,
-    "25ad2a02": 2
+    "25ad2a02": 2,
+    "b8ba1b10": 1
   },
   "started_at": "2026-06-06T00:00:00Z"
 }

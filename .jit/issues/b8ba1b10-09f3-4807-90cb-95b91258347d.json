@@ -2,7 +2,7 @@
   "id": "b8ba1b10-09f3-4807-90cb-95b91258347d",
   "title": "Extend `jit validate` and gate-checker integration",
   "description": "Extend `jit validate` into a per-issue and whole-repo rule runner with `--explain`, and ensure gate-checker and MCP-schema parity.\n\n## Background\n\n`jit validate` is the on-demand validation entry point and the gate-checker target; today it takes no positional id. See `dev/active/f6a704d0-validation-engine-plan.md` (step 7) and decision record section 9.\n\n## Success Criteria\n\n- [ ] [hard] `jit validate` accepts a positional `[<id>]` (net-new surface) plus `--json`; it runs local and graph rules for one issue or the whole repo.\n- [ ] [hard] `--explain` lists matched selectors to rule names to outcomes for an issue.\n- [ ] [hard] Output reports rule name, severity, and message; the command exits non-zero when error findings exist.\n- [ ] [hard] A gate invokes validation via the `JIT_ISSUE_ID` env var: `--checker-command 'jit validate \"$JIT_ISSUE_ID\" --json'` (no `{issue}` placeholder).\n- [ ] [hard] The new positional and flags appear in `jit --schema`; an integration test asserts the MCP server generates a working tool.\n\n## Notes\n\nAnchors: `cli.rs` Validate subcommand 160-180; `main.rs` dispatch near 225/272; `schema.rs` `CommandSchema::generate`; `gate_execution.rs:52-59` sets `JIT_ISSUE_ID`. The server/web-UI surface is deferred (decision record 9.4).\n",
-  "state": "in_progress",
+  "state": "done",
   "priority": "high",
   "assignee": "agent:claude",
   "dependencies": [
@@ -13,7 +13,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-07T07:31:25.067158658Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-07T07:31:37.371066328Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -21,5 +32,5 @@
     "epic:validation-engine"
   ],
   "created_at": "2026-06-06T15:51:20.560156313+00:00",
-  "updated_at": "2026-06-07T06:51:32.902572594+00:00"
+  "updated_at": "2026-06-07T07:37:01.221183032+00:00"
 }

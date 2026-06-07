@@ -2,7 +2,7 @@
   "id": "a6daa05d-510b-47e3-8e15-c6cc5b5fa66b",
   "title": "SDD example rules, schemas, and documentation",
   "description": "Ship SDD as example rules, schemas, and docs, the first application of the engine, with description criteria canonical and labels derived.\n\n## Background\n\nSDD is configuration, not code. The examples demonstrate falsifiable, traceable specs and prove the engine is methodology-agnostic. See `dev/active/f6a704d0-validation-engine-plan.md` (step 12) and decision record section 10.\n\n## Success Criteria\n\n- [ ] [hard] An example `.jit/rules.toml` plus `.jit/schemas/` demonstrate `req:`/`satisfies:` coverage and reference-integrity, with description `[hard]`/`[aspirational]` criteria as the canonical source and `req:`/`satisfies:` labels derived.\n- [ ] [hard] A spec content schema validates the requirement/scenario structure and the `[hard]`/`[aspirational]` criteria check.\n- [ ] [hard] Documentation explains authoring rules and positions the engine as methodology-agnostic with at least one non-SDD example.\n\n## Notes\n\nBuilds on the validate surface, graph rules, and shorthand desugaring.\n",
-  "state": "backlog",
+  "state": "ready",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -20,5 +20,5 @@
     "epic:validation-engine"
   ],
   "created_at": "2026-06-06T15:51:20.573398247+00:00",
-  "updated_at": "2026-06-06T17:00:14.610916524+00:00"
+  "updated_at": "2026-06-07T07:37:01.268444776+00:00"
 }
