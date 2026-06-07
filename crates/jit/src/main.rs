@@ -3577,6 +3577,19 @@ fn run() -> Result<()> {
                 return Err(anyhow!("--dry-run requires --fix to be specified"));
             }
 
+            // `--fix`, `--divergence`, and `--leases` are repo-wide operations and
+            // are NOT scoped to a single issue. Combining any of them with a
+            // positional issue id is rejected explicitly: previously the id was
+            // silently ignored and the command ran repo-wide, which is dangerous
+            // for `--fix` (it could mutate the entire repository when the user
+            // believed they had scoped it to one issue).
+            if id.is_some() && (fix || divergence || leases) {
+                return Err(anyhow!(
+                    "`--fix`/`--divergence`/`--leases` cannot be combined with a \
+                     positional issue id (they are repo-wide)"
+                ));
+            }
+
             // --explain requires an issue id (it is a per-issue debugging view).
             if explain && id.is_none() {
                 return Err(anyhow!("--explain requires an issue id"));
@@ -3619,8 +3632,10 @@ fn run() -> Result<()> {
                 return Ok(());
             }
 
-            // Per-issue rule run: `jit validate <id>` (no --fix/--divergence/--leases).
-            if id.is_some() && !fix && !divergence && !leases {
+            // Per-issue rule run: `jit validate <id>`. Incompatible flag combos
+            // (`--fix`/`--divergence`/`--leases` + id) were already rejected above,
+            // so a present id here is always a pure per-issue rule run.
+            if id.is_some() {
                 let report = executor.run_rules(id.as_deref())?;
                 let exit_nonzero = report.has_errors();
                 if json {
@@ -3783,17 +3798,24 @@ fn run() -> Result<()> {
                     println!("{}", output.to_json_string()?);
                 }
             } else {
-                // Standard validation with warnings. `validate_silent` runs the
-                // repo-integrity checks (broken deps, gates, labels, DAG,
-                // transitive reduction) and fails on any graph-rule error.
-                executor.validate_silent()?;
+                // Standard whole-repo validation. Run the repo-integrity checks
+                // (broken deps, gates, labels, DAG, transitive reduction, claims
+                // index) SEPARATELY from the declarative rule report, and capture
+                // (do NOT `?`-propagate) any integrity error: surfacing it through
+                // the generic error path would lose the structured rule report
+                // (which includes graph-rule findings). The exit status is decided
+                // AFTER rendering, below.
+                let integrity_error = executor.validate_integrity_silent().err();
+                let integrity_message = integrity_error.as_ref().map(|e| e.to_string());
                 let warnings = executor.collect_all_warnings()?;
 
-                // Also run the declarative local rules for every issue so a
-                // whole-repo `jit validate` surfaces (and fails on) local rule
-                // findings, not just graph + integrity checks.
+                // Run the declarative rules for every issue AND the cross-issue
+                // graph rules so a whole-repo `jit validate [--json]` surfaces (and
+                // fails on) local AND graph rule findings, not just integrity
+                // checks. `run_rules(None)` already folds in graph-rule findings.
                 let rule_report = executor.run_rules(None)?;
                 let rules_failed = rule_report.has_errors();
+                let validation_failed = rules_failed || integrity_error.is_some();
 
                 if json {
                     use jit::output::JsonOutput;
@@ -3830,31 +3852,49 @@ fn run() -> Result<()> {
                         .collect();
 
                     let findings_json = serde_json::to_value(&rule_report.findings)?;
+                    let message = if let Some(err) = &integrity_message {
+                        if rules_failed {
+                            format!(
+                                "Repository validation failed: {} rule error(s) and a \
+                                 repository-integrity error: {}",
+                                rule_report.error_count(),
+                                err
+                            )
+                        } else {
+                            format!("Repository integrity validation failed: {}", err)
+                        }
+                    } else if rules_failed {
+                        format!(
+                            "Repository validation failed with {} rule error(s)",
+                            rule_report.error_count()
+                        )
+                    } else {
+                        "Repository validation passed".to_string()
+                    };
                     let output = JsonOutput::success(
                         json!({
-                            "valid": !rules_failed,
+                            "valid": !validation_failed,
+                            "integrity_error": integrity_message,
                             "warnings": warnings_json,
                             "warning_count": warnings_json.len(),
                             "rule_findings": findings_json,
                             "error_count": rule_report.error_count(),
-                            "message": if rules_failed {
-                                format!(
-                                    "Repository validation failed with {} rule error(s)",
-                                    rule_report.error_count()
-                                )
-                            } else {
-                                "Repository validation passed".to_string()
-                            }
+                            "message": message
                         }),
                         "validate",
                     );
                     println!("{}", output.to_json_string()?);
                 } else {
-                    if rules_failed {
-                        println!(
-                            "❌ Repository validation failed with {} rule error(s)",
-                            rule_report.error_count()
-                        );
+                    if validation_failed {
+                        if rules_failed {
+                            println!(
+                                "❌ Repository validation failed with {} rule error(s)",
+                                rule_report.error_count()
+                            );
+                        }
+                        if let Some(err) = &integrity_message {
+                            println!("❌ Repository integrity error: {}", err);
+                        }
                     } else {
                         println!("✓ Repository validation passed");
                     }
@@ -3909,9 +3949,18 @@ fn run() -> Result<()> {
                     }
                 }
 
-                // Exit non-zero when any rule produced an error-severity finding,
-                // mirroring the per-issue path and the graph-error behavior of
-                // validate_silent (which already returns Err on graph errors).
+                // Decide the exit status AFTER rendering. The structured rule
+                // report (including graph-rule findings) has already been printed
+                // above, so finding #1 is fixed regardless of how we exit.
+                //
+                // A repository-integrity error is propagated as an `Err` so it
+                // keeps its specific exit code (e.g. a broken dependency maps to
+                // `ExitCode::ValidationFailed`) and is surfaced on stderr by the
+                // top-level handler — it is never lost. Otherwise, an
+                // error-severity rule finding (local OR graph) exits non-zero.
+                if let Some(err) = integrity_error {
+                    return Err(err);
+                }
                 if rules_failed {
                     std::process::exit(1);
                 }

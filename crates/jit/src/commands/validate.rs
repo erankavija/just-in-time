@@ -192,6 +192,48 @@ impl<S: IssueStore> CommandExecutor<S> {
     // Type hierarchy is orthogonal to DAG structure
 
     pub fn validate_silent(&self) -> Result<()> {
+        // Repository-integrity checks (broken deps, gates, labels, docs, type
+        // hierarchy, DAG, isolated nodes, transitive reduction, claims index).
+        self.validate_integrity_silent()?;
+
+        // Cross-issue graph rules. An `error`-severity violation (including a
+        // `config-error`, since the rule could not be applied) fails validation;
+        // `warn`/`off` findings never fail here.
+        let issues = self.storage.list_issues()?;
+        let graph_findings = self.evaluate_graph_rules(&issues)?;
+        if let Some(message) = graph_findings_error_message(&graph_findings) {
+            return Err(anyhow!(message));
+        }
+
+        Ok(())
+    }
+
+    /// Run the repository-integrity checks ONLY, without evaluating declarative
+    /// graph rules.
+    ///
+    /// This is the structural half of [`CommandExecutor::validate_silent`]:
+    /// broken dependency references, invalid gate references, label validity,
+    /// document references, type hierarchy, DAG acyclicity, isolated nodes,
+    /// transitive reduction, and claims-index consistency. It deliberately
+    /// excludes the `Scope::Graph` declarative rules so a caller can render those
+    /// as structured findings (e.g. whole-repo `jit validate --json`) and decide
+    /// the exit status AFTER output, rather than aborting before the rule report
+    /// is built.
+    ///
+    /// Returns `Ok(())` when the repository is structurally sound, or an `Err`
+    /// describing the first integrity violation found.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use jit::commands::CommandExecutor;
+    /// use jit::storage::JsonFileStorage;
+    ///
+    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
+    /// // Repo-integrity passes (no broken deps, valid DAG, etc.).
+    /// executor.validate_integrity_silent().unwrap();
+    /// ```
+    pub fn validate_integrity_silent(&self) -> Result<()> {
         let issues = self.storage.list_issues()?;
 
         // Build lookup map of valid issue IDs
@@ -273,21 +315,16 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
-        // Evaluate cross-issue graph rules (label-coverage / label-reference /
-        // dependency-shape). An `error`-severity violation fails validation; any
-        // `config-error` finding is also surfaced as an error since the rule
-        // could not be applied. `warn`/`off` findings never fail validation here.
-        let graph_findings = self.evaluate_graph_rules(&issues)?;
-        if let Some(message) = graph_findings_error_message(&graph_findings) {
-            return Err(anyhow!(message));
-        }
-
         Ok(())
     }
 
     /// Evaluate every `Scope::Graph` rule from `.jit/rules.toml` over the supplied
-    /// issue set, returning one [`Finding`](crate::validation::engine::Finding)
-    /// per violation (including `config-error` findings for malformed rules).
+    /// issue set, returning one
+    /// [`GraphFinding`](crate::validation::graph::GraphFinding) per violation
+    /// (including `config-error` findings for malformed rules). Each finding
+    /// carries the issue it pertains to (or `None` for a config-error), so
+    /// per-issue reporting can attribute findings exactly rather than by matching
+    /// substrings in the message.
     ///
     /// The ruleset is loaded via [`CommandExecutor::rules`](crate::commands::CommandExecutor::rules);
     /// a genuine `rules.toml` parse/load failure is surfaced as an `Err` rather
@@ -309,7 +346,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     pub fn evaluate_graph_rules(
         &self,
         issues: &[Issue],
-    ) -> Result<Vec<crate::validation::engine::Finding>> {
+    ) -> Result<Vec<crate::validation::graph::GraphFinding>> {
         use crate::validation::rules::Scope;
 
         // Surface a misconfigured rules.toml instead of swallowing it.
@@ -334,11 +371,12 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// When `id` is `Some`, the issue is resolved (partial ids accepted) and its
     /// matching local rules are evaluated, then graph rules are evaluated across
-    /// the whole store with their findings filtered to those that name this
-    /// issue (graph rules are inherently cross-issue, so a per-issue report
-    /// surfaces only the graph findings relevant to it). When `id` is `None`,
-    /// local rules run for every issue and graph rules run across the store, with
-    /// every graph finding reported. The result is a pure
+    /// the whole store and filtered to those that pertain to this issue using
+    /// structured attribution (each graph finding carries its issue id), plus any
+    /// `config-error` finding for a graph rule whose selector applies to this
+    /// issue — so a malformed graph rule is reported, never silently passed. When
+    /// `id` is `None`, local rules run for every issue and graph rules run across
+    /// the store, with every graph finding reported. The result is a pure
     /// [`RuleReport`](crate::validation::report::RuleReport); rendering and exit
     /// codes are the caller's concern.
     ///
@@ -384,16 +422,22 @@ impl<S: IssueStore> CommandExecutor<S> {
                         .map(|f| ReportedFinding::new(Some(issue.id.clone()), f)),
                 );
 
-                // Graph rules across the store, but keep only findings that name
-                // this issue's short id (graph rules are cross-issue).
-                let short = issue.short_id();
+                // Graph rules across the store. Keep, by EXACT structural
+                // attribution (not substring matching): findings attributed to
+                // this issue, plus any config-error for a graph rule whose
+                // selector applies to this issue (a malformed graph rule must be
+                // reported here, never silently dropped).
+                let applicable_rules: std::collections::HashSet<String> = ruleset
+                    .matching_rules(&issue)
+                    .into_iter()
+                    .map(|r| r.name.clone())
+                    .collect();
                 let graph_findings = self.evaluate_graph_rules(&issues)?;
-                findings.extend(
-                    graph_findings
-                        .iter()
-                        .filter(|f| f.message.contains(&short))
-                        .map(|f| ReportedFinding::new(Some(issue.id.clone()), f)),
-                );
+                findings.extend(graph_findings.iter().filter_map(|gf| {
+                    let pertains = gf.issue_id.as_deref() == Some(issue.id.as_str())
+                        || (gf.is_config_error() && applicable_rules.contains(&gf.finding.rule));
+                    pertains.then(|| ReportedFinding::new(Some(issue.id.clone()), &gf.finding))
+                }));
             }
             None => {
                 // Local rules for every issue.
@@ -408,9 +452,15 @@ impl<S: IssueStore> CommandExecutor<S> {
                     );
                 }
 
-                // Graph rules across the store; every finding is reported.
+                // Graph rules across the store; every finding is reported,
+                // carrying its structured issue attribution (None for config
+                // errors).
                 let graph_findings = self.evaluate_graph_rules(&issues)?;
-                findings.extend(graph_findings.iter().map(|f| ReportedFinding::new(None, f)));
+                findings.extend(
+                    graph_findings
+                        .iter()
+                        .map(|gf| ReportedFinding::new(gf.issue_id.clone(), &gf.finding)),
+                );
             }
         }
 
@@ -422,10 +472,13 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// Local rules are evaluated against the issue; graph rules are evaluated
     /// across the whole store and a graph rule is considered to apply to this
-    /// issue when its selector matches it, with findings filtered to those
-    /// naming the issue. Each [`RuleOutcome`](crate::validation::report::RuleOutcome)
-    /// records the matched selector (rendered), scope, severity, pass/fail, and
-    /// any messages.
+    /// issue when its selector matches it. Graph findings are attributed to this
+    /// issue by EXACT structural attribution (each finding carries its issue id),
+    /// and any `config-error` finding for an applicable graph rule is also
+    /// surfaced — so a malformed graph rule is reported as a FAILED outcome,
+    /// never shown as passing. Each
+    /// [`RuleOutcome`](crate::validation::report::RuleOutcome) records the matched
+    /// selector (rendered), scope, severity, pass/fail, and any messages.
     ///
     /// # Errors
     ///
@@ -451,7 +504,6 @@ impl<S: IssueStore> CommandExecutor<S> {
             .map_err(|e| anyhow!("Invalid .jit/rules.toml: {}", e))?;
         let issue = self.storage.load_issue(id)?;
         let issues = self.storage.list_issues()?;
-        let short = issue.short_id();
 
         // Local findings for this issue, grouped by rule name.
         let local_eval = crate::validation::evaluate_local(&issue, ruleset)
@@ -463,14 +515,19 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .map(|f| (f.rule.clone(), f.message.clone())),
         );
 
-        // Graph findings naming this issue, grouped by rule name.
+        // Graph findings pertaining to this issue, grouped by rule name, using
+        // EXACT structural attribution: a finding attributed to this issue, or a
+        // config-error (which carries no issue id but must be surfaced so a
+        // malformed graph rule fails rather than silently passes). The
+        // selector-based "applies to this issue" decision is made per-rule below;
+        // including all config-errors here is safe because the outcome list is
+        // built only from rules whose selector matches the issue.
         let graph_findings = self.evaluate_graph_rules(&issues)?;
-        let graph_messages = group_messages(
-            graph_findings
-                .iter()
-                .filter(|f| f.message.contains(&short))
-                .map(|f| (f.rule.clone(), f.message.clone())),
-        );
+        let graph_messages = group_messages(graph_findings.iter().filter_map(|gf| {
+            let pertains =
+                gf.issue_id.as_deref() == Some(issue.id.as_str()) || gf.is_config_error();
+            pertains.then(|| (gf.finding.rule.clone(), gf.finding.message.clone()))
+        }));
 
         // Every rule whose selector matches the issue becomes one outcome.
         let outcomes: Vec<RuleOutcome> = ruleset
@@ -1237,12 +1294,14 @@ impl<S: IssueStore> CommandExecutor<S> {
 /// `warn`/`off` findings are intentionally excluded: only `Severity::Error`
 /// findings (which include `config-error` findings, attributed to a rule with
 /// error severity) make `jit validate` fail.
-fn graph_findings_error_message(findings: &[crate::validation::engine::Finding]) -> Option<String> {
+fn graph_findings_error_message(
+    findings: &[crate::validation::graph::GraphFinding],
+) -> Option<String> {
     use crate::validation::rules::Severity;
 
-    let errors: Vec<&crate::validation::engine::Finding> = findings
+    let errors: Vec<&crate::validation::graph::GraphFinding> = findings
         .iter()
-        .filter(|f| f.severity == Severity::Error)
+        .filter(|f| f.finding.severity == Severity::Error)
         .collect();
 
     if errors.is_empty() {
@@ -1251,7 +1310,7 @@ fn graph_findings_error_message(findings: &[crate::validation::engine::Finding])
 
     let body = errors
         .iter()
-        .map(|f| format!("  [{}] {}", f.rule, f.message))
+        .map(|f| format!("  [{}] {}", f.finding.rule, f.finding.message))
         .collect::<Vec<_>>()
         .join("\n");
 

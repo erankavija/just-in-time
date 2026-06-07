@@ -297,6 +297,195 @@ fn test_gate_checker_via_jit_issue_id_fails_for_noncompliant() {
         .failure();
 }
 
+// ---------------------------------------------------------------------------
+// Rework (jit:b8ba1b10): whole-repo --json must surface graph-rule findings;
+// id + legacy flags must be rejected; per-issue + --explain must report
+// malformed graph rules instead of silently passing.
+// ---------------------------------------------------------------------------
+
+/// A `label-coverage` GRAPH rule at error severity. An epic declaring a `[hard]`
+/// criterion with no satisfying child (child-link = any) violates it.
+const COVERAGE_GRAPH_RULE: &str = r#"
+[[rules]]
+name = "epic-criteria-covered"
+when = { type = "epic" }
+severity = "error"
+scope = "graph"
+assert = { label-coverage = { child-link = "any", marker = "[hard]" } }
+"#;
+
+/// A MALFORMED `label-reference` GRAPH rule: the required `to` key is missing, so
+/// the rule cannot be applied and must surface as a config-error finding.
+const MALFORMED_GRAPH_RULE: &str = r#"
+[[rules]]
+name = "broken-graph-rule"
+when = { type = "epic" }
+severity = "error"
+scope = "graph"
+assert = { label-reference = { from = "satisfies" } }
+"#;
+
+/// Create an epic whose body declares a single `[hard]` success criterion.
+fn create_epic_with_criterion(temp: &TempDir) -> String {
+    let output = bin()
+        .current_dir(temp.path())
+        .args([
+            "issue",
+            "create",
+            "--title",
+            "An epic",
+            "--label",
+            "type:epic",
+            "--description",
+            "## Success Criteria\n\n- [hard] REQ-01: do the thing\n",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let s = String::from_utf8_lossy(&output);
+    s.lines()
+        .find(|l| l.contains("Created issue:"))
+        .unwrap()
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string()
+}
+
+#[test]
+fn test_validate_whole_repo_json_includes_graph_error_findings_and_exits_nonzero() {
+    // Regression for finding #1: a whole-repo `jit validate --json` with an
+    // error-severity GRAPH rule violation must EMIT the structured rule report
+    // including the graph finding, and exit non-zero — not bail via the generic
+    // error path that drops the structured report.
+    let temp = setup_repo_with_rules(COVERAGE_GRAPH_RULE);
+    let _id = create_epic_with_criterion(&temp);
+
+    let assert = bin()
+        .current_dir(temp.path())
+        .args(["validate", "--json"])
+        .assert()
+        .failure();
+    let out = assert.get_output().stdout.clone();
+    let json: Value = serde_json::from_slice(&out).unwrap();
+    assert_eq!(
+        json["valid"], false,
+        "whole-repo run must be invalid: {json}"
+    );
+    let findings = json["rule_findings"].as_array().unwrap();
+    assert!(
+        findings
+            .iter()
+            .any(|f| f["rule"] == "epic-criteria-covered" && f["severity"] == "error"),
+        "graph-rule finding must appear in the structured report: {findings:?}"
+    );
+}
+
+#[test]
+fn test_validate_id_with_fix_is_rejected() {
+    // Finding #2: `--fix` is repo-wide and must not be silently scoped to an id.
+    let temp = setup_repo_with_rules(EPIC_NEEDS_REQ);
+    let id = create_epic(&temp, true);
+    bin()
+        .current_dir(temp.path())
+        .args(["validate", &id, "--fix"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "cannot be combined with a positional",
+        ));
+}
+
+#[test]
+fn test_validate_id_with_divergence_is_rejected() {
+    // Finding #2: `--divergence` is repo-wide and incompatible with a positional id.
+    let temp = setup_repo_with_rules(EPIC_NEEDS_REQ);
+    let id = create_epic(&temp, true);
+    bin()
+        .current_dir(temp.path())
+        .args(["validate", &id, "--divergence"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "cannot be combined with a positional",
+        ));
+}
+
+#[test]
+fn test_validate_id_with_leases_is_rejected() {
+    // Finding #2: `--leases` is repo-wide and incompatible with a positional id.
+    let temp = setup_repo_with_rules(EPIC_NEEDS_REQ);
+    let id = create_epic(&temp, true);
+    bin()
+        .current_dir(temp.path())
+        .args(["validate", &id, "--leases"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "cannot be combined with a positional",
+        ));
+}
+
+#[test]
+fn test_validate_id_reports_malformed_graph_rule_not_passed() {
+    // Finding #3: a malformed graph rule whose selector applies to the issue must
+    // be REPORTED for a per-issue `jit validate <id>` (a config-error finding),
+    // never silently dropped.
+    let temp = setup_repo_with_rules(MALFORMED_GRAPH_RULE);
+    let id = create_epic(&temp, false);
+
+    let assert = bin()
+        .current_dir(temp.path())
+        .args(["validate", &id, "--json"])
+        .assert()
+        .failure();
+    let out = assert.get_output().stdout.clone();
+    let json: Value = serde_json::from_slice(&out).unwrap();
+    let findings = json["findings"].as_array().unwrap();
+    assert!(
+        findings.iter().any(|f| f["rule"] == "broken-graph-rule"
+            && f["message"].as_str().unwrap_or("").contains("config error")),
+        "malformed graph rule must be reported per-issue: {findings:?}"
+    );
+}
+
+#[test]
+fn test_validate_explain_marks_malformed_graph_rule_as_failed() {
+    // Finding #3 (--explain): a graph rule with a config error for the issue must
+    // be shown as FAILED, never PASS.
+    let temp = setup_repo_with_rules(MALFORMED_GRAPH_RULE);
+    let id = create_epic(&temp, false);
+
+    // Human form: the rule appears and is marked FAIL.
+    bin()
+        .current_dir(temp.path())
+        .args(["validate", &id, "--explain"])
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains("broken-graph-rule"))
+        .stdout(predicate::str::contains("FAIL"));
+
+    // JSON form: the outcome for the malformed rule has passed = false.
+    let assert = bin()
+        .current_dir(temp.path())
+        .args(["validate", &id, "--explain", "--json"])
+        .assert()
+        .failure();
+    let out = assert.get_output().stdout.clone();
+    let json: Value = serde_json::from_slice(&out).unwrap();
+    let outcomes = json["outcomes"].as_array().unwrap();
+    let outcome = outcomes
+        .iter()
+        .find(|o| o["rule"] == "broken-graph-rule")
+        .expect("malformed graph rule must appear as an outcome");
+    assert_eq!(
+        outcome["passed"], false,
+        "a config-errored graph rule must be reported as failed, not passed: {outcome}"
+    );
+}
+
 #[test]
 fn test_schema_exposes_validate_positional_and_explain_flag() {
     // MCP parity: the new positional `id` arg and `--explain` flag MUST appear in
