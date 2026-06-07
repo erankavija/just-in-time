@@ -94,6 +94,14 @@ strictness = "loose"
 # Auto-assign this type when creating issues without a type:* label
 default_type = "task"
 
+# Repo-level default content format for issue description bodies. Selects the
+# parser used to extract `sections` during validation for issues that carry no
+# per-issue `content_format`. One of: "markdown" (default), "html", "xml".
+# Note: "html"/"xml" require the binary to be built with the matching cargo
+# feature; selecting an uncompiled format produces a clear error, never a silent
+# Markdown fallback.
+content_format = "markdown"
+
 # Require exactly one type:* label per issue
 require_type_label = false
 

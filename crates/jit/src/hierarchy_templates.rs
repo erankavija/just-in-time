@@ -225,6 +225,7 @@ examples = ["resolution:wont-fix", "resolution:duplicate"]
         let validation = ValidationConfig {
             strictness: Some("loose".to_string()),
             default_type: Some("task".to_string()),
+            content_format: None,
             require_type_label: None,
             label_regex: None,
             reject_malformed_labels: Some(true),

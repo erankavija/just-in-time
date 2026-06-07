@@ -31,7 +31,8 @@
 //! `--force`, in which case a bypass event is logged) live in the command layer
 //! so this module stays free of I/O.
 
-use crate::domain::{project, Issue, Projection};
+use crate::document::{content_parser_for, ContentParserError};
+use crate::domain::{project, ContentFormat, Issue, Projection};
 use crate::validation::desugar::desugar;
 use crate::validation::engine::{Finding, SchemaCompileError, SchemaEngine};
 use crate::validation::rules::{Assertion, Rule, RuleSet, Scope, Severity};
@@ -64,6 +65,12 @@ pub enum LocalEvalError {
     /// Surfaced as an error rather than silently validating against a null value.
     #[error("failed to serialize issue projection for validation: {0}")]
     Projection(#[from] serde_json::Error),
+
+    /// The issue's (or repo default's) content format selected a parser whose
+    /// cargo feature is not compiled into this build. Surfaced as an error rather
+    /// than silently falling back to Markdown (which would parse HTML/XML wrong).
+    #[error(transparent)]
+    ContentParser(#[from] ContentParserError),
 }
 
 /// The outcome of evaluating an issue against the local rules.
@@ -75,7 +82,7 @@ pub enum LocalEvalError {
 /// # Examples
 ///
 /// ```
-/// use jit::domain::Issue;
+/// use jit::domain::{ContentFormat, Issue};
 /// use jit::validation::local::evaluate_local;
 /// use jit::validation::rules::RuleSet;
 /// use std::path::Path;
@@ -94,7 +101,7 @@ pub enum LocalEvalError {
 /// // An epic with no `req:*` label violates the enforce rule.
 /// let mut epic = Issue::new("An epic".to_string(), String::new());
 /// epic.labels = vec!["type:epic".to_string()];
-/// let evaluation = evaluate_local(&epic, &rules).unwrap();
+/// let evaluation = evaluate_local(&epic, &rules, ContentFormat::Markdown).unwrap();
 /// assert!(!evaluation.blocking_rules().is_empty());
 /// ```
 #[derive(Debug, Clone, Default)]
@@ -237,7 +244,7 @@ impl LocalEvaluation {
 /// # Examples
 ///
 /// ```
-/// use jit::domain::Issue;
+/// use jit::domain::{ContentFormat, Issue};
 /// use jit::validation::local::evaluate_local;
 /// use jit::validation::rules::RuleSet;
 /// use std::path::Path;
@@ -253,12 +260,16 @@ impl LocalEvaluation {
 ///
 /// let mut task = Issue::new("A task".to_string(), String::new());
 /// task.labels = vec!["type:task".to_string()];
-/// let evaluation = evaluate_local(&task, &rules).unwrap();
+/// let evaluation = evaluate_local(&task, &rules, ContentFormat::Markdown).unwrap();
 /// // A warn rule produces a (non-blocking) finding.
 /// assert!(!evaluation.is_blocking());
 /// assert_eq!(evaluation.warnings().len(), 1);
 /// ```
-pub fn evaluate_local(issue: &Issue, rules: &RuleSet) -> Result<LocalEvaluation, LocalEvalError> {
+pub fn evaluate_local(
+    issue: &Issue,
+    rules: &RuleSet,
+    repo_default_format: ContentFormat,
+) -> Result<LocalEvaluation, LocalEvalError> {
     // Select matching LOCAL rules; graph-scope rules never run on write.
     let local_rules: Vec<&Rule> = rules
         .matching_rules(issue)
@@ -307,7 +318,7 @@ pub fn evaluate_local(issue: &Issue, rules: &RuleSet) -> Result<LocalEvaluation,
         .any(|(_, schema)| schema_needs_sections(schema));
 
     // Project cheaply, then add `sections` ONLY if a matching rule needs it.
-    let projection = build_projection(issue, needs_body);
+    let projection = build_projection(issue, needs_body, repo_default_format)?;
     let value = serde_json::to_value(&projection)?;
 
     // One engine per call (the engine is !Sync; never store it long-lived).
@@ -331,12 +342,23 @@ pub fn evaluate_local(issue: &Issue, rules: &RuleSet) -> Result<LocalEvaluation,
 }
 
 /// Project an issue, populating `sections` only when `with_body` is set.
-fn build_projection(issue: &Issue, with_body: bool) -> Projection {
+///
+/// When the body is parsed, the [`ContentParser`](crate::document::ContentParser)
+/// is chosen by [`content_parser_for`]: the issue's own `content_format` → else
+/// `repo_default_format` → else Markdown. A selected format whose parser feature
+/// is not compiled surfaces as a [`LocalEvalError::ContentParser`] rather than a
+/// silent Markdown fallback.
+fn build_projection(
+    issue: &Issue,
+    with_body: bool,
+    repo_default_format: ContentFormat,
+) -> Result<Projection, LocalEvalError> {
     let projection = project(issue);
     if with_body {
-        projection.with_sections(&issue.description, &crate::document::MarkdownContentParser)
+        let parser = content_parser_for(issue.content_format, repo_default_format)?;
+        Ok(projection.with_sections(&issue.description, parser.as_ref()))
     } else {
-        projection
+        Ok(projection)
     }
 }
 
@@ -416,7 +438,8 @@ enforce = true
 assert = { require-label = { label = "req:*", min = 1 } }
 "#,
         );
-        let evaluation = evaluate_local(&epic_without_req(), &rules).unwrap();
+        let evaluation =
+            evaluate_local(&epic_without_req(), &rules, ContentFormat::Markdown).unwrap();
         assert!(evaluation.is_blocking());
         assert_eq!(evaluation.blocking_rules(), vec!["epic-needs-req"]);
         assert!(evaluation.rejection_message().is_some());
@@ -436,7 +459,7 @@ assert = { require-label = { label = "req:*", min = 1 } }
         );
         let mut issue = epic_without_req();
         issue.labels.push("req:REQ-01".to_string());
-        let evaluation = evaluate_local(&issue, &rules).unwrap();
+        let evaluation = evaluate_local(&issue, &rules, ContentFormat::Markdown).unwrap();
         assert!(!evaluation.is_blocking());
         assert!(evaluation.findings().is_empty());
     }
@@ -452,7 +475,8 @@ severity = "warn"
 assert = { require-label = { label = "req:*", min = 1 } }
 "#,
         );
-        let evaluation = evaluate_local(&epic_without_req(), &rules).unwrap();
+        let evaluation =
+            evaluate_local(&epic_without_req(), &rules, ContentFormat::Markdown).unwrap();
         assert!(!evaluation.is_blocking());
         assert_eq!(evaluation.warnings().len(), 1);
         assert!(evaluation.blocking_rules().is_empty());
@@ -471,7 +495,8 @@ severity = "error"
 assert = { require-label = { label = "req:*", min = 1 } }
 "#,
         );
-        let evaluation = evaluate_local(&epic_without_req(), &rules).unwrap();
+        let evaluation =
+            evaluate_local(&epic_without_req(), &rules, ContentFormat::Markdown).unwrap();
         assert!(!evaluation.is_blocking());
         assert_eq!(evaluation.warnings().len(), 1);
     }
@@ -490,7 +515,8 @@ enforce = true
 assert = { label-coverage = { source = "req", child-state = "done" } }
 "#,
         );
-        let evaluation = evaluate_local(&epic_without_req(), &rules).unwrap();
+        let evaluation =
+            evaluate_local(&epic_without_req(), &rules, ContentFormat::Markdown).unwrap();
         assert!(!evaluation.is_blocking());
         assert!(evaluation.findings().is_empty());
     }
@@ -507,7 +533,8 @@ enforce = true
 assert = { require-label = { label = "req:*", min = 1 } }
 "#,
         );
-        let evaluation = evaluate_local(&epic_without_req(), &rules).unwrap();
+        let evaluation =
+            evaluate_local(&epic_without_req(), &rules, ContentFormat::Markdown).unwrap();
         assert!(evaluation.findings().is_empty());
     }
 
@@ -524,7 +551,8 @@ assert = { require-label = { label = "req:*", min = 1 } }
 "#,
         );
         // The issue is an epic, not a task, so the rule does not match.
-        let evaluation = evaluate_local(&epic_without_req(), &rules).unwrap();
+        let evaluation =
+            evaluate_local(&epic_without_req(), &rules, ContentFormat::Markdown).unwrap();
         assert!(evaluation.findings().is_empty());
     }
 
@@ -545,11 +573,15 @@ assert = { require-section = { heading = "Success Criteria" } }
 
         let mut missing = epic_without_req();
         missing.description = "## Goals\n\n- ship it\n".to_string();
-        assert!(evaluate_local(&missing, &rules).unwrap().is_blocking());
+        assert!(evaluate_local(&missing, &rules, ContentFormat::Markdown)
+            .unwrap()
+            .is_blocking());
 
         let mut present = epic_without_req();
         present.description = "## Success Criteria\n\n- [hard] REQ-01\n".to_string();
-        assert!(!evaluate_local(&present, &rules).unwrap().is_blocking());
+        assert!(!evaluate_local(&present, &rules, ContentFormat::Markdown)
+            .unwrap()
+            .is_blocking());
     }
 
     #[test]
@@ -604,7 +636,7 @@ assert = { require-label = { label = "req:*", min = 1 } }
         );
 
         // And the projection built for this case has no sections populated.
-        let projection = build_projection(&issue, false);
+        let projection = build_projection(&issue, false, ContentFormat::Markdown).unwrap();
         assert!(projection.sections.is_none());
     }
 
@@ -623,11 +655,15 @@ assert = { require-doc-type = { doc-type = "design" } }
         let mut task = Issue::new("A task".to_string(), String::new());
         task.labels = vec!["type:task".to_string()];
         // No design doc -> blocks.
-        assert!(evaluate_local(&task, &rules).unwrap().is_blocking());
+        assert!(evaluate_local(&task, &rules, ContentFormat::Markdown)
+            .unwrap()
+            .is_blocking());
 
         task.documents
             .push(DocumentReference::new("d.md".to_string()).with_type("design".to_string()));
-        assert!(!evaluate_local(&task, &rules).unwrap().is_blocking());
+        assert!(!evaluate_local(&task, &rules, ContentFormat::Markdown)
+            .unwrap()
+            .is_blocking());
     }
 
     #[test]
@@ -649,7 +685,8 @@ enforce = true
 assert = { require-label = { label = "owner:*", min = 1 } }
 "#,
         );
-        let evaluation = evaluate_local(&epic_without_req(), &rules).unwrap();
+        let evaluation =
+            evaluate_local(&epic_without_req(), &rules, ContentFormat::Markdown).unwrap();
         let mut blocking = evaluation.blocking_rules();
         blocking.sort();
         assert_eq!(blocking, vec!["needs-owner", "needs-req"]);
@@ -672,7 +709,7 @@ enforce = true
 assert = { json-schema = "schemas/bad.json" }
 "#;
         let rules = RuleSet::from_toml_str(toml, dir.path()).unwrap();
-        let err = evaluate_local(&epic_without_req(), &rules).unwrap_err();
+        let err = evaluate_local(&epic_without_req(), &rules, ContentFormat::Markdown).unwrap_err();
         assert!(matches!(err, LocalEvalError::Compile(_)));
     }
 }

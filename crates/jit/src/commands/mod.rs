@@ -361,6 +361,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                             .unwrap_or(crate::config::ValidationConfig {
                                 strictness: None,
                                 default_type: None,
+                                content_format: None,
                                 require_type_label: None,
                                 label_regex: None,
                                 reject_malformed_labels: None,
@@ -414,6 +415,18 @@ impl<S: IssueStore> CommandExecutor<S> {
             .map_err(|err| anyhow!("invalid namespace configuration: {err}"))
     }
 
+    /// Resolve the repo-level default content format from `[validation]
+    /// .content_format` (defaulting to Markdown when unset/absent), used as the
+    /// fallback for issues that carry no per-issue `content_format` when selecting
+    /// the [`ContentParser`](crate::document::ContentParser). A malformed value is
+    /// surfaced as an error rather than silently picking the wrong parser.
+    fn repo_content_format(&self) -> Result<crate::domain::ContentFormat> {
+        match self.cached_config()?.validation.as_ref() {
+            Some(validation) => validation.content_format(),
+            None => Ok(crate::domain::ContentFormat::Markdown),
+        }
+    }
+
     /// The single write-time validation entry point shared by issue create,
     /// update, and the batch path (DR §7.5).
     ///
@@ -442,7 +455,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// surfaced as an error rather than silently disabling enforcement.
     fn validate_for_write(&self, issue: &Issue, force: bool) -> Result<WriteValidation> {
         let rules = self.effective_rules()?;
-        let evaluation = crate::validation::evaluate_local(issue, rules)
+        let repo_format = self.repo_content_format()?;
+        let evaluation = crate::validation::evaluate_local(issue, rules, repo_format)
             .map_err(|err| anyhow!("rule evaluation failed: {err}"))?;
 
         let blocking = evaluation.blocking_rules();

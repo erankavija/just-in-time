@@ -316,6 +316,7 @@ mod tests {
         ValidationConfig {
             strictness: None,
             default_type: None,
+            content_format: None,
             require_type_label: None,
             label_regex: None,
             reject_malformed_labels: None,

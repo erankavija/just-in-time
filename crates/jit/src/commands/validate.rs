@@ -210,9 +210,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::validation::rules::Severity;
 
         let ruleset = self.effective_rules()?;
+        let repo_format = self.repo_content_format()?;
         let mut errors: Vec<(String, String)> = Vec::new();
         for issue in issues {
-            let evaluation = crate::validation::evaluate_local(issue, ruleset)
+            let evaluation = crate::validation::evaluate_local(issue, ruleset, repo_format)
                 .map_err(|e| anyhow!("Local rule evaluation failed: {}", e))?;
             for finding in evaluation.findings() {
                 if finding.severity == Severity::Error {
@@ -397,11 +398,13 @@ impl<S: IssueStore> CommandExecutor<S> {
         // it from the same namespace registry the default rules derive from.
         let namespaces = self.cached_namespaces().map_err(|e| anyhow!("{e}"))?;
         let hierarchy = crate::validation::defaults::hierarchy_config(namespaces);
+        let repo_format = self.repo_content_format()?;
 
         Ok(crate::validation::graph::evaluate_graph(
             &graph_rules,
             issues,
             &hierarchy,
+            repo_format,
         ))
     }
 
@@ -440,6 +443,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::validation::report::{ReportedFinding, RuleReport};
 
         let ruleset = self.effective_rules()?;
+        let repo_format = self.repo_content_format()?;
         let issues = self.storage.list_issues()?;
 
         let mut findings: Vec<ReportedFinding> = Vec::new();
@@ -450,7 +454,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 let issue = self.storage.load_issue(partial)?;
 
                 // Local rules for this issue only.
-                let evaluation = crate::validation::evaluate_local(&issue, ruleset)
+                let evaluation = crate::validation::evaluate_local(&issue, ruleset, repo_format)
                     .map_err(|e| anyhow!("Local rule evaluation failed: {}", e))?;
                 findings.extend(
                     evaluation
@@ -479,7 +483,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             None => {
                 // Local rules for every issue.
                 for issue in &issues {
-                    let evaluation = crate::validation::evaluate_local(issue, ruleset)
+                    let evaluation = crate::validation::evaluate_local(issue, ruleset, repo_format)
                         .map_err(|e| anyhow!("Local rule evaluation failed: {}", e))?;
                     findings.extend(
                         evaluation
@@ -537,11 +541,12 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::validation::rules::Scope;
 
         let ruleset = self.effective_rules()?;
+        let repo_format = self.repo_content_format()?;
         let issue = self.storage.load_issue(id)?;
         let issues = self.storage.list_issues()?;
 
         // Local findings for this issue, grouped by rule name.
-        let local_eval = crate::validation::evaluate_local(&issue, ruleset)
+        let local_eval = crate::validation::evaluate_local(&issue, ruleset, repo_format)
             .map_err(|e| anyhow!("Local rule evaluation failed: {}", e))?;
         let local_messages = group_messages(
             local_eval

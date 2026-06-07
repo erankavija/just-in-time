@@ -14,7 +14,7 @@ use std::collections::HashSet;
 use std::path::Path;
 
 use jit::config::ValidationConfig;
-use jit::domain::{Issue, LabelNamespace, LabelNamespaces};
+use jit::domain::{ContentFormat, Issue, LabelNamespace, LabelNamespaces};
 use jit::type_hierarchy::HierarchyConfig;
 use jit::validation::defaults::default_ruleset;
 use jit::validation::evaluate_local;
@@ -33,6 +33,7 @@ fn rich_validation() -> ValidationConfig {
     ValidationConfig {
         strictness: Some("loose".to_string()),
         default_type: Some("task".to_string()),
+        content_format: None,
         require_type_label: Some(true),
         label_regex: Some(r"^[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9._-]*$".to_string()),
         reject_malformed_labels: Some(true),
@@ -90,7 +91,8 @@ struct Outcome {
 }
 
 fn local_outcome(rules: &RuleSet, labels: &[&str]) -> Outcome {
-    let eval = evaluate_local(&issue(labels), rules).expect("local evaluation must not error");
+    let eval = evaluate_local(&issue(labels), rules, ContentFormat::Markdown)
+        .expect("local evaluation must not error");
     let errors = eval
         .findings()
         .iter()
@@ -237,8 +239,9 @@ fn parity_graph_warnings_fire_before_and_after_migration() {
     let before_refs: Vec<&_> = before_rules.iter().collect();
     let after_refs: Vec<&_> = after_rules.iter().collect();
 
-    let before_findings = evaluate_graph(&before_refs, &issues, &hierarchy);
-    let after_findings = evaluate_graph(&after_refs, &issues, &hierarchy);
+    let before_findings =
+        evaluate_graph(&before_refs, &issues, &hierarchy, ContentFormat::Markdown);
+    let after_findings = evaluate_graph(&after_refs, &issues, &hierarchy, ContentFormat::Markdown);
 
     // The warnings ACTUALLY FIRE (not empty-set equality).
     let count_rule = |fs: &[jit::validation::graph::GraphFinding], rule: &str| {
@@ -306,7 +309,7 @@ assert = { require-section = { heading = "Goals" } }
     assert_eq!(reloaded.rules.len(), 1);
     assert_eq!(reloaded.rules[0].severity, Severity::Off);
     // An off rule produces no findings even on a non-matching/violating issue.
-    let eval = evaluate_local(&issue(&["type:epic"]), &reloaded).unwrap();
+    let eval = evaluate_local(&issue(&["type:epic"]), &reloaded, ContentFormat::Markdown).unwrap();
     assert!(eval.findings().is_empty(), "off rule must not fire");
 }
 

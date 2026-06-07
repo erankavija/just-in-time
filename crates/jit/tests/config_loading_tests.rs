@@ -104,6 +104,7 @@ warn_strategic_consistency = false
             jit::Priority::Normal,
             Vec::new(),
             vec!["type:task".to_string()],
+            None,
             false,
         )
         .unwrap();

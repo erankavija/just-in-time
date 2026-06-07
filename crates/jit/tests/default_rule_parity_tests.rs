@@ -31,7 +31,7 @@
 //! engine so the assertions are about the rule layer itself.
 
 use jit::config::ValidationConfig;
-use jit::domain::{Issue, LabelNamespace, LabelNamespaces};
+use jit::domain::{ContentFormat, Issue, LabelNamespace, LabelNamespaces};
 use jit::validation::defaults::default_ruleset;
 use jit::validation::evaluate_local;
 use jit::validation::rules::{RuleSet, Severity};
@@ -41,6 +41,7 @@ fn validation() -> ValidationConfig {
     ValidationConfig {
         strictness: None,
         default_type: None,
+        content_format: None,
         require_type_label: None,
         label_regex: None,
         reject_malformed_labels: None,
@@ -73,13 +74,15 @@ fn issue(labels: &[&str]) -> Issue {
 /// Whether evaluating `labels` against `rules` BLOCKS a write (an enforce rule
 /// produced an error finding).
 fn blocks(rules: &RuleSet, labels: &[&str]) -> bool {
-    evaluate_local(&issue(labels), rules).unwrap().is_blocking()
+    evaluate_local(&issue(labels), rules, ContentFormat::Markdown)
+        .unwrap()
+        .is_blocking()
 }
 
 /// Whether evaluating `labels` against `rules` produces any `error`-severity
 /// finding (i.e. would FAIL `jit validate`), regardless of whether it blocks.
 fn fails_validate(rules: &RuleSet, labels: &[&str]) -> bool {
-    evaluate_local(&issue(labels), rules)
+    evaluate_local(&issue(labels), rules, ContentFormat::Markdown)
         .unwrap()
         .findings()
         .iter()
@@ -496,7 +499,7 @@ fn parity_orphan_leaf_and_strategic_consistency_as_default_graph_rules() {
     let issues = vec![orphan_task.clone(), bare_epic.clone()];
 
     let cfg = HierarchyConfig::default();
-    let findings = evaluate_graph(&graph_rules, &issues, &cfg);
+    let findings = evaluate_graph(&graph_rules, &issues, &cfg, ContentFormat::Markdown);
 
     // The orphan-leaf finding is attributed to the task and matches the legacy
     // domain function firing for that issue.

@@ -12,7 +12,10 @@ pub mod parser;
 pub use adapter::{AdapterRegistry, DocFormatAdapter, HtmlAdapter, MarkdownAdapter};
 pub use assets::{Asset, AssetScanner, AssetType};
 pub use link_validator::{InternalLink, LinkType, LinkValidationResult, LinkValidator};
-pub use parser::{slugify_heading, ContentParser, MarkdownContentParser, ParsedContent, Section};
+pub use parser::{
+    content_parser_for, slugify_heading, ContentParser, ContentParserError, MarkdownContentParser,
+    ParsedContent, Section,
+};
 
 #[cfg(feature = "html")]
 pub use parser::HtmlContentParser;

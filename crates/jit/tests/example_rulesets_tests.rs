@@ -15,7 +15,7 @@
 
 use std::path::{Path, PathBuf};
 
-use jit::domain::{DocumentReference, Issue, State};
+use jit::domain::{ContentFormat, DocumentReference, Issue, State};
 use jit::validation::graph::{evaluate_graph, GraphFinding};
 use jit::validation::local::evaluate_local;
 use jit::validation::rules::{Rule, RuleSet, Scope};
@@ -46,7 +46,8 @@ fn graph_rules(set: &RuleSet) -> Vec<&Rule> {
 
 /// Whether a local evaluation surfaced ANY finding (warning or blocking).
 fn has_local_finding(issue: &Issue, set: &RuleSet) -> bool {
-    let eval = evaluate_local(issue, set).expect("local evaluation must not error");
+    let eval = evaluate_local(issue, set, ContentFormat::Markdown)
+        .expect("local evaluation must not error");
     !eval.findings().is_empty()
 }
 
@@ -57,6 +58,7 @@ fn issue_graph_findings(rules: &[&Rule], issues: &[Issue]) -> Vec<GraphFinding> 
         rules,
         issues,
         &jit::type_hierarchy::HierarchyConfig::default(),
+        ContentFormat::Markdown,
     );
     assert!(
         findings.iter().all(|f| !f.is_config_error()),
@@ -121,7 +123,7 @@ fn test_sdd_missing_criteria_section_fails_local() {
     let set = load_example("sdd");
     let mut epic = sdd_compliant_epic();
     epic.description = "## Goals\n\n- ship it\n".to_string();
-    let eval = evaluate_local(&epic, &set).unwrap();
+    let eval = evaluate_local(&epic, &set, ContentFormat::Markdown).unwrap();
     assert!(
         eval.is_blocking(),
         "an epic with no Success Criteria section must be blocked"
@@ -134,7 +136,7 @@ fn test_sdd_malformed_criteria_fail_local() {
     let mut epic = sdd_compliant_epic();
     // No [hard] marker on any item -> violates schemas/spec-body.json.
     epic.description = "## Success Criteria\n\n- just some freeform note\n".to_string();
-    let eval = evaluate_local(&epic, &set).unwrap();
+    let eval = evaluate_local(&epic, &set, ContentFormat::Markdown).unwrap();
     assert!(
         eval.is_blocking(),
         "criteria with no [hard]/[aspirational] marker must be blocked"
@@ -310,7 +312,7 @@ fn test_sdd_missing_requirements_section_fails_local() {
         ## Success Criteria\n\n\
         - [hard] REQ-01: do the thing\n"
         .to_string();
-    let eval = evaluate_local(&epic, &set).unwrap();
+    let eval = evaluate_local(&epic, &set, ContentFormat::Markdown).unwrap();
     assert!(
         eval.is_blocking(),
         "a spec with no Requirements section must be blocked"
@@ -327,7 +329,7 @@ fn test_sdd_missing_scenarios_section_fails_local() {
         ## Success Criteria\n\n\
         - [hard] REQ-01: do the thing\n"
         .to_string();
-    let eval = evaluate_local(&epic, &set).unwrap();
+    let eval = evaluate_local(&epic, &set, ContentFormat::Markdown).unwrap();
     assert!(
         eval.is_blocking(),
         "a spec with no Scenarios section must be blocked"
@@ -346,7 +348,7 @@ fn test_sdd_malformed_requirement_item_fails_local() {
         ## Success Criteria\n\n\
         - [hard] REQ-01: do the thing\n"
         .to_string();
-    let eval = evaluate_local(&epic, &set).unwrap();
+    let eval = evaluate_local(&epic, &set, ContentFormat::Markdown).unwrap();
     assert!(
         eval.is_blocking(),
         "a malformed Requirements item must be blocked"
@@ -365,7 +367,7 @@ fn test_sdd_malformed_scenario_item_fails_local() {
         ## Success Criteria\n\n\
         - [hard] REQ-01: do the thing\n"
         .to_string();
-    let eval = evaluate_local(&epic, &set).unwrap();
+    let eval = evaluate_local(&epic, &set, ContentFormat::Markdown).unwrap();
     assert!(
         eval.is_blocking(),
         "a malformed Scenarios item must be blocked"
@@ -406,7 +408,7 @@ fn test_bug_without_reproduction_fails() {
     let set = load_example("bug-repro");
     let mut bug = Issue::new("crash".to_string(), "## Notes\n\n- it broke\n".to_string());
     bug.labels = vec!["type:bug".to_string()];
-    let eval = evaluate_local(&bug, &set).unwrap();
+    let eval = evaluate_local(&bug, &set, ContentFormat::Markdown).unwrap();
     assert!(
         eval.is_blocking(),
         "a bug with no Reproduction section must be blocked"
@@ -442,7 +444,7 @@ fn test_release_without_notes_doc_fails_local() {
     let set = load_example("release-checklist");
     let mut release = release_with_notes_doc();
     release.documents.clear();
-    let eval = evaluate_local(&release, &set).unwrap();
+    let eval = evaluate_local(&release, &set, ContentFormat::Markdown).unwrap();
     assert!(
         eval.is_blocking(),
         "a release with no release-notes document must be blocked"

@@ -16,6 +16,7 @@ fn test_breakdown_replaces_type_label_with_child_type() {
             Priority::Normal,
             vec![],
             vec!["type:story".to_string(), "epic:security".to_string()],
+            None,
             false,
         )
         .unwrap();
@@ -71,6 +72,7 @@ fn test_breakdown_preserves_non_type_labels() {
                 "milestone:v1.0".to_string(),
                 "component:backend".to_string(),
             ],
+            None,
             false,
         )
         .unwrap();
@@ -108,6 +110,7 @@ fn test_breakdown_works_with_custom_types() {
             Priority::Normal,
             vec![],
             vec!["type:feature".to_string()],
+            None,
             false,
         )
         .unwrap();
@@ -141,6 +144,7 @@ fn test_breakdown_no_gates_by_default() {
             Priority::Normal,
             vec!["tests".to_string(), "code-review".to_string()],
             vec!["type:story".to_string()],
+            None,
             false,
         )
         .unwrap();
@@ -178,6 +182,7 @@ fn test_breakdown_with_gate_preset() {
             Priority::Normal,
             vec![],
             vec!["type:story".to_string()],
+            None,
             false,
         )
         .unwrap();
@@ -246,6 +251,7 @@ fn test_breakdown_with_inherit_gates() {
             Priority::Normal,
             vec!["tests".to_string(), "clippy".to_string()],
             vec!["type:story".to_string()],
+            None,
             false,
         )
         .unwrap();
@@ -292,6 +298,7 @@ fn test_breakdown_with_nonexistent_preset_fails() {
             Priority::Normal,
             vec![],
             vec!["type:story".to_string()],
+            None,
             false,
         )
         .unwrap();

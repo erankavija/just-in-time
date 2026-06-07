@@ -37,8 +37,8 @@
 
 use std::collections::BTreeSet;
 
-use crate::document::MarkdownContentParser;
-use crate::domain::{project, Issue};
+use crate::document::content_parser_for;
+use crate::domain::{project, ContentFormat, Issue};
 use crate::graph::DependencyGraph;
 use crate::type_hierarchy::{
     validate_orphans, validate_strategic_labels, HierarchyConfig, ValidationWarning,
@@ -101,7 +101,7 @@ pub enum ChildLink {
 /// # Examples
 ///
 /// ```
-/// use jit::domain::Issue;
+/// use jit::domain::{ContentFormat, Issue};
 /// use jit::type_hierarchy::HierarchyConfig;
 /// use jit::validation::graph::{evaluate_graph, GraphFinding};
 /// use jit::validation::rules::RuleSet;
@@ -121,7 +121,7 @@ pub enum ChildLink {
 /// task.labels = vec!["type:task".into()];
 /// let task_id = task.id.clone();
 /// let findings: Vec<GraphFinding> =
-///     evaluate_graph(&rules, &[task], &HierarchyConfig::default());
+///     evaluate_graph(&rules, &[task], &HierarchyConfig::default(), ContentFormat::Markdown);
 /// assert_eq!(findings.len(), 1);
 /// // The finding is attributed to the offending issue, not parsed from text.
 /// assert_eq!(findings[0].issue_id.as_deref(), Some(task_id.as_str()));
@@ -260,29 +260,50 @@ impl ChildLink {
 /// let mut task = Issue::new("a task".into(), String::new());
 /// task.labels = vec!["type:task".into()];
 /// // No design dependency -> one finding, attributed to the task.
-/// let findings = evaluate_graph(&rules, &[task], &HierarchyConfig::default());
+/// let findings = evaluate_graph(
+///     &rules,
+///     &[task],
+///     &HierarchyConfig::default(),
+///     jit::domain::ContentFormat::Markdown,
+/// );
 /// assert_eq!(findings.len(), 1);
 /// assert_eq!(findings[0].finding.rule, "task-needs-design-dep");
 /// ```
 ///
 /// The repo's [`HierarchyConfig`] is injected here (not stored in the parsed
 /// rule) and passed to any `type-hierarchy` rule during evaluation.
+///
+/// `repo_default_format` is the repo-level default content format used to parse
+/// a source issue's criteria section (a `label-coverage` rule) when the issue
+/// carries no per-issue `content_format`. The same
+/// [`content_parser_for`](crate::document::content_parser_for) selector the write
+/// path uses is applied here, so HTML/XML sources are parsed consistently. A
+/// selected format whose parser feature is not compiled surfaces as a
+/// config-error finding on the source issue (no silent Markdown fallback).
 pub fn evaluate_graph(
     rules: &[&Rule],
     issues: &[Issue],
     hierarchy: &HierarchyConfig,
+    repo_default_format: ContentFormat,
 ) -> Vec<GraphFinding> {
     rules
         .iter()
         .filter(|rule| rule.scope == Scope::Graph && rule.severity != Severity::Off)
-        .flat_map(|rule| evaluate_one(rule, issues, hierarchy))
+        .flat_map(|rule| evaluate_one(rule, issues, hierarchy, repo_default_format))
         .collect()
 }
 
 /// Evaluate a single graph rule, dispatching on its assertion kind.
-fn evaluate_one(rule: &Rule, issues: &[Issue], hierarchy: &HierarchyConfig) -> Vec<GraphFinding> {
+fn evaluate_one(
+    rule: &Rule,
+    issues: &[Issue],
+    hierarchy: &HierarchyConfig,
+    repo_default_format: ContentFormat,
+) -> Vec<GraphFinding> {
     match &rule.assert {
-        Assertion::LabelCoverage { config } => evaluate_label_coverage(rule, config, issues),
+        Assertion::LabelCoverage { config } => {
+            evaluate_label_coverage(rule, config, issues, repo_default_format)
+        }
         Assertion::LabelReference { config } => evaluate_label_reference(rule, config, issues),
         Assertion::DependencyShape { config } => evaluate_dependency_shape(rule, config, issues),
         Assertion::TypeHierarchy { kind } => {
@@ -378,6 +399,7 @@ fn evaluate_label_coverage(
     rule: &Rule,
     config: &toml::value::Table,
     issues: &[Issue],
+    repo_default_format: ContentFormat,
 ) -> Vec<GraphFinding> {
     // --- Interpret config (any error short-circuits to one config-error). ---
     let section_slug =
@@ -448,7 +470,19 @@ fn evaluate_label_coverage(
         .iter()
         .filter(|source| rule.when.matches(source))
         .flat_map(|source| {
-            let criteria = criterion_ids(source, section_slug, marker, &id_pattern);
+            // Select the parser per source issue (content_format -> repo default
+            // -> Markdown). A feature-not-compiled selection surfaces as a single
+            // config-error finding on the source rather than parsing wrongly.
+            let criteria = match criterion_ids(
+                source,
+                section_slug,
+                marker,
+                &id_pattern,
+                repo_default_format,
+            ) {
+                Ok(ids) => ids,
+                Err(err) => return vec![config_error(rule, err.to_string())],
+            };
             let candidates: Vec<&Issue> = children_of(source, issues, child_link);
             criteria
                 .into_iter()
@@ -487,28 +521,37 @@ fn describe_link(link: ChildLink) -> &'static str {
 /// For each list item, if `marker` is set the item must start with it; the first
 /// match of `id_pattern` in the item text is the criterion id. Ids are returned
 /// de-duplicated in first-seen order.
+///
+/// The body is parsed with the [`ContentParser`](crate::document::ContentParser)
+/// selected by [`content_parser_for`]: the source's own `content_format` → else
+/// `repo_default_format` → else Markdown. A selected format whose parser feature
+/// is not compiled returns
+/// [`ContentParserError`](crate::document::ContentParserError) rather than a
+/// silent Markdown fallback, so the caller can surface it as a finding.
 fn criterion_ids(
     source: &Issue,
     section_slug: &str,
     marker: Option<&str>,
     id_pattern: &regex::Regex,
-) -> Vec<String> {
-    let projection = project(source).with_sections(&source.description, &MarkdownContentParser);
+    repo_default_format: ContentFormat,
+) -> Result<Vec<String>, crate::document::ContentParserError> {
+    let parser = content_parser_for(source.content_format, repo_default_format)?;
+    let projection = project(source).with_sections(&source.description, parser.as_ref());
     let Some(sections) = projection.sections else {
-        return Vec::new();
+        return Ok(Vec::new());
     };
     let Some(section) = sections.get(section_slug) else {
-        return Vec::new();
+        return Ok(Vec::new());
     };
 
     let mut seen = BTreeSet::new();
-    section
+    Ok(section
         .items
         .iter()
         .filter(|item| marker.is_none_or(|m| item.trim_start().starts_with(m)))
         .filter_map(|item| id_pattern.find(item).map(|m| m.as_str().to_string()))
         .filter(|id| seen.insert(id.clone()))
-        .collect()
+        .collect())
 }
 
 /// The candidate child issues for a source under the given link semantics.
@@ -852,7 +895,12 @@ mod tests {
         child.state = State::Done;
 
         let rules = vec![&rule];
-        let findings = evaluate_graph(&rules, &[epic, child], &HierarchyConfig::default());
+        let findings = evaluate_graph(
+            &rules,
+            &[epic, child],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+        );
         assert!(findings.is_empty(), "covered criterion: {findings:?}");
     }
 
@@ -865,7 +913,12 @@ mod tests {
         child.state = State::Done;
 
         let rules = vec![&rule];
-        let findings = evaluate_graph(&rules, &[epic, child], &HierarchyConfig::default());
+        let findings = evaluate_graph(
+            &rules,
+            &[epic, child],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+        );
         // REQ-02 is uncovered.
         assert_eq!(findings.len(), 1);
         assert!(findings[0].finding.message.contains("REQ-02"));
@@ -882,7 +935,12 @@ mod tests {
         child.state = State::InProgress; // not done
 
         let rules = vec![&rule];
-        let findings = evaluate_graph(&rules, &[epic, child], &HierarchyConfig::default());
+        let findings = evaluate_graph(
+            &rules,
+            &[epic, child],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+        );
         assert_eq!(findings.len(), 1, "wrong-state child does not cover");
     }
 
@@ -897,7 +955,12 @@ mod tests {
         child.dependencies = vec![epic.id.clone()];
 
         let rules = vec![&rule];
-        let findings = evaluate_graph(&rules, &[epic, child], &HierarchyConfig::default());
+        let findings = evaluate_graph(
+            &rules,
+            &[epic, child],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+        );
         assert!(
             findings.is_empty(),
             "aspirational criterion must not be required: {findings:?}"
@@ -912,7 +975,12 @@ mod tests {
         let child = issue("child", &["satisfies:REQ-01"]);
 
         let rules = vec![&rule];
-        let findings = evaluate_graph(&rules, &[epic, child], &HierarchyConfig::default());
+        let findings = evaluate_graph(
+            &rules,
+            &[epic, child],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+        );
         assert!(findings.is_empty(), "any link covers regardless of edges");
     }
 
@@ -921,7 +989,12 @@ mod tests {
         let rule = coverage_rule("child-link = \"bogus\"");
         let epic = epic_with_criteria(&["REQ-01"]);
         let rules = vec![&rule];
-        let findings = evaluate_graph(&rules, &[epic], &HierarchyConfig::default());
+        let findings = evaluate_graph(
+            &rules,
+            &[epic],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+        );
         assert_eq!(findings.len(), 1);
         assert!(findings[0].finding.message.contains("config error"));
         assert!(findings[0].finding.message.contains("child-link"));
@@ -942,7 +1015,12 @@ mod tests {
         let source = issue("epic", &["req:REQ-01"]);
         let child = issue("child", &["satisfies:REQ-01"]);
         let rules = vec![&rule];
-        let findings = evaluate_graph(&rules, &[source, child], &HierarchyConfig::default());
+        let findings = evaluate_graph(
+            &rules,
+            &[source, child],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+        );
         assert!(findings.is_empty(), "resolved reference: {findings:?}");
     }
 
@@ -952,7 +1030,12 @@ mod tests {
         let source = issue("epic", &["req:REQ-01"]);
         let child = issue("child", &["satisfies:REQ-99"]); // no req:REQ-99 anywhere
         let rules = vec![&rule];
-        let findings = evaluate_graph(&rules, &[source, child], &HierarchyConfig::default());
+        let findings = evaluate_graph(
+            &rules,
+            &[source, child],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+        );
         assert_eq!(findings.len(), 1);
         assert!(findings[0].finding.message.contains("REQ-99"));
         assert_eq!(findings[0].finding.severity, Severity::Warn);
@@ -965,14 +1048,24 @@ mod tests {
         let declarer = issue("epic", &["req:REQ-01"]);
         let child = issue("child", &["satisfies:REQ-01"]); // no dependency edge
         let rules = vec![&rule];
-        let findings = evaluate_graph(&rules, &[declarer, child], &HierarchyConfig::default());
+        let findings = evaluate_graph(
+            &rules,
+            &[declarer, child],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+        );
         assert_eq!(findings.len(), 1, "linked scope: unlinked source dangles");
 
         // Now add the edge: the reference resolves.
         let declarer = issue("epic", &["req:REQ-01"]);
         let mut child = issue("child", &["satisfies:REQ-01"]);
         child.dependencies = vec![declarer.id.clone()];
-        let findings = evaluate_graph(&rules, &[declarer, child], &HierarchyConfig::default());
+        let findings = evaluate_graph(
+            &rules,
+            &[declarer, child],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+        );
         assert!(findings.is_empty(), "linked edge resolves: {findings:?}");
     }
 
@@ -984,6 +1077,7 @@ mod tests {
             &rules,
             &[issue("x", &["satisfies:REQ-01"])],
             &HierarchyConfig::default(),
+            ContentFormat::Markdown,
         );
         assert_eq!(findings.len(), 1);
         assert!(findings[0].finding.message.contains("config error"));
@@ -1006,7 +1100,12 @@ mod tests {
         let mut task = issue("task", &["type:task"]);
         task.dependencies = vec![design.id.clone()];
         let rules = vec![&rule];
-        let findings = evaluate_graph(&rules, &[design, task], &HierarchyConfig::default());
+        let findings = evaluate_graph(
+            &rules,
+            &[design, task],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+        );
         assert!(findings.is_empty(), "task depends on design: {findings:?}");
     }
 
@@ -1016,7 +1115,12 @@ mod tests {
         let design = issue("design", &["type:design"]);
         let task = issue("task", &["type:task"]); // no dependency
         let rules = vec![&rule];
-        let findings = evaluate_graph(&rules, &[design, task], &HierarchyConfig::default());
+        let findings = evaluate_graph(
+            &rules,
+            &[design, task],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+        );
         assert_eq!(findings.len(), 1);
         assert!(findings[0].finding.message.contains("depend"));
         assert_eq!(findings[0].finding.rule, "shape");
@@ -1037,12 +1141,18 @@ mod tests {
             &rules,
             &[design.clone(), mid.clone(), task.clone()],
             &HierarchyConfig::default(),
+            ContentFormat::Markdown,
         );
         assert_eq!(findings.len(), 1, "direct-only must not see transitive dep");
 
         let trans = shape_rule("target = { type = \"design\" }, transitive = true");
         let rules = vec![&trans];
-        let findings = evaluate_graph(&rules, &[design, mid, task], &HierarchyConfig::default());
+        let findings = evaluate_graph(
+            &rules,
+            &[design, mid, task],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+        );
         assert!(
             findings.is_empty(),
             "transitive dep satisfies: {findings:?}"
@@ -1057,6 +1167,7 @@ mod tests {
             &rules,
             &[issue("task", &["type:task"])],
             &HierarchyConfig::default(),
+            ContentFormat::Markdown,
         );
         assert_eq!(findings.len(), 1);
         assert!(findings[0].finding.message.contains("config error"));
@@ -1081,6 +1192,7 @@ mod tests {
             &rules,
             &[issue("task", &["type:task"])],
             &HierarchyConfig::default(),
+            ContentFormat::Markdown,
         );
         assert!(findings.is_empty(), "local + off rules produce nothing");
     }
@@ -1102,6 +1214,7 @@ mod tests {
             &rules,
             std::slice::from_ref(&task),
             &HierarchyConfig::default(),
+            ContentFormat::Markdown,
         );
         assert_eq!(findings.len(), 1, "orphan leaf must fire: {findings:?}");
         assert_eq!(findings[0].finding.rule, "default:orphan-leaf");

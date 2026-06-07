@@ -97,6 +97,53 @@ impl FromStr for Priority {
     }
 }
 
+/// The content format of an issue body, selecting which [`ContentParser`] the
+/// validation projection uses to extract `sections`.
+///
+/// Serialized lowercase (`"markdown"`, `"html"`, `"xml"`) so issue JSON stays
+/// human-readable. When absent on an issue the repo default
+/// (`[validation].content_format`) applies; the final fallback is `Markdown`,
+/// which is always compiled in. HTML/XML are only usable when the `html`/`xml`
+/// cargo features are built (see
+/// [`content_parser_for`](crate::document::content_parser_for)).
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::ContentFormat;
+/// use std::str::FromStr;
+///
+/// assert_eq!(ContentFormat::from_str("html").unwrap(), ContentFormat::Html);
+/// assert_eq!(serde_json::to_string(&ContentFormat::Xml).unwrap(), "\"xml\"");
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ContentFormat {
+    /// Markdown body (the default; always available).
+    #[default]
+    Markdown,
+    /// HTML body (requires the `html` cargo feature to parse).
+    Html,
+    /// XML body (requires the `xml` cargo feature to parse).
+    Xml,
+}
+
+impl FromStr for ContentFormat {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        match s.to_lowercase().as_str() {
+            "markdown" | "md" => Ok(ContentFormat::Markdown),
+            "html" => Ok(ContentFormat::Html),
+            "xml" => Ok(ContentFormat::Xml),
+            _ => Err(anyhow!(
+                "Invalid content format: '{}' (expected markdown, html, or xml)",
+                s
+            )),
+        }
+    }
+}
+
 /// Quality gate status
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -147,6 +194,13 @@ pub struct Issue {
     pub documents: Vec<DocumentReference>,
     /// Labels for categorization and hierarchy (format: "namespace:value")
     pub labels: Vec<String>,
+    /// Content format of the `description` body, selecting the parser used to
+    /// extract `sections` during validation. Absent (`None`) means inherit the
+    /// repo default (`[validation].content_format`), with a Markdown fallback.
+    /// Existing issue files without this field deserialize as `None` and are NOT
+    /// rewritten (skipped on serialize when absent).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content_format: Option<ContentFormat>,
     /// RFC 3339 timestamp when issue was created
     pub created_at: String,
     /// RFC 3339 timestamp when issue was last updated
@@ -170,6 +224,7 @@ impl Issue {
             context: HashMap::new(),
             documents: Vec::new(),
             labels: Vec::new(),
+            content_format: None,
             created_at: now.clone(),
             updated_at: now,
         }
@@ -200,6 +255,7 @@ impl Issue {
             context: HashMap::new(),
             documents: Vec::new(),
             labels,
+            content_format: None,
             created_at: now.clone(),
             updated_at: now,
         }
