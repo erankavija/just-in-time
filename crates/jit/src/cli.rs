@@ -159,8 +159,17 @@ pub enum Commands {
 
     /// Validate repository integrity
     Validate {
+        /// Issue id to validate (runs local + graph rules for this issue only).
+        /// When omitted, validates the whole repository.
+        id: Option<String>,
+
         #[arg(long)]
         json: bool,
+
+        /// Explain rule outcomes for the issue: which rules matched and whether
+        /// each passed or failed (requires an issue id)
+        #[arg(long)]
+        explain: bool,
 
         /// Attempt to automatically fix validation issues
         #[arg(long)]
