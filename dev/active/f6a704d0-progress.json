@@ -1,7 +1,7 @@
 {
   "epic_id": "f6a704d0-1f01-447b-a8aa-42251fa7c3eb",
   "epic_short_id": "f6a704d0",
-  "current_wave": 6,
+  "current_wave": 7,
   "waves": [
     {
       "wave_number": 1,
@@ -106,7 +106,7 @@
           "short_id": "a6daa05d",
           "title": "SDD example rules, schemas, and documentation",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         }
       ]
     },
