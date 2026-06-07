@@ -97,24 +97,28 @@ severity = "error"
 assert = { label-coverage = { criteria-section = "success_criteria", marker = "[hard]", id-pattern = "REQ-[0-9]+", satisfies-namespace = "satisfies", child-state = "done", child-link = "dependents" } }
 
 # --- Graph: every satisfies: reference resolves to a declared req: ----------
-# Reference integrity. A child claiming `satisfies:REQ-09` is dangling unless
-# some issue declares `req:REQ-09`. Warn (not error) so a typo surfaces without
-# blocking the whole validate run.
+# Reference integrity within the epic's own dependency graph. A child claiming
+# `satisfies:REQ-09` is dangling unless an issue LINKED to it (its epic, via a
+# dependency edge) declares `req:REQ-09`. `scope = "linked"` keeps resolution
+# inside the epic/child graph so a child cannot accidentally satisfy some
+# unrelated epic's identically-numbered requirement. Warn (not error) so a typo
+# surfaces without blocking the whole validate run.
 [[rules]]
 name = "sdd-satisfies-references-a-req"
 when = { label = "satisfies:*" }
 severity = "warn"
-assert = { label-reference = { from = "satisfies", to = "req", scope = "global" } }
+assert = { label-reference = { from = "satisfies", to = "req", scope = "linked" } }
 
 # --- Graph: every declared req: is actually used by a satisfies: -------------
 # Stray-label / derivation integrity (the INVERSE of the rule above). A `req:`
 # label is meant to be DERIVED from a canonical criterion and then implemented by
-# a child. If an epic declares `req:REQ-77` that NO child satisfies, the label is
-# stray or invented — exactly the "criteria are canonical, labels derived"
-# violation. Reported as an error so a fabricated `req:` cannot float free.
-# `scope = "global"` so the satisfying child can live anywhere in the repository.
+# a child. If an epic declares `req:REQ-77` that NO linked child satisfies, the
+# label is stray or invented — exactly the "criteria are canonical, labels
+# derived" violation. Reported as an error so a fabricated `req:` cannot float
+# free. `scope = "linked"` resolves only within the epic's own dependency graph,
+# so an unrelated issue elsewhere carrying `satisfies:REQ-77` does NOT count.
 [[rules]]
 name = "sdd-req-is-satisfied"
 when = { label = "req:*" }
 severity = "error"
-assert = { label-reference = { from = "req", to = "satisfies", scope = "global" } }
+assert = { label-reference = { from = "req", to = "satisfies", scope = "linked" } }

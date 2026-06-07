@@ -245,6 +245,32 @@ fn test_sdd_graph_stray_req_label_is_reported() {
 }
 
 #[test]
+fn test_sdd_graph_req_resolution_is_scoped_to_linked_graph() {
+    // `scope = "linked"`: an epic's `req:REQ-01` is NOT satisfied by a
+    // `satisfies:REQ-01` on an UNRELATED issue (no dependency edge to the epic).
+    // Cross-epic matches must not count, so the stray-req rule still fires.
+    let set = load_example("sdd");
+    let rules = graph_rules(&set);
+
+    let epic = sdd_compliant_epic(); // declares req:REQ-01
+
+    // An unrelated issue satisfies REQ-01 but is NOT linked to this epic.
+    let mut unrelated = Issue::new("unrelated".to_string(), String::new());
+    unrelated.labels = vec!["type:task".to_string(), "satisfies:REQ-01".to_string()];
+    unrelated.state = State::Done;
+    // deliberately NO dependency edge to the epic
+
+    let findings = issue_graph_findings(&rules, &[epic, unrelated]);
+    assert!(
+        findings
+            .iter()
+            .any(|f| f.finding.rule == "sdd-req-is-satisfied"
+                && f.finding.message.contains("REQ-01")),
+        "under linked scope an unrelated satisfies: must NOT resolve the epic's req: {findings:?}"
+    );
+}
+
+#[test]
 fn test_sdd_graph_missing_req_surfaces_via_coverage_chain() {
     // Finding 1 (other direction): a [hard] criterion for which NO `req:` is
     // declared and NO child satisfies it surfaces through the criteria -> satisfies
