@@ -293,13 +293,47 @@ fn run() -> Result<()> {
                 eprintln!("Warning: Could not set up .gitattributes: {}", e);
             }
 
-            // Write config.toml only when it did not already exist (idempotent)
+            // The chosen template defines both the on-disk config.toml (post-
+            // migration shape) AND the in-code intended defaults that drive a
+            // fresh repo's complete rules.toml (decision D6).
+            let chosen = template
+                .as_ref()
+                .cloned()
+                .unwrap_or_else(jit::hierarchy_templates::HierarchyTemplate::default);
+
+            // Write config.toml only when it did not already exist (idempotent).
             if !config_already_existed {
-                let chosen = template
-                    .as_ref()
-                    .cloned()
-                    .unwrap_or_else(jit::hierarchy_templates::HierarchyTemplate::default);
                 std::fs::write(&config_path, chosen.generate_config_toml())?;
+            }
+
+            // Scaffold .jit/rules.toml as the operative single source of truth, or
+            // migrate an existing repo's legacy `[validation]` / `[namespaces].
+            // {values,pattern,required}` enforcement keys into it (stripping them
+            // from config.toml). A FRESH repo writes the complete ruleset DIRECTLY
+            // from the in-code intended defaults (no strip cycle, no migration
+            // message, no warning); a LEGACY repo migrates+strips; a repo already
+            // migrated is a true no-op. See `MigrationState`.
+            use jit::validation::migration::MigrationState;
+            let fresh_defaults = chosen.intended_default_config();
+            let migration = executor.migrate_or_scaffold_rules(&fresh_defaults)?;
+            for skipped in &migration.skipped_existing {
+                let _ = output_ctx.print_warning(format!(
+                    "Skipped migrating rule '{skipped}': a rule with that name already exists in \
+                     .jit/rules.toml"
+                ));
+            }
+            match migration.state {
+                MigrationState::FreshScaffold => {
+                    let _ = output_ctx.print_success("Scaffolded .jit/rules.toml");
+                }
+                MigrationState::LegacyMigrated | MigrationState::Coexistence => {
+                    let _ = output_ctx.print_success(format!(
+                        "Migrated {} legacy validation key(s) into .jit/rules.toml: {}",
+                        migration.stripped_keys.len(),
+                        migration.stripped_keys.join(", ")
+                    ));
+                }
+                MigrationState::AlreadyMigrated => {}
             }
 
             if let Some(ref t) = template {

@@ -495,11 +495,11 @@ fn parity_orphan_leaf_and_strategic_consistency_as_default_graph_rules() {
     let bare_epic = issue(&["type:epic"]); // strategic, no epic:* label
     let issues = vec![orphan_task.clone(), bare_epic.clone()];
 
-    let findings = evaluate_graph(&graph_rules, &issues);
+    let cfg = HierarchyConfig::default();
+    let findings = evaluate_graph(&graph_rules, &issues, &cfg);
 
     // The orphan-leaf finding is attributed to the task and matches the legacy
     // domain function firing for that issue.
-    let cfg = HierarchyConfig::default();
     assert_eq!(validate_orphans(&cfg, &orphan_task).len(), 1);
     let orphan_findings: Vec<_> = findings
         .iter()

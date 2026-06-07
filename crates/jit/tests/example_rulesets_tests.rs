@@ -53,7 +53,11 @@ fn has_local_finding(issue: &Issue, set: &RuleSet) -> bool {
 /// Graph findings attributable to a real issue (config errors would have
 /// `issue_id == None` and must never appear for a valid example).
 fn issue_graph_findings(rules: &[&Rule], issues: &[Issue]) -> Vec<GraphFinding> {
-    let findings = evaluate_graph(rules, issues);
+    let findings = evaluate_graph(
+        rules,
+        issues,
+        &jit::type_hierarchy::HierarchyConfig::default(),
+    );
     assert!(
         findings.iter().all(|f| !f.is_config_error()),
         "example graph rules must not produce config errors: {findings:?}"

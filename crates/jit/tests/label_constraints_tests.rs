@@ -264,18 +264,28 @@ fn test_config_show_json_includes_namespace_registry() {
     let namespaces = parsed
         .get("namespaces")
         .expect("namespaces key present in config show --json output");
+    // The registry is still exposed (description/unique stay in config.toml).
     let type_ns = namespaces.get("type").expect("type namespace exposed");
-    assert_eq!(type_ns["required"], serde_json::json!(true));
-    assert!(type_ns["values"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .any(|v| v == "task"));
-    let ms_pattern = namespaces["milestone"]["pattern"].as_str().unwrap();
+    assert_eq!(type_ns["unique"], serde_json::json!(true));
+    assert!(namespaces.get("milestone").is_some());
+
+    // Post-migration (0abaddc0): the per-namespace `values` / `pattern` /
+    // `required` constraints are migrated OUT of config.toml into the default
+    // rules in `.jit/rules.toml`, so they are no longer surfaced by
+    // `config show`. They now live as `default:namespace-*` rules instead.
+    let rules_toml = std::fs::read_to_string(temp.path().join(".jit/rules.toml"))
+        .expect("rules.toml scaffolded");
     assert!(
-        ms_pattern.contains(r"\d"),
-        "pattern looks wrong: {}",
-        ms_pattern
+        rules_toml.contains("default:namespace-values:type"),
+        "type values must migrate to a default rule: {rules_toml}"
+    );
+    assert!(
+        rules_toml.contains("default:namespace-required:type"),
+        "type required must migrate to a default rule"
+    );
+    assert!(
+        rules_toml.contains("default:namespace-pattern:milestone"),
+        "milestone pattern must migrate to a default rule"
     );
 }
 

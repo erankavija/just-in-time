@@ -341,14 +341,14 @@ pub fn default_ruleset(validation: &ValidationConfig, namespaces: &LabelNamespac
     // derived from the same namespace registry the rest of the defaults use, so a
     // repo with no `[type_hierarchy]` falls back to the default 4-level set —
     // exactly as the legacy `HierarchyConfig::default()` fallback did.
-    let hierarchy = hierarchy_config(namespaces);
+    // The repo `HierarchyConfig` is no longer stored in the assertion; the graph
+    // evaluator injects it at evaluation time (see `evaluate_graph`).
     if validation.warn_orphaned_leaves.unwrap_or(true) {
         rules.push(graph_rule(
             "default:orphan-leaf",
             Severity::Warn,
             Assertion::TypeHierarchy {
                 kind: TypeHierarchyKind::OrphanLeaf,
-                config: hierarchy.clone(),
             },
         ));
     }
@@ -358,7 +358,6 @@ pub fn default_ruleset(validation: &ValidationConfig, namespaces: &LabelNamespac
             Severity::Warn,
             Assertion::TypeHierarchy {
                 kind: TypeHierarchyKind::StrategicConsistency,
-                config: hierarchy,
             },
         ));
     }
@@ -376,7 +375,11 @@ pub fn default_ruleset(validation: &ValidationConfig, namespaces: &LabelNamespac
 /// configured — carried through to [`LabelNamespaces::type_hierarchy`]. On the
 /// impossible case of a malformed hierarchy (empty type name / level 0), it falls
 /// back to the default rather than panicking, keeping this total.
-fn hierarchy_config(namespaces: &LabelNamespaces) -> HierarchyConfig {
+///
+/// Exposed `pub(crate)` so the graph-rule evaluation call site
+/// (`CommandExecutor::evaluate_graph_rules`) can build the same repo
+/// [`HierarchyConfig`] to inject into `type-hierarchy` rules (D1).
+pub(crate) fn hierarchy_config(namespaces: &LabelNamespaces) -> HierarchyConfig {
     match &namespaces.type_hierarchy {
         // Explicit hierarchy: use its types + associations (legacy `Some` branch).
         Some(types) => {

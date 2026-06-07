@@ -424,10 +424,95 @@ impl JitConfig {
         let content =
             std::fs::read_to_string(&config_path).context("Failed to read config.toml")?;
 
+        // Pre-parse scan for DEPRECATED enforcement keys (DR §8.4, decision D7).
+        // These keys were migrated into `.jit/rules.toml` by `jit init` and
+        // stripped from `config.toml`; a config still carrying them (e.g.
+        // git-synced from an older version) is stale. We must NOT add
+        // `#[serde(deny_unknown_fields)]` (serde already ignores the removed
+        // keys, so the config keeps parsing) — we WARN and prompt a re-run so the
+        // migration actually happens. Best-effort: a deprecated key never
+        // hard-errors here.
+        warn_on_deprecated_keys(&content);
+
         let config: JitConfig = toml::from_str(&content).context("Failed to parse config.toml")?;
 
         Ok(config)
     }
+}
+
+/// The deprecated `[validation]` ENFORCEMENT keys that `jit init` migrates into
+/// `.jit/rules.toml` and strips from `config.toml` (DR §8.3/§8.4, decision D7).
+///
+/// These are exactly the six enforcement keys re-expressed as default rules.
+/// Deliberately NOT listed (they remain LIVE `[validation]` keys per the
+/// 2026-06-07 amendment): `default_type` (behavioral, read at issue creation) and
+/// `strictness` (inert / forward-compat). Both stay in `config.toml` and are
+/// excluded from this warning.
+const DEPRECATED_VALIDATION_KEYS: [&str; 6] = [
+    "require_type_label",
+    "label_regex",
+    "reject_malformed_labels",
+    "enforce_namespace_registry",
+    "warn_orphaned_leaves",
+    "warn_strategic_consistency",
+];
+
+/// The deprecated per-namespace constraint keys (`[namespaces.<ns>]`) that
+/// `jit init` migrates into `.jit/rules.toml` and strips from `config.toml`. The
+/// registry's `description`/`unique`/`examples` keys are NOT deprecated.
+const DEPRECATED_NAMESPACE_KEYS: [&str; 3] = ["values", "pattern", "required"];
+
+/// Scan raw `config.toml` text (pre-parse) for deprecated enforcement keys and
+/// print a one-time migration prompt to stderr when any are present.
+fn warn_on_deprecated_keys(content: &str) {
+    let deprecated = deprecated_keys_in_config(content);
+    if !deprecated.is_empty() {
+        eprintln!(
+            "⚠️  Warning: .jit/config.toml contains deprecated validation key(s) that are no \
+             longer enforced from config: {}.\n   These were replaced by declarative rules in \
+             .jit/rules.toml. Re-run `jit init` to migrate them (the keys will be moved into \
+             rules.toml and removed from config.toml).",
+            deprecated.join(", ")
+        );
+    }
+}
+
+/// Pure detector for deprecated enforcement keys in raw `config.toml` text
+/// (decision D7). Returns the sorted, fully-qualified names of any deprecated
+/// keys present (e.g. `validation.label_regex`, `namespaces.type.values`).
+///
+/// Returns an empty vector for a clean config, or for text that does not parse
+/// as TOML (the caller's typed parse surfaces real syntax errors; this scan is
+/// advisory only and NEVER errors). Kept pure (no I/O, no stderr) so it is
+/// unit-testable and reusable by the migration's key-stripping path.
+pub fn deprecated_keys_in_config(content: &str) -> Vec<String> {
+    let Ok(value) = content.parse::<toml::Value>() else {
+        return Vec::new();
+    };
+    let mut deprecated: Vec<String> = Vec::new();
+
+    if let Some(validation) = value.get("validation").and_then(|v| v.as_table()) {
+        for key in DEPRECATED_VALIDATION_KEYS {
+            if validation.contains_key(key) {
+                deprecated.push(format!("validation.{key}"));
+            }
+        }
+    }
+
+    if let Some(namespaces) = value.get("namespaces").and_then(|v| v.as_table()) {
+        for (ns_name, ns_value) in namespaces {
+            if let Some(ns_table) = ns_value.as_table() {
+                for key in DEPRECATED_NAMESPACE_KEYS {
+                    if ns_table.contains_key(key) {
+                        deprecated.push(format!("namespaces.{ns_name}.{key}"));
+                    }
+                }
+            }
+        }
+    }
+
+    deprecated.sort();
+    deprecated
 }
 
 // ============================================================
@@ -906,6 +991,115 @@ types = { epic = 1, task = 2 }
 
         let result = JitConfig::load(temp_dir.path());
         assert!(result.is_err());
+    }
+
+    // ============================================================
+    // Deprecated-key scan (DR §8.4, decision D7) — warn, never hard-error
+    // ============================================================
+
+    #[test]
+    fn test_deprecated_keys_finds_all_six_validation_enforcement_keys() {
+        let content = r#"
+[validation]
+default_type = "task"
+strictness = "loose"
+require_type_label = true
+label_regex = '^x'
+reject_malformed_labels = true
+enforce_namespace_registry = true
+warn_orphaned_leaves = false
+warn_strategic_consistency = false
+"#;
+        let found = deprecated_keys_in_config(content);
+        // All six enforcement keys are flagged; default_type/strictness are NOT.
+        assert_eq!(
+            found,
+            vec![
+                "validation.enforce_namespace_registry".to_string(),
+                "validation.label_regex".to_string(),
+                "validation.reject_malformed_labels".to_string(),
+                "validation.require_type_label".to_string(),
+                "validation.warn_orphaned_leaves".to_string(),
+                "validation.warn_strategic_consistency".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_deprecated_keys_finds_namespace_constraint_keys() {
+        let content = r#"
+[namespaces.type]
+description = "Issue type"
+unique = true
+values = ["task", "bug"]
+required = true
+
+[namespaces.milestone]
+description = "Release"
+unique = false
+pattern = '^v\d+$'
+"#;
+        let found = deprecated_keys_in_config(content);
+        assert_eq!(
+            found,
+            vec![
+                "namespaces.milestone.pattern".to_string(),
+                "namespaces.type.required".to_string(),
+                "namespaces.type.values".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_deprecated_keys_clean_migrated_config_returns_empty() {
+        // A migrated config keeps only live keys: default_type, strictness, the
+        // namespace registry (description/unique/examples), hierarchy.
+        let content = r#"
+[validation]
+default_type = "task"
+strictness = "loose"
+
+[namespaces.type]
+description = "Issue type"
+unique = true
+examples = ["type:task"]
+"#;
+        assert!(deprecated_keys_in_config(content).is_empty());
+    }
+
+    #[test]
+    fn test_deprecated_keys_ignores_unparseable_toml() {
+        assert!(deprecated_keys_in_config("[broken syntax").is_empty());
+    }
+
+    #[test]
+    fn test_load_config_with_deprecated_keys_warns_but_does_not_error() {
+        // An OLD config carrying removed enforcement keys still loads (no
+        // deny_unknown_fields), parses, and does not error.
+        let temp_dir = TempDir::new().unwrap();
+        let config_toml = r#"
+[validation]
+default_type = "task"
+require_type_label = true
+label_regex = '^[a-z]+:'
+reject_malformed_labels = true
+enforce_namespace_registry = true
+warn_orphaned_leaves = false
+warn_strategic_consistency = false
+
+[namespaces.type]
+description = "Issue type"
+unique = true
+values = ["task", "bug"]
+required = true
+"#;
+        std::fs::write(temp_dir.path().join("config.toml"), config_toml).unwrap();
+
+        let config = JitConfig::load(temp_dir.path()).expect("stale config must still load");
+        // It parsed; the live keys are intact.
+        let validation = config.validation.expect("validation section present");
+        assert_eq!(validation.default_type, Some("task".to_string()));
+        assert!(config.namespaces.is_some());
     }
 
     #[test]
