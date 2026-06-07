@@ -1240,7 +1240,7 @@ enforce_leases = "off"
     }
 
     #[tokio::test]
-    async fn test_get_namespaces_exposes_values_pattern_required() {
+    async fn test_get_namespaces_exposes_taxonomy_only() {
         use jit::storage::{IssueStore, JsonFileStorage};
 
         // A file-backed storage with a config.toml carrying both the taxonomy
