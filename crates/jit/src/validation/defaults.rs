@@ -8,14 +8,18 @@
 //! declarative [`Rule`]s derived from the SAME inputs, so behavior is preserved
 //! (DR §8.3, plan step 8).
 //!
-//! # Composition with user rules
+//! # Role under the file-as-source model (DR §8.2, issue 0abaddc0)
 //!
-//! The default rule set is the BASE ruleset. A user `.jit/rules.toml` is appended
-//! after it (see [`CommandExecutor::effective_rules`](crate::commands::CommandExecutor)),
-//! so user rules extend — and, by being authored later, can add stricter checks
-//! alongside — the defaults. The defaults are derived per-repo from that repo's
-//! own `config.toml`, NOT a fixed static table, because the namespace registry
-//! (allowed values, patterns, uniqueness, required-ness) differs per repo.
+//! `.jit/rules.toml` is the OPERATIVE single source of truth: `jit init`
+//! SERIALIZES this default rule set into that file, after which
+//! [`CommandExecutor::effective_rules`](crate::commands::CommandExecutor) reads the
+//! file alone (the `default:*` rules then live in the file and are user-editable).
+//! This function is therefore used for (a) generating the scaffolded/migrated
+//! `rules.toml`, and (b) a TRANSIENT bootstrap fallback when no `rules.toml` exists
+//! yet — it is NOT concatenated with the user file. The defaults are derived
+//! per-repo from that repo's `config.toml`, NOT a fixed static table, because the
+//! namespace registry (allowed values, patterns, uniqueness, required-ness) differs
+//! per repo.
 //!
 //! # Enforcement parity (DR §7.2, §8.3)
 //!
@@ -74,7 +78,9 @@ const CANONICAL_LABEL_REGEX: &str = r"^[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9._-]
 /// allowed-values / value-pattern / uniqueness / required constraints) as
 /// declarative [`Rule`]s, each carrying an `enforce` flag matching the legacy
 /// reject-vs-warn behavior (see the module docs). Rule names are stable and
-/// prefixed `default:` so they never collide with user rule names.
+/// prefixed `default:`; they are serialized into `rules.toml` under those names
+/// and are user-editable there (the former `default:` name reservation was removed
+/// when the file became the operative source).
 ///
 /// This is a pure function of its inputs: no I/O, deterministic, and total — a
 /// malformed value (e.g. a regex that cannot compile) is not rejected here; the
