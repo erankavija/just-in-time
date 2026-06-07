@@ -626,14 +626,29 @@ mod tests {
     }
 
     #[test]
-    fn test_namespace_registry_blocks_when_enforce_on() {
-        // `enforce_namespace_registry = true` -> the registry rule blocks a write
-        // for an unknown namespace.
-        let mut validation = empty_validation();
-        validation.enforce_namespace_registry = Some(true);
+    fn test_namespace_registry_blocks_only_when_both_flags_on() {
+        // Legacy parity: the registry write-path block fired only when BOTH
+        // `enforce_namespace_registry` AND `reject_malformed_labels` were true
+        // (the legacy check returned early without the former and only warned
+        // without the latter).
         let reg = registry(vec![("type", LabelNamespace::new("Type", true))]);
-        let rules = default_ruleset(&validation, &reg);
 
+        // enforce on, reject off -> warns (does not block).
+        let mut one_flag = empty_validation();
+        one_flag.enforce_namespace_registry = Some(true);
+        one_flag.reject_malformed_labels = Some(false);
+        let rules = default_ruleset(&one_flag, &reg);
+        let eval = evaluate_local(&issue_with(&["unknown:x"]), &rules).unwrap();
+        assert!(
+            !eval.is_blocking(),
+            "registry must not block a write without reject_malformed_labels"
+        );
+
+        // both on -> blocks.
+        let mut both = empty_validation();
+        both.enforce_namespace_registry = Some(true);
+        both.reject_malformed_labels = Some(true);
+        let rules = default_ruleset(&both, &reg);
         let eval = evaluate_local(&issue_with(&["unknown:x"]), &rules).unwrap();
         assert!(eval.is_blocking());
 
