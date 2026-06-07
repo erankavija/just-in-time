@@ -472,18 +472,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         operations: &UpdateOperations,
         force: bool,
     ) -> Result<WriteValidation> {
-        // Validate label operations. Read the namespace registry through the
-        // shared OnceLock cache so an N-issue bulk update parses the config once,
-        // not once per issue (matches the single-issue write path).
-        if !operations.add_labels.is_empty() || !operations.remove_labels.is_empty() {
-            let label_namespaces = self.cached_namespaces()?;
-            crate::labels::validate_label_operations(
-                &issue.labels,
-                &operations.add_labels,
-                &operations.remove_labels,
-                &label_namespaces.namespaces,
-            )?;
-        }
+        // Label format / uniqueness / registry are enforced SOLELY by
+        // `validate_for_write` against the projected post-update shape below
+        // (a0f0f342 migration) — no inline `validate_label_operations` call here.
 
         // Validate gate operations - check that gates exist in registry
         if !operations.add_gates.is_empty() {
@@ -852,11 +843,13 @@ mod tests {
 
         let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
 
-        // Should reject with error
+        // Should reject with error. After the a0f0f342 consolidation the rejection
+        // comes from the always-enforced `default:label-format` rule (canonical
+        // format), not the removed inline `validate_label_operations` check.
         assert_eq!(result.summary.total_matched, 1);
         assert_eq!(result.summary.total_modified, 0);
         assert_eq!(result.summary.total_errors, 1);
-        assert!(result.errors[0].1.contains("format"));
+        assert!(result.errors[0].1.contains("default:label-format"));
     }
 
     #[test]
@@ -882,11 +875,13 @@ mod tests {
 
         let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
 
-        // Should reject with error
+        // Should reject with error. After the a0f0f342 consolidation the rejection
+        // comes from the always-enforced `default:namespace-unique:type` rule, not
+        // the removed inline uniqueness check.
         assert_eq!(result.summary.total_matched, 1);
         assert_eq!(result.summary.total_modified, 0);
         assert_eq!(result.summary.total_errors, 1);
-        assert!(result.errors[0].1.contains("unique namespace"));
+        assert!(result.errors[0].1.contains("default:namespace-unique:type"));
     }
 
     #[test]

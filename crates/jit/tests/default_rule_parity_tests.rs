@@ -15,11 +15,17 @@
 //!     only WARNS.
 //!   - `enforce_namespace_registry = true` + `reject_malformed_labels = true` =>
 //!     an unregistered namespace is REJECTED on write; otherwise WARNS.
+//! * ALWAYS-ON inline write-path rejects (independent of any config flag):
+//!   - the canonical `namespace:value` format (`labels::validate_label`) hard-
+//!     rejected a malformed label on EVERY write; and
+//!   - a second label from a `unique` namespace was hard-rejected on EVERY write.
+//!
+//!   Both are reproduced by ALWAYS-enforced default rules (and both also FAIL
+//!   `jit validate`).
 //! * `validate_labels` (whole-repo `jit validate`), ALWAYS on, hard-reject:
 //!   - a value outside a namespace `values` enum, a value not matching a
-//!     namespace `pattern`, multiple labels in a `unique` namespace, and a
-//!     missing `required` namespace each FAIL `jit validate` but do NOT block a
-//!     write.
+//!     namespace `pattern`, and a missing `required` namespace each FAIL `jit
+//!     validate` but do NOT block a write.
 //!
 //! The default rules are evaluated directly via `default_ruleset` + the local
 //! engine so the assertions are about the rule layer itself.
@@ -107,31 +113,70 @@ fn parity_require_type_label_off_by_default() {
 // label format (legacy IssueValidator label_regex / reject_malformed_labels)
 // ---------------------------------------------------------------------------
 
+/// The canonical `namespace:value` format is the ALWAYS-ON format check that the
+/// inline `labels::validate_label` enforced on EVERY write regardless of config.
+/// (a) A malformed CANONICAL label is hard-rejected on create even with
+/// `reject_malformed_labels` off.
 #[test]
-fn parity_malformed_label_warns_when_reject_off() {
-    let mut v = validation();
-    v.label_regex = Some(r"^[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9._-]*$".to_string());
-    // reject_malformed_labels unset => warn only (legacy default).
+fn parity_malformed_canonical_label_blocks_even_when_reject_off() {
+    // reject_malformed_labels unset/false => canonical rule STILL blocks, exactly
+    // as the legacy inline `validate_label(label)?` did on every write path.
+    let v = validation();
     let rules = default_ruleset(&v, &registry(vec![]));
 
-    let eval = evaluate_local(&issue(&["INVALID:label"]), &rules).unwrap();
     assert!(
-        !eval.is_blocking(),
-        "legacy: malformed label only WARNS by default"
+        blocks(&rules, &["INVALID:label"]),
+        "legacy inline validate_label always rejected a malformed label on write"
     );
-    assert_eq!(eval.warnings().len(), 1);
+    // A well-formed canonical label passes.
+    assert!(!blocks(&rules, &["type:task"]));
+
+    // Same outcome with the flag explicitly false.
+    let mut v2 = validation();
+    v2.reject_malformed_labels = Some(false);
+    let rules2 = default_ruleset(&v2, &registry(vec![]));
+    assert!(blocks(&rules2, &["INVALID:label"]));
 }
 
+/// (e) The canonical/validate path still FAILS `jit validate` on a malformed
+/// label (legacy whole-repo `validate_labels` canonical check).
 #[test]
-fn parity_malformed_label_blocks_when_reject_on() {
-    let mut v = validation();
-    v.label_regex = Some(r"^[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9._-]*$".to_string());
-    v.reject_malformed_labels = Some(true);
-    let rules = default_ruleset(&v, &registry(vec![]));
+fn parity_malformed_canonical_label_fails_validate() {
+    let rules = default_ruleset(&validation(), &registry(vec![]));
+    assert!(
+        fails_validate(&rules, &["INVALID:label"]),
+        "malformed label must fail jit validate (canonical, severity=error)"
+    );
+    assert!(!fails_validate(&rules, &["type:task"]));
+}
 
-    // Legacy: REJECTED on write.
-    assert!(blocks(&rules, &["INVALID:label"]));
-    assert!(!blocks(&rules, &["type:task"]));
+/// (d) A CUSTOM `label_regex` violation (on a canonically-valid label) is
+/// rejected on the WRITE path only when `reject_malformed_labels = true`, and is
+/// NOT applied to the validate path beyond canonical (legacy: custom regex was
+/// write-path only).
+#[test]
+fn parity_custom_label_regex_write_only() {
+    // Custom regex stricter than canonical; `type:task` is canonical-valid but
+    // violates it.
+    let mut warn_cfg = validation();
+    warn_cfg.label_regex = Some(r"^team:[a-z]+$".to_string());
+    // reject_malformed_labels off => custom rule warns only, does not block.
+    let warn_rules = default_ruleset(&warn_cfg, &registry(vec![]));
+    assert!(
+        !blocks(&warn_rules, &["type:task"]),
+        "custom regex must NOT block when reject_malformed_labels off"
+    );
+
+    // reject_malformed_labels on => custom rule blocks the WRITE.
+    let mut block_cfg = warn_cfg.clone();
+    block_cfg.reject_malformed_labels = Some(true);
+    let block_rules = default_ruleset(&block_cfg, &registry(vec![]));
+    assert!(
+        blocks(&block_rules, &["type:task"]),
+        "custom regex must block the write when reject_malformed_labels on"
+    );
+    // A label satisfying the custom regex is accepted.
+    assert!(!blocks(&block_rules, &["team:platform"]));
 }
 
 // ---------------------------------------------------------------------------
@@ -230,13 +275,22 @@ fn parity_namespace_pattern() {
     assert!(!fails_validate(&rules, &["milestone:v1.0"]));
 }
 
+/// (b) A duplicate UNIQUE-namespace label is hard-rejected on create (always-
+/// enforced), reproducing the legacy inline unique-namespace collision check.
+/// It ALSO fails `jit validate` (severity=error), matching whole-repo
+/// `validate_labels`.
 #[test]
-fn parity_namespace_unique() {
+fn parity_namespace_unique_blocks_write_and_fails_validate() {
     let reg = registry(vec![("priority", LabelNamespace::new("Priority", true))]);
     let rules = default_ruleset(&validation(), &reg);
 
     assert!(fails_validate(&rules, &["priority:high", "priority:low"]));
-    assert!(!blocks(&rules, &["priority:high", "priority:low"]));
+    assert!(
+        blocks(&rules, &["priority:high", "priority:low"]),
+        "duplicate unique label must block the write (legacy inline reject)"
+    );
+    // A single label in the unique namespace is fine.
+    assert!(!blocks(&rules, &["priority:high"]));
     assert!(!fails_validate(&rules, &["priority:high"]));
 }
 
@@ -251,6 +305,62 @@ fn parity_namespace_required() {
     assert!(fails_validate(&rules, &["component:core"]));
     assert!(!blocks(&rules, &["component:core"]));
     assert!(!fails_validate(&rules, &["type:task"]));
+}
+
+/// (c) A WELL-FORMED, non-duplicate label set passes both the write path and
+/// `jit validate` — the always-enforced canonical-format and uniqueness rules
+/// fire ONLY on genuinely malformed or duplicate labels, never on normal labels.
+#[test]
+fn parity_wellformed_unique_set_passes() {
+    let reg = registry(vec![
+        ("type", LabelNamespace::new("Type", true)),
+        ("team", LabelNamespace::new("Team", true)),
+        ("resolution", LabelNamespace::new("Resolution", true)),
+    ]);
+    let rules = default_ruleset(&validation(), &reg);
+
+    // One label per unique namespace, all canonical -> nothing blocks, nothing
+    // fails validate.
+    let labels = &["type:task", "team:platform-eng", "resolution:fixed"];
+    assert!(
+        !blocks(&rules, labels),
+        "well-formed unique set must not block"
+    );
+    assert!(
+        !fails_validate(&rules, labels),
+        "well-formed unique set must pass jit validate"
+    );
+}
+
+/// Live-repo-config safety: this repo's own config is loose
+/// (reject_malformed_labels=false, enforce_namespace_registry=false,
+/// require_type_label=false) with `type`/`team`/`resolution` unique=true. Under
+/// EXACTLY that config, normal well-formed labels used by `jit issue
+/// create/update/claim` must not be newly blocked, while genuinely malformed /
+/// duplicate labels are still rejected (parity with the removed inline checks).
+#[test]
+fn parity_live_repo_loose_config_does_not_block_normal_labels() {
+    let mut v = validation();
+    v.require_type_label = Some(false);
+    v.reject_malformed_labels = Some(false);
+    v.enforce_namespace_registry = Some(false);
+    let reg = registry(vec![
+        ("type", LabelNamespace::new("Type", true)),
+        ("team", LabelNamespace::new("Team", true)),
+        ("resolution", LabelNamespace::new("Resolution", true)),
+    ]);
+    let rules = default_ruleset(&v, &reg);
+
+    // Normal labels: not blocked.
+    assert!(!blocks(&rules, &["type:task"]));
+    assert!(!blocks(&rules, &["type:task", "team:platform-eng"]));
+    // An UNREGISTERED but well-formed namespace is not blocked (registry off).
+    assert!(!blocks(&rules, &["sprint:42"]));
+
+    // Genuinely malformed -> still blocked (canonical always-on).
+    assert!(blocks(&rules, &["Bad Label"]));
+    // Duplicate unique namespace -> still blocked (uniqueness always-on).
+    assert!(blocks(&rules, &["type:task", "type:bug"]));
 }
 
 // ---------------------------------------------------------------------------
