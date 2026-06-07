@@ -99,7 +99,7 @@
           "short_id": "a0f0f342",
           "title": "Re-express existing checks as default rules (hard migration)",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "id": "a6daa05d",
@@ -145,6 +145,13 @@
       "topic": "6 review rounds; adversarial review used; pre-existing httpbin.org network test blocked gates",
       "decision": "User: continue+be careful+adversarial reviewer; then point flaky test at local mock",
       "resolution": "All findings fixed; check_links external-URL test now uses an in-process loopback mock; 25ad2a02 done"
+    },
+    {
+      "wave": 6,
+      "issue": "a0f0f342",
+      "topic": "custom label_regex parity: engine has no write-only local rule, so the migrated custom-regex rule (severity=error) also fails jit validate, which legacy validate_labels did not. a0f0f342 at MAX rework (2).",
+      "decision": "User chose: amend the criterion (document the deviation) rather than add a write-only Rule-model concept",
+      "resolution": "DR 8.3a + a0f0f342 criterion 2 + ## Approved Deviations record the deviation; parity_custom_label_regex_also_applies_to_validate pins intended behavior; defaults.rs comments corrected; gates green; a0f0f342 done"
     }
   ],
   "rework_counts": {
