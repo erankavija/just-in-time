@@ -13,12 +13,12 @@ impl<S: IssueStore> CommandExecutor<S> {
         mut labels: Vec<String>,
         force: bool,
     ) -> Result<(String, Vec<String>)> {
-        // Namespaces come from the executor cache so they are not re-parsed per
-        // call. Label format and namespace constraints are now enforced by the
-        // effective rule set inside `validate_for_write` (a0f0f342 migration); the
-        // explicit format check below stays as an early, precise error.
+        // Config comes from the executor cache so it is not re-parsed per call.
+        // Label format and ALL namespace constraints (canonical format, uniqueness,
+        // registry, etc.) are now enforced SOLELY by the effective rule set inside
+        // `validate_for_write` (a0f0f342 migration) — no inline format/uniqueness
+        // check remains here.
         let config = self.cached_config()?;
-        let namespaces = self.cached_namespaces()?;
 
         // Apply the configured default type when the issue carries no `type:*`
         // label. This is a write-time CONVENIENCE (not validation enforcement), so
@@ -37,27 +37,6 @@ impl<S: IssueStore> CommandExecutor<S> {
             });
             if !has_type {
                 labels.push(format!("type:{default_type}"));
-            }
-        }
-
-        // Validate all labels
-        for label_str in &labels {
-            label_utils::validate_label(label_str)?;
-        }
-
-        // Check uniqueness constraints
-        let mut unique_namespaces_seen = std::collections::HashSet::new();
-
-        for label_str in &labels {
-            if let Ok((namespace, _)) = label_utils::parse_label(label_str) {
-                if let Some(ns_config) = namespaces.get(&namespace) {
-                    if ns_config.unique && !unique_namespaces_seen.insert(namespace.clone()) {
-                        return Err(anyhow!(
-                            "Cannot add multiple labels from unique namespace '{}' to the same issue",
-                            namespace
-                        ));
-                    }
-                }
             }
         }
 
@@ -219,9 +198,10 @@ impl<S: IssueStore> CommandExecutor<S> {
             issue.priority = p;
         }
 
-        // Handle label operations
+        // Handle label operations. Label format / uniqueness / registry are
+        // enforced solely by `validate_for_write` against the FINAL shape below
+        // (a0f0f342 migration) — no inline format/uniqueness check here.
         for label_str in &add_labels {
-            label_utils::validate_label(label_str)?;
             if !issue.labels.contains(label_str) {
                 issue.labels.push(label_str.clone());
             }

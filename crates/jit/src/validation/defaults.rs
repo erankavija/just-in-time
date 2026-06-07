@@ -22,16 +22,24 @@
 //! Each default rule carries an `enforce` flag matching the legacy reject-vs-warn
 //! behavior under the repo's effective config:
 //!
-//! - `require_type_label`, the per-whole-label format regex (`label_regex`), and
-//!   the namespace-registry check map to LOCAL rules whose `enforce` follows the
-//!   legacy `[validation]` flags (`require_type_label` / `reject_malformed_labels`
-//!   respectively). They default to warn (`enforce = false`) — exactly today's
-//!   non-blocking default.
-//! - The per-namespace `values` / `pattern` / `unique` / `required` constraints
-//!   were enforced ONLY by the whole-repo `validate_labels` (never on write), so
-//!   their default rules are `severity = error` with `enforce = false`: they
-//!   surface as errors in `jit validate` (which fails on any error finding) but
-//!   never block a write, preserving the legacy timing exactly.
+//! - The canonical `namespace:value` label format (`default:label-format`) is
+//!   ALWAYS enforced (`severity = error`, `enforce = true`), reproducing the
+//!   legacy ALWAYS-ON inline `labels::validate_label` write-path reject AND the
+//!   canonical check the whole-repo `validate_labels` ran. An optional
+//!   `default:label-format-custom` rule (emitted only when `label_regex` is set
+//!   and differs from canonical) reproduces the legacy WRITE-ONLY custom-regex
+//!   check with `enforce = reject_malformed_labels`.
+//! - Per-namespace UNIQUENESS (`default:namespace-unique:<ns>`) is ALSO always
+//!   enforced (`severity = error`, `enforce = true`), reproducing the legacy
+//!   inline unique-namespace collision hard-reject on the write path.
+//! - `require_type_label` and the namespace-registry check map to LOCAL rules
+//!   whose `enforce` follows the legacy `[validation]` flags (`require_type_label`
+//!   / `reject_malformed_labels`).
+//! - The per-namespace `values` / `pattern` / `required` constraints were enforced
+//!   ONLY by the whole-repo `validate_labels` (never on write), so their default
+//!   rules are `severity = error` with `enforce = false`: they surface as errors
+//!   in `jit validate` (which fails on any error finding) but never block a write,
+//!   preserving the legacy timing exactly.
 //!
 //! Most rules here are [`Scope::Local`]. The orphan-leaf and
 //! strategic-consistency warnings are the exceptions: they need the whole issue
@@ -144,29 +152,51 @@ pub fn default_ruleset(validation: &ValidationConfig, namespaces: &LabelNamespac
         ));
     }
 
-    // Label format: every WHOLE label must match the regex. Uses the configured
-    // `label_regex` if present, else the canonical format. A per-whole-label
-    // (`namespace:value`) pattern cannot use the value-only `label-value-pattern`
-    // shorthand, so it is a raw schema over the projection's `raw_labels` array.
-    //
-    // Parity note: this is a deliberate UNIFICATION. Legacy split the format
-    // check across two paths — `IssueValidator` (write) used the configurable
-    // `label_regex`, while whole-repo `validate_labels` used the FIXED canonical
-    // format. The single rule applies `label_regex` to BOTH paths. For repos
-    // whose `label_regex` equals the canonical format (the default) this is
-    // identical; a repo that customizes `label_regex` now gets that regex in
-    // `jit validate` too, which is the more consistent behavior.
-    let format_regex = validation
-        .label_regex
-        .clone()
-        .unwrap_or_else(|| CANONICAL_LABEL_REGEX.to_string());
+    // Label format (canonical): every WHOLE label must match the FIXED canonical
+    // `namespace:value` format. This is the single source of truth for the two
+    // legacy ALWAYS-ON format checks:
+    //   * the inline `labels::validate_label(label)?` that EVERY write path
+    //     (create/update/bulk/add_label) ran unconditionally and hard-rejected on,
+    //     regardless of any config flag; and
+    //   * the whole-repo `validate_labels` canonical-format check that always
+    //     failed `jit validate` on a malformed label.
+    // Hence `severity = error` (fails `jit validate`) AND `enforce = true` ALWAYS
+    // (blocks the write), independent of `reject_malformed_labels`. A per-whole-
+    // label (`namespace:value`) pattern cannot use the value-only
+    // `label-value-pattern` shorthand, so it is a raw schema over the projection's
+    // `raw_labels` array.
     rules.push(json_schema_rule(
         "default:label-format",
         Selector::default(),
         Severity::Error,
-        reject_malformed,
-        raw_labels_pattern_schema(&format_regex),
+        true,
+        raw_labels_pattern_schema(CANONICAL_LABEL_REGEX),
     ));
+
+    // Custom label format (write-path only): when a repo configures a
+    // `validation.label_regex` that DIFFERS from the canonical format, the legacy
+    // `IssueValidator` applied that custom regex on the WRITE path only, gated by
+    // `reject_malformed_labels`. The whole-repo `validate_labels` never used the
+    // custom regex (it used canonical), so this rule MUST NOT add to the validate
+    // path beyond what the canonical rule already covers. We model "write-only" by
+    // emitting it with `enforce = reject_malformed_labels` and `severity = error`;
+    // since canonical already fails `jit validate` on any non-canonical label,
+    // this rule's incremental effect is exactly the legacy write-path custom-regex
+    // reject (when `reject_malformed_labels = true`). When `label_regex` is unset
+    // or equals canonical, the rule is redundant and is not emitted.
+    if let Some(custom_regex) = validation
+        .label_regex
+        .as_deref()
+        .filter(|r| *r != CANONICAL_LABEL_REGEX)
+    {
+        rules.push(json_schema_rule(
+            "default:label-format-custom",
+            Selector::default(),
+            Severity::Error,
+            reject_malformed,
+            raw_labels_pattern_schema(custom_regex),
+        ));
+    }
 
     // Namespace registry: every label's namespace must be declared. Always
     // generated when the registry is non-empty (the legacy validate-time
@@ -217,10 +247,11 @@ pub fn default_ruleset(validation: &ValidationConfig, namespaces: &LabelNamespac
 
     // --- [namespaces] per-namespace constraints (legacy validate_labels) -------
     //
-    // These ran ONLY in the whole-repo `validate_labels` (never on write) and
-    // ALWAYS hard-rejected. Map to `error` + `enforce = false`: an error finding
-    // fails `jit validate` (parity) but never blocks a write (parity: writes that
-    // violate them succeeded before).
+    // `values` / `pattern` / `required` ran ONLY in the whole-repo
+    // `validate_labels` (never on write) and ALWAYS hard-rejected: map to `error` +
+    // `enforce = false` (fails `jit validate`, never blocks a write). UNIQUENESS is
+    // the exception — it ALSO had an inline write-path hard-reject — so its rule is
+    // `error` + `enforce = true` (see below).
     let mut ns_names: Vec<&String> = namespaces.namespaces.keys().collect();
     ns_names.sort(); // deterministic rule order
     for name in ns_names {
@@ -251,13 +282,19 @@ pub fn default_ruleset(validation: &ValidationConfig, namespaces: &LabelNamespac
             ));
         }
 
-        // unique -> at most one label in the namespace.
+        // unique -> at most one label in the namespace. ALWAYS-enforced: the
+        // legacy inline unique-namespace collision check in
+        // `create_issue`/`update_issue`/`bulk_update` (and `add_label`)
+        // hard-rejected a second label from a `unique` namespace on the WRITE
+        // path, regardless of config. So `enforce = true` (blocks the write) with
+        // `severity = error` (also fails `jit validate`, matching the whole-repo
+        // `validate_labels` uniqueness check).
         if ns.unique {
             rules.push(local_rule(
                 &format!("default:namespace-unique:{name}"),
                 Selector::default(),
                 Severity::Error,
-                false,
+                true,
                 Assertion::RequireLabel {
                     label: format!("{name}:*"),
                     min: Some(0),
@@ -542,12 +579,13 @@ mod tests {
     }
 
     #[test]
-    fn test_label_format_always_present_and_warns_by_default() {
-        // A malformed label fails the always-on canonical format rule, but only
-        // warns on the write path when reject_malformed_labels is unset.
+    fn test_canonical_label_format_always_blocks_malformed() {
+        // The canonical format rule is ALWAYS enforced (enforce=true), so a
+        // malformed label blocks the write even when reject_malformed_labels is
+        // unset, reproducing the legacy inline `validate_label` hard-reject.
         let rules = default_ruleset(&empty_validation(), &registry(vec![]));
         let eval = evaluate_local(&issue_with(&["INVALID:label"]), &rules).unwrap();
-        assert!(!eval.is_blocking());
+        assert!(eval.is_blocking(), "malformed label must block (canonical)");
         assert!(eval
             .findings()
             .iter()
@@ -574,31 +612,51 @@ mod tests {
     }
 
     #[test]
-    fn test_label_format_warns_by_default() {
+    fn test_custom_label_regex_only_emitted_when_differs_from_canonical() {
+        // A `label_regex` equal to the canonical format is redundant: only the
+        // always-on canonical rule is emitted, never `default:label-format-custom`.
         let mut validation = empty_validation();
-        validation.label_regex = Some(r"^[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9._-]*$".to_string());
-        // reject_malformed_labels unset -> warn only.
+        validation.label_regex = Some(CANONICAL_LABEL_REGEX.to_string());
         let rules = default_ruleset(&validation, &registry(vec![]));
-
-        let eval = evaluate_local(&issue_with(&["INVALID:label"]), &rules).unwrap();
-        assert!(
-            !eval.is_blocking(),
-            "malformed label must only warn by default"
-        );
-        assert_eq!(eval.warnings().len(), 1);
+        assert!(rules
+            .rules
+            .iter()
+            .all(|r| r.name != "default:label-format-custom"));
     }
 
     #[test]
-    fn test_label_format_blocks_when_reject_enabled() {
+    fn test_custom_label_regex_write_only_gated_by_reject_flag() {
+        // A custom regex stricter than canonical. With reject_malformed_labels
+        // unset the custom rule is warn-only on the write path (canonical still
+        // blocks genuinely malformed labels, but a canonically-valid label that
+        // merely violates the custom regex only warns).
         let mut validation = empty_validation();
-        validation.label_regex = Some(r"^[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9._-]*$".to_string());
+        validation.label_regex = Some(r"^team:[a-z]+$".to_string());
+        let rules = default_ruleset(&validation, &registry(vec![]));
+        assert!(rules
+            .rules
+            .iter()
+            .any(|r| r.name == "default:label-format-custom"));
+
+        // `type:task` is canonical-valid but violates the custom `^team:[a-z]+$`.
+        let warn = evaluate_local(&issue_with(&["type:task"]), &rules).unwrap();
+        assert!(
+            !warn.is_blocking(),
+            "custom regex must only warn when reject_malformed off"
+        );
+        assert!(warn.warnings().iter().any(|w| w.contains("custom")));
+
+        // With reject_malformed_labels on, the custom regex blocks the write.
         validation.reject_malformed_labels = Some(true);
         let rules = default_ruleset(&validation, &registry(vec![]));
+        let block = evaluate_local(&issue_with(&["type:task"]), &rules).unwrap();
+        assert!(
+            block.is_blocking(),
+            "custom regex must block when reject on"
+        );
 
-        let eval = evaluate_local(&issue_with(&["INVALID:label"]), &rules).unwrap();
-        assert!(eval.is_blocking());
-
-        let ok = evaluate_local(&issue_with(&["type:task"]), &rules).unwrap();
+        // A label satisfying the custom regex passes.
+        let ok = evaluate_local(&issue_with(&["team:platform"]), &rules).unwrap();
         assert!(!ok.is_blocking());
     }
 
@@ -714,11 +772,14 @@ mod tests {
     }
 
     #[test]
-    fn test_namespace_unique_errors_on_duplicate() {
+    fn test_namespace_unique_blocks_on_duplicate() {
+        // Uniqueness is ALWAYS enforced (enforce=true): a duplicate unique-
+        // namespace label blocks the write, reproducing the legacy inline reject.
         let reg = registry(vec![("priority", LabelNamespace::new("Priority", true))]);
         let rules = default_ruleset(&empty_validation(), &reg);
 
         let dup = evaluate_local(&issue_with(&["priority:high", "priority:low"]), &rules).unwrap();
+        assert!(dup.is_blocking(), "duplicate unique label must block");
         assert!(dup.findings().iter().any(|f| f.severity == Severity::Error));
 
         let single = evaluate_local(&issue_with(&["priority:high"]), &rules).unwrap();
