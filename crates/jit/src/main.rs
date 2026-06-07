@@ -315,15 +315,22 @@ fn run() -> Result<()> {
             // migrated is a true no-op. See `MigrationState`.
             use jit::validation::migration::MigrationState;
             let fresh_defaults = chosen.intended_default_config();
-            let migration = executor.migrate_or_scaffold_rules(&fresh_defaults)?;
+            let migration =
+                executor.migrate_or_scaffold_rules(&fresh_defaults, config_already_existed)?;
             for skipped in &migration.skipped_existing {
                 let _ = output_ctx.print_warning(format!(
                     "Skipped migrating rule '{skipped}': a rule with that name already exists in \
                      .jit/rules.toml"
                 ));
             }
+            for skipped in &migration.skipped_schema_collision {
+                let _ = output_ctx.print_warning(format!(
+                    "Skipped migrating rule '{skipped}': it would overwrite an existing \
+                     user-authored schema file under .jit/schemas/ with different content"
+                ));
+            }
             match migration.state {
-                MigrationState::FreshScaffold => {
+                MigrationState::FreshScaffold | MigrationState::MaterializeCurrent => {
                     let _ = output_ctx.print_success("Scaffolded .jit/rules.toml");
                 }
                 MigrationState::LegacyMigrated | MigrationState::Coexistence => {
