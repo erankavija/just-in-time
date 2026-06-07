@@ -53,6 +53,10 @@ const DEFAULT_CRITERIA_SECTION: &str = "success_criteria";
 /// Default regex extracting a criterion id from an item's text (e.g. `REQ-01`).
 const DEFAULT_ID_PATTERN: &str = "[A-Z][A-Z0-9]*-[0-9]+";
 
+/// Prefix every `config-error` finding message carries, so a [`GraphFinding`]
+/// can be recognized as a config error structurally.
+const CONFIG_ERROR_PREFIX: &str = "config error: ";
+
 /// How a "child" issue relates to the source issue in `label-coverage`.
 ///
 /// # Examples
@@ -75,6 +79,122 @@ pub enum ChildLink {
     Dependencies,
     /// Any issue in the set is a candidate child, regardless of dependency edges.
     Any,
+}
+
+/// A graph-rule [`Finding`] paired with the issue it pertains to.
+///
+/// Graph rules are inherently cross-issue, so per-issue reporting needs to know
+/// *which* issue each finding concerns. Rather than re-deriving that from the
+/// finding's message text (a lossy substring match), [`evaluate_graph`] returns
+/// this struct so attribution is exact and structural:
+///
+/// - `issue_id` is `Some(full_id)` for a violation attributable to one specific
+///   issue (e.g. the source issue whose criterion is uncovered, or whose
+///   dependency shape is wrong).
+/// - `issue_id` is `None` for a `config-error` finding: a malformed rule config
+///   pertains to the rule itself, not a single issue, and must never be silently
+///   dropped from a per-issue view.
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::Issue;
+/// use jit::validation::graph::{evaluate_graph, GraphFinding};
+/// use jit::validation::rules::RuleSet;
+/// use std::path::Path;
+///
+/// let toml = r#"
+/// [[rules]]
+/// name = "task-needs-design-dep"
+/// when = { type = "task" }
+/// severity = "error"
+/// assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
+/// "#;
+/// let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+/// let rules: Vec<&_> = set.rules.iter().collect();
+///
+/// let mut task = Issue::new("a task".into(), String::new());
+/// task.labels = vec!["type:task".into()];
+/// let task_id = task.id.clone();
+/// let findings: Vec<GraphFinding> = evaluate_graph(&rules, &[task]);
+/// assert_eq!(findings.len(), 1);
+/// // The finding is attributed to the offending issue, not parsed from text.
+/// assert_eq!(findings[0].issue_id.as_deref(), Some(task_id.as_str()));
+/// assert!(!findings[0].is_config_error());
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GraphFinding {
+    /// Full id of the issue this finding concerns, or `None` for a config-error
+    /// (which pertains to the rule, not a single issue).
+    pub issue_id: Option<String>,
+    /// The underlying engine finding (rule name, severity, message).
+    pub finding: Finding,
+}
+
+impl GraphFinding {
+    /// A finding attributed to a specific issue id.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::validation::engine::Finding;
+    /// use jit::validation::graph::GraphFinding;
+    /// use jit::validation::rules::Severity;
+    ///
+    /// let f = Finding { rule: "r".into(), severity: Severity::Error, message: "m".into() };
+    /// let gf = GraphFinding::for_issue("abc123", f);
+    /// assert_eq!(gf.issue_id.as_deref(), Some("abc123"));
+    /// assert!(!gf.is_config_error());
+    /// ```
+    pub fn for_issue(issue_id: impl Into<String>, finding: Finding) -> Self {
+        Self {
+            issue_id: Some(issue_id.into()),
+            finding,
+        }
+    }
+
+    /// A finding not attributable to a single issue (e.g. a `config-error`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::validation::engine::Finding;
+    /// use jit::validation::graph::GraphFinding;
+    /// use jit::validation::rules::Severity;
+    ///
+    /// let f = Finding { rule: "r".into(), severity: Severity::Error, message: "config error: x".into() };
+    /// let gf = GraphFinding::unattributed(f);
+    /// assert!(gf.issue_id.is_none());
+    /// assert!(gf.is_config_error());
+    /// ```
+    pub fn unattributed(finding: Finding) -> Self {
+        Self {
+            issue_id: None,
+            finding,
+        }
+    }
+
+    /// Whether this finding is a `config-error` (a malformed rule config).
+    ///
+    /// Config errors carry no issue id and are reported as `config error: …` by
+    /// the per-kind evaluators. They must surface for any per-issue view of a
+    /// rule that applies, never be silently dropped.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::validation::engine::Finding;
+    /// use jit::validation::graph::GraphFinding;
+    /// use jit::validation::rules::Severity;
+    ///
+    /// let bad = Finding { rule: "r".into(), severity: Severity::Error, message: "config error: missing 'to'".into() };
+    /// assert!(GraphFinding::unattributed(bad).is_config_error());
+    /// let ok = Finding { rule: "r".into(), severity: Severity::Error, message: "criterion uncovered".into() };
+    /// assert!(!GraphFinding::for_issue("x", ok).is_config_error());
+    /// ```
+    pub fn is_config_error(&self) -> bool {
+        self.finding.message.starts_with(CONFIG_ERROR_PREFIX)
+    }
 }
 
 impl ChildLink {
@@ -133,12 +253,12 @@ impl ChildLink {
 ///
 /// let mut task = Issue::new("a task".into(), String::new());
 /// task.labels = vec!["type:task".into()];
-/// // No design dependency -> one finding.
+/// // No design dependency -> one finding, attributed to the task.
 /// let findings = evaluate_graph(&rules, &[task]);
 /// assert_eq!(findings.len(), 1);
-/// assert_eq!(findings[0].rule, "task-needs-design-dep");
+/// assert_eq!(findings[0].finding.rule, "task-needs-design-dep");
 /// ```
-pub fn evaluate_graph(rules: &[&Rule], issues: &[Issue]) -> Vec<Finding> {
+pub fn evaluate_graph(rules: &[&Rule], issues: &[Issue]) -> Vec<GraphFinding> {
     rules
         .iter()
         .filter(|rule| rule.scope == Scope::Graph && rule.severity != Severity::Off)
@@ -147,7 +267,7 @@ pub fn evaluate_graph(rules: &[&Rule], issues: &[Issue]) -> Vec<Finding> {
 }
 
 /// Evaluate a single graph rule, dispatching on its assertion kind.
-fn evaluate_one(rule: &Rule, issues: &[Issue]) -> Vec<Finding> {
+fn evaluate_one(rule: &Rule, issues: &[Issue]) -> Vec<GraphFinding> {
     match &rule.assert {
         Assertion::LabelCoverage { config } => evaluate_label_coverage(rule, config, issues),
         Assertion::LabelReference { config } => evaluate_label_reference(rule, config, issues),
@@ -167,18 +287,27 @@ fn finding(rule: &Rule, message: String) -> Finding {
     }
 }
 
-/// Build a `config-error` [`Finding`]: a malformed/missing config key is always
-/// reported (never swallowed, never a panic) and attributed to the rule.
-fn config_error(rule: &Rule, message: impl Into<String>) -> Finding {
-    finding(rule, format!("config error: {}", message.into()))
+/// Build a [`GraphFinding`] attributed to `issue_id` for this rule.
+fn issue_finding(rule: &Rule, issue_id: &str, message: String) -> GraphFinding {
+    GraphFinding::for_issue(issue_id, finding(rule, message))
 }
 
-/// Read a required string key from a config table, or `Err(Finding)`.
+/// Build a `config-error` [`GraphFinding`]: a malformed/missing config key is
+/// always reported (never swallowed, never a panic), attributed to the rule (not
+/// a single issue, so `issue_id` is `None`).
+fn config_error(rule: &Rule, message: impl Into<String>) -> GraphFinding {
+    GraphFinding::unattributed(finding(
+        rule,
+        format!("{CONFIG_ERROR_PREFIX}{}", message.into()),
+    ))
+}
+
+/// Read a required string key from a config table, or `Err(GraphFinding)`.
 fn require_str<'a>(
     rule: &Rule,
     config: &'a toml::value::Table,
     key: &str,
-) -> Result<&'a str, Finding> {
+) -> Result<&'a str, GraphFinding> {
     match config.get(key) {
         Some(toml::Value::String(s)) => Ok(s.as_str()),
         Some(_) => Err(config_error(rule, format!("key '{key}' must be a string"))),
@@ -193,7 +322,7 @@ fn optional_str<'a>(
     config: &'a toml::value::Table,
     key: &str,
     default: &'a str,
-) -> Result<&'a str, Finding> {
+) -> Result<&'a str, GraphFinding> {
     match config.get(key) {
         None => Ok(default),
         Some(toml::Value::String(s)) => Ok(s.as_str()),
@@ -233,7 +362,7 @@ fn evaluate_label_coverage(
     rule: &Rule,
     config: &toml::value::Table,
     issues: &[Issue],
-) -> Vec<Finding> {
+) -> Vec<GraphFinding> {
     // --- Interpret config (any error short-circuits to one config-error). ---
     let section_slug =
         match optional_str(rule, config, "criteria-section", DEFAULT_CRITERIA_SECTION) {
@@ -309,8 +438,9 @@ fn evaluate_label_coverage(
                 .into_iter()
                 .filter(move |id| !candidates.iter().any(|child| satisfied_id(child, id)))
                 .map(move |id| {
-                    finding(
+                    issue_finding(
                         rule,
+                        &source.id,
                         format!(
                             "criterion '{id}' of issue {} is not satisfied by any {} child{}",
                             source.short_id(),
@@ -406,7 +536,7 @@ fn evaluate_label_reference(
     rule: &Rule,
     config: &toml::value::Table,
     issues: &[Issue],
-) -> Vec<Finding> {
+) -> Vec<GraphFinding> {
     let from_ns = match require_str(rule, config, "from") {
         Ok(v) => v,
         Err(f) => return vec![f],
@@ -451,8 +581,9 @@ fn evaluate_label_reference(
             values_in_namespace(issue, from_ns)
                 .filter(move |value| !allowed.contains(value))
                 .map(move |value| {
-                    finding(
+                    issue_finding(
                         rule,
+                        &issue.id,
                         format!(
                             "issue {} references '{from_ns}:{value}' but no '{to_ns}:{value}' \
                              source is declared in {scope} scope",
@@ -513,7 +644,7 @@ fn evaluate_dependency_shape(
     rule: &Rule,
     config: &toml::value::Table,
     issues: &[Issue],
-) -> Vec<Finding> {
+) -> Vec<GraphFinding> {
     // `target` must be a table we can deserialize into a Selector.
     let target = match config.get("target") {
         Some(value @ toml::Value::Table(_)) => match value.clone().try_into::<Selector>() {
@@ -559,8 +690,9 @@ fn evaluate_dependency_shape(
         .filter(|source| rule.when.matches(source))
         .filter(|source| !depends_on_target(source, &target_ids, transitive, &graph))
         .map(|source| {
-            finding(
+            issue_finding(
                 rule,
+                &source.id,
                 format!(
                     "issue {} {} depend on an issue matching the target selector but does not",
                     source.short_id(),
@@ -661,9 +793,9 @@ mod tests {
         let findings = evaluate_graph(&rules, &[epic, child]);
         // REQ-02 is uncovered.
         assert_eq!(findings.len(), 1);
-        assert!(findings[0].message.contains("REQ-02"));
-        assert_eq!(findings[0].severity, Severity::Error);
-        assert_eq!(findings[0].rule, "coverage");
+        assert!(findings[0].finding.message.contains("REQ-02"));
+        assert_eq!(findings[0].finding.severity, Severity::Error);
+        assert_eq!(findings[0].finding.rule, "coverage");
     }
 
     #[test]
@@ -716,8 +848,8 @@ mod tests {
         let rules = vec![&rule];
         let findings = evaluate_graph(&rules, &[epic]);
         assert_eq!(findings.len(), 1);
-        assert!(findings[0].message.contains("config error"));
-        assert!(findings[0].message.contains("child-link"));
+        assert!(findings[0].finding.message.contains("config error"));
+        assert!(findings[0].finding.message.contains("child-link"));
     }
 
     // --- label-reference ---------------------------------------------------
@@ -747,8 +879,8 @@ mod tests {
         let rules = vec![&rule];
         let findings = evaluate_graph(&rules, &[source, child]);
         assert_eq!(findings.len(), 1);
-        assert!(findings[0].message.contains("REQ-99"));
-        assert_eq!(findings[0].severity, Severity::Warn);
+        assert!(findings[0].finding.message.contains("REQ-99"));
+        assert_eq!(findings[0].finding.severity, Severity::Warn);
     }
 
     #[test]
@@ -775,8 +907,8 @@ mod tests {
         let rules = vec![&rule];
         let findings = evaluate_graph(&rules, &[issue("x", &["satisfies:REQ-01"])]);
         assert_eq!(findings.len(), 1);
-        assert!(findings[0].message.contains("config error"));
-        assert!(findings[0].message.contains("'to'"));
+        assert!(findings[0].finding.message.contains("config error"));
+        assert!(findings[0].finding.message.contains("'to'"));
     }
 
     // --- dependency-shape --------------------------------------------------
@@ -807,8 +939,8 @@ mod tests {
         let rules = vec![&rule];
         let findings = evaluate_graph(&rules, &[design, task]);
         assert_eq!(findings.len(), 1);
-        assert!(findings[0].message.contains("depend"));
-        assert_eq!(findings[0].rule, "shape");
+        assert!(findings[0].finding.message.contains("depend"));
+        assert_eq!(findings[0].finding.rule, "shape");
     }
 
     #[test]
@@ -840,8 +972,8 @@ mod tests {
         let rules = vec![&rule];
         let findings = evaluate_graph(&rules, &[issue("task", &["type:task"])]);
         assert_eq!(findings.len(), 1);
-        assert!(findings[0].message.contains("config error"));
-        assert!(findings[0].message.contains("target"));
+        assert!(findings[0].finding.message.contains("config error"));
+        assert!(findings[0].finding.message.contains("target"));
     }
 
     // --- dispatch / scope filtering ----------------------------------------
