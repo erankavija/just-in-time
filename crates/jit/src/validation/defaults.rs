@@ -108,7 +108,8 @@ pub fn default_ruleset(namespaces: &LabelNamespaces) -> RuleSet {
     // namespace fails `jit validate`) with `enforce = false` (never blocks a
     // write).
     if !namespaces.namespaces.is_empty() {
-        let registered: Vec<&str> = namespaces.namespaces.keys().map(|s| s.as_str()).collect();
+        let mut registered: Vec<&str> = namespaces.namespaces.keys().map(|s| s.as_str()).collect();
+        registered.sort(); // deterministic alternation order (namespaces is a HashMap)
         rules.push(json_schema_rule(
             "default:namespace-registry",
             Selector::default(),
