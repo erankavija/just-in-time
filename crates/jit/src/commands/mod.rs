@@ -545,18 +545,26 @@ impl<S: IssueStore> CommandExecutor<S> {
         // absent-file check and then race on the fixed temp paths for rules.toml
         // and the schema files (MF4: materialize under the write lock). The lock
         // lives in the shared control plane (`.git/jit/locks/`), the same plane
-        // claims coordination uses. When the repo is not under git there is no
-        // cross-process coordination plane (and no concurrency to guard), so we
-        // scaffold without it -- mirroring `init` returning no worktree identity
-        // outside a git repo.
-        let _guard = match WorktreePaths::detect() {
-            Ok(paths) => {
-                let lock_path = paths.shared_jit.join("locks/rules.lock");
-                std::fs::create_dir_all(lock_path.parent().unwrap())
-                    .context("Failed to create control-plane locks directory")?;
-                Some(FileLocker::new(Duration::from_secs(5)).lock_exclusive(&lock_path)?)
-            }
-            Err(_) => None,
+        // claims coordination uses. Outside a git repo there is no control plane
+        // (and no cross-process concurrency to guard), so we scaffold lockless --
+        // mirroring `init` returning no worktree identity outside git. NOTE:
+        // `WorktreePaths::detect()` returns Ok even when NOT in a git repo (with
+        // a cwd-based `<cwd>/.git/jit`), so we must gate on an explicit in-git
+        // check; gating on detect() succeeding would create a bogus `.git`.
+        let in_git_repo = std::process::Command::new("git")
+            .args(["rev-parse", "--is-inside-work-tree"])
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false);
+
+        let _guard = if in_git_repo {
+            let paths = WorktreePaths::detect()?;
+            let lock_path = paths.shared_jit.join("locks/rules.lock");
+            std::fs::create_dir_all(lock_path.parent().unwrap())
+                .context("Failed to create control-plane locks directory")?;
+            Some(FileLocker::new(Duration::from_secs(5)).lock_exclusive(&lock_path)?)
+        } else {
+            None
         };
 
         if jit_root.join("rules.toml").exists() {
