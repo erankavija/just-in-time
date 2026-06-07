@@ -29,4 +29,3 @@ pub use crate::labels::{
     label_matches, matches_pattern, parse_label, validate_assignee_format, validate_label,
     validate_label_operations,
 };
-pub use crate::validation::IssueValidator;

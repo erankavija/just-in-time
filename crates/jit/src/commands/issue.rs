@@ -13,16 +13,31 @@ impl<S: IssueStore> CommandExecutor<S> {
         mut labels: Vec<String>,
         force: bool,
     ) -> Result<(String, Vec<String>)> {
-        // Apply default type if configured and missing (uses the cached
-        // config/namespaces consumed by the unified write-validation path).
+        // Namespaces come from the executor cache so they are not re-parsed per
+        // call. Label format and namespace constraints are now enforced by the
+        // effective rule set inside `validate_for_write` (a0f0f342 migration); the
+        // explicit format check below stays as an early, precise error.
         let config = self.cached_config()?;
         let namespaces = self.cached_namespaces()?;
-        if let Some(ref validation_config) = config.validation {
-            let validator = crate::validation::IssueValidator::new(
-                validation_config.clone(),
-                namespaces.clone(),
-            );
-            validator.apply_default_type(&mut labels);
+
+        // Apply the configured default type when the issue carries no `type:*`
+        // label. This is a write-time CONVENIENCE (not validation enforcement), so
+        // it survives the a0f0f342 migration that removed the hard-coded
+        // validator. The `[validation].default_type` config field remains its
+        // input until the config->rules migration (task 0abaddc0).
+        if let Some(default_type) = config
+            .validation
+            .as_ref()
+            .and_then(|v| v.default_type.as_deref())
+        {
+            let has_type = labels.iter().any(|l| {
+                label_utils::parse_label(l)
+                    .map(|(ns, _)| ns == "type")
+                    .unwrap_or(false)
+            });
+            if !has_type {
+                labels.push(format!("type:{default_type}"));
+            }
         }
 
         // Validate all labels
