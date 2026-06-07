@@ -273,9 +273,10 @@ pub fn evaluate_local(issue: &Issue, rules: &RuleSet) -> Result<LocalEvaluation,
     let mut findings = Vec::new();
 
     // A `checker-command` is the escape hatch (DR §4.3) and is NOT evaluated on
-    // the write path (it runs in `jit validate`). Surface a non-blocking warning
-    // for any matching local checker-command rule so an `enforce=true` one is not
-    // a SILENT no-op — the user is told it was skipped here.
+    // the write path (it runs in `jit validate`). The loader already rejects
+    // `enforce=true` on a checker-command, so these are always non-blocking;
+    // surface a non-blocking warning so a matching rule is not a SILENT no-op —
+    // the user is told it was skipped here.
     for rule in &local_rules {
         if matches!(rule.assert, Assertion::CheckerCommand(_)) {
             findings.push(EnforcedFinding {

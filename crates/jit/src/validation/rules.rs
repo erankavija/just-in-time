@@ -743,6 +743,16 @@ struct RawLabelValuePattern {
 impl RawRule {
     fn into_rule(self, jit_root: &Path) -> Result<Rule, RuleConfigError> {
         let assert = self.assert.into_assertion(&self.name, jit_root)?;
+        // A `checker-command` is the validate/gate ESCAPE HATCH (DR §4.3) and is
+        // never evaluated on the write path, so it can NEVER block a write.
+        // Authoring `enforce = true` on one would silently be a no-op as a
+        // blocker; reject it at load time so the contradiction is explicit.
+        if self.enforce && matches!(assert, Assertion::CheckerCommand(_)) {
+            return Err(RuleConfigError::InvalidAssertion {
+                rule: self.name,
+                message: "checker-command rules cannot block writes; remove enforce".to_string(),
+            });
+        }
         let scope = assert.scope();
         Ok(Rule {
             name: self.name,
@@ -1144,6 +1154,47 @@ assert = { require-label = { label = "req:*" }, json-schema = "schemas/x.json" }
             }
             other => panic!("expected InvalidAssertion, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn test_checker_command_with_enforce_true_is_rejected() {
+        // A checker-command is the validate/gate escape hatch (DR §4.3); it can
+        // never block a write, so `enforce = true` on one is a contradiction and
+        // must be rejected at LOAD time rather than silently demoted (finding #2).
+        let toml = r#"
+[[rules]]
+name = "escape"
+severity = "error"
+enforce = true
+assert = { checker-command = "scripts/check.sh" }
+"#;
+        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        match err {
+            RuleConfigError::InvalidAssertion { rule, message } => {
+                assert_eq!(rule, "escape");
+                assert!(
+                    message.contains("checker-command") && message.contains("enforce"),
+                    "message was: {message}"
+                );
+            }
+            other => panic!("expected InvalidAssertion, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_checker_command_with_enforce_false_is_ok() {
+        // The same rule with enforce = false (the only valid form) must load.
+        let toml = r#"
+[[rules]]
+name = "escape"
+severity = "warn"
+enforce = false
+assert = { checker-command = "scripts/check.sh" }
+"#;
+        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        assert_eq!(set.rules.len(), 1);
+        assert!(!set.rules[0].enforce);
+        assert!(matches!(set.rules[0].assert, Assertion::CheckerCommand(_)));
     }
 
     #[test]

@@ -34,6 +34,7 @@
 //! reference. The round-trip test compares field-wise, excluding those two.
 
 use crate::validation::rules::{Assertion, Rule, RuleSet, Selector, TypeHierarchyKind};
+use std::collections::HashSet;
 
 /// A `rules.toml` body together with the schema files it references.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -84,9 +85,14 @@ pub fn serialize_ruleset(set: &RuleSet) -> SerializedRuleSet {
     rules_toml.push_str(FILE_HEADER);
 
     let mut schema_files: Vec<SchemaFile> = Vec::new();
+    // Track the schema file STEMS already used so two rule names that sanitize to
+    // the same stem (e.g. `default:label` and `default/label` both -> `default-label`)
+    // do not silently overwrite each other's `schemas/<stem>.json` (a rule would
+    // then validate against the wrong schema). Collisions get a numeric suffix.
+    let mut used_stems: HashSet<String> = HashSet::new();
 
     for rule in &set.rules {
-        render_rule(rule, &mut rules_toml, &mut schema_files);
+        render_rule(rule, &mut rules_toml, &mut schema_files, &mut used_stems);
         rules_toml.push('\n');
     }
 
@@ -94,6 +100,20 @@ pub fn serialize_ruleset(set: &RuleSet) -> SerializedRuleSet {
         rules_toml,
         schema_files,
     }
+}
+
+/// Pick a schema-file stem for `rule_name` that is unique within `used_stems`,
+/// inserting the chosen stem. Starts from the sanitized name; on collision
+/// appends `-2`, `-3`, … until unused. Guarantees no two schema files collide.
+fn unique_schema_stem(rule_name: &str, used_stems: &mut HashSet<String>) -> String {
+    let base = sanitize_rule_name(rule_name);
+    if used_stems.insert(base.clone()) {
+        return base;
+    }
+    (2..)
+        .map(|n| format!("{base}-{n}"))
+        .find(|candidate| used_stems.insert(candidate.clone()))
+        .expect("integer counter always yields an unused stem")
 }
 
 const FILE_HEADER: &str = "\
@@ -106,7 +126,12 @@ const FILE_HEADER: &str = "\
 ";
 
 /// Render one rule's `[[rules]]` block, appending any schema file it needs.
-fn render_rule(rule: &Rule, out: &mut String, schema_files: &mut Vec<SchemaFile>) {
+fn render_rule(
+    rule: &Rule,
+    out: &mut String,
+    schema_files: &mut Vec<SchemaFile>,
+    used_stems: &mut HashSet<String>,
+) {
     out.push_str("[[rules]]\n");
     out.push_str(&format!("name = {}\n", toml_basic_string(&rule.name)));
 
@@ -121,7 +146,7 @@ fn render_rule(rule: &Rule, out: &mut String, schema_files: &mut Vec<SchemaFile>
     out.push_str(&format!("enforce = {}\n", rule.enforce));
     out.push_str(&format!(
         "assert = {}\n",
-        render_assertion(&rule.name, &rule.assert, schema_files)
+        render_assertion(&rule.name, &rule.assert, schema_files, used_stems)
     ));
 }
 
@@ -154,6 +179,7 @@ fn render_assertion(
     rule_name: &str,
     assertion: &Assertion,
     schema_files: &mut Vec<SchemaFile>,
+    used_stems: &mut HashSet<String>,
 ) -> String {
     match assertion {
         Assertion::RequireLabel { label, min, max } => {
@@ -180,7 +206,7 @@ fn render_assertion(
             toml_literal_string(regex)
         ),
         Assertion::JsonSchema(source) => {
-            let file_name = format!("{}.json", sanitize_rule_name(rule_name));
+            let file_name = format!("{}.json", unique_schema_stem(rule_name, used_stems));
             schema_files.push(SchemaFile {
                 name: file_name.clone(),
                 content: pretty_schema(&source.schema),
@@ -518,6 +544,55 @@ assert = { label-value-pattern = { namespace = "sc", regex = '^\[hard\]\s+\w+' }
         let out = serialize_ruleset(&set);
         assert!(!out.rules_toml.contains("when = {}"));
         assert!(!out.rules_toml.contains("when = { }"));
+    }
+
+    #[test]
+    fn test_colliding_schema_rule_names_get_unique_files() {
+        // Two DISTINCT rule names that sanitize to the SAME stem
+        // (`a:b` and `a/b` both -> `a-b`) must NOT produce the same schema
+        // file name, or one schema would silently overwrite the other and a
+        // rule would validate against the wrong schema (finding #1).
+        let toml = r#"
+[[rules]]
+name = "a:b"
+severity = "error"
+assert = { json-schema = "schemas/first.json" }
+
+[[rules]]
+name = "a/b"
+severity = "error"
+assert = { json-schema = "schemas/second.json" }
+"#;
+        let dir = tempfile::tempdir().unwrap();
+        let schemas = dir.path().join("schemas");
+        std::fs::create_dir_all(&schemas).unwrap();
+        // Two DIFFERENT schema contents so an overwrite would be observable.
+        std::fs::write(schemas.join("first.json"), "{\"const\": 1}\n").unwrap();
+        std::fs::write(schemas.join("second.json"), "{\"const\": 2}\n").unwrap();
+        std::fs::write(dir.path().join("rules.toml"), toml).unwrap();
+        let set = RuleSet::load(dir.path()).unwrap();
+
+        let out = serialize_ruleset(&set);
+        // Both rules carry a JsonSchema, so two schema files are emitted.
+        assert_eq!(out.schema_files.len(), 2, "two json-schema rules");
+        // The file names must be UNIQUE despite the sanitized-name collision.
+        let names: HashSet<&str> = out.schema_files.iter().map(|f| f.name.as_str()).collect();
+        assert_eq!(
+            names.len(),
+            2,
+            "colliding sanitized names must yield distinct schema files, got {:?}",
+            out.schema_files.iter().map(|f| &f.name).collect::<Vec<_>>()
+        );
+        // And the two distinct schema VALUES are both preserved (no overwrite).
+        let contents: HashSet<&str> = out
+            .schema_files
+            .iter()
+            .map(|f| f.content.as_str())
+            .collect();
+        assert_eq!(contents.len(), 2, "both schema values must survive");
+
+        // The whole thing must round-trip: reload and re-serialize stable.
+        assert_round_trips(&set);
     }
 
     #[test]

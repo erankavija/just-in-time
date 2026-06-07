@@ -172,10 +172,6 @@ fn execute_command(
     // Spawn the process
     let mut child = cmd.spawn().context("Failed to spawn command")?;
 
-    // Save PID before waiting; needed to kill the process group on timeout.
-    #[cfg(unix)]
-    let child_pid = child.id();
-
     // Drain stdout/stderr in background threads to prevent a pipe-buffer
     // deadlock.  Commands like `cargo test` spawn many child processes that
     // together can produce more data than the OS pipe buffer (~64 KB).  If we
@@ -198,20 +194,14 @@ fn execute_command(
         })
     });
 
-    // Wait with timeout
+    // Wait with timeout. On timeout the helper kills the entire process GROUP
+    // (PGID == child PID, set via `process_group(0)` above) BEFORE reaping the
+    // leader, so any grandchildren still holding pipe ends (e.g. test binaries
+    // that outlived the killed `cargo` process) release them and the reader
+    // threads above can reach EOF. Killing the group before the leader is reaped
+    // is essential: once the leader is reaped its PID/PGID can be recycled, and a
+    // later group-kill could then signal an unrelated process group.
     let wait_result = wait_with_timeout(&mut child, timeout)?;
-
-    // On timeout, kill the entire process group so that any grandchildren still
-    // holding pipe ends (e.g. test binaries that outlived the killed `cargo`
-    // process) release them and the reader threads above can reach EOF.
-    #[cfg(unix)]
-    if wait_result.timed_out {
-        use nix::sys::signal::{kill, Signal};
-        use nix::unistd::Pid;
-        // A negative PID in kill(2) targets the process group with that PGID.
-        // PGID == child_pid because we called process_group(0) above.
-        let _ = kill(Pid::from_raw(-(child_pid as i32)), Signal::SIGKILL);
-    }
 
     let stdout = stdout_thread
         .and_then(|h| h.join().ok())
@@ -228,9 +218,9 @@ fn execute_command(
     })
 }
 
-/// Wait for a child process with timeout
+/// Wait for a child process with timeout. `exit_code` is `None` on timeout
+/// (the child was killed) and otherwise the process exit code.
 struct WaitResult {
-    timed_out: bool,
     exit_code: Option<i32>,
 }
 
@@ -241,23 +231,40 @@ fn wait_with_timeout(child: &mut std::process::Child, timeout: Duration) -> Resu
         match child.try_wait()? {
             Some(status) => {
                 return Ok(WaitResult {
-                    timed_out: false,
                     exit_code: status.code(),
                 })
             }
             None => {
                 if start.elapsed() >= timeout {
-                    let _ = child.kill();
+                    // Signal the whole process GROUP first, then reap the leader
+                    // exactly once. The group MUST be signaled before the leader
+                    // is reaped: once reaped, the PID/PGID can be recycled by the
+                    // OS and a later group-kill could hit an unrelated group.
+                    kill_process_group(child);
                     let _ = child.wait();
-                    return Ok(WaitResult {
-                        timed_out: true,
-                        exit_code: None,
-                    });
+                    return Ok(WaitResult { exit_code: None });
                 }
                 std::thread::sleep(Duration::from_millis(100));
             }
         }
     }
+}
+
+/// On unix, send `SIGKILL` to the child's process GROUP (negative PGID) so all
+/// descendants in the group die, not just the leader. PGID == child PID because
+/// the child was spawned with `process_group(0)`. On other platforms, fall back
+/// to killing just the leader.
+#[cfg(unix)]
+fn kill_process_group(child: &mut std::process::Child) {
+    use nix::sys::signal::{kill, Signal};
+    use nix::unistd::Pid;
+    // A negative PID in kill(2) targets the process group with that PGID.
+    let _ = kill(Pid::from_raw(-(child.id() as i32)), Signal::SIGKILL);
+}
+
+#[cfg(not(unix))]
+fn kill_process_group(child: &mut std::process::Child) {
+    let _ = child.kill();
 }
 
 /// Git context information
@@ -392,6 +399,49 @@ mod tests {
         let result = result.unwrap();
         assert_eq!(result.status, GateRunStatus::Error);
         assert_eq!(result.exit_code, None); // No exit code on timeout
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_timeout_kills_process_group_and_does_not_deadlock() {
+        // The command spawns a long-lived BACKGROUND grandchild that inherits the
+        // stdout pipe and would keep it open for 60s. With the group-kill on
+        // timeout, the whole process group (including the grandchild) is killed,
+        // the reader threads reach EOF, and the call returns promptly instead of
+        // deadlocking on pipe drain. This exercises the reap-then-signal fix (#3):
+        // the group is signaled BEFORE the leader is reaped.
+        let checker = GateChecker::Exec {
+            // Background a sleeper that holds the inherited stdout fd, then the
+            // shell itself sleeps past the timeout.
+            command: "sleep 60 & sleep 30".to_string(),
+            timeout_seconds: 1,
+            working_dir: None,
+            env: HashMap::new(),
+            pass_context: false,
+            prompt: None,
+            prompt_file: None,
+        };
+
+        let temp_dir = std::env::temp_dir();
+        let start = Instant::now();
+        let result = execute_gate_checker(
+            "test-gate",
+            "test-issue",
+            GateStage::Postcheck,
+            &checker,
+            &temp_dir,
+        )
+        .unwrap();
+
+        // Returns shortly after the 1s timeout (well under the 30/60s sleeps),
+        // proving the background grandchild's pipe was released by the group-kill.
+        assert!(
+            start.elapsed() < Duration::from_secs(10),
+            "timeout should return promptly, took {:?}",
+            start.elapsed()
+        );
+        assert_eq!(result.status, GateRunStatus::Error);
+        assert_eq!(result.exit_code, None);
     }
 
     #[test]
