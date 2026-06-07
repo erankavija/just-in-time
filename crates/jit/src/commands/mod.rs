@@ -534,7 +534,31 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// is the sole source and is left untouched), so re-init never clobbers user
     /// edits. Returns `true` when it wrote the file, `false` when it was a no-op.
     pub fn scaffold_default_rules(&self) -> Result<bool> {
+        use crate::storage::worktree_paths::WorktreePaths;
+        use crate::storage::FileLocker;
+        use std::time::Duration;
+
         let jit_root = self.storage.root();
+
+        // Hold the repo write lock across the existence check AND the scaffold
+        // writes, so two concurrent `jit init` runs cannot both pass the
+        // absent-file check and then race on the fixed temp paths for rules.toml
+        // and the schema files (MF4: materialize under the write lock). The lock
+        // lives in the shared control plane (`.git/jit/locks/`), the same plane
+        // claims coordination uses. When the repo is not under git there is no
+        // cross-process coordination plane (and no concurrency to guard), so we
+        // scaffold without it -- mirroring `init` returning no worktree identity
+        // outside a git repo.
+        let _guard = match WorktreePaths::detect() {
+            Ok(paths) => {
+                let lock_path = paths.shared_jit.join("locks/rules.lock");
+                std::fs::create_dir_all(lock_path.parent().unwrap())
+                    .context("Failed to create control-plane locks directory")?;
+                Some(FileLocker::new(Duration::from_secs(5)).lock_exclusive(&lock_path)?)
+            }
+            Err(_) => None,
+        };
+
         if jit_root.join("rules.toml").exists() {
             return Ok(false);
         }
