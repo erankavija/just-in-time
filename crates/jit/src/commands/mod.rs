@@ -539,17 +539,23 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// `fresh_defaults` is the in-code INTENDED default config (e.g.
     /// `HierarchyTemplate::intended_default_config()`, decision D6) used ONLY to
-    /// derive the complete `rules.toml` for a FRESH repo, whose on-disk
-    /// `config.toml` ships clean (no enforcement keys / constraints). For a LEGACY
-    /// or COEXISTENCE repo the complete ruleset is derived from the live config
-    /// (which still carries the keys) and those keys are then stripped. A repo
-    /// with `rules.toml` present and no legacy keys is a true no-op.
+    /// derive the complete `rules.toml` for a BRAND-NEW repo (`config.toml` did
+    /// not pre-exist), whose on-disk `config.toml` ships clean and for which the
+    /// rich starter ruleset is the intended default. `config_already_existed` is
+    /// the caller's "did config.toml exist before init?" signal: when it is true
+    /// and there are no legacy keys / no `rules.toml`, migration MATERIALIZES the
+    /// repo's actual current behavior (bare defaults from the live config) rather
+    /// than the rich starter defaults, so init changes nothing observable. For a
+    /// LEGACY or COEXISTENCE repo the complete ruleset is derived from the live
+    /// config (which still carries the keys) and those keys are then stripped. A
+    /// repo with `rules.toml` present and no legacy keys is a true no-op.
     ///
     /// Returns the [`MigrationOutcome`](crate::validation::migration::MigrationOutcome)
     /// so the caller can report what happened.
     pub fn migrate_or_scaffold_rules(
         &self,
         fresh_defaults: &crate::config::JitConfig,
+        config_already_existed: bool,
     ) -> Result<crate::validation::migration::MigrationOutcome> {
         // Parse config.toml WITHOUT the deprecated-key warning scan: the migration
         // is about to remove those keys (legacy path), and a fresh repo's clean
@@ -571,6 +577,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             &config,
             &namespaces,
             &(fresh_defaults.clone(), fresh_namespaces),
+            config_already_existed,
         )
     }
 
