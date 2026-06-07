@@ -50,6 +50,11 @@ fn create_epic(temp: &TempDir, with_req: bool) -> String {
         "An epic".to_string(),
         "--label".to_string(),
         "type:epic".to_string(),
+        // Strategic-consistency is a built-in default warning: give the epic its
+        // identifying `epic:*` label so the only finding under test is the user
+        // rule, not the hierarchy warning.
+        "--label".to_string(),
+        "epic:auth".to_string(),
     ];
     if with_req {
         args.push("--label".to_string());

@@ -7,25 +7,6 @@ use crate::type_hierarchy::{
 };
 use anyhow::Context;
 
-/// Validation configuration flags loaded from config.toml.
-#[derive(Debug, Clone)]
-struct ValidationConfigFlags {
-    #[allow(dead_code)] // Reserved for future strictness levels (strict/loose/permissive)
-    strictness: String,
-    warn_orphaned_leaves: bool,
-    warn_strategic_consistency: bool,
-}
-
-impl Default for ValidationConfigFlags {
-    fn default() -> Self {
-        Self {
-            strictness: "loose".to_string(),
-            warn_orphaned_leaves: true,
-            warn_strategic_consistency: true,
-        }
-    }
-}
-
 impl<S: IssueStore> CommandExecutor<S> {
     /// Validate with optional fix mode.
     ///
@@ -724,106 +705,6 @@ impl<S: IssueStore> CommandExecutor<S> {
             gated,
             total: issues.len(),
         })
-    }
-
-    /// Check for validation warnings on a specific issue.
-    ///
-    /// Returns warnings for:
-    /// - Strategic types (epic, milestone) missing identifying labels
-    /// - Leaf types (task) without parent associations
-    ///
-    /// # Arguments
-    ///
-    /// * `issue_id` - The ID of the issue to check
-    ///
-    /// # Returns
-    ///
-    /// A vector of validation warnings (empty if no warnings)
-    pub fn check_warnings(
-        &self,
-        issue_id: &str,
-    ) -> Result<Vec<crate::type_hierarchy::ValidationWarning>> {
-        use crate::type_hierarchy::{validate_orphans, validate_strategic_labels};
-
-        // Load the issue
-        let issue = self.storage.load_issue(issue_id)?;
-
-        // Load hierarchy config from file or use defaults
-        let config = self.load_hierarchy_config()?;
-
-        // Load validation config to check toggles
-        let validation_config = self.load_validation_config()?;
-
-        // Collect all warnings
-        let mut warnings = Vec::new();
-
-        // Check strategic label consistency (if enabled)
-        if validation_config.warn_strategic_consistency {
-            warnings.extend(validate_strategic_labels(&config, &issue));
-        }
-
-        // Check for orphaned leaves (if enabled)
-        if validation_config.warn_orphaned_leaves {
-            warnings.extend(validate_orphans(&config, &issue));
-        }
-
-        Ok(warnings)
-    }
-
-    /// Load hierarchy configuration from config.toml or fall back to defaults.
-    fn load_hierarchy_config(&self) -> Result<crate::type_hierarchy::HierarchyConfig> {
-        use crate::config::JitConfig;
-        use crate::type_hierarchy::HierarchyConfig;
-
-        let jit_config = JitConfig::load(self.storage.root())?;
-
-        if let Some(hierarchy_toml) = jit_config.type_hierarchy {
-            // Use config from file
-            let label_associations = hierarchy_toml.label_associations.unwrap_or_default();
-            HierarchyConfig::new(hierarchy_toml.types, label_associations)
-                .map_err(|e| anyhow::anyhow!("Invalid hierarchy config: {}", e))
-        } else {
-            // Fall back to defaults
-            Ok(HierarchyConfig::default())
-        }
-    }
-
-    /// Load validation configuration from config.toml or use defaults.
-    fn load_validation_config(&self) -> Result<ValidationConfigFlags> {
-        use crate::config::JitConfig;
-
-        let jit_config = JitConfig::load(self.storage.root())?;
-
-        let flags = if let Some(validation) = jit_config.validation {
-            ValidationConfigFlags {
-                strictness: validation.strictness.unwrap_or_else(|| "loose".to_string()),
-                warn_orphaned_leaves: validation.warn_orphaned_leaves.unwrap_or(true),
-                warn_strategic_consistency: validation.warn_strategic_consistency.unwrap_or(true),
-            }
-        } else {
-            ValidationConfigFlags::default()
-        };
-
-        Ok(flags)
-    }
-
-    /// Collect all validation warnings for all issues in the repository.
-    ///
-    /// Returns a vector of (issue_id, warnings) pairs for all issues with warnings.
-    pub fn collect_all_warnings(
-        &self,
-    ) -> Result<Vec<(String, Vec<crate::type_hierarchy::ValidationWarning>)>> {
-        let issues = self.storage.list_issues()?;
-        let mut all_warnings = Vec::new();
-
-        for issue in issues {
-            let warnings = self.check_warnings(&issue.id)?;
-            if !warnings.is_empty() {
-                all_warnings.push((issue.id.clone(), warnings));
-            }
-        }
-
-        Ok(all_warnings)
     }
 
     /// Validate transitive reduction of dependency graph.

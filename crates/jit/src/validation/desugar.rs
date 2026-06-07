@@ -76,7 +76,8 @@ pub fn desugar(assertion: &Assertion) -> Option<Value> {
         | Assertion::CheckerCommand(_)
         | Assertion::LabelCoverage { .. }
         | Assertion::LabelReference { .. }
-        | Assertion::DependencyShape { .. } => None,
+        | Assertion::DependencyShape { .. }
+        | Assertion::TypeHierarchy { .. } => None,
     }
 }
 

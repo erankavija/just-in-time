@@ -152,13 +152,16 @@ fn parity_unknown_namespace_fails_validate_but_does_not_block_when_reject_off() 
 }
 
 #[test]
-fn parity_unknown_namespace_blocks_write_when_reject_on() {
+fn parity_unknown_namespace_blocks_write_when_enforce_registry_on() {
     let mut v = validation();
-    v.reject_malformed_labels = Some(true);
+    v.enforce_namespace_registry = Some(true);
     let reg = registry(vec![("type", LabelNamespace::new("Type", true))]);
     let rules = default_ruleset(&v, &reg);
 
-    // Legacy: with reject on, the registry check rejected on the write path.
+    // Legacy: the write-path registry block was gated on
+    // `enforce_namespace_registry` (the legacy `validate_namespace_registry`
+    // returned early when it was off). So `enforce` follows that flag, NOT
+    // `reject_malformed_labels`.
     assert!(blocks(&rules, &["unknown:x"]));
     assert!(!blocks(&rules, &["type:task"]));
 }
@@ -252,4 +255,141 @@ assert = { require-label = { label = "req:*", min = 1 } }
     assert!(blocks(&rules, &["type:epic"]));
     // A compliant epic passes both.
     assert!(!blocks(&rules, &["type:epic", "req:REQ-01"]));
+}
+
+// ---------------------------------------------------------------------------
+// A. unknown type label (legacy validate_type_hierarchy unknown-type check):
+// a `type:` value not in the configured hierarchy FAILS validate, never blocks.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn parity_unknown_type_fails_validate_but_does_not_block() {
+    // With no `[type_hierarchy]`, the registry falls back to the default 4-level
+    // hierarchy (milestone/epic/story/task), exactly as legacy did.
+    let rules = default_ruleset(&validation(), &registry(vec![]));
+
+    // Legacy `validate_type_hierarchy` flagged an unknown type as a validate
+    // error and did NOT block the write.
+    assert!(
+        fails_validate(&rules, &["type:widget"]),
+        "unknown type must FAIL validate"
+    );
+    assert!(
+        !blocks(&rules, &["type:widget"]),
+        "unknown type must NOT block a write"
+    );
+    // A known hierarchy type passes.
+    assert!(!fails_validate(&rules, &["type:task"]));
+}
+
+// ---------------------------------------------------------------------------
+// B. orphan-leaf + strategic-consistency as DEFAULT GRAPH rules: each produces
+// the same warning the legacy validate_orphans / validate_strategic_labels did.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn parity_orphan_leaf_and_strategic_consistency_as_default_graph_rules() {
+    use jit::type_hierarchy::{validate_orphans, validate_strategic_labels, HierarchyConfig};
+    use jit::validation::graph::evaluate_graph;
+    use jit::validation::rules::Scope;
+
+    // Default registry -> default 4-level hierarchy, both toggles default-on.
+    let rules = default_ruleset(&validation(), &registry(vec![]));
+    let graph_rules: Vec<_> = rules
+        .rules
+        .iter()
+        .filter(|r| r.scope == Scope::Graph)
+        .collect();
+    // Exactly the two type-hierarchy graph defaults are present.
+    let mut names: Vec<&str> = graph_rules.iter().map(|r| r.name.as_str()).collect();
+    names.sort();
+    assert_eq!(
+        names,
+        vec!["default:orphan-leaf", "default:strategic-consistency"]
+    );
+
+    let orphan_task = issue(&["type:task"]); // leaf, no parent label
+    let bare_epic = issue(&["type:epic"]); // strategic, no epic:* label
+    let issues = vec![orphan_task.clone(), bare_epic.clone()];
+
+    let findings = evaluate_graph(&graph_rules, &issues);
+
+    // The orphan-leaf finding is attributed to the task and matches the legacy
+    // domain function firing for that issue.
+    let cfg = HierarchyConfig::default();
+    assert_eq!(validate_orphans(&cfg, &orphan_task).len(), 1);
+    let orphan_findings: Vec<_> = findings
+        .iter()
+        .filter(|f| f.finding.rule == "default:orphan-leaf")
+        .collect();
+    assert_eq!(orphan_findings.len(), 1);
+    assert_eq!(
+        orphan_findings[0].issue_id.as_deref(),
+        Some(orphan_task.id.as_str())
+    );
+    assert!(orphan_findings[0].finding.message.contains("orphaned leaf"));
+
+    // The strategic-consistency finding is attributed to the epic.
+    assert_eq!(validate_strategic_labels(&cfg, &bare_epic).len(), 1);
+    let strategic_findings: Vec<_> = findings
+        .iter()
+        .filter(|f| f.finding.rule == "default:strategic-consistency")
+        .collect();
+    assert_eq!(strategic_findings.len(), 1);
+    assert_eq!(
+        strategic_findings[0].issue_id.as_deref(),
+        Some(bare_epic.id.as_str())
+    );
+    assert!(strategic_findings[0].finding.message.contains("epic:*"));
+
+    // Legacy was warn-only: no graph finding is error severity.
+    assert!(findings
+        .iter()
+        .all(|f| f.finding.severity != Severity::Error));
+}
+
+#[test]
+fn parity_type_hierarchy_graph_rules_gated_by_toggles() {
+    use jit::validation::rules::Scope;
+
+    // Both toggles off => neither default graph rule is emitted.
+    let mut v = validation();
+    v.warn_orphaned_leaves = Some(false);
+    v.warn_strategic_consistency = Some(false);
+    let rules = default_ruleset(&v, &registry(vec![]));
+    assert!(rules.rules.iter().all(|r| r.scope != Scope::Graph));
+}
+
+// ---------------------------------------------------------------------------
+// C. namespace-registry enforce follows enforce_namespace_registry, NOT
+// reject_malformed_labels.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn parity_namespace_registry_enforce_true_blocks_write() {
+    let mut v = validation();
+    v.enforce_namespace_registry = Some(true);
+    let reg = registry(vec![("type", LabelNamespace::new("Type", true))]);
+    let rules = default_ruleset(&v, &reg);
+
+    // enforce_namespace_registry = true => unknown namespace BLOCKS the write.
+    assert!(blocks(&rules, &["unknown:x"]));
+    assert!(!blocks(&rules, &["type:task"]));
+}
+
+#[test]
+fn parity_namespace_registry_enforce_false_warns_only() {
+    let mut v = validation();
+    v.enforce_namespace_registry = Some(false);
+    // reject_malformed_labels = true must NOT, on its own, make the registry
+    // rule block (parity regression fix: registry enforce is driven by
+    // enforce_namespace_registry only).
+    v.reject_malformed_labels = Some(true);
+    let reg = registry(vec![("type", LabelNamespace::new("Type", true))]);
+    let rules = default_ruleset(&v, &reg);
+
+    // Surfaces as a validate error (severity = error) ...
+    assert!(fails_validate(&rules, &["unknown:x"]));
+    // ... but does NOT block the write (enforce follows enforce_namespace_registry).
+    assert!(!blocks(&rules, &["unknown:x"]));
 }

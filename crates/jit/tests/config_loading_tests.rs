@@ -108,8 +108,16 @@ warn_strategic_consistency = false
         )
         .unwrap();
 
-    // Check warnings - should be empty because toggles are off
-    let warnings = executor.check_warnings(&issue_id).unwrap();
+    // The orphan/strategic warnings are now built-in GRAPH rules gated by the
+    // same `[validation]` toggles. With both toggles off, neither default graph
+    // rule is emitted, so no warning finding pertains to the issue.
+    let issues = executor.storage().list_issues().unwrap();
+    let warnings: Vec<_> = executor
+        .evaluate_graph_rules(&issues)
+        .unwrap()
+        .into_iter()
+        .filter(|gf| gf.issue_id.as_deref() == Some(issue_id.as_str()))
+        .collect();
     assert!(
         warnings.is_empty(),
         "Expected no warnings when toggles disabled, got: {:?}",

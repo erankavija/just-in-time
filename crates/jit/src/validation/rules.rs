@@ -25,6 +25,7 @@ use thiserror::Error;
 
 use crate::domain::Issue;
 use crate::labels as label_utils;
+use crate::type_hierarchy::HierarchyConfig;
 
 /// Errors that can occur while loading and parsing `.jit/rules.toml`.
 ///
@@ -402,6 +403,47 @@ pub enum Assertion {
         /// Raw configuration table for the dependency-shape rule.
         config: toml::value::Table,
     },
+    /// A built-in type-hierarchy warning (orphan-leaf or strategic-consistency).
+    /// Graph scope. Constructed ONLY programmatically as a built-in default rule
+    /// (see [`default_ruleset`](crate::validation::defaults::default_ruleset));
+    /// it is not authorable in `rules.toml`. Evaluation reuses the existing
+    /// [`crate::type_hierarchy`] domain functions rather than reimplementing the
+    /// hierarchy logic, so the repo's [`HierarchyConfig`] is carried inline.
+    TypeHierarchy {
+        /// Which legacy hierarchy check this rule performs.
+        kind: TypeHierarchyKind,
+        /// The repo's hierarchy configuration, passed straight to the reused
+        /// domain function during evaluation.
+        config: HierarchyConfig,
+    },
+}
+
+/// The legacy type-hierarchy warning expressed by an
+/// [`Assertion::TypeHierarchy`].
+///
+/// Each variant reuses one existing domain function over the whole issue set:
+/// `OrphanLeaf` -> [`crate::type_hierarchy::validate_orphans`],
+/// `StrategicConsistency` -> [`crate::type_hierarchy::validate_strategic_labels`].
+///
+/// # Examples
+///
+/// ```
+/// use jit::type_hierarchy::HierarchyConfig;
+/// use jit::validation::rules::{Assertion, Scope, TypeHierarchyKind};
+///
+/// let assertion = Assertion::TypeHierarchy {
+///     kind: TypeHierarchyKind::OrphanLeaf,
+///     config: HierarchyConfig::default(),
+/// };
+/// // Type-hierarchy checks need the whole issue set, so they are graph-scoped.
+/// assert_eq!(assertion.scope(), Scope::Graph);
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TypeHierarchyKind {
+    /// A leaf-level issue (e.g. a task) carries no parent association label.
+    OrphanLeaf,
+    /// A strategic-type issue (e.g. an epic) is missing its identifying label.
+    StrategicConsistency,
 }
 
 impl Assertion {
@@ -424,7 +466,8 @@ impl Assertion {
         match self {
             Assertion::LabelCoverage { .. }
             | Assertion::LabelReference { .. }
-            | Assertion::DependencyShape { .. } => Scope::Graph,
+            | Assertion::DependencyShape { .. }
+            | Assertion::TypeHierarchy { .. } => Scope::Graph,
             _ => Scope::Local,
         }
     }
