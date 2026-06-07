@@ -1,21 +1,33 @@
 {
   "id": "f6a704d0-1f01-447b-a8aa-42251fa7c3eb",
   "title": "Generic issue & label validation engine (JSON-Schema-based), with SDD as first application",
-  "description": "# Generic Issue & Label Validation Engine\n\nA configurable, declarative validation engine for issues and labels, built on\nJSON Schema. Rules live in `.jit/rules.toml`; SDD is the first application,\nshipped only as example rules + schemas. The engine is deliberately general so\njit becomes a flexible substrate for many methodologies, not an SDD-specific\ntool.\n\n## Design\n\nThe authoritative design and all decisions live in the linked decision record\n`dev/active/f6a704d0-validation-engine.md` (revision 2). This description does\nnot restate it.\n\n## Success Criteria\n\n- [hard] Rules load from `.jit/rules.toml`; schemas inline or from `.jit/schemas/`; the loader rejects mixing shorthand and raw schema in one rule.\n- [hard] Selector matrix (type, label, state, doc-type) matches issues; applicable rules union.\n- [hard] Local rules evaluate on create/update; per-rule `enforce` (default false) blocks when set; `--force` bypasses.\n- [hard] Graph rules (coverage, reference-integrity, dependency-shape) run only in `jit validate`/gate checkers.\n- [hard] Validation runs against the enriched projection; Markdown in the default build, HTML/XML behind optional features, all behind one parser trait.\n- [hard] JSON Schema validation via the `jsonschema` crate; shorthand kinds desugar to JSON Schema.\n- [hard] The COMPLETE set of existing checks (validation.rs + validate.rs + `[validation]` + `[namespaces]` enforcement) is re-expressed as default rules with preserved behavior; legacy enforcement keys are migrated and removed (no backward-compat aliases).\n- [hard] `jit init` scaffolds defaults; existing repos migrate without silently losing checks.\n- [hard] `jit validate [<id>] [--json] [--explain]` reports rule name, severity, message; gates invoke it via `$JIT_ISSUE_ID`.\n- [hard] SDD ships as example rules + schemas + docs; description `[hard]`/`[aspirational]` criteria are canonical and labels derived; >=1 non-SDD example included.\n- [hard] `cargo clippy --workspace --all-targets` and `cargo fmt` clean; tests cover engine, projection, parsers, desugaring, migration.\n- [aspirational] The `x-jit-*` custom-keyword extension point is demonstrated.\n\n## Non-goals\n\n- Delta-spec authoring / merge-on-Done (dropped).\n- CEL as a top-level rule type (deferred; checker-command covers the gap).\n- A preset subsystem (SDD is docs/examples).\n- Backward-compat aliases for migrated legacy config keys (hard migration).\n- Deep per-format semantic adapters (one generic projection + JSON Schema).\n",
-  "state": "ready",
+  "description": "# Generic Issue & Label Validation Engine\n\nA configurable, declarative validation engine for issues and labels, built on\nJSON Schema. Rules live in `.jit/rules.toml`; SDD is the first application,\nshipped only as example rules + schemas. The engine is deliberately general so\njit becomes a flexible substrate for many methodologies, not an SDD-specific\ntool.\n\n## Design\n\nThe authoritative design and all decisions live in the linked decision record\n`dev/active/f6a704d0-validation-engine.md` (revision 2). This description does\nnot restate it.\n\n## Success Criteria\n\n- [hard] Rules load from `.jit/rules.toml`; schemas inline or from `.jit/schemas/`; the loader rejects mixing shorthand and raw schema in one rule.\n- [hard] Selector matrix (type, label, state, doc-type) matches issues; applicable rules union.\n- [hard] Local rules evaluate on create/update; per-rule `enforce` (default false) blocks when set; `--force` bypasses.\n- [hard] Graph rules (coverage, reference-integrity, dependency-shape) run only in `jit validate`/gate checkers.\n- [hard] Validation runs against the enriched projection; Markdown in the default build, HTML/XML behind optional features, all behind one parser trait.\n- [hard] JSON Schema validation via the `jsonschema` crate; shorthand kinds desugar to JSON Schema.\n- [hard] The COMPLETE set of existing checks (validation.rs + validate.rs + `[validation]` + `[namespaces]` enforcement) is re-expressed as default rules with preserved behavior; legacy enforcement keys are migrated and removed (no backward-compat aliases).\n- [hard] `jit init` scaffolds defaults; existing repos migrate without silently losing checks.\n- [hard] `jit validate [<id>] [--json] [--explain]` reports rule name, severity, message; gates invoke it via `$JIT_ISSUE_ID`.\n- [hard] SDD ships as example rules + schemas + docs; description `[hard]`/`[aspirational]` criteria are canonical and labels derived; >=1 non-SDD example included.\n- [hard] `cargo clippy --workspace --all-targets` and `cargo fmt` clean; tests cover engine, projection, parsers, desugaring, migration.\n- [aspirational] The `x-jit-*` custom-keyword extension point is demonstrated.\n\n## Non-goals\n\n- Delta-spec authoring / merge-on-Done (dropped).\n- CEL as a top-level rule type (deferred; checker-command covers the gap).\n- A preset subsystem (SDD is docs/examples).\n- Backward-compat aliases for migrated legacy config keys (hard migration).\n- Deep per-format semantic adapters (one generic projection + JSON Schema).\n\n\n## Scope Expansion 2 (2026-06-07, user-directed after epic-gate review)\n\nThe epic-level code-review gate surfaced findings; the user expanded scope. Amended/added criteria (tracked as child tasks 5e79ba48/e93af54b/2fb9f910/d4188154; see dev/active/f6a704d0-expansion2-plan.md):\n\n- [hard] Criterion 5 AMENDED: validation selects the content parser per-issue via a `content_format` field, with a per-repo config default and Markdown fallback; HTML/XML parsers (behind features) are exercised IN PRODUCTION, and a CI `--features html,xml` job executes the cross-format path. (task e93af54b)\n- [hard] Criteria 7/8 AMENDED (hard removal): legacy `[validation]` enforcement keys + `[namespaces].{values,pattern,required}` parsing and the entire migration/coexistence/deprecated-scan machinery are REMOVED; `rules.toml` is the sole source; `jit init` scaffolds a fixed default; an absent rules.toml builds defaults in-memory (no read-path write) and is materialized only by init. (task d4188154)\n- [hard] jit AND gf2 are migrated to rules.toml as deliverables. (task 2fb9f910; this repo already dogfooded)\n- [hard] Epic-review correctness findings fixed: schema-name collision (serialize), checker-command `enforce=true` rejected at load, gate-execution PID-safety (reap-then-signal ordering). (task 5e79ba48)\n- [aspirational deviation] custom `label_regex` validate-path deviation remains documented (DR §8.3a); after hard removal, label_regex itself is gone, so this becomes moot for new repos.",
+  "state": "in_progress",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:project-lead",
   "dependencies": [
-    "a6daa05d-510b-47e3-8e15-c6cc5b5fa66b",
-    "00525fe0-9193-4f12-91dc-2ed1848de047",
     "33f23ec7-8d51-4640-8529-88ed0d85d669",
-    "0abaddc0-9433-42a6-9572-bb08995420ce"
+    "00525fe0-9193-4f12-91dc-2ed1848de047",
+    "a6daa05d-510b-47e3-8e15-c6cc5b5fa66b",
+    "0abaddc0-9433-42a6-9572-bb08995420ce",
+    "d4188154-f465-44f0-9b63-753ad1494204"
   ],
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-07T15:30:10.944816525Z"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-07T15:32:08.172003114Z"
+    }
+  },
   "context": {},
   "documents": [
     {
@@ -39,5 +51,5 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-06-06T15:48:56.227134229+00:00",
-  "updated_at": "2026-06-07T15:29:06.861867241+00:00"
+  "updated_at": "2026-06-07T18:00:18.773829055+00:00"
 }

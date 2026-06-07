@@ -1,0 +1,23 @@
+{
+  "id": "e93af54b-af11-4512-ba34-8122251de039",
+  "title": "Format-agnostic validation: per-issue content_format + repo default + production parser dispatch",
+  "description": "",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "cargo-ci",
+    "cargo-ci-features",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:validation-engine"
+  ],
+  "created_at": "2026-06-07T17:58:58.126685091+00:00",
+  "updated_at": "2026-06-07T17:58:58.126693811+00:00"
+}

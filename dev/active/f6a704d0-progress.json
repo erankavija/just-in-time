@@ -1,7 +1,7 @@
 {
   "epic_id": "f6a704d0-1f01-447b-a8aa-42251fa7c3eb",
   "epic_short_id": "f6a704d0",
-  "current_wave": 7,
+  "current_wave": 8,
   "waves": [
     {
       "wave_number": 1,
@@ -121,6 +121,40 @@
           "status": "done"
         }
       ]
+    },
+    {
+      "wave_number": 8,
+      "note": "Scope Expansion 2 (user-directed after epic-gate review): findings + format-agnostic + BC hard removal + gf2 migration. Plan: dev/active/f6a704d0-expansion2-plan.md (v2). Sequencing: A,B parallel -> C (gf2 migrate, last use of migration code) -> D (hard removal).",
+      "issues": [
+        {
+          "id": "5e79ba48",
+          "short_id": "5e79ba48",
+          "title": "Fix epic-review correctness findings (schema collision, checker-command enforce, gate PID)",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "e93af54b",
+          "short_id": "e93af54b",
+          "title": "Format-agnostic validation: per-issue content_format + repo default + parser dispatch",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "2fb9f910",
+          "short_id": "2fb9f910",
+          "title": "Migrate gf2 (and verify this repo) to rules.toml",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "d4188154",
+          "short_id": "d4188154",
+          "title": "Hard-remove legacy config + migration backward-compat",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
     }
   ],
   "created_during_execution": [],
@@ -159,6 +193,13 @@
       "topic": "planning failure: first impl shipped a PARTIAL migration (kept 6 of 8 [validation] keys live, hard-coded rules remain) because orphan/strategic graph warnings (Assertion::TypeHierarchy) have NO rules.toml surface, so DR 8.2/8.3 'single source of truth / no hard-coded rules' was not achievable as scoped. Adversarial review FAILed it on DR conformance.",
       "decision": "User: planning failure; EXPAND scope to do it properly (add the missing TOML surface + full migration), plan it, dispatch a plan reviewer, drive to completion when green",
       "resolution": "DONE. Plan v2 implemented (worktree-agent-0abaddc0-full); 2 rework rounds (D6 template+idempotency; then materialize-existing + schema no-clobber). Dogfooded this repo. gates green at merge 5c91268. NOTE: user flagged backward-compat work as largely wasted (one real consumer ../gf2) - memory feedback-jit-single-user-no-backward-compat."
+    },
+    {
+      "wave": 8,
+      "issue": "f6a704d0(epic gate)",
+      "topic": "epic-level code-review found 4 findings (schema collision, checker-command enforce ignored, pre-existing gate PID bug, production hardcodes Markdown defeating format-agnostic design)",
+      "decision": "User EXPANDED SCOPE: fix findings; per-issue content_format + repo default + production parser dispatch; HARD-REMOVE migration/backward-compat (only jit+gf2 pre-1.0, both migrated); migrate jit+gf2 as deliverables. Plan-reviewed v2.",
+      "resolution": "IN PROGRESS \u2014 4 tasks created+wired (A 5e79ba48, B e93af54b, C 2fb9f910, D d4188154). See f6a704d0-handoff-2.md + expansion2-plan.md. One flagged deviation: auto-scaffold-on-read changed to in-memory-default-on-read (plan MF4)."
     }
   ],
   "rework_counts": {
@@ -177,6 +218,7 @@
   },
   "started_at": "2026-06-06T00:00:00Z",
   "handoffs": [
-    "dev/active/f6a704d0-handoff.md"
+    "dev/active/f6a704d0-handoff.md",
+    "dev/active/f6a704d0-handoff-2.md"
   ]
 }
