@@ -57,14 +57,21 @@ SDD is worth calling out because it exercises the engine's harder features while
 illustrating a discipline many teams want: the description is the **single source
 of truth**, and labels are **derived** from it.
 
-- An epic's `## Success Criteria` section lists criteria, each marked `[hard]` or
-  `[aspirational]` and carrying a stable id (`REQ-01`).
+- An epic's specification body has `## Requirements`, `## Scenarios`, and
+  `## Success Criteria` sections; each criterion is marked `[hard]` or
+  `[aspirational]` and carries a stable id (`REQ-01`).
+- A `json-schema` rule validates that **structure**: non-empty Requirements
+  (`REQ-N: ...`), Scenarios (`Given ... When ... Then ...`), and Success Criteria
+  sections, with at least one `[hard]` criterion.
 - `req:<id>` (on the epic) and `satisfies:<id>` (on children) are derived from
   those criteria — never an independent source.
 - A `label-coverage` graph rule treats the canonical criteria as the *source
   set* and checks that each `[hard]` one is satisfied by a child.
-- A `label-reference` graph rule checks the inverse: every `satisfies:` resolves
-  to a declared `req:`.
+- Two `label-reference` graph rules check the references in both directions:
+  every `satisfies:` resolves to a declared `req:` (no dangling reference), and
+  every declared `req:` is used by some `satisfies:` (no stray/invented `req:`
+  label). Together with coverage this closes the derivation loop so a `req:`
+  cannot float free of the canonical criteria.
 
 If JIT had hard-coded SDD, none of this would be inspectable or changeable. As
 configuration, a team can tune it (require `[aspirational]` coverage too, change

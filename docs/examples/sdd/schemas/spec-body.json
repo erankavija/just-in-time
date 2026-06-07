@@ -1,13 +1,41 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$comment": "SDD spec content schema. Validates the canonical Success Criteria of an epic, as exposed by the jit projection under sections.success_criteria.items. Each item is the raw text of a list entry, e.g. '[hard] REQ-01: the loader rejects ...'. Requires the section to exist with at least one [hard] criterion, and every criterion to begin with a [hard] or [aspirational] marker.",
+  "$comment": "SDD spec content schema. Validates the STRUCTURE of an SDD epic's specification body as exposed by the jit projection under `sections`. A compliant spec has three sections: `## Requirements` (each item shaped `REQ-N: <text>`), `## Scenarios` (each item a single-line `Given ... When ... Then ...`), and `## Success Criteria` (each item marked `[hard]` or `[aspirational]` and carrying a REQ id). All three sections must exist and be non-empty, every item must match its expected shape via `pattern`, and at least one Success Criteria item must be `[hard]` (the `contains`/`minContains` hard-criterion check). Section keys are the slugified headings the jit projection emits.",
   "type": "object",
   "required": ["sections"],
   "properties": {
     "sections": {
       "type": "object",
-      "required": ["success_criteria"],
+      "required": ["requirements", "scenarios", "success_criteria"],
       "properties": {
+        "requirements": {
+          "type": "object",
+          "required": ["items"],
+          "properties": {
+            "items": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "pattern": "^REQ-[0-9]+:\\s+\\S"
+              }
+            }
+          }
+        },
+        "scenarios": {
+          "type": "object",
+          "required": ["items"],
+          "properties": {
+            "items": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "pattern": "^Given\\s+.+\\sWhen\\s+.+\\sThen\\s+.+"
+              }
+            }
+          }
+        },
         "success_criteria": {
           "type": "object",
           "required": ["items"],
@@ -17,7 +45,7 @@
               "minItems": 1,
               "items": {
                 "type": "string",
-                "pattern": "^\\[(hard|aspirational)\\]\\s+\\S"
+                "pattern": "^\\[(hard|aspirational)\\]\\s+REQ-[0-9]+:\\s+\\S"
               },
               "contains": {
                 "type": "string",
