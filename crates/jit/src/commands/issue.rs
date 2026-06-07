@@ -169,7 +169,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         state: Option<State>,
         add_labels: Vec<String>,
         remove_labels: Vec<String>,
-        content_format: Option<crate::domain::ContentFormat>,
+        // Tri-state: `None` leaves the field unchanged; `Some(None)` clears the
+        // override back to repo-default inheritance; `Some(Some(fmt))` sets it.
+        content_format: Option<Option<crate::domain::ContentFormat>>,
         force: bool,
     ) -> Result<Vec<String>> {
         let full_id = self.storage.resolve_issue_id(id)?;
@@ -202,8 +204,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         if let Some(p) = priority {
             issue.priority = p;
         }
-        if let Some(cf) = content_format {
-            issue.content_format = Some(cf);
+        if let Some(new_cf) = content_format {
+            // `Some(None)` clears to inherit; `Some(Some(fmt))` sets the override.
+            issue.content_format = new_cf;
         }
 
         // Handle label operations. Label format / uniqueness / registry are
@@ -1110,6 +1113,92 @@ enforce_leases = "off"
         assert_eq!(
             after.updated_at, updated_after_first,
             "pure done retry must not bump updated_at"
+        );
+    }
+
+    /// `content_format` update is tri-state: `None` leaves it unchanged,
+    /// `Some(Some(fmt))` sets the override, and `Some(None)` clears it back to
+    /// repo-default inheritance. The CLI maps `--content-format inherit` to the
+    /// clear case — this is the only path back to `None` after an override was set.
+    #[test]
+    fn test_update_issue_content_format_tristate_set_keep_clear() {
+        use crate::domain::ContentFormat;
+        let executor = setup();
+
+        let mut issue = crate::domain::Issue::new("Test".to_string(), "Body".to_string());
+        issue.state = State::InProgress;
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(issue).unwrap();
+
+        // Set the override to Html.
+        executor
+            .update_issue(
+                &issue_id,
+                None,
+                None,
+                None,
+                None,
+                vec![],
+                vec![],
+                Some(Some(ContentFormat::Html)),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            executor
+                .storage
+                .load_issue(&issue_id)
+                .unwrap()
+                .content_format,
+            Some(ContentFormat::Html)
+        );
+
+        // `None` leaves it unchanged (e.g. a title-only edit).
+        executor
+            .update_issue(
+                &issue_id,
+                Some("Renamed".to_string()),
+                None,
+                None,
+                None,
+                vec![],
+                vec![],
+                None,
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            executor
+                .storage
+                .load_issue(&issue_id)
+                .unwrap()
+                .content_format,
+            Some(ContentFormat::Html),
+            "None must not touch content_format"
+        );
+
+        // `Some(None)` clears back to inherit.
+        executor
+            .update_issue(
+                &issue_id,
+                None,
+                None,
+                None,
+                None,
+                vec![],
+                vec![],
+                Some(None),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            executor
+                .storage
+                .load_issue(&issue_id)
+                .unwrap()
+                .content_format,
+            None,
+            "Some(None) must clear the override to repo-default inheritance"
         );
     }
 

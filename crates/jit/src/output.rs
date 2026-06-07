@@ -752,6 +752,9 @@ pub struct IssueShowResponse {
     pub context: std::collections::HashMap<String, String>,
     pub documents: Vec<crate::domain::DocumentReference>,
     pub labels: Vec<String>,
+    /// Per-issue content format override; absent means the repo default applies.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content_format: Option<crate::domain::ContentFormat>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -772,6 +775,7 @@ impl IssueShowResponse {
             context: issue.context,
             documents: issue.documents,
             labels: issue.labels,
+            content_format: issue.content_format,
             created_at: issue.created_at,
             updated_at: issue.updated_at,
         }
@@ -1070,6 +1074,23 @@ pub struct WorktreeListResponse {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn test_show_response_exposes_content_format() {
+        use crate::domain::{ContentFormat, Issue};
+        // Set -> appears in `jit issue show --json` (create/show parity).
+        let mut issue = Issue::new("T".to_string(), "B".to_string());
+        issue.content_format = Some(ContentFormat::Html);
+        let resp = IssueShowResponse::from_issue(issue, vec![]);
+        let v = serde_json::to_value(&resp).unwrap();
+        assert_eq!(v["content_format"], "html");
+
+        // Absent -> omitted (existing issues without the field stay clean).
+        let issue2 = Issue::new("T".to_string(), "B".to_string());
+        let resp2 = IssueShowResponse::from_issue(issue2, vec![]);
+        let v2 = serde_json::to_value(&resp2).unwrap();
+        assert!(v2.get("content_format").is_none());
+    }
 
     #[test]
     fn test_json_output_success() {

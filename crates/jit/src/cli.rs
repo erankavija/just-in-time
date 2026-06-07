@@ -377,7 +377,8 @@ pub enum IssueCommands {
 
         /// Set the content format of the description body (markdown, html, or
         /// xml), selecting the parser used to extract sections during validation.
-        /// html/xml require the matching cargo feature.
+        /// html/xml require the matching cargo feature. Pass `inherit` (or
+        /// `default`) to clear a previous override back to the repo default.
         #[arg(long, value_name = "FORMAT")]
         content_format: Option<String>,
 

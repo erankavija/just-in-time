@@ -626,9 +626,16 @@ fn run() -> Result<()> {
 
                         let prio = priority.map(|p| Priority::from_str(&p)).transpose()?;
                         let st = state.map(|s| State::from_str(&s)).transpose()?;
-                        let content_format = content_format
-                            .map(|s| jit::domain::ContentFormat::from_str(&s))
-                            .transpose()?;
+                        // Tri-state for the per-issue content_format override:
+                        //   flag absent            -> None              (leave unchanged)
+                        //   "inherit"/"default"    -> Some(None)        (clear to repo default)
+                        //   "markdown"/"html"/"xml" -> Some(Some(fmt))  (set the override)
+                        let content_format: Option<Option<jit::domain::ContentFormat>> =
+                            match content_format.as_deref() {
+                                None => None,
+                                Some("inherit") | Some("default") => Some(None),
+                                Some(s) => Some(Some(jit::domain::ContentFormat::from_str(s)?)),
+                            };
 
                         // Handle gate modifications first (before other updates)
                         if !add_gate.is_empty() {
