@@ -2,9 +2,9 @@
   "id": "a0f0f342-5147-4775-b002-3c28d363460e",
   "title": "Re-express existing checks as default rules (hard migration)",
   "description": "Re-express the complete set of existing hard-coded checks as default rules and remove them from validation.rs and validate.rs.\n\n## Background\n\nFor a single source of truth, all current enforcement becomes `rules.toml` content. Behavior must be identical, preserving today's warn-versus-reject semantics via the `enforce` flag. See `dev/active/f6a704d0-validation-engine-plan.md` (\"Migration\", step 8) and decision record section 8.3.\n\n## Success Criteria\n\n- [ ] [hard] Default rules cover the full set: type-label requirement, label format, namespace registry, orphan-leaf warning, strategic-label consistency, and per-namespace allowed-values, value-pattern, uniqueness, and required.\n- [ ] [hard] Default rules preserve today's warn-vs-reject behavior via `enforce` (default false); parity is covered by tests comparing old and new outcomes.\n- [ ] [hard] The hard-coded checks are removed from `validation.rs` (IssueValidator) and `validate.rs` (`validate_labels`/type-hierarchy); no legacy enforcement remains in code.\n\n## Notes\n\nAnchors: `validation.rs:12-160`; `validate.rs` `validate_labels` 279-408 and `validate_type_hierarchy` 410-449; `config.rs` ValidationConfig 65-84 and NamespaceConfig 140-159.\n",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [
     "b8ba1b10-09f3-4807-90cb-95b91258347d"
   ],
@@ -20,5 +20,5 @@
     "epic:validation-engine"
   ],
   "created_at": "2026-06-06T15:51:20.563449834+00:00",
-  "updated_at": "2026-06-07T07:37:01.260610913+00:00"
+  "updated_at": "2026-06-07T07:38:16.450710415+00:00"
 }
