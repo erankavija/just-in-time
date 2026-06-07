@@ -85,10 +85,7 @@ bug = "🐛"  # Override bug icon, other types use preset
 # Control how strictly JIT validates issues and labels
 
 [validation]
-# Strictness level: "strict", "loose", or "permissive"
-# - strict: Enforce all rules, fail on violations
-# - loose: Warn on violations but allow operations (default)
-# - permissive: Minimal validation
+# Strictness level: "strict", "loose", or "permissive" (currently inert).
 strictness = "loose"
 
 # Auto-assign this type when creating issues without a type:* label
@@ -102,27 +99,24 @@ default_type = "task"
 # Markdown fallback.
 content_format = "markdown"
 
-# Require exactly one type:* label per issue
-require_type_label = false
-
-# Label format validation regex
-# Validates namespace:value format
-label_regex = '^[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9._-]*$'
-
-# Reject malformed labels vs warn (default: false)
-reject_malformed_labels = false
-
-# Only allow namespaces defined in [namespaces.*] sections (default: false)
-enforce_namespace_registry = false
-
-# Validation warnings (only apply when strictness = "loose")
-warn_orphaned_leaves = true       # Warn when tasks lack parent labels
-warn_strategic_consistency = true  # Warn on hierarchy inconsistencies
+# NOTE: ALL label/type ENFORCEMENT (format, namespace registry, allowed values,
+# patterns, uniqueness, required namespaces, and the orphan-leaf /
+# strategic-consistency warnings) is defined declaratively in `.jit/rules.toml`
+# — the single source of truth, scaffolded by `jit init`. The former
+# `require_type_label`, `label_regex`, `reject_malformed_labels`,
+# `enforce_namespace_registry`, `warn_orphaned_leaves`, and
+# `warn_strategic_consistency` keys were removed; this section now carries only
+# the behavioral keys above.
 
 # =============================================================================
 # NAMESPACE REGISTRY
 # =============================================================================
-# Define label namespaces for documentation and optional enforcement
+# Declare label namespaces (taxonomy only). Each namespace supports:
+#   description — human-readable purpose (required)
+#   unique      — at most one label from this namespace per issue (required)
+#   examples    — documentation only, not enforced
+# Allowed-value enums, value patterns, and required-ness are NOT configured here:
+# author them as rules in `.jit/rules.toml` (the single source of truth).
 
 [namespaces.type]
 description = "Issue type (hierarchical). Exactly one per issue."

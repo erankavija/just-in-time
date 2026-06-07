@@ -77,19 +77,23 @@ story = "story"
 [validation]
 strictness = "loose"
 default_type = "task"
-require_type_label = false
-label_regex = '^[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9._-]*$'
-reject_malformed_labels = false
-enforce_namespace_registry = false
-warn_orphaned_leaves = true
-warn_strategic_consistency = true
+content_format = "markdown"
 ```
 
 | Field | Description |
 |-------|-------------|
-| `strictness` | `"strict"`, `"loose"`, or `"permissive"` |
+| `strictness` | `"strict"`, `"loose"`, or `"permissive"` (currently inert) |
 | `default_type` | Auto-assign when no type:* label |
-| `warn_orphaned_leaves` | Warn when tasks lack parent labels |
+| `content_format` | Default body parser: `"markdown"` (default), `"html"`, `"xml"` |
+
+> **Validation enforcement lives in `.jit/rules.toml`.** Label/type format, the
+> namespace registry, allowed values, value patterns, uniqueness, required
+> namespaces, and the orphan-leaf / strategic-consistency warnings are all
+> defined declaratively as rules in `.jit/rules.toml` — the single source of
+> truth, scaffolded by `jit init`. The former `require_type_label`,
+> `label_regex`, `reject_malformed_labels`, `enforce_namespace_registry`,
+> `warn_orphaned_leaves`, and `warn_strategic_consistency` keys were removed; an
+> old `config.toml` that still carries them parses fine but they have no effect.
 
 ### `[namespaces.*]`
 
@@ -100,7 +104,10 @@ unique = false
 examples = ["epic:auth", "epic:docs"]
 ```
 
-Define label namespaces for documentation and optional enforcement. Set `enforce_namespace_registry = true` to require defined namespaces only.
+Declare label namespaces (taxonomy: `description`, `unique`, `examples`). The
+registry drives the `default:namespace-registry` and `default:namespace-unique:*`
+rules. Allowed-value enums, value patterns, and required-ness are NOT configured
+here — author them as rules in `.jit/rules.toml`.
 
 ---
 

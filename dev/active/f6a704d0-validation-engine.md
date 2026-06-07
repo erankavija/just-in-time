@@ -168,19 +168,24 @@ A rule is **selector + assertion + severity**.
   shorthand XOR file-schema — the loader REJECTS mixing, keeping one definition
   per constraint.
 - **8.2 No hard-coded rules (operative source = the file).** `jit init` scaffolds
-  a COMPLETE default `.jit/rules.toml` reproducing today's checks, fully editable.
-  `effective_rules()` derives the rule set from the file: when `.jit/rules.toml` is
-  PRESENT (even if it contains zero rules — honoring an intentionally-emptied
-  ruleset) the file is the sole authoritative source; no in-code default rules are
-  combined with it. The in-code `default_ruleset` is retained ONLY as (a) the
-  canonical definition serialized into the file by `jit init`, and (b) a TRANSIENT
-  BOOTSTRAP fallback used when the file is ABSENT (pre-init repo or deleted file),
-  which warns the user to run `jit init`. Because the file becomes the single
-  operative source, the former `default:` rule-name reservation in
-  `RuleSet::load` is REMOVED — the `default:*` rules now live in the file and are
-  user-editable like any other (the separate name-uniqueness guard remains). See
-  §8.2a for the engine surface this requires (scope-expanded 2026-06-07, issue
-  0abaddc0).
+  a COMPLETE FIXED default `.jit/rules.toml`, fully editable. `effective_rules()`
+  derives the rule set from the file: when `.jit/rules.toml` is PRESENT (even if it
+  contains zero rules — honoring an intentionally-emptied ruleset) the file is the
+  sole authoritative source; no in-code default rules are combined with it. The
+  in-code `default_ruleset(namespaces)` is retained ONLY as (a) the canonical
+  definition serialized into the file by `jit init`, and (b) an IN-MEMORY fallback
+  built when the file is ABSENT (pre-init repo or deleted file). Because the file
+  becomes the single operative source, the former `default:` rule-name reservation
+  in `RuleSet::load` is REMOVED — the `default:*` rules now live in the file and
+  are user-editable like any other (the separate name-uniqueness guard remains).
+  See §8.2a for the engine surface this requires.
+  **Amendment (2026-06-07, issue d4188154 — BC hard removal):** the absent-file
+  fallback builds the defaults IN MEMORY only — NO disk write on the read path, NO
+  warning, NO error (MF4). This preserves read-path safety for gates, the server,
+  read-only checkouts, and multiple worktrees. Materializing the file to disk
+  happens ONLY in `jit init` (under the write lock, temp+rename) via
+  `validation::serialize::scaffold_default_rules`. The earlier "transient bootstrap
+  fallback that warns to run `jit init`" is superseded.
 - **8.2a Type-hierarchy TOML surface (scope expansion, 2026-06-07).** Making the
   file the complete source required adding a `type-hierarchy` assertion kind to the
   `rules.toml` grammar so the orphan-leaf and strategic-consistency graph warnings
@@ -227,28 +232,46 @@ A rule is **selector + assertion + severity**.
   emitted at all. Achieving exact legacy parity would require adding a write-only
   local-rule concept to the Rule model; that was considered and declined in favor
   of this documented deviation.
-- **8.4 Migration**: re-running `jit init` on an existing repo performs the
-  one-time migration — it serializes the COMPLETE `default_ruleset` derived from
-  the existing `[validation]` + `[namespaces].{values,pattern,required}` config
-  into `.jit/rules.toml` (+ `.jit/schemas/*.json`), then strips the removed
-  enforcement keys (the six §8.3 `[validation]` keys + the namespace constraints),
-  removing the `[validation]` table header when it is left empty.
-  - **Fresh repos:** `jit init` writes the config template ALREADY in
-    post-migration shape (no enforcement keys) and a complete `rules.toml`, so a
-    brand-new repo emits NO deprecation warning and NO migration message.
-  - **Coexistence** (a user `rules.toml` already exists AND legacy keys remain):
-    the user file is NOT clobbered; migrated rules are appended by name (skipping
-    any name already present, with a warning) and the legacy keys are stripped.
-  - **Idempotent:** re-running with a `rules.toml` present and no legacy keys is a
-    no-op.
-  **Until migration runs** (e.g. a config git-synced from an old version): there
-  is NO `#[serde(deny_unknown_fields)]`, so serde already ignores the removed keys
-  and the config never hard-errors. A pre-parse `toml::Value` scan in
-  `JitConfig::load` detects the deprecated keys — the six removed `[validation]`
-  ENFORCEMENT keys (NOT `default_type`/`strictness`, which are retained per §8.3)
-  and nested `namespaces.*.{values,pattern,required}` — and WARNS, prompting the
-  user to re-run `jit init`. Do NOT add `deny_unknown_fields` (it would turn the
-  warn into a hard error).
+- **8.4 Fixed-default scaffold; NO migration machinery (BC hard removal, issue
+  d4188154).** `jit init` scaffolds the FIXED `default_ruleset(namespaces)` into
+  `.jit/rules.toml` (+ `.jit/schemas/*.json`) when the file is absent, and is a
+  NO-OP when it already exists (re-init never clobbers user edits). The fixed
+  default is derived purely from the RETAINED taxonomy (the `[namespaces]` registry
+  + `[type_hierarchy]`); it no longer reads any removed `[validation]` enforcement
+  flag or per-namespace constraint. It emits exactly (MF1): `default:label-format`
+  (error/enforce=true, always); `default:namespace-registry` (error/enforce=false,
+  when the registry is non-empty); `default:type-hierarchy-known`
+  (error/enforce=false, always); `default:namespace-unique:<ns>`
+  (error/enforce=true, per unique namespace); and `default:orphan-leaf` +
+  `default:strategic-consistency` (warn/enforce=false, UNCONDITIONAL).
+  - **Removed entirely:** the config→rules migration, coexistence/append,
+    materialize-existing, key-stripping, and the deprecated-key scan
+    (`migration.rs` deleted; `config.rs::deprecated_keys_in_config` /
+    `warn_on_deprecated_keys` deleted). The legacy `[validation]` enforcement keys
+    (`require_type_label`, `label_regex`, `reject_malformed_labels`,
+    `enforce_namespace_registry`, `warn_orphaned_leaves`,
+    `warn_strategic_consistency`) and the per-namespace
+    `NamespaceConfig.{values,pattern,required}` parsing are removed from the
+    structs. RETAINED: `default_type`, `content_format`, the inert `strictness`,
+    and the namespace registry taxonomy (`description`/`unique`/`examples`) +
+    `[type_hierarchy]`.
+  - **Dropped default rules** (no longer config-derivable): `require-type-label`,
+    `label-format-custom`, and per-namespace `values`/`pattern`/`required` rules. A
+    repo wanting those authors them directly in `rules.toml`.
+  - **Fresh-init richness:** the LEAN default is accepted (MF2) — a fresh `jit
+    init` no longer emits namespace value/pattern/required starter rules. The
+    former in-code `HierarchyTemplate::intended_default_config` is removed; both
+    `jit init` and the in-memory absent-file fallback use the same
+    `default_ruleset(namespaces)`.
+  - **Stale keys tolerated, not warned:** there is NO `#[serde(deny_unknown_fields)]`,
+    so an old `config.toml` git-synced from a pre-1.0 version still parses — serde
+    silently ignores the removed keys and they have no effect. No warning is emitted
+    (the deprecated-key scan was deleted).
+  - **Justification:** only jit itself + ../gf2 existed pre-1.0, and both were
+    migrated to `rules.toml` (waves X2/C) before this removal, so no live consumer
+    needs the migration path. This supersedes 0abaddc0's migration design; the
+    durable parts are KEPT: file-as-source, the `RuleSet`→TOML serializer, the
+    `type-hierarchy` TOML assert kind, and the removed `default:` name reservation.
 
 ## 9. CLI surface
 

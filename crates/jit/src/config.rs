@@ -63,30 +63,27 @@ pub struct IconConfigToml {
 }
 
 /// Validation behavior configuration.
+///
+/// The former enforcement keys (`require_type_label`, `label_regex`,
+/// `reject_malformed_labels`, `enforce_namespace_registry`, `warn_orphaned_leaves`,
+/// `warn_strategic_consistency`) were removed when `.jit/rules.toml` became the
+/// sole validation source (DR §8.2/§8.4). Only the BEHAVIORAL keys survive:
+/// `default_type`, `content_format`, and the inert `strictness`. serde ignores
+/// any stale enforcement keys still present in an old `config.toml` (no
+/// `deny_unknown_fields`), so such a file still parses; the keys simply have no
+/// effect — the operative rules live in `rules.toml`.
 #[derive(Debug, Clone, Deserialize)]
 pub struct ValidationConfig {
-    /// Strictness level: "strict", "loose", or "permissive".
+    /// Strictness level: "strict", "loose", or "permissive". Retained as an inert
+    /// forward-compat key; it no longer drives validation behavior.
     pub strictness: Option<String>,
     /// Default type when none specified (optional).
     pub default_type: Option<String>,
     /// Repo-level default content format for issue bodies ("markdown", "html",
     /// "xml"). Selects the [`ContentParser`](crate::document::ContentParser) used
     /// to extract `sections` for issues that carry no per-issue `content_format`.
-    /// Absent means "markdown". A BEHAVIORAL key (like `default_type`) that
-    /// survives the later backward-compat removal.
+    /// Absent means "markdown".
     pub content_format: Option<String>,
-    /// Require exactly one type:* label per issue (default: false).
-    pub require_type_label: Option<bool>,
-    /// Label format regex (optional).
-    pub label_regex: Option<String>,
-    /// Reject malformed labels (default: false).
-    pub reject_malformed_labels: Option<bool>,
-    /// Enforce namespace registry (default: false).
-    pub enforce_namespace_registry: Option<bool>,
-    /// Warn on orphaned leaf-level issues (default: true).
-    pub warn_orphaned_leaves: Option<bool>,
-    /// Warn on strategic issues without matching labels (default: true).
-    pub warn_strategic_consistency: Option<bool>,
 }
 
 impl ValidationConfig {
@@ -162,6 +159,12 @@ impl DocumentationConfig {
 
 /// Label namespace configuration from TOML.
 /// Replaces the namespace definitions in labels.json.
+///
+/// The per-namespace constraint fields (`values`, `pattern`, `required`) were
+/// removed when `.jit/rules.toml` became the sole validation source (DR §8.4): a
+/// repo that wants those constraints authors the corresponding rules in
+/// `rules.toml`. The registry keeps only TAXONOMY (`description`/`unique`/
+/// `examples`); serde ignores any stale constraint keys in an old `config.toml`.
 #[derive(Debug, Clone, Deserialize)]
 pub struct NamespaceConfig {
     /// Human-readable description.
@@ -170,15 +173,6 @@ pub struct NamespaceConfig {
     pub unique: bool,
     /// Example labels (optional, for documentation).
     pub examples: Option<Vec<String>>,
-    /// Allowed values for the value portion of the label. When set, `jit validate`
-    /// rejects labels whose value is not in this list (free-form otherwise).
-    pub values: Option<Vec<String>>,
-    /// Optional regex applied to the value portion of the label. Compiled and
-    /// checked by `jit validate`; a malformed pattern surfaces as a validation error.
-    pub pattern: Option<String>,
-    /// If true, every issue must carry at least one label from this namespace
-    /// (generalizes the legacy `validation.require_type_label` flag).
-    pub required: Option<bool>,
 }
 
 /// Worktree and parallel work configuration.
@@ -447,95 +441,14 @@ impl JitConfig {
         let content =
             std::fs::read_to_string(&config_path).context("Failed to read config.toml")?;
 
-        // Pre-parse scan for DEPRECATED enforcement keys (DR §8.4, decision D7).
-        // These keys were migrated into `.jit/rules.toml` by `jit init` and
-        // stripped from `config.toml`; a config still carrying them (e.g.
-        // git-synced from an older version) is stale. We must NOT add
-        // `#[serde(deny_unknown_fields)]` (serde already ignores the removed
-        // keys, so the config keeps parsing) — we WARN and prompt a re-run so the
-        // migration actually happens. Best-effort: a deprecated key never
-        // hard-errors here.
-        warn_on_deprecated_keys(&content);
-
+        // An old `config.toml` may still carry removed enforcement keys
+        // (`require_type_label`, namespace `values`/`pattern`/`required`, etc.).
+        // serde ignores them (no `deny_unknown_fields`), so the file still parses;
+        // the keys simply have no effect — `.jit/rules.toml` is the sole source.
         let config: JitConfig = toml::from_str(&content).context("Failed to parse config.toml")?;
 
         Ok(config)
     }
-}
-
-/// The deprecated `[validation]` ENFORCEMENT keys that `jit init` migrates into
-/// `.jit/rules.toml` and strips from `config.toml` (DR §8.3/§8.4, decision D7).
-///
-/// These are exactly the six enforcement keys re-expressed as default rules.
-/// Deliberately NOT listed (they remain LIVE `[validation]` keys per the
-/// 2026-06-07 amendment): `default_type` (behavioral, read at issue creation) and
-/// `strictness` (inert / forward-compat). Both stay in `config.toml` and are
-/// excluded from this warning.
-const DEPRECATED_VALIDATION_KEYS: [&str; 6] = [
-    "require_type_label",
-    "label_regex",
-    "reject_malformed_labels",
-    "enforce_namespace_registry",
-    "warn_orphaned_leaves",
-    "warn_strategic_consistency",
-];
-
-/// The deprecated per-namespace constraint keys (`[namespaces.<ns>]`) that
-/// `jit init` migrates into `.jit/rules.toml` and strips from `config.toml`. The
-/// registry's `description`/`unique`/`examples` keys are NOT deprecated.
-const DEPRECATED_NAMESPACE_KEYS: [&str; 3] = ["values", "pattern", "required"];
-
-/// Scan raw `config.toml` text (pre-parse) for deprecated enforcement keys and
-/// print a one-time migration prompt to stderr when any are present.
-fn warn_on_deprecated_keys(content: &str) {
-    let deprecated = deprecated_keys_in_config(content);
-    if !deprecated.is_empty() {
-        eprintln!(
-            "⚠️  Warning: .jit/config.toml contains deprecated validation key(s) that are no \
-             longer enforced from config: {}.\n   These were replaced by declarative rules in \
-             .jit/rules.toml. Re-run `jit init` to migrate them (the keys will be moved into \
-             rules.toml and removed from config.toml).",
-            deprecated.join(", ")
-        );
-    }
-}
-
-/// Pure detector for deprecated enforcement keys in raw `config.toml` text
-/// (decision D7). Returns the sorted, fully-qualified names of any deprecated
-/// keys present (e.g. `validation.label_regex`, `namespaces.type.values`).
-///
-/// Returns an empty vector for a clean config, or for text that does not parse
-/// as TOML (the caller's typed parse surfaces real syntax errors; this scan is
-/// advisory only and NEVER errors). Kept pure (no I/O, no stderr) so it is
-/// unit-testable and reusable by the migration's key-stripping path.
-pub fn deprecated_keys_in_config(content: &str) -> Vec<String> {
-    let Ok(value) = content.parse::<toml::Value>() else {
-        return Vec::new();
-    };
-    let mut deprecated: Vec<String> = Vec::new();
-
-    if let Some(validation) = value.get("validation").and_then(|v| v.as_table()) {
-        for key in DEPRECATED_VALIDATION_KEYS {
-            if validation.contains_key(key) {
-                deprecated.push(format!("validation.{key}"));
-            }
-        }
-    }
-
-    if let Some(namespaces) = value.get("namespaces").and_then(|v| v.as_table()) {
-        for (ns_name, ns_value) in namespaces {
-            if let Some(ns_table) = ns_value.as_table() {
-                for key in DEPRECATED_NAMESPACE_KEYS {
-                    if ns_table.contains_key(key) {
-                        deprecated.push(format!("namespaces.{ns_name}.{key}"));
-                    }
-                }
-            }
-        }
-    }
-
-    deprecated.sort();
-    deprecated
 }
 
 // ============================================================
@@ -965,8 +878,7 @@ milestone = "milestone"
 
 [validation]
 strictness = "loose"
-warn_orphaned_leaves = true
-warn_strategic_consistency = false
+default_type = "task"
 "#;
         let config: JitConfig = toml::from_str(config_toml).unwrap();
 
@@ -976,8 +888,7 @@ warn_strategic_consistency = false
 
         let validation = config.validation.unwrap();
         assert_eq!(validation.strictness, Some("loose".to_string()));
-        assert_eq!(validation.warn_orphaned_leaves, Some(true));
-        assert_eq!(validation.warn_strategic_consistency, Some(false));
+        assert_eq!(validation.default_type, Some("task".to_string()));
     }
 
     #[test]
@@ -1019,90 +930,22 @@ types = { epic = 1, task = 2 }
     // ============================================================
     // Deprecated-key scan (DR §8.4, decision D7) — warn, never hard-error
     // ============================================================
+    // Stale-key tolerance: removed enforcement keys are ignored, not errors
+    // ============================================================
 
     #[test]
-    fn test_deprecated_keys_finds_all_six_validation_enforcement_keys() {
-        let content = r#"
-[validation]
-default_type = "task"
-strictness = "loose"
-require_type_label = true
-label_regex = '^x'
-reject_malformed_labels = true
-enforce_namespace_registry = true
-warn_orphaned_leaves = false
-warn_strategic_consistency = false
-"#;
-        let found = deprecated_keys_in_config(content);
-        // All six enforcement keys are flagged; default_type/strictness are NOT.
-        assert_eq!(
-            found,
-            vec![
-                "validation.enforce_namespace_registry".to_string(),
-                "validation.label_regex".to_string(),
-                "validation.reject_malformed_labels".to_string(),
-                "validation.require_type_label".to_string(),
-                "validation.warn_orphaned_leaves".to_string(),
-                "validation.warn_strategic_consistency".to_string(),
-            ]
-        );
-    }
-
-    #[test]
-    fn test_deprecated_keys_finds_namespace_constraint_keys() {
-        let content = r#"
-[namespaces.type]
-description = "Issue type"
-unique = true
-values = ["task", "bug"]
-required = true
-
-[namespaces.milestone]
-description = "Release"
-unique = false
-pattern = '^v\d+$'
-"#;
-        let found = deprecated_keys_in_config(content);
-        assert_eq!(
-            found,
-            vec![
-                "namespaces.milestone.pattern".to_string(),
-                "namespaces.type.required".to_string(),
-                "namespaces.type.values".to_string(),
-            ]
-        );
-    }
-
-    #[test]
-    fn test_deprecated_keys_clean_migrated_config_returns_empty() {
-        // A migrated config keeps only live keys: default_type, strictness, the
-        // namespace registry (description/unique/examples), hierarchy.
-        let content = r#"
-[validation]
-default_type = "task"
-strictness = "loose"
-
-[namespaces.type]
-description = "Issue type"
-unique = true
-examples = ["type:task"]
-"#;
-        assert!(deprecated_keys_in_config(content).is_empty());
-    }
-
-    #[test]
-    fn test_deprecated_keys_ignores_unparseable_toml() {
-        assert!(deprecated_keys_in_config("[broken syntax").is_empty());
-    }
-
-    #[test]
-    fn test_load_config_with_deprecated_keys_warns_but_does_not_error() {
-        // An OLD config carrying removed enforcement keys still loads (no
-        // deny_unknown_fields), parses, and does not error.
+    fn test_load_config_with_removed_keys_still_parses() {
+        // An OLD config carrying the removed enforcement / namespace-constraint
+        // keys still loads (no `deny_unknown_fields`): serde ignores them, the
+        // surviving behavioral keys parse, and the registry taxonomy is intact.
+        // `.jit/rules.toml` is the sole validation source, so the stale keys have
+        // no effect.
         let temp_dir = TempDir::new().unwrap();
         let config_toml = r#"
 [validation]
 default_type = "task"
+strictness = "loose"
+content_format = "markdown"
 require_type_label = true
 label_regex = '^[a-z]+:'
 reject_malformed_labels = true
@@ -1113,16 +956,23 @@ warn_strategic_consistency = false
 [namespaces.type]
 description = "Issue type"
 unique = true
+examples = ["type:task"]
 values = ["task", "bug"]
 required = true
 "#;
         std::fs::write(temp_dir.path().join("config.toml"), config_toml).unwrap();
 
         let config = JitConfig::load(temp_dir.path()).expect("stale config must still load");
-        // It parsed; the live keys are intact.
+        // It parsed; the surviving keys are intact.
         let validation = config.validation.expect("validation section present");
         assert_eq!(validation.default_type, Some("task".to_string()));
-        assert!(config.namespaces.is_some());
+        assert_eq!(validation.strictness, Some("loose".to_string()));
+        assert_eq!(validation.content_format, Some("markdown".to_string()));
+        // The namespace registry survives with only its taxonomy keys.
+        let namespaces = config.namespaces.expect("namespaces present");
+        let type_ns = &namespaces["type"];
+        assert_eq!(type_ns.description, "Issue type");
+        assert!(type_ns.unique);
     }
 
     #[test]
@@ -1152,28 +1002,20 @@ epic = "epic"
     }
 
     #[test]
-    fn test_parse_validation_with_new_fields() {
+    fn test_parse_validation_behavioral_fields() {
+        // Only the behavioral keys survive in [validation].
         let config_toml = r#"
 [validation]
 default_type = "task"
-require_type_label = true
-label_regex = '^[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9._-]*$'
-reject_malformed_labels = true
-enforce_namespace_registry = true
-warn_orphaned_leaves = false
+strictness = "loose"
+content_format = "html"
 "#;
         let config: JitConfig = toml::from_str(config_toml).unwrap();
 
         let validation = config.validation.unwrap();
         assert_eq!(validation.default_type, Some("task".to_string()));
-        assert_eq!(validation.require_type_label, Some(true));
-        assert_eq!(
-            validation.label_regex,
-            Some("^[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9._-]*$".to_string())
-        );
-        assert_eq!(validation.reject_malformed_labels, Some(true));
-        assert_eq!(validation.enforce_namespace_registry, Some(true));
-        assert_eq!(validation.warn_orphaned_leaves, Some(false));
+        assert_eq!(validation.strictness, Some("loose".to_string()));
+        assert_eq!(validation.content_format, Some("html".to_string()));
     }
 
     #[test]
@@ -1230,9 +1072,7 @@ story = "story"
 
 [validation]
 default_type = "task"
-require_type_label = true
-warn_orphaned_leaves = true
-warn_strategic_consistency = true
+strictness = "loose"
 
 [namespaces.type]
 description = "Issue type"
@@ -1258,7 +1098,7 @@ unique = false
         // Validation
         let validation = config.validation.unwrap();
         assert_eq!(validation.default_type, Some("task".to_string()));
-        assert_eq!(validation.require_type_label, Some(true));
+        assert_eq!(validation.strictness, Some("loose".to_string()));
 
         // Namespaces
         let namespaces = config.namespaces.unwrap();

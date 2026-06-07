@@ -1,11 +1,16 @@
-//! Integration tests for the label constraint registry (values / pattern /
-//! required) and the drift surfacing that `jit validate` does on top of it.
+//! Integration tests for the namespace registry and the validation drift it
+//! surfaces, after the backward-compat hard removal (issue d4188154).
+//!
+//! The per-namespace `values` / `pattern` / `required` constraints were removed
+//! from config-derived defaults: `.jit/rules.toml` is the sole validation source,
+//! and a repo wanting those constraints authors them there directly. What the
+//! registry still drives is the `default:namespace-registry` rule (unknown
+//! namespaces) and the `default:namespace-unique:<ns>` rules (uniqueness).
 //!
 //! Tests exercise the CommandExecutor against a tempdir-backed JsonFileStorage
 //! and a real `config.toml`, so the full load-validate path runs.
 
 use jit::commands::CommandExecutor;
-use jit::config::JitConfig;
 use jit::domain::Priority;
 use jit::storage::{IssueStore, JsonFileStorage};
 use std::fs;
@@ -39,71 +44,36 @@ fn create_labeled(exec: &CommandExecutor<JsonFileStorage>, title: &str, labels: 
 }
 
 // ------------------------------------------------------------------
-// Config schema
+// Namespace registry: unknown namespaces fail validate (enforce=false)
 // ------------------------------------------------------------------
 
 #[test]
-fn test_namespace_config_round_trips_new_fields() {
-    let toml = r#"
-[namespaces.type]
-description = "Issue type"
-unique = true
-required = true
-values = ["task", "bug"]
-
-[namespaces.milestone]
-description = "Release"
-unique = false
-pattern = '^v\d+\.\d+$'
-"#;
-    let cfg: JitConfig = toml::from_str(toml).unwrap();
-    let ns = cfg.namespaces.unwrap();
-
-    let t = &ns["type"];
-    assert_eq!(
-        t.values.as_deref(),
-        Some(&["task".to_string(), "bug".to_string()][..])
-    );
-    assert_eq!(t.required, Some(true));
-
-    let m = &ns["milestone"];
-    assert_eq!(m.pattern.as_deref(), Some(r"^v\d+\.\d+$"));
-    assert!(m.values.is_none());
-}
-
-// ------------------------------------------------------------------
-// Enum (values) enforcement
-// ------------------------------------------------------------------
-
-#[test]
-fn test_validate_rejects_value_outside_enum() {
+fn test_validate_flags_unregistered_namespace() {
     let cfg = r#"
 [namespaces.type]
 description = "Issue type"
 unique = true
-values = ["task", "bug", "story"]
+
+[namespaces.component]
+description = "Component"
+unique = false
 "#;
     let (_tmp, exec) = setup_repo(cfg);
-    create_labeled(&exec, "wrong", &["type:taks"]);
+    create_labeled(&exec, "typo", &["typo:foo"]);
 
-    // Post-migration the enum constraint is the `default:namespace-values:type`
-    // rule; accept/reject parity is preserved (the bad value still fails
-    // validation), the message now comes from the JSON Schema engine.
+    // An unregistered namespace is caught by the `default:namespace-registry`
+    // rule. It fails `jit validate` but does NOT block the write (enforce=false).
     let err = exec.validate_silent().unwrap_err().to_string();
-    assert!(
-        err.contains("default:namespace-values:type") && err.contains("taks"),
-        "unexpected error: {}",
-        err
-    );
+    assert!(err.contains("default:namespace-registry"), "{}", err);
+    assert!(err.contains("typo:foo"), "{}", err);
 }
 
 #[test]
-fn test_validate_accepts_value_in_enum() {
+fn test_validate_accepts_registered_namespace() {
     let cfg = r#"
 [namespaces.type]
 description = "Issue type"
 unique = true
-values = ["task", "bug"]
 "#;
     let (_tmp, exec) = setup_repo(cfg);
     create_labeled(&exec, "ok", &["type:task"]);
@@ -111,130 +81,37 @@ values = ["task", "bug"]
 }
 
 // ------------------------------------------------------------------
-// Pattern enforcement
+// Uniqueness: a unique namespace blocks a duplicate on write
 // ------------------------------------------------------------------
 
 #[test]
-fn test_validate_rejects_value_not_matching_pattern() {
+fn test_unique_namespace_blocks_duplicate_on_write() {
     let cfg = r#"
-[namespaces.milestone]
-description = "Release"
-unique = false
-pattern = '^v\d+\.\d+$'
+[namespaces.priority]
+description = "Priority"
+unique = true
 "#;
     let (_tmp, exec) = setup_repo(cfg);
-    create_labeled(&exec, "bad", &["milestone:1.2"]);
 
-    // Post-migration the value-pattern constraint is the
-    // `default:namespace-pattern:milestone` rule; the bad value still fails
-    // validation (parity), message from the JSON Schema engine.
-    let err = exec.validate_silent().unwrap_err().to_string();
+    let result = exec.create_issue(
+        "dup".to_string(),
+        String::new(),
+        Priority::Normal,
+        vec![],
+        vec!["priority:high".to_string(), "priority:low".to_string()],
+        None,
+        false,
+    );
+    let err = result.unwrap_err().to_string();
     assert!(
-        err.contains("default:namespace-pattern:milestone") && err.contains("1.2"),
-        "{}",
-        err
+        err.contains("default:namespace-unique:priority"),
+        "duplicate unique label must block the write: {err}"
     );
 }
 
-#[test]
-fn test_validate_accepts_pattern_match() {
-    let cfg = r#"
-[namespaces.milestone]
-description = "Release"
-unique = false
-pattern = '^v\d+\.\d+$'
-"#;
-    let (_tmp, exec) = setup_repo(cfg);
-    create_labeled(&exec, "good", &["milestone:v1.0"]);
-    exec.validate_silent().unwrap();
-}
-
-#[test]
-fn test_validate_surfaces_invalid_pattern_as_config_error() {
-    let cfg = r#"
-[namespaces.broken]
-description = "Bad regex"
-unique = false
-pattern = "["
-"#;
-    let (_tmp, exec) = setup_repo(cfg);
-    // Post-migration the namespace `pattern` is the `default:namespace-pattern`
-    // rule, whose schema embeds the regex. A malformed regex now surfaces as a
-    // schema COMPILE error when the rule is evaluated (on create OR validate) —
-    // it is never silently swallowed (parity goal: a misconfigured constraint
-    // must be visible). The error names the offending rule/namespace.
-    let (id, _) = exec
-        .create_issue(
-            "x".to_string(),
-            String::new(),
-            Priority::Normal,
-            vec![],
-            vec!["broken:foo".to_string()],
-            None,
-            false,
-        )
-        .unwrap_or_else(|err| {
-            // The bad pattern can surface at create time; assert it is the
-            // compile error for the broken namespace, then stop.
-            let msg = err.to_string();
-            assert!(msg.contains("default:namespace-pattern:broken"), "{}", msg);
-            assert!(msg.contains("compile"), "{}", msg);
-            (String::new(), vec![])
-        });
-    if id.is_empty() {
-        return; // surfaced at create time, already asserted above
-    }
-
-    let err = exec.validate_silent().unwrap_err().to_string();
-    assert!(err.contains("default:namespace-pattern:broken"), "{}", err);
-}
-
 // ------------------------------------------------------------------
-// Required namespace
-// ------------------------------------------------------------------
-
-#[test]
-fn test_validate_flags_missing_required_namespace() {
-    let cfg = r#"
-[namespaces.type]
-description = "Issue type"
-unique = true
-required = true
-
-[namespaces.component]
-description = "Component"
-unique = false
-"#;
-    let (_tmp, exec) = setup_repo(cfg);
-    create_labeled(&exec, "orphan", &["component:core"]);
-
-    // Post-migration the required constraint is the
-    // `default:namespace-required:type` rule; a missing required label still
-    // fails validation (parity), message from the JSON Schema engine.
-    let err = exec.validate_silent().unwrap_err().to_string();
-    assert!(err.contains("default:namespace-required:type"), "{}", err);
-    assert!(err.contains("type"), "{}", err);
-}
-
-#[test]
-fn test_validate_allows_when_required_namespace_present() {
-    let cfg = r#"
-[namespaces.type]
-description = "Issue type"
-unique = true
-required = true
-"#;
-    let (_tmp, exec) = setup_repo(cfg);
-    create_labeled(&exec, "fine", &["type:task"]);
-    exec.validate_silent().unwrap();
-}
-
-// ------------------------------------------------------------------
-// Near-duplicate namespace hint
-// ------------------------------------------------------------------
-
-// ------------------------------------------------------------------
-// CLI: `jit config show --json` surfaces the namespace registry
+// CLI: `jit config show --json` surfaces the namespace registry, and
+// `jit init` scaffolds only the fixed default rules (no value/pattern/required)
 // ------------------------------------------------------------------
 
 #[test]
@@ -271,46 +148,26 @@ fn test_config_show_json_includes_namespace_registry() {
     assert_eq!(type_ns["unique"], serde_json::json!(true));
     assert!(namespaces.get("milestone").is_some());
 
-    // Post-migration (0abaddc0): the per-namespace `values` / `pattern` /
-    // `required` constraints are migrated OUT of config.toml into the default
-    // rules in `.jit/rules.toml`, so they are no longer surfaced by
-    // `config show`. They now live as `default:namespace-*` rules instead.
+    // The scaffolded rules.toml carries the FIXED default rules only: the
+    // canonical format, the namespace registry, type-hierarchy-known, the
+    // per-unique-namespace uniqueness rules, and the two graph warnings. The
+    // removed `values` / `pattern` / `required` rules are NOT present.
     let rules_toml = std::fs::read_to_string(temp.path().join(".jit/rules.toml"))
         .expect("rules.toml scaffolded");
     assert!(
-        rules_toml.contains("default:namespace-values:type"),
-        "type values must migrate to a default rule: {rules_toml}"
+        rules_toml.contains("default:namespace-unique:type"),
+        "uniqueness rule must be scaffolded: {rules_toml}"
     );
     assert!(
-        rules_toml.contains("default:namespace-required:type"),
-        "type required must migrate to a default rule"
+        !rules_toml.contains("default:namespace-values:"),
+        "namespace-values rules must NOT be scaffolded: {rules_toml}"
     );
     assert!(
-        rules_toml.contains("default:namespace-pattern:milestone"),
-        "milestone pattern must migrate to a default rule"
+        !rules_toml.contains("default:namespace-required:"),
+        "namespace-required rules must NOT be scaffolded"
     );
-}
-
-#[test]
-fn test_validate_hints_closest_namespace() {
-    let cfg = r#"
-[namespaces.type]
-description = "Issue type"
-unique = true
-
-[namespaces.component]
-description = "Component"
-unique = false
-"#;
-    let (_tmp, exec) = setup_repo(cfg);
-    create_labeled(&exec, "typo", &["typo:foo"]);
-
-    // Post-migration an unregistered namespace is caught by the
-    // `default:namespace-registry` rule (the former `validate_labels` registry
-    // check). Accept/reject parity holds — an unknown namespace fails validation —
-    // though the closest-namespace hint (a `validate_labels`-only nicety) is no
-    // longer emitted by the schema-based check.
-    let err = exec.validate_silent().unwrap_err().to_string();
-    assert!(err.contains("default:namespace-registry"), "{}", err);
-    assert!(err.contains("typo:foo"), "{}", err);
+    assert!(
+        !rules_toml.contains("default:namespace-pattern:"),
+        "namespace-pattern rules must NOT be scaffolded"
+    );
 }

@@ -921,12 +921,6 @@ struct NamespacesResponse {
 struct NamespaceInfo {
     description: String,
     unique: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    values: Option<Vec<String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pattern: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    required: Option<bool>,
 }
 
 /// Get namespace registry from configuration
@@ -951,9 +945,6 @@ async fn get_namespaces<S: IssueStore>(
                 NamespaceInfo {
                     description: ns.description,
                     unique: ns.unique,
-                    values: ns.values,
-                    pattern: ns.pattern,
-                    required: ns.required,
                 },
             )
         })
@@ -1249,12 +1240,12 @@ enforce_leases = "off"
     }
 
     #[tokio::test]
-    async fn test_get_namespaces_exposes_values_pattern_required() {
+    async fn test_get_namespaces_exposes_taxonomy_only() {
         use jit::storage::{IssueStore, JsonFileStorage};
 
-        // A file-backed storage with a config.toml that exercises every new
-        // field, so the response contract (mirror of CLI config show --json)
-        // stays protected against drift.
+        // A file-backed storage with a config.toml carrying both the taxonomy
+        // keys and (stale, ignored) constraint keys, so the response contract
+        // (mirror of CLI config show --json) stays protected against drift.
         let temp = tempfile::tempdir().unwrap();
         let jit_dir = temp.path().join(".jit");
         std::fs::create_dir(&jit_dir).unwrap();
@@ -1289,21 +1280,18 @@ pattern = '^v\d+\.\d+$'
         response.assert_status_ok();
         let data: NamespacesResponse = response.json();
 
+        // Only the taxonomy (description/unique) is surfaced; the stale
+        // constraint keys are ignored.
         let type_ns = data.namespaces.get("type").expect("type namespace");
-        assert_eq!(type_ns.required, Some(true));
-        assert_eq!(
-            type_ns.values.as_deref(),
-            Some(&["task".to_string(), "bug".to_string()][..])
-        );
-        assert!(type_ns.pattern.is_none());
+        assert_eq!(type_ns.description, "Issue type");
+        assert!(type_ns.unique);
 
         let ms_ns = data
             .namespaces
             .get("milestone")
             .expect("milestone namespace");
-        assert_eq!(ms_ns.pattern.as_deref(), Some(r"^v\d+\.\d+$"));
-        assert!(ms_ns.values.is_none());
-        assert!(ms_ns.required.is_none());
+        assert_eq!(ms_ns.description, "Release");
+        assert!(!ms_ns.unique);
     }
 
     #[tokio::test]
