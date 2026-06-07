@@ -111,18 +111,12 @@ strictness = "loose"
 # Auto-assign this type when creating issues without a type:* label.
 default_type = "task"
 
-# Warning toggles (both enabled by default; set to false to silence):
-# warn_orphaned_leaves = true       # tasks that carry no parent epic/story label
-# warn_strategic_consistency = true # hierarchy inconsistencies across issues
-
-# Label semantics — new repos start strict so convention drift is caught early.
-# Set either flag to false if you want looser enforcement during onboarding.
-reject_malformed_labels = true      # block labels that violate namespace:value format
-enforce_namespace_registry = true   # reject labels whose namespace isn't declared below
-
-# Legacy flag; prefer `required = true` on individual namespaces (see [namespaces.type]).
-# require_type_label = false
-# label_regex = '^[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9._-]*$'
+# NOTE: label/type validation (format, namespace registry, allowed values,
+# patterns, uniqueness, required namespaces, orphan-leaf / strategic-consistency
+# warnings) is defined declaratively in `.jit/rules.toml` — the single source of
+# truth — which `jit init` scaffolds. Edit the rules there, not here.
+reject_malformed_labels = true
+enforce_namespace_registry = true
 
 # =============================================================================
 # NAMESPACE REGISTRY
@@ -131,9 +125,9 @@ enforce_namespace_registry = true   # reject labels whose namespace isn't declar
 #   description — human-readable purpose (required)
 #   unique      — at most one label from this namespace per issue (required)
 #   examples    — documentation only, not enforced
-#   values      — optional allowed-value enum; free-form if omitted
-#   pattern     — optional regex over the value portion (checked by `jit validate`)
-#   required    — optional; when true every issue must carry a label from this namespace
+#
+# Allowed-value enums, value patterns, and required-ness are enforced via
+# `.jit/rules.toml` (the default rules `jit init` scaffolds), not here.
 
 [namespaces.type]
 description = "Issue type (hierarchical). Exactly one per issue."

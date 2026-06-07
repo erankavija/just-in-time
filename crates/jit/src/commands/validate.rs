@@ -392,9 +392,16 @@ impl<S: IssueStore> CommandExecutor<S> {
             .filter(|rule| rule.scope == Scope::Graph)
             .collect();
 
+        // The repo HierarchyConfig is injected into `type-hierarchy` rules at
+        // evaluation time (D1); it is no longer stored in the parsed rule. Build
+        // it from the same namespace registry the default rules derive from.
+        let namespaces = self.cached_namespaces().map_err(|e| anyhow!("{e}"))?;
+        let hierarchy = crate::validation::defaults::hierarchy_config(namespaces);
+
         Ok(crate::validation::graph::evaluate_graph(
             &graph_rules,
             issues,
+            &hierarchy,
         ))
     }
 

@@ -313,21 +313,24 @@ impl<S: IssueStore> CommandExecutor<S> {
             .as_ref()
     }
 
-    /// Return the EFFECTIVE rule set: the built-in default rules followed by the
-    /// user's `.jit/rules.toml`.
+    /// Return the EFFECTIVE rule set, with `.jit/rules.toml` as the operative
+    /// single source of truth (DR §8.2, decisions D2/D3).
     ///
-    /// The default rules are derived from this repo's `config.toml`
-    /// (`[validation]` + `[namespaces]`) by
-    /// [`default_ruleset`](crate::validation::defaults::default_ruleset); they
-    /// re-express the former hard-coded label/type checks (a0f0f342 migration).
-    /// User rules are appended so they extend the defaults. The combined set is
-    /// what every evaluation path (write-time `evaluate_local`, `jit validate`,
-    /// graph rules, `--explain`) runs against — there is no longer any separate
-    /// hard-coded validator.
+    /// Semantics depend on whether the file EXISTS, not whether it is empty:
+    ///
+    /// - **File present (even with zero rules):** the parsed file is the SOLE
+    ///   source. No in-code default rules are combined with it — every rule
+    ///   (including the `default:*` ones `jit init` scaffolds) lives in the file
+    ///   and is user-editable. An intentionally-emptied file yields an empty set.
+    /// - **File ABSENT (pre-init repo or deleted file):** fall back to the in-code
+    ///   [`default_ruleset`](crate::validation::defaults::default_ruleset) derived
+    ///   from `config.toml`, and warn (once) to run `jit init` to materialize it.
+    ///   This is a TRANSIENT bootstrap so a repo stays safe until init runs; it
+    ///   does NOT mutate the read path (no auto-scaffold on read).
     ///
     /// The result is built at most once and cached. A malformed `config.toml` or
-    /// `.jit/rules.toml` is surfaced as an `Err` rather than silently dropping the
-    /// defaults or the user rules.
+    /// `.jit/rules.toml` is surfaced as an `Err` rather than silently dropping
+    /// enforcement.
     ///
     /// # Examples
     ///
@@ -342,27 +345,39 @@ impl<S: IssueStore> CommandExecutor<S> {
     pub fn effective_rules(&self) -> Result<&RuleSet> {
         self.effective_rules
             .get_or_init(|| {
-                let config = self.cached_config().map_err(|e| e.to_string())?;
-                let namespaces = self.cached_namespaces().map_err(|e| e.to_string())?;
-                let validation =
-                    config
-                        .validation
-                        .clone()
-                        .unwrap_or(crate::config::ValidationConfig {
-                            strictness: None,
-                            default_type: None,
-                            require_type_label: None,
-                            label_regex: None,
-                            reject_malformed_labels: None,
-                            enforce_namespace_registry: None,
-                            warn_orphaned_leaves: None,
-                            warn_strategic_consistency: None,
-                        });
-                let mut combined =
-                    crate::validation::defaults::default_ruleset(&validation, namespaces);
-                let user = self.rules().map_err(|e| e.to_string())?;
-                combined.rules.extend(user.rules.iter().cloned());
-                Ok(combined)
+                let rules_path = self.storage.root().join("rules.toml");
+                if rules_path.exists() {
+                    // File present (even empty) is authoritative: use it ALONE.
+                    let user = self.rules().map_err(|e| e.to_string())?;
+                    Ok(user.clone())
+                } else {
+                    // File absent: transient bootstrap fallback + one-time warn.
+                    let config = self.cached_config().map_err(|e| e.to_string())?;
+                    let namespaces = self.cached_namespaces().map_err(|e| e.to_string())?;
+                    let validation =
+                        config
+                            .validation
+                            .clone()
+                            .unwrap_or(crate::config::ValidationConfig {
+                                strictness: None,
+                                default_type: None,
+                                require_type_label: None,
+                                label_regex: None,
+                                reject_malformed_labels: None,
+                                enforce_namespace_registry: None,
+                                warn_orphaned_leaves: None,
+                                warn_strategic_consistency: None,
+                            });
+                    eprintln!(
+                        "⚠️  Warning: no .jit/rules.toml found; using built-in default \
+                         validation rules. Run `jit init` to materialize them into \
+                         .jit/rules.toml (the operative source of truth)."
+                    );
+                    Ok(crate::validation::defaults::default_ruleset(
+                        &validation,
+                        namespaces,
+                    ))
+                }
             })
             .as_ref()
             .map_err(|err| anyhow!("{err}"))
@@ -515,6 +530,39 @@ impl<S: IssueStore> CommandExecutor<S> {
             load_or_create_worktree_identity(&paths.local_jit, &paths.worktree_root, &branch)?;
 
         Ok(Some(identity))
+    }
+
+    /// Scaffold `.jit/rules.toml` (complete default ruleset) or migrate a legacy
+    /// repo's enforcement keys into it (decisions D5/D6/D7). Called from the
+    /// `jit init` path AFTER `config.toml` has been written/exists, so the
+    /// migration sees the repo's real config.
+    ///
+    /// Serializes the COMPLETE [`default_ruleset`](crate::validation::defaults::default_ruleset)
+    /// derived from the repo's config into `rules.toml` (+ `.jit/schemas/*.json`),
+    /// then strips the migrated enforcement keys from `config.toml`. Behavior by
+    /// repo state (fresh / legacy / coexistence / already-migrated) is handled by
+    /// [`migration::migrate_or_scaffold`](crate::validation::migration::migrate_or_scaffold).
+    ///
+    /// Returns the [`MigrationOutcome`](crate::validation::migration::MigrationOutcome)
+    /// so the caller can report what was migrated / skipped.
+    pub fn migrate_or_scaffold_rules(
+        &self,
+    ) -> Result<crate::validation::migration::MigrationOutcome> {
+        // Parse config.toml WITHOUT the deprecated-key warning scan: the
+        // migration is about to remove those keys, so warning here (especially on
+        // a fresh repo whose template still carries them so the complete ruleset
+        // can be derived) would be self-contradictory. The deprecated-key warning
+        // is reserved for ORDINARY loads of a stale, un-migrated config.
+        let config_path = self.storage.root().join("config.toml");
+        let config = if config_path.exists() {
+            let content = std::fs::read_to_string(&config_path)
+                .with_context(|| format!("reading {}", config_path.display()))?;
+            toml::from_str(&content).context("Failed to parse config.toml for migration")?
+        } else {
+            self.config_manager.load()?
+        };
+        let namespaces = self.config_manager.namespaces_from_config(&config);
+        crate::validation::migration::migrate_or_scaffold(self.storage.root(), &config, &namespaces)
     }
 
     /// Check if an active lease exists for the given issue by the current agent.

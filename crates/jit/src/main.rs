@@ -302,6 +302,30 @@ fn run() -> Result<()> {
                 std::fs::write(&config_path, chosen.generate_config_toml())?;
             }
 
+            // Scaffold .jit/rules.toml as the operative single source of truth, or
+            // migrate an existing repo's legacy `[validation]` / `[namespaces].
+            // {values,pattern,required}` enforcement keys into it (stripping them
+            // from config.toml). Serializes the COMPLETE default ruleset + any
+            // referenced schemas. Idempotent. A FRESH repo's template ships with
+            // those keys so its complete ruleset can be derived, then strips them,
+            // emitting NO migration message (only an existing legacy repo does).
+            let migration = executor.migrate_or_scaffold_rules()?;
+            for skipped in &migration.skipped_existing {
+                let _ = output_ctx.print_warning(format!(
+                    "Skipped migrating rule '{skipped}': a rule with that name already exists in \
+                     .jit/rules.toml"
+                ));
+            }
+            if config_already_existed && !migration.stripped_keys.is_empty() {
+                let _ = output_ctx.print_success(format!(
+                    "Migrated {} legacy validation key(s) into .jit/rules.toml: {}",
+                    migration.stripped_keys.len(),
+                    migration.stripped_keys.join(", ")
+                ));
+            } else if !migration.file_preexisted {
+                let _ = output_ctx.print_success("Scaffolded .jit/rules.toml");
+            }
+
             if let Some(ref t) = template {
                 let _ = output_ctx
                     .print_success(format!("Initialized with '{}' hierarchy template", t.name));

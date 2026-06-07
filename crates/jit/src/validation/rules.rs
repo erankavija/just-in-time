@@ -25,7 +25,6 @@ use thiserror::Error;
 
 use crate::domain::Issue;
 use crate::labels as label_utils;
-use crate::type_hierarchy::HierarchyConfig;
 
 /// Errors that can occur while loading and parsing `.jit/rules.toml`.
 ///
@@ -112,16 +111,6 @@ pub enum RuleConfigError {
     #[error("duplicate rule name '{name}': rule names must be unique")]
     DuplicateRuleName {
         /// The name that appeared more than once.
-        name: String,
-    },
-
-    /// A user rule uses the reserved `default:` name prefix. That prefix is
-    /// owned by the built-in default ruleset; a user rule using it could collide
-    /// with a default rule once the two sets are combined, breaking the
-    /// unique-name (unambiguous-attribution) invariant.
-    #[error("rule name '{name}' uses the reserved 'default:' prefix")]
-    ReservedRuleName {
-        /// The offending user rule name.
         name: String,
     },
 }
@@ -414,17 +403,17 @@ pub enum Assertion {
         config: toml::value::Table,
     },
     /// A built-in type-hierarchy warning (orphan-leaf or strategic-consistency).
-    /// Graph scope. Constructed ONLY programmatically as a built-in default rule
-    /// (see [`default_ruleset`](crate::validation::defaults::default_ruleset));
-    /// it is not authorable in `rules.toml`. Evaluation reuses the existing
-    /// [`crate::type_hierarchy`] domain functions rather than reimplementing the
-    /// hierarchy logic, so the repo's [`HierarchyConfig`] is carried inline.
+    /// Graph scope. Authorable in `rules.toml` via the `type-hierarchy` assert
+    /// kind, and also constructed programmatically as a built-in default rule
+    /// (see [`default_ruleset`](crate::validation::defaults::default_ruleset)).
+    /// Evaluation reuses the existing [`crate::type_hierarchy`] domain functions
+    /// rather than reimplementing the hierarchy logic; the repo's
+    /// [`HierarchyConfig`] is NOT stored in the parsed rule — it is injected by
+    /// the graph evaluator at evaluation time (see
+    /// [`evaluate_graph`](crate::validation::graph::evaluate_graph)).
     TypeHierarchy {
         /// Which legacy hierarchy check this rule performs.
         kind: TypeHierarchyKind,
-        /// The repo's hierarchy configuration, passed straight to the reused
-        /// domain function during evaluation.
-        config: HierarchyConfig,
     },
 }
 
@@ -438,12 +427,10 @@ pub enum Assertion {
 /// # Examples
 ///
 /// ```
-/// use jit::type_hierarchy::HierarchyConfig;
 /// use jit::validation::rules::{Assertion, Scope, TypeHierarchyKind};
 ///
 /// let assertion = Assertion::TypeHierarchy {
 ///     kind: TypeHierarchyKind::OrphanLeaf,
-///     config: HierarchyConfig::default(),
 /// };
 /// // Type-hierarchy checks need the whole issue set, so they are graph-scoped.
 /// assert_eq!(assertion.scope(), Scope::Graph);
@@ -612,15 +599,6 @@ impl RuleSet {
             .map(|r| r.into_rule(jit_root))
             .collect::<Result<Vec<_>, _>>()?;
 
-        // The `default:` prefix is reserved for the built-in default ruleset.
-        // Reject user rules that use it so they cannot collide with a default
-        // rule when the two sets are combined (preserving unique-name attribution).
-        if let Some(rule) = rules.iter().find(|r| r.name.starts_with("default:")) {
-            return Err(RuleConfigError::ReservedRuleName {
-                name: rule.name.clone(),
-            });
-        }
-
         // Enforce the documented "Unique" invariant on `Rule::name` so every
         // finding attributes to exactly one rule. (The engine keys its validator
         // cache by schema identity, not name, so this is about attribution
@@ -719,6 +697,17 @@ struct RawAssert {
     label_reference: Option<toml::value::Table>,
     #[serde(default, rename = "dependency-shape")]
     dependency_shape: Option<toml::value::Table>,
+    #[serde(default, rename = "type-hierarchy")]
+    type_hierarchy: Option<RawTypeHierarchy>,
+}
+
+/// The `type-hierarchy` assert payload: a single `kind` discriminator selecting
+/// one of the two built-in hierarchy warnings. `deny_unknown_fields` rejects any
+/// stray key so a typo surfaces as a parse error.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawTypeHierarchy {
+    kind: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -776,7 +765,8 @@ impl RawAssert {
             || self.checker_command.is_some()
             || self.label_coverage.is_some()
             || self.label_reference.is_some()
-            || self.dependency_shape.is_some();
+            || self.dependency_shape.is_some()
+            || self.type_hierarchy.is_some();
         let raw_schema_present = self.json_schema.is_some();
 
         // Shorthand XOR file-schema: combining them in one rule is a config
@@ -802,6 +792,7 @@ impl RawAssert {
             self.label_coverage.is_some(),
             self.label_reference.is_some(),
             self.dependency_shape.is_some(),
+            self.type_hierarchy.is_some(),
         ]
         .into_iter()
         .filter(|present| *present)
@@ -861,6 +852,22 @@ impl RawAssert {
         }
         if let Some(config) = self.dependency_shape {
             return Ok(Assertion::DependencyShape { config });
+        }
+        if let Some(th) = self.type_hierarchy {
+            let kind = match th.kind.as_str() {
+                "orphan-leaf" => TypeHierarchyKind::OrphanLeaf,
+                "strategic-consistency" => TypeHierarchyKind::StrategicConsistency,
+                other => {
+                    return Err(RuleConfigError::InvalidAssertion {
+                        rule: rule.to_string(),
+                        message: format!(
+                            "type-hierarchy 'kind' must be 'orphan-leaf' or \
+                             'strategic-consistency', found '{other}'"
+                        ),
+                    });
+                }
+            };
+            return Ok(Assertion::TypeHierarchy { kind });
         }
 
         // Unreachable: total == 1 guarantees one branch above matched.
@@ -1208,20 +1215,82 @@ assert = { require-doc-type = { doc-type = "design" } }
     }
 
     #[test]
-    fn test_reserved_default_prefix_is_rejected() {
-        // The `default:` prefix is reserved for the built-in default ruleset; a
-        // user rule using it would risk colliding with a default rule once the
-        // sets are combined, so the loader rejects it.
+    fn test_default_prefix_name_is_now_accepted() {
+        // The `default:` reservation was removed (DR §8.2): the default rules now
+        // live in the file and are user-editable, so a `default:*` name loads
+        // like any other (only the uniqueness guard remains).
         let toml = r#"
 [[rules]]
 name = "default:my-rule"
 assert = { require-section = { heading = "A" } }
 "#;
+        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        assert_eq!(set.rules[0].name, "default:my-rule");
+    }
+
+    // --- type-hierarchy assert kind ----------------------------------------
+
+    #[test]
+    fn test_type_hierarchy_orphan_leaf_parses_as_graph_rule() {
+        let toml = r#"
+[[rules]]
+name = "default:orphan-leaf"
+assert = { type-hierarchy = { kind = "orphan-leaf" } }
+"#;
+        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        assert_eq!(set.rules[0].scope, Scope::Graph);
+        assert!(matches!(
+            set.rules[0].assert,
+            Assertion::TypeHierarchy {
+                kind: TypeHierarchyKind::OrphanLeaf
+            }
+        ));
+    }
+
+    #[test]
+    fn test_type_hierarchy_strategic_consistency_parses() {
+        let toml = r#"
+[[rules]]
+name = "default:strategic-consistency"
+assert = { type-hierarchy = { kind = "strategic-consistency" } }
+"#;
+        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        assert!(matches!(
+            set.rules[0].assert,
+            Assertion::TypeHierarchy {
+                kind: TypeHierarchyKind::StrategicConsistency
+            }
+        ));
+    }
+
+    #[test]
+    fn test_type_hierarchy_unknown_kind_is_rejected() {
+        let toml = r#"
+[[rules]]
+name = "bad"
+assert = { type-hierarchy = { kind = "not-a-kind" } }
+"#;
         let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
         match err {
-            RuleConfigError::ReservedRuleName { name } => assert_eq!(name, "default:my-rule"),
-            other => panic!("expected ReservedRuleName, got {other:?}"),
+            RuleConfigError::InvalidAssertion { rule, message } => {
+                assert_eq!(rule, "bad");
+                assert!(message.contains("orphan-leaf"));
+                assert!(message.contains("strategic-consistency"));
+            }
+            other => panic!("expected InvalidAssertion, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn test_type_hierarchy_unknown_field_is_rejected() {
+        // `deny_unknown_fields` on RawTypeHierarchy catches a stray key.
+        let toml = r#"
+[[rules]]
+name = "bad"
+assert = { type-hierarchy = { kind = "orphan-leaf", extra = 1 } }
+"#;
+        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        assert!(matches!(err, RuleConfigError::Toml(_)));
     }
 
     #[test]

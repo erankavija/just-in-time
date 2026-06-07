@@ -102,6 +102,7 @@ pub enum ChildLink {
 ///
 /// ```
 /// use jit::domain::Issue;
+/// use jit::type_hierarchy::HierarchyConfig;
 /// use jit::validation::graph::{evaluate_graph, GraphFinding};
 /// use jit::validation::rules::RuleSet;
 /// use std::path::Path;
@@ -119,7 +120,8 @@ pub enum ChildLink {
 /// let mut task = Issue::new("a task".into(), String::new());
 /// task.labels = vec!["type:task".into()];
 /// let task_id = task.id.clone();
-/// let findings: Vec<GraphFinding> = evaluate_graph(&rules, &[task]);
+/// let findings: Vec<GraphFinding> =
+///     evaluate_graph(&rules, &[task], &HierarchyConfig::default());
 /// assert_eq!(findings.len(), 1);
 /// // The finding is attributed to the offending issue, not parsed from text.
 /// assert_eq!(findings[0].issue_id.as_deref(), Some(task_id.as_str()));
@@ -239,6 +241,7 @@ impl ChildLink {
 ///
 /// ```
 /// use jit::domain::Issue;
+/// use jit::type_hierarchy::HierarchyConfig;
 /// use jit::validation::graph::evaluate_graph;
 /// use jit::validation::rules::RuleSet;
 /// use std::path::Path;
@@ -257,26 +260,33 @@ impl ChildLink {
 /// let mut task = Issue::new("a task".into(), String::new());
 /// task.labels = vec!["type:task".into()];
 /// // No design dependency -> one finding, attributed to the task.
-/// let findings = evaluate_graph(&rules, &[task]);
+/// let findings = evaluate_graph(&rules, &[task], &HierarchyConfig::default());
 /// assert_eq!(findings.len(), 1);
 /// assert_eq!(findings[0].finding.rule, "task-needs-design-dep");
 /// ```
-pub fn evaluate_graph(rules: &[&Rule], issues: &[Issue]) -> Vec<GraphFinding> {
+///
+/// The repo's [`HierarchyConfig`] is injected here (not stored in the parsed
+/// rule) and passed to any `type-hierarchy` rule during evaluation.
+pub fn evaluate_graph(
+    rules: &[&Rule],
+    issues: &[Issue],
+    hierarchy: &HierarchyConfig,
+) -> Vec<GraphFinding> {
     rules
         .iter()
         .filter(|rule| rule.scope == Scope::Graph && rule.severity != Severity::Off)
-        .flat_map(|rule| evaluate_one(rule, issues))
+        .flat_map(|rule| evaluate_one(rule, issues, hierarchy))
         .collect()
 }
 
 /// Evaluate a single graph rule, dispatching on its assertion kind.
-fn evaluate_one(rule: &Rule, issues: &[Issue]) -> Vec<GraphFinding> {
+fn evaluate_one(rule: &Rule, issues: &[Issue], hierarchy: &HierarchyConfig) -> Vec<GraphFinding> {
     match &rule.assert {
         Assertion::LabelCoverage { config } => evaluate_label_coverage(rule, config, issues),
         Assertion::LabelReference { config } => evaluate_label_reference(rule, config, issues),
         Assertion::DependencyShape { config } => evaluate_dependency_shape(rule, config, issues),
-        Assertion::TypeHierarchy { kind, config } => {
-            evaluate_type_hierarchy(rule, *kind, config, issues)
+        Assertion::TypeHierarchy { kind } => {
+            evaluate_type_hierarchy(rule, *kind, hierarchy, issues)
         }
         // Non-graph kinds are never dispatched here (filtered by scope), but be
         // exhaustive and total rather than panic.
@@ -842,7 +852,7 @@ mod tests {
         child.state = State::Done;
 
         let rules = vec![&rule];
-        let findings = evaluate_graph(&rules, &[epic, child]);
+        let findings = evaluate_graph(&rules, &[epic, child], &HierarchyConfig::default());
         assert!(findings.is_empty(), "covered criterion: {findings:?}");
     }
 
@@ -855,7 +865,7 @@ mod tests {
         child.state = State::Done;
 
         let rules = vec![&rule];
-        let findings = evaluate_graph(&rules, &[epic, child]);
+        let findings = evaluate_graph(&rules, &[epic, child], &HierarchyConfig::default());
         // REQ-02 is uncovered.
         assert_eq!(findings.len(), 1);
         assert!(findings[0].finding.message.contains("REQ-02"));
@@ -872,7 +882,7 @@ mod tests {
         child.state = State::InProgress; // not done
 
         let rules = vec![&rule];
-        let findings = evaluate_graph(&rules, &[epic, child]);
+        let findings = evaluate_graph(&rules, &[epic, child], &HierarchyConfig::default());
         assert_eq!(findings.len(), 1, "wrong-state child does not cover");
     }
 
@@ -887,7 +897,7 @@ mod tests {
         child.dependencies = vec![epic.id.clone()];
 
         let rules = vec![&rule];
-        let findings = evaluate_graph(&rules, &[epic, child]);
+        let findings = evaluate_graph(&rules, &[epic, child], &HierarchyConfig::default());
         assert!(
             findings.is_empty(),
             "aspirational criterion must not be required: {findings:?}"
@@ -902,7 +912,7 @@ mod tests {
         let child = issue("child", &["satisfies:REQ-01"]);
 
         let rules = vec![&rule];
-        let findings = evaluate_graph(&rules, &[epic, child]);
+        let findings = evaluate_graph(&rules, &[epic, child], &HierarchyConfig::default());
         assert!(findings.is_empty(), "any link covers regardless of edges");
     }
 
@@ -911,7 +921,7 @@ mod tests {
         let rule = coverage_rule("child-link = \"bogus\"");
         let epic = epic_with_criteria(&["REQ-01"]);
         let rules = vec![&rule];
-        let findings = evaluate_graph(&rules, &[epic]);
+        let findings = evaluate_graph(&rules, &[epic], &HierarchyConfig::default());
         assert_eq!(findings.len(), 1);
         assert!(findings[0].finding.message.contains("config error"));
         assert!(findings[0].finding.message.contains("child-link"));
@@ -932,7 +942,7 @@ mod tests {
         let source = issue("epic", &["req:REQ-01"]);
         let child = issue("child", &["satisfies:REQ-01"]);
         let rules = vec![&rule];
-        let findings = evaluate_graph(&rules, &[source, child]);
+        let findings = evaluate_graph(&rules, &[source, child], &HierarchyConfig::default());
         assert!(findings.is_empty(), "resolved reference: {findings:?}");
     }
 
@@ -942,7 +952,7 @@ mod tests {
         let source = issue("epic", &["req:REQ-01"]);
         let child = issue("child", &["satisfies:REQ-99"]); // no req:REQ-99 anywhere
         let rules = vec![&rule];
-        let findings = evaluate_graph(&rules, &[source, child]);
+        let findings = evaluate_graph(&rules, &[source, child], &HierarchyConfig::default());
         assert_eq!(findings.len(), 1);
         assert!(findings[0].finding.message.contains("REQ-99"));
         assert_eq!(findings[0].finding.severity, Severity::Warn);
@@ -955,14 +965,14 @@ mod tests {
         let declarer = issue("epic", &["req:REQ-01"]);
         let child = issue("child", &["satisfies:REQ-01"]); // no dependency edge
         let rules = vec![&rule];
-        let findings = evaluate_graph(&rules, &[declarer, child]);
+        let findings = evaluate_graph(&rules, &[declarer, child], &HierarchyConfig::default());
         assert_eq!(findings.len(), 1, "linked scope: unlinked source dangles");
 
         // Now add the edge: the reference resolves.
         let declarer = issue("epic", &["req:REQ-01"]);
         let mut child = issue("child", &["satisfies:REQ-01"]);
         child.dependencies = vec![declarer.id.clone()];
-        let findings = evaluate_graph(&rules, &[declarer, child]);
+        let findings = evaluate_graph(&rules, &[declarer, child], &HierarchyConfig::default());
         assert!(findings.is_empty(), "linked edge resolves: {findings:?}");
     }
 
@@ -970,7 +980,11 @@ mod tests {
     fn test_label_reference_missing_key_is_config_error() {
         let rule = reference_rule("from = \"satisfies\""); // missing `to`
         let rules = vec![&rule];
-        let findings = evaluate_graph(&rules, &[issue("x", &["satisfies:REQ-01"])]);
+        let findings = evaluate_graph(
+            &rules,
+            &[issue("x", &["satisfies:REQ-01"])],
+            &HierarchyConfig::default(),
+        );
         assert_eq!(findings.len(), 1);
         assert!(findings[0].finding.message.contains("config error"));
         assert!(findings[0].finding.message.contains("'to'"));
@@ -992,7 +1006,7 @@ mod tests {
         let mut task = issue("task", &["type:task"]);
         task.dependencies = vec![design.id.clone()];
         let rules = vec![&rule];
-        let findings = evaluate_graph(&rules, &[design, task]);
+        let findings = evaluate_graph(&rules, &[design, task], &HierarchyConfig::default());
         assert!(findings.is_empty(), "task depends on design: {findings:?}");
     }
 
@@ -1002,7 +1016,7 @@ mod tests {
         let design = issue("design", &["type:design"]);
         let task = issue("task", &["type:task"]); // no dependency
         let rules = vec![&rule];
-        let findings = evaluate_graph(&rules, &[design, task]);
+        let findings = evaluate_graph(&rules, &[design, task], &HierarchyConfig::default());
         assert_eq!(findings.len(), 1);
         assert!(findings[0].finding.message.contains("depend"));
         assert_eq!(findings[0].finding.rule, "shape");
@@ -1019,12 +1033,16 @@ mod tests {
 
         let direct = shape_rule("target = { type = \"design\" }");
         let rules = vec![&direct];
-        let findings = evaluate_graph(&rules, &[design.clone(), mid.clone(), task.clone()]);
+        let findings = evaluate_graph(
+            &rules,
+            &[design.clone(), mid.clone(), task.clone()],
+            &HierarchyConfig::default(),
+        );
         assert_eq!(findings.len(), 1, "direct-only must not see transitive dep");
 
         let trans = shape_rule("target = { type = \"design\" }, transitive = true");
         let rules = vec![&trans];
-        let findings = evaluate_graph(&rules, &[design, mid, task]);
+        let findings = evaluate_graph(&rules, &[design, mid, task], &HierarchyConfig::default());
         assert!(
             findings.is_empty(),
             "transitive dep satisfies: {findings:?}"
@@ -1035,7 +1053,11 @@ mod tests {
     fn test_dependency_shape_missing_target_is_config_error() {
         let rule = shape_rule("mode = \"must\""); // no target
         let rules = vec![&rule];
-        let findings = evaluate_graph(&rules, &[issue("task", &["type:task"])]);
+        let findings = evaluate_graph(
+            &rules,
+            &[issue("task", &["type:task"])],
+            &HierarchyConfig::default(),
+        );
         assert_eq!(findings.len(), 1);
         assert!(findings[0].finding.message.contains("config error"));
         assert!(findings[0].finding.message.contains("target"));
@@ -1055,7 +1077,35 @@ mod tests {
              assert = { dependency-shape = { target = { type = \"design\" } } }\n",
         );
         let rules = vec![&local, &off];
-        let findings = evaluate_graph(&rules, &[issue("task", &["type:task"])]);
+        let findings = evaluate_graph(
+            &rules,
+            &[issue("task", &["type:task"])],
+            &HierarchyConfig::default(),
+        );
         assert!(findings.is_empty(), "local + off rules produce nothing");
+    }
+
+    // --- type-hierarchy (injected HierarchyConfig) -------------------------
+
+    #[test]
+    fn test_type_hierarchy_orphan_leaf_fires_with_injected_config() {
+        // A `type-hierarchy` rule authored in TOML carries only its kind; the
+        // HierarchyConfig is injected by `evaluate_graph`. A leaf task with no
+        // parent association label is flagged as an orphan.
+        let rule = rule_from(
+            "[[rules]]\nname = \"default:orphan-leaf\"\nseverity = \"warn\"\n\
+             assert = { type-hierarchy = { kind = \"orphan-leaf\" } }\n",
+        );
+        let rules = vec![&rule];
+        let task = issue("task", &["type:task"]);
+        let findings = evaluate_graph(
+            &rules,
+            std::slice::from_ref(&task),
+            &HierarchyConfig::default(),
+        );
+        assert_eq!(findings.len(), 1, "orphan leaf must fire: {findings:?}");
+        assert_eq!(findings[0].finding.rule, "default:orphan-leaf");
+        assert_eq!(findings[0].issue_id.as_deref(), Some(task.id.as_str()));
+        assert_eq!(findings[0].finding.severity, Severity::Warn);
     }
 }

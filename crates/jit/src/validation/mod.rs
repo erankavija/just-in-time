@@ -22,8 +22,10 @@ pub mod desugar;
 pub mod engine;
 pub mod graph;
 pub mod local;
+pub mod migration;
 pub mod report;
 pub mod rules;
+pub mod serialize;
 
 pub use engine::{Finding, KeywordFactory, SchemaCompileError, SchemaEngine};
 pub use local::{evaluate_local, LocalEvalError, LocalEvaluation};
