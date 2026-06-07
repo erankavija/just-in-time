@@ -1,7 +1,7 @@
 {
   "id": "2fb9f910-ae16-431d-8bb3-bf83634d1f90",
   "title": "Migrate gf2 (and verify this repo) to rules.toml as deliverable",
-  "description": "",
+  "description": "Migrate gf2 (and re-verify this repo) to `.jit/rules.toml` as a deliverable, using the migration code BEFORE Task D removes it.\n\n## Background\n\nPart of Scope Expansion 2. Pre-1.0 the only jit consumers are this repo (already dogfooded) and `../gf2`. This is an operational (lead-driven) task. See `dev/active/f6a704d0-expansion2-plan.md` §4 and `dev/active/f6a704d0-handoff-2.md` (gf2 analysis). Depends on tasks A and B.\n\n## Success Criteria\n\n- [ ] [hard] The new jit binary is installed (`cargo install --path crates/jit`) and gf2's running server is restarted on it.\n- [ ] [hard] gf2's `.jit` is git-snapshotted, then `jit init` migrates it: `.jit/rules.toml` + `.jit/schemas/` written, `require_type_label` stripped, config reduced to behavioral keys.\n- [ ] [hard] gf2's `jit validate` output is verified unchanged vs the pre-migration baseline; gf2 `.jit` changes committed.\n- [ ] [hard] This repo re-verified green under the final binary.",
   "state": "backlog",
   "priority": "normal",
   "assignee": null,
@@ -18,5 +18,5 @@
     "epic:validation-engine"
   ],
   "created_at": "2026-06-07T17:58:58.143267736+00:00",
-  "updated_at": "2026-06-07T17:59:28.992538352+00:00"
+  "updated_at": "2026-06-07T18:13:35.493673608+00:00"
 }
