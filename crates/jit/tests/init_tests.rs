@@ -64,6 +64,28 @@ fn test_init_creates_required_files() {
     assert!(jit.join("config.toml").exists(), "config.toml missing");
 }
 
+#[test]
+fn test_init_outside_git_scaffolds_rules_without_creating_dot_git() {
+    // `jit init` in a directory that is NOT a git repo must still scaffold the
+    // default rules.toml, but it must NOT create a bogus `.git` control plane:
+    // the scaffold write lock (.git/jit/locks/rules.lock) is git-only, and the
+    // non-git path is intentionally lockless. (Regression: gating the lock on
+    // `WorktreePaths::detect()` succeeding created `<dir>/.git/jit/locks`,
+    // because detect() returns Ok even outside git.)
+    let temp = TempDir::new().unwrap();
+    let out = jit_init(temp.path(), &[]);
+    assert!(out.status.success(), "jit init failed: {:?}", out);
+
+    assert!(
+        temp.path().join(".jit/rules.toml").exists(),
+        "init should scaffold .jit/rules.toml even outside a git repo"
+    );
+    assert!(
+        !temp.path().join(".git").exists(),
+        "init outside a git repo must not create a .git directory"
+    );
+}
+
 // ---------------------------------------------------------------------------
 // Idempotency
 // ---------------------------------------------------------------------------
