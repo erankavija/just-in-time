@@ -4,8 +4,9 @@
 //! This is the inverse of the [`rules`](crate::validation::rules) loader: it
 //! renders an arbitrary in-memory [`RuleSet`] (typically the built-in
 //! [`default_ruleset`](crate::validation::defaults::default_ruleset)) into a
-//! complete, reloadable `rules.toml`. `jit init` uses it to scaffold/migrate the
-//! file so the file becomes the single operative source of truth.
+//! complete, reloadable `rules.toml`. `jit init` uses it (via
+//! [`scaffold_default_rules`]) to materialize the fixed default ruleset so the
+//! file becomes the single operative source of truth.
 //!
 //! # Why a custom renderer (no `Serialize` derive)
 //!
@@ -34,7 +35,9 @@
 //! reference. The round-trip test compares field-wise, excluding those two.
 
 use crate::validation::rules::{Assertion, Rule, RuleSet, Selector, TypeHierarchyKind};
+use anyhow::{Context, Result};
 use std::collections::HashSet;
+use std::path::Path;
 
 /// A `rules.toml` body together with the schema files it references.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -100,6 +103,51 @@ pub fn serialize_ruleset(set: &RuleSet) -> SerializedRuleSet {
         rules_toml,
         schema_files,
     }
+}
+
+/// Scaffold the FIXED default `.jit/rules.toml` (+ referenced `.jit/schemas/
+/// *.json`) for `jit init`, derived from `namespaces` via
+/// [`default_ruleset`](crate::validation::defaults::default_ruleset).
+///
+/// This is the ONLY place that materializes the default ruleset to disk (MF4):
+/// it runs from `jit init` under the existing write lock. The read path
+/// ([`effective_rules`](crate::commands::CommandExecutor::effective_rules)) builds
+/// the same defaults in memory and never writes.
+///
+/// Idempotent by design at the call site: `jit init` invokes this only when
+/// `rules.toml` is absent (a present file is the sole source and is left intact),
+/// so re-init is a no-op. Writes are atomic (temp + rename).
+pub fn scaffold_default_rules(
+    jit_root: &Path,
+    namespaces: &crate::domain::LabelNamespaces,
+) -> Result<()> {
+    let set = crate::validation::defaults::default_ruleset(namespaces);
+    let serialized = serialize_ruleset(&set);
+    write_schema_files(jit_root, &serialized.schema_files)?;
+    write_atomic(&jit_root.join("rules.toml"), &serialized.rules_toml)
+}
+
+/// Write schema files under `<jit_root>/schemas/`, creating the directory.
+fn write_schema_files(jit_root: &Path, files: &[SchemaFile]) -> Result<()> {
+    if files.is_empty() {
+        return Ok(());
+    }
+    let schemas_dir = jit_root.join("schemas");
+    std::fs::create_dir_all(&schemas_dir)
+        .with_context(|| format!("creating {}", schemas_dir.display()))?;
+    for file in files {
+        write_atomic(&schemas_dir.join(&file.name), &file.content)?;
+    }
+    Ok(())
+}
+
+/// Write `content` to `path` atomically (temp file + rename).
+fn write_atomic(path: &Path, content: &str) -> Result<()> {
+    let tmp = path.with_extension("tmp");
+    std::fs::write(&tmp, content).with_context(|| format!("writing {}", tmp.display()))?;
+    std::fs::rename(&tmp, path)
+        .with_context(|| format!("renaming {} -> {}", tmp.display(), path.display()))?;
+    Ok(())
 }
 
 /// Pick a schema-file stem for `rule_name` that is unique within `used_stems`,
@@ -331,26 +379,11 @@ pub(crate) fn toml_literal_string(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::ValidationConfig;
     use crate::domain::{LabelNamespace, LabelNamespaces};
     use crate::validation::defaults::default_ruleset;
     use crate::validation::rules::{RuleSet, Severity};
     use std::collections::HashMap;
     use std::path::Path;
-
-    fn empty_validation() -> ValidationConfig {
-        ValidationConfig {
-            strictness: None,
-            default_type: None,
-            content_format: None,
-            require_type_label: None,
-            label_regex: None,
-            reject_malformed_labels: None,
-            enforce_namespace_registry: None,
-            warn_orphaned_leaves: None,
-            warn_strategic_consistency: None,
-        }
-    }
 
     fn registry(entries: Vec<(&str, LabelNamespace)>) -> LabelNamespaces {
         let mut namespaces = HashMap::new();
@@ -425,30 +458,22 @@ mod tests {
 
     #[test]
     fn test_round_trip_full_default_ruleset() {
-        // A rich config exercising every default rule kind.
-        let mut validation = empty_validation();
-        validation.require_type_label = Some(true);
-        validation.label_regex = Some(r"^team:[a-z]+$".to_string());
-        validation.enforce_namespace_registry = Some(true);
-        validation.reject_malformed_labels = Some(true);
+        // A registry exercising every default rule kind (json-schema, shorthand,
+        // graph) the fixed default emits.
         let reg = registry(vec![
-            (
-                "type",
-                LabelNamespace::new("Type", true)
-                    .required(true)
-                    .with_values(vec!["task".to_string(), "bug".to_string()]),
-            ),
-            (
-                "milestone",
-                LabelNamespace::new("Release", false).with_pattern(r"^v\d+\.\d+$"),
-            ),
+            ("type", LabelNamespace::new("Type", true)),
+            ("milestone", LabelNamespace::new("Release", false)),
         ]);
-        let set = default_ruleset(&validation, &reg);
+        let set = default_ruleset(&reg);
         // Sanity: the set covers json-schema, shorthand, and graph kinds.
         assert!(set
             .rules
             .iter()
             .any(|r| matches!(r.assert, Assertion::JsonSchema(_))));
+        assert!(set
+            .rules
+            .iter()
+            .any(|r| matches!(r.assert, Assertion::RequireLabel { .. })));
         assert!(set
             .rules
             .iter()
@@ -460,7 +485,7 @@ mod tests {
     fn test_round_trip_canonical_label_format_specifically() {
         // The always-on canonical label-format rule is the highest-traffic
         // JsonSchema rule and most exposed to the reference/path exclusion.
-        let set = default_ruleset(&empty_validation(), &registry(vec![]));
+        let set = default_ruleset(&registry(vec![]));
         let canonical: Vec<&Rule> = set
             .rules
             .iter()
@@ -541,7 +566,7 @@ assert = { label-value-pattern = { namespace = "sc", regex = '^\[hard\]\s+\w+' }
     fn test_empty_selector_is_omitted() {
         // A rule with no selector must NOT emit `when = {}` (which the loader
         // accepts, but the canonical form omits it).
-        let set = default_ruleset(&empty_validation(), &registry(vec![]));
+        let set = default_ruleset(&registry(vec![]));
         let out = serialize_ruleset(&set);
         assert!(!out.rules_toml.contains("when = {}"));
         assert!(!out.rules_toml.contains("when = { }"));
@@ -601,7 +626,7 @@ assert = { json-schema = "schemas/second.json" }
         // Serializing, reloading, and re-serializing yields identical text once
         // schema references are stable (file-name driven). The second pass uses
         // the reloaded set (whose JsonSchema references now point at files).
-        let set = default_ruleset(&empty_validation(), &registry(vec![]));
+        let set = default_ruleset(&registry(vec![]));
         let (_dir, reloaded) = round_trip(&set);
         let first = serialize_ruleset(&set).rules_toml;
         let second = serialize_ruleset(&reloaded).rules_toml;

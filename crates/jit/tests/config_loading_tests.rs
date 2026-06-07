@@ -15,8 +15,7 @@ milestone = "milestone"
 
 [validation]
 strictness = "loose"
-warn_orphaned_leaves = true
-warn_strategic_consistency = true
+default_type = "task"
 "#;
 
     let config: JitConfig = toml::from_str(config_toml).unwrap();
@@ -36,8 +35,7 @@ warn_strategic_consistency = true
 
     let validation = config.validation.unwrap();
     assert_eq!(validation.strictness, Some("loose".to_string()));
-    assert_eq!(validation.warn_orphaned_leaves, Some(true));
-    assert_eq!(validation.warn_strategic_consistency, Some(true));
+    assert_eq!(validation.default_type, Some("task".to_string()));
 }
 
 #[test]
@@ -81,22 +79,24 @@ feature = "epic"
 }
 
 #[test]
-fn test_warning_toggles_respect_config() {
+fn test_orphan_warning_is_unconditional_in_default_ruleset() {
+    // The orphan-leaf / strategic-consistency graph warnings are now UNCONDITIONAL
+    // built-in default rules (the former `warn_*` toggles were removed; MF1). With
+    // no rules.toml, the in-memory defaults always emit them, so an orphaned task
+    // warns. A repo that wants them silenced edits rules.toml.
     let temp_dir = TempDir::new().unwrap();
     let storage = JsonFileStorage::new(temp_dir.path());
     storage.init().unwrap();
 
-    // Write config with warnings disabled
-    let config_toml = r#"
-[validation]
-warn_orphaned_leaves = false
-warn_strategic_consistency = false
-"#;
-    std::fs::write(storage.root().join("config.toml"), config_toml).unwrap();
+    // Remove the scaffolded rules.toml so we exercise the in-memory defaults.
+    let rules_path = storage.root().join("rules.toml");
+    if rules_path.exists() {
+        std::fs::remove_file(&rules_path).unwrap();
+    }
 
     let executor = CommandExecutor::new(storage);
 
-    // Create a task without parent labels (would normally warn)
+    // Create a task without parent labels (orphaned at a leaf level).
     let (issue_id, _) = executor
         .create_issue(
             "Orphaned task".to_string(),
@@ -109,9 +109,6 @@ warn_strategic_consistency = false
         )
         .unwrap();
 
-    // The orphan/strategic warnings are now built-in GRAPH rules gated by the
-    // same `[validation]` toggles. With both toggles off, neither default graph
-    // rule is emitted, so no warning finding pertains to the issue.
     let issues = executor.storage().list_issues().unwrap();
     let warnings: Vec<_> = executor
         .evaluate_graph_rules(&issues)
@@ -120,9 +117,8 @@ warn_strategic_consistency = false
         .filter(|gf| gf.issue_id.as_deref() == Some(issue_id.as_str()))
         .collect();
     assert!(
-        warnings.is_empty(),
-        "Expected no warnings when toggles disabled, got: {:?}",
-        warnings
+        !warnings.is_empty(),
+        "Expected an orphan warning from the unconditional default graph rules"
     );
 }
 

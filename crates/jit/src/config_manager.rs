@@ -202,10 +202,10 @@ impl ConfigManager {
     ) -> LabelNamespaces {
         let mut namespaces = HashMap::new();
         for (name, ns_config) in namespaces_config {
-            let mut ns = LabelNamespace::new(ns_config.description, ns_config.unique);
-            ns.values = ns_config.values;
-            ns.pattern = ns_config.pattern;
-            ns.required = ns_config.required;
+            // Only the taxonomy (description/unique) crosses into the domain
+            // registry; per-namespace constraints (values/pattern/required) were
+            // removed when rules.toml became the sole validation source.
+            let ns = LabelNamespace::new(ns_config.description, ns_config.unique);
             namespaces.insert(name, ns);
         }
 
@@ -348,7 +348,10 @@ milestone = "milestone"
     }
 
     #[test]
-    fn test_namespace_constraints_propagate() {
+    fn test_namespace_constraint_keys_are_ignored() {
+        // Stale per-namespace constraint keys (values/pattern/required) in an old
+        // config.toml are IGNORED: the domain registry carries only taxonomy
+        // (description/unique). rules.toml is the sole validation source.
         let temp_dir = setup_test_dir();
         let jit_dir = temp_dir.path().join(".jit");
         fs::create_dir(&jit_dir).unwrap();
@@ -371,15 +374,12 @@ pattern = '^v\d+\.\d+$'
         let namespaces = config_mgr.get_namespaces().unwrap();
 
         let type_ns = namespaces.namespaces.get("type").unwrap();
-        assert_eq!(type_ns.required, Some(true));
-        assert_eq!(
-            type_ns.values.as_deref(),
-            Some(&["task".to_string(), "bug".to_string(), "story".to_string()][..])
-        );
+        assert_eq!(type_ns.description, "Issue type");
+        assert!(type_ns.unique);
 
         let ms_ns = namespaces.namespaces.get("milestone").unwrap();
-        assert_eq!(ms_ns.pattern.as_deref(), Some(r"^v\d+\.\d+$"));
-        assert!(ms_ns.values.is_none());
+        assert_eq!(ms_ns.description, "Release milestone");
+        assert!(!ms_ns.unique);
     }
 
     #[test]

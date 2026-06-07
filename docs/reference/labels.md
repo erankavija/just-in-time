@@ -128,19 +128,16 @@ pre-declared and ready to customize.
 [namespaces.type]
 description = "Issue type (hierarchical). Exactly one per issue."
 unique = true
-required = true
-values = ["epic", "story", "task", "bug", "spike", "chore", "milestone"]
 examples = ["type:task", "type:story", "type:epic"]
 
 [namespaces.priority]
 description = "Work priority (orthogonal to the issue priority field; used for filtering)."
 unique = true
-values = ["critical", "high", "normal", "low"]
+examples = ["priority:high", "priority:low"]
 
 [namespaces.milestone]
 description = "Release milestone membership (version tag)."
 unique = false
-pattern = '^v\d+\.\d+(\.\d+)?(-[a-zA-Z0-9.-]+)?$'
 examples = ["milestone:v1.0", "milestone:v1.2.3", "milestone:v2.0-rc1"]
 
 [namespaces.component]
@@ -156,7 +153,7 @@ examples = ["team:backend", "team:platform"]
 [namespaces.resolution]
 description = "Reason for issue closure (used with rejected state)."
 unique = true
-values = ["wont-fix", "duplicate", "obsolete", "invalid"]
+examples = ["resolution:wont-fix", "resolution:duplicate"]
 ```
 
 Membership namespaces for parent types (`epic:*`, `story:*`, `milestone:*`
@@ -165,36 +162,37 @@ when used as membership rather than as the version tag) are inferred from
 
 ### Namespace Properties
 
-Each `[namespaces.<name>]` table supports these fields:
+Each `[namespaces.<name>]` table declares TAXONOMY only:
 
 - **description** (string, required): Human-readable purpose, shown by `jit config show` and the web UI.
-- **unique** (bool, required): If true, an issue can carry at most one label from this namespace.
-- **required** (bool, optional): If true, every issue must carry at least one label from this namespace. Generalizes the legacy `validation.require_type_label` flag — prefer `required = true` on the specific namespace.
-- **values** (list of string, optional): Allowed values for the value portion of the label. When set, `jit validate` rejects any label whose value is not in the list. Omit for free-form content.
-- **pattern** (string, optional): Regex applied to the value portion (PCRE-compatible via the `regex` crate). An invalid pattern surfaces as a config error at `jit validate` time. `values` and `pattern` may be combined — both are checked.
+- **unique** (bool, required): If true, an issue can carry at most one label from this namespace. Drives the `default:namespace-unique:<ns>` rule.
 - **examples** (list of string, optional): Documentation-only examples; not enforced.
 
-Enforcement flags (in `[validation]`):
+The registry drives two fixed default rules in `.jit/rules.toml`:
+`default:namespace-registry` (an undeclared namespace fails `jit validate`) and
+`default:namespace-unique:<ns>` (a unique namespace blocks a second label on
+write).
 
-- **reject_malformed_labels** — hard-reject labels that don't match the `namespace:value` format. New repos default to `true`; existing repos keep whatever they have written.
-- **enforce_namespace_registry** — hard-reject labels whose namespace isn't declared under `[namespaces.*]`. New repos default to `true`.
-
-Example combining all constraints:
+> **Enforcement lives in `.jit/rules.toml`, the single source of truth.** Allowed
+> values, value patterns, required namespaces, the canonical label format, and the
+> orphan-leaf / strategic-consistency warnings are declarative rules there
+> (scaffolded by `jit init`). The former per-namespace `values`/`pattern`/
+> `required` fields and the `[validation]` enforcement flags
+> (`require_type_label`, `label_regex`, `reject_malformed_labels`,
+> `enforce_namespace_registry`, `warn_orphaned_leaves`,
+> `warn_strategic_consistency`) were removed. To restrict a namespace's values,
+> author a rule in `rules.toml`, e.g.:
 
 ```toml
-[namespaces.type]
-description = "Issue type (hierarchical). Exactly one per issue."
-unique = true
-required = true
-values = ["epic", "story", "task", "bug", "spike", "chore", "milestone"]
-
-[namespaces.milestone]
-description = "Release milestone membership."
-unique = false
-pattern = '^v\d+\.\d+(\.\d+)?$'
+# .jit/rules.toml — restrict type:* to a fixed set (authored, not config-derived)
+[[rules]]
+name = "type-allowed-values"
+severity = "error"
+enforce = false
+assert = { label-value-pattern = { namespace = "type", regex = '^(epic|story|task|bug|spike|chore|milestone)$' } }
 ```
 
-When `jit validate` reports an unregistered namespace, it suggests the closest registered one (for example `typo` → `type`) using edit distance, so typos are caught without the author having to re-read the registry.
+When `jit validate` reports an unregistered namespace, the `default:namespace-registry` rule names the offending label so typos are caught.
 
 ### Standard Work Item Types
 

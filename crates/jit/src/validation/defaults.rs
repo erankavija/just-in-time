@@ -1,65 +1,44 @@
-//! Built-in DEFAULT rule set: the migrated former hard-coded checks.
+//! Built-in DEFAULT rule set: the fixed default validation rules.
 //!
-//! Before the declarative engine, label/type validation was split across two
-//! hard-coded sites: a per-issue `IssueValidator` (run on write) and the
-//! whole-repo `validate_labels`/`validate_type_hierarchy` (run only by
-//! `jit validate`). Both consumed `config.toml`'s `[validation]` block and the
-//! `[namespaces]` registry. This module re-expresses every one of those checks as
-//! declarative [`Rule`]s derived from the SAME inputs, so behavior is preserved
-//! (DR §8.3, plan step 8).
+//! `.jit/rules.toml` is the SOLE source of truth for issue/label validation (DR
+//! §8.2/§8.4). This module produces the FIXED default rule set that `jit init`
+//! serializes into that file, and that
+//! [`CommandExecutor::effective_rules`](crate::commands::CommandExecutor) builds
+//! IN MEMORY when no `rules.toml` exists yet (no disk write on the read path).
 //!
-//! # Role under the file-as-source model (DR §8.2, issue 0abaddc0)
+//! After the backward-compat hard removal (issue d4188154), the default set no
+//! longer reads any `[validation]` enforcement flags or per-namespace
+//! `values`/`pattern`/`required` constraints — those keys were removed. The set
+//! is derived purely from the RETAINED taxonomy: the `[namespaces]` registry and
+//! `[type_hierarchy]`. Hence the signature is [`default_ruleset(namespaces)`].
 //!
-//! `.jit/rules.toml` is the OPERATIVE single source of truth: `jit init`
-//! SERIALIZES this default rule set into that file, after which
-//! [`CommandExecutor::effective_rules`](crate::commands::CommandExecutor) reads the
-//! file alone (the `default:*` rules then live in the file and are user-editable).
-//! This function is therefore used for (a) generating the scaffolded/migrated
-//! `rules.toml`, and (b) a TRANSIENT bootstrap fallback when no `rules.toml` exists
-//! yet — it is NOT concatenated with the user file. The defaults are derived
-//! per-repo from that repo's `config.toml`, NOT a fixed static table, because the
-//! namespace registry (allowed values, patterns, uniqueness, required-ness) differs
-//! per repo.
+//! # The fixed default contract (MF1)
 //!
-//! # Enforcement parity (DR §7.2, §8.3)
+//! [`default_ruleset`] emits EXACTLY:
 //!
-//! Each default rule carries an `enforce` flag matching the legacy reject-vs-warn
-//! behavior under the repo's effective config:
+//! 1. `default:label-format` — `severity = error`, `enforce = true`, ALWAYS. The
+//!    canonical `namespace:value` whole-label format; blocks the write and fails
+//!    `jit validate`.
+//! 2. `default:namespace-registry` — `severity = error`, `enforce = false`, when
+//!    the namespace registry is NON-EMPTY. An unknown namespace fails
+//!    `jit validate` but never blocks a write.
+//! 3. `default:type-hierarchy-known` — `severity = error`, `enforce = false`,
+//!    ALWAYS. A `type:<value>` outside the configured hierarchy fails
+//!    `jit validate` but never blocks a write.
+//! 4. `default:namespace-unique:<ns>` — `severity = error`, `enforce = true`, per
+//!    UNIQUE namespace (sorted). At most one label per unique namespace; blocks
+//!    the write and fails `jit validate`.
+//! 5. `default:orphan-leaf` + `default:strategic-consistency` — `severity = warn`,
+//!    `enforce = false`, UNCONDITIONAL. Built-in [`Scope::Graph`] rules whose
+//!    evaluation REUSES the existing
+//!    [`type_hierarchy::validate_orphans`](crate::type_hierarchy::validate_orphans)
+//!    / [`validate_strategic_labels`](crate::type_hierarchy::validate_strategic_labels)
+//!    domain functions.
 //!
-//! - The canonical `namespace:value` label format (`default:label-format`) is
-//!   ALWAYS enforced (`severity = error`, `enforce = true`), reproducing the
-//!   legacy ALWAYS-ON inline `labels::validate_label` write-path reject AND the
-//!   canonical check the whole-repo `validate_labels` ran. An optional
-//!   `default:label-format-custom` rule (emitted only when `label_regex` is set
-//!   and differs from canonical) reproduces the legacy custom-regex write-time
-//!   block with `enforce = reject_malformed_labels`. Per the approved deviation
-//!   (decision record §8.3a) it ALSO fails `jit validate`, which legacy did not —
-//!   the engine has no write-only local rule. Unaffected when `label_regex` is
-//!   unset or equals canonical.
-//! - Per-namespace UNIQUENESS (`default:namespace-unique:<ns>`) is ALSO always
-//!   enforced (`severity = error`, `enforce = true`), reproducing the legacy
-//!   inline unique-namespace collision hard-reject on the write path.
-//! - `require_type_label` and the namespace-registry check map to LOCAL rules
-//!   whose `enforce` follows the legacy `[validation]` flags (`require_type_label`
-//!   / `reject_malformed_labels`).
-//! - The per-namespace `values` / `pattern` / `required` constraints were enforced
-//!   ONLY by the whole-repo `validate_labels` (never on write), so their default
-//!   rules are `severity = error` with `enforce = false`: they surface as errors
-//!   in `jit validate` (which fails on any error finding) but never block a write,
-//!   preserving the legacy timing exactly.
-//!
-//! Most rules here are [`Scope::Local`]. The orphan-leaf and
-//! strategic-consistency warnings are the exceptions: they need the whole issue
-//! set, so they are built-in [`Scope::Graph`] rules
-//! ([`Assertion::TypeHierarchy`](crate::validation::rules::Assertion::TypeHierarchy))
-//! whose evaluation REUSES the existing
-//! [`type_hierarchy::validate_orphans`](crate::type_hierarchy::validate_orphans)
-//! / [`validate_strategic_labels`](crate::type_hierarchy::validate_strategic_labels)
-//! domain functions. They remain warn-only and config-toggled
-//! (`warn_orphaned_leaves` / `warn_strategic_consistency`), exactly as the
-//! former hard-coded `check_warnings` path was.
+//! DROPPED (no longer config-derivable): `require-type-label`,
+//! `label-format-custom`, and the per-namespace `values`/`pattern`/`required`
+//! rules. A repo wanting those authors them directly in `rules.toml`.
 
-use crate::config::ValidationConfig;
 use crate::domain::LabelNamespaces;
 use crate::type_hierarchy::HierarchyConfig;
 use crate::validation::rules::{
@@ -70,39 +49,28 @@ use crate::validation::rules::{
 /// `validate_labels` enforced unconditionally via `labels::validate_label`.
 const CANONICAL_LABEL_REGEX: &str = r"^[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9._-]*$";
 
-/// Build the built-in default [`RuleSet`] from a repo's validation config and
-/// namespace registry.
+/// Build the FIXED built-in default [`RuleSet`] from a repo's namespace registry
+/// + type hierarchy (MF1).
 ///
-/// The returned rules re-express the former hard-coded checks (type-label
-/// requirement, whole-label format, namespace registry, and the per-namespace
-/// allowed-values / value-pattern / uniqueness / required constraints) as
-/// declarative [`Rule`]s, each carrying an `enforce` flag matching the legacy
-/// reject-vs-warn behavior (see the module docs). Rule names are stable and
-/// prefixed `default:`; they are serialized into `rules.toml` under those names
-/// and are user-editable there (the former `default:` name reservation was removed
-/// when the file became the operative source).
+/// The returned rules are derived purely from the RETAINED taxonomy (the
+/// `[namespaces]` registry and `[type_hierarchy]`); the removed `[validation]`
+/// enforcement flags and per-namespace constraint fields no longer influence it.
+/// Rule names are stable and prefixed `default:`; they are serialized into
+/// `rules.toml` under those names and are user-editable there.
 ///
-/// This is a pure function of its inputs: no I/O, deterministic, and total — a
-/// malformed value (e.g. a regex that cannot compile) is not rejected here; the
-/// engine surfaces it as a compile error when the rule is evaluated, exactly as
-/// the legacy `validate_labels` surfaced a bad `pattern` as a config error.
+/// See the module docs for the EXACT emitted contract. This is a pure function of
+/// its input: no I/O, deterministic, and total.
 ///
 /// # Examples
 ///
 /// ```
-/// use jit::config::ValidationConfig;
 /// use jit::domain::{LabelNamespace, LabelNamespaces};
 /// use jit::validation::defaults::default_ruleset;
 /// use std::collections::HashMap;
 ///
-/// // A registry with a required, unique `type` namespace restricted to an enum.
+/// // A registry with a unique `type` namespace.
 /// let mut namespaces = HashMap::new();
-/// namespaces.insert(
-///     "type".to_string(),
-///     LabelNamespace::new("Issue type", true)
-///         .required(true)
-///         .with_values(vec!["task".to_string(), "bug".to_string()]),
-/// );
+/// namespaces.insert("type".to_string(), LabelNamespace::new("Issue type", true));
 /// let registry = LabelNamespaces {
 ///     schema_version: 2,
 ///     namespaces,
@@ -110,71 +78,23 @@ const CANONICAL_LABEL_REGEX: &str = r"^[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9._-]
 ///     label_associations: None,
 ///     strategic_types: None,
 /// };
-/// let validation = ValidationConfig {
-///     strictness: None,
-///     default_type: None,
-///     content_format: None,
-///     require_type_label: None,
-///     label_regex: None,
-///     reject_malformed_labels: None,
-///     enforce_namespace_registry: None,
-///     warn_orphaned_leaves: None,
-///     warn_strategic_consistency: None,
-/// };
 ///
-/// let rules = default_ruleset(&validation, &registry);
-/// // The required + unique + enum constraints each produce a default rule.
+/// let rules = default_ruleset(&registry);
 /// assert!(rules.rules.iter().all(|r| r.name.starts_with("default:")));
-/// assert!(!rules.rules.is_empty());
+/// // The unique `type` namespace yields a uniqueness rule.
+/// assert!(rules
+///     .rules
+///     .iter()
+///     .any(|r| r.name == "default:namespace-unique:type"));
 /// ```
-pub fn default_ruleset(validation: &ValidationConfig, namespaces: &LabelNamespaces) -> RuleSet {
+pub fn default_ruleset(namespaces: &LabelNamespaces) -> RuleSet {
     let mut rules: Vec<Rule> = Vec::new();
 
-    // --- Label format & namespace registry ------------------------------------
-    //
-    // Two legacy sites enforced these:
-    //   * `validate_labels` (whole-repo, `jit validate`): ALWAYS checked the
-    //     `namespace:value` format and that each namespace was registered, and
-    //     hard-rejected on a violation.
-    //   * `IssueValidator` (write path): checked the configurable `label_regex`
-    //     and the namespace registry only when their `[validation]` flags were on,
-    //     and rejected only when `reject_malformed_labels` was true.
-    //
-    // A single `error` rule per check unifies both: `severity = error` makes it
-    // fail `jit validate` (parity with `validate_labels`), while `enforce` is set
-    // to `reject_malformed_labels` so it blocks a WRITE only when the legacy flag
-    // would have (parity with `IssueValidator`); otherwise the write only warns.
-    let reject_malformed = validation.reject_malformed_labels.unwrap_or(false);
-
-    // require_type_label -> require at least one `type:*` label on every issue.
-    // This legacy flag always hard-rejected on the write path when enabled.
-    if validation.require_type_label.unwrap_or(false) {
-        rules.push(local_rule(
-            "default:require-type-label",
-            Selector::default(),
-            Severity::Error,
-            true,
-            Assertion::RequireLabel {
-                label: "type:*".to_string(),
-                min: Some(1),
-                max: None,
-            },
-        ));
-    }
-
-    // Label format (canonical): every WHOLE label must match the FIXED canonical
-    // `namespace:value` format. This is the single source of truth for the two
-    // legacy ALWAYS-ON format checks:
-    //   * the inline `labels::validate_label(label)?` that EVERY write path
-    //     (create/update/bulk/add_label) ran unconditionally and hard-rejected on,
-    //     regardless of any config flag; and
-    //   * the whole-repo `validate_labels` canonical-format check that always
-    //     failed `jit validate` on a malformed label.
-    // Hence `severity = error` (fails `jit validate`) AND `enforce = true` ALWAYS
-    // (blocks the write), independent of `reject_malformed_labels`. A per-whole-
-    // label (`namespace:value`) pattern cannot use the value-only
-    // `label-value-pattern` shorthand, so it is a raw schema over the projection's
-    // `raw_labels` array.
+    // (1) Label format (canonical): every WHOLE label must match the FIXED
+    // canonical `namespace:value` format. `severity = error` (fails
+    // `jit validate`) AND `enforce = true` ALWAYS (blocks the write). A
+    // per-whole-label pattern cannot use the value-only `label-value-pattern`
+    // shorthand, so it is a raw schema over the projection's `raw_labels` array.
     rules.push(json_schema_rule(
         "default:label-format",
         Selector::default(),
@@ -183,74 +103,27 @@ pub fn default_ruleset(validation: &ValidationConfig, namespaces: &LabelNamespac
         raw_labels_pattern_schema(CANONICAL_LABEL_REGEX),
     ));
 
-    // Custom label format: when a repo configures a `validation.label_regex` that
-    // DIFFERS from the canonical format, the legacy `IssueValidator` applied that
-    // custom regex on the WRITE path only, gated by `reject_malformed_labels`, and
-    // the whole-repo `validate_labels` never used it (it used canonical). We
-    // reproduce the write-time blocking exactly via `enforce = reject_malformed_labels`
-    // (a write is blocked only when an `enforce` rule emits an `error`).
-    //
-    // APPROVED DEVIATION (decision record §8.3a, user-approved 2026-06-07): the
-    // rule engine has no write-only representation for a LOCAL rule — `jit validate`
-    // fails on any `severity = error` finding regardless of `enforce` — so emitting
-    // this rule as `severity = error` necessarily makes a custom-regex violation
-    // ALSO fail `jit validate`, which legacy did not do. This is the single
-    // documented parity deviation; the new behavior is stricter and consistent
-    // across the write and validate paths. When `label_regex` is unset or equals
-    // canonical, the rule is redundant and is not emitted, so most repos (including
-    // this one) are unaffected. See parity test
-    // `parity_custom_label_regex_also_applies_to_validate`.
-    if let Some(custom_regex) = validation
-        .label_regex
-        .as_deref()
-        .filter(|r| *r != CANONICAL_LABEL_REGEX)
-    {
-        rules.push(json_schema_rule(
-            "default:label-format-custom",
-            Selector::default(),
-            Severity::Error,
-            reject_malformed,
-            raw_labels_pattern_schema(custom_regex),
-        ));
-    }
-
-    // Namespace registry: every label's namespace must be declared. Always
-    // generated when the registry is non-empty (the legacy validate-time
-    // `validate_labels` check warned regardless of any flag); empty registry =>
-    // skip (nothing to check against).
-    //
-    // Enforcement parity: the legacy WRITE-PATH registry check
-    // (`IssueValidator::validate_namespace_registry`) returned early unless
-    // `enforce_namespace_registry = true`, and then HARD-REJECTED only when
-    // `reject_malformed_labels = true` (otherwise it merely warned). A write was
-    // therefore blocked ONLY when BOTH flags were true, so `enforce` must be
-    // their conjunction. Severity stays `error` so an unknown namespace still
-    // fails `jit validate` (parity with the validate-time registry check).
+    // (2) Namespace registry: every label's namespace must be declared. Emitted
+    // only when the registry is NON-EMPTY. `severity = error` (an unknown
+    // namespace fails `jit validate`) with `enforce = false` (never blocks a
+    // write).
     if !namespaces.namespaces.is_empty() {
         let registered: Vec<&str> = namespaces.namespaces.keys().map(|s| s.as_str()).collect();
-        let registry_blocks =
-            validation.enforce_namespace_registry.unwrap_or(false) && reject_malformed;
         rules.push(json_schema_rule(
             "default:namespace-registry",
             Selector::default(),
             Severity::Error,
-            registry_blocks,
+            false,
             registered_namespace_schema(&registered),
         ));
     }
 
-    // Unknown type label: a `type:<value>` label whose value is not one of the
-    // configured hierarchy types. Legacy `validate_type_hierarchy` (run only by
-    // `jit validate`) flagged this and did NOT block writes. This is exactly a
-    // per-namespace allowed-VALUES rule over the `type` namespace, with the
-    // allowed set derived from the hierarchy config (`type_hierarchy.types`
-    // keys). Severity = error (so `jit validate` fails on it) with enforce =
-    // false (so it never blocks a write), matching legacy timing precisely.
-    //
+    // (3) Unknown type label: a `type:<value>` outside the configured hierarchy.
+    // Modeled as an allowed-VALUES rule over the `type` namespace, the allowed set
+    // being the hierarchy `types` keys. `severity = error` / `enforce = false`.
     // The hierarchy is always present (a repo with no `[type_hierarchy]` falls
-    // back to the default 4-level set via `get_type_hierarchy`), mirroring the
-    // legacy `HierarchyConfig::default()` fallback, so this rule is always
-    // emitted.
+    // back to the default 4-level set via `get_type_hierarchy`), so this rule is
+    // always emitted.
     let mut hierarchy_types: Vec<String> = namespaces.get_type_hierarchy().into_keys().collect();
     hierarchy_types.sort(); // deterministic schema enum order
     rules.push(json_schema_rule(
@@ -261,50 +134,13 @@ pub fn default_ruleset(validation: &ValidationConfig, namespaces: &LabelNamespac
         namespace_values_schema("type", &hierarchy_types),
     ));
 
-    // --- [namespaces] per-namespace constraints (legacy validate_labels) -------
-    //
-    // `values` / `pattern` / `required` ran ONLY in the whole-repo
-    // `validate_labels` (never on write) and ALWAYS hard-rejected: map to `error` +
-    // `enforce = false` (fails `jit validate`, never blocks a write). UNIQUENESS is
-    // the exception — it ALSO had an inline write-path hard-reject — so its rule is
-    // `error` + `enforce = true` (see below).
+    // (4) Per-namespace UNIQUENESS: at most one label per unique namespace.
+    // `severity = error` / `enforce = true` (blocks the write and fails
+    // `jit validate`). One rule per UNIQUE namespace, in sorted order.
     let mut ns_names: Vec<&String> = namespaces.namespaces.keys().collect();
     ns_names.sort(); // deterministic rule order
     for name in ns_names {
         let ns = &namespaces.namespaces[name];
-
-        // values -> allowed-value enum on `labels.<ns>` items.
-        if let Some(values) = &ns.values {
-            rules.push(json_schema_rule(
-                &format!("default:namespace-values:{name}"),
-                Selector::default(),
-                Severity::Error,
-                false,
-                namespace_values_schema(name, values),
-            ));
-        }
-
-        // pattern -> value-portion regex on `labels.<ns>` items.
-        if let Some(pattern) = &ns.pattern {
-            rules.push(local_rule(
-                &format!("default:namespace-pattern:{name}"),
-                Selector::default(),
-                Severity::Error,
-                false,
-                Assertion::LabelValuePattern {
-                    namespace: name.clone(),
-                    regex: pattern.clone(),
-                },
-            ));
-        }
-
-        // unique -> at most one label in the namespace. ALWAYS-enforced: the
-        // legacy inline unique-namespace collision check in
-        // `create_issue`/`update_issue`/`bulk_update` (and `add_label`)
-        // hard-rejected a second label from a `unique` namespace on the WRITE
-        // path, regardless of config. So `enforce = true` (blocks the write) with
-        // `severity = error` (also fails `jit validate`, matching the whole-repo
-        // `validate_labels` uniqueness check).
         if ns.unique {
             rules.push(local_rule(
                 &format!("default:namespace-unique:{name}"),
@@ -318,56 +154,29 @@ pub fn default_ruleset(validation: &ValidationConfig, namespaces: &LabelNamespac
                 },
             ));
         }
-
-        // required -> at least one label in the namespace.
-        if ns.is_required() {
-            rules.push(local_rule(
-                &format!("default:namespace-required:{name}"),
-                Selector::default(),
-                Severity::Error,
-                false,
-                Assertion::RequireLabel {
-                    label: format!("{name}:*"),
-                    min: Some(1),
-                    max: None,
-                },
-            ));
-        }
     }
 
-    // --- Type-hierarchy GRAPH warnings (legacy validate_type_hierarchy path) ---
-    //
-    // The orphan-leaf and strategic-consistency checks were warn-only, run by
-    // `jit validate` (via `check_warnings`), and gated by the `[validation]`
-    // toggles `warn_orphaned_leaves` / `warn_strategic_consistency` (both default
-    // true). They are now built-in GRAPH rules whose evaluation REUSES the
-    // existing `type_hierarchy::validate_orphans` / `validate_strategic_labels`
-    // domain functions (see `validation::graph::evaluate_type_hierarchy`). Each is
-    // severity Warn + enforce = false (legacy was never blocking) and is emitted
-    // only when its config toggle is enabled. The repo's `HierarchyConfig` is
-    // derived from the same namespace registry the rest of the defaults use, so a
-    // repo with no `[type_hierarchy]` falls back to the default 4-level set —
-    // exactly as the legacy `HierarchyConfig::default()` fallback did.
-    // The repo `HierarchyConfig` is no longer stored in the assertion; the graph
-    // evaluator injects it at evaluation time (see `evaluate_graph`).
-    if validation.warn_orphaned_leaves.unwrap_or(true) {
-        rules.push(graph_rule(
-            "default:orphan-leaf",
-            Severity::Warn,
-            Assertion::TypeHierarchy {
-                kind: TypeHierarchyKind::OrphanLeaf,
-            },
-        ));
-    }
-    if validation.warn_strategic_consistency.unwrap_or(true) {
-        rules.push(graph_rule(
-            "default:strategic-consistency",
-            Severity::Warn,
-            Assertion::TypeHierarchy {
-                kind: TypeHierarchyKind::StrategicConsistency,
-            },
-        ));
-    }
+    // (5) Type-hierarchy GRAPH warnings: orphan-leaf + strategic-consistency.
+    // Built-in GRAPH rules whose evaluation REUSES the existing
+    // `type_hierarchy::validate_orphans` / `validate_strategic_labels` domain
+    // functions (see `validation::graph`). Each is `severity = warn` /
+    // `enforce = false` and UNCONDITIONAL (the former `warn_*` toggles defaulted
+    // true, so unconditional preserves behavior). The repo `HierarchyConfig` is
+    // injected by the graph evaluator at evaluation time.
+    rules.push(graph_rule(
+        "default:orphan-leaf",
+        Severity::Warn,
+        Assertion::TypeHierarchy {
+            kind: TypeHierarchyKind::OrphanLeaf,
+        },
+    ));
+    rules.push(graph_rule(
+        "default:strategic-consistency",
+        Severity::Warn,
+        Assertion::TypeHierarchy {
+            kind: TypeHierarchyKind::StrategicConsistency,
+        },
+    ));
 
     RuleSet { rules }
 }
@@ -543,20 +352,6 @@ mod tests {
     use crate::validation::evaluate_local;
     use std::collections::HashMap;
 
-    fn empty_validation() -> ValidationConfig {
-        ValidationConfig {
-            strictness: None,
-            default_type: None,
-            content_format: None,
-            require_type_label: None,
-            label_regex: None,
-            reject_malformed_labels: None,
-            enforce_namespace_registry: None,
-            warn_orphaned_leaves: None,
-            warn_strategic_consistency: None,
-        }
-    }
-
     fn registry(entries: Vec<(&str, LabelNamespace)>) -> LabelNamespaces {
         let mut namespaces = HashMap::new();
         for (name, ns) in entries {
@@ -578,14 +373,11 @@ mod tests {
     }
 
     #[test]
-    fn test_empty_config_still_emits_format_rule() {
-        // Even with no config, the canonical label-format rule is always present
-        // (the legacy `validate_labels` checked format unconditionally), as is the
-        // type-hierarchy-known rule (legacy `validate_type_hierarchy` ran
-        // unconditionally over the default hierarchy) and the two type-hierarchy
-        // graph warnings (toggles default-on). With no namespace registry, no
-        // registry rule is emitted.
-        let rules = default_ruleset(&empty_validation(), &registry(vec![]));
+    fn test_empty_registry_emits_exactly_the_unconditional_rules() {
+        // With NO namespace registry, the fixed default emits exactly:
+        // label-format, type-hierarchy-known, orphan-leaf, strategic-consistency.
+        // No registry rule (registry empty), no uniqueness rules (no namespaces).
+        let rules = default_ruleset(&registry(vec![]));
         let names: Vec<&str> = rules.rules.iter().map(|r| r.name.as_str()).collect();
         assert_eq!(
             names,
@@ -599,11 +391,52 @@ mod tests {
     }
 
     #[test]
+    fn test_fixed_default_contract_mf1() {
+        // The EXACT MF1 contract: name -> (severity, enforce), in emission order,
+        // for a registry with two unique + one non-unique namespace.
+        let rules = default_ruleset(&registry(vec![
+            ("type", LabelNamespace::new("Type", true)),
+            ("team", LabelNamespace::new("Team", true)),
+            ("component", LabelNamespace::new("Component", false)),
+        ]));
+        let got: Vec<(&str, Severity, bool)> = rules
+            .rules
+            .iter()
+            .map(|r| (r.name.as_str(), r.severity, r.enforce))
+            .collect();
+        assert_eq!(
+            got,
+            vec![
+                ("default:label-format", Severity::Error, true),
+                ("default:namespace-registry", Severity::Error, false),
+                ("default:type-hierarchy-known", Severity::Error, false),
+                // namespace-unique only for the UNIQUE namespaces, sorted.
+                ("default:namespace-unique:team", Severity::Error, true),
+                ("default:namespace-unique:type", Severity::Error, true),
+                ("default:orphan-leaf", Severity::Warn, false),
+                ("default:strategic-consistency", Severity::Warn, false),
+            ]
+        );
+        // The dropped rules are never emitted.
+        let names: Vec<&str> = rules.rules.iter().map(|r| r.name.as_str()).collect();
+        assert!(!names.contains(&"default:require-type-label"));
+        assert!(!names.contains(&"default:label-format-custom"));
+        assert!(!names
+            .iter()
+            .any(|n| n.starts_with("default:namespace-values:")));
+        assert!(!names
+            .iter()
+            .any(|n| n.starts_with("default:namespace-pattern:")));
+        assert!(!names
+            .iter()
+            .any(|n| n.starts_with("default:namespace-required:")));
+    }
+
+    #[test]
     fn test_canonical_label_format_always_blocks_malformed() {
         // The canonical format rule is ALWAYS enforced (enforce=true), so a
-        // malformed label blocks the write even when reject_malformed_labels is
-        // unset, reproducing the legacy inline `validate_label` hard-reject.
-        let rules = default_ruleset(&empty_validation(), &registry(vec![]));
+        // malformed label blocks the write.
+        let rules = default_ruleset(&registry(vec![]));
         let eval = evaluate_local(
             &issue_with(&["INVALID:label"]),
             &rules,
@@ -626,111 +459,11 @@ mod tests {
     }
 
     #[test]
-    fn test_require_type_label_rule_blocks_when_missing() {
-        let mut validation = empty_validation();
-        validation.require_type_label = Some(true);
-        let rules = default_ruleset(&validation, &registry(vec![]));
-
-        // Missing type label -> blocks (enforce=true).
-        let eval = evaluate_local(
-            &issue_with(&["epic:auth"]),
-            &rules,
-            crate::domain::ContentFormat::Markdown,
-        )
-        .unwrap();
-        assert!(eval.is_blocking());
-
-        // Present -> passes.
-        let eval = evaluate_local(
-            &issue_with(&["type:task"]),
-            &rules,
-            crate::domain::ContentFormat::Markdown,
-        )
-        .unwrap();
-        assert!(!eval.is_blocking());
-        assert!(eval.findings().is_empty());
-    }
-
-    #[test]
-    fn test_custom_label_regex_only_emitted_when_differs_from_canonical() {
-        // A `label_regex` equal to the canonical format is redundant: only the
-        // always-on canonical rule is emitted, never `default:label-format-custom`.
-        let mut validation = empty_validation();
-        validation.label_regex = Some(CANONICAL_LABEL_REGEX.to_string());
-        let rules = default_ruleset(&validation, &registry(vec![]));
-        assert!(rules
-            .rules
-            .iter()
-            .all(|r| r.name != "default:label-format-custom"));
-    }
-
-    #[test]
-    fn test_custom_label_regex_write_only_gated_by_reject_flag() {
-        // A custom regex stricter than canonical. With reject_malformed_labels
-        // unset the custom rule is warn-only on the write path (canonical still
-        // blocks genuinely malformed labels, but a canonically-valid label that
-        // merely violates the custom regex only warns).
-        let mut validation = empty_validation();
-        validation.label_regex = Some(r"^team:[a-z]+$".to_string());
-        let rules = default_ruleset(&validation, &registry(vec![]));
-        assert!(rules
-            .rules
-            .iter()
-            .any(|r| r.name == "default:label-format-custom"));
-
-        // `type:task` is canonical-valid but violates the custom `^team:[a-z]+$`.
-        let warn = evaluate_local(
-            &issue_with(&["type:task"]),
-            &rules,
-            crate::domain::ContentFormat::Markdown,
-        )
-        .unwrap();
-        assert!(
-            !warn.is_blocking(),
-            "custom regex must only warn when reject_malformed off"
-        );
-        assert!(warn.warnings().iter().any(|w| w.contains("custom")));
-        // Approved deviation (§8.3a): although it does not BLOCK the write, the
-        // custom-regex finding is `severity=error`, so it DOES fail `jit validate`
-        // (legacy applied the custom regex write-time only). See the integration
-        // test `parity_custom_label_regex_also_applies_to_validate`.
-        assert!(warn
-            .findings()
-            .iter()
-            .any(|f| f.rule == "default:label-format-custom"
-                && f.severity == crate::validation::rules::Severity::Error));
-
-        // With reject_malformed_labels on, the custom regex blocks the write.
-        validation.reject_malformed_labels = Some(true);
-        let rules = default_ruleset(&validation, &registry(vec![]));
-        let block = evaluate_local(
-            &issue_with(&["type:task"]),
-            &rules,
-            crate::domain::ContentFormat::Markdown,
-        )
-        .unwrap();
-        assert!(
-            block.is_blocking(),
-            "custom regex must block when reject on"
-        );
-
-        // A label satisfying the custom regex passes.
-        let ok = evaluate_local(
-            &issue_with(&["team:platform"]),
-            &rules,
-            crate::domain::ContentFormat::Markdown,
-        )
-        .unwrap();
-        assert!(!ok.is_blocking());
-    }
-
-    #[test]
-    fn test_namespace_registry_warns_when_enforce_off() {
-        // With the registry configured but `enforce_namespace_registry` off, an
-        // unknown namespace surfaces as an error finding (fails `jit validate`)
-        // that does NOT block a write.
+    fn test_namespace_registry_warns_but_does_not_block() {
+        // With a registry configured, an unknown namespace surfaces as an error
+        // finding (fails `jit validate`) that does NOT block a write.
         let reg = registry(vec![("type", LabelNamespace::new("Type", true))]);
-        let rules = default_ruleset(&empty_validation(), &reg);
+        let rules = default_ruleset(&reg);
 
         let eval = evaluate_local(
             &issue_with(&["unknown:x"]),
@@ -740,7 +473,7 @@ mod tests {
         .unwrap();
         assert!(
             !eval.is_blocking(),
-            "registry must not block when enforce off"
+            "registry must never block a write (enforce=false)"
         );
         assert!(eval
             .findings()
@@ -758,144 +491,20 @@ mod tests {
     }
 
     #[test]
-    fn test_namespace_registry_blocks_only_when_both_flags_on() {
-        // Legacy parity: the registry write-path block fired only when BOTH
-        // `enforce_namespace_registry` AND `reject_malformed_labels` were true
-        // (the legacy check returned early without the former and only warned
-        // without the latter).
-        let reg = registry(vec![("type", LabelNamespace::new("Type", true))]);
-
-        // enforce on, reject off -> warns (does not block).
-        let mut one_flag = empty_validation();
-        one_flag.enforce_namespace_registry = Some(true);
-        one_flag.reject_malformed_labels = Some(false);
-        let rules = default_ruleset(&one_flag, &reg);
-        let eval = evaluate_local(
-            &issue_with(&["unknown:x"]),
-            &rules,
-            crate::domain::ContentFormat::Markdown,
-        )
-        .unwrap();
-        assert!(
-            !eval.is_blocking(),
-            "registry must not block a write without reject_malformed_labels"
-        );
-
-        // both on -> blocks.
-        let mut both = empty_validation();
-        both.enforce_namespace_registry = Some(true);
-        both.reject_malformed_labels = Some(true);
-        let rules = default_ruleset(&both, &reg);
-        let eval = evaluate_local(
-            &issue_with(&["unknown:x"]),
-            &rules,
-            crate::domain::ContentFormat::Markdown,
-        )
-        .unwrap();
-        assert!(eval.is_blocking());
-
-        let eval = evaluate_local(
-            &issue_with(&["type:task"]),
-            &rules,
-            crate::domain::ContentFormat::Markdown,
-        )
-        .unwrap();
-        assert!(eval.findings().is_empty());
-    }
-
-    #[test]
-    fn test_namespace_values_enum_errors_but_does_not_block() {
-        let reg = registry(vec![(
-            "type",
-            LabelNamespace::new("Type", true)
-                .with_values(vec!["task".to_string(), "bug".to_string()]),
-        )]);
-        let rules = default_ruleset(&empty_validation(), &reg);
-
-        // Value outside the enum -> an error finding that does NOT block writes.
-        let eval = evaluate_local(
-            &issue_with(&["type:taks"]),
-            &rules,
-            crate::domain::ContentFormat::Markdown,
-        )
-        .unwrap();
-        assert!(!eval.is_blocking(), "enum violation must not block writes");
-        assert!(eval
-            .findings()
+    fn test_no_registry_rule_when_registry_empty() {
+        let rules = default_ruleset(&registry(vec![]));
+        assert!(rules
+            .rules
             .iter()
-            .any(|f| f.severity == Severity::Error));
-
-        // Value inside the enum -> clean.
-        let eval = evaluate_local(
-            &issue_with(&["type:task"]),
-            &rules,
-            crate::domain::ContentFormat::Markdown,
-        )
-        .unwrap();
-        assert!(eval.findings().is_empty());
-    }
-
-    #[test]
-    fn test_namespace_pattern_errors_but_does_not_block() {
-        let reg = registry(vec![(
-            "milestone",
-            LabelNamespace::new("Release", false).with_pattern(r"^v\d+\.\d+$"),
-        )]);
-        let rules = default_ruleset(&empty_validation(), &reg);
-
-        let bad = evaluate_local(
-            &issue_with(&["milestone:1.2"]),
-            &rules,
-            crate::domain::ContentFormat::Markdown,
-        )
-        .unwrap();
-        assert!(!bad.is_blocking());
-        assert!(bad.findings().iter().any(|f| f.severity == Severity::Error));
-
-        let good = evaluate_local(
-            &issue_with(&["milestone:v1.0"]),
-            &rules,
-            crate::domain::ContentFormat::Markdown,
-        )
-        .unwrap();
-        assert!(good.findings().is_empty());
-    }
-
-    #[test]
-    fn test_namespace_required_errors_but_does_not_block() {
-        let reg = registry(vec![(
-            "type",
-            LabelNamespace::new("Type", true).required(true),
-        )]);
-        let rules = default_ruleset(&empty_validation(), &reg);
-
-        let missing = evaluate_local(
-            &issue_with(&["component:core"]),
-            &rules,
-            crate::domain::ContentFormat::Markdown,
-        )
-        .unwrap();
-        assert!(!missing.is_blocking());
-        assert!(missing
-            .findings()
-            .iter()
-            .any(|f| f.severity == Severity::Error));
-
-        let present = evaluate_local(
-            &issue_with(&["type:task"]),
-            &rules,
-            crate::domain::ContentFormat::Markdown,
-        )
-        .unwrap();
-        assert!(present.findings().is_empty());
+            .all(|r| r.name != "default:namespace-registry"));
     }
 
     #[test]
     fn test_namespace_unique_blocks_on_duplicate() {
         // Uniqueness is ALWAYS enforced (enforce=true): a duplicate unique-
-        // namespace label blocks the write, reproducing the legacy inline reject.
+        // namespace label blocks the write.
         let reg = registry(vec![("priority", LabelNamespace::new("Priority", true))]);
-        let rules = default_ruleset(&empty_validation(), &reg);
+        let rules = default_ruleset(&reg);
 
         let dup = evaluate_local(
             &issue_with(&["priority:high", "priority:low"]),
@@ -916,21 +525,46 @@ mod tests {
     }
 
     #[test]
+    fn test_non_unique_namespace_has_no_uniqueness_rule() {
+        let reg = registry(vec![("epic", LabelNamespace::new("Epic", false))]);
+        let rules = default_ruleset(&reg);
+        assert!(rules
+            .rules
+            .iter()
+            .all(|r| r.name != "default:namespace-unique:epic"));
+    }
+
+    #[test]
+    fn test_type_hierarchy_known_errors_but_does_not_block() {
+        // A type value outside the (default) hierarchy errors in validate but does
+        // not block a write.
+        let rules = default_ruleset(&registry(vec![("type", LabelNamespace::new("Type", true))]));
+        let bad = evaluate_local(
+            &issue_with(&["type:nonsense"]),
+            &rules,
+            crate::domain::ContentFormat::Markdown,
+        )
+        .unwrap();
+        assert!(!bad.is_blocking(), "unknown type must not block writes");
+        assert!(bad.findings().iter().any(|f| f.severity == Severity::Error));
+
+        let good = evaluate_local(
+            &issue_with(&["type:task"]),
+            &rules,
+            crate::domain::ContentFormat::Markdown,
+        )
+        .unwrap();
+        assert!(good.findings().is_empty());
+    }
+
+    #[test]
     fn test_all_rules_are_named_default_and_unique() {
-        let mut validation = empty_validation();
-        validation.require_type_label = Some(true);
-        validation.label_regex = Some("^x".to_string());
-        validation.enforce_namespace_registry = Some(true);
-        let reg = registry(vec![(
-            "type",
-            LabelNamespace::new("Type", true)
-                .required(true)
-                .with_pattern("^t")
-                .with_values(vec!["task".to_string()]),
-        )]);
-        let rules = default_ruleset(&validation, &reg);
-        // Local rules dominate; the only graph rules are the two type-hierarchy
-        // warnings (gated by their toggles, both default-on here).
+        let reg = registry(vec![
+            ("type", LabelNamespace::new("Type", true)),
+            ("team", LabelNamespace::new("Team", true)),
+        ]);
+        let rules = default_ruleset(&reg);
+        // The only graph rules are the two type-hierarchy warnings.
         assert!(rules
             .rules
             .iter()

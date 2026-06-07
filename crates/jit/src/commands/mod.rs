@@ -314,7 +314,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     /// Return the EFFECTIVE rule set, with `.jit/rules.toml` as the operative
-    /// single source of truth (DR §8.2, decisions D2/D3).
+    /// single source of truth (DR §8.2/§8.4).
     ///
     /// Semantics depend on whether the file EXISTS, not whether it is empty:
     ///
@@ -322,11 +322,12 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///   source. No in-code default rules are combined with it — every rule
     ///   (including the `default:*` ones `jit init` scaffolds) lives in the file
     ///   and is user-editable. An intentionally-emptied file yields an empty set.
-    /// - **File ABSENT (pre-init repo or deleted file):** fall back to the in-code
-    ///   [`default_ruleset`](crate::validation::defaults::default_ruleset) derived
-    ///   from `config.toml`, and warn (once) to run `jit init` to materialize it.
-    ///   This is a TRANSIENT bootstrap so a repo stays safe until init runs; it
-    ///   does NOT mutate the read path (no auto-scaffold on read).
+    /// - **File ABSENT (pre-init repo or deleted file):** build the FIXED
+    ///   [`default_ruleset`](crate::validation::defaults::default_ruleset) from the
+    ///   repo's namespace registry IN MEMORY (MF4). This is read-only — NO disk
+    ///   write, NO warning, NO error — so gates, the server, read-only checkouts,
+    ///   and multiple worktrees stay safe. Only `jit init` materializes the file
+    ///   to disk (under the write lock).
     ///
     /// The result is built at most once and cached. A malformed `config.toml` or
     /// `.jit/rules.toml` is surfaced as an `Err` rather than silently dropping
@@ -351,33 +352,11 @@ impl<S: IssueStore> CommandExecutor<S> {
                     let user = self.rules().map_err(|e| e.to_string())?;
                     Ok(user.clone())
                 } else {
-                    // File absent: transient bootstrap fallback + one-time warn.
-                    let config = self.cached_config().map_err(|e| e.to_string())?;
+                    // File absent: build the fixed defaults IN MEMORY (no write,
+                    // no warning) from the repo's namespace registry. Materialized
+                    // to disk only by `jit init`.
                     let namespaces = self.cached_namespaces().map_err(|e| e.to_string())?;
-                    let validation =
-                        config
-                            .validation
-                            .clone()
-                            .unwrap_or(crate::config::ValidationConfig {
-                                strictness: None,
-                                default_type: None,
-                                content_format: None,
-                                require_type_label: None,
-                                label_regex: None,
-                                reject_malformed_labels: None,
-                                enforce_namespace_registry: None,
-                                warn_orphaned_leaves: None,
-                                warn_strategic_consistency: None,
-                            });
-                    eprintln!(
-                        "⚠️  Warning: no .jit/rules.toml found; using built-in default \
-                         validation rules. Run `jit init` to materialize them into \
-                         .jit/rules.toml (the operative source of truth)."
-                    );
-                    Ok(crate::validation::defaults::default_ruleset(
-                        &validation,
-                        namespaces,
-                    ))
+                    Ok(crate::validation::defaults::default_ruleset(namespaces))
                 }
             })
             .as_ref()
@@ -546,53 +525,23 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(Some(identity))
     }
 
-    /// Scaffold `.jit/rules.toml` (complete default ruleset) or migrate a legacy
-    /// repo's enforcement keys into it (decisions D5/D6/D7). Called from the
-    /// `jit init` path AFTER `config.toml` has been written/exists, so the
-    /// migration sees the repo's real config.
+    /// Scaffold the FIXED default `.jit/rules.toml` (+ `.jit/schemas/*.json`) for a
+    /// new repo (DR §8.4). Called from the `jit init` path AFTER `config.toml` has
+    /// been written/exists, so the default rules derive from the repo's real
+    /// namespace registry + type hierarchy.
     ///
-    /// `fresh_defaults` is the in-code INTENDED default config (e.g.
-    /// `HierarchyTemplate::intended_default_config()`, decision D6) used ONLY to
-    /// derive the complete `rules.toml` for a BRAND-NEW repo (`config.toml` did
-    /// not pre-exist), whose on-disk `config.toml` ships clean and for which the
-    /// rich starter ruleset is the intended default. `config_already_existed` is
-    /// the caller's "did config.toml exist before init?" signal: when it is true
-    /// and there are no legacy keys / no `rules.toml`, migration MATERIALIZES the
-    /// repo's actual current behavior (bare defaults from the live config) rather
-    /// than the rich starter defaults, so init changes nothing observable. For a
-    /// LEGACY or COEXISTENCE repo the complete ruleset is derived from the live
-    /// config (which still carries the keys) and those keys are then stripped. A
-    /// repo with `rules.toml` present and no legacy keys is a true no-op.
-    ///
-    /// Returns the [`MigrationOutcome`](crate::validation::migration::MigrationOutcome)
-    /// so the caller can report what happened.
-    pub fn migrate_or_scaffold_rules(
-        &self,
-        fresh_defaults: &crate::config::JitConfig,
-        config_already_existed: bool,
-    ) -> Result<crate::validation::migration::MigrationOutcome> {
-        // Parse config.toml WITHOUT the deprecated-key warning scan: the migration
-        // is about to remove those keys (legacy path), and a fresh repo's clean
-        // template has none anyway, so warning here would be self-contradictory.
-        // The deprecated-key warning is reserved for ORDINARY loads of a stale,
-        // un-migrated config.
-        let config_path = self.storage.root().join("config.toml");
-        let config: crate::config::JitConfig = if config_path.exists() {
-            let content = std::fs::read_to_string(&config_path)
-                .with_context(|| format!("reading {}", config_path.display()))?;
-            toml::from_str(&content).context("Failed to parse config.toml for migration")?
-        } else {
-            self.config_manager.load()?
-        };
+    /// Idempotent: a no-op when `.jit/rules.toml` already exists (the present file
+    /// is the sole source and is left untouched), so re-init never clobbers user
+    /// edits. Returns `true` when it wrote the file, `false` when it was a no-op.
+    pub fn scaffold_default_rules(&self) -> Result<bool> {
+        let jit_root = self.storage.root();
+        if jit_root.join("rules.toml").exists() {
+            return Ok(false);
+        }
+        let config = self.config_manager.load()?;
         let namespaces = self.config_manager.namespaces_from_config(&config);
-        let fresh_namespaces = self.config_manager.namespaces_from_config(fresh_defaults);
-        crate::validation::migration::migrate_or_scaffold(
-            self.storage.root(),
-            &config,
-            &namespaces,
-            &(fresh_defaults.clone(), fresh_namespaces),
-            config_already_existed,
-        )
+        crate::validation::serialize::scaffold_default_rules(jit_root, &namespaces)?;
+        Ok(true)
     }
 
     /// Check if an active lease exists for the given issue by the current agent.
