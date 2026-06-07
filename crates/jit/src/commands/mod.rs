@@ -534,7 +534,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// is the sole source and is left untouched), so re-init never clobbers user
     /// edits. Returns `true` when it wrote the file, `false` when it was a no-op.
     pub fn scaffold_default_rules(&self) -> Result<bool> {
-        use crate::storage::worktree_paths::WorktreePaths;
         use crate::storage::FileLocker;
         use std::time::Duration;
 
@@ -544,27 +543,23 @@ impl<S: IssueStore> CommandExecutor<S> {
         // writes, so two concurrent `jit init` runs cannot both pass the
         // absent-file check and then race on the fixed temp paths for rules.toml
         // and the schema files (MF4: materialize under the write lock). The lock
-        // lives in the shared control plane (`.git/jit/locks/`), the same plane
-        // claims coordination uses. Outside a git repo there is no control plane
-        // (and no cross-process concurrency to guard), so we scaffold lockless --
-        // mirroring `init` returning no worktree identity outside git. NOTE:
-        // `WorktreePaths::detect()` returns Ok even when NOT in a git repo (with
-        // a cwd-based `<cwd>/.git/jit`), so we must gate on an explicit in-git
-        // check; gating on detect() succeeding would create a bogus `.git`.
-        let in_git_repo = std::process::Command::new("git")
-            .args(["rev-parse", "--is-inside-work-tree"])
-            .output()
-            .map(|o| o.status.success())
-            .unwrap_or(false);
-
-        let _guard = if in_git_repo {
-            let paths = WorktreePaths::detect()?;
-            let lock_path = paths.shared_jit.join("locks/rules.lock");
-            std::fs::create_dir_all(lock_path.parent().unwrap())
-                .context("Failed to create control-plane locks directory")?;
-            Some(FileLocker::new(Duration::from_secs(5)).lock_exclusive(&lock_path)?)
-        } else {
-            None
+        // lives in the repo's git control plane (`.git/jit/locks/`), the same
+        // plane claims coordination uses.
+        //
+        // The control plane is derived from the repository that OWNS this storage
+        // root (its working tree's own `.git`), NOT from the process's ambient
+        // cwd: initializing a `.jit` that happens to be nested under an unrelated
+        // ancestor git repo must never borrow that ancestor's control plane. A
+        // working tree with no `.git` of its own has no control plane and no
+        // cross-process concurrency to guard, so it scaffolds lockless.
+        let _guard = match self.repo_control_plane_dir() {
+            Some(control_plane) => {
+                let lock_path = control_plane.join("locks").join("rules.lock");
+                std::fs::create_dir_all(lock_path.parent().unwrap())
+                    .context("Failed to create control-plane locks directory")?;
+                Some(FileLocker::new(Duration::from_secs(5)).lock_exclusive(&lock_path)?)
+            }
+            None => None,
         };
 
         if jit_root.join("rules.toml").exists() {
@@ -574,6 +569,46 @@ impl<S: IssueStore> CommandExecutor<S> {
         let namespaces = self.config_manager.namespaces_from_config(&config);
         crate::validation::serialize::scaffold_default_rules(jit_root, &namespaces)?;
         Ok(true)
+    }
+
+    /// Resolve the git control-plane dir (`<git-common-dir>/jit`) for the
+    /// repository that OWNS this storage root's working tree, or `None` when that
+    /// working tree is not a git repository of its own.
+    ///
+    /// Determined from the storage root's parent (the working dir) rather than the
+    /// process cwd, so a `.jit` nested under an unrelated ancestor repo is treated
+    /// as non-git instead of borrowing the ancestor's control plane. Returns the
+    /// shared common dir for linked worktrees (where `.git` is a gitdir pointer
+    /// file) so siblings serialize on the same lock.
+    fn repo_control_plane_dir(&self) -> Option<std::path::PathBuf> {
+        let work_dir = self.storage.root().parent()?;
+        let dot_git = work_dir.join(".git");
+        if dot_git.is_dir() {
+            // Main worktree: the common dir IS `<work_dir>/.git`.
+            Some(dot_git.join("jit"))
+        } else if dot_git.is_file() {
+            // Linked worktree: `.git` is a gitdir pointer; ask git (with cwd at
+            // this working tree, so it resolves THIS repo) for the shared common
+            // dir that all linked worktrees share.
+            let out = std::process::Command::new("git")
+                .args(["rev-parse", "--git-common-dir"])
+                .current_dir(work_dir)
+                .output()
+                .ok()?;
+            if !out.status.success() {
+                return None;
+            }
+            let raw = String::from_utf8(out.stdout).ok()?;
+            let common = std::path::PathBuf::from(raw.trim());
+            let common = if common.is_absolute() {
+                common
+            } else {
+                work_dir.join(common)
+            };
+            Some(common.join("jit"))
+        } else {
+            None
+        }
     }
 
     /// Check if an active lease exists for the given issue by the current agent.

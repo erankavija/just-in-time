@@ -72,20 +72,13 @@ fn test_init_outside_git_scaffolds_rules_without_creating_dot_git() {
     // non-git path is intentionally lockless. (Regression: gating the lock on
     // `WorktreePaths::detect()` succeeding created `<dir>/.git/jit/locks`,
     // because detect() returns Ok even outside git.)
+    // Hermetic by construction: the control plane (and thus the scaffold lock) is
+    // derived from the working tree that owns this `.jit` -- i.e. whether
+    // `<temp>/.git` exists -- not from the ambient cwd. A fresh TempDir has no
+    // `.git` of its own, so the non-git lockless path is taken even when $TMPDIR
+    // itself lives inside an unrelated git worktree (as in some CI sandboxes).
     let temp = TempDir::new().unwrap();
-    // Hermeticity: `$TMPDIR` itself may live inside a git worktree, which would
-    // make the `git rev-parse --is-inside-work-tree` check (run by jit) report
-    // true and exercise the git path instead of the non-git one. Pin
-    // GIT_CEILING_DIRECTORIES to the temp dir so git cannot ascend past it when
-    // searching for a repository, forcing the non-git scaffold path regardless
-    // of the ambient tree.
-    let ceiling = temp.path().canonicalize().unwrap();
-    let out = Command::new(jit_binary())
-        .arg("init")
-        .current_dir(temp.path())
-        .env("GIT_CEILING_DIRECTORIES", &ceiling)
-        .output()
-        .expect("failed to run jit init");
+    let out = jit_init(temp.path(), &[]);
     assert!(out.status.success(), "jit init failed: {:?}", out);
 
     assert!(
