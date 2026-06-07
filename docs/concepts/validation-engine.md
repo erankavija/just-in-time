@@ -70,8 +70,10 @@ of truth**, and labels are **derived** from it.
 - Two `label-reference` graph rules check the references in both directions:
   every `satisfies:` resolves to a declared `req:` (no dangling reference), and
   every declared `req:` is used by some `satisfies:` (no stray/invented `req:`
-  label). Together with coverage this closes the derivation loop so a `req:`
-  cannot float free of the canonical criteria.
+  label). The engine enforces these label-to-label relationships; it does not
+  compare a `req:` value against ids parsed from the criteria prose (no rule kind
+  does that). Together with coverage, the rules keep `req:`/`satisfies:` labels
+  consistent with the criteria as an authoring workflow.
 
 If JIT had hard-coded SDD, none of this would be inspectable or changeable. As
 configuration, a team can tune it (require `[aspirational]` coverage too, change

@@ -114,6 +114,16 @@ pub enum RuleConfigError {
         /// The name that appeared more than once.
         name: String,
     },
+
+    /// A user rule uses the reserved `default:` name prefix. That prefix is
+    /// owned by the built-in default ruleset; a user rule using it could collide
+    /// with a default rule once the two sets are combined, breaking the
+    /// unique-name (unambiguous-attribution) invariant.
+    #[error("rule name '{name}' uses the reserved 'default:' prefix")]
+    ReservedRuleName {
+        /// The offending user rule name.
+        name: String,
+    },
 }
 
 /// Severity of a rule finding.
@@ -601,6 +611,15 @@ impl RuleSet {
             .into_iter()
             .map(|r| r.into_rule(jit_root))
             .collect::<Result<Vec<_>, _>>()?;
+
+        // The `default:` prefix is reserved for the built-in default ruleset.
+        // Reject user rules that use it so they cannot collide with a default
+        // rule when the two sets are combined (preserving unique-name attribution).
+        if let Some(rule) = rules.iter().find(|r| r.name.starts_with("default:")) {
+            return Err(RuleConfigError::ReservedRuleName {
+                name: rule.name.clone(),
+            });
+        }
 
         // Enforce the documented "Unique" invariant on `Rule::name` so every
         // finding attributes to exactly one rule. (The engine keys its validator
@@ -1185,6 +1204,23 @@ assert = { require-doc-type = { doc-type = "design" } }
         match err {
             RuleConfigError::DuplicateRuleName { name } => assert_eq!(name, "dup"),
             other => panic!("expected DuplicateRuleName, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_reserved_default_prefix_is_rejected() {
+        // The `default:` prefix is reserved for the built-in default ruleset; a
+        // user rule using it would risk colliding with a default rule once the
+        // sets are combined, so the loader rejects it.
+        let toml = r#"
+[[rules]]
+name = "default:my-rule"
+assert = { require-section = { heading = "A" } }
+"#;
+        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        match err {
+            RuleConfigError::ReservedRuleName { name } => assert_eq!(name, "default:my-rule"),
+            other => panic!("expected ReservedRuleName, got {other:?}"),
         }
     }
 

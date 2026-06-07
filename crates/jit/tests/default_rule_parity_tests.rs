@@ -152,18 +152,48 @@ fn parity_unknown_namespace_fails_validate_but_does_not_block_when_reject_off() 
 }
 
 #[test]
-fn parity_unknown_namespace_blocks_write_when_enforce_registry_on() {
-    let mut v = validation();
-    v.enforce_namespace_registry = Some(true);
+fn parity_unknown_namespace_registry_block_requires_both_flags() {
+    // Legacy `validate_namespace_registry` returned early unless
+    // `enforce_namespace_registry = true`, and then HARD-REJECTED only when
+    // `reject_malformed_labels = true` (else it warned). So a write is blocked
+    // ONLY when BOTH flags are true; either flag alone never blocks the write
+    // (an unknown namespace still fails `jit validate` via severity=error).
     let reg = registry(vec![("type", LabelNamespace::new("Type", true))]);
-    let rules = default_ruleset(&v, &reg);
 
-    // Legacy: the write-path registry block was gated on
-    // `enforce_namespace_registry` (the legacy `validate_namespace_registry`
-    // returned early when it was off). So `enforce` follows that flag, NOT
-    // `reject_malformed_labels`.
-    assert!(blocks(&rules, &["unknown:x"]));
-    assert!(!blocks(&rules, &["type:task"]));
+    // enforce_namespace_registry on, reject_malformed off -> warn only, no block.
+    let mut v1 = validation();
+    v1.enforce_namespace_registry = Some(true);
+    v1.reject_malformed_labels = Some(false);
+    let rules1 = default_ruleset(&v1, &reg);
+    assert!(
+        !blocks(&rules1, &["unknown:x"]),
+        "registry must not block a write when reject_malformed_labels is off"
+    );
+    assert!(
+        fails_validate(&rules1, &["unknown:x"]),
+        "unknown namespace must still fail jit validate"
+    );
+
+    // Both flags on -> blocks the write.
+    let mut v2 = validation();
+    v2.enforce_namespace_registry = Some(true);
+    v2.reject_malformed_labels = Some(true);
+    let rules2 = default_ruleset(&v2, &reg);
+    assert!(
+        blocks(&rules2, &["unknown:x"]),
+        "registry must block the write when both flags are on"
+    );
+    assert!(!blocks(&rules2, &["type:task"]));
+
+    // enforce_namespace_registry off -> never blocks, regardless of reject flag.
+    let mut v3 = validation();
+    v3.enforce_namespace_registry = Some(false);
+    v3.reject_malformed_labels = Some(true);
+    let rules3 = default_ruleset(&v3, &reg);
+    assert!(
+        !blocks(&rules3, &["unknown:x"]),
+        "registry must not block when enforce_namespace_registry is off"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -361,35 +391,25 @@ fn parity_type_hierarchy_graph_rules_gated_by_toggles() {
 }
 
 // ---------------------------------------------------------------------------
-// C. namespace-registry enforce follows enforce_namespace_registry, NOT
-// reject_malformed_labels.
+// C. namespace-registry write-path block requires BOTH enforce_namespace_registry
+// AND reject_malformed_labels (legacy parity). The comprehensive case is covered
+// by `parity_unknown_namespace_registry_block_requires_both_flags` above; this
+// adds the "enforce on, reject off => warn only" corner explicitly.
 // ---------------------------------------------------------------------------
-
-#[test]
-fn parity_namespace_registry_enforce_true_blocks_write() {
-    let mut v = validation();
-    v.enforce_namespace_registry = Some(true);
-    let reg = registry(vec![("type", LabelNamespace::new("Type", true))]);
-    let rules = default_ruleset(&v, &reg);
-
-    // enforce_namespace_registry = true => unknown namespace BLOCKS the write.
-    assert!(blocks(&rules, &["unknown:x"]));
-    assert!(!blocks(&rules, &["type:task"]));
-}
 
 #[test]
 fn parity_namespace_registry_enforce_false_warns_only() {
     let mut v = validation();
     v.enforce_namespace_registry = Some(false);
     // reject_malformed_labels = true must NOT, on its own, make the registry
-    // rule block (parity regression fix: registry enforce is driven by
-    // enforce_namespace_registry only).
+    // rule block: the legacy write-path check returned early when
+    // enforce_namespace_registry was off, so it never blocked in this config.
     v.reject_malformed_labels = Some(true);
     let reg = registry(vec![("type", LabelNamespace::new("Type", true))]);
     let rules = default_ruleset(&v, &reg);
 
     // Surfaces as a validate error (severity = error) ...
     assert!(fails_validate(&rules, &["unknown:x"]));
-    // ... but does NOT block the write (enforce follows enforce_namespace_registry).
+    // ... but does NOT block the write (registry block needs BOTH flags).
     assert!(!blocks(&rules, &["unknown:x"]));
 }

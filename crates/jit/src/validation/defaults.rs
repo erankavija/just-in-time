@@ -148,6 +148,14 @@ pub fn default_ruleset(validation: &ValidationConfig, namespaces: &LabelNamespac
     // `label_regex` if present, else the canonical format. A per-whole-label
     // (`namespace:value`) pattern cannot use the value-only `label-value-pattern`
     // shorthand, so it is a raw schema over the projection's `raw_labels` array.
+    //
+    // Parity note: this is a deliberate UNIFICATION. Legacy split the format
+    // check across two paths — `IssueValidator` (write) used the configurable
+    // `label_regex`, while whole-repo `validate_labels` used the FIXED canonical
+    // format. The single rule applies `label_regex` to BOTH paths. For repos
+    // whose `label_regex` equals the canonical format (the default) this is
+    // identical; a repo that customizes `label_regex` now gets that regex in
+    // `jit validate` too, which is the more consistent behavior.
     let format_regex = validation
         .label_regex
         .clone()
@@ -165,19 +173,22 @@ pub fn default_ruleset(validation: &ValidationConfig, namespaces: &LabelNamespac
     // `validate_labels` check warned regardless of any flag); empty registry =>
     // skip (nothing to check against).
     //
-    // Enforcement parity: the legacy WRITE-PATH block for an unknown namespace
-    // only happened when `enforce_namespace_registry = true`. So this rule's
-    // `enforce` MUST follow `enforce_namespace_registry` (NOT
-    // `reject_malformed_labels`): with the registry configured but the toggle
-    // off, an unknown namespace still surfaces as an error in `jit validate`
-    // (severity = error) yet never blocks a write (enforce = false).
+    // Enforcement parity: the legacy WRITE-PATH registry check
+    // (`IssueValidator::validate_namespace_registry`) returned early unless
+    // `enforce_namespace_registry = true`, and then HARD-REJECTED only when
+    // `reject_malformed_labels = true` (otherwise it merely warned). A write was
+    // therefore blocked ONLY when BOTH flags were true, so `enforce` must be
+    // their conjunction. Severity stays `error` so an unknown namespace still
+    // fails `jit validate` (parity with the validate-time registry check).
     if !namespaces.namespaces.is_empty() {
         let registered: Vec<&str> = namespaces.namespaces.keys().map(|s| s.as_str()).collect();
+        let registry_blocks =
+            validation.enforce_namespace_registry.unwrap_or(false) && reject_malformed;
         rules.push(json_schema_rule(
             "default:namespace-registry",
             Selector::default(),
             Severity::Error,
-            validation.enforce_namespace_registry.unwrap_or(false),
+            registry_blocks,
             registered_namespace_schema(&registered),
         ));
     }
