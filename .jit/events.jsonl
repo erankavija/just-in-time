@@ -2528,3 +2528,7 @@
 {"type":"issue_created","id":"36c194cb-5aa4-444c-9f59-15af6abd2c1d","issue_id":"d4188154-f465-44f0-9b63-753ad1494204","timestamp":"2026-06-07T17:58:58.163046502Z","title":"Hard-remove legacy config + migration backward-compat (rules.toml sole source)","priority":"normal"}
 {"type":"issue_state_changed","id":"4a4cbbae-7092-45f6-b016-5698b2ea5a55","issue_id":"2fb9f910-ae16-431d-8bb3-bf83634d1f90","timestamp":"2026-06-07T17:59:28.973147157Z","from":"ready","to":"backlog"}
 {"type":"issue_state_changed","id":"5fe68bd8-bd6e-46c9-879d-655ff9697bcc","issue_id":"d4188154-f465-44f0-9b63-753ad1494204","timestamp":"2026-06-07T17:59:29.011701458Z","from":"ready","to":"backlog"}
+{"type":"issue_state_changed","id":"ef841470-4518-445f-ada9-a645958810b0","issue_id":"5e79ba48-0012-4c79-b35f-6a7bc8c2f675","timestamp":"2026-06-07T18:02:37.295740026Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"f4f746ee-5319-4e0b-8989-58e1282a28a0","issue_id":"5e79ba48-0012-4c79-b35f-6a7bc8c2f675","timestamp":"2026-06-07T18:02:37.295923986Z","assignee":"agent:claude"}
+{"type":"issue_state_changed","id":"fa71b2f5-de59-4da1-9ce3-ac2b220a5902","issue_id":"e93af54b-af11-4512-ba34-8122251de039","timestamp":"2026-06-07T18:02:37.311116711Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"9af3a62b-9b6d-4c2d-91fe-069845b8d73e","issue_id":"e93af54b-af11-4512-ba34-8122251de039","timestamp":"2026-06-07T18:02:37.311289041Z","assignee":"agent:claude"}
