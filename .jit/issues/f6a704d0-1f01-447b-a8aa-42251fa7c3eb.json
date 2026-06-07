@@ -2,7 +2,7 @@
   "id": "f6a704d0-1f01-447b-a8aa-42251fa7c3eb",
   "title": "Generic issue & label validation engine (JSON-Schema-based), with SDD as first application",
   "description": "# Generic Issue & Label Validation Engine\n\nA configurable, declarative validation engine for issues and labels, built on\nJSON Schema. Rules live in `.jit/rules.toml`; SDD is the first application,\nshipped only as example rules + schemas. The engine is deliberately general so\njit becomes a flexible substrate for many methodologies, not an SDD-specific\ntool.\n\n## Design\n\nThe authoritative design and all decisions live in the linked decision record\n`dev/active/f6a704d0-validation-engine.md` (revision 2). This description does\nnot restate it.\n\n## Success Criteria\n\n- [hard] Rules load from `.jit/rules.toml`; schemas inline or from `.jit/schemas/`; the loader rejects mixing shorthand and raw schema in one rule.\n- [hard] Selector matrix (type, label, state, doc-type) matches issues; applicable rules union.\n- [hard] Local rules evaluate on create/update; per-rule `enforce` (default false) blocks when set; `--force` bypasses.\n- [hard] Graph rules (coverage, reference-integrity, dependency-shape) run only in `jit validate`/gate checkers.\n- [hard] Validation runs against the enriched projection; Markdown in the default build, HTML/XML behind optional features, all behind one parser trait.\n- [hard] JSON Schema validation via the `jsonschema` crate; shorthand kinds desugar to JSON Schema.\n- [hard] The COMPLETE set of existing checks (validation.rs + validate.rs + `[validation]` + `[namespaces]` enforcement) is re-expressed as default rules with preserved behavior; legacy enforcement keys are migrated and removed (no backward-compat aliases).\n- [hard] `jit init` scaffolds defaults; existing repos migrate without silently losing checks.\n- [hard] `jit validate [<id>] [--json] [--explain]` reports rule name, severity, message; gates invoke it via `$JIT_ISSUE_ID`.\n- [hard] SDD ships as example rules + schemas + docs; description `[hard]`/`[aspirational]` criteria are canonical and labels derived; >=1 non-SDD example included.\n- [hard] `cargo clippy --workspace --all-targets` and `cargo fmt` clean; tests cover engine, projection, parsers, desugaring, migration.\n- [aspirational] The `x-jit-*` custom-keyword extension point is demonstrated.\n\n## Non-goals\n\n- Delta-spec authoring / merge-on-Done (dropped).\n- CEL as a top-level rule type (deferred; checker-command covers the gap).\n- A preset subsystem (SDD is docs/examples).\n- Backward-compat aliases for migrated legacy config keys (hard migration).\n- Deep per-format semantic adapters (one generic projection + JSON Schema).\n",
-  "state": "backlog",
+  "state": "ready",
   "priority": "high",
   "assignee": null,
   "dependencies": [
@@ -39,5 +39,5 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-06-06T15:48:56.227134229+00:00",
-  "updated_at": "2026-06-06T16:59:14.301717060+00:00"
+  "updated_at": "2026-06-07T15:29:06.861867241+00:00"
 }

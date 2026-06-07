@@ -118,7 +118,7 @@
           "short_id": "0abaddc0",
           "title": "jit init default ruleset scaffolding and existing-repo migration",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         }
       ]
     }
@@ -158,7 +158,7 @@
       "issue": "0abaddc0",
       "topic": "planning failure: first impl shipped a PARTIAL migration (kept 6 of 8 [validation] keys live, hard-coded rules remain) because orphan/strategic graph warnings (Assertion::TypeHierarchy) have NO rules.toml surface, so DR 8.2/8.3 'single source of truth / no hard-coded rules' was not achievable as scoped. Adversarial review FAILed it on DR conformance.",
       "decision": "User: planning failure; EXPAND scope to do it properly (add the missing TOML surface + full migration), plan it, dispatch a plan reviewer, drive to completion when green",
-      "resolution": "IN PROGRESS. Plan v2 at dev/active/f6a704d0-0abaddc0-fullmigration-plan.md (incorporates 9 plan-review must-fixes incl. removing the default: reservation, file-as-source + bootstrap fallback, type-hierarchy TOML kind, complete serializer, dogfood-migrate this repo). Partial branch worktree-agent-0abaddc0@5cb6d3c is SUPERSEDED (reuse its migration mechanics only)."
+      "resolution": "DONE. Plan v2 implemented (worktree-agent-0abaddc0-full); 2 rework rounds (D6 template+idempotency; then materialize-existing + schema no-clobber). Dogfooded this repo. gates green at merge 5c91268. NOTE: user flagged backward-compat work as largely wasted (one real consumer ../gf2) - memory feedback-jit-single-user-no-backward-compat."
     }
   ],
   "rework_counts": {
@@ -173,7 +173,7 @@
     "b8ba1b10": 1,
     "a0f0f342": 2,
     "a6daa05d": 1,
-    "0abaddc0": 1
+    "0abaddc0": 2
   },
   "started_at": "2026-06-06T00:00:00Z",
   "handoffs": [

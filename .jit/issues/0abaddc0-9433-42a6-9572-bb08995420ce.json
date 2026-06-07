@@ -2,7 +2,7 @@
   "id": "0abaddc0-9433-42a6-9572-bb08995420ce",
   "title": "jit init default ruleset scaffolding and existing-repo migration",
   "description": "Scaffold a default `.jit/rules.toml` on `jit init` and migrate existing repos' legacy config into rules when init is re-run. SCOPE-EXPANDED 2026-06-07 (user-directed, after a planning gap) to achieve literal DR section 8.2/8.3 conformance: `.jit/rules.toml` becomes the operative single source of truth, ALL default checks are expressible in TOML, and the legacy enforcement keys are removed.\n\n## Background\n\nRepos obtain their checks from `rules.toml`: new repos via `init`, existing repos by re-running `init`, which performs the one-time migration. Stale configs must not break before migration. The original breakdown missed that two default checks (orphan-leaf, strategic-consistency graph warnings) had no `rules.toml` surface, so a TOML `type-hierarchy` assertion kind must be added to make the full migration possible. See `dev/active/f6a704d0-0abaddc0-fullmigration-plan.md` (the reviewed implementation plan), `dev/active/f6a704d0-validation-engine-plan.md` (step 9), and decision record sections 8.2, 8.2a, 8.3, 8.4.\n\n## Success Criteria\n\n- [ ] [hard] A `type-hierarchy` assertion kind is added to the `rules.toml` grammar (orphan-leaf, strategic-consistency), with the repo `HierarchyConfig` injected by the graph evaluator; every default rule is now expressible in TOML. The `default:` rule-name reservation in the loader is removed.\n- [ ] [hard] `jit init` scaffolds a COMPLETE default `.jit/rules.toml` (every default rule serialized, plus any referenced `.jit/schemas/*.json`) reproducing today's checks; a fresh repo emits no deprecation warning and no migration message.\n- [ ] [hard] Re-running `jit init` on a legacy repo serializes the complete default ruleset into `rules.toml` and strips the removed enforcement keys (the six `[validation]` keys: `require_type_label`, `label_regex`, `reject_malformed_labels`, `enforce_namespace_registry`, `warn_orphaned_leaves`, `warn_strategic_consistency`; plus `namespaces.*.{values,pattern,required}`), removing an emptied `[validation]` header. `default_type` and `strictness` are retained. The coexistence case (user `rules.toml` already present) appends migrated rules by name without clobbering, and init is idempotent.\n- [ ] [hard] `effective_rules()` derives the rule set from the file: when `rules.toml` is present (even empty) it is the sole source; when absent it falls back to in-code defaults with a warning to run `jit init` (no read-path mutation).\n- [ ] [hard] A pre-parse `toml::Value` scan in `JitConfig::load` warns when deprecated keys are present (the six removed `[validation]` enforcement keys; nested `namespaces.*.{values,pattern,required}`; NOT `default_type`/`strictness`) and prompts to re-run `jit init`; no `deny_unknown_fields` is added, so stale configs never hard-error.\n- [ ] [hard] An exhaustive before/after parity battery proves effective rules (block/error/warn) are identical across migration for every dimension (require-type-label, canonical + custom label_regex with reject_malformed on/off, namespace values/pattern/required, uniqueness, registry both flags, unknown-type, orphan-leaf, strategic-consistency), with graph warnings asserted to actually fire, plus a full-RuleSet serialize/reload round-trip. A test covers an old config carrying removed keys (it warns, parses, does not error).\n- [ ] [hard] The just-in-time repo itself is migrated (its `.jit/rules.toml` + schemas generated, enforcement keys stripped) and verified to have unchanged validation behavior (dogfood).\n\n## Notes\n\nAnchors: init path `main.rs:272` + `executor.init` in `commands/mod.rs`; config load `config.rs:405-430`, `config_manager.rs:51-53`; `effective_rules` `commands/mod.rs:342-369` (remove the `default_ruleset ++ user` concat); loader `RuleSet::load`/`from_toml_str` in `validation/rules.rs`. Reuse (rewritten) migration mechanics from the superseded partial branch `worktree-agent-0abaddc0@5cb6d3c`.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "normal",
   "assignee": "agent:claude",
   "dependencies": [
@@ -13,15 +13,15 @@
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "failed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-07T14:46:17.847898770Z"
-    },
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-06-07T14:44:43.762351652Z"
+      "updated_at": "2026-06-07T15:17:46.825067081Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-07T15:20:03.812481183Z"
     }
   },
   "context": {},
@@ -31,5 +31,5 @@
     "epic:validation-engine"
   ],
   "created_at": "2026-06-06T15:51:20.566825385+00:00",
-  "updated_at": "2026-06-07T14:52:06.632889088+00:00"
+  "updated_at": "2026-06-07T15:29:06.829899881+00:00"
 }
