@@ -1,9 +1,35 @@
 use assert_cmd::assert::OutputAssertExt;
 use predicates::prelude::*;
 use std::fs;
+use std::io::{Read, Write};
+use std::net::TcpListener;
 use std::path::PathBuf;
 use std::process::Command;
 use tempfile::TempDir;
+
+/// Spawn a minimal loopback HTTP server that answers every request with
+/// `200 OK`, returning its base URL (e.g. `http://127.0.0.1:PORT`).
+///
+/// Used instead of a live external service (previously `httpbin.org`) so the
+/// external-URL reachability test is deterministic and works offline: the `jit`
+/// subprocess issues its HEAD request to this in-process loopback listener.
+fn spawn_ok_server() -> String {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind mock HTTP server");
+    let addr = listener.local_addr().expect("mock server local addr");
+    std::thread::spawn(move || {
+        for stream in listener.incoming() {
+            let Ok(mut stream) = stream else { continue };
+            // Drain the request head (a HEAD request carries no body), then
+            // reply 200 and close. Path/method are ignored — any request is OK.
+            let mut buf = [0u8; 1024];
+            let _ = stream.read(&mut buf);
+            let _ = stream
+                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+            let _ = stream.flush();
+        }
+    });
+    format!("http://{addr}")
+}
 
 /// Integration tests for jit doc check-links command
 ///
@@ -328,11 +354,13 @@ fn test_external_urls_are_validated() {
 
     let issue_id = ctx.create_issue("Test issue", "Description");
 
-    // Document with reachable external URL
+    // Document with a reachable external URL, served by a local loopback mock so
+    // the test is deterministic and offline-safe (no dependency on httpbin.org).
+    let base = spawn_ok_server();
     fs::create_dir_all(ctx.repo_path().join("docs")).unwrap();
     fs::write(
         ctx.repo_path().join("docs/external.md"),
-        "# External\n\n![Remote](https://httpbin.org/status/200)\n",
+        format!("# External\n\n![Remote]({base}/status/200)\n"),
     )
     .unwrap();
 
@@ -346,8 +374,7 @@ fn test_external_urls_are_validated() {
     ])
     .success();
 
-    // Reachable external URLs should validate successfully (no warnings/errors)
-    // Note: Using httpbin.org which has valid SSL certificates
+    // A reachable external URL should validate successfully (no warnings/errors).
     ctx.run_jit(&["doc", "check-links", "--scope", "all"])
         .code(0)
         .stdout(predicate::str::contains("valid"));
