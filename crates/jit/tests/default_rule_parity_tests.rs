@@ -151,9 +151,13 @@ fn parity_malformed_canonical_label_fails_validate() {
 }
 
 /// (d) A CUSTOM `label_regex` violation (on a canonically-valid label) is
-/// rejected on the WRITE path only when `reject_malformed_labels = true`, and is
-/// NOT applied to the validate path beyond canonical (legacy: custom regex was
-/// write-path only).
+/// rejected on the WRITE path only when `reject_malformed_labels = true`.
+///
+/// APPROVED DEVIATION (decision record §8.3a, user-approved 2026-06-07): unlike
+/// the legacy `validate_labels` (which used only the fixed canonical regex on the
+/// validate path), the migrated custom-regex rule ALSO surfaces on the validate
+/// path (`severity=error`), because the rule engine has no write-only local-rule
+/// representation. See `parity_custom_label_regex_also_applies_to_validate`.
 #[test]
 fn parity_custom_label_regex_write_only() {
     // Custom regex stricter than canonical; `type:task` is canonical-valid but
@@ -178,6 +182,45 @@ fn parity_custom_label_regex_write_only() {
     // A label satisfying the custom regex is accepted.
     assert!(!blocks(&block_rules, &["team:platform"]));
 }
+
+/// APPROVED DEVIATION (decision record §8.3a): the migrated custom `label_regex`
+/// rule applies to the validate path too, whereas legacy `validate_labels` used
+/// only the canonical regex there. A canonically-valid label that violates a
+/// custom regex therefore FAILS `jit validate`, regardless of
+/// `reject_malformed_labels` (which only governs write-time blocking). When
+/// `label_regex` equals the canonical regex the rule is not emitted, so most
+/// repos see no change. This test pins the intentional new behavior so it is not
+/// mistaken for a regression.
+#[test]
+fn parity_custom_label_regex_also_applies_to_validate() {
+    let mut cfg = validation();
+    cfg.label_regex = Some(r"^team:[a-z]+$".to_string());
+    // reject_malformed_labels off: does NOT block the write, but DOES fail validate.
+    let rules = default_ruleset(&cfg, &registry(vec![]));
+    assert!(
+        !blocks(&rules, &["type:task"]),
+        "custom regex must not block write when reject_malformed_labels off"
+    );
+    assert!(
+        fails_validate(&rules, &["type:task"]),
+        "deviation §8.3a: custom regex surfaces as a validate error"
+    );
+    // A label satisfying the custom regex neither blocks nor fails validate.
+    assert!(!fails_validate(&rules, &["team:platform"]));
+
+    // When label_regex equals canonical, the custom rule is not emitted, so a
+    // canonical label that would only have violated a *stricter* custom regex is
+    // unaffected (no validate failure beyond the canonical check).
+    let mut canon = validation();
+    canon.label_regex = Some(CANONICAL_LABEL_REGEX_FOR_TEST.to_string());
+    let canon_rules = default_ruleset(&canon, &registry(vec![]));
+    assert!(!fails_validate(&canon_rules, &["type:task"]));
+}
+
+/// Mirror of the production `CANONICAL_LABEL_REGEX` (defaults.rs). Kept in the
+/// test so the "label_regex == canonical => custom rule not emitted" branch is
+/// exercised without exporting the constant.
+const CANONICAL_LABEL_REGEX_FOR_TEST: &str = r"^[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9._-]*$";
 
 // ---------------------------------------------------------------------------
 // namespace registry (legacy IssueValidator enforce_namespace_registry +

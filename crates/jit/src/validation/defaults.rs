@@ -27,8 +27,11 @@
 //!   legacy ALWAYS-ON inline `labels::validate_label` write-path reject AND the
 //!   canonical check the whole-repo `validate_labels` ran. An optional
 //!   `default:label-format-custom` rule (emitted only when `label_regex` is set
-//!   and differs from canonical) reproduces the legacy WRITE-ONLY custom-regex
-//!   check with `enforce = reject_malformed_labels`.
+//!   and differs from canonical) reproduces the legacy custom-regex write-time
+//!   block with `enforce = reject_malformed_labels`. Per the approved deviation
+//!   (decision record §8.3a) it ALSO fails `jit validate`, which legacy did not —
+//!   the engine has no write-only local rule. Unaffected when `label_regex` is
+//!   unset or equals canonical.
 //! - Per-namespace UNIQUENESS (`default:namespace-unique:<ns>`) is ALSO always
 //!   enforced (`severity = error`, `enforce = true`), reproducing the legacy
 //!   inline unique-namespace collision hard-reject on the write path.
@@ -173,17 +176,23 @@ pub fn default_ruleset(validation: &ValidationConfig, namespaces: &LabelNamespac
         raw_labels_pattern_schema(CANONICAL_LABEL_REGEX),
     ));
 
-    // Custom label format (write-path only): when a repo configures a
-    // `validation.label_regex` that DIFFERS from the canonical format, the legacy
-    // `IssueValidator` applied that custom regex on the WRITE path only, gated by
-    // `reject_malformed_labels`. The whole-repo `validate_labels` never used the
-    // custom regex (it used canonical), so this rule MUST NOT add to the validate
-    // path beyond what the canonical rule already covers. We model "write-only" by
-    // emitting it with `enforce = reject_malformed_labels` and `severity = error`;
-    // since canonical already fails `jit validate` on any non-canonical label,
-    // this rule's incremental effect is exactly the legacy write-path custom-regex
-    // reject (when `reject_malformed_labels = true`). When `label_regex` is unset
-    // or equals canonical, the rule is redundant and is not emitted.
+    // Custom label format: when a repo configures a `validation.label_regex` that
+    // DIFFERS from the canonical format, the legacy `IssueValidator` applied that
+    // custom regex on the WRITE path only, gated by `reject_malformed_labels`, and
+    // the whole-repo `validate_labels` never used it (it used canonical). We
+    // reproduce the write-time blocking exactly via `enforce = reject_malformed_labels`
+    // (a write is blocked only when an `enforce` rule emits an `error`).
+    //
+    // APPROVED DEVIATION (decision record §8.3a, user-approved 2026-06-07): the
+    // rule engine has no write-only representation for a LOCAL rule — `jit validate`
+    // fails on any `severity = error` finding regardless of `enforce` — so emitting
+    // this rule as `severity = error` necessarily makes a custom-regex violation
+    // ALSO fail `jit validate`, which legacy did not do. This is the single
+    // documented parity deviation; the new behavior is stricter and consistent
+    // across the write and validate paths. When `label_regex` is unset or equals
+    // canonical, the rule is redundant and is not emitted, so most repos (including
+    // this one) are unaffected. See parity test
+    // `parity_custom_label_regex_also_applies_to_validate`.
     if let Some(custom_regex) = validation
         .label_regex
         .as_deref()
@@ -645,6 +654,15 @@ mod tests {
             "custom regex must only warn when reject_malformed off"
         );
         assert!(warn.warnings().iter().any(|w| w.contains("custom")));
+        // Approved deviation (§8.3a): although it does not BLOCK the write, the
+        // custom-regex finding is `severity=error`, so it DOES fail `jit validate`
+        // (legacy applied the custom regex write-time only). See the integration
+        // test `parity_custom_label_regex_also_applies_to_validate`.
+        assert!(warn
+            .findings()
+            .iter()
+            .any(|f| f.rule == "default:label-format-custom"
+                && f.severity == crate::validation::rules::Severity::Error));
 
         // With reject_malformed_labels on, the custom regex blocks the write.
         validation.reject_malformed_labels = Some(true);

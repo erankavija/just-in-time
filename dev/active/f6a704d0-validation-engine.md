@@ -182,7 +182,22 @@ A rule is **selector + assertion + severity**.
     `enforce_namespace_registry`, `warn_orphaned_leaves`,
     `warn_strategic_consistency`.
   `rules.toml` becomes the SINGLE source of truth for issue/label validation.
-  Default rules preserve today's behavior (warn vs reject) via `enforce` (§7.2).
+  Default rules preserve today's behavior (warn vs reject) via `enforce` (§7.2),
+  modulo the one approved deviation in §8.3a.
+- **8.3a Approved parity deviation — custom `label_regex` on the validate path**
+  (user-approved 2026-06-07). Legacy `validate_labels` checked only the FIXED
+  canonical regex on the validate path; a custom `validation.label_regex` was
+  applied write-time only (gated by `reject_malformed_labels`). Because the rule
+  engine has no "write-only" representation for local rules — a write-blocking
+  rule needs `severity=error`, and `jit validate` fails on any `severity=error`
+  finding regardless of `enforce` (§7 gives local rules no write-only carve-out;
+  only graph rules are validate-only, §7.4) — migrating the custom regex makes it
+  apply to BOTH the write and validate paths. The resulting behavior is stricter
+  and consistent across paths. Most repos are unaffected: when `label_regex`
+  equals the canonical regex, the `default:label-format-custom` rule is not
+  emitted at all. Achieving exact legacy parity would require adding a write-only
+  local-rule concept to the Rule model; that was considered and declined in favor
+  of this documented deviation.
 - **8.4 Migration**: re-running `jit init` on an existing repo performs the
   one-time migration — it converts existing `[validation]` and
   `[namespaces].{values,pattern,required}` config into `.jit/rules.toml` and
