@@ -340,6 +340,13 @@ fn schema_needs_sections(schema: &serde_json::Value) -> bool {
                 .iter()
                 .any(|(key, child)| key == "sections" || walk(child)),
             serde_json::Value::Array(items) => items.iter().any(walk),
+            // A raw schema can reference the body without `sections` ever being
+            // an object key — e.g. `"required": ["sections"]` or
+            // `"const": "sections"`. Treat any string occurrence as a body need
+            // too: over-parsing the body is merely a tiny cost, whereas missing
+            // it would silently validate against a body-less projection and
+            // falsely reject valid descriptions.
+            serde_json::Value::String(s) => s == "sections",
             _ => false,
         }
     }

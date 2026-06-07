@@ -323,9 +323,13 @@ impl<S: IssueStore> CommandExecutor<S> {
     fn cached_namespaces(&self) -> Result<&LabelNamespaces> {
         self.namespaces
             .get_or_init(|| {
-                self.config_manager
-                    .get_namespaces()
-                    .map_err(|err| err.to_string())
+                // Derive namespaces from the already-cached config so a single
+                // write command reads `config.toml` at most once (the prior
+                // `get_namespaces()` call re-loaded it from disk).
+                match self.cached_config() {
+                    Ok(config) => Ok(self.config_manager.namespaces_from_config(config)),
+                    Err(err) => Err(format!("{err}")),
+                }
             })
             .as_ref()
             .map_err(|err| anyhow!("invalid namespace configuration: {err}"))

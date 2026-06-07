@@ -153,6 +153,47 @@ assert = { require-label = { label = "req:*", min = 1 } }
 }
 
 #[test]
+fn test_raw_schema_requiring_sections_triggers_body_parse() {
+    // A RAW json-schema rule that requires the body via `required: ["sections"]`
+    // references the body through a STRING VALUE, not an object key. Body-need
+    // detection must still trigger the lazy description parse, otherwise the
+    // schema validates against a body-less projection and falsely rejects.
+    let executor = executor_with_rules(
+        r#"
+[[rules]]
+name = "must-have-body"
+when = { type = "epic" }
+severity = "error"
+enforce = true
+assert = { json-schema = "schemas/needs-sections.json" }
+"#,
+    );
+    let schemas = executor.storage().root().join("schemas");
+    std::fs::create_dir_all(&schemas).unwrap();
+    std::fs::write(
+        schemas.join("needs-sections.json"),
+        r#"{ "type": "object", "required": ["sections"] }"#,
+    )
+    .unwrap();
+
+    // An epic with a body section: the description parses into a `sections`
+    // projection, so `required: ["sections"]` is satisfied. Without the body
+    // parse being triggered, `sections` is absent and this would wrongly fail.
+    let result = executor.create_issue(
+        "An epic".to_string(),
+        "## Goals\n\n- ship it\n".to_string(),
+        Priority::Normal,
+        vec![],
+        vec!["type:epic".to_string()],
+        false,
+    );
+    assert!(
+        result.is_ok(),
+        "a raw schema requiring `sections` must trigger the body parse, got {result:?}"
+    );
+}
+
+#[test]
 fn test_graph_rule_not_evaluated_on_create() {
     // A graph-scope enforce rule that would "fail" must be skipped on write.
     let executor = executor_with_rules(

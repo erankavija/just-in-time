@@ -62,14 +62,22 @@ impl ConfigManager {
     /// Returns an error if config.toml exists but cannot be parsed.
     pub fn get_namespaces(&self) -> Result<LabelNamespaces> {
         let config = self.load()?;
+        Ok(self.namespaces_from_config(&config))
+    }
 
-        // If config has namespaces, build from those
+    /// Build the namespace registry from an ALREADY-loaded config, without
+    /// re-reading `config.toml` from disk.
+    ///
+    /// Callers that already hold a parsed [`JitConfig`] (e.g. a cached copy)
+    /// should use this instead of [`get_namespaces`](Self::get_namespaces) so a
+    /// single write command parses `config.toml` at most once.
+    pub fn namespaces_from_config(&self, config: &JitConfig) -> LabelNamespaces {
+        // If config has namespaces, build from those; otherwise return defaults.
         if let Some(ref namespaces_config) = config.namespaces {
-            return Ok(self.build_namespaces_from_config(&config, namespaces_config.clone()));
+            self.build_namespaces_from_config(config, namespaces_config.clone())
+        } else {
+            self.default_namespaces()
         }
-
-        // Otherwise return defaults
-        Ok(self.default_namespaces())
     }
 
     /// Get the enforcement mode for lease requirements.
