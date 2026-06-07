@@ -1,7 +1,13 @@
-//! Integration tests for CLI warning display
+//! Integration tests for CLI warning display.
+//!
+//! The orphan-leaf / strategic-consistency warnings are now produced by the
+//! built-in GRAPH rules (`default:orphan-leaf` / `default:strategic-consistency`)
+//! rather than the former hard-coded `check_warnings` path. These tests exercise
+//! that the same create-time warnings still surface, now through the rule engine.
 
 use jit::commands::CommandExecutor;
 use jit::storage::{IssueStore, JsonFileStorage};
+use jit::validation::graph::GraphFinding;
 use tempfile::TempDir;
 
 fn setup_test_storage() -> (TempDir, JsonFileStorage) {
@@ -9,6 +15,18 @@ fn setup_test_storage() -> (TempDir, JsonFileStorage) {
     let storage = JsonFileStorage::new(temp_dir.path());
     storage.init().unwrap();
     (temp_dir, storage)
+}
+
+/// Graph-rule findings attributed to `id`, the rule-engine replacement for the
+/// former `executor.check_warnings(&id)`.
+fn warnings_for(executor: &CommandExecutor<JsonFileStorage>, id: &str) -> Vec<GraphFinding> {
+    let issues = executor.storage().list_issues().unwrap();
+    executor
+        .evaluate_graph_rules(&issues)
+        .unwrap()
+        .into_iter()
+        .filter(|gf| gf.issue_id.as_deref() == Some(id))
+        .collect()
 }
 
 #[test]
@@ -28,22 +46,10 @@ fn test_create_epic_without_label_shows_warning() {
         )
         .unwrap();
 
-    // Check for warnings
-    let warnings = executor.check_warnings(&id).unwrap();
+    let warnings = warnings_for(&executor, &id);
     assert_eq!(warnings.len(), 1);
-
-    // Verify it's a strategic label warning
-    match &warnings[0] {
-        jit::type_hierarchy::ValidationWarning::MissingStrategicLabel {
-            type_name,
-            expected_namespace,
-            ..
-        } => {
-            assert_eq!(type_name, "epic");
-            assert_eq!(expected_namespace, "epic");
-        }
-        _ => panic!("Expected MissingStrategicLabel warning"),
-    }
+    assert_eq!(warnings[0].finding.rule, "default:strategic-consistency");
+    assert!(warnings[0].finding.message.contains("epic:*"));
 }
 
 #[test]
@@ -63,17 +69,10 @@ fn test_create_task_without_parent_shows_warning() {
         )
         .unwrap();
 
-    // Check for warnings
-    let warnings = executor.check_warnings(&id).unwrap();
+    let warnings = warnings_for(&executor, &id);
     assert_eq!(warnings.len(), 1);
-
-    // Verify it's an orphan warning
-    match &warnings[0] {
-        jit::type_hierarchy::ValidationWarning::OrphanedLeaf { type_name, .. } => {
-            assert_eq!(type_name, "task");
-        }
-        _ => panic!("Expected OrphanedLeaf warning"),
-    }
+    assert_eq!(warnings[0].finding.rule, "default:orphan-leaf");
+    assert!(warnings[0].finding.message.contains("orphaned leaf"));
 }
 
 #[test]
@@ -93,9 +92,7 @@ fn test_create_epic_with_label_no_warning() {
         )
         .unwrap();
 
-    // Check for warnings
-    let warnings = executor.check_warnings(&id).unwrap();
-    assert_eq!(warnings.len(), 0);
+    assert!(warnings_for(&executor, &id).is_empty());
 }
 
 #[test]
@@ -115,7 +112,5 @@ fn test_create_task_with_parent_no_warning() {
         )
         .unwrap();
 
-    // Check for warnings
-    let warnings = executor.check_warnings(&id).unwrap();
-    assert_eq!(warnings.len(), 0);
+    assert!(warnings_for(&executor, &id).is_empty());
 }

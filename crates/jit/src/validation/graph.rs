@@ -40,8 +40,11 @@ use std::collections::BTreeSet;
 use crate::document::MarkdownContentParser;
 use crate::domain::{project, Issue};
 use crate::graph::DependencyGraph;
+use crate::type_hierarchy::{
+    validate_orphans, validate_strategic_labels, HierarchyConfig, ValidationWarning,
+};
 use crate::validation::engine::Finding;
-use crate::validation::rules::{Assertion, Rule, Scope, Selector, Severity};
+use crate::validation::rules::{Assertion, Rule, Scope, Selector, Severity, TypeHierarchyKind};
 
 /// Default label namespace whose values are criterion ids a child claims to
 /// satisfy (e.g. `satisfies:REQ-01`).
@@ -272,6 +275,9 @@ fn evaluate_one(rule: &Rule, issues: &[Issue]) -> Vec<GraphFinding> {
         Assertion::LabelCoverage { config } => evaluate_label_coverage(rule, config, issues),
         Assertion::LabelReference { config } => evaluate_label_reference(rule, config, issues),
         Assertion::DependencyShape { config } => evaluate_dependency_shape(rule, config, issues),
+        Assertion::TypeHierarchy { kind, config } => {
+            evaluate_type_hierarchy(rule, *kind, config, issues)
+        }
         // Non-graph kinds are never dispatched here (filtered by scope), but be
         // exhaustive and total rather than panic.
         _ => Vec::new(),
@@ -726,6 +732,65 @@ fn depends_on_target(
     target_ids
         .iter()
         .any(|target| !graph.find_shortest_path(&source.id, target).is_empty())
+}
+
+// ---------------------------------------------------------------------------
+// type-hierarchy (orphan-leaf / strategic-consistency)
+// ---------------------------------------------------------------------------
+
+/// Evaluate a built-in `type-hierarchy` rule (orphan-leaf or
+/// strategic-consistency) by REUSING the existing
+/// [`crate::type_hierarchy`] domain functions over each issue, converting their
+/// [`ValidationWarning`]s into [`GraphFinding`]s attributed to the issue.
+///
+/// This carries no hierarchy logic of its own: `OrphanLeaf` delegates to
+/// [`validate_orphans`] and `StrategicConsistency` to [`validate_strategic_labels`],
+/// preserving the exact legacy warnings (which were warn-only). Each warning maps
+/// to one finding with the rule's severity (Warn for the built-in defaults).
+fn evaluate_type_hierarchy(
+    rule: &Rule,
+    kind: TypeHierarchyKind,
+    config: &HierarchyConfig,
+    issues: &[Issue],
+) -> Vec<GraphFinding> {
+    let check = |issue: &Issue| -> Vec<ValidationWarning> {
+        match kind {
+            TypeHierarchyKind::OrphanLeaf => validate_orphans(config, issue),
+            TypeHierarchyKind::StrategicConsistency => validate_strategic_labels(config, issue),
+        }
+    };
+
+    issues
+        .iter()
+        .flat_map(|issue| {
+            check(issue)
+                .into_iter()
+                .map(|warning| issue_finding(rule, &issue.id, warning_message(&warning)))
+                .collect::<Vec<_>>()
+        })
+        .collect()
+}
+
+/// Render a [`ValidationWarning`] into a finding message, preserving the legacy
+/// wording so `jit validate` surfaces the same text through the rule engine.
+fn warning_message(warning: &ValidationWarning) -> String {
+    match warning {
+        ValidationWarning::MissingStrategicLabel {
+            issue_id,
+            type_name,
+            expected_namespace,
+        } => format!(
+            "issue {issue_id} (type:{type_name}) is missing a {expected_namespace}:* \
+             identifying label"
+        ),
+        ValidationWarning::OrphanedLeaf {
+            issue_id,
+            type_name,
+        } => format!(
+            "issue {issue_id} (type:{type_name}) is an orphaned leaf with no parent \
+             association label"
+        ),
+    }
 }
 
 #[cfg(test)]

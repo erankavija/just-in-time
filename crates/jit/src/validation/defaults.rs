@@ -33,13 +33,23 @@
 //!   surface as errors in `jit validate` (which fails on any error finding) but
 //!   never block a write, preserving the legacy timing exactly.
 //!
-//! Every rule here is [`Scope::Local`]; the orphan-leaf and strategic-consistency
-//! warnings keep their existing type-hierarchy warning mechanism
-//! (`check_warnings`), which is already warn-only and config-toggled.
+//! Most rules here are [`Scope::Local`]. The orphan-leaf and
+//! strategic-consistency warnings are the exceptions: they need the whole issue
+//! set, so they are built-in [`Scope::Graph`] rules
+//! ([`Assertion::TypeHierarchy`](crate::validation::rules::Assertion::TypeHierarchy))
+//! whose evaluation REUSES the existing
+//! [`type_hierarchy::validate_orphans`](crate::type_hierarchy::validate_orphans)
+//! / [`validate_strategic_labels`](crate::type_hierarchy::validate_strategic_labels)
+//! domain functions. They remain warn-only and config-toggled
+//! (`warn_orphaned_leaves` / `warn_strategic_consistency`), exactly as the
+//! former hard-coded `check_warnings` path was.
 
 use crate::config::ValidationConfig;
 use crate::domain::LabelNamespaces;
-use crate::validation::rules::{Assertion, Rule, RuleSet, SchemaSource, Scope, Selector, Severity};
+use crate::type_hierarchy::HierarchyConfig;
+use crate::validation::rules::{
+    Assertion, Rule, RuleSet, SchemaSource, Scope, Selector, Severity, TypeHierarchyKind,
+};
 
 /// The canonical `namespace:value` label format, mirroring the regex the legacy
 /// `validate_labels` enforced unconditionally via `labels::validate_label`.
@@ -151,18 +161,48 @@ pub fn default_ruleset(validation: &ValidationConfig, namespaces: &LabelNamespac
     ));
 
     // Namespace registry: every label's namespace must be declared. Always
-    // generated when the registry is non-empty (the legacy `validate_labels`
-    // check was unconditional); empty registry => skip (nothing to check against).
+    // generated when the registry is non-empty (the legacy validate-time
+    // `validate_labels` check warned regardless of any flag); empty registry =>
+    // skip (nothing to check against).
+    //
+    // Enforcement parity: the legacy WRITE-PATH block for an unknown namespace
+    // only happened when `enforce_namespace_registry = true`. So this rule's
+    // `enforce` MUST follow `enforce_namespace_registry` (NOT
+    // `reject_malformed_labels`): with the registry configured but the toggle
+    // off, an unknown namespace still surfaces as an error in `jit validate`
+    // (severity = error) yet never blocks a write (enforce = false).
     if !namespaces.namespaces.is_empty() {
         let registered: Vec<&str> = namespaces.namespaces.keys().map(|s| s.as_str()).collect();
         rules.push(json_schema_rule(
             "default:namespace-registry",
             Selector::default(),
             Severity::Error,
-            reject_malformed,
+            validation.enforce_namespace_registry.unwrap_or(false),
             registered_namespace_schema(&registered),
         ));
     }
+
+    // Unknown type label: a `type:<value>` label whose value is not one of the
+    // configured hierarchy types. Legacy `validate_type_hierarchy` (run only by
+    // `jit validate`) flagged this and did NOT block writes. This is exactly a
+    // per-namespace allowed-VALUES rule over the `type` namespace, with the
+    // allowed set derived from the hierarchy config (`type_hierarchy.types`
+    // keys). Severity = error (so `jit validate` fails on it) with enforce =
+    // false (so it never blocks a write), matching legacy timing precisely.
+    //
+    // The hierarchy is always present (a repo with no `[type_hierarchy]` falls
+    // back to the default 4-level set via `get_type_hierarchy`), mirroring the
+    // legacy `HierarchyConfig::default()` fallback, so this rule is always
+    // emitted.
+    let mut hierarchy_types: Vec<String> = namespaces.get_type_hierarchy().into_keys().collect();
+    hierarchy_types.sort(); // deterministic schema enum order
+    rules.push(json_schema_rule(
+        "default:type-hierarchy-known",
+        Selector::default(),
+        Severity::Error,
+        false,
+        namespace_values_schema("type", &hierarchy_types),
+    ));
 
     // --- [namespaces] per-namespace constraints (legacy validate_labels) -------
     //
@@ -231,7 +271,64 @@ pub fn default_ruleset(validation: &ValidationConfig, namespaces: &LabelNamespac
         }
     }
 
+    // --- Type-hierarchy GRAPH warnings (legacy validate_type_hierarchy path) ---
+    //
+    // The orphan-leaf and strategic-consistency checks were warn-only, run by
+    // `jit validate` (via `check_warnings`), and gated by the `[validation]`
+    // toggles `warn_orphaned_leaves` / `warn_strategic_consistency` (both default
+    // true). They are now built-in GRAPH rules whose evaluation REUSES the
+    // existing `type_hierarchy::validate_orphans` / `validate_strategic_labels`
+    // domain functions (see `validation::graph::evaluate_type_hierarchy`). Each is
+    // severity Warn + enforce = false (legacy was never blocking) and is emitted
+    // only when its config toggle is enabled. The repo's `HierarchyConfig` is
+    // derived from the same namespace registry the rest of the defaults use, so a
+    // repo with no `[type_hierarchy]` falls back to the default 4-level set —
+    // exactly as the legacy `HierarchyConfig::default()` fallback did.
+    let hierarchy = hierarchy_config(namespaces);
+    if validation.warn_orphaned_leaves.unwrap_or(true) {
+        rules.push(graph_rule(
+            "default:orphan-leaf",
+            Severity::Warn,
+            Assertion::TypeHierarchy {
+                kind: TypeHierarchyKind::OrphanLeaf,
+                config: hierarchy.clone(),
+            },
+        ));
+    }
+    if validation.warn_strategic_consistency.unwrap_or(true) {
+        rules.push(graph_rule(
+            "default:strategic-consistency",
+            Severity::Warn,
+            Assertion::TypeHierarchy {
+                kind: TypeHierarchyKind::StrategicConsistency,
+                config: hierarchy,
+            },
+        ));
+    }
+
     RuleSet { rules }
+}
+
+/// Build the repo's [`HierarchyConfig`] from its label-namespace registry.
+///
+/// Mirrors the legacy `check_warnings` path EXACTLY: that path built the config
+/// from `config.toml`'s `[type_hierarchy]` when present (taking its `types` and
+/// `label_associations.unwrap_or_default()`), and otherwise fell back to the
+/// FULL [`HierarchyConfig::default`] (which includes the default membership
+/// associations). The discriminator is whether an explicit `type_hierarchy` was
+/// configured — carried through to [`LabelNamespaces::type_hierarchy`]. On the
+/// impossible case of a malformed hierarchy (empty type name / level 0), it falls
+/// back to the default rather than panicking, keeping this total.
+fn hierarchy_config(namespaces: &LabelNamespaces) -> HierarchyConfig {
+    match &namespaces.type_hierarchy {
+        // Explicit hierarchy: use its types + associations (legacy `Some` branch).
+        Some(types) => {
+            let label_associations = namespaces.label_associations.clone().unwrap_or_default();
+            HierarchyConfig::new(types.clone(), label_associations).unwrap_or_default()
+        }
+        // No explicit hierarchy: the legacy default (with default associations).
+        None => HierarchyConfig::default(),
+    }
 }
 
 /// Construct a local-scope rule with a shorthand or raw assertion already built.
@@ -249,6 +346,21 @@ fn local_rule(
         when,
         severity,
         enforce,
+        assert,
+        scope,
+    }
+}
+
+/// Construct a built-in graph-scope rule (warn-only, never blocking). Used for
+/// the type-hierarchy defaults, whose assertions are [`Scope::Graph`].
+fn graph_rule(name: &str, severity: Severity, assert: Assertion) -> Rule {
+    let scope = assert.scope();
+    debug_assert_eq!(scope, Scope::Graph, "graph default rules are graph-scope");
+    Rule {
+        name: name.to_string(),
+        when: Selector::default(),
+        severity,
+        enforce: false,
         assert,
         scope,
     }
@@ -400,11 +512,22 @@ mod tests {
     #[test]
     fn test_empty_config_still_emits_format_rule() {
         // Even with no config, the canonical label-format rule is always present
-        // (the legacy `validate_labels` checked format unconditionally). With no
-        // namespace registry, no registry rule is emitted.
+        // (the legacy `validate_labels` checked format unconditionally), as is the
+        // type-hierarchy-known rule (legacy `validate_type_hierarchy` ran
+        // unconditionally over the default hierarchy) and the two type-hierarchy
+        // graph warnings (toggles default-on). With no namespace registry, no
+        // registry rule is emitted.
         let rules = default_ruleset(&empty_validation(), &registry(vec![]));
         let names: Vec<&str> = rules.rules.iter().map(|r| r.name.as_str()).collect();
-        assert_eq!(names, vec!["default:label-format"]);
+        assert_eq!(
+            names,
+            vec![
+                "default:label-format",
+                "default:type-hierarchy-known",
+                "default:orphan-leaf",
+                "default:strategic-consistency",
+            ]
+        );
     }
 
     #[test]
@@ -469,17 +592,40 @@ mod tests {
     }
 
     #[test]
-    fn test_namespace_registry_flags_unknown_namespace() {
+    fn test_namespace_registry_warns_when_enforce_off() {
+        // With the registry configured but `enforce_namespace_registry` off, an
+        // unknown namespace surfaces as an error finding (fails `jit validate`)
+        // that does NOT block a write.
+        let reg = registry(vec![("type", LabelNamespace::new("Type", true))]);
+        let rules = default_ruleset(&empty_validation(), &reg);
+
+        let eval = evaluate_local(&issue_with(&["unknown:x"]), &rules).unwrap();
+        assert!(
+            !eval.is_blocking(),
+            "registry must not block when enforce off"
+        );
+        assert!(eval
+            .findings()
+            .iter()
+            .any(|f| f.severity == Severity::Error));
+
+        // Registered namespace -> clean.
+        let eval = evaluate_local(&issue_with(&["type:task"]), &rules).unwrap();
+        assert!(eval.findings().is_empty());
+    }
+
+    #[test]
+    fn test_namespace_registry_blocks_when_enforce_on() {
+        // `enforce_namespace_registry = true` -> the registry rule blocks a write
+        // for an unknown namespace.
         let mut validation = empty_validation();
         validation.enforce_namespace_registry = Some(true);
         let reg = registry(vec![("type", LabelNamespace::new("Type", true))]);
         let rules = default_ruleset(&validation, &reg);
 
-        // Unknown namespace -> a finding (warn by default, so non-blocking).
         let eval = evaluate_local(&issue_with(&["unknown:x"]), &rules).unwrap();
-        assert_eq!(eval.warnings().len(), 1);
+        assert!(eval.is_blocking());
 
-        // Registered namespace -> clean.
         let eval = evaluate_local(&issue_with(&["type:task"]), &rules).unwrap();
         assert!(eval.findings().is_empty());
     }
@@ -554,7 +700,7 @@ mod tests {
     }
 
     #[test]
-    fn test_all_rules_are_local_and_named_default() {
+    fn test_all_rules_are_named_default_and_unique() {
         let mut validation = empty_validation();
         validation.require_type_label = Some(true);
         validation.label_regex = Some("^x".to_string());
@@ -567,7 +713,13 @@ mod tests {
                 .with_values(vec!["task".to_string()]),
         )]);
         let rules = default_ruleset(&validation, &reg);
-        assert!(rules.rules.iter().all(|r| r.scope == Scope::Local));
+        // Local rules dominate; the only graph rules are the two type-hierarchy
+        // warnings (gated by their toggles, both default-on here).
+        assert!(rules
+            .rules
+            .iter()
+            .filter(|r| r.scope == Scope::Graph)
+            .all(|r| r.name == "default:orphan-leaf" || r.name == "default:strategic-consistency"));
         assert!(rules.rules.iter().all(|r| r.name.starts_with("default:")));
         // All generated rule names are unique.
         let mut names: Vec<&str> = rules.rules.iter().map(|r| r.name.as_str()).collect();

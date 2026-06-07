@@ -361,40 +361,22 @@ fn run() -> Result<()> {
                             println!("Created issue: {}", id);
                         }
 
-                        // Check for warnings unless --force or --quiet
+                        // Surface the built-in type-hierarchy warnings
+                        // (orphan-leaf / strategic-consistency) for the new issue
+                        // unless --force or --quiet. These are now GRAPH rule
+                        // findings (`default:orphan-leaf` /
+                        // `default:strategic-consistency`) produced by the rule
+                        // engine, not a hard-coded check. `--orphan` suppresses the
+                        // orphan-leaf hint (acknowledged intentional orphan).
                         if !force && !quiet {
-                            use jit::type_hierarchy::ValidationWarning;
-
-                            let warnings = executor.check_warnings(&id)?;
-
-                            // Filter orphan warnings if --orphan flag is set
-                            let warnings_to_display: Vec<_> = if orphan {
-                                warnings
-                                    .into_iter()
-                                    .filter(|w| {
-                                        !matches!(w, ValidationWarning::OrphanedLeaf { .. })
-                                    })
-                                    .collect()
-                            } else {
-                                warnings
-                            };
-
-                            // Display warnings
-                            for warning in warnings_to_display {
-                                match warning {
-                                    ValidationWarning::MissingStrategicLabel {
-                                        type_name,
-                                        expected_namespace,
-                                        ..
-                                    } => {
-                                        let _ = output_ctx.print_warning(format!("\n⚠ Strategic consistency issue\n  Issue {} (type:{}) should have a {}:* label for identification.\n  Suggested: jit issue update {} --label \"{}:value\"",
-                                            id, type_name, expected_namespace, id, expected_namespace));
-                                    }
-                                    ValidationWarning::OrphanedLeaf { type_name, .. } => {
-                                        let _ = output_ctx.print_warning(format!("\n⚠ Orphaned leaf issue\n  {} {} has no parent association (epic or milestone).\n  Consider adding: --label \"epic:value\" or --label \"milestone:value\"\n  Or use --orphan flag to acknowledge intentional orphan.",
-                                            type_name.to_uppercase(), id));
-                                    }
-                                }
+                            let issues = storage.list_issues()?;
+                            let graph_findings = executor.evaluate_graph_rules(&issues)?;
+                            for gf in graph_findings.iter().filter(|gf| {
+                                gf.issue_id.as_deref() == Some(id.as_str())
+                                    && !(orphan && gf.finding.rule == "default:orphan-leaf")
+                            }) {
+                                let _ =
+                                    output_ctx.print_warning(format!("\n⚠ {}", gf.finding.message));
                             }
                         }
                     }
@@ -3807,46 +3789,38 @@ fn run() -> Result<()> {
                 // AFTER rendering, below.
                 let integrity_error = executor.validate_integrity_silent().err();
                 let integrity_message = integrity_error.as_ref().map(|e| e.to_string());
-                let warnings = executor.collect_all_warnings()?;
 
                 // Run the declarative rules for every issue AND the cross-issue
                 // graph rules so a whole-repo `jit validate [--json]` surfaces (and
                 // fails on) local AND graph rule findings, not just integrity
-                // checks. `run_rules(None)` already folds in graph-rule findings.
+                // checks. `run_rules(None)` already folds in graph-rule findings,
+                // INCLUDING the built-in type-hierarchy warnings (orphan-leaf,
+                // strategic-consistency) that were formerly surfaced by the
+                // hard-coded `collect_all_warnings` path.
                 let rule_report = executor.run_rules(None)?;
                 let rules_failed = rule_report.has_errors();
                 let validation_failed = rules_failed || integrity_error.is_some();
 
+                // Warn-severity findings are reported separately as "warnings" for
+                // output-shape stability (the prior orphan/strategic warning list).
+                let warning_findings: Vec<&jit::validation::report::ReportedFinding> = rule_report
+                    .findings
+                    .iter()
+                    .filter(|f| !f.is_error())
+                    .collect();
+
                 if json {
                     use jit::output::JsonOutput;
-                    use jit::type_hierarchy::ValidationWarning;
                     use serde_json::json;
 
-                    let warnings_json: Vec<_> = warnings
+                    let warnings_json: Vec<_> = warning_findings
                         .iter()
-                        .flat_map(|(issue_id, issue_warnings)| {
-                            issue_warnings.iter().map(move |w| match w {
-                                ValidationWarning::MissingStrategicLabel {
-                                    type_name,
-                                    expected_namespace,
-                                    ..
-                                } => {
-                                    json!({
-                                        "type": "missing_strategic_label",
-                                        "issue_id": issue_id,
-                                        "issue_type": type_name,
-                                        "expected_namespace": expected_namespace,
-                                        "suggestion": format!("Add label: {}:*", expected_namespace)
-                                    })
-                                }
-                                ValidationWarning::OrphanedLeaf { type_name, .. } => {
-                                    json!({
-                                        "type": "orphaned_leaf",
-                                        "issue_id": issue_id,
-                                        "issue_type": type_name,
-                                        "suggestion": "Add label: epic:* or milestone:*"
-                                    })
-                                }
+                        .map(|f| {
+                            json!({
+                                "type": "rule_warning",
+                                "issue_id": f.issue_id,
+                                "rule": f.rule,
+                                "message": f.message,
                             })
                         })
                         .collect();
@@ -3899,6 +3873,8 @@ fn run() -> Result<()> {
                         println!("✓ Repository validation passed");
                     }
 
+                    // Every finding (errors AND warnings — including the built-in
+                    // type-hierarchy warnings) is rendered through the rule report.
                     for finding in &rule_report.findings {
                         println!(
                             "{} [{}] {}",
@@ -3908,44 +3884,8 @@ fn run() -> Result<()> {
                         );
                     }
 
-                    if !warnings.is_empty() {
-                        use jit::type_hierarchy::ValidationWarning;
-
-                        println!(
-                            "\nWarnings: {}",
-                            warnings.iter().map(|(_, w)| w.len()).sum::<usize>()
-                        );
-                        println!();
-
-                        for (issue_id, issue_warnings) in warnings {
-                            for warning in issue_warnings {
-                                match warning {
-                                    ValidationWarning::MissingStrategicLabel {
-                                        type_name,
-                                        expected_namespace,
-                                        ..
-                                    } => {
-                                        println!(
-                                            "⚠ Issue {} (type:{}): Missing {}:* label",
-                                            issue_id, type_name, expected_namespace
-                                        );
-                                        println!(
-                                            "  Suggested: jit issue update {} --label \"{}:value\"",
-                                            issue_id, expected_namespace
-                                        );
-                                    }
-                                    ValidationWarning::OrphanedLeaf { type_name, .. } => {
-                                        println!(
-                                            "⚠ Issue {} (type:{}): Orphaned leaf issue",
-                                            issue_id, type_name
-                                        );
-                                        println!("  Suggested: jit issue update {} --label \"epic:value\"", 
-                                                issue_id);
-                                    }
-                                }
-                                println!();
-                            }
-                        }
+                    if !warning_findings.is_empty() {
+                        println!("\nWarnings: {}", warning_findings.len());
                     }
                 }
 
