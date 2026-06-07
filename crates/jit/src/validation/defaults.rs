@@ -113,6 +113,7 @@ const CANONICAL_LABEL_REGEX: &str = r"^[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9._-]
 /// let validation = ValidationConfig {
 ///     strictness: None,
 ///     default_type: None,
+///     content_format: None,
 ///     require_type_label: None,
 ///     label_regex: None,
 ///     reject_malformed_labels: None,
@@ -546,6 +547,7 @@ mod tests {
         ValidationConfig {
             strictness: None,
             default_type: None,
+            content_format: None,
             require_type_label: None,
             label_regex: None,
             reject_malformed_labels: None,
@@ -602,14 +604,24 @@ mod tests {
         // malformed label blocks the write even when reject_malformed_labels is
         // unset, reproducing the legacy inline `validate_label` hard-reject.
         let rules = default_ruleset(&empty_validation(), &registry(vec![]));
-        let eval = evaluate_local(&issue_with(&["INVALID:label"]), &rules).unwrap();
+        let eval = evaluate_local(
+            &issue_with(&["INVALID:label"]),
+            &rules,
+            crate::domain::ContentFormat::Markdown,
+        )
+        .unwrap();
         assert!(eval.is_blocking(), "malformed label must block (canonical)");
         assert!(eval
             .findings()
             .iter()
             .any(|f| f.severity == Severity::Error));
 
-        let ok = evaluate_local(&issue_with(&["type:task"]), &rules).unwrap();
+        let ok = evaluate_local(
+            &issue_with(&["type:task"]),
+            &rules,
+            crate::domain::ContentFormat::Markdown,
+        )
+        .unwrap();
         assert!(ok.findings().is_empty());
     }
 
@@ -620,11 +632,21 @@ mod tests {
         let rules = default_ruleset(&validation, &registry(vec![]));
 
         // Missing type label -> blocks (enforce=true).
-        let eval = evaluate_local(&issue_with(&["epic:auth"]), &rules).unwrap();
+        let eval = evaluate_local(
+            &issue_with(&["epic:auth"]),
+            &rules,
+            crate::domain::ContentFormat::Markdown,
+        )
+        .unwrap();
         assert!(eval.is_blocking());
 
         // Present -> passes.
-        let eval = evaluate_local(&issue_with(&["type:task"]), &rules).unwrap();
+        let eval = evaluate_local(
+            &issue_with(&["type:task"]),
+            &rules,
+            crate::domain::ContentFormat::Markdown,
+        )
+        .unwrap();
         assert!(!eval.is_blocking());
         assert!(eval.findings().is_empty());
     }
@@ -657,7 +679,12 @@ mod tests {
             .any(|r| r.name == "default:label-format-custom"));
 
         // `type:task` is canonical-valid but violates the custom `^team:[a-z]+$`.
-        let warn = evaluate_local(&issue_with(&["type:task"]), &rules).unwrap();
+        let warn = evaluate_local(
+            &issue_with(&["type:task"]),
+            &rules,
+            crate::domain::ContentFormat::Markdown,
+        )
+        .unwrap();
         assert!(
             !warn.is_blocking(),
             "custom regex must only warn when reject_malformed off"
@@ -676,14 +703,24 @@ mod tests {
         // With reject_malformed_labels on, the custom regex blocks the write.
         validation.reject_malformed_labels = Some(true);
         let rules = default_ruleset(&validation, &registry(vec![]));
-        let block = evaluate_local(&issue_with(&["type:task"]), &rules).unwrap();
+        let block = evaluate_local(
+            &issue_with(&["type:task"]),
+            &rules,
+            crate::domain::ContentFormat::Markdown,
+        )
+        .unwrap();
         assert!(
             block.is_blocking(),
             "custom regex must block when reject on"
         );
 
         // A label satisfying the custom regex passes.
-        let ok = evaluate_local(&issue_with(&["team:platform"]), &rules).unwrap();
+        let ok = evaluate_local(
+            &issue_with(&["team:platform"]),
+            &rules,
+            crate::domain::ContentFormat::Markdown,
+        )
+        .unwrap();
         assert!(!ok.is_blocking());
     }
 
@@ -695,7 +732,12 @@ mod tests {
         let reg = registry(vec![("type", LabelNamespace::new("Type", true))]);
         let rules = default_ruleset(&empty_validation(), &reg);
 
-        let eval = evaluate_local(&issue_with(&["unknown:x"]), &rules).unwrap();
+        let eval = evaluate_local(
+            &issue_with(&["unknown:x"]),
+            &rules,
+            crate::domain::ContentFormat::Markdown,
+        )
+        .unwrap();
         assert!(
             !eval.is_blocking(),
             "registry must not block when enforce off"
@@ -706,7 +748,12 @@ mod tests {
             .any(|f| f.severity == Severity::Error));
 
         // Registered namespace -> clean.
-        let eval = evaluate_local(&issue_with(&["type:task"]), &rules).unwrap();
+        let eval = evaluate_local(
+            &issue_with(&["type:task"]),
+            &rules,
+            crate::domain::ContentFormat::Markdown,
+        )
+        .unwrap();
         assert!(eval.findings().is_empty());
     }
 
@@ -723,7 +770,12 @@ mod tests {
         one_flag.enforce_namespace_registry = Some(true);
         one_flag.reject_malformed_labels = Some(false);
         let rules = default_ruleset(&one_flag, &reg);
-        let eval = evaluate_local(&issue_with(&["unknown:x"]), &rules).unwrap();
+        let eval = evaluate_local(
+            &issue_with(&["unknown:x"]),
+            &rules,
+            crate::domain::ContentFormat::Markdown,
+        )
+        .unwrap();
         assert!(
             !eval.is_blocking(),
             "registry must not block a write without reject_malformed_labels"
@@ -734,10 +786,20 @@ mod tests {
         both.enforce_namespace_registry = Some(true);
         both.reject_malformed_labels = Some(true);
         let rules = default_ruleset(&both, &reg);
-        let eval = evaluate_local(&issue_with(&["unknown:x"]), &rules).unwrap();
+        let eval = evaluate_local(
+            &issue_with(&["unknown:x"]),
+            &rules,
+            crate::domain::ContentFormat::Markdown,
+        )
+        .unwrap();
         assert!(eval.is_blocking());
 
-        let eval = evaluate_local(&issue_with(&["type:task"]), &rules).unwrap();
+        let eval = evaluate_local(
+            &issue_with(&["type:task"]),
+            &rules,
+            crate::domain::ContentFormat::Markdown,
+        )
+        .unwrap();
         assert!(eval.findings().is_empty());
     }
 
@@ -751,7 +813,12 @@ mod tests {
         let rules = default_ruleset(&empty_validation(), &reg);
 
         // Value outside the enum -> an error finding that does NOT block writes.
-        let eval = evaluate_local(&issue_with(&["type:taks"]), &rules).unwrap();
+        let eval = evaluate_local(
+            &issue_with(&["type:taks"]),
+            &rules,
+            crate::domain::ContentFormat::Markdown,
+        )
+        .unwrap();
         assert!(!eval.is_blocking(), "enum violation must not block writes");
         assert!(eval
             .findings()
@@ -759,7 +826,12 @@ mod tests {
             .any(|f| f.severity == Severity::Error));
 
         // Value inside the enum -> clean.
-        let eval = evaluate_local(&issue_with(&["type:task"]), &rules).unwrap();
+        let eval = evaluate_local(
+            &issue_with(&["type:task"]),
+            &rules,
+            crate::domain::ContentFormat::Markdown,
+        )
+        .unwrap();
         assert!(eval.findings().is_empty());
     }
 
@@ -771,11 +843,21 @@ mod tests {
         )]);
         let rules = default_ruleset(&empty_validation(), &reg);
 
-        let bad = evaluate_local(&issue_with(&["milestone:1.2"]), &rules).unwrap();
+        let bad = evaluate_local(
+            &issue_with(&["milestone:1.2"]),
+            &rules,
+            crate::domain::ContentFormat::Markdown,
+        )
+        .unwrap();
         assert!(!bad.is_blocking());
         assert!(bad.findings().iter().any(|f| f.severity == Severity::Error));
 
-        let good = evaluate_local(&issue_with(&["milestone:v1.0"]), &rules).unwrap();
+        let good = evaluate_local(
+            &issue_with(&["milestone:v1.0"]),
+            &rules,
+            crate::domain::ContentFormat::Markdown,
+        )
+        .unwrap();
         assert!(good.findings().is_empty());
     }
 
@@ -787,14 +869,24 @@ mod tests {
         )]);
         let rules = default_ruleset(&empty_validation(), &reg);
 
-        let missing = evaluate_local(&issue_with(&["component:core"]), &rules).unwrap();
+        let missing = evaluate_local(
+            &issue_with(&["component:core"]),
+            &rules,
+            crate::domain::ContentFormat::Markdown,
+        )
+        .unwrap();
         assert!(!missing.is_blocking());
         assert!(missing
             .findings()
             .iter()
             .any(|f| f.severity == Severity::Error));
 
-        let present = evaluate_local(&issue_with(&["type:task"]), &rules).unwrap();
+        let present = evaluate_local(
+            &issue_with(&["type:task"]),
+            &rules,
+            crate::domain::ContentFormat::Markdown,
+        )
+        .unwrap();
         assert!(present.findings().is_empty());
     }
 
@@ -805,11 +897,21 @@ mod tests {
         let reg = registry(vec![("priority", LabelNamespace::new("Priority", true))]);
         let rules = default_ruleset(&empty_validation(), &reg);
 
-        let dup = evaluate_local(&issue_with(&["priority:high", "priority:low"]), &rules).unwrap();
+        let dup = evaluate_local(
+            &issue_with(&["priority:high", "priority:low"]),
+            &rules,
+            crate::domain::ContentFormat::Markdown,
+        )
+        .unwrap();
         assert!(dup.is_blocking(), "duplicate unique label must block");
         assert!(dup.findings().iter().any(|f| f.severity == Severity::Error));
 
-        let single = evaluate_local(&issue_with(&["priority:high"]), &rules).unwrap();
+        let single = evaluate_local(
+            &issue_with(&["priority:high"]),
+            &rules,
+            crate::domain::ContentFormat::Markdown,
+        )
+        .unwrap();
         assert!(single.findings().is_empty());
     }
 

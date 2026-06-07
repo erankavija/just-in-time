@@ -62,6 +62,7 @@ fn test_create_enforce_rule_blocks_without_force() {
         Priority::Normal,
         vec![],
         vec!["type:epic".to_string()],
+        None,
         false,
     );
     assert!(result.is_err(), "enforce rule must block the create");
@@ -86,6 +87,7 @@ fn test_create_satisfying_issue_passes() {
         Priority::Normal,
         vec![],
         vec!["type:epic".to_string(), "req:REQ-01".to_string()],
+        None,
         false,
     );
     assert!(result.is_ok(), "a satisfying epic must be created");
@@ -104,6 +106,7 @@ fn test_create_force_bypasses_and_logs_event() {
             Priority::Normal,
             vec![],
             vec!["type:epic".to_string()],
+            None,
             true, // --force
         )
         .expect("force must allow the create");
@@ -142,6 +145,7 @@ assert = { require-label = { label = "req:*", min = 1 } }
             Priority::Normal,
             vec![],
             vec!["type:epic".to_string()],
+            None,
             false,
         )
         .expect("a warn rule must not block");
@@ -185,6 +189,7 @@ assert = { json-schema = "schemas/needs-sections.json" }
         Priority::Normal,
         vec![],
         vec!["type:epic".to_string()],
+        None,
         false,
     );
     assert!(
@@ -212,6 +217,7 @@ assert = { label-coverage = { source = "req", child-state = "done" } }
         Priority::Normal,
         vec![],
         vec!["type:epic".to_string()],
+        None,
         false,
     );
     assert!(result.is_ok(), "graph rules must not block writes");
@@ -237,6 +243,7 @@ fn test_update_enforce_rule_blocks_and_force_logs() {
         None,
         vec![],
         vec!["req:REQ-01".to_string()],
+        None,
         false,
     );
     assert!(blocked.is_err(), "update must be blocked by enforce rule");
@@ -258,6 +265,7 @@ fn test_update_enforce_rule_blocks_and_force_logs() {
             None,
             vec![],
             vec!["req:REQ-01".to_string()],
+            None,
             true,
         )
         .expect("force must allow the update");
@@ -314,7 +322,7 @@ assert = { require-label = { label = "owner:*", min = 1 } }
     // no label edits. force = true makes the still-violated enforce rules a
     // bypass rather than a rejection.
     executor
-        .update_issue(&id, None, None, None, None, vec![], vec![], true)
+        .update_issue(&id, None, None, None, None, vec![], vec![], None, true)
         .expect("a forced no-op update must not be rejected by enforce rules");
 
     // Exactly one bypass event per violated enforce rule.
@@ -447,6 +455,7 @@ assert = { require-label = { label = "req:*", min = 1 } }
         Some(State::Done),
         vec![],
         vec![],
+        None,
         true, // --force
     );
 
@@ -551,6 +560,7 @@ fn test_create_evaluates_rules_against_post_autopromote_shape() {
         Priority::Normal,
         vec![],
         vec!["type:task".to_string()], // no req: label
+        None,
         false,
     );
     assert!(
@@ -568,6 +578,7 @@ fn test_create_evaluates_rules_against_post_autopromote_shape() {
             Priority::Normal,
             vec![],
             vec!["type:task".to_string(), "req:REQ-1".to_string()],
+            None,
             false,
         )
         .expect("satisfying issue must be created");
@@ -598,6 +609,7 @@ fn test_update_evaluates_rules_against_post_transition_shape() {
         Some(State::Ready), // transition into the selected state
         vec![],
         vec![],
+        None,
         false,
     );
     assert!(
@@ -622,6 +634,7 @@ fn test_update_evaluates_rules_against_post_transition_shape() {
             Some(State::Ready),
             vec!["req:REQ-1".to_string()],
             vec![],
+            None,
             false,
         )
         .expect("satisfying the rule unblocks the transition");
@@ -646,6 +659,7 @@ fn test_force_bypass_event_emitted_after_successful_create_save() {
             Priority::Normal,
             vec![],
             vec!["type:epic".to_string()],
+            None,
             true, // --force
         )
         .expect("force must allow the create");
@@ -690,6 +704,7 @@ fn test_no_bypass_event_when_save_fails() {
         Priority::Normal,
         vec![],
         vec!["type:epic".to_string()],
+        None,
         true, // --force: would bypass, but the save will fail
     );
     assert!(result.is_err(), "the failing save must surface an error");
@@ -719,6 +734,7 @@ fn test_ordinary_rejection_is_not_logged() {
         Priority::Normal,
         vec![],
         vec!["type:epic".to_string()],
+        None,
         false,
     );
     let after = executor.storage().read_events().unwrap().len();

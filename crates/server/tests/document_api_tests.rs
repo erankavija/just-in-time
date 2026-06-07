@@ -37,6 +37,7 @@ async fn create_test_server_with_issue() -> (TestServer, String) {
             Priority::High,
             vec![],
             vec![],
+            None,
             false,
         )
         .expect("Failed to create issue");
@@ -89,6 +90,7 @@ async fn test_get_document_content_not_yet_implemented() {
             Priority::High,
             vec![],
             vec![],
+            None,
             false,
         )
         .expect("Failed to create issue");

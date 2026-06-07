@@ -52,6 +52,7 @@ fn test_issue_lifecycle_works_without_coordinator() {
             Priority::Normal,
             vec![],
             vec![],
+            None,
             false,
         )
         .unwrap();
@@ -67,6 +68,7 @@ fn test_issue_lifecycle_works_without_coordinator() {
             None,
             vec![],
             vec![],
+            None,
             false,
         )
         .unwrap();
@@ -136,6 +138,7 @@ fn test_gates_work_without_coordinator() {
         Some(jit::domain::State::Done),
         vec![],
         vec![],
+        None,
         false,
     );
     assert!(result.is_err());

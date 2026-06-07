@@ -4,6 +4,7 @@ use super::*;
 use crate::errors::{TransitionBlockedError, TransitionBlocker};
 
 impl<S: IssueStore> CommandExecutor<S> {
+    #[allow(clippy::too_many_arguments)]
     pub fn create_issue(
         &self,
         title: String,
@@ -11,6 +12,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         priority: Priority,
         gates: Vec<String>,
         mut labels: Vec<String>,
+        content_format: Option<crate::domain::ContentFormat>,
         force: bool,
     ) -> Result<(String, Vec<String>)> {
         // Config comes from the executor cache so it is not re-parsed per call.
@@ -44,6 +46,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue.priority = priority;
         issue.gates_required = gates;
         issue.labels = labels;
+        issue.content_format = content_format;
 
         // Auto-transition to Ready if no dependencies (gates don't block Ready)
         // BEFORE validating, so rules keyed on the final state (e.g.
@@ -166,6 +169,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         state: Option<State>,
         add_labels: Vec<String>,
         remove_labels: Vec<String>,
+        content_format: Option<crate::domain::ContentFormat>,
         force: bool,
     ) -> Result<Vec<String>> {
         let full_id = self.storage.resolve_issue_id(id)?;
@@ -187,6 +191,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let original_description = issue.description.clone();
         let original_priority = issue.priority;
         let original_labels = issue.labels.clone();
+        let original_content_format = issue.content_format;
 
         if let Some(t) = title {
             issue.title = t;
@@ -196,6 +201,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
         if let Some(p) = priority {
             issue.priority = p;
+        }
+        if let Some(cf) = content_format {
+            issue.content_format = Some(cf);
         }
 
         // Handle label operations. Label format / uniqueness / registry are
@@ -216,7 +224,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         let has_field_edits = issue.title != original_title
             || issue.description != original_description
             || issue.priority != original_priority
-            || issue.labels != original_labels;
+            || issue.labels != original_labels
+            || issue.content_format != original_content_format;
 
         let old_state = issue.state;
 
@@ -1068,6 +1077,7 @@ enforce_leases = "off"
                 Some(State::Done),
                 vec![],
                 vec![],
+                None,
                 false
             )
             .is_err());
@@ -1086,6 +1096,7 @@ enforce_leases = "off"
                 Some(State::Done),
                 vec![],
                 vec![],
+                None,
                 false
             )
             .is_err());
@@ -1125,6 +1136,7 @@ enforce_leases = "off"
                 Some(State::Done),
                 vec![],
                 vec![],
+                None,
                 false
             )
             .is_err());
@@ -1139,6 +1151,7 @@ enforce_leases = "off"
             Some(State::Done),
             vec![],
             vec![],
+            None,
             false,
         );
         assert!(result.is_err(), "gates should still block done");
@@ -1179,6 +1192,7 @@ enforce_leases = "off"
                 Some(State::Done),
                 vec![],
                 vec![],
+                None,
                 false
             )
             .is_err());
@@ -1196,6 +1210,7 @@ enforce_leases = "off"
                 Some(State::Done),
                 vec![],
                 vec![],
+                None,
                 false,
             )
             .is_err());
@@ -1266,7 +1281,17 @@ enforce_leases = "off"
 
         // No fields and no state change: pure no-op.
         executor
-            .update_issue(&issue_id, None, None, None, None, vec![], vec![], false)
+            .update_issue(
+                &issue_id,
+                None,
+                None,
+                None,
+                None,
+                vec![],
+                vec![],
+                None,
+                false,
+            )
             .unwrap();
         let after = executor.storage.load_issue(&issue_id).unwrap();
         assert_eq!(
@@ -1306,7 +1331,8 @@ enforce_leases = "off"
             Some(State::Ready), // state
             vec![],             // add_labels
             vec![],             // remove_labels
-            false,              // force
+            None,
+            false, // force
         );
 
         assert!(

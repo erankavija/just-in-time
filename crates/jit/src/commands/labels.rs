@@ -33,7 +33,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         // defaults + user rules). This path never blocks, so enforce findings are
         // reported as warnings too.
         let rules = self.effective_rules()?;
-        let evaluation = crate::validation::evaluate_local(&issue, rules)
+        let repo_format = self.repo_content_format()?;
+        let evaluation = crate::validation::evaluate_local(&issue, rules, repo_format)
             .map_err(|err| anyhow!("rule evaluation failed: {err}"))?;
         let warnings: Vec<String> = evaluation
             .findings()

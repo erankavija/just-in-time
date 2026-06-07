@@ -63,6 +63,7 @@ fn test_harness_issue_lifecycle() {
             Some(State::Ready),
             vec![],
             vec![],
+            None,
             false,
         )
         .unwrap();
@@ -116,6 +117,7 @@ fn test_harness_dependencies_block() {
             Some(State::Done),
             vec![],
             vec![],
+            None,
             false,
         )
         .unwrap();
@@ -211,6 +213,7 @@ fn test_harness_complex_workflow() {
             Some(State::Done),
             vec![],
             vec![],
+            None,
             false,
         )
         .unwrap();
@@ -224,6 +227,7 @@ fn test_harness_complex_workflow() {
             Some(State::Done),
             vec![],
             vec![],
+            None,
             false,
         )
         .unwrap();

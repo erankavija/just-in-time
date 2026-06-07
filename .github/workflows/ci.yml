@@ -79,6 +79,51 @@ jobs:
           cd crates/jit
           cargo test --test '*' --verbose
 
+  # The html/xml content parsers and their production-dispatch tests are behind
+  # optional cargo features that the default `cargo test` build never compiles.
+  # The cross-format equality test is `#![cfg(all(feature="html",feature="xml"))]`
+  # and the per-issue content_format dispatch tests are `#[cfg(feature = ...)]`,
+  # so without this job those production HTML/XML paths would NEVER run in CI.
+  test-rust-features:
+    name: Test Rust (html + xml features)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Free Disk Space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          df -h
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Install ripgrep (for search tests)
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
+
+      - name: Configure git default branch
+        run: git config --global init.defaultBranch main
+
+      - name: Run tests with html + xml features
+        run: cargo test -p jit --features html,xml --verbose
+
   coverage:
     name: Coverage Badges
     runs-on: ubuntu-latest

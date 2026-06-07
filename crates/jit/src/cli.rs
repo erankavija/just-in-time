@@ -273,6 +273,13 @@ pub enum IssueCommands {
         #[arg(short, long, value_delimiter = ',')]
         label: Vec<String>,
 
+        /// Content format of the description body, selecting the parser used to
+        /// extract sections during validation (markdown, html, or xml). When
+        /// omitted the repo default ([validation].content_format) applies, with a
+        /// Markdown fallback. html/xml require the matching cargo feature.
+        #[arg(long, value_name = "FORMAT")]
+        content_format: Option<String>,
+
         /// Bypass validation warnings
         #[arg(long)]
         force: bool,
@@ -367,6 +374,12 @@ pub enum IssueCommands {
         /// Clear assignee
         #[arg(long)]
         unassign: bool,
+
+        /// Set the content format of the description body (markdown, html, or
+        /// xml), selecting the parser used to extract sections during validation.
+        /// html/xml require the matching cargo feature.
+        #[arg(long, value_name = "FORMAT")]
+        content_format: Option<String>,
 
         /// Bypass blocking (`enforce`) validation rules; the bypass is logged
         #[arg(long)]

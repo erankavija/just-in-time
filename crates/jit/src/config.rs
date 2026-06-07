@@ -69,6 +69,12 @@ pub struct ValidationConfig {
     pub strictness: Option<String>,
     /// Default type when none specified (optional).
     pub default_type: Option<String>,
+    /// Repo-level default content format for issue bodies ("markdown", "html",
+    /// "xml"). Selects the [`ContentParser`](crate::document::ContentParser) used
+    /// to extract `sections` for issues that carry no per-issue `content_format`.
+    /// Absent means "markdown". A BEHAVIORAL key (like `default_type`) that
+    /// survives the later backward-compat removal.
+    pub content_format: Option<String>,
     /// Require exactly one type:* label per issue (default: false).
     pub require_type_label: Option<bool>,
     /// Label format regex (optional).
@@ -81,6 +87,23 @@ pub struct ValidationConfig {
     pub warn_orphaned_leaves: Option<bool>,
     /// Warn on strategic issues without matching labels (default: true).
     pub warn_strategic_consistency: Option<bool>,
+}
+
+impl ValidationConfig {
+    /// Resolve the repo-level default content format, defaulting to
+    /// [`ContentFormat::Markdown`](crate::domain::ContentFormat::Markdown) when
+    /// unset. An invalid value is surfaced as an error rather than silently
+    /// defaulting, so a misconfigured `config.toml` cannot quietly pick the wrong
+    /// parser.
+    pub fn content_format(&self) -> Result<crate::domain::ContentFormat> {
+        use std::str::FromStr;
+        match self.content_format.as_deref() {
+            None => Ok(crate::domain::ContentFormat::Markdown),
+            Some(value) => crate::domain::ContentFormat::from_str(value).with_context(|| {
+                format!("invalid [validation].content_format in .jit/config.toml: '{value}'")
+            }),
+        }
+    }
 }
 
 /// Documentation lifecycle management configuration.

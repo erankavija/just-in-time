@@ -31,6 +31,7 @@ fn create_labeled(exec: &CommandExecutor<JsonFileStorage>, title: &str, labels: 
             Priority::Normal,
             vec![],
             labels.iter().map(|s| s.to_string()).collect(),
+            None,
             false,
         )
         .unwrap();
@@ -169,6 +170,7 @@ pattern = "["
             Priority::Normal,
             vec![],
             vec!["broken:foo".to_string()],
+            None,
             false,
         )
         .unwrap_or_else(|err| {

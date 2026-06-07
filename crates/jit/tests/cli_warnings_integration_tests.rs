@@ -42,6 +42,7 @@ fn test_create_epic_without_label_shows_warning() {
             jit::domain::Priority::Normal,
             vec![],
             vec!["type:epic".to_string()],
+            None,
             false,
         )
         .unwrap();
@@ -65,6 +66,7 @@ fn test_create_task_without_parent_shows_warning() {
             jit::domain::Priority::Normal,
             vec![],
             vec!["type:task".to_string()],
+            None,
             false,
         )
         .unwrap();
@@ -88,6 +90,7 @@ fn test_create_epic_with_label_no_warning() {
             jit::domain::Priority::Normal,
             vec![],
             vec!["type:epic".to_string(), "epic:auth".to_string()],
+            None,
             false,
         )
         .unwrap();
@@ -108,6 +111,7 @@ fn test_create_task_with_parent_no_warning() {
             jit::domain::Priority::Normal,
             vec![],
             vec!["type:task".to_string(), "epic:auth".to_string()],
+            None,
             false,
         )
         .unwrap();

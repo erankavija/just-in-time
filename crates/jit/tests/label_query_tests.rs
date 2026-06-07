@@ -18,6 +18,7 @@ fn test_query_by_label_exact_match() {
             Priority::High,
             vec![],
             vec!["milestone:v1.0".to_string()],
+            None,
             false,
         )
         .unwrap();
@@ -29,6 +30,7 @@ fn test_query_by_label_exact_match() {
             Priority::Normal,
             vec![],
             vec!["epic:auth".to_string(), "milestone:v1.0".to_string()],
+            None,
             false,
         )
         .unwrap();
@@ -40,6 +42,7 @@ fn test_query_by_label_exact_match() {
             Priority::Normal,
             vec![],
             vec!["milestone:v2.0".to_string()],
+            None,
             false,
         )
         .unwrap();
@@ -67,6 +70,7 @@ fn test_query_by_label_wildcard_namespace() {
             Priority::Normal,
             vec![],
             vec!["milestone:v1.0".to_string()],
+            None,
             false,
         )
         .unwrap();
@@ -78,6 +82,7 @@ fn test_query_by_label_wildcard_namespace() {
             Priority::Normal,
             vec![],
             vec!["milestone:v2.0".to_string()],
+            None,
             false,
         )
         .unwrap();
@@ -89,6 +94,7 @@ fn test_query_by_label_wildcard_namespace() {
             Priority::Normal,
             vec![],
             vec!["epic:auth".to_string()],
+            None,
             false,
         )
         .unwrap();
@@ -116,6 +122,7 @@ fn test_query_by_label_no_matches() {
             Priority::Normal,
             vec![],
             vec!["milestone:v1.0".to_string()],
+            None,
             false,
         )
         .unwrap();
@@ -152,6 +159,7 @@ fn test_query_by_label_wildcard_matches_all_in_namespace() {
             Priority::Normal,
             vec![],
             vec!["type:task".to_string()],
+            None,
             false,
         )
         .unwrap();
@@ -163,6 +171,7 @@ fn test_query_by_label_wildcard_matches_all_in_namespace() {
             Priority::Normal,
             vec![],
             vec!["type:bug".to_string()],
+            None,
             false,
         )
         .unwrap();
@@ -174,6 +183,7 @@ fn test_query_by_label_wildcard_matches_all_in_namespace() {
             Priority::Normal,
             vec![],
             vec!["type:epic".to_string(), "component:auth".to_string()],
+            None,
             false,
         )
         .unwrap();
@@ -202,6 +212,7 @@ fn test_query_by_label_case_sensitive() {
             Priority::Normal,
             vec![],
             vec!["component:AuthService".to_string()],
+            None,
             false,
         )
         .unwrap();
@@ -248,6 +259,7 @@ fn test_query_by_label_multiple_labels_per_issue() {
                 "epic:auth".to_string(),
                 "component:backend".to_string(),
             ],
+            None,
             false,
         )
         .unwrap();

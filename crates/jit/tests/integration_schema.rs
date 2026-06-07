@@ -76,6 +76,36 @@ fn test_schema_issue_create_details() {
     assert!(flags.iter().any(|f| f["name"] == "json"));
 }
 
+/// The `--content-format` flag must surface in the auto-generated `--schema`
+/// for BOTH `issue create` and `issue update` so the MCP server (which derives
+/// its tools from this schema, DR §9.3) exposes the new authorable surface.
+#[test]
+fn test_schema_issue_create_and_update_expose_content_format() {
+    let output = cmd!().arg("--schema").output().unwrap();
+    let json_str = String::from_utf8(output.stdout).unwrap();
+    let parsed: Value = serde_json::from_str(&json_str).unwrap();
+
+    let create_flags = parsed["commands"]["issue"]["subcommands"]["create"]["flags"]
+        .as_array()
+        .unwrap();
+    assert!(
+        create_flags
+            .iter()
+            .any(|f| f["name"] == "content-format" || f["name"] == "content_format"),
+        "issue create must expose a content-format flag in --schema, got: {create_flags:?}"
+    );
+
+    let update_flags = parsed["commands"]["issue"]["subcommands"]["update"]["flags"]
+        .as_array()
+        .unwrap();
+    assert!(
+        update_flags
+            .iter()
+            .any(|f| f["name"] == "content-format" || f["name"] == "content_format"),
+        "issue update must expose a content-format flag in --schema, got: {update_flags:?}"
+    );
+}
+
 #[test]
 fn test_schema_includes_exit_codes() {
     let output = cmd!().arg("--schema").output().unwrap();

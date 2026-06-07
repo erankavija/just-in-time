@@ -37,6 +37,7 @@ impl TestHarness {
                 Priority::Normal,
                 vec![],
                 vec![],
+                None,
                 false,
             )
             .unwrap();
@@ -54,6 +55,7 @@ impl TestHarness {
                 Priority::Normal,
                 vec![],
                 vec![],
+                None,
                 false,
             )
             .unwrap();
@@ -71,6 +73,7 @@ impl TestHarness {
                 priority,
                 vec![],
                 vec![],
+                None,
                 false,
             )
             .unwrap();
@@ -91,6 +94,7 @@ impl TestHarness {
                 Some(State::Ready),
                 vec![],
                 vec![],
+                None,
                 false,
             )
             .unwrap();
@@ -108,6 +112,7 @@ impl TestHarness {
                 Priority::Normal,
                 gates,
                 vec![],
+                None,
                 false,
             )
             .unwrap();

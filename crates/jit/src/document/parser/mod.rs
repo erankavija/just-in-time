@@ -191,6 +191,88 @@ pub trait ContentParser {
     fn parse(&self, content: &str) -> ParsedContent;
 }
 
+/// Error returned when a requested [`ContentFormat`](crate::domain::ContentFormat)
+/// cannot be served because its parser was not compiled in (the `html`/`xml`
+/// cargo features).
+///
+/// The selector NEVER silently falls back to Markdown for an explicitly
+/// requested format: a build that lacks the feature must surface a clear error
+/// so the misconfiguration is visible rather than hidden behind wrong parsing.
+#[derive(Debug, thiserror::Error)]
+pub enum ContentParserError {
+    /// The selected format's parser feature is not compiled into this build.
+    #[error(
+        "content_format={format} requires the `{feature}` feature, which is not compiled into this build"
+    )]
+    FeatureNotCompiled {
+        /// The requested format name (e.g. `"html"`).
+        format: &'static str,
+        /// The cargo feature that enables it (e.g. `"html"`).
+        feature: &'static str,
+    },
+}
+
+/// Select the [`ContentParser`] for an issue, applying the resolution order:
+/// the issue's own `content_format` → else the repo default → else
+/// [`ContentFormat::Markdown`](crate::domain::ContentFormat::Markdown).
+///
+/// This is the SINGLE production seam every projection-with-sections site uses
+/// so the parser dispatch is identical across the write path
+/// ([`evaluate_local`](crate::validation::evaluate_local)) and the graph path
+/// ([`evaluate_graph`](crate::validation::graph::evaluate_graph) →
+/// `criterion_ids`). Markdown is always available; HTML/XML are returned only
+/// when their cargo feature is compiled, otherwise a
+/// [`ContentParserError::FeatureNotCompiled`] is returned (NO silent Markdown
+/// fallback for an explicitly selected format).
+///
+/// # Examples
+///
+/// ```
+/// use jit::document::{content_parser_for, ContentParser};
+/// use jit::domain::{ContentFormat, Issue};
+///
+/// // Absent issue format + Markdown repo default -> Markdown parser.
+/// let issue = Issue::new("t".into(), "## Plan\n\n- step\n".into());
+/// let parser = content_parser_for(issue.content_format, ContentFormat::Markdown).unwrap();
+/// assert_eq!(parser.id(), "markdown");
+/// ```
+pub fn content_parser_for(
+    issue_format: Option<crate::domain::ContentFormat>,
+    repo_default: crate::domain::ContentFormat,
+) -> Result<Box<dyn ContentParser>, ContentParserError> {
+    use crate::domain::ContentFormat;
+
+    match issue_format.unwrap_or(repo_default) {
+        ContentFormat::Markdown => Ok(Box::new(MarkdownContentParser)),
+        ContentFormat::Html => {
+            #[cfg(feature = "html")]
+            {
+                Ok(Box::new(HtmlContentParser))
+            }
+            #[cfg(not(feature = "html"))]
+            {
+                Err(ContentParserError::FeatureNotCompiled {
+                    format: "html",
+                    feature: "html",
+                })
+            }
+        }
+        ContentFormat::Xml => {
+            #[cfg(feature = "xml")]
+            {
+                Ok(Box::new(XmlContentParser))
+            }
+            #[cfg(not(feature = "xml"))]
+            {
+                Err(ContentParserError::FeatureNotCompiled {
+                    format: "xml",
+                    feature: "xml",
+                })
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -374,13 +374,24 @@ fn run() -> Result<()> {
                     priority,
                     gate,
                     label,
+                    content_format,
                     force,
                     orphan,
                     json,
                 } => {
                     let prio = Priority::from_str(&priority)?;
-                    let (id, warnings) =
-                        executor.create_issue(title, description, prio, gate, label, force)?;
+                    let content_format = content_format
+                        .map(|s| jit::domain::ContentFormat::from_str(&s))
+                        .transpose()?;
+                    let (id, warnings) = executor.create_issue(
+                        title,
+                        description,
+                        prio,
+                        gate,
+                        label,
+                        content_format,
+                        force,
+                    )?;
 
                     // Print warnings to stderr
                     for warning in &warnings {
@@ -583,6 +594,7 @@ fn run() -> Result<()> {
                     remove_gate,
                     assignee,
                     unassign,
+                    content_format,
                     force,
                     json,
                 } => {
@@ -599,6 +611,13 @@ fn run() -> Result<()> {
                             "Cannot specify both ID and --filter (mutually exclusive)"
                         ));
                     }
+                    // --content-format is a per-issue field; batch mode does not
+                    // support it (would set the same format on every match).
+                    if filter.is_some() && content_format.is_some() {
+                        return Err(anyhow!(
+                            "--content-format is not supported with --filter (batch mode); set it per issue"
+                        ));
+                    }
 
                     // Single issue mode
                     if let Some(id_str) = id {
@@ -607,6 +626,9 @@ fn run() -> Result<()> {
 
                         let prio = priority.map(|p| Priority::from_str(&p)).transpose()?;
                         let st = state.map(|s| State::from_str(&s)).transpose()?;
+                        let content_format = content_format
+                            .map(|s| jit::domain::ContentFormat::from_str(&s))
+                            .transpose()?;
 
                         // Handle gate modifications first (before other updates)
                         if !add_gate.is_empty() {
@@ -645,6 +667,7 @@ fn run() -> Result<()> {
                             st,
                             label,
                             remove_label,
+                            content_format,
                             force,
                         ) {
                             Ok(warnings) => {
