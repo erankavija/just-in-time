@@ -243,9 +243,12 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// graph rules.
     ///
     /// This is the structural half of [`CommandExecutor::validate_silent`]:
-    /// broken dependency references, invalid gate references, label validity,
-    /// document references, type hierarchy, DAG acyclicity, isolated nodes,
-    /// transitive reduction, and claims-index consistency. It deliberately
+    /// broken dependency references, invalid gate references, document
+    /// references, DAG acyclicity, isolated nodes, transitive reduction, and
+    /// claims-index consistency. Label validity and type-hierarchy checks are NO
+    /// LONGER here — they were migrated to default rules and are evaluated by the
+    /// local/graph rule engine in `validate_silent` (see the NOTE in that
+    /// method). It deliberately
     /// excludes the `Scope::Graph` declarative rules so a caller can render those
     /// as structured findings (e.g. whole-repo `jit validate --json`) and decide
     /// the exit status AFTER output, rather than aborting before the rule report
