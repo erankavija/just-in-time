@@ -415,6 +415,66 @@ assert = { json-schema = "schemas/no-bad.json" }
 }
 
 #[test]
+fn test_update_gate_blocked_force_logs_bypass_and_persists_gated() {
+    // Intersection of three behaviors on the update path: an issue with an
+    // UNPASSED gate AND a violated `enforce` rule, updated with `--force
+    // --state done`. The Done transition diverts to `Gated` (unpassed gate), the
+    // forced enforce-rule bypass is still audited, yet the call returns Err
+    // (gate-blocked). This is the audit-sensitive `handle_gate_blocking` path.
+    let executor = executor_with_rules(
+        r#"
+[[rules]]
+name = "task-needs-req"
+when = { type = "task" }
+severity = "error"
+enforce = true
+assert = { require-label = { label = "req:*", min = 1 } }
+"#,
+    );
+
+    let mut issue = Issue::new("A task".to_string(), String::new());
+    issue.labels = vec!["type:task".to_string()]; // no req: -> violates the rule
+    issue.state = State::InProgress;
+    issue.gates_required = vec!["manual-gate".to_string()]; // unpassed
+    let id = issue.id.clone();
+    executor.storage().save_issue(issue).unwrap();
+
+    let result = executor.update_issue(
+        &id,
+        None,
+        None,
+        None,
+        Some(State::Done),
+        vec![],
+        vec![],
+        true, // --force
+    );
+
+    // (a) The unpassed gate blocks the Done transition.
+    assert!(
+        result.is_err(),
+        "an unpassed gate must block the Done transition"
+    );
+    // (b) The issue is persisted in Gated (gate-diversion).
+    assert_eq!(
+        executor.storage().load_issue(&id).unwrap().state,
+        State::Gated
+    );
+    // (c) The forced enforce-rule override is audited exactly once, even though
+    // the overall call returned Err (gate-blocked).
+    let events = bypass_events(&executor);
+    assert_eq!(
+        events.len(),
+        1,
+        "a forced enforce-rule bypass must be audited on the gate-blocked path"
+    );
+    match &events[0] {
+        Event::LocalRuleBypassed { rule, .. } => assert_eq!(rule, "task-needs-req"),
+        other => panic!("expected LocalRuleBypassed, got {other:?}"),
+    }
+}
+
+#[test]
 fn test_bulk_update_force_noop_logs_bypass() {
     // A forced bulk update that makes NO effective field change to an issue which
     // ALREADY violates an enforce rule must still audit the `--force` override
