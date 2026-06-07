@@ -153,8 +153,12 @@ fn test_validate_explain_json_structure() {
     let out = assert.get_output().stdout.clone();
     let json: Value = serde_json::from_slice(&out).unwrap();
     let outcomes = json["outcomes"].as_array().unwrap();
-    let outcome = &outcomes[0];
-    assert_eq!(outcome["rule"], "epic-needs-req");
+    // The effective rule set prepends the built-in default rules, so the user
+    // rule is no longer guaranteed at index 0; find it by name.
+    let outcome = outcomes
+        .iter()
+        .find(|o| o["rule"] == "epic-needs-req")
+        .expect("epic-needs-req outcome present");
     assert_eq!(outcome["scope"], "local");
     assert_eq!(outcome["passed"], true);
 }

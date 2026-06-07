@@ -85,9 +85,12 @@ values = ["task", "bug", "story"]
     let (_tmp, exec) = setup_repo(cfg);
     create_labeled(&exec, "wrong", &["type:taks"]);
 
+    // Post-migration the enum constraint is the `default:namespace-values:type`
+    // rule; accept/reject parity is preserved (the bad value still fails
+    // validation), the message now comes from the JSON Schema engine.
     let err = exec.validate_silent().unwrap_err().to_string();
     assert!(
-        err.contains("not in allowed set") && err.contains("taks"),
+        err.contains("default:namespace-values:type") && err.contains("taks"),
         "unexpected error: {}",
         err
     );
@@ -121,8 +124,15 @@ pattern = '^v\d+\.\d+$'
     let (_tmp, exec) = setup_repo(cfg);
     create_labeled(&exec, "bad", &["milestone:1.2"]);
 
+    // Post-migration the value-pattern constraint is the
+    // `default:namespace-pattern:milestone` rule; the bad value still fails
+    // validation (parity), message from the JSON Schema engine.
     let err = exec.validate_silent().unwrap_err().to_string();
-    assert!(err.contains("does not match pattern"), "{}", err);
+    assert!(
+        err.contains("default:namespace-pattern:milestone") && err.contains("1.2"),
+        "{}",
+        err
+    );
 }
 
 #[test]
@@ -147,12 +157,34 @@ unique = false
 pattern = "["
 "#;
     let (_tmp, exec) = setup_repo(cfg);
-    // Even one issue triggers validate_labels.
-    create_labeled(&exec, "x", &["broken:foo"]);
+    // Post-migration the namespace `pattern` is the `default:namespace-pattern`
+    // rule, whose schema embeds the regex. A malformed regex now surfaces as a
+    // schema COMPILE error when the rule is evaluated (on create OR validate) —
+    // it is never silently swallowed (parity goal: a misconfigured constraint
+    // must be visible). The error names the offending rule/namespace.
+    let (id, _) = exec
+        .create_issue(
+            "x".to_string(),
+            String::new(),
+            Priority::Normal,
+            vec![],
+            vec!["broken:foo".to_string()],
+            false,
+        )
+        .unwrap_or_else(|err| {
+            // The bad pattern can surface at create time; assert it is the
+            // compile error for the broken namespace, then stop.
+            let msg = err.to_string();
+            assert!(msg.contains("default:namespace-pattern:broken"), "{}", msg);
+            assert!(msg.contains("compile"), "{}", msg);
+            (String::new(), vec![])
+        });
+    if id.is_empty() {
+        return; // surfaced at create time, already asserted above
+    }
 
     let err = exec.validate_silent().unwrap_err().to_string();
-    assert!(err.contains("Invalid regex pattern"), "{}", err);
-    assert!(err.contains("broken"), "{}", err);
+    assert!(err.contains("default:namespace-pattern:broken"), "{}", err);
 }
 
 // ------------------------------------------------------------------
@@ -174,8 +206,11 @@ unique = false
     let (_tmp, exec) = setup_repo(cfg);
     create_labeled(&exec, "orphan", &["component:core"]);
 
+    // Post-migration the required constraint is the
+    // `default:namespace-required:type` rule; a missing required label still
+    // fails validation (parity), message from the JSON Schema engine.
     let err = exec.validate_silent().unwrap_err().to_string();
-    assert!(err.contains("missing a required label"), "{}", err);
+    assert!(err.contains("default:namespace-required:type"), "{}", err);
     assert!(err.contains("type"), "{}", err);
 }
 
@@ -258,6 +293,12 @@ unique = false
     let (_tmp, exec) = setup_repo(cfg);
     create_labeled(&exec, "typo", &["typo:foo"]);
 
+    // Post-migration an unregistered namespace is caught by the
+    // `default:namespace-registry` rule (the former `validate_labels` registry
+    // check). Accept/reject parity holds — an unknown namespace fails validation —
+    // though the closest-namespace hint (a `validate_labels`-only nicety) is no
+    // longer emitted by the schema-based check.
     let err = exec.validate_silent().unwrap_err().to_string();
-    assert!(err.contains("Did you mean 'type'"), "{}", err);
+    assert!(err.contains("default:namespace-registry"), "{}", err);
+    assert!(err.contains("typo:foo"), "{}", err);
 }

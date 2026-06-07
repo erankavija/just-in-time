@@ -6,6 +6,12 @@
 //! wiring tests over `CommandExecutor::run_rules` / `explain_rules` proving the
 //! production orchestration loads the ruleset, scopes correctly, and reports
 //! findings with the right severity.
+//!
+//! NOTE: post-a0f0f342 the effective rule set ALSO includes the built-in default
+//! rules derived from the scaffolded `config.toml` (label format, namespace
+//! registry, etc.). These tests therefore filter to the USER rule under test
+//! rather than asserting on the total finding/outcome count, which now legitimately
+//! includes default-rule activity.
 
 use jit::commands::CommandExecutor;
 use jit::domain::Issue;
@@ -71,8 +77,12 @@ fn test_per_issue_local_rule_passes() {
     let executor = CommandExecutor::new(storage);
     let report = executor.run_rules(Some(&id)).unwrap();
 
-    assert!(!report.has_errors(), "satisfied rule: {report:?}");
-    assert!(report.findings.is_empty());
+    // The user rule is satisfied: no `epic-needs-req` finding. (Default rules may
+    // independently flag the scaffolded-config namespaces; out of scope here.)
+    assert!(
+        !report.findings.iter().any(|f| f.rule == "epic-needs-req"),
+        "satisfied user rule must not appear: {report:?}"
+    );
 }
 
 #[test]
@@ -129,9 +139,13 @@ fn test_explain_lists_matched_rules_and_outcomes() {
     let report = executor.explain_rules(&id).unwrap();
 
     assert_eq!(report.issue_id, id);
-    assert_eq!(report.outcomes.len(), 1, "one matching rule");
-    let outcome = &report.outcomes[0];
-    assert_eq!(outcome.rule, "epic-needs-req");
+    // The effective set also contains always-on default rules (e.g. label-format);
+    // assert on the USER rule's outcome by name.
+    let outcome = report
+        .outcomes
+        .iter()
+        .find(|o| o.rule == "epic-needs-req")
+        .expect("epic-needs-req outcome present");
     assert_eq!(outcome.scope, "local");
     assert_eq!(outcome.severity, "error");
     assert_eq!(outcome.selector, "type=epic");
@@ -151,10 +165,15 @@ fn test_explain_passing_rule_marks_pass() {
     let executor = CommandExecutor::new(storage);
     let report = executor.explain_rules(&id).unwrap();
 
-    assert_eq!(report.outcomes.len(), 1);
-    assert!(report.outcomes[0].passed, "satisfied rule passes");
-    assert!(report.outcomes[0].messages.is_empty());
-    assert!(!report.has_failures());
+    // The USER rule passes for a compliant epic; assert on it by name (default
+    // rules derived from the scaffolded config are evaluated alongside it).
+    let outcome = report
+        .outcomes
+        .iter()
+        .find(|o| o.rule == "epic-needs-req")
+        .expect("epic-needs-req outcome present");
+    assert!(outcome.passed, "satisfied user rule passes");
+    assert!(outcome.messages.is_empty());
 }
 
 #[test]
@@ -169,8 +188,12 @@ fn test_explain_non_matching_issue_has_no_outcomes() {
     let executor = CommandExecutor::new(storage);
     let report = executor.explain_rules(&id).unwrap();
 
-    assert!(report.outcomes.is_empty(), "no rules match a task");
-    assert!(!report.has_failures());
+    // The epic-selected USER rule does not match a task. (Default rules with an
+    // empty selector match every issue, so the outcome list is not empty.)
+    assert!(
+        !report.outcomes.iter().any(|o| o.rule == "epic-needs-req"),
+        "epic rule must not match a task"
+    );
 }
 
 #[test]

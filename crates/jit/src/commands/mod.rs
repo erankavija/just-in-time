@@ -246,12 +246,20 @@ pub struct CommandExecutor<S: IssueStore> {
     /// load/parse error so callers can surface a misconfigured rules file
     /// instead of silently treating it as "no rules".
     rules: OnceLock<Result<RuleSet, RuleConfigError>>,
+    /// Lazily-built EFFECTIVE rule set: the built-in default rules (derived from
+    /// this repo's `config.toml` by
+    /// [`default_ruleset`](crate::validation::defaults::default_ruleset)) followed
+    /// by the user's `.jit/rules.toml`. This is the single source of truth for
+    /// issue/label validation after the a0f0f342 migration — the former
+    /// hard-coded checks now live as default rules here. A load/parse error from
+    /// either source is retained as an `Err` so a misconfigured repo surfaces the
+    /// problem rather than silently disabling enforcement.
+    effective_rules: OnceLock<Result<RuleSet, String>>,
     /// Lazily-loaded `.jit/config.toml`, cached so the unified write-time
     /// validation entry point does not re-read and re-parse `config.toml` on
-    /// every write. The parsed config drives the legacy
-    /// [`IssueValidator`](crate::validation::IssueValidator) until
-    /// task a0f0f342 migrates those checks to default rules. A malformed config
-    /// is retained as an `Err` so it is surfaced rather than swallowed.
+    /// every write. The parsed config seeds the built-in default rules. A
+    /// malformed config is retained as an `Err` so it is surfaced rather than
+    /// swallowed.
     config: OnceLock<Result<JitConfig, String>>,
     /// Lazily-built label namespace registry, derived from the cached config and
     /// cached alongside it for the same reason.
@@ -266,6 +274,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             storage,
             config_manager,
             rules: OnceLock::new(),
+            effective_rules: OnceLock::new(),
             config: OnceLock::new(),
             namespaces: OnceLock::new(),
         }
@@ -302,6 +311,61 @@ impl<S: IssueStore> CommandExecutor<S> {
         self.rules
             .get_or_init(|| RuleSet::load(self.storage.root()))
             .as_ref()
+    }
+
+    /// Return the EFFECTIVE rule set: the built-in default rules followed by the
+    /// user's `.jit/rules.toml`.
+    ///
+    /// The default rules are derived from this repo's `config.toml`
+    /// (`[validation]` + `[namespaces]`) by
+    /// [`default_ruleset`](crate::validation::defaults::default_ruleset); they
+    /// re-express the former hard-coded label/type checks (a0f0f342 migration).
+    /// User rules are appended so they extend the defaults. The combined set is
+    /// what every evaluation path (write-time `evaluate_local`, `jit validate`,
+    /// graph rules, `--explain`) runs against — there is no longer any separate
+    /// hard-coded validator.
+    ///
+    /// The result is built at most once and cached. A malformed `config.toml` or
+    /// `.jit/rules.toml` is surfaced as an `Err` rather than silently dropping the
+    /// defaults or the user rules.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use jit::commands::CommandExecutor;
+    /// use jit::storage::JsonFileStorage;
+    ///
+    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
+    /// let rules = executor.effective_rules().unwrap();
+    /// println!("{} effective rule(s)", rules.rules.len());
+    /// ```
+    pub fn effective_rules(&self) -> Result<&RuleSet> {
+        self.effective_rules
+            .get_or_init(|| {
+                let config = self.cached_config().map_err(|e| e.to_string())?;
+                let namespaces = self.cached_namespaces().map_err(|e| e.to_string())?;
+                let validation =
+                    config
+                        .validation
+                        .clone()
+                        .unwrap_or(crate::config::ValidationConfig {
+                            strictness: None,
+                            default_type: None,
+                            require_type_label: None,
+                            label_regex: None,
+                            reject_malformed_labels: None,
+                            enforce_namespace_registry: None,
+                            warn_orphaned_leaves: None,
+                            warn_strategic_consistency: None,
+                        });
+                let mut combined =
+                    crate::validation::defaults::default_ruleset(&validation, namespaces);
+                let user = self.rules().map_err(|e| e.to_string())?;
+                combined.rules.extend(user.rules.iter().cloned());
+                Ok(combined)
+            })
+            .as_ref()
+            .map_err(|err| anyhow!("{err}"))
     }
 
     /// Return the cached parsed `.jit/config.toml`, loading it on first access.
@@ -343,44 +407,26 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// transition, bulk's projected after-update shape) already applied — so that
     /// rules keyed on the final `state` are evaluated correctly.
     ///
-    /// It performs two layers of validation in one place:
+    /// It evaluates the EFFECTIVE local rules (built-in defaults + user
+    /// `.jit/rules.toml`) via
+    /// [`evaluate_local`](crate::validation::evaluate_local), with blocking
+    /// semantics:
     ///
-    /// 1. The legacy [`IssueValidator`](crate::validation::IssueValidator)
-    ///    (driven by the cached `config.toml`), retained until task a0f0f342
-    ///    migrates its label/type/namespace checks to default rules. Its
-    ///    non-blocking warnings are collected.
-    /// 2. The declarative local rules (`.jit/rules.toml`) via
-    ///    [`evaluate_local`](crate::validation::evaluate_local), with blocking
-    ///    semantics:
-    ///    - An `error` finding from an `enforce = true` rule REJECTS the write
-    ///      unless `force` is set (DR §7.2).
-    ///    - With `force`, the write is allowed and the bypassed rule names are
-    ///      returned in [`WriteValidation::bypassed_rules`] for the CALLER to log
-    ///      AFTER the write commits (DR §7.6) — they are NOT logged here, so a
-    ///      failed save cannot leave a false bypass entry in the audit log.
-    ///    - `warn`/non-`enforce` findings never block; their messages are
-    ///      returned as warnings.
+    /// - An `error` finding from an `enforce = true` rule REJECTS the write
+    ///   unless `force` is set (DR §7.2).
+    /// - With `force`, the write is allowed and the bypassed rule names are
+    ///   returned in [`WriteValidation::bypassed_rules`] for the CALLER to log
+    ///   AFTER the write commits (DR §7.6) — they are NOT logged here, so a
+    ///   failed save cannot leave a false bypass entry in the audit log.
+    /// - `warn`/non-`enforce` findings never block; their messages are
+    ///   returned as warnings.
     ///
-    /// A genuinely misconfigured `.jit/rules.toml` or `config.toml` (parse/load
-    /// error) is surfaced as an error rather than silently disabling enforcement.
+    /// The former hard-coded `IssueValidator` checks are now default rules inside
+    /// the effective rule set, so they run through this same path. A genuinely
+    /// misconfigured `.jit/rules.toml` or `config.toml` (parse/load error) is
+    /// surfaced as an error rather than silently disabling enforcement.
     fn validate_for_write(&self, issue: &Issue, force: bool) -> Result<WriteValidation> {
-        // Layer 1: legacy IssueValidator (config-driven). Retained until a0f0f342.
-        let config = self.cached_config()?;
-        let mut warnings = if let Some(ref validation_config) = config.validation {
-            let validator = crate::validation::IssueValidator::new(
-                validation_config.clone(),
-                self.cached_namespaces()?.clone(),
-            );
-            validator.validate(issue)?
-        } else {
-            Vec::new()
-        };
-
-        // Layer 2: declarative local rules (.jit/rules.toml).
-        let rules = match self.rules() {
-            Ok(rules) => rules,
-            Err(err) => return Err(anyhow!("invalid .jit/rules.toml: {err}")),
-        };
+        let rules = self.effective_rules()?;
         let evaluation = crate::validation::evaluate_local(issue, rules)
             .map_err(|err| anyhow!("rule evaluation failed: {err}"))?;
 
@@ -395,6 +441,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             ));
         }
 
+        let mut warnings = Vec::new();
         warnings.extend(evaluation.warnings());
 
         // On a forced write `blocking` names the enforce rules being overridden;

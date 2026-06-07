@@ -85,6 +85,13 @@ pub struct Projection {
     /// order. Labels without a `namespace:value` shape are skipped.
     pub labels: BTreeMap<String, Vec<String>>,
 
+    /// Every label verbatim, in author order, including labels that do not parse
+    /// into a `namespace:value` shape. Whereas [`Projection::labels`] groups only
+    /// well-formed labels by namespace, this preserves the RAW strings so rules
+    /// can assert over the whole label (e.g. a format regex, or that each label's
+    /// namespace is registered).
+    pub raw_labels: Vec<String>,
+
     /// Distinct `doc_type` values across the issue's document references.
     pub doc_types: Vec<String>,
 
@@ -197,6 +204,7 @@ pub fn project(issue: &Issue) -> Projection {
         state: serde_plain_state(&issue.state),
         priority: serde_plain_priority(&issue.priority),
         labels,
+        raw_labels: issue.labels.clone(),
         doc_types: collect_doc_types(issue),
         sections: None,
     }

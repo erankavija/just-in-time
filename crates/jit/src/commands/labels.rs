@@ -28,9 +28,10 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Check uniqueness constraint. This path is only reached internally from
         // `jit issue reject --reason` (adding a `resolution:` label); reject
-        // deliberately bypasses rule enforcement, so only the legacy validator
-        // runs here, not `.jit/rules.toml` local rules. Config/namespaces come
-        // from the executor cache so they are not re-parsed from disk per call.
+        // deliberately bypasses rule ENFORCEMENT, so the default/user rules are
+        // evaluated here only for their non-blocking WARNINGS, never to block.
+        // Config/namespaces come from the executor cache so they are not re-parsed
+        // from disk per call.
         let (namespace, _) = label_utils::parse_label(label)?;
         let namespaces = self.cached_namespaces()?;
 
@@ -53,16 +54,18 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         issue.labels.push(label.to_string());
 
-        // Validate the updated issue with the legacy validator (config from cache).
-        let mut warnings = Vec::new();
-        let config = self.cached_config()?;
-        if let Some(ref validation_config) = config.validation {
-            let validator = crate::validation::IssueValidator::new(
-                validation_config.clone(),
-                namespaces.clone(),
-            );
-            warnings = validator.validate(&issue)?;
-        }
+        // Surface non-blocking warnings from the effective rule set (built-in
+        // defaults + user rules). This path never blocks, so enforce findings are
+        // reported as warnings too.
+        let rules = self.effective_rules()?;
+        let evaluation = crate::validation::evaluate_local(&issue, rules)
+            .map_err(|err| anyhow!("rule evaluation failed: {err}"))?;
+        let warnings: Vec<String> = evaluation
+            .findings()
+            .into_iter()
+            .filter(|f| f.severity != crate::validation::rules::Severity::Off)
+            .map(|f| format!("[{}] {}", f.rule, f.message))
+            .collect();
 
         self.storage.save_issue(issue)?;
         Ok(warnings)

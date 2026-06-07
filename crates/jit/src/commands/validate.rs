@@ -192,20 +192,70 @@ impl<S: IssueStore> CommandExecutor<S> {
     // Type hierarchy is orthogonal to DAG structure
 
     pub fn validate_silent(&self) -> Result<()> {
-        // Repository-integrity checks (broken deps, gates, labels, docs, type
-        // hierarchy, DAG, isolated nodes, transitive reduction, claims index).
+        // Repository-integrity checks (broken deps, gates, docs, DAG, isolated
+        // nodes, transitive reduction, claims index). Label/type-label/namespace
+        // checks are NO LONGER here: they are default rules evaluated below.
         self.validate_integrity_silent()?;
+
+        // Local rules (built-in defaults + user rules) across every issue. The
+        // former hard-coded label/type/namespace checks live here now: an
+        // `error`-severity finding (e.g. a value outside a namespace enum, a bad
+        // pattern, a missing required label) fails validation — matching the old
+        // `validate_labels`/`validate_type_hierarchy` hard-reject behavior — while
+        // `warn` findings never fail.
+        let issues = self.storage.list_issues()?;
+        if let Some(message) = self.local_rules_error_message(&issues)? {
+            return Err(anyhow!(message));
+        }
 
         // Cross-issue graph rules. An `error`-severity violation (including a
         // `config-error`, since the rule could not be applied) fails validation;
         // `warn`/`off` findings never fail here.
-        let issues = self.storage.list_issues()?;
         let graph_findings = self.evaluate_graph_rules(&issues)?;
         if let Some(message) = graph_findings_error_message(&graph_findings) {
             return Err(anyhow!(message));
         }
 
         Ok(())
+    }
+
+    /// Evaluate the EFFECTIVE local rules for every issue and, if any produces an
+    /// `error`-severity finding, return a single combined message; otherwise
+    /// `None`. This is the migrated replacement for the former hard-coded
+    /// `validate_labels`/`validate_type_hierarchy` whole-repo checks: those always
+    /// hard-rejected on a violation, so any `error` finding here fails validation.
+    /// `warn` findings are never fatal.
+    fn local_rules_error_message(&self, issues: &[Issue]) -> Result<Option<String>> {
+        use crate::validation::rules::Severity;
+
+        let ruleset = self.effective_rules()?;
+        let mut errors: Vec<(String, String)> = Vec::new();
+        for issue in issues {
+            let evaluation = crate::validation::evaluate_local(issue, ruleset)
+                .map_err(|e| anyhow!("Local rule evaluation failed: {}", e))?;
+            for finding in evaluation.findings() {
+                if finding.severity == Severity::Error {
+                    errors.push((
+                        issue.id.clone(),
+                        format!("[{}] {}", finding.rule, finding.message),
+                    ));
+                }
+            }
+        }
+
+        if errors.is_empty() {
+            return Ok(None);
+        }
+        let body = errors
+            .iter()
+            .map(|(id, msg)| format!("  issue {}: {}", &id[..8.min(id.len())], msg))
+            .collect::<Vec<_>>()
+            .join("\n");
+        Ok(Some(format!(
+            "Validation failed with {} rule error(s):\n{}",
+            errors.len(),
+            body
+        )))
     }
 
     /// Run the repository-integrity checks ONLY, without evaluating declarative
@@ -267,14 +317,14 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
-        // Validate labels
-        self.validate_labels(&issues)?;
+        // NOTE: label format, namespace registry, namespace value/pattern/
+        // unique/required, type-label requirement, and unknown-type detection are
+        // NO LONGER checked here. They are now default rules (see
+        // `validation::defaults`) evaluated by `validate_silent` via
+        // `local_rules_error_message` (a0f0f342 migration).
 
         // Validate document references (git integration)
         self.validate_document_references(&issues)?;
-
-        // Validate type hierarchy
-        self.validate_type_hierarchy(&issues)?;
 
         // Validate DAG (no cycles)
         let issue_refs: Vec<&Issue> = issues.iter().collect();
@@ -350,9 +400,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::validation::rules::Scope;
 
         // Surface a misconfigured rules.toml instead of swallowing it.
-        let ruleset = self
-            .rules()
-            .map_err(|e| anyhow!("Invalid .jit/rules.toml: {}", e))?;
+        let ruleset = self.effective_rules()?;
 
         let graph_rules: Vec<&crate::validation::rules::Rule> = ruleset
             .rules
@@ -400,9 +448,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     pub fn run_rules(&self, id: Option<&str>) -> Result<crate::validation::report::RuleReport> {
         use crate::validation::report::{ReportedFinding, RuleReport};
 
-        let ruleset = self
-            .rules()
-            .map_err(|e| anyhow!("Invalid .jit/rules.toml: {}", e))?;
+        let ruleset = self.effective_rules()?;
         let issues = self.storage.list_issues()?;
 
         let mut findings: Vec<ReportedFinding> = Vec::new();
@@ -499,9 +545,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::validation::report::{ExplainReport, RuleOutcome};
         use crate::validation::rules::Scope;
 
-        let ruleset = self
-            .rules()
-            .map_err(|e| anyhow!("Invalid .jit/rules.toml: {}", e))?;
+        let ruleset = self.effective_rules()?;
         let issue = self.storage.load_issue(id)?;
         let issues = self.storage.list_issues()?;
 
@@ -557,184 +601,6 @@ impl<S: IssueStore> CommandExecutor<S> {
             issue_id: issue.id,
             outcomes,
         })
-    }
-
-    fn validate_labels(&self, issues: &[Issue]) -> Result<()> {
-        let namespaces = self.config_manager.get_namespaces()?;
-
-        // Pre-compile regex patterns once per validate run; a bad pattern is a
-        // config error and surfaces with the namespace name for debuggability.
-        let mut compiled_patterns: std::collections::HashMap<String, regex::Regex> =
-            std::collections::HashMap::new();
-        for (name, ns_config) in &namespaces.namespaces {
-            if let Some(pattern) = &ns_config.pattern {
-                let re = regex::Regex::new(pattern).map_err(|e| {
-                    anyhow!(
-                        "Invalid regex pattern for namespace '{}': {} (pattern: {:?})",
-                        name,
-                        e,
-                        pattern
-                    )
-                })?;
-                compiled_patterns.insert(name.clone(), re);
-            }
-        }
-
-        for issue in issues {
-            // Check label format
-            for label in &issue.labels {
-                label_utils::validate_label(label)
-                    .map_err(|e| anyhow!("Invalid label format in issue '{}': {}", issue.id, e))?;
-            }
-
-            // Check namespace exists in registry
-            for label in &issue.labels {
-                if let Ok((namespace, _)) = label_utils::parse_label(label) {
-                    if !namespaces.namespaces.contains_key(&namespace) {
-                        let hint = closest_namespace(&namespace, namespaces.namespaces.keys())
-                            .map(|s| format!(" Did you mean '{}'?", s))
-                            .unwrap_or_default();
-                        return Err(anyhow!(
-                            "Issue '{}' has label with unknown namespace '{}'. \
-                             Label: '{}'.{} Available namespaces: {}",
-                            issue.id,
-                            namespace,
-                            label,
-                            hint,
-                            namespaces
-                                .namespaces
-                                .keys()
-                                .map(|k| k.as_str())
-                                .collect::<Vec<_>>()
-                                .join(", ")
-                        ));
-                    }
-                }
-            }
-
-            // Check value-level constraints (enum + regex)
-            for label in &issue.labels {
-                if let Ok((namespace, value)) = label_utils::parse_label(label) {
-                    if let Some(ns_config) = namespaces.namespaces.get(&namespace) {
-                        if let Some(allowed) = &ns_config.values {
-                            if !allowed.iter().any(|v| v == &value) {
-                                return Err(anyhow!(
-                                    "Issue '{}' label '{}' has value '{}' not in allowed \
-                                     set for namespace '{}'. Allowed: {}",
-                                    issue.id,
-                                    label,
-                                    value,
-                                    namespace,
-                                    allowed.join(", ")
-                                ));
-                            }
-                        }
-                        if let Some(re) = compiled_patterns.get(&namespace) {
-                            if !re.is_match(&value) {
-                                return Err(anyhow!(
-                                    "Issue '{}' label '{}' value '{}' does not match \
-                                     pattern {:?} for namespace '{}'",
-                                    issue.id,
-                                    label,
-                                    value,
-                                    ns_config.pattern.as_deref().unwrap_or(""),
-                                    namespace
-                                ));
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Check uniqueness constraints
-            let mut unique_namespaces_seen = std::collections::HashMap::new();
-            for label in &issue.labels {
-                if let Ok((namespace, _)) = label_utils::parse_label(label) {
-                    if let Some(ns_config) = namespaces.namespaces.get(&namespace) {
-                        if ns_config.unique {
-                            if let Some(first_label) = unique_namespaces_seen.get(&namespace) {
-                                return Err(anyhow!(
-                                    "Issue '{}' has multiple labels from unique namespace '{}': '{}' and '{}'",
-                                    issue.id,
-                                    namespace,
-                                    first_label,
-                                    label
-                                ));
-                            }
-                            unique_namespaces_seen.insert(namespace, label.clone());
-                        }
-                    }
-                }
-            }
-
-            // Check required-namespace constraints.
-            for (name, ns_config) in &namespaces.namespaces {
-                if !ns_config.is_required() {
-                    continue;
-                }
-                let has_any = issue.labels.iter().any(|l| {
-                    label_utils::parse_label(l)
-                        .map(|(ns, _)| &ns == name)
-                        .unwrap_or(false)
-                });
-                if !has_any {
-                    return Err(anyhow!(
-                        "Issue '{}' is missing a required label from namespace '{}'",
-                        issue.id,
-                        name
-                    ));
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    fn validate_type_hierarchy(&self, issues: &[Issue]) -> Result<()> {
-        use crate::hierarchy_templates::get_hierarchy_config;
-        use crate::type_hierarchy::{detect_validation_issues, ValidationIssue};
-
-        let config = get_hierarchy_config(&self.storage)?;
-
-        for issue in issues {
-            let validation_issues = detect_validation_issues(&config, &issue.id, &issue.labels);
-
-            // Report first validation issue found
-            if let Some(val_issue) = validation_issues.into_iter().next() {
-                match val_issue {
-                    ValidationIssue::UnknownType {
-                        issue_id,
-                        unknown_type,
-                        suggested_fix,
-                    } => {
-                        let suggestion = suggested_fix
-                            .map(|s| format!(" (did you mean '{}'?)", s))
-                            .unwrap_or_default();
-                        return Err(anyhow!(
-                            "Issue '{}' has unknown type '{}'{}",
-                            issue_id,
-                            unknown_type,
-                            suggestion
-                        ));
-                    }
-                    ValidationIssue::InvalidMembershipReference {
-                        issue_id,
-                        label,
-                        reason,
-                        ..
-                    } => {
-                        return Err(anyhow!(
-                            "Issue '{}' has invalid membership label '{}': {}",
-                            issue_id,
-                            label,
-                            reason
-                        ));
-                    }
-                }
-            }
-        }
-
-        Ok(())
     }
 
     fn validate_document_references(&self, issues: &[Issue]) -> Result<()> {
@@ -1360,50 +1226,6 @@ fn render_selector(selector: &crate::validation::rules::Selector) -> String {
     }
 }
 
-/// Find the closest match for an unregistered namespace among known ones.
-/// Returns a suggestion only if it's genuinely close (edit distance ≤ 2 or
-/// a shared 4-char prefix); otherwise None so callers can stay silent.
-fn closest_namespace<'a, I: IntoIterator<Item = &'a String>>(
-    unknown: &str,
-    known: I,
-) -> Option<String> {
-    let mut best: Option<(usize, &str)> = None;
-    for candidate in known {
-        let d = edit_distance(unknown, candidate);
-        // Character-based prefix check — namespace keys can contain non-ASCII,
-        // so byte-slicing would panic mid-codepoint.
-        let prefix_match = unknown.chars().zip(candidate.chars()).take(4).count() == 4
-            && unknown
-                .chars()
-                .zip(candidate.chars())
-                .take(4)
-                .all(|(a, b)| a == b);
-        let score = if prefix_match { d.min(2) } else { d };
-        if score <= 2 && best.map(|(b, _)| score < b).unwrap_or(true) {
-            best = Some((score, candidate.as_str()));
-        }
-    }
-    best.map(|(_, s)| s.to_string())
-}
-
-/// Damerau-Levenshtein-ish edit distance (insert/delete/substitute).
-/// Small strings only — we don't care about performance here.
-fn edit_distance(a: &str, b: &str) -> usize {
-    let a: Vec<char> = a.chars().collect();
-    let b: Vec<char> = b.chars().collect();
-    let mut prev: Vec<usize> = (0..=b.len()).collect();
-    let mut curr: Vec<usize> = vec![0; b.len() + 1];
-    for i in 1..=a.len() {
-        curr[0] = i;
-        for j in 1..=b.len() {
-            let cost = if a[i - 1] == b[j - 1] { 0 } else { 1 };
-            curr[j] = (prev[j] + 1).min(curr[j - 1] + 1).min(prev[j - 1] + cost);
-        }
-        std::mem::swap(&mut prev, &mut curr);
-    }
-    prev[b.len()]
-}
-
 /// Format duration in human-readable form
 fn format_duration(duration: chrono::Duration) -> String {
     let secs = duration.num_seconds();
@@ -1585,49 +1407,5 @@ mod tests {
         assert_eq!(format_duration(Duration::seconds(90000)), "1 day");
         assert_eq!(format_duration(Duration::seconds(172800)), "2 days");
         assert_eq!(format_duration(Duration::seconds(604800)), "7 days");
-    }
-
-    #[test]
-    fn test_edit_distance_basic() {
-        assert_eq!(edit_distance("type", "type"), 0);
-        assert_eq!(edit_distance("type", "typ"), 1);
-        assert_eq!(edit_distance("type", "types"), 1);
-        assert_eq!(edit_distance("type", "typo"), 1);
-        assert!(edit_distance("type", "component") >= 5);
-    }
-
-    #[test]
-    fn test_closest_namespace_finds_near_match() {
-        let known: Vec<String> = ["type", "component", "milestone"]
-            .iter()
-            .map(|s| s.to_string())
-            .collect();
-        assert_eq!(closest_namespace("typ", &known), Some("type".to_string()));
-        assert_eq!(closest_namespace("typo", &known), Some("type".to_string()));
-        assert_eq!(
-            closest_namespace("component-", &known),
-            Some("component".to_string())
-        );
-    }
-
-    #[test]
-    fn test_closest_namespace_ignores_distant_match() {
-        let known: Vec<String> = ["type", "component"]
-            .iter()
-            .map(|s| s.to_string())
-            .collect();
-        assert_eq!(closest_namespace("xyz", &known), None);
-    }
-
-    #[test]
-    fn test_closest_namespace_handles_non_ascii_safely() {
-        // Regression: namespace keys can be non-ASCII; byte-slicing would have
-        // panicked mid-codepoint. This just needs to not panic.
-        let known: Vec<String> = ["café", "naïve", "type"]
-            .iter()
-            .map(|s| s.to_string())
-            .collect();
-        let _ = closest_namespace("cafe", &known);
-        let _ = closest_namespace("typé", &known);
     }
 }
