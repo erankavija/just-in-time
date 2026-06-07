@@ -1,0 +1,37 @@
+# Example ruleset: release checklist (a non-SDD methodology)
+#
+# A second non-SDD example, demonstrating the GRAPH and document-shape rule kinds
+# in a workflow that has nothing to do with requirements coverage.
+#
+# The methodology: a `type:release` issue gates a ship. Before it is done it must
+# (a) carry a Checklist section, (b) have an attached `release-notes` document,
+# and (c) depend on a QA sign-off issue.
+#
+# Engine kinds used:
+#   require-section   (local)  the release must have a `## Checklist` section
+#   require-doc-type  (local)  a `release-notes` document must be attached
+#   dependency-shape  (graph)  the release must depend on a `type:qa-signoff`
+
+# The release issue must carry a Checklist section. Structural; warn-only so an
+# in-progress release page can be drafted before the checklist is filled in.
+[[rules]]
+name = "release-has-checklist"
+when = { type = "release" }
+severity = "warn"
+assert = { require-section = { heading = "Checklist" } }
+
+# Release notes must be attached as a document of type `release-notes`. Enforced.
+[[rules]]
+name = "release-has-notes-doc"
+when = { type = "release" }
+severity = "error"
+enforce = true
+assert = { require-doc-type = { doc-type = "release-notes" } }
+
+# Graph: a release must depend (directly or transitively) on a QA sign-off issue.
+# Runs only in `jit validate` / gate checkers.
+[[rules]]
+name = "release-depends-on-qa-signoff"
+when = { type = "release" }
+severity = "error"
+assert = { dependency-shape = { target = { type = "qa-signoff" }, mode = "must", transitive = true } }

@@ -14,6 +14,7 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 - [Scope](concepts/scope.md) - Domain coverage and boundaries
 - [System Guarantees](concepts/guarantees.md) - Invariants and consistency
 - [Design Philosophy](concepts/design-philosophy.md) - Domain-agnostic principles
+- [Methodology-Agnostic Validation](concepts/validation-engine.md) - Why validation is configuration, not code
 
 ### 🎓 [Tutorials](tutorials/) - Learning-Oriented
 *Step-by-step lessons to get started*
@@ -28,6 +29,7 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 - [Software Development](how-to/software-development.md) - Feature dev, TDD, CI/CD
 - [Research Projects](how-to/research-projects.md) - Research questions, experiments
 - [Knowledge Work](how-to/knowledge-work.md) - Personal projects, learning goals
+- [Validation Rules](how-to/validation-rules.md) - Author `.jit/rules.toml` rules and schemas
 - [Custom Gates](how-to/custom-gates.md) - Define and use quality gates
 - [Dependency Management](how-to/dependency-management.md) - Graph strategies
 - [Multi-Agent Coordination](how-to/multi-agent-coordination.md) - Team and parallel work

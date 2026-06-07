@@ -1,0 +1,77 @@
+# Example ruleset: Spec-Driven Development (SDD)
+#
+# This is an EXAMPLE configuration, not the rules active on this repository. To
+# use it, copy this file to `.jit/rules.toml` and the `schemas/` directory to
+# `.jit/schemas/` in your own project.
+#
+# SDD models the methodology where an epic's `## Success Criteria` section is the
+# single canonical source of truth. Each criterion carries a `[hard]` or
+# `[aspirational]` marker and an embedded stable id (e.g. `REQ-01`). The
+# `req:<id>` and `satisfies:<id>` labels are DERIVED from those criteria, never
+# authored as an independent source:
+#
+#   * an epic declares `req:REQ-01` for each id it owns;
+#   * a child issue that implements REQ-01 carries `satisfies:REQ-01`;
+#   * coverage (every hard criterion has a satisfying child) and
+#     reference-integrity (every `satisfies:` points at a declared `req:`) are
+#     CHECKED against the canonical criteria by the graph rules below.
+#
+# Engine kinds used here (all real, see crates/jit/src/validation/):
+#   require-section       (local)  structural: the criteria section must exist
+#   json-schema           (local)  content: schemas/spec-body.json over `sections`
+#   label-value-pattern   (local)  req ids look like REQ-01
+#   label-coverage        (graph)  req -> satisfies coverage of [hard] criteria
+#   label-reference       (graph)  satisfies -> req reference integrity
+
+# --- Local: the spec must have a Success Criteria section -------------------
+# Structural shorthand. Runs on the write path; `enforce = true` blocks a write
+# whose epic has no `## Success Criteria` section at all.
+[[rules]]
+name = "sdd-epic-has-criteria-section"
+when = { type = "epic" }
+severity = "error"
+enforce = true
+assert = { require-section = { heading = "Success Criteria" } }
+
+# --- Local: the criteria structure is well-formed --------------------------
+# Content schema over the parsed projection's `sections`. Requires at least one
+# `[hard]` criterion and that every criterion item begins with a recognised
+# marker. See schemas/spec-body.json. Raw JSON Schema lives in a file because
+# TOML cannot express the `contains`/`pattern` constructs faithfully.
+[[rules]]
+name = "sdd-criteria-are-well-formed"
+when = { type = "epic" }
+severity = "error"
+enforce = true
+assert = { json-schema = "schemas/spec-body.json" }
+
+# --- Local: req ids follow the canonical id format -------------------------
+# Value-format shorthand. Any `req:` label value must look like `REQ-01`. The
+# regex is authored as a TOML literal string so backslashes survive verbatim.
+[[rules]]
+name = "sdd-req-id-format"
+when = { label = "req:*" }
+severity = "error"
+assert = { label-value-pattern = { namespace = "req", regex = '^REQ-[0-9]+$' } }
+
+# --- Graph: every [hard] criterion is satisfied by a child -----------------
+# Coverage. The epic's canonical `## Success Criteria` items are the SOURCE set;
+# `marker = "[hard]"` means only hard criteria are required (aspirational ones
+# are advisory). A criterion id is covered when some child that depends on the
+# epic carries `satisfies:<id>` and is in state `done`. Runs only in
+# `jit validate` / gate checkers, never on write.
+[[rules]]
+name = "sdd-hard-criteria-covered"
+when = { type = "epic" }
+severity = "error"
+assert = { label-coverage = { criteria-section = "success_criteria", marker = "[hard]", id-pattern = "REQ-[0-9]+", satisfies-namespace = "satisfies", child-state = "done", child-link = "dependents" } }
+
+# --- Graph: every satisfies: reference resolves to a declared req: ----------
+# Reference integrity. A child claiming `satisfies:REQ-09` is dangling unless
+# some issue declares `req:REQ-09`. Warn (not error) so a typo surfaces without
+# blocking the whole validate run.
+[[rules]]
+name = "sdd-satisfies-references-a-req"
+when = { label = "satisfies:*" }
+severity = "warn"
+assert = { label-reference = { from = "satisfies", to = "req", scope = "global" } }

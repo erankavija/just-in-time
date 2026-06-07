@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "SDD spec content schema. Validates the canonical Success Criteria of an epic, as exposed by the jit projection under sections.success_criteria.items. Each item is the raw text of a list entry, e.g. '[hard] REQ-01: the loader rejects ...'. Requires the section to exist with at least one [hard] criterion, and every criterion to begin with a [hard] or [aspirational] marker.",
+  "type": "object",
+  "required": ["sections"],
+  "properties": {
+    "sections": {
+      "type": "object",
+      "required": ["success_criteria"],
+      "properties": {
+        "success_criteria": {
+          "type": "object",
+          "required": ["items"],
+          "properties": {
+            "items": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "pattern": "^\\[(hard|aspirational)\\]\\s+\\S"
+              },
+              "contains": {
+                "type": "string",
+                "pattern": "^\\[hard\\]"
+              },
+              "minContains": 1
+            }
+          }
+        }
+      }
+    }
+  }
+}

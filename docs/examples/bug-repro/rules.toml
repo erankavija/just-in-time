@@ -1,0 +1,31 @@
+# Example ruleset: bug triage (a non-SDD methodology)
+#
+# This example exists to prove the validation engine is methodology-agnostic: the
+# same rule grammar that expresses Spec-Driven Development (see ../sdd/) here
+# expresses an unrelated workflow — bug hygiene — with no engine changes.
+#
+# The methodology: every `type:bug` issue must document how to reproduce the
+# defect before it can move forward. A bug with no reproduction steps is not
+# actionable.
+#
+# Engine kinds used:
+#   require-section  (local)  the body must have a `## Reproduction` section
+#   json-schema      (local)  the reproduction steps are a non-empty list
+#                              (schemas/bug-body.json over `sections`)
+
+# A bug must carry a Reproduction section. Structural shorthand; enforced.
+[[rules]]
+name = "bug-has-reproduction"
+when = { type = "bug" }
+severity = "error"
+enforce = true
+assert = { require-section = { heading = "Reproduction" } }
+
+# The reproduction must actually list at least one step. Content schema over the
+# projection's `sections.reproduction.items`.
+[[rules]]
+name = "bug-reproduction-has-steps"
+when = { type = "bug" }
+severity = "error"
+enforce = true
+assert = { json-schema = "schemas/bug-body.json" }
