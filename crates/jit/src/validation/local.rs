@@ -59,6 +59,11 @@ pub enum LocalEvalError {
     /// A rule's JSON Schema failed to compile.
     #[error(transparent)]
     Compile(#[from] SchemaCompileError),
+
+    /// The issue projection could not be serialized to JSON for validation.
+    /// Surfaced as an error rather than silently validating against a null value.
+    #[error("failed to serialize issue projection for validation: {0}")]
+    Projection(#[from] serde_json::Error),
 }
 
 /// The outcome of evaluating an issue against the local rules.
@@ -265,12 +270,36 @@ pub fn evaluate_local(issue: &Issue, rules: &RuleSet) -> Result<LocalEvaluation,
         return Ok(LocalEvaluation::default());
     }
 
+    let mut findings = Vec::new();
+
+    // A `checker-command` is the escape hatch (DR §4.3) and is NOT evaluated on
+    // the write path (it runs in `jit validate`). Surface a non-blocking warning
+    // for any matching local checker-command rule so an `enforce=true` one is not
+    // a SILENT no-op — the user is told it was skipped here.
+    for rule in &local_rules {
+        if matches!(rule.assert, Assertion::CheckerCommand(_)) {
+            findings.push(EnforcedFinding {
+                finding: Finding {
+                    rule: rule.name.clone(),
+                    severity: Severity::Warn,
+                    message: format!(
+                        "rule '{}' uses checker-command, which is not evaluated on the write \
+                         path; run `jit validate` to apply it",
+                        rule.name
+                    ),
+                },
+                enforce: false,
+            });
+        }
+    }
+
     // Resolve each rule's schema up front (desugar shorthand). This also lets us
     // detect whether ANY matching rule needs the parsed body before we decide to
-    // parse the description (laziness, DR §6.1).
+    // parse the description (laziness, DR §6.1). Rules with no evaluable schema
+    // (checker-command) are handled above.
     let resolved: Vec<(&Rule, serde_json::Value)> = local_rules
-        .into_iter()
-        .filter_map(|rule| rule_schema(rule).map(|schema| (rule, schema)))
+        .iter()
+        .filter_map(|&rule| rule_schema(rule).map(|schema| (rule, schema)))
         .collect();
 
     let needs_body = resolved
@@ -279,11 +308,10 @@ pub fn evaluate_local(issue: &Issue, rules: &RuleSet) -> Result<LocalEvaluation,
 
     // Project cheaply, then add `sections` ONLY if a matching rule needs it.
     let projection = build_projection(issue, needs_body);
-    let value = serde_json::to_value(&projection).unwrap_or_default();
+    let value = serde_json::to_value(&projection)?;
 
     // One engine per call (the engine is !Sync; never store it long-lived).
     let engine = SchemaEngine::new();
-    let mut findings = Vec::new();
     for (rule, schema) in &resolved {
         let key = crate::validation::engine::schema_key(schema);
         let validator = engine.validator_for(&key, &rule.name, schema)?;
@@ -336,9 +364,16 @@ fn rule_schema(rule: &Rule) -> Option<serde_json::Value> {
 fn schema_needs_sections(schema: &serde_json::Value) -> bool {
     fn walk(value: &serde_json::Value) -> bool {
         match value {
-            serde_json::Value::Object(map) => map
-                .iter()
-                .any(|(key, child)| key == "sections" || walk(child)),
+            serde_json::Value::Object(map) => map.iter().any(|(key, child)| {
+                key == "sections"
+                    // Regex-based property matching can target `sections`
+                    // without the literal ever appearing. Conservatively treat
+                    // its presence as a body need (over-parsing is a tiny cost;
+                    // missing it would silently validate a body-less projection).
+                    || key == "patternProperties"
+                    || key == "propertyNames"
+                    || walk(child)
+            }),
             serde_json::Value::Array(items) => items.iter().any(walk),
             // A raw schema can reference the body without `sections` ever being
             // an object key — e.g. `"required": ["sections"]` or

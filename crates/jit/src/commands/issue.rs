@@ -363,6 +363,13 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// and postchecks when transitioning to Gated.
     ///
     /// Returns warnings (e.g., lease warnings) if any.
+    ///
+    /// Note: this state-only transition path (used by `jit claim` → InProgress and
+    /// `jit issue reject` → Rejected) intentionally does NOT run `.jit/rules.toml`
+    /// local-rule enforcement: `claim` carries no content edits and `reject`
+    /// deliberately bypasses validation. Local rules are enforced on the
+    /// content-bearing write paths (`create_issue`, `update_issue`, bulk update)
+    /// via `validate_for_write`.
     pub fn update_issue_state(&self, id: &str, new_state: State) -> Result<Vec<String>> {
         let full_id = self.storage.resolve_issue_id(id)?;
 

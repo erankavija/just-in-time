@@ -554,7 +554,11 @@ impl<S: IssueStore> CommandExecutor<S> {
     pub fn require_active_lease(&self, issue_id: &str) -> Result<Option<String>> {
         use crate::config::EnforcementMode;
 
-        let mode = self.config_manager.get_enforcement_mode()?;
+        // Derive the mode from the cached config so a write command that also runs
+        // `validate_for_write` parses `config.toml` at most once (DR §6.1).
+        let mode = self
+            .config_manager
+            .enforcement_mode_from_config(self.cached_config()?)?;
 
         match mode {
             EnforcementMode::Off => Ok(None),

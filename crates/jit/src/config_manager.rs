@@ -111,12 +111,22 @@ impl ConfigManager {
     /// ```
     pub fn get_enforcement_mode(&self) -> Result<crate::config::EnforcementMode> {
         let config = self.load()?;
+        self.enforcement_mode_from_config(&config)
+    }
 
-        if let Some(worktree_config) = config.worktree {
-            worktree_config.enforcement_mode()
-        } else {
-            // No worktree section - default to Off for single-agent development
-            Ok(crate::config::EnforcementMode::Off)
+    /// Resolve the lease enforcement mode from an ALREADY-loaded config, without
+    /// re-reading `config.toml` from disk.
+    ///
+    /// Callers on a write path that already hold a cached [`JitConfig`] should use
+    /// this so a single command parses `config.toml` at most once.
+    pub fn enforcement_mode_from_config(
+        &self,
+        config: &JitConfig,
+    ) -> Result<crate::config::EnforcementMode> {
+        match config.worktree.as_ref() {
+            Some(worktree_config) => worktree_config.enforcement_mode(),
+            // No worktree section - default to Off for single-agent development.
+            None => Ok(crate::config::EnforcementMode::Off),
         }
     }
 

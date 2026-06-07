@@ -26,9 +26,13 @@ impl<S: IssueStore> CommandExecutor<S> {
         let full_id = self.storage.resolve_issue_id(issue_id)?;
         let mut issue = self.storage.load_issue(&full_id)?;
 
-        // Check uniqueness constraint
+        // Check uniqueness constraint. This path is only reached internally from
+        // `jit issue reject --reason` (adding a `resolution:` label); reject
+        // deliberately bypasses rule enforcement, so only the legacy validator
+        // runs here, not `.jit/rules.toml` local rules. Config/namespaces come
+        // from the executor cache so they are not re-parsed from disk per call.
         let (namespace, _) = label_utils::parse_label(label)?;
-        let namespaces = self.config_manager.get_namespaces()?;
+        let namespaces = self.cached_namespaces()?;
 
         if let Some(ns_config) = namespaces.get(&namespace) {
             if ns_config.unique {
@@ -49,12 +53,14 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         issue.labels.push(label.to_string());
 
-        // Validate the updated issue with configured rules
+        // Validate the updated issue with the legacy validator (config from cache).
         let mut warnings = Vec::new();
-        let config = self.config_manager.load()?;
+        let config = self.cached_config()?;
         if let Some(ref validation_config) = config.validation {
-            let validator =
-                crate::validation::IssueValidator::new(validation_config.clone(), namespaces);
+            let validator = crate::validation::IssueValidator::new(
+                validation_config.clone(),
+                namespaces.clone(),
+            );
             warnings = validator.validate(&issue)?;
         }
 
