@@ -258,8 +258,20 @@ fn wait_with_timeout(child: &mut std::process::Child, timeout: Duration) -> Resu
 fn kill_process_group(child: &mut std::process::Child) {
     use nix::sys::signal::{kill, Signal};
     use nix::unistd::Pid;
-    // A negative PID in kill(2) targets the process group with that PGID.
-    let _ = kill(Pid::from_raw(-(child.id() as i32)), Signal::SIGKILL);
+    // A negative PID in kill(2) targets the process group with that PGID
+    // (== the leader PID, set via `process_group(0)` at spawn). Guard the value
+    // before negating: a checked u32->i32 conversion avoids wrap-around for large
+    // PIDs, and rejecting PID <= 1 prevents the catastrophic `kill(-1)` (every
+    // process owned by the user) and `kill(0)` (the caller's OWN group). Any
+    // unexpected value simply falls back to killing the leader directly.
+    match i32::try_from(child.id()) {
+        Ok(pid) if pid > 1 => {
+            let _ = kill(Pid::from_raw(-pid), Signal::SIGKILL);
+        }
+        _ => {
+            let _ = child.kill();
+        }
+    }
 }
 
 #[cfg(not(unix))]
