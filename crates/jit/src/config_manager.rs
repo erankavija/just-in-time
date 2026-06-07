@@ -71,6 +71,19 @@ impl ConfigManager {
     /// Callers that already hold a parsed [`JitConfig`] (e.g. a cached copy)
     /// should use this instead of [`get_namespaces`](Self::get_namespaces) so a
     /// single write command parses `config.toml` at most once.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::config_manager::ConfigManager;
+    /// use jit::config::JitConfig;
+    ///
+    /// // A config with no `[namespaces]` section yields the default registry.
+    /// let config: JitConfig = serde_json::from_str("{}").unwrap();
+    /// let mgr = ConfigManager::new(".jit");
+    /// let namespaces = mgr.namespaces_from_config(&config);
+    /// let _ = namespaces;
+    /// ```
     pub fn namespaces_from_config(&self, config: &JitConfig) -> LabelNamespaces {
         // If config has namespaces, build from those; otherwise return defaults.
         if let Some(ref namespaces_config) = config.namespaces {
@@ -119,6 +132,21 @@ impl ConfigManager {
     ///
     /// Callers on a write path that already hold a cached [`JitConfig`] should use
     /// this so a single command parses `config.toml` at most once.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::config_manager::ConfigManager;
+    /// use jit::config::{EnforcementMode, JitConfig};
+    ///
+    /// // A config with no `[worktree]` section defaults to `Off`.
+    /// let config: JitConfig = serde_json::from_str("{}").unwrap();
+    /// let mgr = ConfigManager::new(".jit");
+    /// assert_eq!(
+    ///     mgr.enforcement_mode_from_config(&config).unwrap(),
+    ///     EnforcementMode::Off
+    /// );
+    /// ```
     pub fn enforcement_mode_from_config(
         &self,
         config: &JitConfig,
