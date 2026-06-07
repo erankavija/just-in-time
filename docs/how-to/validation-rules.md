@@ -142,12 +142,21 @@ criterion" with `contains` + `pattern` over `sections.success_criteria.items`.
 
 ## Worked example: Spec-Driven Development
 
-SDD treats an epic's `## Success Criteria` section as the single canonical source
-of truth. Each criterion has a `[hard]` or `[aspirational]` marker and a stable
-id (`REQ-01`). The `req:` / `satisfies:` labels are **derived** from those
-criteria, not authored independently:
+SDD treats an epic's specification body as the single canonical source of truth.
+The body has three structured sections — `## Requirements`, `## Scenarios`, and
+`## Success Criteria` — and the `req:` / `satisfies:` labels are **derived** from
+the criteria, not authored independently:
 
 ```markdown
+## Requirements
+
+- REQ-01: the loader rejects mixed shorthand and raw schema
+- REQ-02: a nicety we would like
+
+## Scenarios
+
+- Given a rule mixing shorthand and a raw schema When the loader runs Then it errors
+
 ## Success Criteria
 
 - [hard] REQ-01: the loader rejects mixed shorthand and raw schema
@@ -160,19 +169,41 @@ The epic carries `req:REQ-01`; a child that implements it carries
 
 - **`require-section`** (local, enforced) — the epic must have a
   `## Success Criteria` section at all.
-- **`json-schema`** (local, enforced) — the criteria are well-formed: at least
-  one `[hard]` item, and every item begins with a recognised marker. See
-  [`schemas/spec-body.json`](../examples/sdd/schemas/spec-body.json), which uses
-  `contains` + `pattern` over `sections.success_criteria.items`.
+- **`json-schema`** (local, enforced) — the spec **structure** is well-formed:
+  the body must contain non-empty `## Requirements` (each item `REQ-N: ...`),
+  `## Scenarios` (each item a single-line `Given ... When ... Then ...`), and
+  `## Success Criteria` sections, every Success Criteria item carries a
+  `[hard]`/`[aspirational]` marker and a `REQ-N:` id, and at least one item is
+  `[hard]`. See [`schemas/spec-body.json`](../examples/sdd/schemas/spec-body.json),
+  which uses `pattern` over `sections.<slug>.items` plus a `contains` +
+  `minContains` hard-criterion check.
 - **`label-value-pattern`** (local) — `req:` ids look like `REQ-01`.
 - **`label-coverage`** (graph) — every `[hard]` criterion is satisfied by some
-  `done` child carrying `satisfies:<id>`. This is the canonical criteria → labels
-  coverage check.
-- **`label-reference`** (graph) — every `satisfies:<id>` points at a declared
-  `req:<id>` (reference integrity); a typo surfaces as a warning.
+  `done` child carrying `satisfies:<id>`. This is the canonical criteria →
+  `satisfies:` coverage check.
+- **`label-reference`** (graph, `satisfies` → `req`) — every `satisfies:<id>`
+  points at a declared `req:<id>` (reference integrity); a typo surfaces as a
+  warning.
+- **`label-reference`** (graph, `req` → `satisfies`) — every declared `req:<id>`
+  is actually used by some `satisfies:<id>` child. A `req:` label that nothing
+  satisfies is a **stray/invented** label — exactly the "criteria are canonical,
+  labels derived" violation — and is reported as an error.
 
-This demonstrates the criteria → `req:`/`satisfies:` derivation the methodology
-requires: the description is the source, and the labels are checked against it.
+### What is enforced vs. authoring discipline
+
+Precisely, the engine enforces: (1) `req:` **format**; (2) the
+Requirements/Scenarios/Success-Criteria **structure** with a `[hard]` criterion;
+(3) **coverage** of each `[hard]` criterion id by a `satisfies:` child;
+(4) `satisfies:` → `req:` reference integrity; and (5) `req:` → `satisfies:`
+integrity (no stray `req:`). Together (3)–(5) close the derivation loop so a
+`req:` label cannot float free of the canonical criteria.
+
+One direction is an authoring convention rather than a hard check: the engine
+compares a `req:` value against the `satisfies:` labels present, not directly
+against the REQ ids in the criteria prose (no rule kind compares a label value to
+ids extracted from description text). So always derive a `req:` from a criterion
+that actually exists in the body — and rule (5) catches a `req:` that no child
+ever satisfies.
 
 ## The engine is methodology-agnostic
 

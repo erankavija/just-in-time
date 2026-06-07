@@ -80,13 +80,25 @@ fn test_all_example_rulesets_load() {
 // 2a. SDD — local rules: compliant epic passes, non-compliant epic fails.
 // ---------------------------------------------------------------------------
 
-/// A compliant SDD epic: has the Success Criteria section with a well-formed
-/// `[hard]` criterion, and a correctly-formatted `req:` id.
-fn sdd_compliant_epic() -> Issue {
-    let body = "## Success Criteria\n\n\
+/// A well-formed SDD spec body: Requirements, Scenarios, and Success Criteria
+/// sections, each shaped as `schemas/spec-body.json` requires.
+fn sdd_compliant_body() -> String {
+    "## Requirements\n\n\
+        - REQ-01: the loader rejects mixed shorthand and raw schema\n\
+        - REQ-02: a nicety we would like\n\n\
+        ## Scenarios\n\n\
+        - Given a rule mixing shorthand and a raw schema When the loader runs Then it errors\n\n\
+        ## Success Criteria\n\n\
         - [hard] REQ-01: the loader rejects mixed shorthand and raw schema\n\
-        - [aspirational] REQ-02: a nicety we would like\n";
-    let mut epic = Issue::new("Validation engine".to_string(), body.to_string());
+        - [aspirational] REQ-02: a nicety we would like\n"
+        .to_string()
+}
+
+/// A compliant SDD epic: a well-formed spec body (Requirements / Scenarios /
+/// Success Criteria with a `[hard]` criterion) and a correctly-formatted `req:`
+/// id derived from the criteria.
+fn sdd_compliant_epic() -> Issue {
+    let mut epic = Issue::new("Validation engine".to_string(), sdd_compliant_body());
     epic.labels = vec!["type:epic".to_string(), "req:REQ-01".to_string()];
     epic
 }
@@ -193,6 +205,151 @@ fn test_sdd_graph_reference_warns_on_dangling_satisfies() {
         findings.iter().any(|f| f.finding.message.contains("REQ-99")
             && f.finding.rule == "sdd-satisfies-references-a-req"),
         "a dangling satisfies: reference must be reported: {findings:?}"
+    );
+}
+
+#[test]
+fn test_sdd_graph_stray_req_label_is_reported() {
+    // Finding 1: a `req:` label that no child satisfies is stray/invented — it
+    // does NOT correspond to any implemented criterion. The `sdd-req-is-satisfied`
+    // rule (req -> satisfies integrity) catches it.
+    let set = load_example("sdd");
+    let rules = graph_rules(&set);
+
+    // Epic declares the legitimate req:REQ-01 AND a stray req:REQ-77.
+    let mut epic = sdd_compliant_epic();
+    epic.labels.push("req:REQ-77".to_string());
+
+    // A done child satisfies only REQ-01.
+    let mut child = Issue::new("implement REQ-01".to_string(), String::new());
+    child.labels = vec!["type:task".to_string(), "satisfies:REQ-01".to_string()];
+    child.dependencies = vec![epic.id.clone()];
+    child.state = State::Done;
+
+    let findings = issue_graph_findings(&rules, &[epic, child]);
+    assert!(
+        findings
+            .iter()
+            .any(|f| f.finding.message.contains("REQ-77")
+                && f.finding.rule == "sdd-req-is-satisfied"),
+        "a stray req: label with no satisfying child must be reported: {findings:?}"
+    );
+    // The legitimate req:REQ-01 must NOT be reported as stray.
+    assert!(
+        !findings
+            .iter()
+            .any(|f| f.finding.rule == "sdd-req-is-satisfied"
+                && f.finding.message.contains("REQ-01")),
+        "a satisfied req: label must not be flagged as stray: {findings:?}"
+    );
+}
+
+#[test]
+fn test_sdd_graph_missing_req_surfaces_via_coverage_chain() {
+    // Finding 1 (other direction): a [hard] criterion for which NO `req:` is
+    // declared and NO child satisfies it surfaces through the criteria -> satisfies
+    // coverage rule. This is the enforceable criteria -> req chain: a hard
+    // criterion cannot silently lack a derived label.
+    let set = load_example("sdd");
+    let rules = graph_rules(&set);
+
+    // Epic body has [hard] REQ-01, but the epic declares NO req: label and there
+    // is no satisfying child.
+    let mut epic = sdd_compliant_epic();
+    epic.labels = vec!["type:epic".to_string()];
+
+    let findings = issue_graph_findings(&rules, std::slice::from_ref(&epic));
+    assert!(
+        findings.iter().any(|f| f.finding.message.contains("REQ-01")
+            && f.finding.rule == "sdd-hard-criteria-covered"),
+        "a hard criterion with no derived/satisfying label must be reported: {findings:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// 2b'. SDD — local schema: requirement/scenario STRUCTURE is validated.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_sdd_missing_requirements_section_fails_local() {
+    // Finding 2: a spec missing the Requirements section fails schema validation.
+    let set = load_example("sdd");
+    let mut epic = sdd_compliant_epic();
+    epic.description = "## Scenarios\n\n\
+        - Given x When y Then z\n\n\
+        ## Success Criteria\n\n\
+        - [hard] REQ-01: do the thing\n"
+        .to_string();
+    let eval = evaluate_local(&epic, &set).unwrap();
+    assert!(
+        eval.is_blocking(),
+        "a spec with no Requirements section must be blocked"
+    );
+}
+
+#[test]
+fn test_sdd_missing_scenarios_section_fails_local() {
+    // Finding 2: a spec missing the Scenarios section fails schema validation.
+    let set = load_example("sdd");
+    let mut epic = sdd_compliant_epic();
+    epic.description = "## Requirements\n\n\
+        - REQ-01: do the thing\n\n\
+        ## Success Criteria\n\n\
+        - [hard] REQ-01: do the thing\n"
+        .to_string();
+    let eval = evaluate_local(&epic, &set).unwrap();
+    assert!(
+        eval.is_blocking(),
+        "a spec with no Scenarios section must be blocked"
+    );
+}
+
+#[test]
+fn test_sdd_malformed_requirement_item_fails_local() {
+    // Finding 2: a Requirements item not shaped `REQ-N: ...` fails the schema.
+    let set = load_example("sdd");
+    let mut epic = sdd_compliant_epic();
+    epic.description = "## Requirements\n\n\
+        - this is not a REQ id at all\n\n\
+        ## Scenarios\n\n\
+        - Given x When y Then z\n\n\
+        ## Success Criteria\n\n\
+        - [hard] REQ-01: do the thing\n"
+        .to_string();
+    let eval = evaluate_local(&epic, &set).unwrap();
+    assert!(
+        eval.is_blocking(),
+        "a malformed Requirements item must be blocked"
+    );
+}
+
+#[test]
+fn test_sdd_malformed_scenario_item_fails_local() {
+    // Finding 2: a Scenarios item not in Given/When/Then shape fails the schema.
+    let set = load_example("sdd");
+    let mut epic = sdd_compliant_epic();
+    epic.description = "## Requirements\n\n\
+        - REQ-01: do the thing\n\n\
+        ## Scenarios\n\n\
+        - just a freeform note, no given/when/then\n\n\
+        ## Success Criteria\n\n\
+        - [hard] REQ-01: do the thing\n"
+        .to_string();
+    let eval = evaluate_local(&epic, &set).unwrap();
+    assert!(
+        eval.is_blocking(),
+        "a malformed Scenarios item must be blocked"
+    );
+}
+
+#[test]
+fn test_sdd_well_formed_structure_passes_local() {
+    // Finding 2: a fully well-formed spec (Requirements + Scenarios + Success
+    // Criteria, all correctly shaped) passes the structural schema.
+    let set = load_example("sdd");
+    assert!(
+        !has_local_finding(&sdd_compliant_epic(), &set),
+        "a well-formed Requirements/Scenarios/Success-Criteria spec must pass"
     );
 }
 

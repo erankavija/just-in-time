@@ -4,24 +4,54 @@
 # use it, copy this file to `.jit/rules.toml` and the `schemas/` directory to
 # `.jit/schemas/` in your own project.
 #
-# SDD models the methodology where an epic's `## Success Criteria` section is the
-# single canonical source of truth. Each criterion carries a `[hard]` or
-# `[aspirational]` marker and an embedded stable id (e.g. `REQ-01`). The
-# `req:<id>` and `satisfies:<id>` labels are DERIVED from those criteria, never
-# authored as an independent source:
+# SDD models the methodology where an epic's specification body is the single
+# canonical source of truth. The body has three structured sections:
+#
+#   * `## Requirements`     each item `REQ-N: <text>`
+#   * `## Scenarios`        each item a single-line `Given ... When ... Then ...`
+#   * `## Success Criteria` each item `[hard]`/`[aspirational]` + a `REQ-N:` id
+#
+# The `req:<id>` (on the epic) and `satisfies:<id>` (on children) labels are
+# DERIVED from those criteria, never authored as an independent source:
 #
 #   * an epic declares `req:REQ-01` for each id it owns;
 #   * a child issue that implements REQ-01 carries `satisfies:REQ-01`;
-#   * coverage (every hard criterion has a satisfying child) and
-#     reference-integrity (every `satisfies:` points at a declared `req:`) are
-#     CHECKED against the canonical criteria by the graph rules below.
+#   * the graph rules below CHECK the labels against the canonical criteria.
+#
+# WHAT THE ENGINE ENFORCES (precisely):
+#   1. format        — `req:` values look like `REQ-01` (label-value-pattern).
+#   2. structure     — the body has well-formed Requirements / Scenarios /
+#                      Success Criteria sections, with >= 1 `[hard]` criterion
+#                      (json-schema over the projection's `sections`).
+#   3. coverage      — every `[hard]` criterion id in `## Success Criteria` is
+#                      satisfied by a `done` child carrying `satisfies:<id>`
+#                      (label-coverage; criteria -> satisfies).
+#   4. satisfies->req — every `satisfies:<id>` resolves to a declared `req:<id>`
+#                      (label-reference reference-integrity).
+#   5. req->satisfies — every declared `req:<id>` is actually USED by some
+#                      `satisfies:<id>` child; a `req:` label that nothing
+#                      satisfies is a STRAY/invented label and is reported
+#                      (label-reference; the inverse direction). Combined with
+#                      (3) and (4) this closes the derivation loop so a `req:`
+#                      label cannot float free of the canonical criteria.
+#
+# NOTE ON THE LIMIT OF (5): the engine compares a `req:` label value against the
+# `satisfies:` labels actually present, not directly against the criterion text
+# in `## Success Criteria` (no rule kind compares a label value to ids extracted
+# from description prose). So a `req:REQ-77` is caught when no child satisfies it;
+# the criteria-as-canonical discipline (only ever declare a `req:` for a REQ id
+# that exists in the body) remains an AUTHORING convention reinforced by (2)+(3).
+#
+# AUTHORING WORKFLOW (the derivation discipline the methodology asks for): write
+# the criteria first; for each `REQ-N:` you keep, add the matching `req:REQ-N`
+# label on the epic and a `satisfies:REQ-N` label on the implementing child.
 #
 # Engine kinds used here (all real, see crates/jit/src/validation/):
 #   require-section       (local)  structural: the criteria section must exist
 #   json-schema           (local)  content: schemas/spec-body.json over `sections`
 #   label-value-pattern   (local)  req ids look like REQ-01
-#   label-coverage        (graph)  req -> satisfies coverage of [hard] criteria
-#   label-reference       (graph)  satisfies -> req reference integrity
+#   label-coverage        (graph)  criteria -> satisfies coverage of [hard] items
+#   label-reference       (graph)  satisfies -> req AND req -> satisfies integrity
 
 # --- Local: the spec must have a Success Criteria section -------------------
 # Structural shorthand. Runs on the write path; `enforce = true` blocks a write
@@ -75,3 +105,16 @@ name = "sdd-satisfies-references-a-req"
 when = { label = "satisfies:*" }
 severity = "warn"
 assert = { label-reference = { from = "satisfies", to = "req", scope = "global" } }
+
+# --- Graph: every declared req: is actually used by a satisfies: -------------
+# Stray-label / derivation integrity (the INVERSE of the rule above). A `req:`
+# label is meant to be DERIVED from a canonical criterion and then implemented by
+# a child. If an epic declares `req:REQ-77` that NO child satisfies, the label is
+# stray or invented — exactly the "criteria are canonical, labels derived"
+# violation. Reported as an error so a fabricated `req:` cannot float free.
+# `scope = "global"` so the satisfying child can live anywhere in the repository.
+[[rules]]
+name = "sdd-req-is-satisfied"
+when = { label = "req:*" }
+severity = "error"
+assert = { label-reference = { from = "req", to = "satisfies", scope = "global" } }
