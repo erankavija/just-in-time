@@ -3564,7 +3564,9 @@ fn run() -> Result<()> {
             }
         }
         Commands::Validate {
+            id,
             json,
+            explain,
             fix,
             dry_run,
             divergence,
@@ -3573,6 +3575,83 @@ fn run() -> Result<()> {
             // Validate dry_run requires fix
             if dry_run && !fix {
                 return Err(anyhow!("--dry-run requires --fix to be specified"));
+            }
+
+            // --explain requires an issue id (it is a per-issue debugging view).
+            if explain && id.is_none() {
+                return Err(anyhow!("--explain requires an issue id"));
+            }
+
+            // --explain path: report matched selectors -> rule names -> outcomes.
+            if explain {
+                let issue_id = id.as_deref().expect("checked above");
+                let report = executor.explain_rules(issue_id)?;
+                let exit_nonzero = report.has_errors();
+                if json {
+                    use jit::output::JsonOutput;
+                    let value = serde_json::to_value(&report)?;
+                    let output =
+                        JsonOutput::success(value, "validate").with_message(if exit_nonzero {
+                            "Validation found error-severity rule failures".to_string()
+                        } else {
+                            "Validation passed".to_string()
+                        });
+                    println!("{}", output.to_json_string()?);
+                } else {
+                    println!("Rule explanation for issue {}", report.issue_id);
+                    if report.outcomes.is_empty() {
+                        println!("  (no rules match this issue)");
+                    }
+                    for outcome in &report.outcomes {
+                        let status = if outcome.passed { "PASS" } else { "FAIL" };
+                        println!(
+                            "  [{}] {} ({}, {}) selector: {}",
+                            status, outcome.rule, outcome.scope, outcome.severity, outcome.selector
+                        );
+                        for message in &outcome.messages {
+                            println!("      - {}", message);
+                        }
+                    }
+                }
+                if exit_nonzero {
+                    std::process::exit(1);
+                }
+                return Ok(());
+            }
+
+            // Per-issue rule run: `jit validate <id>` (no --fix/--divergence/--leases).
+            if id.is_some() && !fix && !divergence && !leases {
+                let report = executor.run_rules(id.as_deref())?;
+                let exit_nonzero = report.has_errors();
+                if json {
+                    use jit::output::JsonOutput;
+                    let value = serde_json::to_value(&report)?;
+                    let output =
+                        JsonOutput::success(value, "validate").with_message(if exit_nonzero {
+                            format!("Validation failed with {} error(s)", report.error_count())
+                        } else {
+                            "Validation passed".to_string()
+                        });
+                    println!("{}", output.to_json_string()?);
+                } else if report.findings.is_empty() {
+                    println!("✓ Issue validation passed");
+                } else {
+                    for finding in &report.findings {
+                        println!(
+                            "{} [{}] {}",
+                            if finding.is_error() { "❌" } else { "⚠" },
+                            finding.rule,
+                            finding.message
+                        );
+                    }
+                    if exit_nonzero {
+                        eprintln!("Validation failed with {} error(s)", report.error_count());
+                    }
+                }
+                if exit_nonzero {
+                    std::process::exit(1);
+                }
+                return Ok(());
             }
 
             // Handle specific validations if requested
@@ -3704,9 +3783,17 @@ fn run() -> Result<()> {
                     println!("{}", output.to_json_string()?);
                 }
             } else {
-                // Standard validation with warnings
+                // Standard validation with warnings. `validate_silent` runs the
+                // repo-integrity checks (broken deps, gates, labels, DAG,
+                // transitive reduction) and fails on any graph-rule error.
                 executor.validate_silent()?;
                 let warnings = executor.collect_all_warnings()?;
+
+                // Also run the declarative local rules for every issue so a
+                // whole-repo `jit validate` surfaces (and fails on) local rule
+                // findings, not just graph + integrity checks.
+                let rule_report = executor.run_rules(None)?;
+                let rules_failed = rule_report.has_errors();
 
                 if json {
                     use jit::output::JsonOutput;
@@ -3742,18 +3829,44 @@ fn run() -> Result<()> {
                         })
                         .collect();
 
+                    let findings_json = serde_json::to_value(&rule_report.findings)?;
                     let output = JsonOutput::success(
                         json!({
-                            "valid": true,
+                            "valid": !rules_failed,
                             "warnings": warnings_json,
                             "warning_count": warnings_json.len(),
-                            "message": "Repository validation passed"
+                            "rule_findings": findings_json,
+                            "error_count": rule_report.error_count(),
+                            "message": if rules_failed {
+                                format!(
+                                    "Repository validation failed with {} rule error(s)",
+                                    rule_report.error_count()
+                                )
+                            } else {
+                                "Repository validation passed".to_string()
+                            }
                         }),
                         "validate",
                     );
                     println!("{}", output.to_json_string()?);
                 } else {
-                    println!("✓ Repository validation passed");
+                    if rules_failed {
+                        println!(
+                            "❌ Repository validation failed with {} rule error(s)",
+                            rule_report.error_count()
+                        );
+                    } else {
+                        println!("✓ Repository validation passed");
+                    }
+
+                    for finding in &rule_report.findings {
+                        println!(
+                            "{} [{}] {}",
+                            if finding.is_error() { "❌" } else { "⚠" },
+                            finding.rule,
+                            finding.message
+                        );
+                    }
 
                     if !warnings.is_empty() {
                         use jit::type_hierarchy::ValidationWarning;
@@ -3794,6 +3907,13 @@ fn run() -> Result<()> {
                             }
                         }
                     }
+                }
+
+                // Exit non-zero when any rule produced an error-severity finding,
+                // mirroring the per-issue path and the graph-error behavior of
+                // validate_silent (which already returns Err on graph errors).
+                if rules_failed {
+                    std::process::exit(1);
                 }
             }
         }

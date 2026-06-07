@@ -329,6 +329,179 @@ impl<S: IssueStore> CommandExecutor<S> {
         ))
     }
 
+    /// Run the declarative rule set (`.jit/rules.toml`) as a per-issue or
+    /// whole-repo report.
+    ///
+    /// When `id` is `Some`, the issue is resolved (partial ids accepted) and its
+    /// matching local rules are evaluated, then graph rules are evaluated across
+    /// the whole store with their findings filtered to those that name this
+    /// issue (graph rules are inherently cross-issue, so a per-issue report
+    /// surfaces only the graph findings relevant to it). When `id` is `None`,
+    /// local rules run for every issue and graph rules run across the store, with
+    /// every graph finding reported. The result is a pure
+    /// [`RuleReport`](crate::validation::report::RuleReport); rendering and exit
+    /// codes are the caller's concern.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `.jit/rules.toml` is malformed, the issue id cannot be
+    /// resolved, or a matching local rule's schema fails to compile (a
+    /// misconfigured rule never silently disables enforcement).
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use jit::commands::CommandExecutor;
+    /// use jit::storage::JsonFileStorage;
+    ///
+    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
+    /// // Whole-repo rule report.
+    /// let report = executor.run_rules(None).unwrap();
+    /// println!("{} error(s)", report.error_count());
+    /// ```
+    pub fn run_rules(&self, id: Option<&str>) -> Result<crate::validation::report::RuleReport> {
+        use crate::validation::report::{ReportedFinding, RuleReport};
+
+        let ruleset = self
+            .rules()
+            .map_err(|e| anyhow!("Invalid .jit/rules.toml: {}", e))?;
+        let issues = self.storage.list_issues()?;
+
+        let mut findings: Vec<ReportedFinding> = Vec::new();
+
+        match id {
+            Some(partial) => {
+                // Resolve the target issue (partial ids accepted via storage).
+                let issue = self.storage.load_issue(partial)?;
+
+                // Local rules for this issue only.
+                let evaluation = crate::validation::evaluate_local(&issue, ruleset)
+                    .map_err(|e| anyhow!("Local rule evaluation failed: {}", e))?;
+                findings.extend(
+                    evaluation
+                        .findings()
+                        .into_iter()
+                        .map(|f| ReportedFinding::new(Some(issue.id.clone()), f)),
+                );
+
+                // Graph rules across the store, but keep only findings that name
+                // this issue's short id (graph rules are cross-issue).
+                let short = issue.short_id();
+                let graph_findings = self.evaluate_graph_rules(&issues)?;
+                findings.extend(
+                    graph_findings
+                        .iter()
+                        .filter(|f| f.message.contains(&short))
+                        .map(|f| ReportedFinding::new(Some(issue.id.clone()), f)),
+                );
+            }
+            None => {
+                // Local rules for every issue.
+                for issue in &issues {
+                    let evaluation = crate::validation::evaluate_local(issue, ruleset)
+                        .map_err(|e| anyhow!("Local rule evaluation failed: {}", e))?;
+                    findings.extend(
+                        evaluation
+                            .findings()
+                            .into_iter()
+                            .map(|f| ReportedFinding::new(Some(issue.id.clone()), f)),
+                    );
+                }
+
+                // Graph rules across the store; every finding is reported.
+                let graph_findings = self.evaluate_graph_rules(&issues)?;
+                findings.extend(graph_findings.iter().map(|f| ReportedFinding::new(None, f)));
+            }
+        }
+
+        Ok(RuleReport { findings })
+    }
+
+    /// Build the `--explain` report for one issue: every rule whose selector
+    /// matches the issue, paired with whether it passed and its messages.
+    ///
+    /// Local rules are evaluated against the issue; graph rules are evaluated
+    /// across the whole store and a graph rule is considered to apply to this
+    /// issue when its selector matches it, with findings filtered to those
+    /// naming the issue. Each [`RuleOutcome`](crate::validation::report::RuleOutcome)
+    /// records the matched selector (rendered), scope, severity, pass/fail, and
+    /// any messages.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `.jit/rules.toml` is malformed, the issue id cannot be
+    /// resolved, or a matching local rule's schema fails to compile.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use jit::commands::CommandExecutor;
+    /// use jit::storage::JsonFileStorage;
+    ///
+    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
+    /// let report = executor.explain_rules("abc12345").unwrap();
+    /// println!("{} matching rule(s)", report.outcomes.len());
+    /// ```
+    pub fn explain_rules(&self, id: &str) -> Result<crate::validation::report::ExplainReport> {
+        use crate::validation::report::{ExplainReport, RuleOutcome};
+        use crate::validation::rules::Scope;
+
+        let ruleset = self
+            .rules()
+            .map_err(|e| anyhow!("Invalid .jit/rules.toml: {}", e))?;
+        let issue = self.storage.load_issue(id)?;
+        let issues = self.storage.list_issues()?;
+        let short = issue.short_id();
+
+        // Local findings for this issue, grouped by rule name.
+        let local_eval = crate::validation::evaluate_local(&issue, ruleset)
+            .map_err(|e| anyhow!("Local rule evaluation failed: {}", e))?;
+        let local_messages = group_messages(
+            local_eval
+                .findings()
+                .into_iter()
+                .map(|f| (f.rule.clone(), f.message.clone())),
+        );
+
+        // Graph findings naming this issue, grouped by rule name.
+        let graph_findings = self.evaluate_graph_rules(&issues)?;
+        let graph_messages = group_messages(
+            graph_findings
+                .iter()
+                .filter(|f| f.message.contains(&short))
+                .map(|f| (f.rule.clone(), f.message.clone())),
+        );
+
+        // Every rule whose selector matches the issue becomes one outcome.
+        let outcomes: Vec<RuleOutcome> = ruleset
+            .matching_rules(&issue)
+            .into_iter()
+            .map(|rule| {
+                let scope = match rule.scope {
+                    Scope::Local => "local",
+                    Scope::Graph => "graph",
+                };
+                let messages = match rule.scope {
+                    Scope::Local => local_messages.get(&rule.name).cloned().unwrap_or_default(),
+                    Scope::Graph => graph_messages.get(&rule.name).cloned().unwrap_or_default(),
+                };
+                RuleOutcome {
+                    rule: rule.name.clone(),
+                    scope: scope.to_string(),
+                    severity: rule.severity.token().to_string(),
+                    selector: render_selector(&rule.when),
+                    passed: messages.is_empty(),
+                    messages,
+                }
+            })
+            .collect();
+
+        Ok(ExplainReport {
+            issue_id: issue.id,
+            outcomes,
+        })
+    }
+
     fn validate_labels(&self, issues: &[Issue]) -> Result<()> {
         let namespaces = self.config_manager.get_namespaces()?;
 
@@ -1087,6 +1260,45 @@ fn graph_findings_error_message(findings: &[crate::validation::engine::Finding])
         errors.len(),
         body
     ))
+}
+
+/// Group `(rule_name, message)` pairs into a map of rule name to its messages,
+/// preserving first-seen order within each rule.
+fn group_messages(
+    pairs: impl IntoIterator<Item = (String, String)>,
+) -> std::collections::HashMap<String, Vec<String>> {
+    pairs.into_iter().fold(
+        std::collections::HashMap::new(),
+        |mut acc, (rule, message)| {
+            acc.entry(rule).or_default().push(message);
+            acc
+        },
+    )
+}
+
+/// Render a rule selector as a compact, human-readable string for `--explain`.
+///
+/// An empty selector (matches everything) renders as `"*"`; otherwise the
+/// present dimensions are joined with `", "` (e.g. `"type=epic, state=ready"`).
+fn render_selector(selector: &crate::validation::rules::Selector) -> String {
+    let mut parts: Vec<String> = Vec::new();
+    if let Some(t) = &selector.type_ {
+        parts.push(format!("type={t}"));
+    }
+    if let Some(l) = &selector.label {
+        parts.push(format!("label={l}"));
+    }
+    if let Some(s) = &selector.state {
+        parts.push(format!("state={s}"));
+    }
+    if let Some(d) = &selector.has_doc_type {
+        parts.push(format!("has_doc_type={d}"));
+    }
+    if parts.is_empty() {
+        "*".to_string()
+    } else {
+        parts.join(", ")
+    }
 }
 
 /// Find the closest match for an unregistered namespace among known ones.

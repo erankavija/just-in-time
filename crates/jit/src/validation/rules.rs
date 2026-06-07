@@ -141,6 +141,30 @@ pub enum Severity {
     Error,
 }
 
+impl Severity {
+    /// Stable snake_case token for this severity, matching the TOML grammar.
+    ///
+    /// Used to render severities consistently in both human and `--json`
+    /// validation output.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::validation::rules::Severity;
+    ///
+    /// assert_eq!(Severity::Off.token(), "off");
+    /// assert_eq!(Severity::Warn.token(), "warn");
+    /// assert_eq!(Severity::Error.token(), "error");
+    /// ```
+    pub fn token(self) -> &'static str {
+        match self {
+            Severity::Off => "off",
+            Severity::Warn => "warn",
+            Severity::Error => "error",
+        }
+    }
+}
+
 /// Evaluation scope of a rule, derived from its assertion kind.
 ///
 /// `Local` rules are pure predicates over a single projected issue and run on
