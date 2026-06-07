@@ -131,7 +131,7 @@
           "short_id": "5e79ba48",
           "title": "Fix epic-review correctness findings (schema collision, checker-command enforce, gate PID)",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "e93af54b",
@@ -214,7 +214,8 @@
     "b8ba1b10": 1,
     "a0f0f342": 2,
     "a6daa05d": 1,
-    "0abaddc0": 2
+    "0abaddc0": 2,
+    "5e79ba48": 0
   },
   "started_at": "2026-06-06T00:00:00Z",
   "handoffs": [

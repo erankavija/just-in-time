@@ -2,7 +2,7 @@
   "id": "5e79ba48-0012-4c79-b35f-6a7bc8c2f675",
   "title": "Fix epic-review correctness findings (schema-name collision, checker-command enforce, gate PID safety)",
   "description": "Fix the three correctness findings raised by the epic-level code-review gate on f6a704d0.\n\n## Background\n\nPart of Scope Expansion 2. See `dev/active/f6a704d0-expansion2-plan.md` §1 and §6a (MF6).\n\n## Success Criteria\n\n- [ ] [hard] Schema-filename collisions are prevented: two distinct rule names that sanitize to the same `schemas/<name>.json` no longer silently overwrite each other (`serialize.rs`/`migration.rs` write path); a test with colliding names proves it.\n- [ ] [hard] `checker-command` rules with `enforce = true` are REJECTED at load with a clear `RuleConfigError` (checker-command is a validate/gate escape hatch per DR §4.3, not a write-blocker); a loader test covers reject-on-true and accept-on-false.\n- [ ] [hard] The gate-execution PID-safety bug is fixed: the process group is signalled BEFORE the leader is reaped (reap-then-signal ordering eliminated), so a recycled PID/PGID cannot be signalled; existing gate-execution tests stay green.\n- [ ] [hard] `cargo fmt`, `cargo clippy --workspace --all-targets`, and `cargo test --workspace` are clean.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "normal",
   "assignee": "agent:claude",
   "dependencies": [],
@@ -10,7 +10,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-07T18:55:18.835847760Z"
+    },
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-07T18:51:35.108759101Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -18,5 +29,5 @@
     "epic:validation-engine"
   ],
   "created_at": "2026-06-07T17:58:58.107570116+00:00",
-  "updated_at": "2026-06-07T18:13:35.476517253+00:00"
+  "updated_at": "2026-06-07T19:02:29.254341243+00:00"
 }
