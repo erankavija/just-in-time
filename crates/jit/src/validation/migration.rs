@@ -44,19 +44,40 @@ use crate::validation::defaults::default_ruleset;
 use crate::validation::rules::RuleSet;
 use crate::validation::serialize::{serialize_ruleset, SchemaFile, SerializedRuleSet};
 
+/// Which of the four repo states [`migrate_or_scaffold`] acted on (D5).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MigrationState {
+    /// No `rules.toml`, no legacy keys: a complete `rules.toml` was scaffolded
+    /// from the in-code intended defaults (no strip, no migration message).
+    FreshScaffold,
+    /// No `rules.toml`, legacy keys present: serialized the complete ruleset from
+    /// the live config and stripped the legacy keys.
+    LegacyMigrated,
+    /// `rules.toml` present AND legacy keys present: appended missing defaults by
+    /// name (no clobber) and stripped the legacy keys.
+    Coexistence,
+    /// `rules.toml` present AND no legacy keys: nothing to do (true no-op).
+    AlreadyMigrated,
+}
+
 /// The outcome of running [`migrate_or_scaffold`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MigrationOutcome {
-    /// Fully-qualified legacy keys stripped from `config.toml` (empty when there
-    /// were none, e.g. a fresh post-migration template or an already-migrated
-    /// repo).
+    /// Which repo state was handled.
+    pub state: MigrationState,
+    /// Fully-qualified legacy keys stripped from `config.toml` (empty for a fresh
+    /// scaffold or an already-migrated repo).
     pub stripped_keys: Vec<String>,
     /// Default rule names skipped during coexistence because the user's
-    /// `rules.toml` already defined them.
+    /// `rules.toml` already defined them (empty otherwise).
     pub skipped_existing: Vec<String>,
-    /// Whether a `rules.toml` already existed before this run (coexistence /
-    /// already-migrated). When false, a fresh complete file was written.
-    pub file_preexisted: bool,
+}
+
+impl MigrationOutcome {
+    /// Whether this run performed no changes (already-migrated no-op).
+    pub fn is_noop(&self) -> bool {
+        self.state == MigrationState::AlreadyMigrated
+    }
 }
 
 /// Serialize the COMPLETE default ruleset for a repo (D4/D5).
@@ -88,49 +109,77 @@ fn empty_validation_config() -> ValidationConfig {
     }
 }
 
-/// Run the `jit init` migration / scaffold under `jit_root` (the `.jit` dir).
+/// Run the `jit init` migration / scaffold under `jit_root` (the `.jit` dir),
+/// dispatching on the repo's state (D5).
 ///
-/// `config` and `namespaces` are the repo's already-loaded config (for a fresh
-/// repo these come from the just-written template; for a legacy repo they carry
-/// the live enforcement keys). The function:
+/// - `config`/`namespaces` are the repo's LIVE on-disk config (post-template for
+///   a fresh repo, so they carry NO constraints; for a legacy repo they carry the
+///   live enforcement keys). They drive the complete ruleset for the legacy and
+///   coexistence paths and the legacy-key detection.
+/// - `fresh_defaults` is the in-code INTENDED default config (carrying the rich
+///   constraints, decision D6). It drives the complete ruleset ONLY for a fresh
+///   scaffold, where the on-disk config is intentionally clean and therefore
+///   cannot reproduce today's checks on its own.
 ///
-/// 1. Computes the complete serialized ruleset.
-/// 2. Detects the legacy keys present in `config.toml`.
-/// 3. Writes / appends `rules.toml` + schema files per repo state (D5).
-/// 4. Strips the legacy keys from `config.toml` (removing an emptied
-///    `[validation]` header).
+/// The four states (keyed on `rules.toml` presence AND legacy-key presence):
 ///
-/// Idempotent: re-running with a present `rules.toml` and no legacy keys is a
-/// no-op.
+/// | rules.toml | legacy keys | state            | action                          |
+/// |------------|-------------|------------------|---------------------------------|
+/// | absent     | none        | FreshScaffold    | write complete file from `fresh_defaults` |
+/// | absent     | present     | LegacyMigrated   | write complete file from `config`, strip keys |
+/// | present    | present     | Coexistence      | append missing defaults by name, strip keys |
+/// | present    | none        | AlreadyMigrated  | NO-OP (no append, no warnings, no strip) |
+///
+/// The AlreadyMigrated guard is what makes a repeated `jit init` a true no-op
+/// (no spurious "skipped" warnings).
 pub fn migrate_or_scaffold(
     jit_root: &Path,
     config: &JitConfig,
     namespaces: &LabelNamespaces,
+    fresh_defaults: &(JitConfig, LabelNamespaces),
 ) -> Result<MigrationOutcome> {
     let rules_path = jit_root.join("rules.toml");
     let config_path = jit_root.join("config.toml");
-    let file_preexisted = rules_path.exists();
+    let file_present = rules_path.exists();
+    let legacy_keys = detect_legacy_keys(&config_path);
 
-    let serialized = serialize_complete_ruleset(config, namespaces);
-    let stripped_keys = detect_legacy_keys(&config_path);
+    let (state, stripped_keys, skipped_existing) = match (file_present, legacy_keys.is_empty()) {
+        // Already-migrated: a present file with no stale keys is a true no-op.
+        (true, true) => (MigrationState::AlreadyMigrated, Vec::new(), Vec::new()),
 
-    let skipped_existing = if file_preexisted {
-        // Coexistence: append by name without clobbering the user file.
-        append_missing_rules(jit_root, &rules_path, &serialized)?
-    } else {
-        // Fresh / legacy: write the complete file + schemas.
-        write_complete_ruleset(jit_root, &rules_path, &serialized)?;
-        Vec::new()
+        // Coexistence: preserve the user file, append missing defaults by name,
+        // then strip the stale keys. The complete ruleset is derived from the
+        // LIVE config (it still carries the legacy constraints).
+        (true, false) => {
+            let serialized = serialize_complete_ruleset(config, namespaces);
+            let skipped = append_missing_rules(jit_root, &rules_path, &serialized)?;
+            strip_keys_from_config(&config_path, &legacy_keys)?;
+            (MigrationState::Coexistence, legacy_keys, skipped)
+        }
+
+        // Fresh scaffold: write the complete file from the in-code intended
+        // defaults (the on-disk config is clean). No keys to strip.
+        (false, true) => {
+            let (fresh_config, fresh_ns) = fresh_defaults;
+            let serialized = serialize_complete_ruleset(fresh_config, fresh_ns);
+            write_complete_ruleset(jit_root, &rules_path, &serialized)?;
+            (MigrationState::FreshScaffold, Vec::new(), Vec::new())
+        }
+
+        // Legacy migration: write the complete file from the LIVE config (which
+        // carries the keys), then strip them.
+        (false, false) => {
+            let serialized = serialize_complete_ruleset(config, namespaces);
+            write_complete_ruleset(jit_root, &rules_path, &serialized)?;
+            strip_keys_from_config(&config_path, &legacy_keys)?;
+            (MigrationState::LegacyMigrated, legacy_keys, Vec::new())
+        }
     };
 
-    if !stripped_keys.is_empty() {
-        strip_keys_from_config(&config_path, &stripped_keys)?;
-    }
-
     Ok(MigrationOutcome {
+        state,
         stripped_keys,
         skipped_existing,
-        file_preexisted,
     })
 }
 
@@ -391,6 +440,16 @@ mod tests {
         dir
     }
 
+    /// The in-code intended defaults used for the fresh-scaffold path. For
+    /// legacy/coexistence/already-migrated cases these are unused, but the API
+    /// requires a value.
+    fn fresh_defaults() -> (JitConfig, LabelNamespaces) {
+        let config =
+            crate::hierarchy_templates::HierarchyTemplate::default().intended_default_config();
+        let ns = namespaces_for(&config);
+        (config, ns)
+    }
+
     #[test]
     fn test_serialize_complete_ruleset_reloads_with_all_default_rules() {
         let config = config_from_toml(
@@ -454,9 +513,10 @@ required = true
         let config =
             config_from_toml(&std::fs::read_to_string(dir.path().join("config.toml")).unwrap());
         let namespaces = namespaces_for(&config);
-        let outcome = migrate_or_scaffold(dir.path(), &config, &namespaces).unwrap();
+        let outcome =
+            migrate_or_scaffold(dir.path(), &config, &namespaces, &fresh_defaults()).unwrap();
 
-        assert!(!outcome.file_preexisted);
+        assert_eq!(outcome.state, MigrationState::LegacyMigrated);
         // The six enforcement keys + namespace constraints are stripped.
         for key in [
             "validation.require_type_label",
@@ -558,29 +618,83 @@ unique = true
             config_from_toml(&std::fs::read_to_string(dir.path().join("config.toml")).unwrap());
         let namespaces = namespaces_for(&config);
 
-        let first = migrate_or_scaffold(dir.path(), &config, &namespaces).unwrap();
-        assert!(!first.file_preexisted);
+        let first =
+            migrate_or_scaffold(dir.path(), &config, &namespaces, &fresh_defaults()).unwrap();
+        assert_eq!(first.state, MigrationState::LegacyMigrated);
         assert!(!first.stripped_keys.is_empty());
 
-        // Reload the (now-stripped) config and re-run: a no-op (file present, no keys).
+        // Reload the (now-stripped) config and re-run: a TRUE no-op (file present,
+        // no legacy keys) — NOT the coexistence/append path.
         let config2 =
             config_from_toml(&std::fs::read_to_string(dir.path().join("config.toml")).unwrap());
         let namespaces2 = namespaces_for(&config2);
         let rules_before = std::fs::read_to_string(dir.path().join("rules.toml")).unwrap();
-        let second = migrate_or_scaffold(dir.path(), &config2, &namespaces2).unwrap();
-        assert!(second.file_preexisted, "rules.toml now present");
+        let second =
+            migrate_or_scaffold(dir.path(), &config2, &namespaces2, &fresh_defaults()).unwrap();
+        assert_eq!(
+            second.state,
+            MigrationState::AlreadyMigrated,
+            "second init must be a true no-op"
+        );
+        assert!(second.is_noop());
         assert!(second.stripped_keys.is_empty(), "no keys left to strip");
-        assert!(second
-            .skipped_existing
-            .iter()
-            .all(|n| n.starts_with("default:")));
-        // No legacy keys remain, so nothing new is appended in the coexistence
-        // path beyond what already matches; the file is unchanged.
+        assert!(
+            second.skipped_existing.is_empty(),
+            "no-op must not emit skipped-rule warnings"
+        );
+        // The file is unchanged.
         let rules_after = std::fs::read_to_string(dir.path().join("rules.toml")).unwrap();
         assert_eq!(
             rules_before, rules_after,
             "idempotent: rules.toml unchanged"
         );
+    }
+
+    #[test]
+    fn test_fresh_scaffold_uses_in_code_defaults_not_clean_on_disk_config() {
+        // A repo whose on-disk config is already CLEAN (post-migration shape: no
+        // enforcement keys, no namespace constraints) and has no rules.toml is a
+        // FRESH scaffold: the complete ruleset comes from the in-code intended
+        // defaults, so it still reproduces the rich checks. No keys stripped.
+        let dir = jit_with_config(
+            r#"[validation]
+strictness = "loose"
+default_type = "task"
+
+[namespaces.type]
+description = "Issue type"
+unique = true
+"#,
+        );
+        let config =
+            config_from_toml(&std::fs::read_to_string(dir.path().join("config.toml")).unwrap());
+        let namespaces = namespaces_for(&config);
+        let outcome =
+            migrate_or_scaffold(dir.path(), &config, &namespaces, &fresh_defaults()).unwrap();
+
+        assert_eq!(outcome.state, MigrationState::FreshScaffold);
+        assert!(outcome.stripped_keys.is_empty());
+        assert!(outcome.skipped_existing.is_empty());
+
+        // The scaffolded rules.toml carries the RICH constraints from the in-code
+        // defaults, NOT derived from the (constraint-free) on-disk config.
+        let set = RuleSet::load(dir.path()).unwrap();
+        assert!(set
+            .rules
+            .iter()
+            .any(|r| r.name == "default:namespace-values:type"));
+        assert!(set
+            .rules
+            .iter()
+            .any(|r| r.name == "default:namespace-required:type"));
+        assert!(set
+            .rules
+            .iter()
+            .any(|r| r.name == "default:namespace-pattern:milestone"));
+        // The on-disk config stays clean (nothing added, nothing stripped).
+        let config_after = std::fs::read_to_string(dir.path().join("config.toml")).unwrap();
+        assert!(!config_after.contains("values ="));
+        assert!(!config_after.contains("reject_malformed_labels"));
     }
 
     #[test]
@@ -616,9 +730,10 @@ assert = { require-section = { heading = "PLACEHOLDER" } }
         let config =
             config_from_toml(&std::fs::read_to_string(dir.path().join("config.toml")).unwrap());
         let namespaces = namespaces_for(&config);
-        let outcome = migrate_or_scaffold(dir.path(), &config, &namespaces).unwrap();
+        let outcome =
+            migrate_or_scaffold(dir.path(), &config, &namespaces, &fresh_defaults()).unwrap();
 
-        assert!(outcome.file_preexisted);
+        assert_eq!(outcome.state, MigrationState::Coexistence);
         // The pre-existing default name is skipped (not clobbered).
         assert!(outcome
             .skipped_existing

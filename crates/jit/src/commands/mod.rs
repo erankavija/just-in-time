@@ -537,24 +537,27 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// `jit init` path AFTER `config.toml` has been written/exists, so the
     /// migration sees the repo's real config.
     ///
-    /// Serializes the COMPLETE [`default_ruleset`](crate::validation::defaults::default_ruleset)
-    /// derived from the repo's config into `rules.toml` (+ `.jit/schemas/*.json`),
-    /// then strips the migrated enforcement keys from `config.toml`. Behavior by
-    /// repo state (fresh / legacy / coexistence / already-migrated) is handled by
-    /// [`migration::migrate_or_scaffold`](crate::validation::migration::migrate_or_scaffold).
+    /// `fresh_defaults` is the in-code INTENDED default config (e.g.
+    /// `HierarchyTemplate::intended_default_config()`, decision D6) used ONLY to
+    /// derive the complete `rules.toml` for a FRESH repo, whose on-disk
+    /// `config.toml` ships clean (no enforcement keys / constraints). For a LEGACY
+    /// or COEXISTENCE repo the complete ruleset is derived from the live config
+    /// (which still carries the keys) and those keys are then stripped. A repo
+    /// with `rules.toml` present and no legacy keys is a true no-op.
     ///
     /// Returns the [`MigrationOutcome`](crate::validation::migration::MigrationOutcome)
-    /// so the caller can report what was migrated / skipped.
+    /// so the caller can report what happened.
     pub fn migrate_or_scaffold_rules(
         &self,
+        fresh_defaults: &crate::config::JitConfig,
     ) -> Result<crate::validation::migration::MigrationOutcome> {
-        // Parse config.toml WITHOUT the deprecated-key warning scan: the
-        // migration is about to remove those keys, so warning here (especially on
-        // a fresh repo whose template still carries them so the complete ruleset
-        // can be derived) would be self-contradictory. The deprecated-key warning
-        // is reserved for ORDINARY loads of a stale, un-migrated config.
+        // Parse config.toml WITHOUT the deprecated-key warning scan: the migration
+        // is about to remove those keys (legacy path), and a fresh repo's clean
+        // template has none anyway, so warning here would be self-contradictory.
+        // The deprecated-key warning is reserved for ORDINARY loads of a stale,
+        // un-migrated config.
         let config_path = self.storage.root().join("config.toml");
-        let config = if config_path.exists() {
+        let config: crate::config::JitConfig = if config_path.exists() {
             let content = std::fs::read_to_string(&config_path)
                 .with_context(|| format!("reading {}", config_path.display()))?;
             toml::from_str(&content).context("Failed to parse config.toml for migration")?
@@ -562,7 +565,13 @@ impl<S: IssueStore> CommandExecutor<S> {
             self.config_manager.load()?
         };
         let namespaces = self.config_manager.namespaces_from_config(&config);
-        crate::validation::migration::migrate_or_scaffold(self.storage.root(), &config, &namespaces)
+        let fresh_namespaces = self.config_manager.namespaces_from_config(fresh_defaults);
+        crate::validation::migration::migrate_or_scaffold(
+            self.storage.root(),
+            &config,
+            &namespaces,
+            &(fresh_defaults.clone(), fresh_namespaces),
+        )
     }
 
     /// Check if an active lease exists for the given issue by the current agent.

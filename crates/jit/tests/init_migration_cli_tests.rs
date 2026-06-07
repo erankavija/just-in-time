@@ -170,9 +170,24 @@ fn cli_double_init_is_idempotent() {
     let second = run(dir.path(), &["init"]);
     assert!(second.status.success(), "second init failed: {second:?}");
     let stdout = String::from_utf8_lossy(&second.stdout);
+    let stderr = String::from_utf8_lossy(&second.stderr);
+    // True no-op: no migration message, no "skipped" warnings, no deprecation /
+    // missing-file noise on either stream.
     assert!(
         !stdout.contains("Migrated"),
         "idempotent re-init must not migrate again: {stdout}"
+    );
+    assert!(
+        !stderr.contains("Skipped migrating") && !stdout.contains("Skipped migrating"),
+        "idempotent re-init must not emit skipped-rule warnings: out={stdout} err={stderr}"
+    );
+    assert!(
+        !stderr.contains("deprecated"),
+        "idempotent re-init must not warn about deprecated keys: {stderr}"
+    );
+    assert!(
+        !stderr.contains("no .jit/rules.toml found"),
+        "rules.toml present, must not warn about absence: {stderr}"
     );
     let rules_after_second = std::fs::read_to_string(dir.path().join(".jit/rules.toml")).unwrap();
     let config_after_second = std::fs::read_to_string(dir.path().join(".jit/config.toml")).unwrap();
@@ -235,4 +250,100 @@ assert = { require-section = { heading = "Goals" } }
     let v = run(dir.path(), &["validate"]);
     let verr = String::from_utf8_lossy(&v.stderr);
     assert!(!verr.contains("invalid"), "merged rules must load: {verr}");
+}
+
+#[test]
+fn cli_fresh_init_end_state_equals_legacy_reinit_end_state() {
+    // D6 acceptance: a FRESH init (config ships clean, rules derived from in-code
+    // intended defaults) must reach the SAME end state as a LEGACY re-init of a
+    // repo whose config carried the full old-template constraints. We compare the
+    // scaffolded rules.toml byte-for-byte and the schema file set.
+
+    // Fresh repo.
+    let fresh = fresh_repo();
+    assert!(run(fresh.path(), &["init"]).status.success());
+    let fresh_rules = std::fs::read_to_string(fresh.path().join(".jit/rules.toml")).unwrap();
+    let mut fresh_schemas: Vec<String> = std::fs::read_dir(fresh.path().join(".jit/schemas"))
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    fresh_schemas.sort();
+
+    // Legacy repo carrying the full pre-reshape default template constraints.
+    let legacy = fresh_repo();
+    let jit_dir = legacy.path().join(".jit");
+    std::fs::create_dir_all(&jit_dir).unwrap();
+    std::fs::write(
+        jit_dir.join("config.toml"),
+        r#"[version]
+schema = 2
+
+[type_hierarchy]
+types = { milestone = 1, epic = 2, story = 3, task = 4 }
+strategic_types = ["milestone", "epic"]
+
+[type_hierarchy.label_associations]
+milestone = "milestone"
+epic = "epic"
+story = "story"
+
+[validation]
+strictness = "loose"
+default_type = "task"
+reject_malformed_labels = true
+enforce_namespace_registry = true
+
+[namespaces.type]
+description = "Issue type (hierarchical). Exactly one per issue."
+unique = true
+required = true
+values = ["epic", "story", "task", "bug", "spike", "chore", "milestone"]
+examples = ["type:task", "type:story", "type:epic"]
+
+[namespaces.component]
+description = "Technical area or subsystem affected."
+unique = false
+examples = ["component:backend", "component:frontend", "component:cli"]
+
+[namespaces.priority]
+description = "Work priority. Orthogonal to issue priority field; used for filtering."
+unique = true
+values = ["critical", "high", "normal", "low"]
+examples = ["priority:high", "priority:low"]
+
+[namespaces.team]
+description = "Owning team."
+unique = true
+examples = ["team:backend", "team:platform"]
+
+[namespaces.milestone]
+description = "Release milestone membership (version tag)."
+unique = false
+pattern = '^v\d+\.\d+(\.\d+)?(-[a-zA-Z0-9.-]+)?$'
+examples = ["milestone:v1.0", "milestone:v1.2.3", "milestone:v2.0-rc1"]
+
+[namespaces.resolution]
+description = "Reason for issue closure (used with rejected state)."
+unique = true
+values = ["wont-fix", "duplicate", "obsolete", "invalid"]
+examples = ["resolution:wont-fix", "resolution:duplicate"]
+"#,
+    )
+    .unwrap();
+    assert!(run(legacy.path(), &["init"]).status.success());
+    let legacy_rules = std::fs::read_to_string(legacy.path().join(".jit/rules.toml")).unwrap();
+    let mut legacy_schemas: Vec<String> = std::fs::read_dir(legacy.path().join(".jit/schemas"))
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    legacy_schemas.sort();
+
+    assert_eq!(
+        fresh_rules, legacy_rules,
+        "fresh-init and legacy-re-init rules.toml must be identical"
+    );
+    assert_eq!(
+        fresh_schemas, legacy_schemas,
+        "fresh-init and legacy-re-init schema sets must be identical"
+    );
 }

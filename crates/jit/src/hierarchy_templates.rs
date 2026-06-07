@@ -111,12 +111,11 @@ strictness = "loose"
 # Auto-assign this type when creating issues without a type:* label.
 default_type = "task"
 
-# NOTE: label/type validation (format, namespace registry, allowed values,
+# NOTE: ALL label/type validation (format, namespace registry, allowed values,
 # patterns, uniqueness, required namespaces, orphan-leaf / strategic-consistency
 # warnings) is defined declaratively in `.jit/rules.toml` — the single source of
-# truth — which `jit init` scaffolds. Edit the rules there, not here.
-reject_malformed_labels = true
-enforce_namespace_registry = true
+# truth — which `jit init` scaffolds with the same default checks. Edit the rules
+# there, not here; this section carries only the two behavioral keys above.
 
 # =============================================================================
 # NAMESPACE REGISTRY
@@ -126,14 +125,13 @@ enforce_namespace_registry = true
 #   unique      — at most one label from this namespace per issue (required)
 #   examples    — documentation only, not enforced
 #
-# Allowed-value enums, value patterns, and required-ness are enforced via
-# `.jit/rules.toml` (the default rules `jit init` scaffolds), not here.
+# Allowed-value enums, value patterns, and required-ness are NOT configured here:
+# they live as `default:namespace-*` rules in `.jit/rules.toml`, the single source
+# of truth (scaffolded by `jit init`).
 
 [namespaces.type]
 description = "Issue type (hierarchical). Exactly one per issue."
 unique = true
-required = true
-values = ["epic", "story", "task", "bug", "spike", "chore", "milestone"]
 examples = ["type:task", "type:story", "type:epic"]
 
 [namespaces.component]
@@ -144,7 +142,6 @@ examples = ["component:backend", "component:frontend", "component:cli"]
 [namespaces.priority]
 description = "Work priority. Orthogonal to issue priority field; used for filtering."
 unique = true
-values = ["critical", "high", "normal", "low"]
 examples = ["priority:high", "priority:low"]
 
 [namespaces.team]
@@ -155,13 +152,11 @@ examples = ["team:backend", "team:platform"]
 [namespaces.milestone]
 description = "Release milestone membership (version tag)."
 unique = false
-pattern = '^v\d+\.\d+(\.\d+)?(-[a-zA-Z0-9.-]+)?$'
 examples = ["milestone:v1.0", "milestone:v1.2.3", "milestone:v2.0-rc1"]
 
 [namespaces.resolution]
 description = "Reason for issue closure (used with rejected state)."
 unique = true
-values = ["wont-fix", "duplicate", "obsolete", "invalid"]
 examples = ["resolution:wont-fix", "resolution:duplicate"]
 
 # =============================================================================
@@ -207,6 +202,147 @@ examples = ["resolution:wont-fix", "resolution:duplicate"]
             strategic_array = strategic_array,
             label_assoc_lines = label_assoc_lines,
         )
+    }
+
+    /// The INTENDED default validation behavior for this template, as an in-code
+    /// [`JitConfig`] (decision D6).
+    ///
+    /// The on-disk `config.toml` template ships in post-migration shape (no
+    /// enforcement keys, no per-namespace `values`/`pattern`/`required`), so it is
+    /// NOT a source for the default rules. This method is that single in-code
+    /// source: it carries the rich constraints (`reject_malformed_labels`,
+    /// `enforce_namespace_registry`, the `type`/`priority`/`resolution` allowed
+    /// values, the `milestone` version pattern, `type` required) plus this
+    /// template's hierarchy, so a FRESH `jit init` can serialize a COMPLETE
+    /// `rules.toml` reproducing today's checks WITHOUT writing those keys to disk
+    /// or running a strip cycle. It mirrors exactly what the legacy full template
+    /// used to encode, so fresh-init and legacy-re-init reach the same end state.
+    pub fn intended_default_config(&self) -> crate::config::JitConfig {
+        use crate::config::{
+            HierarchyConfigToml, JitConfig, NamespaceConfig, ValidationConfig, VersionConfig,
+        };
+
+        let validation = ValidationConfig {
+            strictness: Some("loose".to_string()),
+            default_type: Some("task".to_string()),
+            require_type_label: None,
+            label_regex: None,
+            reject_malformed_labels: Some(true),
+            enforce_namespace_registry: Some(true),
+            warn_orphaned_leaves: Some(true),
+            warn_strategic_consistency: Some(true),
+        };
+
+        let ns = |description: &str,
+                  unique: bool,
+                  examples: &[&str],
+                  values: Option<Vec<&str>>,
+                  pattern: Option<&str>,
+                  required: Option<bool>|
+         -> NamespaceConfig {
+            NamespaceConfig {
+                description: description.to_string(),
+                unique,
+                examples: Some(examples.iter().map(|s| s.to_string()).collect()),
+                values: values.map(|v| v.iter().map(|s| s.to_string()).collect()),
+                pattern: pattern.map(|s| s.to_string()),
+                required,
+            }
+        };
+
+        let mut namespaces = HashMap::new();
+        namespaces.insert(
+            "type".to_string(),
+            ns(
+                "Issue type (hierarchical). Exactly one per issue.",
+                true,
+                &["type:task", "type:story", "type:epic"],
+                Some(vec![
+                    "epic",
+                    "story",
+                    "task",
+                    "bug",
+                    "spike",
+                    "chore",
+                    "milestone",
+                ]),
+                None,
+                Some(true),
+            ),
+        );
+        namespaces.insert(
+            "component".to_string(),
+            ns(
+                "Technical area or subsystem affected.",
+                false,
+                &["component:backend", "component:frontend", "component:cli"],
+                None,
+                None,
+                None,
+            ),
+        );
+        namespaces.insert(
+            "priority".to_string(),
+            ns(
+                "Work priority. Orthogonal to issue priority field; used for filtering.",
+                true,
+                &["priority:high", "priority:low"],
+                Some(vec!["critical", "high", "normal", "low"]),
+                None,
+                None,
+            ),
+        );
+        namespaces.insert(
+            "team".to_string(),
+            ns(
+                "Owning team.",
+                true,
+                &["team:backend", "team:platform"],
+                None,
+                None,
+                None,
+            ),
+        );
+        namespaces.insert(
+            "milestone".to_string(),
+            ns(
+                "Release milestone membership (version tag).",
+                false,
+                &["milestone:v1.0", "milestone:v1.2.3", "milestone:v2.0-rc1"],
+                None,
+                Some(r"^v\d+\.\d+(\.\d+)?(-[a-zA-Z0-9.-]+)?$"),
+                None,
+            ),
+        );
+        namespaces.insert(
+            "resolution".to_string(),
+            ns(
+                "Reason for issue closure (used with rejected state).",
+                true,
+                &["resolution:wont-fix", "resolution:duplicate"],
+                Some(vec!["wont-fix", "duplicate", "obsolete", "invalid"]),
+                None,
+                None,
+            ),
+        );
+
+        JitConfig {
+            version: Some(VersionConfig { schema: 2 }),
+            type_hierarchy: Some(HierarchyConfigToml {
+                types: self.hierarchy.clone(),
+                label_associations: Some(self.label_associations.clone()),
+                strategic_types: Some(self.get_strategic_types()),
+                icons: None,
+            }),
+            validation: Some(validation),
+            documentation: None,
+            namespaces: Some(namespaces),
+            worktree: None,
+            coordination: None,
+            global_operations: None,
+            locks: None,
+            events: None,
+        }
     }
 
     /// Default 4-level hierarchy: milestone → epic → story → task
@@ -369,24 +505,29 @@ mod tests {
     }
 
     #[test]
-    fn test_generated_config_has_strict_label_defaults() {
+    fn test_generated_config_ships_in_post_migration_shape() {
+        // D6: the on-disk template carries NO enforcement keys and NO per-namespace
+        // constraint fields — those live in `.jit/rules.toml`. Only the two
+        // behavioral keys (strictness, default_type) remain in [validation].
         let toml = HierarchyTemplate::default().generate_config_toml();
-        assert!(toml.contains("reject_malformed_labels = true"));
-        assert!(toml.contains("enforce_namespace_registry = true"));
+        assert!(toml.contains("strictness = \"loose\""));
+        assert!(toml.contains("default_type = \"task\""));
+        assert!(!toml.contains("reject_malformed_labels"));
+        assert!(!toml.contains("enforce_namespace_registry"));
+        // No per-namespace constraint fields anywhere.
+        assert!(!toml.contains("values ="));
+        assert!(!toml.contains("pattern ="));
+        assert!(!toml.contains("required ="));
     }
 
     #[test]
-    fn test_generated_config_seeds_namespace_constraints() {
+    fn test_generated_config_keeps_registry_descriptions() {
+        // The namespace registry is still declared (description/unique/examples).
         let toml = HierarchyTemplate::default().generate_config_toml();
-        // type namespace declares enum + required
         assert!(toml.contains("[namespaces.type]"));
-        assert!(toml.contains("required = true"));
-        assert!(toml.contains(
-            r#"values = ["epic", "story", "task", "bug", "spike", "chore", "milestone"]"#
-        ));
-        // milestone declares a version pattern
         assert!(toml.contains("[namespaces.milestone]"));
-        assert!(toml.contains(r"pattern = '^v\d+\.\d+(\.\d+)?"));
+        assert!(toml.contains("unique = true"));
+        assert!(toml.contains("examples = [\"type:task\""));
     }
 
     #[test]
@@ -396,7 +537,38 @@ mod tests {
             ::toml::from_str(&toml).expect("generated template must parse");
         let ns = cfg.namespaces.expect("namespaces block present");
         let type_ns = ns.get("type").expect("type namespace present");
+        // Post-migration: the constraint fields are absent from config.toml.
+        assert!(type_ns.required.is_none());
+        assert!(type_ns.values.is_none());
+        assert!(type_ns.unique);
+    }
+
+    #[test]
+    fn test_generated_config_emits_no_deprecated_keys() {
+        // The shipped template must itself be free of deprecated enforcement keys,
+        // so a fresh repo never triggers the deprecated-key warning.
+        let toml = HierarchyTemplate::default().generate_config_toml();
+        assert!(
+            crate::config::deprecated_keys_in_config(&toml).is_empty(),
+            "fresh template must carry no deprecated keys: {:?}",
+            crate::config::deprecated_keys_in_config(&toml)
+        );
+    }
+
+    #[test]
+    fn test_intended_default_config_carries_rich_constraints() {
+        // The in-code intended defaults (NOT on disk) carry the rich constraints
+        // that drive the scaffolded rules.toml.
+        let cfg = HierarchyTemplate::default().intended_default_config();
+        let validation = cfg.validation.expect("validation present");
+        assert_eq!(validation.reject_malformed_labels, Some(true));
+        assert_eq!(validation.enforce_namespace_registry, Some(true));
+        let ns = cfg.namespaces.expect("namespaces present");
+        let type_ns = &ns["type"];
         assert_eq!(type_ns.required, Some(true));
-        assert!(type_ns.values.is_some());
+        assert!(type_ns.values.as_ref().unwrap().iter().any(|v| v == "task"));
+        assert!(ns["milestone"].pattern.is_some());
+        // It encodes this template's hierarchy.
+        assert!(cfg.type_hierarchy.unwrap().types.contains_key("epic"));
     }
 }
