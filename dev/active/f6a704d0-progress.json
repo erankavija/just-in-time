@@ -152,6 +152,13 @@
       "topic": "custom label_regex parity: engine has no write-only local rule, so the migrated custom-regex rule (severity=error) also fails jit validate, which legacy validate_labels did not. a0f0f342 at MAX rework (2).",
       "decision": "User chose: amend the criterion (document the deviation) rather than add a write-only Rule-model concept",
       "resolution": "DR 8.3a + a0f0f342 criterion 2 + ## Approved Deviations record the deviation; parity_custom_label_regex_also_applies_to_validate pins intended behavior; defaults.rs comments corrected; gates green; a0f0f342 done"
+    },
+    {
+      "wave": 7,
+      "issue": "0abaddc0",
+      "topic": "planning failure: first impl shipped a PARTIAL migration (kept 6 of 8 [validation] keys live, hard-coded rules remain) because orphan/strategic graph warnings (Assertion::TypeHierarchy) have NO rules.toml surface, so DR 8.2/8.3 'single source of truth / no hard-coded rules' was not achievable as scoped. Adversarial review FAILed it on DR conformance.",
+      "decision": "User: planning failure; EXPAND scope to do it properly (add the missing TOML surface + full migration), plan it, dispatch a plan reviewer, drive to completion when green",
+      "resolution": "IN PROGRESS. Plan v2 at dev/active/f6a704d0-0abaddc0-fullmigration-plan.md (incorporates 9 plan-review must-fixes incl. removing the default: reservation, file-as-source + bootstrap fallback, type-hierarchy TOML kind, complete serializer, dogfood-migrate this repo). Partial branch worktree-agent-0abaddc0@5cb6d3c is SUPERSEDED (reuse its migration mechanics only)."
     }
   ],
   "rework_counts": {
