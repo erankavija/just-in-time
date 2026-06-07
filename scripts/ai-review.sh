@@ -18,6 +18,7 @@ set -euo pipefail
 #                       review to stdout. Evaluated as a shell command.
 #
 # Example REVIEWER_AGENT values:
+#   codex review -
 #   copilot -s --model claude-haiku-4.5
 #   claude --model haiku -p -
 #   cat                                    # dry-run (echoes the prompt)
@@ -33,7 +34,7 @@ set -euo pipefail
 #          --pass-context \
 #          --prompt "Review the implementation for correctness and style." \
 #          --checker-command "./scripts/ai-review.sh" \
-#          --env REVIEWER_AGENT="copilot -s --model claude-haiku-4.5" \
+#          --env REVIEWER_AGENT="codex review -" \
 #          --timeout 120
 #   4. Run: jit gate check <issue> ai-review
 
@@ -50,7 +51,7 @@ fi
 if [ -z "${REVIEWER_AGENT:-}" ]; then
   echo "ERROR: REVIEWER_AGENT not set." >&2
   echo "  Set it to a command that reads a prompt from stdin and writes to stdout." >&2
-  echo "  Example: REVIEWER_AGENT='copilot -s --model claude-haiku-4.5'" >&2
+  echo "  Example: REVIEWER_AGENT='codex review -'" >&2
   exit 1
 fi
 

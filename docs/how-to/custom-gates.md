@@ -136,8 +136,7 @@ jit gate define ai-review \
   --description "AI-powered code review" \
   --mode auto \
   --checker-command "./scripts/ai-review.sh" \
-  --env REVIEWER_AGENT="copilot -s --model claude-haiku-4.5" \
-  --env MODEL=claude-haiku-4.5
+  --env REVIEWER_AGENT="codex review -"
 ```
 
 These are passed to the checker process alongside the built-in variables. Use `--env` multiple times to set several variables.
@@ -337,7 +336,7 @@ jit gate define ai-review \
   --pass-context \
   --prompt-file "contrib/gates/prompts/code-review.md" \
   --checker-command "./scripts/ai-review.sh" \
-  --env REVIEWER_AGENT="copilot -s --model claude-haiku-4.5" \
+  --env REVIEWER_AGENT="codex review -" \
   --timeout 120
 ```
 
@@ -360,7 +359,7 @@ jit gate define security-audit \
   --mode auto --pass-context \
   --prompt-file "contrib/gates/prompts/security-audit.md" \
   --checker-command "./scripts/ai-review.sh" \
-  --env REVIEWER_AGENT="copilot -s --model claude-sonnet-4.5"
+  --env REVIEWER_AGENT="codex review -"
 ```
 
 The prompts reference the context JSON structure (issue, gate, documents, dependencies, run_history) and end with the verdict format. Customize them or use them as starting points for your own.

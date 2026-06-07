@@ -32,7 +32,7 @@ jit gate define ai-review \
   --pass-context \
   --prompt-file "contrib/gates/prompts/code-review.md" \
   --checker-command "./scripts/ai-review.sh" \
-  --env REVIEWER_AGENT="copilot -s --model claude-haiku-4.5" \
+  --env REVIEWER_AGENT="codex review -" \
   --timeout 120
 ```
 
