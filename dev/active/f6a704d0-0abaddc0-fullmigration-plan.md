@@ -106,9 +106,11 @@ real `.jit/schemas/*.json` files.
 | **orphan-leaf** | `TypeHierarchy{OrphanLeaf}` | **NO surface** |
 | **strategic-consistency** | `TypeHierarchy{StrategicConsistency}` | **NO surface** |
 
-So the ONLY engine gap is a TOML surface for `Assertion::TypeHierarchy`.
-
 `effective_rules()` (mod.rs:342-369) today = `default_ruleset(config) ++ rules()`.
+**Load-bearing edit (plan-review note):** this concat at `mod.rs:361-364` MUST be
+removed under D2/D3 so defaults and the file are never combined when the file is
+present — otherwise the file's `default:*` rules collide with concatenated
+defaults (`DuplicateRuleName`).
 `rules()` (mod.rs:310-314) loads `.jit/rules.toml` via `RuleSet::load`.
 `RawAssert` (rules.rs:701-722) is the serde parse surface (deny_unknown_fields).
 This repo (just-in-time) has **no** `.jit/rules.toml` today.

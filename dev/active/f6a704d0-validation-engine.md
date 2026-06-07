@@ -167,8 +167,29 @@ A rule is **selector + assertion + severity**.
   use a TOML literal string (`'^\[hard\]'`, not a basic string). A rule is
   shorthand XOR file-schema — the loader REJECTS mixing, keeping one definition
   per constraint.
-- **8.2 No hard-coded rules.** `jit init` scaffolds a default `.jit/rules.toml`
-  reproducing today's checks, fully editable.
+- **8.2 No hard-coded rules (operative source = the file).** `jit init` scaffolds
+  a COMPLETE default `.jit/rules.toml` reproducing today's checks, fully editable.
+  `effective_rules()` derives the rule set from the file: when `.jit/rules.toml` is
+  PRESENT (even if it contains zero rules — honoring an intentionally-emptied
+  ruleset) the file is the sole authoritative source; no in-code default rules are
+  combined with it. The in-code `default_ruleset` is retained ONLY as (a) the
+  canonical definition serialized into the file by `jit init`, and (b) a TRANSIENT
+  BOOTSTRAP fallback used when the file is ABSENT (pre-init repo or deleted file),
+  which warns the user to run `jit init`. Because the file becomes the single
+  operative source, the former `default:` rule-name reservation in
+  `RuleSet::load` is REMOVED — the `default:*` rules now live in the file and are
+  user-editable like any other (the separate name-uniqueness guard remains). See
+  §8.2a for the engine surface this requires (scope-expanded 2026-06-07, issue
+  0abaddc0).
+- **8.2a Type-hierarchy TOML surface (scope expansion, 2026-06-07).** Making the
+  file the complete source required adding a `type-hierarchy` assertion kind to the
+  `rules.toml` grammar so the orphan-leaf and strategic-consistency graph warnings
+  (previously default-only `Assertion::TypeHierarchy`, with no TOML surface) can be
+  serialized and authored. The repo `HierarchyConfig` is injected by the graph
+  evaluator at evaluation time (not stored in the parsed rule). This closed the
+  original 0abaddc0 PLANNING GAP: the first attempt could not achieve §8.3 because
+  two default checks had no TOML representation, forcing a partial split that kept
+  hard-coded rules. With this surface, every default rule is file-expressible.
 - **8.3 Hard migration, NO backward compatibility.** ALL existing enforcement is
   re-expressed as default rules and the legacy config keys are REMOVED (not
   aliased). Complete inventory to migrate:
@@ -177,13 +198,21 @@ A rule is **selector + assertion + severity**.
   - From `validate.rs`: orphan-leaf warning, strategic-label consistency, and
     per-namespace allowed-`values`, value-`pattern`, uniqueness, and `required`
     constraints (`config.rs` `NamespaceConfig`, enforced ~`validate.rs:286-388`).
-  - From `[validation]` (`config.rs:67-84`): `strictness`, `default_type`,
+  - From `[validation]` (`config.rs:67-84`) — the ENFORCEMENT keys are removed:
     `require_type_label`, `label_regex`, `reject_malformed_labels`,
     `enforce_namespace_registry`, `warn_orphaned_leaves`,
     `warn_strategic_consistency`.
   `rules.toml` becomes the SINGLE source of truth for issue/label validation.
   Default rules preserve today's behavior (warn vs reject) via `enforce` (§7.2),
   modulo the one approved deviation in §8.3a.
+  **Amendment (2026-06-07, issue 0abaddc0):** the removal is scoped to the
+  ENFORCEMENT keys above. `default_type` is RETAINED as live behavioral config
+  (consumed at issue creation, `commands/issue.rs`; not an enforcement rule and
+  has no `rules.toml` representation). `strictness` is RETAINED as inert /
+  forward-compat (no live consumer). The original §8.3 inventory listed both for
+  removal; that was a contract defect — they are not enforcement and cannot be
+  expressed as rules, so they stay in `config.toml` and are EXCLUDED from the
+  deprecated-key warning (§8.4).
 - **8.3a Approved parity deviation — custom `label_regex` on the validate path**
   (user-approved 2026-06-07). Legacy `validate_labels` checked only the FIXED
   canonical regex on the validate path; a custom `validation.label_regex` was
@@ -199,16 +228,27 @@ A rule is **selector + assertion + severity**.
   local-rule concept to the Rule model; that was considered and declined in favor
   of this documented deviation.
 - **8.4 Migration**: re-running `jit init` on an existing repo performs the
-  one-time migration — it converts existing `[validation]` and
-  `[namespaces].{values,pattern,required}` config into `.jit/rules.toml` and
-  strips the old enforcement keys. `jit init` also scaffolds defaults for new
-  repos. **Until migration runs** (e.g. a config git-synced from an old version):
-  there is NO `#[serde(deny_unknown_fields)]`, so serde already ignores the
-  removed keys and the config never hard-errors. A pre-parse `toml::Value` scan
-  in `JitConfig::load` detects the deprecated keys (top-level `validation` and
-  nested `namespaces.*.{values,pattern,required}`) and WARNS, prompting the user
-  to re-run `jit init`. Do NOT add `deny_unknown_fields` (it would turn the warn
-  into a hard error).
+  one-time migration — it serializes the COMPLETE `default_ruleset` derived from
+  the existing `[validation]` + `[namespaces].{values,pattern,required}` config
+  into `.jit/rules.toml` (+ `.jit/schemas/*.json`), then strips the removed
+  enforcement keys (the six §8.3 `[validation]` keys + the namespace constraints),
+  removing the `[validation]` table header when it is left empty.
+  - **Fresh repos:** `jit init` writes the config template ALREADY in
+    post-migration shape (no enforcement keys) and a complete `rules.toml`, so a
+    brand-new repo emits NO deprecation warning and NO migration message.
+  - **Coexistence** (a user `rules.toml` already exists AND legacy keys remain):
+    the user file is NOT clobbered; migrated rules are appended by name (skipping
+    any name already present, with a warning) and the legacy keys are stripped.
+  - **Idempotent:** re-running with a `rules.toml` present and no legacy keys is a
+    no-op.
+  **Until migration runs** (e.g. a config git-synced from an old version): there
+  is NO `#[serde(deny_unknown_fields)]`, so serde already ignores the removed keys
+  and the config never hard-errors. A pre-parse `toml::Value` scan in
+  `JitConfig::load` detects the deprecated keys — the six removed `[validation]`
+  ENFORCEMENT keys (NOT `default_type`/`strictness`, which are retained per §8.3)
+  and nested `namespaces.*.{values,pattern,required}` — and WARNS, prompting the
+  user to re-run `jit init`. Do NOT add `deny_unknown_fields` (it would turn the
+  warn into a hard error).
 
 ## 9. CLI surface
 
