@@ -39,6 +39,27 @@
   Expansion 2").
 - Analyzed gf2 migration (see below).
 
+## CONTINUATION UPDATE (later in session 2)
+
+Expansion-2 progress since the above was written:
+- **Task A (`5e79ba48`) — DONE + gated.** schema-name collision guard, checker-command
+  enforce rejected at load, gate PID-safety (reap-then-signal + a `kill(-1)`/wrap guard
+  the code-review gate additionally required). Merged to main.
+- **Task B (`e93af54b`) — DONE + gated** (cargo-ci + cargo-ci-features + code-review).
+  per-issue `content_format` + repo default + production parser dispatch (both local +
+  graph sites) + feature-not-compiled error + CI `--features html,xml` job. Code-review
+  also required two follow-ups (now fixed): `jit issue show --json` exposes
+  content_format; `--content-format inherit`/`default` clears an override back to None
+  (update is tri-state `Option<Option<ContentFormat>>`).
+- **REMAINING: Task C (`2fb9f910`, gf2 migration — UNBLOCKED, 2/2 deps done) then Task D
+  (`d4188154`, BC hard removal, depends on C), then epic completion.**
+- **Rate-limit note (user, this session):** the `code-review` gate's AI reviewer is near
+  its rate limit; `cargo-ci`/`cargo-ci-features` are LOCAL (free) — only `code-review`
+  consumes the budget. Remaining code-review runs needed: Task D + epic completion (≈2),
+  plus any rework. If a `code-review` run returns a rate-limit error, write a handoff and
+  stop. Task C has NO code-review gate (operational), so it spends none.
+- main HEAD after A+B: run `git log --oneline -1` (the B-fix merge + commits).
+
 ## What to do next — execute Scope Expansion 2 (follow the plan)
 
 THE SPEC is `dev/active/f6a704d0-expansion2-plan.md` (read §0 scope, §1-§4, §6a v2

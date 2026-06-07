@@ -2,7 +2,7 @@
   "id": "e93af54b-af11-4512-ba34-8122251de039",
   "title": "Format-agnostic validation: per-issue content_format + repo default + production parser dispatch",
   "description": "Make production validation format-agnostic: select the content parser per issue, defaulting to a per-repo setting, so HTML/XML parsers are exercised in production rather than always parsing Markdown.\n\n## Background\n\nPart of Scope Expansion 2. Epic-review finding: production hardcodes `MarkdownContentParser`, defeating the format-agnostic design. See `dev/active/f6a704d0-expansion2-plan.md` §2 and §6a (MF5).\n\n## Success Criteria\n\n- [ ] [hard] An `Issue` carries an optional `content_format` field (`markdown|html|xml`), serde default+skip so existing issue files are not rewritten; settable via `jit issue create/update --content-format` and reflected in `--json` and `jit --schema` (MCP parity).\n- [ ] [hard] A per-repo default `content_format` (default markdown) exists in config.toml and survives later backward-compat removal (behavioral key).\n- [ ] [hard] A single selector chooses the parser as issue.content_format → repo default → markdown, and is used at BOTH production projection sites (`local.rs` build_projection AND `graph.rs` criterion_ids); no production site hardcodes Markdown.\n- [ ] [hard] A selected format whose parser feature is not compiled in produces a clear error (no silent Markdown fallback).\n- [ ] [hard] CI executes the cross-format path via a `cargo test -p jit --features html,xml` job (it is not run today); end-to-end tests prove HTML/XML bodies are parsed by the selected parser in production.\n- [ ] [hard] `cargo fmt`, `clippy --workspace --all-targets`, `cargo test --workspace`, and `cargo test -p jit --features html,xml` are clean.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "normal",
   "assignee": "agent:claude",
   "dependencies": [],
@@ -11,7 +11,23 @@
     "cargo-ci-features",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci-features": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-07T19:35:25.671419741Z"
+    },
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-07T19:32:45.735672603Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-07T19:38:12.380614207Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -19,5 +35,5 @@
     "epic:validation-engine"
   ],
   "created_at": "2026-06-07T17:58:58.126685091+00:00",
-  "updated_at": "2026-06-07T18:13:35.485794646+00:00"
+  "updated_at": "2026-06-07T19:44:14.514488744+00:00"
 }
