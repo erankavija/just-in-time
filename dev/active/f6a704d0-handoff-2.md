@@ -51,8 +51,22 @@ Expansion-2 progress since the above was written:
   also required two follow-ups (now fixed): `jit issue show --json` exposes
   content_format; `--content-format inherit`/`default` clears an override back to None
   (update is tri-state `Option<Option<ContentFormat>>`).
-- **REMAINING: Task C (`2fb9f910`, gf2 migration — UNBLOCKED, 2/2 deps done) then Task D
-  (`d4188154`, BC hard removal, depends on C), then epic completion.**
+- **Task C (`2fb9f910`) — DONE.** gf2 migrated to rules.toml: installed the new `jit`
+  AND `jit-server` globally (`cargo install --path crates/jit` + `crates/server`, from
+  main which has A+B but NOT D), stopped gf2's old server (PID 2406670), ran `jit init`
+  in `../gf2` (migrated `require_type_label`; 8 rules + 3 schemas; config reduced to
+  behavioral keys), verified `jit validate` IDENTICAL to baseline (exit 1 on gf2's
+  PRE-EXISTING isolated-issue integrity error + 117 warnings — not introduced by us),
+  committed in the gf2 repo (`49d2c38`), restarted `jit-server` on :3000 (healthy, HTTP
+  200; pid file is gitignored, updated to the live PID). This repo also re-verified green
+  (exit 0) under the new global binary.
+- **REMAINING: Task D (`d4188154`, BC hard removal — UNBLOCKED, 1/1 dep done), then epic
+  completion.**
+- **BINARY-INSTALL NOTE:** the global `jit`/`jit-server` are from main@(A+B), which still
+  contains the migration/BC code. After Task D lands (removes that code), RE-INSTALL both
+  (`cargo install --path crates/jit --force` + `--path crates/server --force`) and restart
+  gf2's server so the deployed binaries match the slimmed code. gf2's already-migrated
+  rules.toml stays valid (post-D loader still reads all rule kinds; re-init = no-op).
 - **Rate-limit note (user, this session):** the `code-review` gate's AI reviewer is near
   its rate limit; `cargo-ci`/`cargo-ci-features` are LOCAL (free) — only `code-review`
   consumes the budget. Remaining code-review runs needed: Task D + epic completion (≈2),

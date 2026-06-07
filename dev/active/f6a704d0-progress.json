@@ -145,7 +145,7 @@
           "short_id": "2fb9f910",
           "title": "Migrate gf2 (and verify this repo) to rules.toml",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "d4188154",
@@ -216,11 +216,15 @@
     "a6daa05d": 1,
     "0abaddc0": 2,
     "5e79ba48": 0,
-    "e93af54b": 0
+    "e93af54b": 0,
+    "2fb9f910": 0
   },
   "started_at": "2026-06-06T00:00:00Z",
   "handoffs": [
     "dev/active/f6a704d0-handoff.md",
     "dev/active/f6a704d0-handoff-2.md"
+  ],
+  "notes": [
+    "Task C done: gf2 migrated to rules.toml (gf2 repo commit 49d2c38); validate behavior preserved (exit1 on gf2's pre-existing isolated-issue error + 117 warns); jit+jit-server reinstalled globally from main@(A+B); gf2 server restarted healthy on :3000. Reinstall both binaries after Task D removes the migration/BC code."
   ]
 }
