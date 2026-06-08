@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<title>jit's Validation Engine — Leverage &amp; Configure</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;0,700;1,400&family=Source+Code+Pro:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<!-- reveal.js core only (no reveal theme — base.css + the theme token file own all appearance) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+
+<!-- KaTeX (synchronous math; deterministic heights for the fit-checker) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+
+<!-- Theme system: structure is theme-agnostic; swap the #theme link to retheme -->
+<link rel="stylesheet" id="theme" href="themes/rust.css">
+<link rel="stylesheet" href="base.css">
+</head>
+<body>
+<div class="reveal"><div class="slides">
+
+<!-- ── TITLE ───────────────────────────────────────────────────────────── -->
+<section class="title">
+  <h1>jit's Validation Engine</h1>
+  <p class="tagline">A declarative engine for issue &amp; label validation — how to leverage and configure it</p>
+  <p>Epic <code>f6a704d0</code> &nbsp;·&nbsp; just-in-time &nbsp;·&nbsp; 2026-06</p>
+  <p class="caption">All enforcement now lives in <code>.jit/rules.toml</code>, the single source of truth.</p>
+</section>
+
+<!-- ── AGENDA ──────────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Outline <span class="num">· 2 / 18</span></span>
+  <h2>Agenda</h2>
+  <ol>
+    <li>What changed and why</li>
+    <li>Concepts: the rule pipeline, selectors, severity vs enforce</li>
+    <li>Authoring rules: shorthand, JSON Schema, graph rules, checker-command</li>
+    <li>Configuring: <code>config.toml</code> vs <code>rules.toml</code>, <code>content_format</code></li>
+    <li>Operating: <code>jit validate</code>, gates, the default ruleset</li>
+    <li>A worked example, and a getting-started recipe</li>
+  </ol>
+</section>
+
+<!-- ── MOTIVATION ──────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Motivation <span class="num">· 3 / 18</span></span>
+  <h2>What changed</h2>
+  <div class="two-col">
+    <div>
+      <h3>Before</h3>
+      <p>Validation was hard-coded in Rust and steered by scattered
+      <code>[validation]</code> flags. Adding a check meant editing the binary.</p>
+    </div>
+    <div>
+      <h3>Now</h3>
+      <p>A general, declarative engine. Rules are data in
+      <code>.jit/rules.toml</code>; the same engine serves many methodologies,
+      not just one.</p>
+    </div>
+  </div>
+  <div class="note"><code>rules.toml</code> is the <em>sole</em> source of truth when present. The
+  legacy enforcement keys were removed — jit is now a flexible substrate for whatever discipline you author.</div>
+</section>
+
+<!-- ── MENTAL MODEL ────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Concepts <span class="num">· 4 / 18</span></span>
+  <h2>The mental model</h2>
+  <div class="three-col">
+    <div><h3>1 · Project</h3><p>Each issue becomes an enriched <em>projection</em>: its fields, labels, and the parsed <em>sections</em> of its body.</p></div>
+    <div><h3>2 · Select</h3><p>A rule's <code>when</code> selector decides which issues it applies to. Matching rules form a union.</p></div>
+    <div><h3>3 · Assert</h3><p>Each applicable rule asserts a condition over the projection and reports name, severity, message.</p></div>
+  </div>
+  <div class="note">One trait parses the body (Markdown by default; HTML/XML behind features), so every rule sees the same shape regardless of format.</div>
+</section>
+
+<!-- ── ANATOMY OF A RULE ───────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Concepts <span class="num">· 5 / 18</span></span>
+  <h2>Anatomy of a rule</h2>
+<pre><code class="language-toml" data-trim>[[rules]]
+name    = "epic-has-criteria-section"   # unique identifier, shown in reports
+when    = { type = "epic" }             # selector — omit to match every issue
+severity = "error"                      # "error" fails validate; "warn" advises
+enforce = true                          # error + enforce => also BLOCKS the write
+assert  = { require-section = { heading = "Success Criteria" } }</code></pre>
+  <div class="note">Five fields. <code>assert</code> is the only required one; <code>severity</code> defaults to error,
+  <code>enforce</code> to <code>false</code>, and an absent <code>when</code> matches all issues.</div>
+</section>
+
+<!-- ── SELECTORS ───────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Concepts <span class="num">· 6 / 18</span></span>
+  <h2>Selectors: the <code>when</code> matrix</h2>
+  <table>
+    <thead><tr><th>key</th><th>matches on</th><th>example</th></tr></thead>
+    <tbody>
+      <tr><td><code>type</code></td><td>the <code>type:*</code> label value</td><td><code>{ type = "epic" }</code></td></tr>
+      <tr><td><code>label</code></td><td>presence of a label (glob)</td><td><code>{ label = "req:*" }</code></td></tr>
+      <tr><td><code>state</code></td><td>lifecycle state</td><td><code>{ state = "in_progress" }</code></td></tr>
+      <tr><td><code>doc-type</code></td><td>a linked document's type</td><td><code>{ doc-type = "design" }</code></td></tr>
+    </tbody>
+  </table>
+  <div class="note">Keys combine (AND). Omitting <code>when</code> applies the rule to every issue — that is how the
+  canonical <code>default:label-format</code> rule covers all labels.</div>
+</section>
+
+<!-- ── SEVERITY x ENFORCE ──────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Concepts <span class="num">· 7 / 18</span></span>
+  <h2>Severity vs enforce</h2>
+  <table>
+    <thead><tr><th></th><th>enforce = false</th><th>enforce = true</th></tr></thead>
+    <tbody>
+      <tr><td><code>severity = "error"</code></td><td>fails <code>jit validate</code> / gates</td><td>fails validate <em>and</em> blocks the write</td></tr>
+      <tr><td><code>severity = "warn"</code></td><td>advisory warning only</td><td>(warn never blocks)</td></tr>
+    </tbody>
+  </table>
+  <div class="note"><strong>severity</strong> = how loud (does it fail a run?). <strong>enforce</strong> = how early
+  (does it stop a <code>create</code>/<code>update</code> at write time?). Use <code>--force</code> to bypass an enforced block, logged.</div>
+</section>
+
+<!-- ── LOCAL VS GRAPH ──────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Concepts <span class="num">· 8 / 18</span></span>
+  <h2>Local rules vs graph rules</h2>
+  <div class="two-col">
+    <div>
+      <h3>Local</h3>
+      <p>Judge one issue in isolation: format, structure, required sections,
+      schema shape. Evaluate on <code>create</code>/<code>update</code> and can
+      block writes.</p>
+    </div>
+    <div>
+      <h3>Graph</h3>
+      <p>Judge relationships across the DAG: coverage, reference integrity,
+      dependency shape, hierarchy. Run only in <code>jit validate</code> and gate
+      checkers — never on the write path.</p>
+    </div>
+  </div>
+  <div class="note">Rule of thumb: if answering the question needs <em>another</em> issue, it is a graph rule.</div>
+</section>
+
+<!-- ── SHORTHAND KINDS ─────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Authoring <span class="num">· 9 / 18</span></span>
+  <h2>Shorthand assert kinds (local)</h2>
+  <table>
+    <thead><tr><th>kind</th><th>checks</th></tr></thead>
+    <tbody>
+      <tr><td><code>require-label</code></td><td>min/max count of a label glob (e.g. uniqueness)</td></tr>
+      <tr><td><code>label-value-pattern</code></td><td>a namespace's value matches a regex</td></tr>
+      <tr><td><code>require-section</code></td><td>the body has a given <code>## Heading</code></td></tr>
+      <tr><td><code>require-doc-type</code> / <code>has-doc-type</code></td><td>a linked document of a given type exists</td></tr>
+    </tbody>
+  </table>
+  <div class="note">Shorthands are ergonomic sugar — they desugar to JSON Schema under the hood, so behaviour is uniform.</div>
+</section>
+
+<!-- ── RAW JSON SCHEMA ─────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Authoring <span class="num">· 10 / 18</span></span>
+  <h2>Raw JSON Schema, when sugar is not enough</h2>
+<pre><code class="language-toml" data-trim># Inline, or reference a file under .jit/schemas/
+assert = { json-schema = "schemas/spec-body.json" }</code></pre>
+  <p>Validates against the enriched projection (fields, <code>raw_labels</code>,
+  parsed <code>sections</code>) via the <code>jsonschema</code> crate. Use it for
+  <code>contains</code>, <code>pattern</code>, and structure TOML can't express.</p>
+  <div class="note"><strong>Extension point:</strong> custom <code>x-jit-*</code> keywords let you add bespoke checks
+  inside a schema. One rule may use shorthand <em>or</em> raw schema — mixing the two in one rule is rejected at load.</div>
+</section>
+
+<!-- ── GRAPH KINDS ─────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Authoring <span class="num">· 11 / 18</span></span>
+  <h2>Graph assert kinds</h2>
+  <table>
+    <thead><tr><th>kind</th><th>checks across the DAG</th></tr></thead>
+    <tbody>
+      <tr><td><code>label-coverage</code></td><td>every source item (e.g. a <code>[hard]</code> criterion) is covered by a child label</td></tr>
+      <tr><td><code>label-reference</code></td><td>reference integrity between two namespaces (and the inverse)</td></tr>
+      <tr><td><code>dependency-shape</code></td><td>structural constraints on dependency edges</td></tr>
+      <tr><td><code>type-hierarchy</code></td><td>built-in <code>orphan-leaf</code> / <code>strategic-consistency</code> warnings</td></tr>
+    </tbody>
+  </table>
+  <div class="note"><code>scope = "linked"</code> confines resolution to an issue's own dependency graph — so a child
+  cannot accidentally satisfy an unrelated epic's identically-named requirement.</div>
+</section>
+
+<!-- ── CHECKER-COMMAND ─────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Authoring <span class="num">· 12 / 18</span></span>
+  <h2>The <code>checker-command</code> escape hatch</h2>
+<pre><code class="language-toml" data-trim>[[rules]]
+name   = "spec-spellcheck"
+when   = { type = "epic" }
+assert = { checker-command = { run = "scripts/lint-spec.sh" } }</code></pre>
+  <p>For checks the engine can't express declaratively, shell out. The command
+  receives <code>$JIT_ISSUE_ID</code> and its exit code / output drive the result.</p>
+  <div class="warning">It is a validate/gate hatch only — a <code>checker-command</code> rule with
+  <code>enforce = true</code> is <em>rejected at load</em>. It must never silently block writes.</div>
+</section>
+
+<!-- ── CONFIG VS RULES ─────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Configuring <span class="num">· 13 / 18</span></span>
+  <h2><code>config.toml</code> vs <code>rules.toml</code></h2>
+  <div class="two-col">
+    <div>
+      <h3>config.toml — taxonomy</h3>
+      <p><code>[type_hierarchy]</code> (the type levels &amp; membership labels)
+      and <code>[namespaces.*]</code> (<code>description</code>,
+      <code>unique</code>, <code>examples</code>). <em>What things are.</em></p>
+    </div>
+    <div>
+      <h3>rules.toml — enforcement</h3>
+      <p>Every check: formats, allowed values, patterns, coverage, references.
+      <em>What is allowed.</em> Scaffolded from the taxonomy by
+      <code>jit init</code>.</p>
+    </div>
+  </div>
+  <div class="note">The registry drives <code>default:namespace-registry</code> and <code>default:namespace-unique:*</code>.
+  Allowed-value enums and patterns are no longer config keys — author them as rules.</div>
+</section>
+
+<!-- ── CONTENT FORMAT ──────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Configuring <span class="num">· 14 / 18</span></span>
+  <h2>Format-agnostic bodies: <code>content_format</code></h2>
+<pre><code class="language-bash" data-trim># repo default in config.toml: [validation] content_format = "markdown"
+# override per issue at authoring time:
+jit issue create -t "Spec" --content-format html --label type:epic</code></pre>
+  <p>Selection order: the issue's <code>content_format</code> → the repo default
+  → Markdown. The matching parser feeds the same projected <code>sections</code>
+  to every rule, so HTML/XML specs validate in production, not just tests.</p>
+  <div class="note">HTML/XML parsers are behind cargo features; selecting a format whose feature isn't compiled
+  is a clear error, never a silent Markdown fallback.</div>
+</section>
+
+<!-- ── RUNNING IT ──────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Operate <span class="num">· 15 / 18</span></span>
+  <h2>Running validation</h2>
+<pre><code class="language-bash" data-trim>jit validate                 # whole repo: local + graph rules
+jit validate &lt;id&gt; --explain  # which rules matched this issue, and why
+jit validate --json          # machine-readable: name, severity, message</code></pre>
+  <p>Quality gates invoke the same engine per issue via
+  <code>$JIT_ISSUE_ID</code>, so a gate enforces exactly the rules you authored —
+  no separate configuration.</p>
+  <div class="note"><code>--explain</code> is the debugging workhorse: it lists every rule that matched the issue and
+  whether each passed or failed.</div>
+</section>
+
+<!-- ── DEFAULT RULESET ─────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Operate <span class="num">· 16 / 18</span></span>
+  <h2>What <code>jit init</code> scaffolds</h2>
+  <table>
+    <thead><tr><th>rule</th><th>severity</th><th>enforce</th></tr></thead>
+    <tbody>
+      <tr><td><code>default:label-format</code></td><td>error</td><td>true</td></tr>
+      <tr><td><code>default:namespace-registry</code></td><td>error</td><td>false</td></tr>
+      <tr><td><code>default:type-hierarchy-known</code></td><td>error</td><td>false</td></tr>
+      <tr><td><code>default:namespace-unique:&lt;ns&gt;</code></td><td>error</td><td>true</td></tr>
+      <tr><td><code>default:orphan-leaf</code> · <code>strategic-consistency</code></td><td>warn</td><td>false</td></tr>
+    </tbody>
+  </table>
+  <div class="note">Fully editable — these <code>default:*</code> rules have no special status. Absent a file, the
+  defaults are built in memory (no write-on-read); only <code>jit init</code> materializes them to disk.</div>
+</section>
+
+<!-- ── WORKED EXAMPLE: SDD ─────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Patterns <span class="num">· 17 / 18</span></span>
+  <h2>Worked example: spec-driven development</h2>
+<pre><code class="language-toml" data-trim># Coverage: every [hard] criterion in the epic body is implemented by a done child
+assert = { label-coverage = { criteria-section = "success_criteria",
+  marker = "[hard]", id-pattern = "REQ-[0-9]+",
+  satisfies-namespace = "satisfies", child-state = "done", child-link = "dependents" } }</code></pre>
+  <p>The epic's <code>## Success Criteria</code> are canonical; <code>req:</code>
+  and <code>satisfies:</code> labels are <em>derived</em>. Local rules check
+  format and structure; graph rules close the derivation loop.</p>
+  <div class="note">Ships as a copy-in example under <code>docs/examples/sdd/</code> — methodologies are examples, not built-ins.</div>
+</section>
+
+<!-- ── GETTING STARTED ─────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Wrap-up <span class="num">· 18 / 18</span></span>
+  <h2>A getting-started recipe</h2>
+  <ol>
+    <li>Run <code>jit init</code> — get a sensible default <code>rules.toml</code> from your taxonomy.</li>
+    <li>Declare namespaces in <code>config.toml</code>; let init derive the registry/uniqueness rules.</li>
+    <li>Add your own <code>[[rules]]</code>: start with shorthand, reach for JSON Schema when needed.</li>
+    <li>Iterate with <code>jit validate &lt;id&gt; --explain</code>; flip <code>enforce = true</code> once stable.</li>
+    <li>Wire the engine into a gate so it runs on every issue.</li>
+  </ol>
+  <div class="note">Start advisory (warn / enforce=false), tighten to enforced once the rule earns trust.</div>
+</section>
+
+<!-- ── CLOSING ─────────────────────────────────────────────────────────── -->
+<section class="title">
+  <h1>One engine, your rules</h1>
+  <p class="tagline">Declarative validation in <code>.jit/rules.toml</code> — the single source of truth</p>
+  <p><code>docs/reference/configuration.md</code> &nbsp;·&nbsp; <code>docs/examples/</code></p>
+</section>
+
+</div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script>
+  // fitcheck.py waits on these flags before measuring.
+  window.__deckReady = false;
+  window.__mathReady = false;
+
+  function initDeck() {
+    if (window.renderMathInElement) {
+      renderMathInElement(document.body, {
+        delimiters: [
+          { left: "\\[", right: "\\]", display: true },
+          { left: "\\(", right: "\\)", display: false },
+        ],
+        throwOnError: false,
+      });
+    }
+    window.__mathReady = true;
+
+    Reveal.initialize({
+      width: 1280,
+      height: 720,
+      margin: 0.04,
+      minScale: 0.4,
+      maxScale: 1.2,
+      hash: true,
+      center: false,
+      slideNumber: 'c/t',
+      transition: 'none',
+      backgroundTransition: 'none',
+      plugins: [ RevealHighlight ],
+    }).then(function () {
+      Promise.resolve(document.fonts ? document.fonts.ready : null)
+        .finally(function () { window.__deckReady = true; });
+    });
+  }
+
+  // KaTeX scripts are deferred; run once they (and the DOM) are available.
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', function () {
+      // give deferred KaTeX a tick to attach renderMathInElement
+      setTimeout(initDeck, 0);
+    });
+  } else {
+    setTimeout(initDeck, 0);
+  }
+</script>
+</body>
+</html>
