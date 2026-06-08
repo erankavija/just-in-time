@@ -16,8 +16,17 @@ pub fn process_exists(pid: u32) -> bool {
     use nix::sys::signal::kill;
     use nix::unistd::Pid;
 
-    // Signal 0 (None) doesn't send a signal but checks if process exists
-    kill(Pid::from_raw(pid as i32), None).is_ok()
+    // Guard the PID before handing it to kill(2): a checked u32->i32 conversion
+    // avoids wrap-around for large PIDs (notably `u32::MAX as i32 == -1`), and the
+    // positive-PID check prevents `kill(-1, 0)` (every process owned by the user)
+    // and `kill(0, 0)` (the caller's OWN process group) from being mistaken for a
+    // liveness probe. Any value that is not a valid positive PID is treated as a
+    // non-existent process. Signal 0 (None) only checks existence; it sends no
+    // signal.
+    match i32::try_from(pid) {
+        Ok(p) if p > 0 => kill(Pid::from_raw(p), None).is_ok(),
+        _ => false,
+    }
 }
 
 #[cfg(windows)]
@@ -141,6 +150,22 @@ mod tests {
         // Use a very high PID that is unlikely to exist
         let invalid_pid = u32::MAX - 1;
         assert!(!process_exists(invalid_pid), "Invalid PID should not exist");
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_process_exists_rejects_u32_max_without_process_wide_kill() {
+        // `u32::MAX as i32 == -1`, and `kill(-1, 0)` targets EVERY process owned
+        // by the user. The PID guard must reject this as a non-existent process
+        // rather than issuing the process-wide probe. (If the guard were missing,
+        // kill(-1, 0) would succeed and this would wrongly report `true`.)
+        assert!(
+            !process_exists(u32::MAX),
+            "u32::MAX must be rejected, never treated as a live process via kill(-1)"
+        );
+        // PID 0 maps to the caller's OWN process group under kill(2); it must not
+        // be mistaken for a liveness probe either.
+        assert!(!process_exists(0), "PID 0 must be rejected");
     }
 
     #[test]
