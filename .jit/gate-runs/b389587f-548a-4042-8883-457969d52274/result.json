@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "b389587f-548a-4042-8883-457969d52274",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "d4188154-f465-44f0-9b63-753ad1494204",
+  "commit": "9ef22e0843f34c874cdb6bbfdd6cd26b7fa1c92c",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-06-07T21:16:04.303998387Z",
+  "completed_at": "2026-06-07T21:20:11.591241656Z",
+  "duration_ms": 247287,
+  "exit_code": 1,
+  "stdout": "The patch introduces nondeterministic scaffold output for namespace-registry schemas, which can dirty generated validation files across equivalent init runs. I also observed workspace tests failing in this environment, but the actionable introduced issue is the unstable namespace ordering.\n\nReview comment:\n\n- [P2] Sort registry namespaces before serializing schema — /home/vkaskivuo/Projects/just-in-time/crates/jit/src/validation/defaults.rs:111-111\n  When `jit init` scaffolds defaults for any repo with more than one namespace, this collects `HashMap` keys in nondeterministic order and embeds that order in the `default:namespace-registry` regex inside `.jit/schemas/default-namespace-registry.json`. Because `HashMap` iteration order varies across runs/processes, the scaffolded schema can change without any config change, causing spurious git diffs and breaking the deterministic fresh-init/parity expectation. Sort `registered` before building the schema, as is already done for hierarchy types and uniqueness rules.\n",
+  "stderr": "---\nERROR: Could not extract VERDICT from review output. Treating as failure.\n--- agent stderr ---\nOpenAI Codex v0.137.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019ea3f1-5fe5-7f81-b28e-2b9fb1323eb1\n--------\nuser\n--- remainder omitted; resume the session id above for the full transcript ---",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

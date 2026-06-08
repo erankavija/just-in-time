@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "053efd8a-b1db-4a34-a5c3-a921a49222d9",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "d4188154-f465-44f0-9b63-753ad1494204",
+  "commit": "ba198ab64e33cf3f0db9e0cb78554565b41e2fa0",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-06-07T23:01:24.437240181Z",
+  "completed_at": "2026-06-07T23:02:14.352309882Z",
+  "duration_ms": 49915,
+  "exit_code": 1,
+  "stdout": "The prior git-repo locking concern is addressed, but the implementation now creates a bogus `.git/jit` control plane for non-git repositories during init. That is an introduced behavioral regression in the scaffold path.\n\nReview comment:\n\n- [P2] Avoid creating .git in non-git init — /home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/mod.rs:552-557\n  When `jit init` is run outside a Git repository, `WorktreePaths::detect()` returns `Ok` with `shared_jit = <cwd>/.git/jit` rather than `Err`, so this new lock path creates `<cwd>/.git/jit/locks` before scaffolding rules. That silently turns a non-git JIT directory into one with a bogus `.git` directory and contradicts the intended lockless non-git path; detect whether the returned paths are actually inside a Git worktree before creating the control-plane lock.\n",
+  "stderr": "---\nERROR: Could not extract VERDICT from review output. Treating as failure.\n--- agent stderr (first 12 of 2055 lines; the session id below points to the full agent transcript) ---\nOpenAI Codex v0.137.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019ea451-cedb-7830-b247-f4c1ab813566\n--------\nuser\n--- 2043 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
