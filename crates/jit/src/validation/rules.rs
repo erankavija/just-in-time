@@ -396,11 +396,24 @@ impl StatePredicate {
         self.tokens().iter().any(|t| t.to_lowercase() == needle)
     }
 
-    /// Validate that every token names one of the seven valid lifecycle states.
+    /// Validate that this predicate is non-empty and every token names one of
+    /// the seven valid lifecycle states.
+    ///
+    /// An empty list (`state = []`) is rejected because it silently never
+    /// matches any issue — a rule scoped to zero states is always a config
+    /// error, not a useful no-op.
     ///
     /// Returns [`RuleConfigError::InvalidState`] naming the first unrecognized
-    /// token, the owning rule, and the list of valid tokens.
+    /// token (or the empty-list sentinel `"<empty list>"`) together with the
+    /// owning rule and the list of valid tokens.
     fn validate(&self, rule: &str) -> Result<(), RuleConfigError> {
+        if self.tokens().is_empty() {
+            return Err(RuleConfigError::InvalidState {
+                rule: rule.to_string(),
+                value: "<empty list>".to_string(),
+                valid: VALID_STATE_TOKENS.join(", "),
+            });
+        }
         for token in self.tokens() {
             if !VALID_STATE_TOKENS.contains(&token.to_lowercase().as_str()) {
                 return Err(RuleConfigError::InvalidState {
@@ -972,6 +985,12 @@ impl RawAssert {
             return Ok(Assertion::CheckerCommand(cmd));
         }
         if let Some(config) = self.label_coverage {
+            // Validate `child-state` at load so a typo'd state (which would
+            // otherwise silently never match any child, producing spurious
+            // "criterion not satisfied" findings) is caught immediately.
+            if let Some(toml::Value::String(s)) = config.get("child-state") {
+                StatePredicate::Single(s.clone()).validate(rule)?;
+            }
             return Ok(Assertion::LabelCoverage { config });
         }
         if let Some(config) = self.label_reference {
@@ -1235,6 +1254,79 @@ assert = { require-section = { heading = "Plan" } }
             }
             other => panic!("expected InvalidState, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn test_selector_state_empty_list_is_rejected_at_load() {
+        // `when = { state = [] }` deserializes to `StatePredicate::List(vec![])`.
+        // It must be rejected at load because it silently never matches any issue.
+        let toml = r#"
+[[rules]]
+name = "empty-list"
+when = { state = [] }
+assert = { require-section = { heading = "Plan" } }
+"#;
+        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        match err {
+            RuleConfigError::InvalidState { rule, value, valid } => {
+                assert_eq!(rule, "empty-list");
+                // The sentinel value must make the problem explicit.
+                assert!(
+                    value.contains("empty"),
+                    "value should indicate empty list, got: {value}"
+                );
+                // The valid list must name every legal token.
+                for token in VALID_STATE_TOKENS {
+                    assert!(
+                        valid.contains(token),
+                        "valid list missing '{token}': {valid}"
+                    );
+                }
+            }
+            other => panic!("expected InvalidState, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_label_coverage_invalid_child_state_rejected_at_load() {
+        // A typo'd `child-state` in a label-coverage config silently never matches
+        // any child, producing spurious "criterion not satisfied" findings.
+        // It must be rejected at load, naming the rule, the bad token, and valid states.
+        let toml = r#"
+[[rules]]
+name = "typo-child-state"
+when = { type = "epic" }
+assert = { label-coverage = { source = "req", child-state = "don" } }
+"#;
+        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        match err {
+            RuleConfigError::InvalidState { rule, value, valid } => {
+                assert_eq!(rule, "typo-child-state");
+                assert_eq!(value, "don");
+                // The valid list names every legal token.
+                for token in VALID_STATE_TOKENS {
+                    assert!(
+                        valid.contains(token),
+                        "valid list missing '{token}': {valid}"
+                    );
+                }
+            }
+            other => panic!("expected InvalidState, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_label_coverage_valid_child_state_accepted_at_load() {
+        // A correctly spelled `child-state` must load without error.
+        let toml = r#"
+[[rules]]
+name = "coverage"
+when = { type = "epic" }
+assert = { label-coverage = { child-state = "done" } }
+"#;
+        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        assert_eq!(set.rules.len(), 1);
+        assert_eq!(set.rules[0].name, "coverage");
     }
 
     #[test]
