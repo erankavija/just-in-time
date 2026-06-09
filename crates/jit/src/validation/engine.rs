@@ -591,9 +591,13 @@ pub fn render_finding_message(
     // `sections.<slug>.items` instance because the body had prose, not bullets.
     if let Some(slug) = empty_items_section_slug(error, path) {
         let heading = section_heading(schema, &slug).unwrap_or(slug);
-        return format!(
-            "section '{heading}' has no list items; items must be Markdown bullets \
-             (lines starting with '- ')"
+        let readable = readable_instance_path(path);
+        return with_path_prefix(
+            &readable,
+            &format!(
+                "section '{heading}' has no list items; items must be Markdown bullets \
+                 (lines starting with '- ')"
+            ),
         );
     }
 
@@ -701,15 +705,21 @@ fn render_contains_message(
         (Some(slug), Some(pattern)) => {
             let heading = section_heading(schema, &slug).unwrap_or(slug);
             let humanized = humanize_regex(pattern);
-            format!(
-                "section '{heading}' items must include at least one entry matching {humanized}"
+            with_path_prefix(
+                &readable,
+                &format!(
+                    "section '{heading}' items must include at least one entry matching {humanized}"
+                ),
             )
         }
         (Some(slug), None) => {
             let heading = section_heading(schema, &slug).unwrap_or(slug);
-            format!(
-                "section '{heading}' items must include at least one entry \
-                 satisfying the required shape"
+            with_path_prefix(
+                &readable,
+                &format!(
+                    "section '{heading}' items must include at least one entry \
+                     satisfying the required shape"
+                ),
             )
         }
         (None, Some(pattern)) => {
@@ -1641,8 +1651,9 @@ assert = { json-schema = "schemas/b.json" }
     #[test]
     fn test_empty_section_names_heading_and_demands_bullets() {
         // Prose-without-bullets: the section parsed but yielded an empty `items`
-        // array. The message must name the heading and state that items must be
-        // Markdown bullets — not the content-free `[] has less than 1 item`.
+        // array. The message must carry the instance path prefix, name the heading,
+        // and state that items must be Markdown bullets — not the content-free
+        // `[] has less than 1 item`.
         let rule = rule_for(spec_body_schema());
         let projection = serde_json::json!({
             "sections": { "success_criteria": { "heading": "Success Criteria", "items": [] } }
@@ -1652,6 +1663,11 @@ assert = { json-schema = "schemas/b.json" }
             .iter()
             .find(|m| m.contains("no list items"))
             .unwrap_or_else(|| panic!("expected an empty-section message, got {msgs:?}"));
+        // Must carry the readable instance path prefix.
+        assert!(
+            empty_msg.starts_with("at sections.success_criteria.items:"),
+            "must be prefixed with instance path: {empty_msg}"
+        );
         assert!(
             empty_msg.contains("section 'Success Criteria'"),
             "{empty_msg}"
@@ -1694,9 +1710,11 @@ assert = { json-schema = "schemas/b.json" }
         });
         let msgs = messages(&rule, &projection);
         assert!(
-            msgs.iter()
-                .any(|m| m.contains("section 'success_criteria' has no list items")),
-            "expected slug fallback, got {msgs:?}"
+            msgs.iter().any(|m| {
+                m.starts_with("at sections.success_criteria.items:")
+                    && m.contains("section 'success_criteria' has no list items")
+            }),
+            "expected path-prefixed slug fallback, got {msgs:?}"
         );
     }
 
@@ -1826,9 +1844,9 @@ assert = { json-schema = "schemas/b.json" }
     #[test]
     fn test_nonempty_contains_failure_names_heading_and_pattern() {
         // The production SDD path: all items are [aspirational]; none is [hard].
-        // The message must (a) name the section heading, (b) state at least one
-        // entry must match the [hard] pattern, and (c) NOT dump the full array /
-        // contain 'None of'.
+        // The message must (a) carry the instance path prefix,
+        // (b) name the section heading, (c) state at least one entry must match
+        // the [hard] pattern, and (d) NOT dump the full array / contain 'None of'.
         let rule = rule_for(spec_body_schema());
         let projection = serde_json::json!({
             "sections": {
@@ -1847,17 +1865,22 @@ assert = { json-schema = "schemas/b.json" }
             .find(|m| m.contains("must include at least one entry"))
             .unwrap_or_else(|| panic!("expected a contains message, got {msgs:?}"));
 
-        // (a) names the section heading
+        // (a) carries the readable instance path prefix
+        assert!(
+            contains_msg.starts_with("at sections.success_criteria.items:"),
+            "must be prefixed with instance path: {contains_msg}"
+        );
+        // (b) names the section heading
         assert!(
             contains_msg.contains("section 'Success Criteria'"),
             "must name the heading: {contains_msg}"
         );
-        // (b) states the required pattern (humanized)
+        // (c) states the required pattern (humanized)
         assert!(
             contains_msg.contains("^\\[hard\\]"),
             "must state the required pattern: {contains_msg}"
         );
-        // (c) must not dump the full array
+        // (d) must not dump the full array
         assert!(
             !contains_msg.contains("None of"),
             "must not dump the array: {contains_msg}"
@@ -1871,7 +1894,7 @@ assert = { json-schema = "schemas/b.json" }
     #[test]
     fn test_nonempty_contains_failure_falls_back_to_slug_without_heading_annotation() {
         // Same as above but the schema has no `x-jit-section-heading` annotation.
-        // The message must fall back to the slug rather than dumping the array.
+        // The message must carry the instance path prefix and fall back to the slug.
         let rule = rule_for(sdd_shaped_schema_no_heading());
         let projection = serde_json::json!({
             "sections": {
@@ -1886,6 +1909,11 @@ assert = { json-schema = "schemas/b.json" }
             .find(|m| m.contains("must include at least one entry"))
             .unwrap_or_else(|| panic!("expected a contains message, got {msgs:?}"));
 
+        // Must carry the instance path prefix
+        assert!(
+            contains_msg.starts_with("at sections.success_criteria.items:"),
+            "must be prefixed with instance path: {contains_msg}"
+        );
         // Falls back to slug
         assert!(
             contains_msg.contains("success_criteria"),
@@ -1948,6 +1976,11 @@ assert = { json-schema = "schemas/b.json" }
             .find(|m| m.contains("must include at least one entry"))
             .unwrap_or_else(|| panic!("expected a contains message, got {msgs:?}"));
 
+        // Must carry the instance path prefix
+        assert!(
+            contains_msg.starts_with("at sections.success_criteria.items:"),
+            "must be prefixed with instance path: {contains_msg}"
+        );
         assert!(
             contains_msg.contains("section 'Success Criteria'"),
             "must name the heading: {contains_msg}"
