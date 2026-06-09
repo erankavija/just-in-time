@@ -1,0 +1,22 @@
+{
+  "id": "690f618a-6b40-44b2-969d-582335cf768f",
+  "title": "Criteria-to-check mapping rule kind with Nyquist example",
+  "description": "Add a rule kind asserting that each criterion in a configured section maps to a verifiable check, and ship a Nyquist-style example ruleset built on it.\n\n## Background\n\nMethodologies like Nyquist validation require every hard requirement to have an automated verification path before work starts. The engine has no primitive linking criteria to checks; this stays methodology-agnostic by shipping the discipline as an example, not engine policy.\n\n## Success Criteria\n\n- [ ] A rule kind asserts that each criterion (filterable by marker) in a configured section maps to a verifiable check (a configured gate or a declared check reference)\n- [ ] An unmapped criterion yields a finding naming the criterion id and what is missing\n- [ ] An example ruleset under docs/examples/ demonstrates requirement-to-check mapping end to end\n- [ ] No methodology-specific names or behavior are added to engine code",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:validation-lifecycle"
+  ],
+  "created_at": "2026-06-09T21:52:58.491874133+00:00",
+  "updated_at": "2026-06-09T21:52:58.493473254+00:00"
+}

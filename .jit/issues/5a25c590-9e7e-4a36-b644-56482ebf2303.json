@@ -1,0 +1,22 @@
+{
+  "id": "5a25c590-9e7e-4a36-b644-56482ebf2303",
+  "title": "Actionable validation error messages",
+  "description": "Make validation findings actionable enough that an agent can self-correct from the message alone, without reading the ruleset or docs.\n\n## Background\n\nWhen section items fail to parse (prose without bullets), the json-schema rule emits `[] has less than 1 item` and `None of [] are valid under the given schema` with no field context. Regex feedback renders raw tab and zero-width characters. A typo'd heading surfaces only as a missing-property error.\n\n## Success Criteria\n\n- [ ] An empty section projection produces a message naming the section heading and stating that items must be Markdown bullets\n- [ ] json-schema findings include the instance path of the failing field\n- [ ] Character classes in regex feedback render readably (`\\s` or a word, never raw control characters)\n- [ ] `require-section` emits a did-you-mean hint when a heading is a near-miss of the required one (e.g. `Sucess Criteria`)\n- [ ] The steering loop on the sloppy-epic scenario reaches a valid write in at most 2 iterations using only error text",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:validation-lifecycle"
+  ],
+  "created_at": "2026-06-09T21:52:58.445037640+00:00",
+  "updated_at": "2026-06-09T21:52:58.446576580+00:00"
+}

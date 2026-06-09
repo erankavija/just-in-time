@@ -6,17 +6,18 @@
   "priority": "critical",
   "assignee": null,
   "dependencies": [
-    "9d427a6b-a8f7-4478-a0e1-1637781e00f6",
     "94f873c8-8508-44b0-b036-ff61c2a9716d",
-    "41d07c6b-24ff-4d4d-8f7f-56daba93bfd7",
     "d7bfd4a4-b2ad-477a-977e-e3242b77b7a2",
-    "ad601a15-5217-439f-9b3c-94a52c06c18b",
-    "b9255f47-dc01-4ad2-b6c0-a8f6756cb761",
-    "f6a704d0-1f01-447b-a8aa-42251fa7c3eb",
+    "94d26c42-3f4f-4a5e-99cc-0e82475a7635",
     "5fe00921-6548-4263-b428-f1e839f68c74",
-    "a4e3cfb0-626e-4a73-8be4-364dd0597833",
+    "41d07c6b-24ff-4d4d-8f7f-56daba93bfd7",
     "93f3e4df-990c-4993-b8dc-66a8827acba7",
-    "4a00b2b0-a527-4f04-9475-62f1d838f903"
+    "4a00b2b0-a527-4f04-9475-62f1d838f903",
+    "b9255f47-dc01-4ad2-b6c0-a8f6756cb761",
+    "9d427a6b-a8f7-4478-a0e1-1637781e00f6",
+    "ad601a15-5217-439f-9b3c-94a52c06c18b",
+    "f6a704d0-1f01-447b-a8aa-42251fa7c3eb",
+    "a4e3cfb0-626e-4a73-8be4-364dd0597833"
   ],
   "gates_required": [
     "code-review"
@@ -29,5 +30,5 @@
     "milestone:v1.0"
   ],
   "created_at": "2025-12-18T20:35:58.694584821Z",
-  "updated_at": "2026-06-06T15:49:05.108227860+00:00"
+  "updated_at": "2026-06-09T21:53:06.361235655+00:00"
 }

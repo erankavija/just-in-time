@@ -1,0 +1,24 @@
+{
+  "id": "bc86f54c-6372-44fe-b375-3e3a882a73e0",
+  "title": "Blocking graph-rule evaluation at state transitions",
+  "description": "Evaluate graph rules at issue state transitions and block the transition when an enforcing rule fails, closing the bypass where an issue reaches `done` despite failing coverage rules.\n\n## Background\n\nGraph rules currently run only in `jit validate` and gate checkers; the write path runs local rules only. The done transition is therefore unguarded by coverage and reference-integrity rules.\n\n## Success Criteria\n\n- [ ] Transitioning an issue evaluates the graph rules applicable to it in its target state; a failing rule with `enforce = true` blocks the transition with exit 4 and prints the findings\n- [ ] Non-enforcing failures are reported on the transition without blocking it\n- [ ] Transition-time evaluation touches only the affected issue's graph neighborhood, not the whole repository\n- [ ] Blocked transitions are recorded in the event log\n- [ ] Documentation describing where rules run (concepts doc and rules.toml comments) matches the new behavior",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "cca3e80b-4a9a-498d-995b-15ff80acab4a"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:validation-lifecycle"
+  ],
+  "created_at": "2026-06-09T21:52:58.401969838+00:00",
+  "updated_at": "2026-06-09T21:53:06.160324467+00:00"
+}

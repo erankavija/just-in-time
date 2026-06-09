@@ -1,0 +1,22 @@
+{
+  "id": "765688e1-2b0d-4d64-8836-eb1f57e3aa6e",
+  "title": "Gate-result recency predicate with fresh-evidence example",
+  "description": "Add a predicate on gate-result freshness so rulesets can require recent evidence before completion, and ship a fresh-evidence example ruleset.\n\n## Success Criteria\n\n- [ ] Rules can assert that an issue's gate results are no older than a configured age (evaluated against the recorded gate timestamps)\n- [ ] A stale or missing gate result yields a finding naming the gate and its age\n- [ ] An example ruleset under docs/examples/ demonstrates fresh-evidence-before-done, blocking via transition enforcement\n- [ ] Behavior is deterministic and testable (clock injection or equivalent; no hidden wall-clock reads in the pure engine)",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:validation-lifecycle"
+  ],
+  "created_at": "2026-06-09T21:52:58.511871939+00:00",
+  "updated_at": "2026-06-09T21:52:58.513272739+00:00"
+}

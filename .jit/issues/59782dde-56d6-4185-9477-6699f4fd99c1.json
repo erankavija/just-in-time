@@ -1,0 +1,22 @@
+{
+  "id": "59782dde-56d6-4185-9477-6699f4fd99c1",
+  "title": "Distinguish stray req labels from unsatisfied ones",
+  "description": "Distinguish a `req:` label whose id does not appear in the canonical criteria section (stray or invented) from one that is declared but not yet satisfied by a child, so the two failure modes are separable by an agent.\n\n## Background\n\nThe label-reference rule compares label values only against other labels, never against ids extracted from the criteria prose. A fabricated `req:REQ-77` and a legitimate not-yet-implemented `req:REQ-01` produce the identical rule, message, and severity.\n\n## Success Criteria\n\n- [ ] A check (new rule kind or an extension of the existing graph kinds) compares `req:`-namespace label values against criterion ids extracted from the configured criteria section\n- [ ] A label with no matching criterion id yields a finding that names the unmatched id and the section searched\n- [ ] A declared-but-unsatisfied label yields a clearly different finding text\n- [ ] Unit tests cover both paths plus the id-format-mismatch case (criterion `REQ-03` vs label `req:REQ-3`)",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:validation-lifecycle"
+  ],
+  "created_at": "2026-06-09T21:52:58.423778914+00:00",
+  "updated_at": "2026-06-09T21:52:58.425245554+00:00"
+}

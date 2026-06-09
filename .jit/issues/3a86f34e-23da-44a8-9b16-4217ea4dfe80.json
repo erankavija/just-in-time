@@ -1,0 +1,22 @@
+{
+  "id": "3a86f34e-23da-44a8-9b16-4217ea4dfe80",
+  "title": "Repo-wide graph rule scope with cross-epic example",
+  "description": "Extend graph rules with a repository-wide scope so rulesets can express checks across unlinked issues, and ship a cross-epic contradiction example.\n\n## Background\n\nGraph rules currently resolve only within an issue's linked dependency graph (`scope = \"linked\"`), so overlapping or colliding requirement ids across independent epics are inexpressible.\n\n## Success Criteria\n\n- [ ] Applicable graph rule kinds accept a repo-wide scope in addition to linked scope\n- [ ] An example ruleset under docs/examples/ detects requirement-id collisions or duplicated ownership across unlinked parent issues\n- [ ] Validation remains performant on repositories with hundreds of issues (measured, not assumed)\n- [ ] Scope semantics are documented in the configuration reference",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:validation-lifecycle"
+  ],
+  "created_at": "2026-06-09T21:52:58.537839556+00:00",
+  "updated_at": "2026-06-09T21:52:58.539355637+00:00"
+}
