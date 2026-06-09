@@ -103,6 +103,22 @@ pub enum RuleConfigError {
         message: String,
     },
 
+    /// A `when` selector names a lifecycle state that is not one of the seven
+    /// valid `state_token` values. Caught at config load so a typo'd state
+    /// (which would otherwise silently never match) surfaces immediately.
+    #[error(
+        "rule '{rule}': invalid state '{value}' in 'when' selector; \
+         valid states are {valid}"
+    )]
+    InvalidState {
+        /// Name of the offending rule.
+        rule: String,
+        /// The unrecognized state token as authored.
+        value: String,
+        /// Comma-separated list of the valid snake_case state tokens.
+        valid: String,
+    },
+
     /// Two or more rules share the same `name`. Rule names MUST be unique so
     /// that every finding attributes unambiguously to exactly one rule: a
     /// finding naming rule `"foo"` must refer to a single rule. (The engine
@@ -221,9 +237,12 @@ pub struct Selector {
     /// Match issues carrying this label, supporting `ns:*` wildcards.
     #[serde(default)]
     pub label: Option<String>,
-    /// Match issues in this lifecycle state (serde snake_case, e.g. `"ready"`).
+    /// Match issues in any of these lifecycle states (serde snake_case, e.g.
+    /// `"ready"`). Authored as a single string or a list of strings; matching
+    /// is true when the issue's state token is in the set. State names are
+    /// validated at config load (see [`RuleConfigError::InvalidState`]).
     #[serde(default)]
-    pub state: Option<String>,
+    pub state: Option<StatePredicate>,
     /// Match issues that have a document with this `doc_type`.
     #[serde(rename = "has_doc_type", alias = "has-doc-type", default)]
     pub has_doc_type: Option<String>,
@@ -274,7 +293,7 @@ impl Selector {
     fn matches_state(&self, issue: &Issue) -> bool {
         match &self.state {
             None => true,
-            Some(state) => state_token(issue.state) == state.to_lowercase(),
+            Some(predicate) => predicate.matches(issue.state),
         }
     }
 
@@ -300,6 +319,98 @@ fn state_token(state: crate::domain::State) -> &'static str {
         State::Done => "done",
         State::Rejected => "rejected",
         State::Archived => "archived",
+    }
+}
+
+/// The seven valid lifecycle-state tokens, in lifecycle order, that a `when`
+/// state predicate may name. Used both to validate authored predicates at load
+/// and to list the valid values in [`RuleConfigError::InvalidState`].
+const VALID_STATE_TOKENS: [&str; 7] = [
+    "backlog",
+    "ready",
+    "in_progress",
+    "gated",
+    "done",
+    "rejected",
+    "archived",
+];
+
+/// A `when` state predicate: one or more lifecycle states a rule applies to.
+///
+/// Authored in TOML as either a single string or a list of strings, both of
+/// which deserialize into the same set-of-states predicate:
+///
+/// ```toml
+/// when = { state = "in_progress" }                       # single
+/// when = { state = ["ready", "in_progress", "gated"] }   # list
+/// ```
+///
+/// Matching is membership: [`StatePredicate::matches`] is true when the issue's
+/// state token is one of the predicate's tokens. The stored tokens are the
+/// authored strings (lowercased on comparison); they are validated against the
+/// seven valid tokens at config load via [`StatePredicate::validate`].
+///
+/// # Examples
+///
+/// ```
+/// use jit::validation::rules::Selector;
+/// use jit::domain::{Issue, State};
+///
+/// let toml = r#"
+/// [[rules]]
+/// name = "lifecycle"
+/// when = { state = ["ready", "in_progress"] }
+/// assert = { require-section = { heading = "Plan" } }
+/// "#;
+/// let set =
+///     jit::validation::rules::RuleSet::from_toml_str(toml, std::path::Path::new("/x")).unwrap();
+/// let mut issue = Issue::new("t".to_string(), String::new());
+/// issue.state = State::InProgress;
+/// assert!(set.rules[0].when.matches(&issue));
+/// issue.state = State::Done;
+/// assert!(!set.rules[0].when.matches(&issue));
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(untagged)]
+pub enum StatePredicate {
+    /// A single authored state token (e.g. `"in_progress"`).
+    Single(String),
+    /// A list of authored state tokens (e.g. `["ready", "in_progress"]`).
+    List(Vec<String>),
+}
+
+impl StatePredicate {
+    /// The authored state tokens this predicate carries, in authored order.
+    pub fn tokens(&self) -> &[String] {
+        match self {
+            StatePredicate::Single(s) => std::slice::from_ref(s),
+            StatePredicate::List(v) => v.as_slice(),
+        }
+    }
+
+    /// Returns whether the given lifecycle state is in this predicate's set.
+    ///
+    /// Comparison is case-insensitive against the snake_case state tokens.
+    pub fn matches(&self, state: crate::domain::State) -> bool {
+        let needle = state_token(state);
+        self.tokens().iter().any(|t| t.to_lowercase() == needle)
+    }
+
+    /// Validate that every token names one of the seven valid lifecycle states.
+    ///
+    /// Returns [`RuleConfigError::InvalidState`] naming the first unrecognized
+    /// token, the owning rule, and the list of valid tokens.
+    fn validate(&self, rule: &str) -> Result<(), RuleConfigError> {
+        for token in self.tokens() {
+            if !VALID_STATE_TOKENS.contains(&token.to_lowercase().as_str()) {
+                return Err(RuleConfigError::InvalidState {
+                    rule: rule.to_string(),
+                    value: token.clone(),
+                    valid: VALID_STATE_TOKENS.join(", "),
+                });
+            }
+        }
+        Ok(())
     }
 }
 
@@ -742,6 +853,12 @@ struct RawLabelValuePattern {
 
 impl RawRule {
     fn into_rule(self, jit_root: &Path) -> Result<Rule, RuleConfigError> {
+        // Validate the `when` state predicate at load so a typo'd state (which
+        // would otherwise silently never match any issue) is rejected with an
+        // error naming the rule and the valid tokens.
+        if let Some(state) = &self.when.state {
+            state.validate(&self.name)?;
+        }
         let assert = self.assert.into_assertion(&self.name, jit_root)?;
         // A `checker-command` is the validate/gate ESCAPE HATCH (DR §4.3) and is
         // never evaluated on the write path, so it can NEVER block a write.
@@ -1006,11 +1123,118 @@ mod tests {
     #[test]
     fn test_selector_state_matches_snake_case() {
         let sel = Selector {
-            state: Some("in_progress".to_string()),
+            state: Some(StatePredicate::Single("in_progress".to_string())),
             ..Default::default()
         };
         assert!(sel.matches(&issue_with(&[], State::InProgress)));
         assert!(!sel.matches(&issue_with(&[], State::Ready)));
+    }
+
+    #[test]
+    fn test_selector_state_single_predicate_from_toml() {
+        // A single-string `state` deserializes into a one-element predicate that
+        // matches only the named state.
+        let toml = r#"
+[[rules]]
+name = "single"
+when = { state = "in_progress" }
+assert = { require-section = { heading = "Plan" } }
+"#;
+        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        let sel = &set.rules[0].when;
+        assert!(sel.matches(&issue_with(&[], State::InProgress)));
+        assert!(!sel.matches(&issue_with(&[], State::Ready)));
+    }
+
+    #[test]
+    fn test_selector_state_list_predicate_matches_any_member() {
+        // A list `state` matches an issue in any listed state and nothing else.
+        let toml = r#"
+[[rules]]
+name = "list"
+when = { state = ["ready", "in_progress", "gated"] }
+assert = { require-section = { heading = "Plan" } }
+"#;
+        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        let sel = &set.rules[0].when;
+        assert!(sel.matches(&issue_with(&[], State::Ready)));
+        assert!(sel.matches(&issue_with(&[], State::InProgress)));
+        assert!(sel.matches(&issue_with(&[], State::Gated)));
+        // Not a member of the list.
+        assert!(!sel.matches(&issue_with(&[], State::Done)));
+        assert!(!sel.matches(&issue_with(&[], State::Backlog)));
+    }
+
+    #[test]
+    fn test_selector_state_list_combines_with_type() {
+        // The state predicate AND-combines with the type selector.
+        let toml = r#"
+[[rules]]
+name = "epic-lifecycle"
+when = { type = "epic", state = ["ready", "in_progress"] }
+assert = { require-section = { heading = "Plan" } }
+"#;
+        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        let sel = &set.rules[0].when;
+        // type + state both match.
+        assert!(sel.matches(&issue_with(&["type:epic"], State::InProgress)));
+        // state matches but type does not.
+        assert!(!sel.matches(&issue_with(&["type:task"], State::InProgress)));
+        // type matches but state does not.
+        assert!(!sel.matches(&issue_with(&["type:epic"], State::Done)));
+    }
+
+    #[test]
+    fn test_selector_state_invalid_name_in_list_is_rejected_at_load() {
+        // An unknown state token anywhere in a `when` list is rejected at config
+        // load with an error naming the rule, the bad value, and the valid set.
+        let toml = r#"
+[[rules]]
+name = "typo"
+when = { state = ["ready", "in_progres"] }
+assert = { require-section = { heading = "Plan" } }
+"#;
+        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        match err {
+            RuleConfigError::InvalidState { rule, value, valid } => {
+                assert_eq!(rule, "typo");
+                assert_eq!(value, "in_progres");
+                // The valid list names every legal token.
+                for token in [
+                    "backlog",
+                    "ready",
+                    "in_progress",
+                    "gated",
+                    "done",
+                    "rejected",
+                    "archived",
+                ] {
+                    assert!(
+                        valid.contains(token),
+                        "valid list missing '{token}': {valid}"
+                    );
+                }
+            }
+            other => panic!("expected InvalidState, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_selector_state_invalid_single_name_is_rejected_at_load() {
+        let toml = r#"
+[[rules]]
+name = "typo-single"
+when = { state = "nope" }
+assert = { require-section = { heading = "Plan" } }
+"#;
+        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        match err {
+            RuleConfigError::InvalidState { rule, value, .. } => {
+                assert_eq!(rule, "typo-single");
+                assert_eq!(value, "nope");
+            }
+            other => panic!("expected InvalidState, got {other:?}"),
+        }
     }
 
     #[test]
@@ -1033,7 +1257,7 @@ mod tests {
     fn test_selector_is_and_across_dimensions() {
         let sel = Selector {
             type_: Some("epic".to_string()),
-            state: Some("ready".to_string()),
+            state: Some(StatePredicate::Single("ready".to_string())),
             ..Default::default()
         };
         // Both dimensions satisfied.

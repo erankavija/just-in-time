@@ -1110,7 +1110,7 @@ fn render_selector(selector: &crate::validation::rules::Selector) -> String {
         parts.push(format!("label={l}"));
     }
     if let Some(s) = &selector.state {
-        parts.push(format!("state={s}"));
+        parts.push(format!("state={}", s.tokens().join("|")));
     }
     if let Some(d) = &selector.has_doc_type {
         parts.push(format!("has_doc_type={d}"));
@@ -1279,6 +1279,30 @@ mod tests {
         assert_eq!(format_duration(Duration::seconds(1)), "1 second");
         assert_eq!(format_duration(Duration::seconds(30)), "30 seconds");
         assert_eq!(format_duration(Duration::seconds(59)), "59 seconds");
+    }
+
+    #[test]
+    fn test_render_selector_state_single() {
+        use crate::validation::rules::{Selector, StatePredicate};
+        let sel = Selector {
+            type_: Some("epic".to_string()),
+            state: Some(StatePredicate::Single("in_progress".to_string())),
+            ..Default::default()
+        };
+        assert_eq!(render_selector(&sel), "type=epic, state=in_progress");
+    }
+
+    #[test]
+    fn test_render_selector_state_list_joins_with_pipe() {
+        use crate::validation::rules::{Selector, StatePredicate};
+        let sel = Selector {
+            state: Some(StatePredicate::List(vec![
+                "ready".to_string(),
+                "in_progress".to_string(),
+            ])),
+            ..Default::default()
+        };
+        assert_eq!(render_selector(&sel), "state=ready|in_progress");
     }
 
     #[test]

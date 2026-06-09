@@ -71,12 +71,32 @@ assert = { require-section = { heading = "Success Criteria" } }  # exactly one k
 A selector is the AND of any dimensions you specify; an empty `when` matches
 every issue:
 
-| Key            | Matches issues…                                   |
-|----------------|---------------------------------------------------|
-| `type`         | whose `type:<value>` label equals this            |
-| `label`        | carrying this label; supports `ns:*` wildcards    |
-| `state`        | in this lifecycle state (e.g. `"in_progress"`)    |
-| `has-doc-type` | with an attached document of this `doc_type`      |
+| Key            | Matches issues…                                          |
+|----------------|----------------------------------------------------------|
+| `type`         | whose `type:<value>` label equals this                   |
+| `label`        | carrying this label; supports `ns:*` wildcards           |
+| `state`        | in one of these lifecycle states (single value or list)  |
+| `has-doc-type` | with an attached document of this `doc_type`             |
+
+#### State predicates
+
+`state` scopes a rule to a lifecycle phase. It accepts either a single state or
+a list of states; the rule matches when the issue is in any of them:
+
+```toml
+when = { type = "epic", state = "in_progress" }              # single state
+when = { state = ["ready", "in_progress", "gated"] }         # any of several
+```
+
+The valid state tokens are `backlog`, `ready`, `in_progress`, `gated`, `done`,
+`rejected`, and `archived`. An unknown state name is rejected when the ruleset
+loads, with an error naming the offending rule and listing the valid tokens, so
+a typo cannot silently turn a rule into one that never matches.
+
+State predicates combine (AND) with the other selector dimensions and are
+evaluated everywhere a rule is selected — on the write path and in
+`jit validate`. `jit validate <id> --explain` shows the matched predicate in the
+rule's selector, rendering a list as `state=ready|in_progress`.
 
 ### Assertion kinds
 

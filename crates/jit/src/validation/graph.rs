@@ -44,7 +44,9 @@ use crate::type_hierarchy::{
     validate_orphans, validate_strategic_labels, HierarchyConfig, ValidationWarning,
 };
 use crate::validation::engine::Finding;
-use crate::validation::rules::{Assertion, Rule, Scope, Selector, Severity, TypeHierarchyKind};
+use crate::validation::rules::{
+    Assertion, Rule, Scope, Selector, Severity, StatePredicate, TypeHierarchyKind,
+};
 
 /// Default label namespace whose values are criterion ids a child claims to
 /// satisfy (e.g. `satisfies:REQ-01`).
@@ -454,7 +456,7 @@ fn evaluate_label_coverage(
     // A child satisfies criterion `id` if it carries `satisfies-ns:id` and (when
     // configured) is in `child-state`.
     let state_matcher = child_state.map(|s| Selector {
-        state: Some(s.to_string()),
+        state: Some(StatePredicate::Single(s.to_string())),
         ..Selector::default()
     });
     let satisfied_id = |child: &Issue, id: &str| -> bool {

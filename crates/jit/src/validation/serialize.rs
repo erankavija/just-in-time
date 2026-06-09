@@ -209,7 +209,14 @@ fn render_selector(selector: &Selector) -> Option<String> {
         parts.push(format!("label = {}", toml_basic_string(label)));
     }
     if let Some(state) = &selector.state {
-        parts.push(format!("state = {}", toml_basic_string(state)));
+        let tokens = state.tokens();
+        let rendered = if tokens.len() == 1 {
+            toml_basic_string(&tokens[0])
+        } else {
+            let items: Vec<String> = tokens.iter().map(|t| toml_basic_string(t)).collect();
+            format!("[{}]", items.join(", "))
+        };
+        parts.push(format!("state = {rendered}"));
     }
     if let Some(doc_type) = &selector.has_doc_type {
         parts.push(format!("has_doc_type = {}", toml_basic_string(doc_type)));
@@ -560,6 +567,30 @@ assert = { label-value-pattern = { namespace = "sc", regex = '^\[hard\]\s+\w+' }
         let set = RuleSet::empty();
         let (_dir, reloaded) = round_trip(&set);
         assert!(reloaded.rules.is_empty());
+    }
+
+    #[test]
+    fn test_round_trip_state_predicate_single_and_list() {
+        // A single-state selector serializes as a string and a multi-state
+        // selector as a TOML array; both must reload to the same predicate.
+        let toml = r#"
+[[rules]]
+name = "single-state"
+when = { type = "epic", state = "in_progress" }
+assert = { require-section = { heading = "Plan" } }
+
+[[rules]]
+name = "list-state"
+when = { state = ["ready", "in_progress", "gated"] }
+assert = { require-section = { heading = "Plan" } }
+"#;
+        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        let out = serialize_ruleset(&set);
+        assert!(out.rules_toml.contains(r#"state = "in_progress""#));
+        assert!(out
+            .rules_toml
+            .contains(r#"state = ["ready", "in_progress", "gated"]"#));
+        assert_round_trips(&set);
     }
 
     #[test]

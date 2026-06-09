@@ -109,6 +109,33 @@ registry drives the `default:namespace-registry` and `default:namespace-unique:*
 rules. Allowed-value enums, value patterns, and required-ness are NOT configured
 here — author them as rules in `.jit/rules.toml`.
 
+### Rule selectors (`.jit/rules.toml` `when`)
+
+Each rule's `when` table selects which issues it applies to. All present
+dimensions are AND-combined; an empty `when` matches every issue. The full
+authoring guide is in
+[How to define validation rules](../how-to/validation-rules.md); the selector
+grammar is:
+
+| Key            | Type            | Matches issues…                          |
+|----------------|-----------------|------------------------------------------|
+| `type`         | string          | whose `type:<value>` label equals this   |
+| `label`        | string          | carrying this label; supports `ns:*`      |
+| `state`        | string or list  | in one of these lifecycle states         |
+| `has_doc_type` | string          | with a document of this `doc_type`        |
+
+The `state` predicate accepts a single state or a list of states and matches
+when the issue is in any of them:
+
+```toml
+when = { type = "epic", state = "in_progress" }              # single state
+when = { state = ["ready", "in_progress", "gated"] }         # any of several
+```
+
+Valid state tokens: `backlog`, `ready`, `in_progress`, `gated`, `done`,
+`rejected`, `archived`. An unknown state name is rejected at load with an error
+naming the rule and listing the valid tokens.
+
 ---
 
 ## Runtime Configuration
