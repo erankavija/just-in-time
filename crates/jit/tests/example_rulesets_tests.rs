@@ -53,12 +53,20 @@ fn has_local_finding(issue: &Issue, set: &RuleSet) -> bool {
 
 /// Graph findings attributable to a real issue (config errors would have
 /// `issue_id == None` and must never appear for a valid example).
-fn issue_graph_findings(rules: &[&Rule], issues: &[Issue]) -> Vec<GraphFinding> {
+///
+/// `now` is the injected clock used by `gate-recency` rules; callers that do not
+/// exercise recency pass [`fixed_now`].
+fn issue_graph_findings_at(
+    rules: &[&Rule],
+    issues: &[Issue],
+    now: chrono::DateTime<chrono::Utc>,
+) -> Vec<GraphFinding> {
     let findings = evaluate_graph(
         rules,
         issues,
         &jit::type_hierarchy::HierarchyConfig::default(),
         ContentFormat::Markdown,
+        now,
     );
     assert!(
         findings.iter().all(|f| !f.is_config_error()),
@@ -67,13 +75,24 @@ fn issue_graph_findings(rules: &[&Rule], issues: &[Issue]) -> Vec<GraphFinding> 
     findings
 }
 
+/// Convenience for non-recency graph examples: evaluate at [`fixed_now`].
+fn issue_graph_findings(rules: &[&Rule], issues: &[Issue]) -> Vec<GraphFinding> {
+    issue_graph_findings_at(rules, issues, fixed_now())
+}
+
+/// A fixed clock instant for deterministic example evaluation.
+fn fixed_now() -> chrono::DateTime<chrono::Utc> {
+    use chrono::TimeZone;
+    chrono::Utc.with_ymd_and_hms(2026, 6, 10, 12, 0, 0).unwrap()
+}
+
 // ---------------------------------------------------------------------------
 // 1. Every example ruleset parses (loader + schema compilation reachable).
 // ---------------------------------------------------------------------------
 
 #[test]
 fn test_all_example_rulesets_load() {
-    for name in ["sdd", "bug-repro", "release-checklist"] {
+    for name in ["sdd", "bug-repro", "release-checklist", "fresh-evidence"] {
         let set = load_example(name);
         assert!(
             !set.rules.is_empty(),
@@ -479,4 +498,98 @@ fn test_release_graph_requires_qa_signoff_dependency() {
         ok.is_empty(),
         "a release that depends on QA sign-off must pass the graph rule: {ok:?}"
     );
+}
+
+// ---------------------------------------------------------------------------
+// 2e. fresh-evidence (non-SDD) — graph `gate-recency` rule.
+//
+// Kept in its own module (separate from the SDD/bug-repro/release sections
+// above) since other validation-lifecycle tasks also extend this file.
+// ---------------------------------------------------------------------------
+
+mod fresh_evidence {
+    use super::*;
+    use chrono::Duration;
+    use jit::domain::{GateState, GateStatus};
+
+    /// A done issue whose `code-review` gate was recorded `hours_ago` before
+    /// [`fixed_now`].
+    fn done_with_code_review(hours_ago: i64) -> Issue {
+        let mut issue = Issue::new("implement feature".to_string(), String::new());
+        issue.state = State::Done;
+        issue.gates_required = vec!["code-review".to_string()];
+        issue.gates_status.insert(
+            "code-review".to_string(),
+            GateState {
+                status: GateStatus::Passed,
+                updated_by: Some("agent:reviewer".to_string()),
+                updated_at: fixed_now() - Duration::hours(hours_ago),
+            },
+        );
+        issue
+    }
+
+    #[test]
+    fn test_fresh_evidence_recent_gate_passes() {
+        let set = load_example("fresh-evidence");
+        let rules = graph_rules(&set);
+        // Reviewed 1 day ago — within the 7-day window.
+        let issue = done_with_code_review(24);
+        let findings = issue_graph_findings_at(&rules, std::slice::from_ref(&issue), fixed_now());
+        assert!(
+            findings.is_empty(),
+            "a done issue with a fresh code-review gate must pass: {findings:?}"
+        );
+    }
+
+    #[test]
+    fn test_fresh_evidence_stale_gate_is_reported() {
+        let set = load_example("fresh-evidence");
+        let rules = graph_rules(&set);
+        // Reviewed 10 days ago — exceeds the 7-day window.
+        let issue = done_with_code_review(10 * 24);
+        let findings = issue_graph_findings_at(&rules, std::slice::from_ref(&issue), fixed_now());
+        assert!(
+            findings
+                .iter()
+                .any(|f| f.finding.rule == "fresh-evidence-before-done"
+                    && f.finding.message.contains("code-review")
+                    && f.finding.message.contains("days old")),
+            "a stale code-review gate must be reported with its age: {findings:?}"
+        );
+    }
+
+    #[test]
+    fn test_fresh_evidence_missing_gate_is_reported() {
+        let set = load_example("fresh-evidence");
+        let rules = graph_rules(&set);
+        // Done, requires the gate, but has no recorded result.
+        let mut issue = Issue::new("implement feature".to_string(), String::new());
+        issue.state = State::Done;
+        issue.gates_required = vec!["code-review".to_string()];
+        let findings = issue_graph_findings_at(&rules, std::slice::from_ref(&issue), fixed_now());
+        assert!(
+            findings
+                .iter()
+                .any(|f| f.finding.rule == "fresh-evidence-before-done"
+                    && f.finding.message == "gate 'code-review' has no recorded result"),
+            "a missing code-review gate result must be reported: {findings:?}"
+        );
+    }
+
+    #[test]
+    fn test_fresh_evidence_blocks_at_done_via_enforce() {
+        // The example uses severity=error + enforce=true so it blocks the
+        // transition INTO done once transition enforcement lands; here we assert
+        // the rule carries that blocking shape.
+        let set = load_example("fresh-evidence");
+        let rule = set
+            .rules
+            .iter()
+            .find(|r| r.name == "fresh-evidence-before-done")
+            .expect("example must define fresh-evidence-before-done");
+        assert_eq!(rule.severity, jit::validation::rules::Severity::Error);
+        assert!(rule.enforce, "the example deliberately enforces at done");
+        assert_eq!(rule.scope, Scope::Graph);
+    }
 }

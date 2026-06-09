@@ -400,11 +400,14 @@ impl<S: IssueStore> CommandExecutor<S> {
         let hierarchy = crate::validation::defaults::hierarchy_config(namespaces);
         let repo_format = self.repo_content_format()?;
 
+        // Inject the wall-clock instant at the boundary so `gate-recency` rules
+        // are deterministic and the graph engine stays pure (CC-5b).
         Ok(crate::validation::graph::evaluate_graph(
             &graph_rules,
             issues,
             &hierarchy,
             repo_format,
+            chrono::Utc::now(),
         ))
     }
 

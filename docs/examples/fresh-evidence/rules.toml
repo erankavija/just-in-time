@@ -1,0 +1,39 @@
+# Example ruleset: fresh evidence before done
+#
+# A methodology demonstrating the GRAPH `gate-recency` rule kind: an issue may not
+# be marked done on the strength of STALE gate results. A `code-review` (or other)
+# gate that passed weeks ago is no longer trustworthy evidence that the CURRENT
+# state of the work is reviewed; this rule requires the recorded gate result to be
+# recent.
+#
+# Engine kind used:
+#   gate-recency  (graph)  each checked gate's recorded result is no older than
+#                          `max-age-days` (computed against GateState.updated_at
+#                          and the clock injected into the engine — the engine
+#                          never reads wall-clock, so behavior is deterministic).
+#
+# How it blocks:
+#   This rule is scoped to `state = "done"` with `severity = "error"` and
+#   `enforce = true`. Once TRANSITION ENFORCEMENT lands (jit issue bc86f54c), an
+#   enforce-at-done error rule blocks the transition INTO `done`: you cannot move
+#   an issue to done while its required gate evidence is stale. Until that lands,
+#   the rule still REPORTS via `jit validate` (graph rules run in `jit validate`
+#   and gate checkers, never on the plain write path), so a done issue with stale
+#   evidence shows up as a finding even before the transition gate exists.
+#
+# Design note (R-3): in REAL rulesets, recency rules should usually default to
+# `severity = "warn"` — wall-clock-relative findings flicker as time passes
+# (a result that was fresh yesterday is stale today), and a warning surfaces that
+# without hard-blocking routine work. THIS EXAMPLE uses `enforce = true`
+# DELIBERATELY to demonstrate the blocking-at-done behavior; copy it as `warn`
+# unless you specifically want completion blocked on freshness.
+
+# A done issue's code-review gate result must be at most 7 days old. With
+# `gates = ["code-review"]` only that gate is checked; omit `gates` to require
+# freshness for ALL of the issue's `gates_required`.
+[[rules]]
+name = "fresh-evidence-before-done"
+when = { state = "done" }
+severity = "error"
+enforce = true
+assert = { gate-recency = { max-age-days = 7, gates = ["code-review"] } }

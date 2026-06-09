@@ -18,6 +18,7 @@ This guide shows you how to write rules, using three ready-to-copy examples:
 - [`docs/examples/sdd/`](../examples/sdd/rules.toml) — Spec-Driven Development
 - [`docs/examples/bug-repro/`](../examples/bug-repro/rules.toml) — bug triage
 - [`docs/examples/release-checklist/`](../examples/release-checklist/rules.toml) — release gating
+- [`docs/examples/fresh-evidence/`](../examples/fresh-evidence/rules.toml) — fresh-evidence-before-done
 
 > The files under `docs/examples/` are EXAMPLES. They are not active on this
 > repository. To use one, copy its `rules.toml` to your project's `.jit/rules.toml`
@@ -141,6 +142,7 @@ ending in `.json`.
 | `label-coverage`   | every source criterion is satisfied by at least one child      |
 | `label-reference`  | a `from:`-namespace label resolves to a declared `to:` source  |
 | `dependency-shape` | issues matching a selector depend on issues matching a target  |
+| `gate-recency`     | recorded gate results are no older than a configured age        |
 
 **Escape hatch:** `checker-command` runs an external command. It is applied by
 `jit validate`, not on the write path.
@@ -258,6 +260,29 @@ that every `type:bug` carries a `## Reproduction` section
 requires a `type:release` to have a `## Checklist` section, an attached
 `release-notes` document (`require-doc-type`), and a dependency on a
 `type:qa-signoff` issue (`dependency-shape`, a graph rule).
+
+### Fresh evidence — "don't finish on stale gates"
+
+[`docs/examples/fresh-evidence/rules.toml`](../examples/fresh-evidence/rules.toml)
+requires that a done issue's recorded gate results are recent (`gate-recency`, a
+graph rule). It asserts the `code-review` gate result is at most 7 days old,
+computed against the gate's recorded timestamp:
+
+```toml
+[[rules]]
+name = "fresh-evidence-before-done"
+when = { state = "done" }
+severity = "error"
+enforce = true
+assert = { gate-recency = { max-age-days = 7, gates = ["code-review"] } }
+```
+
+A stale result yields `gate 'code-review' result is <N> days old (max 7)`; a
+required gate with no recorded result yields `gate 'code-review' has no recorded
+result`. Use `max-age-hours` for sub-day windows, and omit `gates` to require
+freshness for ALL of the issue's required gates. Recency is relative to the clock,
+so real rulesets usually keep these rules at `severity = "warn"` (the example
+uses `enforce = true` to demonstrate blocking completion).
 
 None of these is built into JIT. They are configuration over one engine.
 

@@ -201,6 +201,7 @@ fn test_html_graph_label_coverage_uses_html_parser_in_production() {
         &[html_epic],
         &HierarchyConfig::default(),
         ContentFormat::Markdown,
+        chrono::Utc::now(),
     );
     assert_eq!(
         findings.len(),

@@ -78,6 +78,7 @@ pub fn desugar(assertion: &Assertion) -> Option<Value> {
         | Assertion::LabelCoverage { .. }
         | Assertion::LabelReference { .. }
         | Assertion::DependencyShape { .. }
+        | Assertion::GateRecency { .. }
         | Assertion::TypeHierarchy { .. } => None,
     }
 }
@@ -670,6 +671,11 @@ mod tests {
         .is_none());
         assert!(desugar(&Assertion::DependencyShape {
             config: toml::value::Table::new()
+        })
+        .is_none());
+        assert!(desugar(&Assertion::GateRecency {
+            max_age_hours: 168,
+            gates: Vec::new(),
         })
         .is_none());
     }

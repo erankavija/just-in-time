@@ -283,6 +283,19 @@ fn render_assertion(
         Assertion::DependencyShape { config } => {
             format!("{{ dependency-shape = {} }}", render_config_table(config))
         }
+        Assertion::GateRecency {
+            max_age_hours,
+            gates,
+        } => {
+            // Round-trip the normalized hours; emit the `gates` filter only when
+            // present (an empty list means "all of the issue's gates_required").
+            let mut parts = vec![format!("max-age-hours = {max_age_hours}")];
+            if !gates.is_empty() {
+                let rendered: Vec<String> = gates.iter().map(|g| toml_basic_string(g)).collect();
+                parts.push(format!("gates = [{}]", rendered.join(", ")));
+            }
+            format!("{{ gate-recency = {{ {} }} }}", parts.join(", "))
+        }
         Assertion::TypeHierarchy { kind } => {
             let kind_token = match kind {
                 TypeHierarchyKind::OrphanLeaf => "orphan-leaf",

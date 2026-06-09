@@ -12,6 +12,9 @@
 //! - **`dependency-shape`** — issues matching a rule's selector must (or should)
 //!   depend on at least one issue matching a target selector, evaluated over the
 //!   dependency DAG via [`DependencyGraph`].
+//! - **`gate-recency`** — an issue's recorded gate results must be no older than
+//!   a configured age, computed against `GateState.updated_at` and an injected
+//!   `now` (the engine never reads wall-clock).
 //!
 //! # Entry point
 //!
@@ -36,6 +39,8 @@
 //! the store; nothing here touches the filesystem.
 
 use std::collections::BTreeSet;
+
+use chrono::{DateTime, Utc};
 
 use crate::document::content_parser_for;
 use crate::domain::{project, ContentFormat, Issue};
@@ -122,8 +127,13 @@ pub enum ChildLink {
 /// let mut task = Issue::new("a task".into(), String::new());
 /// task.labels = vec!["type:task".into()];
 /// let task_id = task.id.clone();
-/// let findings: Vec<GraphFinding> =
-///     evaluate_graph(&rules, &[task], &HierarchyConfig::default(), ContentFormat::Markdown);
+/// let findings: Vec<GraphFinding> = evaluate_graph(
+///     &rules,
+///     &[task],
+///     &HierarchyConfig::default(),
+///     ContentFormat::Markdown,
+///     chrono::Utc::now(),
+/// );
 /// assert_eq!(findings.len(), 1);
 /// // The finding is attributed to the offending issue, not parsed from text.
 /// assert_eq!(findings[0].issue_id.as_deref(), Some(task_id.as_str()));
@@ -267,6 +277,7 @@ impl ChildLink {
 ///     &[task],
 ///     &HierarchyConfig::default(),
 ///     jit::domain::ContentFormat::Markdown,
+///     chrono::Utc::now(),
 /// );
 /// assert_eq!(findings.len(), 1);
 /// assert_eq!(findings[0].finding.rule, "task-needs-design-dep");
@@ -282,16 +293,23 @@ impl ChildLink {
 /// path uses is applied here, so HTML/XML sources are parsed consistently. A
 /// selected format whose parser feature is not compiled surfaces as a
 /// config-error finding on the source issue (no silent Markdown fallback).
+///
+/// `now` is the injected clock instant against which `gate-recency` rules compute
+/// each gate result's age. CLOCK INJECTION IS MANDATORY: this is the single graph
+/// entry point and the only place a wall-clock instant enters graph evaluation,
+/// so the engine stays pure and deterministic. Callers pass `Utc::now()` at the
+/// boundary; tests pass a fixed instant.
 pub fn evaluate_graph(
     rules: &[&Rule],
     issues: &[Issue],
     hierarchy: &HierarchyConfig,
     repo_default_format: ContentFormat,
+    now: DateTime<Utc>,
 ) -> Vec<GraphFinding> {
     rules
         .iter()
         .filter(|rule| rule.scope == Scope::Graph && rule.severity != Severity::Off)
-        .flat_map(|rule| evaluate_one(rule, issues, hierarchy, repo_default_format))
+        .flat_map(|rule| evaluate_one(rule, issues, hierarchy, repo_default_format, now))
         .collect()
 }
 
@@ -301,6 +319,7 @@ fn evaluate_one(
     issues: &[Issue],
     hierarchy: &HierarchyConfig,
     repo_default_format: ContentFormat,
+    now: DateTime<Utc>,
 ) -> Vec<GraphFinding> {
     match &rule.assert {
         Assertion::LabelCoverage { config } => {
@@ -308,6 +327,10 @@ fn evaluate_one(
         }
         Assertion::LabelReference { config } => evaluate_label_reference(rule, config, issues),
         Assertion::DependencyShape { config } => evaluate_dependency_shape(rule, config, issues),
+        Assertion::GateRecency {
+            max_age_hours,
+            gates,
+        } => evaluate_gate_recency(rule, *max_age_hours, gates, issues, now),
         Assertion::TypeHierarchy { kind } => {
             evaluate_type_hierarchy(rule, *kind, hierarchy, issues)
         }
@@ -790,6 +813,92 @@ fn depends_on_target(
 }
 
 // ---------------------------------------------------------------------------
+// gate-recency
+// ---------------------------------------------------------------------------
+
+/// Evaluate a `gate-recency` rule.
+///
+/// Every issue matching the rule's selector must have a recorded result for each
+/// checked gate, no older than `max_age_hours`. Age is `now - GateState.updated_at`
+/// (the injected clock; never wall-clock). When `gates` is empty, the issue's own
+/// `gates_required` set is checked; otherwise only the named gates are.
+///
+/// One finding is produced per stale or missing gate result, attributed to the
+/// issue:
+///
+/// - missing: `gate '<key>' has no recorded result`
+/// - stale: `gate '<key>' result is <N> days old (max <M>)` (rendered in days
+///   when the configured max is a whole number of days, else in hours)
+///
+/// This kind takes no raw config table (its payload is parsed and validated at
+/// load), so it never produces a `config-error` finding.
+fn evaluate_gate_recency(
+    rule: &Rule,
+    max_age_hours: u64,
+    gates: &[String],
+    issues: &[Issue],
+    now: DateTime<Utc>,
+) -> Vec<GraphFinding> {
+    // Render ages/limits in days when the configured max is a whole number of
+    // days, matching the natural `max-age-days` authoring; otherwise in hours.
+    let in_days = max_age_hours.is_multiple_of(24);
+    let unit = if in_days { "days" } else { "hours" };
+    let limit = if in_days {
+        max_age_hours / 24
+    } else {
+        max_age_hours
+    };
+    let age_in_unit = |hours: i64| -> i64 {
+        if in_days {
+            hours / 24
+        } else {
+            hours
+        }
+    };
+
+    issues
+        .iter()
+        .filter(|issue| rule.when.matches(issue))
+        .flat_map(|issue| {
+            // Empty `gates` means "all of the issue's gates_required".
+            let checked: Vec<&String> = if gates.is_empty() {
+                issue.gates_required.iter().collect()
+            } else {
+                gates.iter().collect()
+            };
+            checked
+                .into_iter()
+                .filter_map(|gate_key| {
+                    match issue.gates_status.get(gate_key) {
+                        None => Some(issue_finding(
+                            rule,
+                            &issue.id,
+                            format!("gate '{gate_key}' has no recorded result"),
+                        )),
+                        Some(state) => {
+                            // Whole hours elapsed since the gate was recorded.
+                            let age_hours = (now - state.updated_at).num_hours();
+                            if age_hours > max_age_hours as i64 {
+                                Some(issue_finding(
+                                    rule,
+                                    &issue.id,
+                                    format!(
+                                        "gate '{gate_key}' result is {} {unit} old (max {limit})",
+                                        age_in_unit(age_hours)
+                                    ),
+                                ))
+                            } else {
+                                None
+                            }
+                        }
+                    }
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
 // type-hierarchy (orphan-leaf / strategic-consistency)
 // ---------------------------------------------------------------------------
 
@@ -866,6 +975,13 @@ mod tests {
         i
     }
 
+    /// A fixed clock instant for deterministic graph evaluation. Rules other than
+    /// `gate-recency` ignore it; recency tests subtract from it explicitly.
+    fn fixed_now() -> DateTime<Utc> {
+        use chrono::TimeZone;
+        Utc.with_ymd_and_hms(2026, 6, 10, 12, 0, 0).unwrap()
+    }
+
     // --- label-coverage ----------------------------------------------------
 
     fn coverage_rule(extra: &str) -> Rule {
@@ -902,6 +1018,7 @@ mod tests {
             &[epic, child],
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
+            fixed_now(),
         );
         assert!(findings.is_empty(), "covered criterion: {findings:?}");
     }
@@ -920,6 +1037,7 @@ mod tests {
             &[epic, child],
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
+            fixed_now(),
         );
         // REQ-02 is uncovered.
         assert_eq!(findings.len(), 1);
@@ -942,6 +1060,7 @@ mod tests {
             &[epic, child],
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
+            fixed_now(),
         );
         assert_eq!(findings.len(), 1, "wrong-state child does not cover");
     }
@@ -962,6 +1081,7 @@ mod tests {
             &[epic, child],
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
+            fixed_now(),
         );
         assert!(
             findings.is_empty(),
@@ -982,6 +1102,7 @@ mod tests {
             &[epic, child],
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
+            fixed_now(),
         );
         assert!(findings.is_empty(), "any link covers regardless of edges");
     }
@@ -996,6 +1117,7 @@ mod tests {
             &[epic],
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
+            fixed_now(),
         );
         assert_eq!(findings.len(), 1);
         assert!(findings[0].finding.message.contains("config error"));
@@ -1022,6 +1144,7 @@ mod tests {
             &[source, child],
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
+            fixed_now(),
         );
         assert!(findings.is_empty(), "resolved reference: {findings:?}");
     }
@@ -1037,6 +1160,7 @@ mod tests {
             &[source, child],
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
+            fixed_now(),
         );
         assert_eq!(findings.len(), 1);
         assert!(findings[0].finding.message.contains("REQ-99"));
@@ -1055,6 +1179,7 @@ mod tests {
             &[declarer, child],
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
+            fixed_now(),
         );
         assert_eq!(findings.len(), 1, "linked scope: unlinked source dangles");
 
@@ -1067,6 +1192,7 @@ mod tests {
             &[declarer, child],
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
+            fixed_now(),
         );
         assert!(findings.is_empty(), "linked edge resolves: {findings:?}");
     }
@@ -1080,6 +1206,7 @@ mod tests {
             &[issue("x", &["satisfies:REQ-01"])],
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
+            fixed_now(),
         );
         assert_eq!(findings.len(), 1);
         assert!(findings[0].finding.message.contains("config error"));
@@ -1107,6 +1234,7 @@ mod tests {
             &[design, task],
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
+            fixed_now(),
         );
         assert!(findings.is_empty(), "task depends on design: {findings:?}");
     }
@@ -1122,6 +1250,7 @@ mod tests {
             &[design, task],
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
+            fixed_now(),
         );
         assert_eq!(findings.len(), 1);
         assert!(findings[0].finding.message.contains("depend"));
@@ -1144,6 +1273,7 @@ mod tests {
             &[design.clone(), mid.clone(), task.clone()],
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
+            fixed_now(),
         );
         assert_eq!(findings.len(), 1, "direct-only must not see transitive dep");
 
@@ -1154,6 +1284,7 @@ mod tests {
             &[design, mid, task],
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
+            fixed_now(),
         );
         assert!(
             findings.is_empty(),
@@ -1170,10 +1301,189 @@ mod tests {
             &[issue("task", &["type:task"])],
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
+            fixed_now(),
         );
         assert_eq!(findings.len(), 1);
         assert!(findings[0].finding.message.contains("config error"));
         assert!(findings[0].finding.message.contains("target"));
+    }
+
+    // --- gate-recency ------------------------------------------------------
+
+    use crate::domain::{GateState, GateStatus};
+
+    fn recency_rule(extra: &str) -> Rule {
+        rule_from(&format!(
+            "[[rules]]\nname = \"recency\"\nwhen = {{ state = \"done\" }}\n\
+             severity = \"error\"\nassert = {{ gate-recency = {{ {extra} }} }}\n"
+        ))
+    }
+
+    /// A done issue requiring `gate`, last recorded `hours_ago` before [`fixed_now`].
+    fn issue_with_gate(gate: &str, hours_ago: i64) -> Issue {
+        let mut i = issue("work", &[]);
+        i.state = State::Done;
+        i.gates_required = vec![gate.to_string()];
+        i.gates_status.insert(
+            gate.to_string(),
+            GateState {
+                status: GateStatus::Passed,
+                updated_by: Some("ci:x".to_string()),
+                updated_at: fixed_now() - chrono::Duration::hours(hours_ago),
+            },
+        );
+        i
+    }
+
+    #[test]
+    fn test_gate_recency_fresh_result_passes() {
+        let rule = recency_rule("max-age-days = 7, gates = [\"code-review\"]");
+        // Recorded 1 day ago — well within 7 days.
+        let i = issue_with_gate("code-review", 24);
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[i],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        assert!(findings.is_empty(), "fresh gate must pass: {findings:?}");
+    }
+
+    #[test]
+    fn test_gate_recency_stale_result_reports_age_in_days() {
+        let rule = recency_rule("max-age-days = 7, gates = [\"code-review\"]");
+        // Recorded 10 days ago — exceeds 7.
+        let i = issue_with_gate("code-review", 10 * 24);
+        let id = i.id.clone();
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[i],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].issue_id.as_deref(), Some(id.as_str()));
+        assert_eq!(
+            findings[0].finding.message,
+            "gate 'code-review' result is 10 days old (max 7)"
+        );
+        assert_eq!(findings[0].finding.severity, Severity::Error);
+    }
+
+    #[test]
+    fn test_gate_recency_missing_result_reports_missing() {
+        let rule = recency_rule("max-age-days = 7, gates = [\"code-review\"]");
+        // Issue requires the gate but has no recorded status.
+        let mut i = issue("work", &[]);
+        i.state = State::Done;
+        i.gates_required = vec!["code-review".to_string()];
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[i],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        assert_eq!(findings.len(), 1);
+        assert_eq!(
+            findings[0].finding.message,
+            "gate 'code-review' has no recorded result"
+        );
+    }
+
+    #[test]
+    fn test_gate_recency_default_gates_checks_all_required() {
+        // No `gates` filter -> every gate in gates_required is checked.
+        let rule = recency_rule("max-age-days = 7");
+        let mut i = issue_with_gate("code-review", 10 * 24); // stale
+                                                             // A second required gate with no recorded result.
+        i.gates_required.push("security".to_string());
+        let rules = vec![&rule];
+        let mut findings = evaluate_graph(
+            &rules,
+            &[i],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        findings.sort_by(|a, b| a.finding.message.cmp(&b.finding.message));
+        assert_eq!(
+            findings.len(),
+            2,
+            "both required gates checked: {findings:?}"
+        );
+        assert!(findings[0].finding.message.contains("code-review"));
+        assert!(findings[1].finding.message.contains("security"));
+    }
+
+    #[test]
+    fn test_gate_recency_named_gate_not_required_is_missing() {
+        // A named gate the issue does not even require is reported as missing.
+        let rule = recency_rule("max-age-hours = 12, gates = [\"code-review\"]");
+        let mut i = issue("work", &[]);
+        i.state = State::Done;
+        // No gates_required, no gates_status.
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[i],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        assert_eq!(findings.len(), 1);
+        assert_eq!(
+            findings[0].finding.message,
+            "gate 'code-review' has no recorded result"
+        );
+    }
+
+    #[test]
+    fn test_gate_recency_hours_unit_in_message() {
+        // A sub-day max renders age and limit in hours.
+        let rule = recency_rule("max-age-hours = 12, gates = [\"code-review\"]");
+        let i = issue_with_gate("code-review", 30); // 30h old > 12h
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[i],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        assert_eq!(findings.len(), 1);
+        assert_eq!(
+            findings[0].finding.message,
+            "gate 'code-review' result is 30 hours old (max 12)"
+        );
+    }
+
+    #[test]
+    fn test_gate_recency_is_deterministic_under_injected_clock() {
+        // Same inputs + same `now` -> identical findings (no wall-clock read).
+        let rule = recency_rule("max-age-days = 7, gates = [\"code-review\"]");
+        let i = issue_with_gate("code-review", 10 * 24);
+        let rules = vec![&rule];
+        let a = evaluate_graph(
+            &rules,
+            std::slice::from_ref(&i),
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        let b = evaluate_graph(
+            &rules,
+            std::slice::from_ref(&i),
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        assert_eq!(a, b);
     }
 
     // --- dispatch / scope filtering ----------------------------------------
@@ -1195,6 +1505,7 @@ mod tests {
             &[issue("task", &["type:task"])],
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
+            fixed_now(),
         );
         assert!(findings.is_empty(), "local + off rules produce nothing");
     }
@@ -1217,6 +1528,7 @@ mod tests {
             std::slice::from_ref(&task),
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
+            fixed_now(),
         );
         assert_eq!(findings.len(), 1, "orphan leaf must fire: {findings:?}");
         assert_eq!(findings[0].finding.rule, "default:orphan-leaf");

@@ -590,6 +590,19 @@ pub enum Assertion {
         /// Raw configuration table for the dependency-shape rule.
         config: toml::value::Table,
     },
+    /// An issue's recorded gate results must be no older than a configured age.
+    /// Graph scope. Age is computed against `GateState.updated_at` at evaluation
+    /// time, with the clock injected into
+    /// [`evaluate_graph`](crate::validation::graph::evaluate_graph) (never read
+    /// from wall-clock inside the engine).
+    GateRecency {
+        /// Maximum permitted age of a gate result, in whole hours. Authored as
+        /// `max-age-days` (multiplied by 24) or `max-age-hours`.
+        max_age_hours: u64,
+        /// Which gate keys to check. Empty means "all of the issue's
+        /// `gates_required`".
+        gates: Vec<String>,
+    },
     /// A built-in type-hierarchy warning (orphan-leaf or strategic-consistency).
     /// Graph scope. Authorable in `rules.toml` via the `type-hierarchy` assert
     /// kind, and also constructed programmatically as a built-in default rule
@@ -652,6 +665,7 @@ impl Assertion {
             Assertion::LabelCoverage { .. }
             | Assertion::LabelReference { .. }
             | Assertion::DependencyShape { .. }
+            | Assertion::GateRecency { .. }
             | Assertion::TypeHierarchy { .. } => Scope::Graph,
             _ => Scope::Local,
         }
@@ -885,8 +899,61 @@ struct RawAssert {
     label_reference: Option<toml::value::Table>,
     #[serde(default, rename = "dependency-shape")]
     dependency_shape: Option<toml::value::Table>,
+    #[serde(default, rename = "gate-recency")]
+    gate_recency: Option<RawGateRecency>,
     #[serde(default, rename = "type-hierarchy")]
     type_hierarchy: Option<RawTypeHierarchy>,
+}
+
+/// The `gate-recency` assert payload: a max age plus an optional gate filter.
+///
+/// Exactly one of `max-age-days` / `max-age-hours` MUST be set; both-or-neither
+/// is a config error (caught in [`RawGateRecency::into_assertion`]).
+/// `deny_unknown_fields` rejects a stray key so a typo surfaces at load.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawGateRecency {
+    #[serde(default, rename = "max-age-days")]
+    max_age_days: Option<u64>,
+    #[serde(default, rename = "max-age-hours")]
+    max_age_hours: Option<u64>,
+    #[serde(default)]
+    gates: Option<Vec<String>>,
+}
+
+impl RawGateRecency {
+    /// Lower into an [`Assertion::GateRecency`], normalizing the age to whole
+    /// hours and rejecting a missing/ambiguous/zero age at load.
+    fn into_assertion(self, rule: &str) -> Result<Assertion, RuleConfigError> {
+        let max_age_hours = match (self.max_age_days, self.max_age_hours) {
+            (Some(_), Some(_)) => {
+                return Err(RuleConfigError::InvalidAssertion {
+                    rule: rule.to_string(),
+                    message: "gate-recency must set exactly one of 'max-age-days' or \
+                              'max-age-hours', not both"
+                        .to_string(),
+                });
+            }
+            (None, None) => {
+                return Err(RuleConfigError::InvalidAssertion {
+                    rule: rule.to_string(),
+                    message: "gate-recency requires 'max-age-days' or 'max-age-hours'".to_string(),
+                });
+            }
+            (Some(days), None) => days.saturating_mul(24),
+            (None, Some(hours)) => hours,
+        };
+        if max_age_hours == 0 {
+            return Err(RuleConfigError::InvalidAssertion {
+                rule: rule.to_string(),
+                message: "gate-recency max age must be greater than zero".to_string(),
+            });
+        }
+        Ok(Assertion::GateRecency {
+            max_age_hours,
+            gates: self.gates.unwrap_or_default(),
+        })
+    }
 }
 
 /// The `type-hierarchy` assert payload: a single `kind` discriminator selecting
@@ -970,6 +1037,7 @@ impl RawAssert {
             || self.label_coverage.is_some()
             || self.label_reference.is_some()
             || self.dependency_shape.is_some()
+            || self.gate_recency.is_some()
             || self.type_hierarchy.is_some();
         let raw_schema_present = self.json_schema.is_some();
 
@@ -996,6 +1064,7 @@ impl RawAssert {
             self.label_coverage.is_some(),
             self.label_reference.is_some(),
             self.dependency_shape.is_some(),
+            self.gate_recency.is_some(),
             self.type_hierarchy.is_some(),
         ]
         .into_iter()
@@ -1062,6 +1131,9 @@ impl RawAssert {
         }
         if let Some(config) = self.dependency_shape {
             return Ok(Assertion::DependencyShape { config });
+        }
+        if let Some(gr) = self.gate_recency {
+            return gr.into_assertion(rule);
         }
         if let Some(th) = self.type_hierarchy {
             let kind = match th.kind.as_str() {
@@ -1719,6 +1791,120 @@ assert = { type-hierarchy = { kind = "not-a-kind" } }
 [[rules]]
 name = "bad"
 assert = { type-hierarchy = { kind = "orphan-leaf", extra = 1 } }
+"#;
+        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        assert!(matches!(err, RuleConfigError::Toml(_)));
+    }
+
+    // --- gate-recency assert kind ------------------------------------------
+
+    #[test]
+    fn test_gate_recency_max_age_days_parses_as_graph_rule() {
+        let toml = r#"
+[[rules]]
+name = "fresh-evidence"
+when = { state = "done" }
+severity = "error"
+enforce = true
+assert = { gate-recency = { max-age-days = 7, gates = ["code-review"] } }
+"#;
+        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        assert_eq!(set.rules[0].scope, Scope::Graph);
+        match &set.rules[0].assert {
+            Assertion::GateRecency {
+                max_age_hours,
+                gates,
+            } => {
+                assert_eq!(*max_age_hours, 7 * 24);
+                assert_eq!(gates, &["code-review".to_string()]);
+            }
+            other => panic!("expected GateRecency, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_gate_recency_max_age_hours_parses() {
+        let toml = r#"
+[[rules]]
+name = "fresh"
+assert = { gate-recency = { max-age-hours = 12 } }
+"#;
+        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        match &set.rules[0].assert {
+            Assertion::GateRecency {
+                max_age_hours,
+                gates,
+            } => {
+                assert_eq!(*max_age_hours, 12);
+                // `gates` defaults to empty (= all of the issue's gates_required).
+                assert!(gates.is_empty());
+            }
+            other => panic!("expected GateRecency, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_gate_recency_both_ages_is_rejected() {
+        let toml = r#"
+[[rules]]
+name = "ambiguous"
+assert = { gate-recency = { max-age-days = 1, max-age-hours = 1 } }
+"#;
+        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        match err {
+            RuleConfigError::InvalidAssertion { rule, message } => {
+                assert_eq!(rule, "ambiguous");
+                assert!(message.contains("not both"), "message was: {message}");
+            }
+            other => panic!("expected InvalidAssertion, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_gate_recency_missing_age_is_rejected() {
+        let toml = r#"
+[[rules]]
+name = "no-age"
+assert = { gate-recency = { gates = ["code-review"] } }
+"#;
+        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        match err {
+            RuleConfigError::InvalidAssertion { rule, message } => {
+                assert_eq!(rule, "no-age");
+                assert!(
+                    message.contains("max-age-days") && message.contains("max-age-hours"),
+                    "message was: {message}"
+                );
+            }
+            other => panic!("expected InvalidAssertion, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_gate_recency_zero_age_is_rejected() {
+        let toml = r#"
+[[rules]]
+name = "zero"
+assert = { gate-recency = { max-age-days = 0 } }
+"#;
+        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        match err {
+            RuleConfigError::InvalidAssertion { message, .. } => {
+                assert!(
+                    message.contains("greater than zero"),
+                    "message was: {message}"
+                );
+            }
+            other => panic!("expected InvalidAssertion, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_gate_recency_unknown_field_is_rejected() {
+        let toml = r#"
+[[rules]]
+name = "bad"
+assert = { gate-recency = { max-age-days = 7, extra = 1 } }
 "#;
         let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
         assert!(matches!(err, RuleConfigError::Toml(_)));
