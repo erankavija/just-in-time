@@ -2,57 +2,142 @@
   "epic_id": "94d26c42-3f4f-4a5e-99cc-0e82475a7635",
   "epic_short_id": "94d26c42",
   "design_doc": "dev/active/94d26c42-validation-lifecycle-design.md",
-  "current_wave": 1,
+  "current_wave": 2,
   "waves": [
     {
       "wave_number": 1,
       "note": "parallel worktrees; disjoint files per design conflict map",
       "issues": [
-        {"id": "cca3e80b-4a9a-498d-995b-15ff80acab4a", "short_id": "cca3e80b", "title": "State predicates in validation rule selectors", "classification": "implementation", "model": "opus", "status": "pending"},
-        {"id": "5a25c590-9e7e-4a36-b644-56482ebf2303", "short_id": "5a25c590", "title": "Actionable validation error messages", "classification": "implementation", "model": "opus", "status": "pending"}
+        {
+          "id": "cca3e80b-4a9a-498d-995b-15ff80acab4a",
+          "short_id": "cca3e80b",
+          "title": "State predicates in validation rule selectors",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "done"
+        },
+        {
+          "id": "5a25c590-9e7e-4a36-b644-56482ebf2303",
+          "short_id": "5a25c590",
+          "title": "Actionable validation error messages",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "done"
+        }
       ]
     },
     {
       "wave_number": 2,
       "note": "serialized within wave: 765688e1 lands evaluate_graph now-signature first; bc86f54c consumes it. T7 transition-blocking criterion verified after bc86f54c lands.",
       "issues": [
-        {"id": "765688e1-2b0d-4d64-8836-eb1f57e3aa6e", "short_id": "765688e1", "title": "Gate-result recency predicate with fresh-evidence example", "classification": "implementation", "model": "opus", "status": "pending"},
-        {"id": "bc86f54c-6372-44fe-b375-3e3a882a73e0", "short_id": "bc86f54c", "title": "Blocking graph-rule evaluation at state transitions", "classification": "implementation", "model": "opus", "status": "pending"}
+        {
+          "id": "765688e1-2b0d-4d64-8836-eb1f57e3aa6e",
+          "short_id": "765688e1",
+          "title": "Gate-result recency predicate with fresh-evidence example",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "pending"
+        },
+        {
+          "id": "bc86f54c-6372-44fe-b375-3e3a882a73e0",
+          "short_id": "bc86f54c",
+          "title": "Blocking graph-rule evaluation at state transitions",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "pending"
+        }
       ]
     },
     {
       "wave_number": 3,
       "note": "parallel worktrees; each appends Assertion variant + evaluator; lead merges sequentially resolving enum/dispatch append conflicts",
       "issues": [
-        {"id": "59782dde-56d6-4185-9477-6699f4fd99c1", "short_id": "59782dde", "title": "Distinguish stray req labels from unsatisfied ones", "classification": "implementation", "model": "sonnet", "status": "pending"},
-        {"id": "690f618a-6b40-44b2-969d-582335cf768f", "short_id": "690f618a", "title": "Criteria-to-check mapping rule kind with Nyquist example", "classification": "implementation", "model": "sonnet", "status": "pending"},
-        {"id": "3a86f34e-23da-44a8-9b16-4217ea4dfe80", "short_id": "3a86f34e", "title": "Repo-wide graph rule scope with cross-epic example", "classification": "implementation", "model": "sonnet", "status": "pending"}
+        {
+          "id": "59782dde-56d6-4185-9477-6699f4fd99c1",
+          "short_id": "59782dde",
+          "title": "Distinguish stray req labels from unsatisfied ones",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "id": "690f618a-6b40-44b2-969d-582335cf768f",
+          "short_id": "690f618a",
+          "title": "Criteria-to-check mapping rule kind with Nyquist example",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "id": "3a86f34e-23da-44a8-9b16-4217ea4dfe80",
+          "short_id": "3a86f34e",
+          "title": "Repo-wide graph rule scope with cross-epic example",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        }
       ]
     },
     {
       "wave_number": 4,
       "note": "parallel worktrees; both touch example_rulesets_tests.rs - instruct per-module test separation",
       "issues": [
-        {"id": "490f1f99-1ec2-4984-b3fa-16d2ea49249e", "short_id": "490f1f99", "title": "Lifecycle-aware SDD example ruleset", "classification": "implementation", "model": "sonnet", "status": "pending"},
-        {"id": "872cdccd-a25d-4f61-8495-e7310358ddc4", "short_id": "872cdccd", "title": "Non-software example ruleset", "classification": "implementation", "model": "sonnet", "status": "pending"}
+        {
+          "id": "490f1f99-1ec2-4984-b3fa-16d2ea49249e",
+          "short_id": "490f1f99",
+          "title": "Lifecycle-aware SDD example ruleset",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "id": "872cdccd-a25d-4f61-8495-e7310358ddc4",
+          "short_id": "872cdccd",
+          "title": "Non-software example ruleset",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        }
       ]
     },
     {
       "wave_number": 5,
       "issues": [
-        {"id": "7aacfd89-8ed8-4fb7-97a0-bc1ab7af0d1f", "short_id": "7aacfd89", "title": "Deterministic steering-scenario harness", "classification": "implementation", "model": "sonnet", "status": "pending"}
+        {
+          "id": "7aacfd89-8ed8-4fb7-97a0-bc1ab7af0d1f",
+          "short_id": "7aacfd89",
+          "title": "Deterministic steering-scenario harness",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        }
       ]
     },
     {
       "wave_number": 6,
       "issues": [
-        {"id": "6a6af4e3-ef20-4540-b039-fd6de2d60568", "short_id": "6a6af4e3", "title": "LLM-agent steering eval", "classification": "implementation", "model": "opus", "status": "pending"}
+        {
+          "id": "6a6af4e3-ef20-4540-b039-fd6de2d60568",
+          "short_id": "6a6af4e3",
+          "title": "LLM-agent steering eval",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "pending"
+        }
       ]
     }
   ],
   "open_question_resolutions": "Architect recommendations R-1 through R-6 accepted as-is (routine per escalation policy): minimal --explain rendering; now-parameter clock injection; recency rules default warn with documented done-blocking opt-in; defer cross-rule index caching; pin LLM eval model in README; reserve scope=all for label-uniqueness only.",
   "created_during_execution": [],
   "escalations": [],
-  "rework_counts": {},
-  "started_at": "2026-06-10T00:00:00Z"
+  "rework_counts": {
+    "cca3e80b": 2,
+    "5a25c590": 2
+  },
+  "started_at": "2026-06-10T00:00:00Z",
+  "traps": [
+    "Workers must NEVER git-restore/stage anything under .jit/ - rework2-cca3e80b's restore wiped the lead's recorded gate results (re-run was cheap this time; may not be next time). Dispatch prompts now must say: never run git restore on .jit paths.",
+    "code-review gate enforces literal acceptance-criteria readings: --explain criterion required visible non-match reporting (R-1 minimal option was insufficient); 'instance path on findings' applies to specialized messages too; public APIs need # Examples doctests.",
+    "version_cli_tests flake under full parallel cargo test (binary-build contention + aws-lc-sys in no-network sandbox); pass serially - do not chase as regressions."
+  ]
 }

@@ -2,7 +2,7 @@
   "id": "cca3e80b-4a9a-498d-995b-15ff80acab4a",
   "title": "State predicates in validation rule selectors",
   "description": "Extend rule `when` selectors so rules can match on issue state, enabling lifecycle-phase scoping of validation rules.\n\n## Success Criteria\n\n- [ ] `when` accepts a state predicate (single state or list) combinable with the existing type and label selectors\n- [ ] Rules with a state predicate are evaluated only for issues in a matching state, on both the write path and `jit validate`\n- [ ] Unknown state names in `when` are rejected at config load with an error naming the rule and the valid states\n- [ ] `jit validate <id> --explain` shows whether the state predicate matched\n- [ ] The validation-rules how-to and configuration reference document state predicates",
-  "state": "in_progress",
+  "state": "done",
   "priority": "high",
   "assignee": "agent:claude",
   "dependencies": [],
@@ -10,7 +10,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-09T23:06:17.795817364Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-09T23:10:31.275153765Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -18,5 +29,5 @@
     "epic:validation-lifecycle"
   ],
   "created_at": "2026-06-09T21:52:58.376575210+00:00",
-  "updated_at": "2026-06-09T22:04:45.054004342+00:00"
+  "updated_at": "2026-06-09T23:30:16.960913972+00:00"
 }

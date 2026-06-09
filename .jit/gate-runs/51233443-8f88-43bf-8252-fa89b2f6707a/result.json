@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "51233443-8f88-43bf-8252-fa89b2f6707a",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "cca3e80b-4a9a-498d-995b-15ff80acab4a",
+  "commit": "b1cc71046ea427761dc53ee967e52960c36aab13",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-06-09T23:10:31.275153765Z",
+  "completed_at": "2026-06-09T23:13:04.862237377Z",
+  "duration_ms": 153587,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nPASS. `when.state` supports single and list predicates via `StatePredicate` and combines through `Selector::matches` in `crates/jit/src/validation/rules.rs:240` and `:269`. Invalid state names are rejected at load in `RawRule::into_rule` at `crates/jit/src/validation/rules.rs:932`, with valid tokens defined at `:392`.\n\nThe prior review issue is addressed: `explain_rules` now emits every rule with `matched` and `skip_reason` for selector misses at `crates/jit/src/commands/validate.rs:585`, and the CLI renders skipped rules with the state mismatch reason at `crates/jit/src/main.rs:3661`.\n\n**Architecture And Separation Of Concerns**\n\nNo blocking issues. Selector matching and explanations remain in validation (`crates/jit/src/validation/rules.rs:269`, `:301`), command orchestration builds reports in `crates/jit/src/commands/validate.rs:544`, and CLI rendering stays in `crates/jit/src/main.rs:3624`.\n\n**Functional Paradigm**\n\nNo blocking issues. The implementation uses iterator pipelines for rule selection and outcome construction, notably `ruleset.rules.iter().map(...)` in `crates/jit/src/commands/validate.rs:585`.\n\n**Correctness And Invariants**\n\nNo blocking issues. Write-path state-scoped enforcement is covered by final-shape tests in `crates/jit/tests/local_rule_enforcement_tests.rs:549` and `:591`. Skipped explain outcomes are non-failing and carry reasons through `RuleOutcome` fields at `crates/jit/src/validation/report.rs:198`.\n\n**Safety**\n\nNo unsafe code observed in the reviewed changes.\n\n**Testing**\n\nPASS. Provided `cargo-ci` gate evidence is passed. I also ran `./scripts/jit-validate.sh`, which passed with allowed label warnings, and `cargo test -p jit validate_explain --quiet`, which passed 7 filtered tests. Coverage includes state selector matching and invalid config tests in `crates/jit/src/validation/rules.rs:1217`, `:1232`, `:1270`, plus explain skip tests in `crates/jit/tests/validate_rule_runner_tests.rs:187` and CLI JSON/human tests in `crates/jit/tests/validate_cli_rule_tests.rs:184`.\n\n**Error Handling**\n\nNo blocking issues. Invalid state errors name the rule, invalid value, and valid states via `RuleConfigError::InvalidState` and validation at `crates/jit/src/validation/rules.rs:473`.\n\n**CLI Contract**\n\nNo blocking issue. `jit validate <id> --explain --json` serializes `matched` and omits `skip_reason` for matched rules through `serde` at `crates/jit/src/validation/report.rs:204`; CLI tests verify JSON shape at `crates/jit/tests/validate_cli_rule_tests.rs:203`.\n\n**Documentation**\n\nPASS. State predicates are documented in the how-to at `docs/how-to/validation-rules.md:81`, including explain skip output at `:101`. Configuration reference documents grammar and valid tokens at `docs/reference/configuration.md:112`.\n\n**Prior Review Feedback**\n\nResolved. The previous failure said non-matching state-scoped rules were omitted from `--explain`; they are now included as `[SKIP]` with state mismatch details in command, CLI, and JSON tests.\n\n**JIT Issue Management**\n\nThe issue has no dependencies. `./scripts/jit-validate.sh` passed; warnings are label warnings only and allowed by the review instructions.\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
