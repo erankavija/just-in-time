@@ -580,6 +580,46 @@ fn rule_schema(rule: &Rule) -> Option<&serde_json::Value> {
 /// 5. **Instance-path prefix.** Every other finding is prefixed with the
 ///    readable instance path, e.g. `at sections.success_criteria.items: <msg>`;
 ///    an empty path renders as the projection root (no prefix change).
+///
+/// # Examples
+///
+/// ```
+/// use jit::validation::engine::render_finding_message;
+/// use jsonschema::Draft;
+/// use serde_json::json;
+///
+/// let schema = json!({
+///     "type": "object",
+///     "required": ["sections"],
+///     "properties": {
+///         "sections": {
+///             "type": "object",
+///             "properties": {
+///                 "success_criteria": {
+///                     "type": "object",
+///                     "x-jit-section-heading": "Success Criteria",
+///                     "properties": { "items": { "type": "array", "minItems": 1 } }
+///                 }
+///             }
+///         }
+///     }
+/// });
+/// let validator = jsonschema::options()
+///     .with_draft(Draft::Draft202012)
+///     .build(&schema)
+///     .unwrap();
+///
+/// // Prose-without-bullets: the section parsed to an empty `items` array.
+/// let projection = json!({
+///     "sections": { "success_criteria": { "heading": "Success Criteria", "items": [] } }
+/// });
+/// let error = validator.iter_errors(&projection).next().unwrap();
+/// assert_eq!(
+///     render_finding_message(&error, &schema, &projection),
+///     "at sections.success_criteria.items: section 'Success Criteria' has no list \
+///      items; items must be Markdown bullets (lines starting with '- ')"
+/// );
+/// ```
 pub fn render_finding_message(
     error: &ValidationError,
     schema: &serde_json::Value,
