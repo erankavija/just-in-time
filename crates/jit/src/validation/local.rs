@@ -34,7 +34,9 @@
 use crate::document::{content_parser_for, ContentParserError};
 use crate::domain::{project, ContentFormat, Issue, Projection};
 use crate::validation::desugar::desugar;
-use crate::validation::engine::{Finding, SchemaCompileError, SchemaEngine};
+use crate::validation::engine::{
+    render_finding_message, Finding, SchemaCompileError, SchemaEngine,
+};
 use crate::validation::rules::{Assertion, Rule, RuleSet, Scope, Severity};
 
 /// Error raised while evaluating local rules against an issue.
@@ -332,7 +334,9 @@ pub fn evaluate_local(
                 finding: Finding {
                     rule: rule.name.clone(),
                     severity: rule.severity,
-                    message: error.to_string(),
+                    // Route through the one shared renderer (CC-4) so write-path
+                    // findings are as actionable as `jit validate`'s.
+                    message: render_finding_message(&error, schema, &value),
                 },
                 enforce: rule.enforce,
             });
@@ -691,6 +695,65 @@ assert = { require-label = { label = "owner:*", min = 1 } }
         let mut blocking = evaluation.blocking_rules();
         blocking.sort();
         assert_eq!(blocking, vec!["needs-owner", "needs-req"]);
+    }
+
+    #[test]
+    fn test_write_path_renders_actionable_section_message() {
+        // The write path must route findings through the shared renderer (CC-4):
+        // a require-section rule whose section is present-but-empty yields the
+        // actionable "Markdown bullets" message, naming the heading via the
+        // `x-jit-section-heading` annotation desugar emits — not raw schema text.
+        let rules = rules_from(
+            r#"
+[[rules]]
+name = "epic-needs-criteria"
+when = { type = "epic" }
+severity = "error"
+enforce = true
+assert = { require-section = { heading = "Success Criteria" } }
+"#,
+        );
+        let mut empty = epic_without_req();
+        // A heading with prose and no bullet list: the section parses to empty items.
+        empty.description = "## Success Criteria\n\nWe will ship a great product.\n".to_string();
+        let evaluation = evaluate_local(&empty, &rules, ContentFormat::Markdown).unwrap();
+        let message = evaluation
+            .findings()
+            .into_iter()
+            .map(|f| f.message.clone())
+            .find(|m| m.contains("no list items"))
+            .unwrap_or_else(|| panic!("expected an actionable empty-section message"));
+        assert!(message.contains("section 'Success Criteria'"), "{message}");
+        assert!(
+            message.contains("must be Markdown bullets (lines starting with '- ')"),
+            "{message}"
+        );
+    }
+
+    #[test]
+    fn test_write_path_did_you_mean_on_typo_heading() {
+        // A typo'd heading on the write path surfaces a did-you-mean hint.
+        let rules = rules_from(
+            r#"
+[[rules]]
+name = "epic-needs-criteria"
+when = { type = "epic" }
+severity = "error"
+enforce = true
+assert = { require-section = { heading = "Success Criteria" } }
+"#,
+        );
+        let mut typo = epic_without_req();
+        typo.description = "## Sucess Criteria\n\n- [hard] REQ-01: x\n".to_string();
+        let evaluation = evaluate_local(&typo, &rules, ContentFormat::Markdown).unwrap();
+        assert!(
+            evaluation
+                .findings()
+                .into_iter()
+                .any(|f| f.message.contains("did you mean 'Sucess Criteria'?")),
+            "expected a did-you-mean hint, got {:?}",
+            evaluation.findings()
+        );
     }
 
     #[test]

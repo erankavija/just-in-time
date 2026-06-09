@@ -32,6 +32,7 @@
 use serde_json::{json, Value};
 
 use crate::document::slugify_heading;
+use crate::validation::engine::SECTION_HEADING_ANNOTATION;
 use crate::validation::rules::Assertion;
 
 /// Lower a shorthand [`Assertion`] to its equivalent JSON Schema (Draft 2020-12).
@@ -273,6 +274,11 @@ fn desugar_require_section(heading: &str) -> Value {
                 "properties": {
                     slug: {
                         "type": "object",
+                        // Carry the original heading so the message renderer can
+                        // name the section in a finding without a lossy
+                        // de-slugify (CC-4 point 1). It is an annotation keyword:
+                        // jsonschema treats it as a no-op during validation.
+                        SECTION_HEADING_ANNOTATION: heading,
                         "required": ["items"],
                         "properties": {
                             "items": { "type": "array", "minItems": 1 }
@@ -574,6 +580,22 @@ mod tests {
             json!({ "sections": { "other": { "items": ["y"] } } }), // wrong section -> reject
         ];
         assert_equivalent(&desugared, &handwritten, &cases);
+    }
+
+    #[test]
+    fn test_require_section_carries_heading_annotation() {
+        // The desugared schema must carry the original heading on the section
+        // subschema so the message renderer can name it (CC-4 point 1). The
+        // annotation is a no-op for validation but readable downstream.
+        let desugared = desugar(&Assertion::RequireSection {
+            heading: "Success Criteria".to_string(),
+        })
+        .unwrap();
+        assert_eq!(
+            desugared["properties"]["sections"]["properties"]["success_criteria"]
+                ["x-jit-section-heading"],
+            "Success Criteria"
+        );
     }
 
     #[test]

@@ -43,6 +43,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use jsonschema::error::ValidationErrorKind;
 use jsonschema::paths::Location;
 use jsonschema::{Draft, Keyword, ValidationError, Validator};
 use thiserror::Error;
@@ -436,7 +437,7 @@ impl SchemaEngine {
             .map(|error| Finding {
                 rule: rule.name.clone(),
                 severity: rule.severity,
-                message: error.to_string(),
+                message: render_finding_message(&error, schema, projection),
             })
             .collect();
 
@@ -547,6 +548,265 @@ fn rule_schema(rule: &Rule) -> Option<&serde_json::Value> {
         _ => None,
     }
 }
+
+/// Render a single [`ValidationError`] into an actionable [`Finding`] message
+/// (CC-4).
+///
+/// This is the one renderer shared by both [`SchemaEngine::validate`] and
+/// [`local`](crate::validation::local)'s write-path `iter_errors` loop, so
+/// message quality is fixed in exactly one place and cannot drift. It is pure: a
+/// deterministic function of the error, the rule's `schema`, and the validated
+/// `projection`, with no I/O.
+///
+/// Four behaviors, in priority order:
+///
+/// 1. **Empty-projection special case.** A `minItems`/`contains` failure on an
+///    empty `sections.<slug>.items` array (the prose-without-bullets case) emits
+///    `section '<Heading>' has no list items; items must be Markdown bullets
+///    (lines starting with '- ')`. The heading is recovered from the section
+///    schema's `x-jit-section-heading` annotation, falling back to the slug.
+/// 2. **did-you-mean for a missing section.** A `required` failure naming an
+///    absent section slug appends `did you mean '<Present Heading>'?` when a
+///    present section heading is a near-miss (Levenshtein on slugified forms,
+///    threshold `max(2, 20% of heading length)`).
+/// 3. **Readable character classes.** Any `pattern`-keyword message is passed
+///    through [`humanize_regex`] so control/zero-width characters render as
+///    escapes (`\t`, `\u{200b}`) and `\s` survives intact.
+/// 4. **Instance-path prefix.** Every other finding is prefixed with the
+///    readable instance path, e.g. `at sections.success_criteria.items: <msg>`;
+///    an empty path renders as the projection root (no prefix change).
+pub fn render_finding_message(
+    error: &ValidationError,
+    schema: &serde_json::Value,
+    projection: &serde_json::Value,
+) -> String {
+    let path = error.instance_path();
+
+    // (1) Empty-section special case: an array keyword failed on an empty
+    // `sections.<slug>.items` instance because the body had prose, not bullets.
+    if let Some(slug) = empty_items_section_slug(error, path) {
+        let heading = section_heading(schema, &slug).unwrap_or(slug);
+        return format!(
+            "section '{heading}' has no list items; items must be Markdown bullets \
+             (lines starting with '- ')"
+        );
+    }
+
+    let readable = readable_instance_path(path);
+
+    // (2) Missing required section: name the field and, when a present heading is
+    // a near-miss of the required one, append a did-you-mean hint.
+    if let ValidationErrorKind::Required { property } = error.kind() {
+        if let Some(required) = property.as_str() {
+            let base = with_path_prefix(&readable, &error.to_string());
+            if let Some(suggestion) = did_you_mean_section(required, projection) {
+                return format!("{base}; did you mean '{suggestion}'?");
+            }
+            return base;
+        }
+    }
+
+    // (3) Pattern failures: render the regex readably before prefixing.
+    if let ValidationErrorKind::Pattern { pattern } = error.kind() {
+        let humanized = humanize_regex(pattern);
+        let message = format!(
+            "{} is not valid under the given pattern (expected to match {humanized})",
+            error.instance()
+        );
+        return with_path_prefix(&readable, &message);
+    }
+
+    // (4) Default: prefix the readable instance path.
+    with_path_prefix(&readable, &error.to_string())
+}
+
+/// If `error` is an array-shape failure (`minItems`/`contains`) on an *empty*
+/// `sections.<slug>.items` instance, return the section slug. This is the
+/// prose-without-bullets signature: the projection parsed the section but found
+/// no list items, so its `items` array is `[]`.
+fn empty_items_section_slug(error: &ValidationError, path: &Location) -> Option<String> {
+    // Only the array-presence keywords produce the content-free messages we want
+    // to replace; a `type` or `pattern` failure on items is a different problem.
+    if !matches!(
+        error.kind(),
+        ValidationErrorKind::MinItems { .. } | ValidationErrorKind::Contains
+    ) {
+        return None;
+    }
+    // The instance that failed must be the empty array itself.
+    match error.instance().as_ref() {
+        serde_json::Value::Array(items) if items.is_empty() => {}
+        _ => return None,
+    }
+    // Path shape: /sections/<slug>/items
+    let segments: Vec<&str> = path.as_str().split('/').skip(1).collect();
+    match segments.as_slice() {
+        ["sections", slug, "items"] => Some(unescape_pointer_token(slug)),
+        _ => None,
+    }
+}
+
+/// Look up the original heading for a section `slug` via the
+/// `x-jit-section-heading` annotation desugar emits on the section subschema.
+///
+/// Returns `None` when the schema carries no annotation for the slug (e.g. a
+/// hand-written `json-schema` rule), in which case the caller falls back to the
+/// slug itself — never a lossy de-slugify.
+fn section_heading(schema: &serde_json::Value, slug: &str) -> Option<String> {
+    schema
+        .get("properties")?
+        .get("sections")?
+        .get("properties")?
+        .get(slug)?
+        .get("x-jit-section-heading")?
+        .as_str()
+        .map(str::to_string)
+}
+
+/// For a missing required section `slug`, find the present section heading whose
+/// slug is the nearest near-miss and return its original heading text.
+///
+/// Compares the required slug against the slugs of the sections actually present
+/// in `projection` (`sections.<slug>`) by Levenshtein distance, accepting the
+/// nearest within `max(2, 20% of the required slug length)` edits. Returns the
+/// present section's *heading* (recovered from the projection's stored heading,
+/// falling back to the present slug) so the hint reads naturally.
+fn did_you_mean_section(required_slug: &str, projection: &serde_json::Value) -> Option<String> {
+    let sections = projection.get("sections")?.as_object()?;
+    let threshold = (required_slug.chars().count() / 5).max(2);
+    sections
+        .iter()
+        .filter(|(present, _)| present.as_str() != required_slug)
+        .map(|(present, value)| {
+            let distance = levenshtein(required_slug, present);
+            (distance, present, value)
+        })
+        .filter(|(distance, _, _)| *distance <= threshold)
+        .min_by_key(|(distance, _, _)| *distance)
+        .map(|(_, present, value)| section_present_heading(value, present))
+}
+
+/// Recover a present section's display heading from its projected value
+/// (`{"heading": "...", "items": [...]}`), falling back to the slug.
+fn section_present_heading(value: &serde_json::Value, slug: &str) -> String {
+    value
+        .get("heading")
+        .and_then(serde_json::Value::as_str)
+        .map_or_else(|| slug.to_string(), str::to_string)
+}
+
+/// Prefix a message with its readable instance path, e.g.
+/// `at sections.success_criteria.items: <message>`. An empty path (the
+/// projection root) yields the message unchanged.
+fn with_path_prefix(readable_path: &str, message: &str) -> String {
+    if readable_path.is_empty() {
+        message.to_string()
+    } else {
+        format!("at {readable_path}: {message}")
+    }
+}
+
+/// Convert a JSON Pointer [`Location`] (`/sections/success_criteria/items`) into
+/// the readable dotted path the projection uses (`sections.success_criteria.items`).
+/// The empty (root) location renders as the empty string.
+fn readable_instance_path(path: &Location) -> String {
+    path.as_str()
+        .split('/')
+        .skip(1)
+        .map(unescape_pointer_token)
+        .collect::<Vec<_>>()
+        .join(".")
+}
+
+/// Decode the two JSON Pointer escapes (`~1` -> `/`, `~0` -> `~`) in a single
+/// pointer token so a section slug containing them renders literally.
+fn unescape_pointer_token(token: &str) -> String {
+    token.replace("~1", "/").replace("~0", "~")
+}
+
+/// Render a regex so control and zero-width characters become readable escapes,
+/// while ordinary regex syntax (including `\s`, `\d`, character classes) is left
+/// untouched (CC-4 point 3).
+///
+/// The fix targets the failure mode where a `pattern` keyword's source text
+/// contains a literal tab or zero-width space, which `error.to_string()` would
+/// emit raw into a message — invisible or confusing to an agent. Each `char` is
+/// mapped: a literal tab/newline/carriage-return becomes `\t`/`\n`/`\r`, any
+/// other control or zero-width character becomes a `\u{XXXX}` escape, and every
+/// other character (letters, digits, backslash-escapes already in the source,
+/// brackets) is passed through verbatim so `\s` stays `\s`.
+///
+/// # Examples
+///
+/// ```
+/// use jit::validation::engine::humanize_regex;
+///
+/// // A backslash-s class is preserved verbatim.
+/// assert_eq!(humanize_regex(r"\s+"), r"\s+");
+/// // A literal tab in the source becomes a visible escape, never raw.
+/// assert_eq!(humanize_regex("a\tb"), r"a\tb");
+/// // A zero-width space becomes a unicode escape.
+/// assert_eq!(humanize_regex("a\u{200b}b"), r"a\u{200b}b");
+/// ```
+pub fn humanize_regex(pattern: &str) -> String {
+    pattern
+        .chars()
+        .map(|ch| match ch {
+            '\t' => "\\t".to_string(),
+            '\n' => "\\n".to_string(),
+            '\r' => "\\r".to_string(),
+            // Other control characters and zero-width / formatting characters
+            // are invisible when emitted raw; render them as a unicode escape.
+            c if c.is_control() || is_zero_width(c) => format!("\\u{{{:04x}}}", c as u32),
+            c => c.to_string(),
+        })
+        .collect()
+}
+
+/// Whether a character is zero-width or an invisible formatting character that
+/// would render as nothing in a message (so it must be escaped to be readable).
+fn is_zero_width(ch: char) -> bool {
+    matches!(
+        ch,
+        '\u{200b}' // zero-width space
+            | '\u{200c}' // zero-width non-joiner
+            | '\u{200d}' // zero-width joiner
+            | '\u{2060}' // word joiner
+            | '\u{feff}' // zero-width no-break space / BOM
+    )
+}
+
+/// Levenshtein edit distance over `char`s, used for the section did-you-mean
+/// hint. Kept local to the renderer so the message layer carries no dependency
+/// on other modules' internals.
+fn levenshtein(a: &str, b: &str) -> usize {
+    let a: Vec<char> = a.chars().collect();
+    let b: Vec<char> = b.chars().collect();
+    if a.is_empty() {
+        return b.len();
+    }
+    if b.is_empty() {
+        return a.len();
+    }
+    // Single-row dynamic-programming table: `row[j]` holds the distance from the
+    // first `i` chars of `a` to the first `j` chars of `b`.
+    let mut row: Vec<usize> = (0..=b.len()).collect();
+    for (i, &ca) in a.iter().enumerate() {
+        let mut prev_diagonal = row[0];
+        row[0] = i + 1;
+        for (j, &cb) in b.iter().enumerate() {
+            let cost = usize::from(ca != cb);
+            let candidate = (row[j] + 1).min(row[j + 1] + 1).min(prev_diagonal + cost);
+            prev_diagonal = row[j + 1];
+            row[j + 1] = candidate;
+        }
+    }
+    row[b.len()]
+}
+
+/// The `x-jit-section-heading` annotation key desugar attaches to section
+/// subschemas so the renderer can name the original heading in a finding.
+pub(crate) const SECTION_HEADING_ANNOTATION: &str = "x-jit-section-heading";
 
 #[cfg(test)]
 mod tests {
@@ -1162,6 +1422,289 @@ assert = { json-schema = "schemas/b.json" }
             findings.len(),
             1,
             "after registration the warmed engine enforces the keyword, got {findings:?}"
+        );
+    }
+
+    // === Actionable message rendering (CC-4, task 5a25c590) =================
+
+    /// The SDD-style spec-body schema: requires a `success_criteria` section with
+    /// non-empty `items`, each shaped `[hard|aspirational] REQ-N: <text>`, and at
+    /// least one `[hard]` item. Carries an `x-jit-section-heading` annotation so
+    /// the renderer can name the heading on the empty-projection path.
+    fn spec_body_schema() -> serde_json::Value {
+        serde_json::json!({
+            "type": "object",
+            "required": ["sections"],
+            "properties": {
+                "sections": {
+                    "type": "object",
+                    "required": ["success_criteria"],
+                    "properties": {
+                        "success_criteria": {
+                            "type": "object",
+                            "x-jit-section-heading": "Success Criteria",
+                            "required": ["items"],
+                            "properties": {
+                                "items": {
+                                    "type": "array",
+                                    "minItems": 1,
+                                    "items": {
+                                        "type": "string",
+                                        "pattern": "^\\[(hard|aspirational)\\]\\s+REQ-[0-9]+:\\s+\\S"
+                                    },
+                                    "contains": { "type": "string", "pattern": "^\\[hard\\]" },
+                                    "minContains": 1
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    }
+
+    fn rule_for(schema: serde_json::Value) -> Rule {
+        use crate::validation::rules::{Assertion, SchemaSource, Selector};
+        Rule {
+            name: "spec".to_string(),
+            when: Selector::default(),
+            severity: Severity::Error,
+            enforce: true,
+            assert: Assertion::JsonSchema(SchemaSource {
+                reference: "inline".to_string(),
+                path: std::path::PathBuf::from("inline"),
+                schema,
+            }),
+            scope: crate::validation::rules::Scope::Local,
+        }
+    }
+
+    fn messages(rule: &Rule, projection: &serde_json::Value) -> Vec<String> {
+        SchemaEngine::new()
+            .validate(rule, projection)
+            .unwrap()
+            .into_iter()
+            .map(|f| f.message)
+            .collect()
+    }
+
+    #[test]
+    fn test_empty_section_names_heading_and_demands_bullets() {
+        // Prose-without-bullets: the section parsed but yielded an empty `items`
+        // array. The message must name the heading and state that items must be
+        // Markdown bullets — not the content-free `[] has less than 1 item`.
+        let rule = rule_for(spec_body_schema());
+        let projection = serde_json::json!({
+            "sections": { "success_criteria": { "heading": "Success Criteria", "items": [] } }
+        });
+        let msgs = messages(&rule, &projection);
+        let empty_msg = msgs
+            .iter()
+            .find(|m| m.contains("no list items"))
+            .unwrap_or_else(|| panic!("expected an empty-section message, got {msgs:?}"));
+        assert!(
+            empty_msg.contains("section 'Success Criteria'"),
+            "{empty_msg}"
+        );
+        assert!(
+            empty_msg.contains("must be Markdown bullets (lines starting with '- ')"),
+            "{empty_msg}"
+        );
+        // It must not leak the raw json-schema wording.
+        assert!(
+            !empty_msg.contains("less than") && !empty_msg.contains("None of"),
+            "raw schema wording leaked: {empty_msg}"
+        );
+    }
+
+    #[test]
+    fn test_empty_section_falls_back_to_slug_without_annotation() {
+        // A hand-written json-schema rule with no `x-jit-section-heading` falls
+        // back to the slug rather than a lossy de-slugify.
+        let schema = serde_json::json!({
+            "type": "object",
+            "required": ["sections"],
+            "properties": {
+                "sections": {
+                    "type": "object",
+                    "required": ["success_criteria"],
+                    "properties": {
+                        "success_criteria": {
+                            "type": "object",
+                            "required": ["items"],
+                            "properties": { "items": { "type": "array", "minItems": 1 } }
+                        }
+                    }
+                }
+            }
+        });
+        let rule = rule_for(schema);
+        let projection = serde_json::json!({
+            "sections": { "success_criteria": { "heading": "Success Criteria", "items": [] } }
+        });
+        let msgs = messages(&rule, &projection);
+        assert!(
+            msgs.iter()
+                .any(|m| m.contains("section 'success_criteria' has no list items")),
+            "expected slug fallback, got {msgs:?}"
+        );
+    }
+
+    #[test]
+    fn test_instance_path_is_prefixed_on_findings() {
+        // A non-empty items array whose entry violates the item `pattern` must
+        // carry the readable instance path of the failing field.
+        let rule = rule_for(spec_body_schema());
+        let projection = serde_json::json!({
+            "sections": {
+                "success_criteria": {
+                    "heading": "Success Criteria",
+                    "items": ["just some prose, no marker"]
+                }
+            }
+        });
+        let msgs = messages(&rule, &projection);
+        assert!(
+            msgs.iter()
+                .any(|m| m.starts_with("at sections.success_criteria.items")),
+            "expected a path-prefixed finding, got {msgs:?}"
+        );
+    }
+
+    #[test]
+    fn test_missing_section_emits_did_you_mean() {
+        // A typo'd heading (`Sucess Criteria`) slugs to `sucess_criteria`; the
+        // required `success_criteria` is absent. The renderer must suggest the
+        // near-miss heading actually present.
+        let rule = rule_for(spec_body_schema());
+        let projection = serde_json::json!({
+            "sections": {
+                "sucess_criteria": { "heading": "Sucess Criteria", "items": ["[hard] REQ-01: x"] }
+            }
+        });
+        let msgs = messages(&rule, &projection);
+        assert!(
+            msgs.iter()
+                .any(|m| m.contains("did you mean 'Sucess Criteria'?")),
+            "expected a did-you-mean hint, got {msgs:?}"
+        );
+    }
+
+    #[test]
+    fn test_missing_section_no_hint_when_no_near_miss() {
+        // No present heading is close to the required one: no spurious hint.
+        let rule = rule_for(spec_body_schema());
+        let projection = serde_json::json!({
+            "sections": { "goals": { "heading": "Goals", "items": ["ship"] } }
+        });
+        let msgs = messages(&rule, &projection);
+        assert!(
+            msgs.iter().any(|m| m.contains("success_criteria")),
+            "the missing section is still named, got {msgs:?}"
+        );
+        assert!(
+            !msgs.iter().any(|m| m.contains("did you mean")),
+            "a far-off heading must not produce a hint, got {msgs:?}"
+        );
+    }
+
+    #[test]
+    fn test_humanize_regex_preserves_classes_and_escapes_control() {
+        // `\s` survives verbatim; a literal tab and zero-width space become
+        // visible escapes rather than raw control characters.
+        assert_eq!(humanize_regex(r"^\s+REQ"), r"^\s+REQ");
+        assert_eq!(humanize_regex("col1\tcol2"), r"col1\tcol2");
+        assert_eq!(humanize_regex("a\u{200b}b"), r"a\u{200b}b");
+        // The output of any pattern must never contain a raw control char.
+        let rendered = humanize_regex("x\ty\nz\u{feff}");
+        assert!(
+            !rendered.chars().any(|c| c.is_control()),
+            "humanized regex still contains a control char: {rendered:?}"
+        );
+    }
+
+    #[test]
+    fn test_pattern_finding_renders_regex_readably() {
+        // A `pattern` failure whose regex contains whitespace classes must render
+        // the class readably (no raw control characters in the message).
+        let schema = serde_json::json!({
+            "type": "object",
+            "properties": { "code": { "type": "string", "pattern": "^REQ-[0-9]+$" } }
+        });
+        let rule = rule_for(schema);
+        let projection = serde_json::json!({ "code": "nope" });
+        let msgs = messages(&rule, &projection);
+        let pattern_msg = &msgs[0];
+        assert!(pattern_msg.starts_with("at code:"), "{pattern_msg}");
+        assert!(pattern_msg.contains("^REQ-[0-9]+$"), "{pattern_msg}");
+        assert!(
+            !pattern_msg.chars().any(|c| c.is_control()),
+            "pattern message has a raw control char: {pattern_msg:?}"
+        );
+    }
+
+    #[test]
+    fn test_sloppy_epic_steering_reaches_valid_write_in_two_iterations() {
+        // Simulate the sloppy-epic steering loop using ONLY the error text, per
+        // the task: an agent must be able to self-correct in <=2 iterations.
+        //
+        // The projection mirrors what `jit` would project from each body; we
+        // assert the message content drives the next fix at each step.
+        let rule = rule_for(spec_body_schema());
+
+        // --- Iteration 0: prose, no bullets. The section parsed but is empty.
+        let step0 = serde_json::json!({
+            "sections": {
+                "success_criteria": {
+                    "heading": "Success Criteria",
+                    "items": []
+                }
+            }
+        });
+        let msgs0 = messages(&rule, &step0);
+        // The message tells the agent EXACTLY what to do: use Markdown bullets.
+        assert!(
+            msgs0.iter().any(|m| m.contains("must be Markdown bullets")),
+            "step 0 must guide toward bullets, got {msgs0:?}"
+        );
+
+        // --- Iteration 1: agent adds bullets, but they lack the [hard] marker
+        // and REQ id shape (it followed "use bullets" but not the item shape yet).
+        let step1 = serde_json::json!({
+            "sections": {
+                "success_criteria": {
+                    "heading": "Success Criteria",
+                    "items": ["the thing works"]
+                }
+            }
+        });
+        let msgs1 = messages(&rule, &step1);
+        // The findings now name the failing field and the expected pattern, so the
+        // agent knows the items themselves are malformed (not the section).
+        assert!(
+            msgs1
+                .iter()
+                .any(|m| m.starts_with("at sections.success_criteria.items")),
+            "step 1 must name the failing items field, got {msgs1:?}"
+        );
+        assert!(
+            !msgs1.iter().any(|m| m.contains("no list items")),
+            "the empty-section error must be gone once bullets exist, got {msgs1:?}"
+        );
+
+        // --- Iteration 2: agent fixes item shape per the surfaced pattern.
+        let step2 = serde_json::json!({
+            "sections": {
+                "success_criteria": {
+                    "heading": "Success Criteria",
+                    "items": ["[hard] REQ-01: the thing works"]
+                }
+            }
+        });
+        let msgs2 = messages(&rule, &step2);
+        assert!(
+            msgs2.is_empty(),
+            "a valid write must be reached by iteration 2, got {msgs2:?}"
         );
     }
 }
