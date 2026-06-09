@@ -552,27 +552,32 @@ fn rule_schema(rule: &Rule) -> Option<&serde_json::Value> {
 /// Render a single [`ValidationError`] into an actionable [`Finding`] message
 /// (CC-4).
 ///
-/// This is the one renderer shared by both [`SchemaEngine::validate`] and
-/// [`local`](crate::validation::local)'s write-path `iter_errors` loop, so
-/// message quality is fixed in exactly one place and cannot drift. It is pure: a
-/// deterministic function of the error, the rule's `schema`, and the validated
-/// `projection`, with no I/O.
+/// This is the one renderer shared by [`SchemaEngine::validate`],
+/// [`evaluate_local`](crate::validation::local)'s write-path `iter_errors` loop,
+/// and the `jit validate` command path, so message quality is fixed in exactly
+/// one place and cannot drift. It is pure: a deterministic function of the error,
+/// the rule's `schema`, and the validated `projection`, with no I/O.
 ///
-/// Four behaviors, in priority order:
+/// Five behaviors, in priority order:
 ///
 /// 1. **Empty-projection special case.** A `minItems`/`contains` failure on an
 ///    empty `sections.<slug>.items` array (the prose-without-bullets case) emits
 ///    `section '<Heading>' has no list items; items must be Markdown bullets
 ///    (lines starting with '- ')`. The heading is recovered from the section
 ///    schema's `x-jit-section-heading` annotation, falling back to the slug.
-/// 2. **did-you-mean for a missing section.** A `required` failure naming an
+/// 2. **Non-empty contains failure.** A `contains` failure on a non-empty
+///    `sections.<slug>.items` array emits `section '<Heading>' items must include
+///    at least one entry matching <humanized pattern>` when the `contains`
+///    subschema carries a `pattern`. When no pattern is present, emits a generic
+///    path-prefixed message naming the path without dumping the full array.
+/// 3. **did-you-mean for a missing section.** A `required` failure naming an
 ///    absent section slug appends `did you mean '<Present Heading>'?` when a
 ///    present section heading is a near-miss (Levenshtein on slugified forms,
 ///    threshold `max(2, 20% of heading length)`).
-/// 3. **Readable character classes.** Any `pattern`-keyword message is passed
+/// 4. **Readable character classes.** Any `pattern`-keyword message is passed
 ///    through [`humanize_regex`] so control/zero-width characters render as
 ///    escapes (`\t`, `\u{200b}`) and `\s` survives intact.
-/// 4. **Instance-path prefix.** Every other finding is prefixed with the
+/// 5. **Instance-path prefix.** Every other finding is prefixed with the
 ///    readable instance path, e.g. `at sections.success_criteria.items: <msg>`;
 ///    an empty path renders as the projection root (no prefix change).
 pub fn render_finding_message(
@@ -592,9 +597,16 @@ pub fn render_finding_message(
         );
     }
 
+    // (2) Non-empty contains failure: the items array has entries but none satisfies
+    // the `contains` subschema. The default rendering dumps the full array; instead
+    // name the section heading (or path) and the required pattern.
+    if matches!(error.kind(), ValidationErrorKind::Contains) {
+        return render_contains_message(error, schema, path);
+    }
+
     let readable = readable_instance_path(path);
 
-    // (2) Missing required section: name the field and, when a present heading is
+    // (3) Missing required section: name the field and, when a present heading is
     // a near-miss of the required one, append a did-you-mean hint.
     if let ValidationErrorKind::Required { property } = error.kind() {
         if let Some(required) = property.as_str() {
@@ -606,7 +618,7 @@ pub fn render_finding_message(
         }
     }
 
-    // (3) Pattern failures: render the regex readably before prefixing.
+    // (4) Pattern failures: render the regex readably before prefixing.
     if let ValidationErrorKind::Pattern { pattern } = error.kind() {
         let humanized = humanize_regex(pattern);
         let message = format!(
@@ -616,7 +628,7 @@ pub fn render_finding_message(
         return with_path_prefix(&readable, &message);
     }
 
-    // (4) Default: prefix the readable instance path.
+    // (5) Default: prefix the readable instance path.
     with_path_prefix(&readable, &error.to_string())
 }
 
@@ -644,6 +656,144 @@ fn empty_items_section_slug(error: &ValidationError, path: &Location) -> Option<
         ["sections", slug, "items"] => Some(unescape_pointer_token(slug)),
         _ => None,
     }
+}
+
+/// Render an actionable message for a `contains`/`minContains` failure on a
+/// *non-empty* array (the empty-array case is already handled upstream by
+/// `empty_items_section_slug`).
+///
+/// When the failing `contains` subschema carries a `pattern`, the message reads:
+/// `section '<Heading>' items must include at least one entry matching <pattern>`
+/// (heading via the `x-jit-section-heading` annotation, falling back to the
+/// slug or to the readable instance path). When no pattern is present, emits a
+/// generic path-prefixed message that does not dump the full array.
+///
+/// The `contains` subschema is located by walking `schema` using the error's
+/// `schema_path` (which ends with `/contains`). If the walk fails for any reason
+/// (hand-written schema with an unexpected shape), the function falls back
+/// gracefully to a generic path-prefixed message — it never panics.
+fn render_contains_message(
+    error: &ValidationError,
+    schema: &serde_json::Value,
+    path: &jsonschema::paths::Location,
+) -> String {
+    let readable = readable_instance_path(path);
+
+    // Locate the `contains` subschema by following the error's schema_path.
+    let contains_sub = contains_subschema_via_schema_path(error.schema_path(), schema);
+
+    // Extract the pattern from the contains subschema, if present.
+    let maybe_pattern = contains_sub
+        .as_ref()
+        .and_then(|sub| sub.get("pattern"))
+        .and_then(serde_json::Value::as_str);
+
+    // Try to name the section by slug (instance path: /sections/<slug>/items).
+    let maybe_slug = {
+        let segments: Vec<&str> = path.as_str().split('/').skip(1).collect();
+        match segments.as_slice() {
+            ["sections", slug, "items"] => Some(unescape_pointer_token(slug)),
+            _ => None,
+        }
+    };
+
+    match (maybe_slug, maybe_pattern) {
+        (Some(slug), Some(pattern)) => {
+            let heading = section_heading(schema, &slug).unwrap_or(slug);
+            let humanized = humanize_regex(pattern);
+            format!(
+                "section '{heading}' items must include at least one entry matching {humanized}"
+            )
+        }
+        (Some(slug), None) => {
+            let heading = section_heading(schema, &slug).unwrap_or(slug);
+            format!(
+                "section '{heading}' items must include at least one entry \
+                 satisfying the required shape"
+            )
+        }
+        (None, Some(pattern)) => {
+            let humanized = humanize_regex(pattern);
+            with_path_prefix(
+                &readable,
+                &format!("items must include at least one entry matching {humanized}"),
+            )
+        }
+        (None, None) => {
+            // No slug, no pattern: generic message without the array dump.
+            with_path_prefix(&readable, "items must include at least one matching entry")
+        }
+    }
+}
+
+/// Walk `schema` using the segments of `schema_path` to locate the `contains`
+/// subschema and return a reference to it, or `None` if the walk fails.
+///
+/// # Schema-path variants
+///
+/// A `ValidationErrorKind::Contains` error can originate from two different
+/// internal validators, each of which sets a distinct schema_path:
+///
+/// - **`ContainsValidator`** (plain `contains`, no `minContains`/`maxContains`):
+///   schema_path ends with `contains`, e.g. `.../properties/items/contains`.
+///   Walking all segments reaches the `contains` subschema directly.
+///
+/// - **`MinContainsValidator`** / **`MinMaxContainsValidator`** (`minContains: 1`
+///   or both bounds): schema_path ends with `minContains` (or `maxContains`),
+///   e.g. `.../properties/items/minContains`. The `contains` subschema lives one
+///   level up as a sibling key `contains`. We strip the trailing `minContains` /
+///   `maxContains`, walk to the parent, then fetch `contains` from it.
+///
+/// If any segment is not found, the schema node is not an object, or the
+/// trailing segment is neither `contains` nor `minContains`/`maxContains`, we
+/// return `None` so the caller falls back gracefully — no panics.
+fn contains_subschema_via_schema_path<'s>(
+    schema_path: &jsonschema::paths::Location,
+    schema: &'s serde_json::Value,
+) -> Option<&'s serde_json::Value> {
+    let path_str = schema_path.as_str();
+    // Segments are `/`-separated; skip the leading empty string from the leading `/`.
+    let segments: Vec<&str> = path_str
+        .split('/')
+        .skip(1)
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    let last = segments.last().copied()?;
+
+    if last == "contains" {
+        // Walk all segments: the final node IS the contains subschema.
+        walk_schema_path(schema, &segments)
+    } else if last == "minContains" || last == "maxContains" {
+        // Walk all-but-last to reach the parent (the array keyword object), then
+        // get its `contains` sibling.
+        let parent_segments = &segments[..segments.len() - 1];
+        let parent = walk_schema_path(schema, parent_segments)?;
+        parent.get("contains")
+    } else {
+        None
+    }
+}
+
+/// Walk an object-only JSON schema node following `segments` in order, returning
+/// a reference to the final node, or `None` if any segment is missing or the
+/// current node is not an object.
+fn walk_schema_path<'s>(
+    schema: &'s serde_json::Value,
+    segments: &[&str],
+) -> Option<&'s serde_json::Value> {
+    let mut node = schema;
+    for segment in segments {
+        match node {
+            serde_json::Value::Object(map) => {
+                node = map.get(*segment)?;
+            }
+            // A numeric segment (array index in a schema path) is not expected for
+            // `contains` errors; treat as unrecognized shape and bail.
+            _ => return None,
+        }
+    }
+    Some(node)
 }
 
 /// Look up the original heading for a section `slug` via the
@@ -1640,6 +1790,215 @@ assert = { json-schema = "schemas/b.json" }
         assert!(
             !pattern_msg.chars().any(|c| c.is_control()),
             "pattern message has a raw control char: {pattern_msg:?}"
+        );
+    }
+
+    // --- contains / non-empty array: actionable message (review finding) ------
+
+    /// Schema shaped like the production SDD spec-body schema but WITHOUT the
+    /// `x-jit-section-heading` annotation, to test the slug-fallback path.
+    fn sdd_shaped_schema_no_heading() -> serde_json::Value {
+        serde_json::json!({
+            "type": "object",
+            "required": ["sections"],
+            "properties": {
+                "sections": {
+                    "type": "object",
+                    "required": ["success_criteria"],
+                    "properties": {
+                        "success_criteria": {
+                            "type": "object",
+                            "required": ["items"],
+                            "properties": {
+                                "items": {
+                                    "type": "array",
+                                    "contains": { "type": "string", "pattern": "^\\[hard\\]" },
+                                    "minContains": 1
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    }
+
+    #[test]
+    fn test_nonempty_contains_failure_names_heading_and_pattern() {
+        // The production SDD path: all items are [aspirational]; none is [hard].
+        // The message must (a) name the section heading, (b) state at least one
+        // entry must match the [hard] pattern, and (c) NOT dump the full array /
+        // contain 'None of'.
+        let rule = rule_for(spec_body_schema());
+        let projection = serde_json::json!({
+            "sections": {
+                "success_criteria": {
+                    "heading": "Success Criteria",
+                    "items": [
+                        "[aspirational] REQ-01: nice to have",
+                        "[aspirational] REQ-02: also nice"
+                    ]
+                }
+            }
+        });
+        let msgs = messages(&rule, &projection);
+        let contains_msg = msgs
+            .iter()
+            .find(|m| m.contains("must include at least one entry"))
+            .unwrap_or_else(|| panic!("expected a contains message, got {msgs:?}"));
+
+        // (a) names the section heading
+        assert!(
+            contains_msg.contains("section 'Success Criteria'"),
+            "must name the heading: {contains_msg}"
+        );
+        // (b) states the required pattern (humanized)
+        assert!(
+            contains_msg.contains("^\\[hard\\]"),
+            "must state the required pattern: {contains_msg}"
+        );
+        // (c) must not dump the full array
+        assert!(
+            !contains_msg.contains("None of"),
+            "must not dump the array: {contains_msg}"
+        );
+        assert!(
+            !contains_msg.contains("[aspirational]"),
+            "must not dump array contents: {contains_msg}"
+        );
+    }
+
+    #[test]
+    fn test_nonempty_contains_failure_falls_back_to_slug_without_heading_annotation() {
+        // Same as above but the schema has no `x-jit-section-heading` annotation.
+        // The message must fall back to the slug rather than dumping the array.
+        let rule = rule_for(sdd_shaped_schema_no_heading());
+        let projection = serde_json::json!({
+            "sections": {
+                "success_criteria": {
+                    "items": ["[aspirational] nice to have", "[soft] maybe"]
+                }
+            }
+        });
+        let msgs = messages(&rule, &projection);
+        let contains_msg = msgs
+            .iter()
+            .find(|m| m.contains("must include at least one entry"))
+            .unwrap_or_else(|| panic!("expected a contains message, got {msgs:?}"));
+
+        // Falls back to slug
+        assert!(
+            contains_msg.contains("success_criteria"),
+            "must name the slug: {contains_msg}"
+        );
+        // States the pattern
+        assert!(
+            contains_msg.contains("^\\[hard\\]"),
+            "must state the required pattern: {contains_msg}"
+        );
+        // Must not dump the array
+        assert!(
+            !contains_msg.contains("None of"),
+            "must not dump the array: {contains_msg}"
+        );
+    }
+
+    #[test]
+    fn test_nonempty_contains_failure_no_pattern_generic_message() {
+        // A `contains` schema without a `pattern` — e.g. requires at least one
+        // object item matching a shape. The message must name the path and say
+        // "satisfying the required shape", without dumping the full array.
+        let schema = serde_json::json!({
+            "type": "object",
+            "required": ["sections"],
+            "properties": {
+                "sections": {
+                    "type": "object",
+                    "required": ["success_criteria"],
+                    "properties": {
+                        "success_criteria": {
+                            "type": "object",
+                            "x-jit-section-heading": "Success Criteria",
+                            "required": ["items"],
+                            "properties": {
+                                "items": {
+                                    "type": "array",
+                                    // contains subschema with no `pattern` — requires
+                                    // an object item, not a string pattern match.
+                                    "contains": { "type": "object" },
+                                    "minContains": 1
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        let rule = rule_for(schema);
+        let projection = serde_json::json!({
+            "sections": {
+                "success_criteria": {
+                    "items": ["a string", "another string"]
+                }
+            }
+        });
+        let msgs = messages(&rule, &projection);
+        let contains_msg = msgs
+            .iter()
+            .find(|m| m.contains("must include at least one entry"))
+            .unwrap_or_else(|| panic!("expected a contains message, got {msgs:?}"));
+
+        assert!(
+            contains_msg.contains("section 'Success Criteria'"),
+            "must name the heading: {contains_msg}"
+        );
+        assert!(
+            contains_msg.contains("satisfying the required shape"),
+            "must say 'required shape': {contains_msg}"
+        );
+        // Must not dump the array
+        assert!(
+            !contains_msg.contains("None of"),
+            "must not dump the array: {contains_msg}"
+        );
+    }
+
+    #[test]
+    fn test_nonempty_contains_failure_non_section_path_names_path() {
+        // A `contains` failure outside of `sections.<slug>.items` — the message
+        // must still name the instance path and avoid dumping the array.
+        let schema = serde_json::json!({
+            "type": "object",
+            "properties": {
+                "tags": {
+                    "type": "array",
+                    "contains": { "type": "string", "pattern": "^important:" },
+                    "minContains": 1
+                }
+            }
+        });
+        let rule = rule_for(schema);
+        let projection = serde_json::json!({ "tags": ["other:a", "other:b"] });
+        let msgs = messages(&rule, &projection);
+        let contains_msg = msgs
+            .iter()
+            .find(|m| m.contains("must include at least one entry"))
+            .unwrap_or_else(|| panic!("expected a contains message, got {msgs:?}"));
+
+        // Must name the path
+        assert!(
+            contains_msg.contains("at tags:"),
+            "must prefix with the path: {contains_msg}"
+        );
+        // Must state the pattern
+        assert!(
+            contains_msg.contains("^important:"),
+            "must state the required pattern: {contains_msg}"
+        );
+        // Must not dump the array
+        assert!(
+            !contains_msg.contains("None of"),
+            "must not dump the array: {contains_msg}"
         );
     }
 
