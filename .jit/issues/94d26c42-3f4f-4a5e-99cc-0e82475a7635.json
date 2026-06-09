@@ -18,12 +18,20 @@
   ],
   "gates_status": {},
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "dev/active/94d26c42-validation-lifecycle-design.md",
+      "commit": null,
+      "label": "Design Document",
+      "doc_type": "design",
+      "format": "markdown"
+    }
+  ],
   "labels": [
     "type:epic",
     "epic:validation-lifecycle",
     "milestone:v1.0"
   ],
   "created_at": "2026-06-09T21:52:58.354367064+00:00",
-  "updated_at": "2026-06-09T21:56:06.264330385+00:00"
+  "updated_at": "2026-06-09T22:02:09.887572069+00:00"
 }
