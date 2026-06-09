@@ -273,6 +273,70 @@ impl Selector {
             && self.matches_doc_type(issue)
     }
 
+    /// Explain why this selector does NOT match the issue, or `None` if it does.
+    ///
+    /// Returns a human-readable reason naming the selector dimension(s) that
+    /// excluded the issue, joined by `"; "` when more than one dimension fails.
+    /// The state dimension is called out explicitly (the issue's current state
+    /// token versus the predicate's authored tokens) so `--explain` can show
+    /// "state predicate did not match". `None` is returned exactly when
+    /// [`Selector::matches`] is `true`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::validation::rules::{Selector, StatePredicate};
+    /// use jit::domain::{Issue, State};
+    ///
+    /// let selector = Selector {
+    ///     state: Some(StatePredicate::Single("done".to_string())),
+    ///     ..Default::default()
+    /// };
+    /// let mut issue = Issue::new("t".to_string(), String::new());
+    /// issue.state = State::InProgress;
+    /// let reason = selector.match_failure(&issue).unwrap();
+    /// assert!(reason.contains("in_progress"));
+    /// assert!(reason.contains("done"));
+    /// ```
+    pub fn match_failure(&self, issue: &Issue) -> Option<String> {
+        let mut reasons: Vec<String> = Vec::new();
+        if !self.matches_type(issue) {
+            let want = self.type_.as_deref().unwrap_or("");
+            reasons.push(format!(
+                "type predicate did not match (issue is not 'type:{want}')"
+            ));
+        }
+        if !self.matches_label(issue) {
+            let want = self.label.as_deref().unwrap_or("");
+            reasons.push(format!(
+                "label predicate did not match (issue lacks label '{want}')"
+            ));
+        }
+        if !self.matches_state(issue) {
+            let want = self
+                .state
+                .as_ref()
+                .map(|p| p.tokens().join("|"))
+                .unwrap_or_default();
+            reasons.push(format!(
+                "state predicate did not match (issue is '{}', wants '{}')",
+                state_token(issue.state),
+                want
+            ));
+        }
+        if !self.matches_doc_type(issue) {
+            let want = self.has_doc_type.as_deref().unwrap_or("");
+            reasons.push(format!(
+                "has_doc_type predicate did not match (issue has no '{want}' document)"
+            ));
+        }
+        if reasons.is_empty() {
+            None
+        } else {
+            Some(reasons.join("; "))
+        }
+    }
+
     fn matches_type(&self, issue: &Issue) -> bool {
         match &self.type_ {
             None => true,

@@ -153,10 +153,18 @@ impl RuleReport {
 
 /// One rule's outcome for a single issue under `--explain`.
 ///
-/// Records the rule's name, scope, severity, the matched selector (as authored,
-/// rendered for display), whether the rule passed for the issue, and any
+/// Records the rule's name, scope, severity, the authored selector (rendered for
+/// display), whether the rule's selector matched the issue, whether it passed (for
+/// matched rules), the reason it was skipped (for non-matched rules), and any
 /// messages it produced. This is the per-issue debugging view that justifies not
 /// having a separate `jit rule` subcommand (DR §9.1).
+///
+/// Every rule in the ruleset becomes a `RuleOutcome`, not just the ones whose
+/// selector matched: a rule that does not apply is reported with `matched =
+/// false` and a [`RuleOutcome::skip_reason`] naming the selector dimension(s)
+/// that excluded the issue, so `--explain` can show "the state predicate did not
+/// match". For a matched rule, `matched` is `true`, `skip_reason` is `None`, and
+/// `passed`/`messages` carry the PASS/FAIL result as before.
 ///
 /// # Examples
 ///
@@ -168,9 +176,12 @@ impl RuleReport {
 ///     scope: "local".to_string(),
 ///     severity: "error".to_string(),
 ///     selector: "type=epic".to_string(),
+///     matched: true,
+///     skip_reason: None,
 ///     passed: false,
 ///     messages: vec!["missing req:* label".to_string()],
 /// };
+/// assert!(outcome.matched);
 /// assert!(!outcome.passed);
 /// assert_eq!(outcome.messages.len(), 1);
 /// ```
@@ -182,11 +193,21 @@ pub struct RuleOutcome {
     pub scope: String,
     /// Severity token (`off`/`warn`/`error`).
     pub severity: String,
-    /// Human-readable rendering of the selector that matched the issue.
+    /// Human-readable rendering of the rule's authored selector.
     pub selector: String,
-    /// Whether the rule passed for this issue (no findings).
+    /// Whether the rule's selector matched the issue. When `false`, the rule did
+    /// not execute and [`RuleOutcome::skip_reason`] explains why.
+    pub matched: bool,
+    /// Why the rule was skipped, when its selector did not match (`None` for a
+    /// matched rule). Names the excluding dimension(s), e.g. `"state predicate
+    /// did not match: issue is 'in_progress', wants 'done'"`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub skip_reason: Option<String>,
+    /// Whether the rule passed for this issue (no findings). Always `true` for a
+    /// skipped (non-matched) rule, which produces no findings.
     pub passed: bool,
-    /// Messages produced by the rule for this issue (empty when it passed).
+    /// Messages produced by the rule for this issue (empty when it passed or was
+    /// skipped).
     pub messages: Vec<String>,
 }
 
@@ -208,7 +229,8 @@ pub struct RuleOutcome {
 pub struct ExplainReport {
     /// Full id of the explained issue.
     pub issue_id: String,
-    /// One outcome per rule whose selector matched the issue, in rule order.
+    /// One outcome per rule in the ruleset, in rule order. Matched rules carry a
+    /// PASS/FAIL result; non-matched rules carry a skip reason.
     pub outcomes: Vec<RuleOutcome>,
 }
 
@@ -227,6 +249,8 @@ impl ExplainReport {
     ///         scope: "local".to_string(),
     ///         severity: "warn".to_string(),
     ///         selector: "*".to_string(),
+    ///         matched: true,
+    ///         skip_reason: None,
     ///         passed: false,
     ///         messages: vec!["m".to_string()],
     ///     }],

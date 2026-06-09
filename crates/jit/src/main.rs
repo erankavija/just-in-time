@@ -3638,9 +3638,12 @@ fn run() -> Result<()> {
                 } else {
                     println!("Rule explanation for issue {}", report.issue_id);
                     if report.outcomes.is_empty() {
-                        println!("  (no rules match this issue)");
+                        println!("  (no rules defined)");
                     }
-                    for outcome in &report.outcomes {
+                    // Matched rules first, with their PASS/FAIL result.
+                    let mut any_matched = false;
+                    for outcome in report.outcomes.iter().filter(|o| o.matched) {
+                        any_matched = true;
                         let status = if outcome.passed { "PASS" } else { "FAIL" };
                         println!(
                             "  [{}] {} ({}, {}) selector: {}",
@@ -3649,6 +3652,21 @@ fn run() -> Result<()> {
                         for message in &outcome.messages {
                             println!("      - {}", message);
                         }
+                    }
+                    if !any_matched && !report.outcomes.is_empty() {
+                        println!("  (no rules match this issue)");
+                    }
+                    // Non-matching rules after, each with the reason its selector
+                    // did not apply (e.g. the state predicate did not match).
+                    for outcome in report.outcomes.iter().filter(|o| !o.matched) {
+                        let reason = outcome
+                            .skip_reason
+                            .as_deref()
+                            .unwrap_or("selector did not match");
+                        println!(
+                            "  [SKIP] {} ({}, {}) selector: {} — {}",
+                            outcome.rule, outcome.scope, outcome.severity, outcome.selector, reason
+                        );
                     }
                 }
                 if exit_nonzero {

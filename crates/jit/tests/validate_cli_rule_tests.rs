@@ -168,6 +168,90 @@ fn test_validate_explain_json_structure() {
     assert_eq!(outcome["passed"], true);
 }
 
+/// A state-scoped rule used to exercise `--explain`'s skip rendering: it applies
+/// only to `done` issues. Against a non-`done` issue the rule is skipped, and the
+/// success criterion requires `--explain` to show that the state predicate did
+/// not match.
+const DONE_NEEDS_SUMMARY: &str = r#"
+[[rules]]
+name = "done-needs-summary"
+when = { state = "done" }
+severity = "error"
+enforce = false
+assert = { require-section = { heading = "Summary" } }
+"#;
+
+#[test]
+fn test_validate_explain_renders_skipped_rule_with_state_reason() {
+    // The success criterion: `jit validate <id> --explain` shows whether the
+    // state predicate matched. A fresh issue is in `backlog`, so the `done`-scoped
+    // rule is rendered as a [SKIP] line naming the issue state and the wanted
+    // token.
+    let temp = setup_repo_with_rules(DONE_NEEDS_SUMMARY);
+    let id = create_epic(&temp, true);
+
+    bin()
+        .current_dir(temp.path())
+        .args(["validate", &id, "--explain"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("[SKIP] done-needs-summary"))
+        .stdout(predicate::str::contains("state predicate did not match"))
+        .stdout(predicate::str::contains("wants 'done'"));
+}
+
+#[test]
+fn test_validate_explain_json_includes_matched_and_skip_reason() {
+    let temp = setup_repo_with_rules(DONE_NEEDS_SUMMARY);
+    let id = create_epic(&temp, true);
+
+    let assert = bin()
+        .current_dir(temp.path())
+        .args(["validate", &id, "--explain", "--json"])
+        .assert()
+        .success();
+    let out = assert.get_output().stdout.clone();
+    let json: Value = serde_json::from_slice(&out).unwrap();
+    let outcomes = json["outcomes"].as_array().unwrap();
+    let outcome = outcomes
+        .iter()
+        .find(|o| o["rule"] == "done-needs-summary")
+        .expect("done-needs-summary outcome present even though it does not match");
+    assert_eq!(outcome["matched"], false);
+    assert_eq!(outcome["passed"], true);
+    let reason = outcome["skip_reason"].as_str().unwrap();
+    assert!(
+        reason.contains("state predicate did not match") && reason.contains("done"),
+        "skip_reason names the state dimension: {reason}"
+    );
+}
+
+#[test]
+fn test_validate_explain_json_matched_rule_has_no_skip_reason() {
+    // A matched rule keeps `matched = true` and omits `skip_reason` from JSON.
+    let temp = setup_repo_with_rules(EPIC_NEEDS_REQ);
+    let id = create_epic(&temp, true);
+
+    let assert = bin()
+        .current_dir(temp.path())
+        .args(["validate", &id, "--explain", "--json"])
+        .assert()
+        .success();
+    let out = assert.get_output().stdout.clone();
+    let json: Value = serde_json::from_slice(&out).unwrap();
+    let outcome = json["outcomes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|o| o["rule"] == "epic-needs-req")
+        .expect("epic-needs-req outcome present");
+    assert_eq!(outcome["matched"], true);
+    assert!(
+        outcome.get("skip_reason").is_none(),
+        "matched rule omits skip_reason: {outcome:?}"
+    );
+}
+
 #[test]
 fn test_validate_explain_requires_id() {
     let temp = setup_repo_with_rules(EPIC_NEEDS_REQ);

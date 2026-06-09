@@ -98,6 +98,21 @@ evaluated everywhere a rule is selected — on the write path and in
 `jit validate`. `jit validate <id> --explain` shows the matched predicate in the
 rule's selector, rendering a list as `state=ready|in_progress`.
 
+`--explain` lists **every** rule in the ruleset, not just the ones that fired:
+matched rules render as `[PASS]`/`[FAIL]`, and rules whose selector excluded the
+issue render as `[SKIP]` with the reason their selector did not apply. The state
+dimension is called out explicitly, so you can see at a glance whether a
+state-scoped rule applied. For example, asking `--explain` about an
+`in_progress` issue against a rule scoped to `done`:
+
+```text
+[SKIP] done-needs-summary (local, error) selector: state=done — state predicate did not match (issue is 'in_progress', wants 'done')
+```
+
+In `--json`, each outcome carries `matched` (bool) and, when skipped, a
+`skip_reason` string naming the excluding dimension(s); `skip_reason` is omitted
+for matched rules.
+
 ### Assertion kinds
 
 **Shorthand kinds** carry simple scalars in TOML and desugar to JSON Schema:

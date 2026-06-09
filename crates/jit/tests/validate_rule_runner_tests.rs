@@ -184,7 +184,7 @@ fn test_explain_passing_rule_marks_pass() {
 }
 
 #[test]
-fn test_explain_non_matching_issue_has_no_outcomes() {
+fn test_explain_non_matching_rule_is_reported_as_skipped() {
     let storage = store_with_rules(EPIC_NEEDS_REQ);
     // A task does not match the epic selector.
     let mut task = Issue::new("a task".to_string(), String::new());
@@ -195,11 +195,106 @@ fn test_explain_non_matching_issue_has_no_outcomes() {
     let executor = CommandExecutor::new(storage);
     let report = executor.explain_rules(&id).unwrap();
 
-    // The epic-selected USER rule does not match a task. (Default rules with an
-    // empty selector match every issue, so the outcome list is not empty.)
+    // The epic-selected USER rule does not match a task, but is now STILL listed
+    // as a skipped outcome carrying the reason its selector excluded the issue.
+    let outcome = report
+        .outcomes
+        .iter()
+        .find(|o| o.rule == "epic-needs-req")
+        .expect("non-matching epic rule must still appear as an outcome");
+    assert!(!outcome.matched, "task does not match the epic selector");
+    assert!(outcome.passed, "a skipped rule produces no failures");
+    assert!(outcome.messages.is_empty());
+    let reason = outcome
+        .skip_reason
+        .as_deref()
+        .expect("skipped rule carries a reason");
     assert!(
-        !report.outcomes.iter().any(|o| o.rule == "epic-needs-req"),
-        "epic rule must not match a task"
+        reason.contains("type predicate did not match"),
+        "reason names the failing dimension: {reason}"
+    );
+    // A skipped rule never counts as a failure.
+    assert!(!report.has_failures());
+}
+
+#[test]
+fn test_explain_matched_rule_with_state_predicate_shows_state_in_selector() {
+    // A rule scoped to a state the issue IS in: it matches, its selector renders
+    // the state, and it yields a PASS/FAIL outcome (here FAIL: missing section).
+    let rules = r#"
+[[rules]]
+name = "in-progress-needs-plan"
+when = { state = "in_progress" }
+severity = "error"
+assert = { require-section = { heading = "Plan" } }
+"#;
+    let storage = store_with_rules(rules);
+    let mut issue = Issue::new("a task".to_string(), String::new());
+    issue.state = jit::domain::State::InProgress;
+    let id = issue.id.clone();
+    storage.save_issue(issue).unwrap();
+
+    let executor = CommandExecutor::new(storage);
+    let report = executor.explain_rules(&id).unwrap();
+
+    let outcome = report
+        .outcomes
+        .iter()
+        .find(|o| o.rule == "in-progress-needs-plan")
+        .expect("state-scoped rule outcome present");
+    assert!(outcome.matched, "issue is in_progress so the rule matches");
+    assert!(outcome.skip_reason.is_none());
+    assert!(
+        outcome.selector.contains("state=in_progress"),
+        "selector shows the state predicate: {}",
+        outcome.selector
+    );
+    assert!(!outcome.passed, "missing 'Plan' section fails the rule");
+    assert!(!outcome.messages.is_empty());
+}
+
+#[test]
+fn test_explain_state_predicate_mismatch_names_state_and_tokens() {
+    // The success criterion: `--explain` shows whether the state predicate
+    // matched. A rule wanting `done` against an `in_progress` issue is skipped
+    // with a reason naming BOTH the issue state and the predicate token.
+    let rules = r#"
+[[rules]]
+name = "done-needs-summary"
+when = { state = "done" }
+severity = "error"
+assert = { require-section = { heading = "Summary" } }
+"#;
+    let storage = store_with_rules(rules);
+    let mut issue = Issue::new("a task".to_string(), String::new());
+    issue.state = jit::domain::State::InProgress;
+    let id = issue.id.clone();
+    storage.save_issue(issue).unwrap();
+
+    let executor = CommandExecutor::new(storage);
+    let report = executor.explain_rules(&id).unwrap();
+
+    let outcome = report
+        .outcomes
+        .iter()
+        .find(|o| o.rule == "done-needs-summary")
+        .expect("state-mismatched rule still appears as an outcome");
+    assert!(!outcome.matched);
+    let reason = outcome
+        .skip_reason
+        .as_deref()
+        .expect("skipped rule carries a reason");
+    assert!(
+        reason.contains("state predicate did not match"),
+        "reason calls out the state dimension: {reason}"
+    );
+    assert!(
+        reason.contains("in_progress"),
+        "reason names the issue's current state: {reason}"
+    );
+    assert!(
+        reason.contains("done"),
+        "reason names the predicate token: {reason}"
     );
 }
 

@@ -508,18 +508,22 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(RuleReport { findings })
     }
 
-    /// Build the `--explain` report for one issue: every rule whose selector
-    /// matches the issue, paired with whether it passed and its messages.
+    /// Build the `--explain` report for one issue: EVERY rule in the ruleset,
+    /// paired with whether its selector matched the issue and, for matched rules,
+    /// whether they passed and their messages.
     ///
-    /// Local rules are evaluated against the issue; graph rules are evaluated
-    /// across the whole store and a graph rule is considered to apply to this
-    /// issue when its selector matches it. Graph findings are attributed to this
-    /// issue by EXACT structural attribution (each finding carries its issue id),
-    /// and any `config-error` finding for an applicable graph rule is also
-    /// surfaced — so a malformed graph rule is reported as a FAILED outcome,
-    /// never shown as passing. Each
-    /// [`RuleOutcome`](crate::validation::report::RuleOutcome) records the matched
-    /// selector (rendered), scope, severity, pass/fail, and any messages.
+    /// A rule whose selector excludes the issue is reported as skipped: its
+    /// [`RuleOutcome`](crate::validation::report::RuleOutcome) carries `matched =
+    /// false` and a `skip_reason` naming the excluding selector dimension(s) (the
+    /// state dimension is called out explicitly, e.g. "state predicate did not
+    /// match (issue is 'in_progress', wants 'done')"). Local rules that match are
+    /// evaluated against the issue; matching graph rules are evaluated across the
+    /// whole store and attributed to this issue by EXACT structural attribution
+    /// (each finding carries its issue id), and any `config-error` finding for an
+    /// applicable graph rule is also surfaced — so a malformed graph rule is
+    /// reported as a FAILED outcome, never shown as passing. Widening the report
+    /// to include non-matching rules does not change which rules EXECUTE: only
+    /// matched rules are evaluated.
     ///
     /// # Errors
     ///
@@ -534,7 +538,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
     /// let report = executor.explain_rules("abc12345").unwrap();
-    /// println!("{} matching rule(s)", report.outcomes.len());
+    /// let matched = report.outcomes.iter().filter(|o| o.matched).count();
+    /// println!("{matched} matching rule(s) of {}", report.outcomes.len());
     /// ```
     pub fn explain_rules(&self, id: &str) -> Result<crate::validation::report::ExplainReport> {
         use crate::validation::report::{ExplainReport, RuleOutcome};
@@ -560,8 +565,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         // config-error (which carries no issue id but must be surfaced so a
         // malformed graph rule fails rather than silently passes). The
         // selector-based "applies to this issue" decision is made per-rule below;
-        // including all config-errors here is safe because the outcome list is
-        // built only from rules whose selector matches the issue.
+        // including all config-errors here is safe because these messages are
+        // consumed only by the matched arm (non-matching rules are reported as
+        // skipped with no messages).
         let graph_findings = self.evaluate_graph_rules(&issues)?;
         let graph_messages = group_messages(graph_findings.iter().filter_map(|gf| {
             let pertains =
@@ -569,26 +575,54 @@ impl<S: IssueStore> CommandExecutor<S> {
             pertains.then(|| (gf.finding.rule.clone(), gf.finding.message.clone()))
         }));
 
-        // Every rule whose selector matches the issue becomes one outcome.
+        // EVERY rule in the ruleset becomes one outcome, not just the matching
+        // ones: a rule excluded by its selector is reported with `matched =
+        // false` and a `skip_reason` naming the dimension(s) that excluded the
+        // issue, so `--explain` can show "the state predicate did not match".
+        // Matching rules keep their PASS/FAIL semantics. This widens only the
+        // REPORT; which rules EXECUTE is still decided by `matching_rules`
+        // (here, the per-rule `when.matches` check selecting the matched arm).
         let outcomes: Vec<RuleOutcome> = ruleset
-            .matching_rules(&issue)
-            .into_iter()
+            .rules
+            .iter()
             .map(|rule| {
                 let scope = match rule.scope {
                     Scope::Local => "local",
                     Scope::Graph => "graph",
                 };
-                let messages = match rule.scope {
-                    Scope::Local => local_messages.get(&rule.name).cloned().unwrap_or_default(),
-                    Scope::Graph => graph_messages.get(&rule.name).cloned().unwrap_or_default(),
-                };
-                RuleOutcome {
-                    rule: rule.name.clone(),
-                    scope: scope.to_string(),
-                    severity: rule.severity.token().to_string(),
-                    selector: render_selector(&rule.when),
-                    passed: messages.is_empty(),
-                    messages,
+                match rule.when.match_failure(&issue) {
+                    // Selector excluded the issue: report it as skipped.
+                    Some(skip_reason) => RuleOutcome {
+                        rule: rule.name.clone(),
+                        scope: scope.to_string(),
+                        severity: rule.severity.token().to_string(),
+                        selector: render_selector(&rule.when),
+                        matched: false,
+                        skip_reason: Some(skip_reason),
+                        passed: true,
+                        messages: Vec::new(),
+                    },
+                    // Selector matched: PASS/FAIL from the evaluated findings.
+                    None => {
+                        let messages = match rule.scope {
+                            Scope::Local => {
+                                local_messages.get(&rule.name).cloned().unwrap_or_default()
+                            }
+                            Scope::Graph => {
+                                graph_messages.get(&rule.name).cloned().unwrap_or_default()
+                            }
+                        };
+                        RuleOutcome {
+                            rule: rule.name.clone(),
+                            scope: scope.to_string(),
+                            severity: rule.severity.token().to_string(),
+                            selector: render_selector(&rule.when),
+                            matched: true,
+                            skip_reason: None,
+                            passed: messages.is_empty(),
+                            messages,
+                        }
+                    }
                 }
             })
             .collect();
