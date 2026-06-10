@@ -39,4 +39,4 @@ capture = "none"
 [[steps]]
 argv = ["validate"]
 capture = "none"
-expect = { exit = 0, contains = ["validation passed"], enforcement_point = "validate" }
+expect = { exit = 0, contains = ["validation passed"], not_contains = ["error", "Error"], enforcement_point = "validate" }

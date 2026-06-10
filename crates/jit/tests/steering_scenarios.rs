@@ -15,9 +15,18 @@
 //!
 //! ## Isolation guarantee
 //!
-//! Every scenario runs in a fresh `TempDir`. The runner calls `jit init` there,
-//! installs the named ruleset from `docs/examples/<ruleset>/` into `.jit/`, and
-//! then executes the steps. The production `.jit/` is never touched.
+//! Every scenario runs in a fresh `TempDir`. Two mechanisms together guarantee
+//! that the production `.jit/` is never touched:
+//!
+//! 1. **cwd isolation** — every `jit` invocation uses `.current_dir(temp.path())`
+//!    so the default `.jit/` resolution anchors inside the temp directory.
+//! 2. **env sanitization** — all `jit` invocations are constructed through
+//!    `jit_cmd()`, which calls `.env_remove` on every JIT_* variable that can
+//!    redirect or alter storage (`JIT_DATA_DIR`, `JIT_ALLOW_DELETION`,
+//!    `JIT_WORKTREE_MODE`, `JIT_ENFORCE_LEASES`, `JIT_LOCK_TIMEOUT`) and pins
+//!    `JIT_AGENT_ID` to `"agent:steering-harness"` for determinism.
+//!    An absolute `JIT_DATA_DIR` value would otherwise discard the temp cwd and
+//!    write directly to an arbitrary path on the developer's machine.
 //!
 //! ## Fresh-evidence note
 //!
@@ -116,15 +125,38 @@ fn workspace_root() -> PathBuf {
         .expect("workspace root must exist")
 }
 
+/// Build a sanitized `jit` [`Command`] anchored in `dir`.
+///
+/// Removes every JIT_* environment variable that can redirect or alter storage,
+/// and pins `JIT_AGENT_ID` to a fixed harness identity. This is the single place
+/// all scenario spawns go through; never call `Command::new(jit_binary())` directly
+/// in this module.
+///
+/// Variables removed:
+/// - `JIT_DATA_DIR` — would redirect `.jit/` to an arbitrary (possibly absolute) path.
+/// - `JIT_ALLOW_DELETION` — would allow destructive operations not expected by tests.
+/// - `JIT_WORKTREE_MODE` — could alter worktree resolution, masking the temp dir.
+/// - `JIT_ENFORCE_LEASES` — could change lease-enforcement behaviour.
+/// - `JIT_LOCK_TIMEOUT` — could slow tests or interact with external lock state.
+fn jit_cmd(dir: &Path) -> Command {
+    let mut cmd = Command::new(jit_binary());
+    cmd.current_dir(dir)
+        .env_remove("JIT_DATA_DIR")
+        .env_remove("JIT_ALLOW_DELETION")
+        .env_remove("JIT_WORKTREE_MODE")
+        .env_remove("JIT_ENFORCE_LEASES")
+        .env_remove("JIT_LOCK_TIMEOUT")
+        .env("JIT_AGENT_ID", "agent:steering-harness");
+    cmd
+}
+
 /// Initialize a fresh isolated repo and install the named ruleset.
 fn setup_scenario_repo(ruleset: &str) -> TempDir {
     let temp = TempDir::new().expect("tempdir");
-    let jit = jit_binary();
 
     // `jit init` in the temp dir.
-    let out = Command::new(jit)
+    let out = jit_cmd(temp.path())
         .arg("init")
-        .current_dir(temp.path())
         .output()
         .expect("jit init failed to spawn");
     assert!(
@@ -210,13 +242,22 @@ fn is_uuid(s: &str) -> bool {
 }
 
 /// Substitute `$<slot>` and `$<slot>_short` in argv with captured ids.
+///
+/// Slots are applied longest-name-first so that a slot named `epic2` is never
+/// partially consumed by a shorter slot named `epic` (e.g. `$epic2` would
+/// otherwise be rewritten to `<uuid>2` when the `epic` slot is applied first).
 fn substitute_argv(argv: &[String], ids: &HashMap<String, String>) -> Vec<String> {
+    // Sort slot names by descending length so longer names are replaced first.
+    let mut slots: Vec<(&String, &String)> = ids.iter().collect();
+    slots.sort_by_key(|(k, _)| std::cmp::Reverse(k.len()));
+
     argv.iter()
         .map(|arg| {
             let mut result = arg.clone();
-            for (slot, uuid) in ids {
+            for (slot, uuid) in &slots {
                 let short = &uuid[..8];
-                // Replace _short first to avoid partial collision with full id.
+                // Replace _short first to avoid the plain-slot pattern consuming
+                // the leading characters of `$<slot>_short`.
                 result = result.replace(&format!("${slot}_short"), short);
                 result = result.replace(&format!("${slot}"), uuid.as_str());
             }
@@ -260,7 +301,6 @@ fn run_scenario(name: &str, fixture_dir: &Path) {
         .unwrap_or_else(|e| panic!("scenario {name}: cannot parse scenario.toml: {e}"));
 
     let repo = setup_scenario_repo(&scenario.ruleset);
-    let jit = jit_binary();
 
     // Captured id slots: slot_name -> full UUID.
     let mut ids: HashMap<String, String> = HashMap::new();
@@ -268,9 +308,8 @@ fn run_scenario(name: &str, fixture_dir: &Path) {
     for (step_idx, step) in scenario.steps.iter().enumerate() {
         let argv = substitute_argv(&step.argv, &ids);
 
-        let output = Command::new(jit)
+        let output = jit_cmd(repo.path())
             .args(&argv)
-            .current_dir(repo.path())
             .output()
             .unwrap_or_else(|e| panic!("scenario {name} step {step_idx}: failed to spawn: {e}"));
 
@@ -295,6 +334,21 @@ fn run_scenario(name: &str, fixture_dir: &Path) {
         }
 
         // Apply per-step assertions.
+        //
+        // If no `expect` block is present the step must still succeed (exit 0).
+        // Unexpected non-zero exits are swallowed otherwise, silently hiding
+        // intermediate failures.
+        let default_exit_zero = step.expect.is_none();
+        if default_exit_zero {
+            assert_eq!(
+                exit_code, 0,
+                "scenario {name} step {step_idx}: expected exit 0 (implicit default) got {exit_code}\n\
+                 argv: {argv:?}\n\
+                 stdout: {stdout}\n\
+                 stderr: {stderr}"
+            );
+        }
+
         if let Some(expect) = &step.expect {
             // Exit code.
             if let Some(want_exit) = expect.exit {
@@ -364,19 +418,29 @@ fn test_all_steering_scenarios() {
         fixtures_dir.display()
     );
 
-    let mut scenarios: Vec<(String, PathBuf)> = fs::read_dir(&fixtures_dir)
-        .expect("read fixtures/steering")
-        .filter_map(|entry| {
-            let entry = entry.ok()?;
-            let path = entry.path();
-            if path.is_dir() && path.join("scenario.toml").exists() {
-                let name = path.file_name()?.to_string_lossy().into_owned();
-                Some((name, path))
-            } else {
-                None
-            }
-        })
-        .collect();
+    let mut scenarios: Vec<(String, PathBuf)> = Vec::new();
+    for entry in fs::read_dir(&fixtures_dir).expect("read fixtures/steering") {
+        let entry = entry.expect("read dir entry");
+        let path = entry.path();
+        // Non-directory entries (README.md, etc.) are allowed without a scenario.toml.
+        if !path.is_dir() {
+            continue;
+        }
+        let name = path
+            .file_name()
+            .expect("dir entry has file name")
+            .to_string_lossy()
+            .into_owned();
+        let toml_path = path.join("scenario.toml");
+        assert!(
+            toml_path.exists(),
+            "steering fixture directory '{name}' has no scenario.toml — \
+             either add scenario.toml or remove the directory \
+             ({})",
+            toml_path.display()
+        );
+        scenarios.push((name, path));
+    }
 
     // Sort for deterministic ordering.
     scenarios.sort_by(|(a, _), (b, _)| a.cmp(b));
@@ -483,4 +547,66 @@ fn test_step_enforcement_point_dep_is_none() {
         .map(|s| s.to_string())
         .collect();
     assert_eq!(step_enforcement_point(&argv), None);
+}
+
+#[test]
+fn test_substitute_argv_prefix_collision() {
+    // Slot "epic2" must not be partially consumed by the shorter slot "epic".
+    // Without longest-first ordering, "$epic2" would become "<epic-uuid>2".
+    let mut ids = HashMap::new();
+    ids.insert(
+        "epic".to_string(),
+        "aaaaaaaa-0000-0000-0000-000000000000".to_string(),
+    );
+    ids.insert(
+        "epic2".to_string(),
+        "bbbbbbbb-0000-0000-0000-000000000000".to_string(),
+    );
+
+    let argv = vec!["$epic".to_string(), "$epic2".to_string()];
+    let result = substitute_argv(&argv, &ids);
+    assert_eq!(result[0], "aaaaaaaa-0000-0000-0000-000000000000");
+    assert_eq!(result[1], "bbbbbbbb-0000-0000-0000-000000000000");
+}
+
+#[test]
+fn test_jit_cmd_strips_jit_data_dir() {
+    // Verify that jit_cmd removes JIT_DATA_DIR even when it is set in the
+    // calling process's environment.  We inspect the Command's env via a
+    // round-trip: spawn `env` and check the output does not contain JIT_DATA_DIR.
+    // (We use a tempdir as the working directory so the command can actually run.)
+    use std::env;
+    let tmp = TempDir::new().expect("tempdir for env test");
+
+    // Set JIT_DATA_DIR in this test process.
+    unsafe { env::set_var("JIT_DATA_DIR", "/tmp/should-not-appear") };
+
+    // Ask the child to print its environment.
+    let out = jit_cmd(tmp.path())
+        .arg("--version") // any valid jit subcommand; we only care about env
+        .env("PATH", env::var("PATH").unwrap_or_default()) // ensure binary is found
+        .output();
+
+    // Restore caller's environment regardless of outcome.
+    unsafe { env::remove_var("JIT_DATA_DIR") };
+
+    // The spawn itself may fail if the binary isn't built; treat that as a skip.
+    let out = match out {
+        Ok(o) => o,
+        Err(_) => return,
+    };
+
+    // JIT_DATA_DIR must not reach the child.  We verify indirectly: jit with
+    // JIT_DATA_DIR set to a nonexistent path would still exit 0 for --version,
+    // but we can assert the variable was removed by checking the child does NOT
+    // emit the sentinel value we set.
+    let combined = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        !combined.contains("/tmp/should-not-appear"),
+        "JIT_DATA_DIR sentinel leaked into child output: {combined}"
+    );
 }

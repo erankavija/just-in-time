@@ -25,13 +25,13 @@ ruleset = "sdd"
 #              The short-id prefix (first 8 hex chars) is also substituted for
 #              "$<slot>_short".
 #   expect   — per-step assertion (optional, see below).
-#              When omitted no assertion is made beyond the step completing.
+#              When omitted the step is still asserted to exit 0.
 #
 [[steps]]
 argv = ["issue", "create", "--title", "My Epic", "--label", "type:epic"]
 capture = "id"          # extract UUID from output
 id_slot = "epic"        # store as "$epic"
-# expect omitted -> only run the step
+# expect omitted -> exit 0 is asserted implicitly
 
 [[steps]]
 argv = ["issue", "update", "$epic", "--state", "done"]
@@ -39,16 +39,21 @@ capture = "none"
 expect = { exit = 4, contains = ["sdd-hard-criteria-covered"], enforcement_point = "transition" }
 
 # Per-step `expect` table:
-#   exit              — expected process exit code (integer, required when present)
+#   exit              — expected process exit code (integer, required when present).
+#                       When the whole `expect` block is omitted, exit 0 is asserted.
 #   contains          — list of substrings that must appear in stderr+stdout combined
 #   not_contains      — list of substrings that must NOT appear
-#   enforcement_point — "write" | "validate" | "transition" (informational label
-#                       asserted by which step carries the expect: a create/update
-#                       write step -> "write"; a `jit validate` step -> "validate";
-#                       a `--state` transition step -> "transition").
-#                       The runner checks this equals the step_type of the step
-#                       carrying the expect (not a separate mechanism; the runner
-#                       derives step_type from the argv).
+#   enforcement_point — "write" | "validate" | "transition".
+#                       Identifies the COMMAND CLASS of the step that carries this
+#                       expect block:
+#                         "write"      -> the step argv starts with "issue create"
+#                                         or "issue update" (without --state)
+#                         "validate"   -> the step argv starts with "validate"
+#                         "transition" -> the step argv includes "issue update --state"
+#                       The runner derives the command class from argv and asserts
+#                       it matches this field.  It is NOT a separate failure-location
+#                       oracle; it acts as documentation pinned by the exit/contains
+#                       assertions on the same step.
 ```
 
 ## Step variable substitution
@@ -62,11 +67,16 @@ Substitution is literal string replacement; no shell quoting is applied.
 
 ## Enforcement points
 
-| `enforcement_point` | Meaning |
+`enforcement_point` is an annotation on the step whose exit code and/or output
+substrings are asserted.  It declares the command class of that specific step and
+is verified by the runner against the step's argv — it is not a separate internal
+failure-location oracle.
+
+| `enforcement_point` | Command class of the step carrying the `expect` |
 |---|---|
-| `write` | The failure is on a `jit issue create` or `jit issue update` step (write-path local rules) |
-| `validate` | The failure is on a `jit validate` step (graph rules in validate mode) |
-| `transition` | The failure is on a `jit issue update --state <target>` step (transition-time graph rules) |
+| `write` | `jit issue create` or `jit issue update` (no `--state`) — write-path local rules |
+| `validate` | `jit validate` — graph rules checked at validate time |
+| `transition` | `jit issue update --state <target>` — transition-time graph rules |
 
 ## Existing scenarios
 
