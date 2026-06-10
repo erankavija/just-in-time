@@ -184,8 +184,9 @@ impl Severity {
 /// Evaluation scope of a rule, derived from its assertion kind.
 ///
 /// `Local` rules are pure predicates over a single projected issue and run on
-/// write. `Graph` rules need the whole store and run only in `jit validate` and
-/// gate checkers, never on write.
+/// write. `Graph` rules need cross-issue context and run in `jit validate`,
+/// gate checkers, and at state transitions (where an enforcing failure blocks
+/// the transition); they never run on plain field writes.
 ///
 /// # Examples
 ///

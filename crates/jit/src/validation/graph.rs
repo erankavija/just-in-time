@@ -1,7 +1,9 @@
 //! Graph / aggregate rule evaluation (DR §4.2).
 //!
-//! Three rule kinds need cross-issue context and therefore run ONLY in
-//! `jit validate` and gate checkers, NEVER on the write path:
+//! These rule kinds need cross-issue context and therefore run in
+//! `jit validate`, gate checkers, and at state transitions (where enforcing
+//! failures block the transition; see `enforce_transition_graph_rules` in
+//! `commands`). They never run on plain field writes:
 //!
 //! - **`label-coverage`** — every canonical criterion id declared in a source
 //!   issue's `## Success Criteria` section is satisfied by at least one related
