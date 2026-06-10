@@ -35,9 +35,13 @@ When you create or update an issue, the engine:
 4. **Blocks** the write if any matching rule has `severity = "error"` AND
    `enforce = true` — unless you pass `--force` (which logs a bypass event).
 
-Some rules are *graph* rules: they need the whole repository (e.g. "is every
-requirement covered by a child issue?"). Graph rules NEVER run on the write path;
-they run only when you invoke `jit validate` or a gate checker.
+Some rules are *graph* rules: they need cross-issue context (e.g. "is every
+requirement covered by a child issue?"). Graph rules never run on plain field
+writes; they run when you invoke `jit validate` or a gate checker, and at
+**state transitions**, where a matching rule with `severity = "error"` and
+`enforce = true` blocks the transition (exit 4) unless you pass `--force`
+(which logs a bypass event). Scope a rule to a transition with a state
+predicate, e.g. `when = { state = "done" }`.
 
 ```bash
 jit validate            # run all rules (local + graph) over the whole repo
@@ -135,7 +139,8 @@ Raw schemas live in files only (TOML cannot faithfully express constructs like
 `contains`/`pattern`). The reference must be a relative path under `schemas/`
 ending in `.json`.
 
-**Graph kinds** need the whole repository and run only in `jit validate`:
+**Graph kinds** need cross-issue context and run in `jit validate`, gate
+checkers, and at state transitions (where enforcing failures block):
 
 | Kind               | Asserts…                                                       |
 |--------------------|----------------------------------------------------------------|
