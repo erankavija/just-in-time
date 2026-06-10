@@ -2,7 +2,7 @@
   "id": "872cdccd-a25d-4f61-8495-e7310358ddc4",
   "title": "Non-software example ruleset",
   "description": "Ship an example ruleset for a non-software hierarchy to demonstrate that the engine and its new lifecycle features carry no software assumptions.\n\n## Background\n\njit is generic: projects may configure hierarchies without epics or milestones (research programs, knowledge work). All current examples assume a software epic/task shape.\n\n## Success Criteria\n\n- [ ] An example ruleset under docs/examples/ models a non-software methodology (e.g. research goals with experiments and evidence sections) using its own configured types, sections, and label namespaces\n- [ ] The example uses state predicates and transition enforcement where appropriate\n- [ ] No rule in the example references epic or milestone types\n- [ ] The examples index and validation-engine concepts doc present it alongside the existing examples",
-  "state": "in_progress",
+  "state": "done",
   "priority": "high",
   "assignee": "agent:claude",
   "dependencies": [],
@@ -10,7 +10,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-10T18:47:59.468378269Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-10T18:50:58.409319825Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -18,5 +29,5 @@
     "epic:validation-lifecycle"
   ],
   "created_at": "2026-06-09T21:52:58.560151723+00:00",
-  "updated_at": "2026-06-10T15:57:45.255012730+00:00"
+  "updated_at": "2026-06-10T18:53:21.997790206+00:00"
 }

@@ -2,7 +2,7 @@
   "id": "490f1f99-1ec2-4984-b3fa-16d2ea49249e",
   "title": "Lifecycle-aware SDD example ruleset",
   "description": "Rework the SDD example ruleset so coverage and derivation rules are lifecycle-aware: silent or advisory while work is in flight, blocking at completion.\n\n## Success Criteria\n\n- [ ] Coverage and req-satisfaction rules in the SDD example use state predicates so an in-flight epic with incomplete children yields no error-severity findings\n- [ ] An epic with an uncovered `[hard]` criterion cannot transition to `done` (blocked via transition enforcement)\n- [ ] The stray-req check from the disambiguation work is wired into the example\n- [ ] Example comments and the validation-engine concepts doc describe the new lifecycle behavior accurately\n- [ ] The June 2026 evaluation scenarios (in-flight epic, premature done, stray req) all behave correctly against the reworked example",
-  "state": "in_progress",
+  "state": "done",
   "priority": "high",
   "assignee": "agent:claude",
   "dependencies": [
@@ -14,7 +14,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-10T18:49:41.772102679Z"
+    },
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-10T18:45:49.812477075Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -22,5 +33,5 @@
     "epic:validation-lifecycle"
   ],
   "created_at": "2026-06-09T21:52:58.470095007+00:00",
-  "updated_at": "2026-06-10T15:57:45.240305176+00:00"
+  "updated_at": "2026-06-10T18:53:21.929939586+00:00"
 }

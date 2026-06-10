@@ -2,7 +2,7 @@
   "epic_id": "94d26c42-3f4f-4a5e-99cc-0e82475a7635",
   "epic_short_id": "94d26c42",
   "design_doc": "dev/active/94d26c42-validation-lifecycle-design.md",
-  "current_wave": 4,
+  "current_wave": 5,
   "waves": [
     {
       "wave_number": 1,
@@ -88,7 +88,7 @@
           "title": "Lifecycle-aware SDD example ruleset",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "872cdccd-a25d-4f61-8495-e7310358ddc4",
@@ -96,7 +96,7 @@
           "title": "Non-software example ruleset",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -140,7 +140,9 @@
     "bc86f54c": 3,
     "59782dde": 0,
     "690f618a": 0,
-    "3a86f34e": 1
+    "3a86f34e": 1,
+    "490f1f99": 1,
+    "872cdccd": 1
   },
   "started_at": "2026-06-10T00:00:00Z",
   "traps": [
@@ -149,6 +151,7 @@
     "version_cli_tests flake under full parallel cargo test (binary-build contention + aws-lc-sys in no-network sandbox); pass serially - do not chase as regressions.",
     "All issue state changes MUST route through CommandExecutor::apply_state_transition (commands/mod.rs). Direct issue.state writes in command code are the recurring review-blocker class; the only sanctioned exceptions are documented inline (create initial state, dependency.rs ready->backlog demotion, validation projections).",
     "The code-review gate keeps finding the next unguarded transition path; before re-running it after transition-semantics changes, grep commands/ for '.state = ' and check each site routes through the chokepoint.",
-    "Parallel workers appending to the same enum/match/test files produce conflicts that split FUNCTIONS across hunks - naive keep-both interleaves code. Resolution that works: take main's file whole, extract the second branch's additions from its original commit (git show <sha>:file), splice programmatically, then fmt+test. Also: doc tables triple-merge; collapse to one table and re-read the rendered region."
+    "Parallel workers appending to the same enum/match/test files produce conflicts that split FUNCTIONS across hunks - naive keep-both interleaves code. Resolution that works: take main's file whole, extract the second branch's additions from its original commit (git show <sha>:file), splice programmatically, then fmt+test. Also: doc tables triple-merge; collapse to one table and re-read the rendered region.",
+    "Coverage examples must use child-link='dependencies' (epic depends on children, jit dep add <epic> <child>). child-link='dependents' is self-defeating with jit's dependency guard: a child depending on the epic can never reach done first. Verified E2E 2026-06-10; June happy-path now passes via CLI."
   ]
 }

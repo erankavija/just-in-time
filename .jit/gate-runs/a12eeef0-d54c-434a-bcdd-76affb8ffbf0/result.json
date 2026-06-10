@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "a12eeef0-d54c-434a-bcdd-76affb8ffbf0",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "872cdccd-a25d-4f61-8495-e7310358ddc4",
+  "commit": "ac9c6751daa19f876cb1c4a3ba8bbd1f4f073527",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-06-10T18:50:58.409319825Z",
+  "completed_at": "2026-06-10T18:53:09.335766423Z",
+  "duration_ms": 130926,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\n- Example ruleset exists at `docs/examples/research/rules.toml:1` and models a research workflow with `type:goal`, `type:experiment`, `hyp:`, `tests:`, and research-specific sections at `docs/examples/research/rules.toml:12`.\n- State predicate and transition enforcement are present: `when = { type = \"goal\", state = \"done\" }` with `enforce = true` at `docs/examples/research/rules.toml:180`.\n- No `epic` or `milestone` appears in the research ruleset; this is also covered by `test_research_no_rule_references_epic_or_milestone` at `crates/jit/tests/example_rulesets_tests.rs:1375`.\n- The example is listed in the examples guide at `docs/how-to/validation-rules.md:24` and in the validation-engine concepts table at `docs/concepts/validation-engine.md:74`.\n\n**Architecture And Separation Of Concerns**\n\nNo production architecture boundary changes. The change is limited to documentation examples and tests. Tests use `CommandExecutor` and `InMemoryStorage` appropriately for transition-enforcement coverage at `crates/jit/tests/example_rulesets_tests.rs:1570`.\n\n**Functional Paradigm**\n\nNo new production Rust logic. Test additions are conventional and scoped to example verification.\n\n**Correctness And Invariants**\n\nThe research example exercises lifecycle-scoped graph enforcement through `label-coverage` at `docs/examples/research/rules.toml:184`. Transition blocking is verified at `crates/jit/tests/example_rulesets_tests.rs:1607`, including persistence staying `InProgress` after a blocked transition at `crates/jit/tests/example_rulesets_tests.rs:1649`.\n\n**Safety**\n\nNo unsafe code added. No production Rust implementation changes in this issue.\n\n**Testing**\n\nEvidence:\n- Provided gate evidence: `cargo-ci` passed for issue `872cdccd`.\n- Ran `cargo test -p jit --test example_rulesets_tests research --quiet`: 16 passed.\n- Ran `cargo test -p jit --test example_rulesets_tests --quiet`: 60 passed.\n- Ran `./scripts/jit-validate.sh`: passed with label warnings only, which are allowed by the review rubric.\n\n**Error Handling**\n\nNo new production fallible operations or error paths. Test panics are confined to tests.\n\n**CLI Contract**\n\nNo CLI commands changed. No `--json` contract impact.\n\n**Documentation**\n\nThe new research example is documented in `docs/how-to/validation-rules.md:354` and `docs/concepts/validation-engine.md:74`. No public API additions requiring doc comments.\n\n**Prior Review Feedback**\n\n`run_history` is empty, so there is no prior feedback to verify.\n\n**Jit Issue Management**\n\nIssue `872cdccd` has no dependencies. Required `cargo-ci` gate is passed. Repository validation passes.\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
