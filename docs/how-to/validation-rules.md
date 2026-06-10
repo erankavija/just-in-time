@@ -151,25 +151,13 @@ checkers, and at state transitions (where enforcing failures block):
 | `dependency-shape`      | issues matching a selector depend on issues matching a target               |
 | `gate-recency`          | recorded gate results are no older than a configured age                    |
 | `criteria-label-match`  | a namespace label's value names a real criterion id (stray-req detection)   |
-| Kind                  | Asserts…                                                          |
-|-----------------------|-------------------------------------------------------------------|
-| `label-coverage`      | every source criterion is satisfied by at least one child         |
-| `label-reference`     | a `from:`-namespace label resolves to a declared `to:` source     |
-| `dependency-shape`    | issues matching a selector depend on issues matching a target     |
-| `gate-recency`        | recorded gate results are no older than a configured age          |
-| `criteria-to-check`   | every criterion in a section maps to a verifiable check (a required gate or a label) |
-| Kind                | Asserts…                                                            |
-|---------------------|---------------------------------------------------------------------|
-| `label-coverage`    | every source criterion is satisfied by at least one child           |
-| `label-reference`   | a `from:`-namespace label resolves to a declared `to:` source       |
-| `dependency-shape`  | issues matching a selector depend on issues matching a target       |
-| `gate-recency`      | recorded gate results are no older than a configured age            |
-| `label-uniqueness`  | each value in a namespace is declared by at most one matching issue |
+| `criteria-to-check`     | every criterion in a section maps to a verifiable check (a required gate or a label) |
+| `label-uniqueness`      | each value in a namespace is declared by at most one matching issue         |
 
 `label-uniqueness` is repo-wide (`scope = "all"` is required and is the only
 valid value). It runs ONLY in `jit validate` — not at transition time — because
 repo-wide uniqueness cannot be determined from a single issue's dependency
-neighborhood. See the [scope semantics reference](../reference/configuration.md#graph-rule-scope-semantics-jit-rulestoml-scope)
+neighborhood. See the [scope semantics reference](../reference/configuration.md#graph-rule-scope-semantics-jitrulestoml-scope)
 and the [`docs/examples/cross-epic/`](../examples/cross-epic/rules.toml) example.
 
 **Escape hatch:** `checker-command` runs an external command. It is applied by

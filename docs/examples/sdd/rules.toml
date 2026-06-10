@@ -41,7 +41,8 @@
 # a `req:REQ-77` that exists in no criterion is a STRAY and reported immediately,
 # without needing a child to (fail to) satisfy it. The two findings are textually
 # distinct: a stray says "names no criterion in section '...' (stray or invented)";
-# an unsatisfied one says "is not satisfied by any ... child".
+# an unsatisfied one says "references 'req:...' but no 'satisfies:...' source is
+# declared in linked scope".
 #
 # AUTHORING WORKFLOW (the derivation discipline the methodology asks for): write
 # the criteria first; for each `REQ-N:` you keep, add the matching `req:REQ-N`

@@ -1217,7 +1217,11 @@ fn evaluate_criteria_label_match(
 
     // The section heading displayed in the finding is the human-readable form of
     // the slug: convert underscores back to spaces and title-case each word so
-    // `success_criteria` renders as `Success Criteria` in the message.
+    // `success_criteria` renders as `Success Criteria` in the message. This is
+    // an APPROXIMATION (a custom-cased heading like `QA Sign-Off` renders as
+    // `Qa Sign Off`): unlike the schema engine, graph rules have no
+    // x-jit-section-heading annotation to consult, and the text is cosmetic —
+    // the slug uniquely identifies the section either way.
     let section_heading = slug_to_heading(criteria_section);
 
     issues
