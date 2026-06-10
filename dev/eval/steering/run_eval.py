@@ -74,10 +74,23 @@ UUID_RE = re.compile(
 
 DEFAULT_CAP = 5
 DEFAULT_RUNS = 3
+DEFAULT_AGENT_TIMEOUT = 120  # seconds
+JIT_TIMEOUT = 600  # seconds; generous to cover slow CI but not an infinite hang
+
+# Known top-level, step-level, and expect-level keys in scenario.toml.
+# Fail fast if the schema drifts — see NOTE in Scenario.load().
+_KNOWN_TOP_KEYS = {"ruleset", "steps"}
+_KNOWN_STEP_KEYS = {"argv", "capture", "id_slot", "expect"}
+_KNOWN_EXPECT_KEYS = {"exit", "contains", "not_contains", "enforcement_point"}
 
 
 # ---------------------------------------------------------------------------
 # Scenario schema (subset of fixtures/steering/README.md, the parts we drive)
+#
+# NOTE: This parser is a deliberate duplicate subset of the schema parsed by
+# steering_scenarios.rs. Any schema evolution in the TOML fixtures MUST be
+# mirrored here. To surface schema drift early, the parser fails fast on
+# unknown top-level, step, and expect keys (see _KNOWN_* sets above).
 # ---------------------------------------------------------------------------
 
 
@@ -91,6 +104,9 @@ class Expect:
     def from_toml(raw: Optional[dict[str, Any]]) -> Optional["Expect"]:
         if raw is None:
             return None
+        unknown = set(raw) - _KNOWN_EXPECT_KEYS
+        if unknown:
+            raise ValueError(f"unknown expect key(s) in scenario.toml: {sorted(unknown)}")
         return Expect(
             exit=raw.get("exit"),
             contains=list(raw.get("contains", [])),
@@ -107,6 +123,9 @@ class Step:
 
     @staticmethod
     def from_toml(raw: dict[str, Any]) -> "Step":
+        unknown = set(raw) - _KNOWN_STEP_KEYS
+        if unknown:
+            raise ValueError(f"unknown step key(s) in scenario.toml: {sorted(unknown)}")
         return Step(
             argv=list(raw["argv"]),
             capture=raw.get("capture", "id"),
@@ -125,6 +144,12 @@ class Scenario:
     def load(name: str, fixture_dir: Path) -> "Scenario":
         with (fixture_dir / "scenario.toml").open("rb") as fh:
             raw = tomllib.load(fh)
+        unknown = set(raw) - _KNOWN_TOP_KEYS
+        if unknown:
+            raise ValueError(
+                f"unknown top-level key(s) in {fixture_dir / 'scenario.toml'}: "
+                f"{sorted(unknown)}"
+            )
         return Scenario(
             name=name,
             ruleset=raw["ruleset"],
@@ -197,13 +222,19 @@ class CmdResult:
 
 
 def run_jit(argv: list[str], cwd: Path) -> CmdResult:
-    """Run `jit <argv>` in an isolated repo and capture its output."""
+    """Run `jit <argv>` in an isolated repo and capture its output.
+
+    A generous fixed timeout (JIT_TIMEOUT seconds) prevents a hung jit process
+    from stalling the eval indefinitely. TimeoutExpired propagates to the caller
+    which counts it as a failed attempt.
+    """
     proc = subprocess.run(  # noqa: S603 - argv is constructed, not shell.
         [str(JIT_BIN), *argv],
         cwd=str(cwd),
         env=child_env(),
         capture_output=True,
         text=True,
+        timeout=JIT_TIMEOUT,
     )
     return CmdResult(argv, proc.returncode, proc.stdout, proc.stderr)
 
@@ -396,14 +427,22 @@ def oracle_action(task: dict[str, Any], ids: dict[str, str]) -> AgentAction:
     )
 
 
-def run_external_agent(agent_cmd: list[str], task: dict[str, Any]) -> AgentAction:
-    """Run an external agent command, piping the JSON task to stdin."""
+def run_external_agent(
+    agent_cmd: list[str], task: dict[str, Any], agent_timeout: int
+) -> AgentAction:
+    """Run an external agent command, piping the JSON task to stdin.
+
+    ``agent_timeout`` caps how long the agent process may run. On
+    TimeoutExpired the exception propagates to the caller which counts the
+    iteration as a failed attempt.
+    """
     proc = subprocess.run(  # noqa: S603
         agent_cmd,
         input=json.dumps(task),
         capture_output=True,
         text=True,
         env=dict(os.environ),  # agent env is the operator's concern, not jit's.
+        timeout=agent_timeout,
     )
     if proc.returncode != 0:
         raise RuntimeError(
@@ -428,6 +467,7 @@ class RunResult:
 
     green: bool
     iterations: int  # iterations-to-green (1 = fixed on first attempt)
+    failure_reason: Optional[str] = None  # set when green=False due to an error
     history: list[dict[str, Any]] = field(default_factory=list)
 
 
@@ -470,6 +510,7 @@ def run_one(
     target_idx: int,
     agent_cmd: str,
     cap: int,
+    agent_timeout: int,
 ) -> RunResult:
     """Drive a single scenario run through the agent loop in an isolated repo."""
     repo = setup_scenario_repo(scenario.ruleset)
@@ -506,13 +547,35 @@ def run_one(
 
         # 3. Agent loop.
         for attempt in range(1, cap + 1):
-            task = build_task(scenario, failing, history)
-            if agent_cmd == "builtin:oracle":
-                action = oracle_action(task, ids)
-            else:
-                action = run_external_agent(_split_agent_cmd(agent_cmd), task)
+            try:
+                task = build_task(scenario, failing, history)
+                if agent_cmd == "builtin:oracle":
+                    action = oracle_action(task, ids)
+                else:
+                    action = run_external_agent(
+                        _split_agent_cmd(agent_cmd), task, agent_timeout
+                    )
 
-            result = apply_action(failing_step.argv, action, repo, ids)
+                result = apply_action(failing_step.argv, action, repo, ids)
+            except subprocess.TimeoutExpired as exc:
+                reason = f"timeout on attempt {attempt}: {exc}"
+                run_history.append({"attempt": attempt, "error": reason})
+                return RunResult(
+                    green=False,
+                    iterations=cap,
+                    failure_reason=reason,
+                    history=run_history,
+                )
+            except (json.JSONDecodeError, RuntimeError, ValueError) as exc:
+                reason = f"error on attempt {attempt}: {exc}"
+                run_history.append({"attempt": attempt, "error": reason})
+                return RunResult(
+                    green=False,
+                    iterations=cap,
+                    failure_reason=reason,
+                    history=run_history,
+                )
+
             history.append(result)
             run_history.append(
                 {
@@ -547,7 +610,9 @@ class ScenarioStats:
     name: str
     runs: int
     greens: int
+    cap: int
     iterations: list[int]  # iterations-to-green for green runs only
+    failure_reasons: list[str] = field(default_factory=list)
 
     @property
     def stability(self) -> str:
@@ -559,7 +624,24 @@ class ScenarioStats:
 
     @property
     def mean_iterations(self) -> Optional[float]:
+        """Mean iterations over green runs only.
+
+        This metric is optimistic: non-green runs are excluded. See
+        ``penalized_mean`` for the bias-corrected metric.
+        """
         return statistics.fmean(self.iterations) if self.iterations else None
+
+    @property
+    def penalized_mean(self) -> float:
+        """Mean iterations with non-green runs charged as ``cap``.
+
+        This is the bias-corrected companion to ``mean_iterations``. Non-green
+        runs (whether stopped by the cap, a timeout, or a malformed agent
+        response) are charged the full cap value, so a model that never
+        converges cannot appear to have a low mean through survivorship bias.
+        """
+        all_iters = list(self.iterations) + [self.cap] * (self.runs - self.greens)
+        return statistics.fmean(all_iters)
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -567,9 +649,11 @@ class ScenarioStats:
             "greens": self.greens,
             "stability": self.stability,
             "mean_iterations": self.mean_iterations,
+            "penalized_mean": self.penalized_mean,
             "min_iterations": min(self.iterations) if self.iterations else None,
             "max_iterations": max(self.iterations) if self.iterations else None,
             "iterations": self.iterations,
+            "failure_reasons": self.failure_reasons,
         }
 
 
@@ -578,9 +662,14 @@ class ScenarioStats:
 # ---------------------------------------------------------------------------
 
 
-def discover_steering_scenarios() -> list[Scenario]:
-    """Load all fixtures that are steering scenarios (have a failing target step)."""
-    scenarios: list[Scenario] = []
+def discover_scenarios() -> tuple[list[Scenario], list[str]]:
+    """Load all fixtures; return (failing_input_scenarios, skipped_names).
+
+    ``skipped_names`` are scenario directory names that exist but are not
+    failing-input scenarios (e.g. happy-path or transition scenarios).
+    """
+    driven: list[Scenario] = []
+    skipped: list[str] = []
     for entry in sorted(FIXTURES_DIR.iterdir()):
         if not entry.is_dir():
             continue
@@ -588,8 +677,10 @@ def discover_steering_scenarios() -> list[Scenario]:
             continue
         sc = Scenario.load(entry.name, entry)
         if sc.is_failing_input_scenario():
-            scenarios.append(sc)
-    return scenarios
+            driven.append(sc)
+        else:
+            skipped.append(entry.name)
+    return driven, skipped
 
 
 # ---------------------------------------------------------------------------
@@ -623,15 +714,16 @@ def jit_commit() -> str:
 
 
 # ---------------------------------------------------------------------------
-# Isolation self-check
+# Isolation self-check (warns + strips; does not refuse)
 # ---------------------------------------------------------------------------
 
 
-def assert_isolation() -> None:
-    """Fail fast if the eval's own environment could leak into a production .jit.
+def warn_inherited_jit_env() -> None:
+    """Warn if the eval's own environment contains JIT_* vars that will be stripped.
 
     JIT_DATA_DIR in *our* environment would otherwise be inherited; child_env()
-    strips it, but we surface a clear warning so the operator knows it was set.
+    strips it from every jit child process, but we surface a clear warning so
+    the operator knows it was set.
     """
     leaked = [k for k in JIT_ENV_STRIP if k in os.environ]
     if leaked:
@@ -646,16 +738,20 @@ def assert_isolation() -> None:
 # ---------------------------------------------------------------------------
 
 
-def print_table(stats: list[ScenarioStats], runs: int) -> None:
-    header = f"{'scenario':<22} {'stability':<10} {'mean':>6} {'min':>4} {'max':>4} {'green/runs':>11}"
+def print_table(stats: list[ScenarioStats]) -> None:
+    header = (
+        f"{'scenario':<22} {'stability':<10} {'mean':>6} {'penalized':>10} "
+        f"{'min':>4} {'max':>4} {'green/runs':>11}"
+    )
     print(header)
     print("-" * len(header))
     for s in stats:
         mean = f"{s.mean_iterations:.2f}" if s.mean_iterations is not None else "-"
+        pen = f"{s.penalized_mean:.2f}"
         mn = str(min(s.iterations)) if s.iterations else "-"
         mx = str(max(s.iterations)) if s.iterations else "-"
         print(
-            f"{s.name:<22} {s.stability:<10} {mean:>6} {mn:>4} {mx:>4} "
+            f"{s.name:<22} {s.stability:<10} {mean:>6} {pen:>10} {mn:>4} {mx:>4} "
             f"{f'{s.greens}/{s.runs}':>11}"
         )
 
@@ -663,18 +759,26 @@ def print_table(stats: list[ScenarioStats], runs: int) -> None:
 def write_results_json(
     stats: list[ScenarioStats],
     runs: int,
+    cap: int,
+    agent_timeout: int,
     model_id: str,
     out_dir: Path,
+    skipped_scenarios: list[str],
+    timestamp: Optional[str] = None,
 ) -> Path:
-    timestamp = _dt.datetime.now(_dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    ts = timestamp or _dt.datetime.now(_dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     payload = {
         "jit_commit": jit_commit(),
         "model_id": model_id,
         "runs": runs,
-        "timestamp": timestamp,
+        "cap": cap,
+        "agent_timeout": agent_timeout,
+        "timestamp": ts,
+        "scenarios": [s.name for s in stats],
+        "skipped_scenarios": skipped_scenarios,
         "per_scenario": {s.name: s.to_json() for s in stats},
     }
-    out_path = out_dir / f"results-{timestamp}.json"
+    out_path = out_dir / f"results-{ts}.json"
     out_path.write_text(json.dumps(payload, indent=2) + "\n")
     return out_path
 
@@ -688,52 +792,115 @@ def run_eval(
     agent_cmd: str,
     runs: int,
     cap: int,
+    agent_timeout: int,
     model_id: str,
+    out_dir: Optional[Path],
+    skipped_scenarios: list[str],
 ) -> list[ScenarioStats]:
-    scenarios = discover_steering_scenarios()
+    scenarios, _ = discover_scenarios()
     if not scenarios:
         raise SystemExit(f"no steering scenarios found under {FIXTURES_DIR}")
 
     all_stats: list[ScenarioStats] = []
     for sc in scenarios:
         target = sc.target_index()
-        assert target is not None  # discover_* guarantees this.
+        assert target is not None  # discover_scenarios guarantees this.
         iterations: list[int] = []
         greens = 0
-        for _ in range(runs):
-            result = run_one(sc, target, agent_cmd, cap)
+        failure_reasons: list[str] = []
+        for run_idx in range(runs):
+            try:
+                result = run_one(sc, target, agent_cmd, cap, agent_timeout)
+            except Exception as exc:  # noqa: BLE001
+                reason = f"run {run_idx + 1} setup error: {exc}"
+                print(f"  [{sc.name}] {reason}", file=sys.stderr)
+                failure_reasons.append(reason)
+                # Count as a non-green attempt (charged cap in penalized_mean).
+                continue
             if result.green:
                 greens += 1
                 iterations.append(result.iterations)
-        all_stats.append(
-            ScenarioStats(
-                name=sc.name, runs=runs, greens=greens, iterations=iterations
-            )
+            elif result.failure_reason:
+                failure_reasons.append(result.failure_reason)
+                print(
+                    f"  [{sc.name}] attempt failed: {result.failure_reason}",
+                    file=sys.stderr,
+                )
+
+        scenario_stats = ScenarioStats(
+            name=sc.name,
+            runs=runs,
+            greens=greens,
+            cap=cap,
+            iterations=iterations,
+            failure_reasons=failure_reasons,
         )
+        all_stats.append(scenario_stats)
+
+        # Write results incrementally after each scenario completes so a late
+        # crash preserves earlier scenarios' data.
+        if out_dir is not None:
+            out_dir.mkdir(parents=True, exist_ok=True)
+            _write_partial_results(
+                all_stats, runs, cap, agent_timeout, model_id, out_dir,
+                skipped_scenarios,
+            )
+
     return all_stats
 
 
-def run_smoke() -> int:
+def _write_partial_results(
+    stats: list[ScenarioStats],
+    runs: int,
+    cap: int,
+    agent_timeout: int,
+    model_id: str,
+    out_dir: Path,
+    skipped_scenarios: list[str],
+) -> None:
+    """Overwrite a fixed-name partial results file after each scenario completes."""
+    payload = {
+        "jit_commit": jit_commit(),
+        "model_id": model_id,
+        "runs": runs,
+        "cap": cap,
+        "agent_timeout": agent_timeout,
+        "timestamp": _dt.datetime.now(_dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ"),
+        "partial": True,
+        "scenarios": [s.name for s in stats],
+        "skipped_scenarios": skipped_scenarios,
+        "per_scenario": {s.name: s.to_json() for s in stats},
+    }
+    partial_path = out_dir / "results-partial.json"
+    partial_path.write_text(json.dumps(payload, indent=2) + "\n")
+
+
+def run_smoke(agent_timeout: int) -> int:
     """Oracle agent, 1 run; assert every steering scenario greens in exactly 1
     corrective iteration. CI-runnable self-test of the eval loop (not wired into
     cargo test; run manually per README).
     """
-    scenarios = discover_steering_scenarios()
+    scenarios, skipped = discover_scenarios()
     if not scenarios:
         print(f"SMOKE FAIL: no steering scenarios under {FIXTURES_DIR}")
         return 1
+
+    if skipped:
+        print(f"skipped (not failing-input scenarios): {', '.join(skipped)}", file=sys.stderr)
 
     failures: list[str] = []
     for sc in scenarios:
         target = sc.target_index()
         assert target is not None
-        result = run_one(sc, target, "builtin:oracle", cap=DEFAULT_CAP)
+        result = run_one(sc, target, "builtin:oracle", cap=DEFAULT_CAP,
+                         agent_timeout=agent_timeout)
         status = "green" if result.green else "STUCK"
         print(
             f"smoke: {sc.name:<22} {status:<6} iterations={result.iterations}"
         )
         if not result.green:
-            failures.append(f"{sc.name}: oracle did not reach green")
+            reason = result.failure_reason or "oracle did not reach green"
+            failures.append(f"{sc.name}: {reason}")
         elif result.iterations != 1:
             failures.append(
                 f"{sc.name}: oracle expected 1 iteration, got {result.iterations}"
@@ -772,6 +939,13 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         help=f"max corrective iterations before giving up (default {DEFAULT_CAP}).",
     )
     p.add_argument(
+        "--agent-timeout",
+        type=int,
+        default=DEFAULT_AGENT_TIMEOUT,
+        help=f"seconds before the agent process is killed (default {DEFAULT_AGENT_TIMEOUT}). "
+        "Applies to external agents only; builtin:oracle is not time-limited.",
+    )
+    p.add_argument(
         "--model-id",
         default=None,
         help="model identifier recorded in the results JSON. REQUIRED for "
@@ -793,11 +967,11 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
 
 def main(argv: Optional[list[str]] = None) -> int:
     args = parse_args(argv)
-    assert_isolation()
+    warn_inherited_jit_env()
     ensure_jit_binary()
 
     if args.smoke:
-        return run_smoke()
+        return run_smoke(agent_timeout=args.agent_timeout)
 
     is_builtin = args.agent_cmd.startswith("builtin:")
     if not is_builtin and not args.model_id:
@@ -807,21 +981,35 @@ def main(argv: Optional[list[str]] = None) -> int:
         )
     model_id = args.model_id or args.agent_cmd
 
+    _, skipped = discover_scenarios()
+    if skipped:
+        print(
+            f"skipped (not failing-input scenarios): {', '.join(skipped)}",
+            file=sys.stderr,
+        )
+
+    out_dir = Path(args.out_dir)
+
     stats = run_eval(
         agent_cmd=args.agent_cmd,
         runs=args.runs,
         cap=args.cap,
+        agent_timeout=args.agent_timeout,
         model_id=model_id,
+        out_dir=out_dir,
+        skipped_scenarios=skipped,
     )
 
     print(f"\njit_commit: {jit_commit()}")
     print(f"model_id:   {model_id}")
-    print(f"runs:       {args.runs}\n")
-    print_table(stats, args.runs)
+    print(f"runs:       {args.runs}")
+    print(f"cap:        {args.cap}\n")
+    print_table(stats)
 
-    out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    out_path = write_results_json(stats, args.runs, model_id, out_dir)
+    out_path = write_results_json(
+        stats, args.runs, args.cap, args.agent_timeout, model_id, out_dir, skipped
+    )
     print(f"\nresults written to {out_path}")
     return 0
 

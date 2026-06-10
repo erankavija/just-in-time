@@ -12,6 +12,13 @@ stay in lockstep: the deterministic harness (`crates/jit/tests/steering_scenario
 guarantees the message *content* the agent relies on; this eval measures whether
 an agent can act on that content.
 
+> **Schema note:** The TOML parser in `run_eval.py` is a deliberate duplicate
+> subset of the schema parsed by `steering_scenarios.rs`. It covers only the
+> keys the Python driver needs to drive the loop. Any schema evolution in the
+> fixture TOML (new top-level, step, or expect keys) **must be mirrored** in
+> both parsers. The Python parser fails fast on unknown keys so schema drift
+> surfaces immediately rather than silently producing wrong behavior.
+
 It is **not** a `cargo test` — it is a runnable harness that needs an agent
 (network/model access for real runs) and is not deterministic across models. CI
 stays deterministic; this lives outside the test gate.
@@ -169,7 +176,19 @@ Stability classification per scenario:
 - **sometimes** — mixed (some runs green, some not).
 - **never** — no run reached green within the cap.
 
-Report the **mean over ≥3 runs**, not the best/peak run.
+Two iteration-count metrics are reported (both in the table and in the results
+JSON):
+
+- **mean** (`mean_iterations`) — mean iterations-to-green computed **over green
+  runs only**. This is the primary signal for "how long does it take when it
+  works", but it is an optimistic metric: non-green runs are excluded, so a
+  model that rarely converges can still show a low mean (survivorship bias).
+- **penalized** (`penalized_mean`) — mean iterations where every non-green run
+  (including timeouts, malformed responses, and cap-exhausted runs) is charged
+  the full `--cap` value. This is the bias-corrected companion; prefer it when
+  comparing models with different convergence rates.
+
+Report both metrics over ≥3 runs, not the best/peak run.
 
 ## Re-run procedure (comparing after rule or message changes)
 
