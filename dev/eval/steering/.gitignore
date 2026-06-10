@@ -1,3 +1,2 @@
-# Run artifacts (timestamped result files) are not committed; only the harness
-# and README are. Each run writes results-<timestamp>.json here.
 results/
+__pycache__/
