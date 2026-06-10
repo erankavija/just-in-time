@@ -80,7 +80,8 @@ pub fn desugar(assertion: &Assertion) -> Option<Value> {
         | Assertion::DependencyShape { .. }
         | Assertion::GateRecency { .. }
         | Assertion::TypeHierarchy { .. }
-        | Assertion::CriteriaLabelMatch { .. } => None,
+        | Assertion::CriteriaLabelMatch { .. }
+        | Assertion::CriteriaToCheck { .. } => None,
     }
 }
 
@@ -677,6 +678,14 @@ mod tests {
         assert!(desugar(&Assertion::GateRecency {
             max_age_hours: 168,
             gates: Vec::new(),
+        })
+        .is_none());
+        assert!(desugar(&Assertion::CriteriaToCheck {
+            criteria_section: "success_criteria".to_string(),
+            marker: None,
+            id_pattern: "[A-Z][A-Z0-9]*-[0-9]+".to_string(),
+            gate_prefix: Some("verify:".to_string()),
+            check_namespace: None,
         })
         .is_none());
     }

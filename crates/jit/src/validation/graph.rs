@@ -350,6 +350,22 @@ fn evaluate_one(
             issues,
             repo_default_format,
         ),
+        Assertion::CriteriaToCheck {
+            criteria_section,
+            marker,
+            id_pattern,
+            gate_prefix,
+            check_namespace,
+        } => evaluate_criteria_to_check(
+            rule,
+            criteria_section,
+            marker.as_deref(),
+            id_pattern,
+            gate_prefix.as_deref(),
+            check_namespace.as_deref(),
+            issues,
+            repo_default_format,
+        ),
         // Non-graph kinds are never dispatched here (filtered by scope), but be
         // exhaustive and total rather than panic.
         _ => Vec::new(),
@@ -922,6 +938,133 @@ fn evaluate_gate_recency(
                 .collect::<Vec<_>>()
         })
         .collect()
+}
+
+// ---------------------------------------------------------------------------
+// criteria-to-check
+// ---------------------------------------------------------------------------
+
+/// Evaluate a `criteria-to-check` rule.
+///
+/// Every criterion id extracted from the configured section of a matching issue
+/// must map to a verifiable check. "Checked" means the issue has EITHER:
+///
+/// - a `gates_required` entry equal to `"<gate_prefix><id>"` (when `gate_prefix`
+///   is configured), OR
+/// - a label `"<check_namespace>:<id>"` (when `check_namespace` is configured).
+///
+/// Either mechanism alone satisfies the criterion. At least one mechanism must be
+/// configured (enforced at load by the `RawCriteriaToCheck::into_assertion`
+/// validator).
+///
+/// # Config
+///
+/// - `criteria_section` (default `"success_criteria"`): projection slug of the
+///   section whose list items hold the criteria.
+/// - `marker` (optional): when set, only items starting with this marker
+///   contribute criterion ids.
+/// - `id_pattern` (default `"[A-Z][A-Z0-9]*-[0-9]+"`): regex extracting the
+///   criterion id from an item's text.
+/// - `gate_prefix` (optional): prefix for gate keys. A criterion `id` is
+///   gate-checked when `"<gate_prefix><id>"` is in `gates_required`.
+/// - `check_namespace` (optional): label namespace. A criterion `id` is
+///   label-checked when `"<check_namespace>:<id>"` is a label.
+///
+/// The finding message names exactly the missing mechanism(s). When only one
+/// mechanism is configured, the message names only that one; when both are
+/// configured, the message names both.
+///
+/// One finding per unmapped criterion per matching issue. A malformed config
+/// yields a single `config-error` finding.
+#[allow(clippy::too_many_arguments)]
+fn evaluate_criteria_to_check(
+    rule: &Rule,
+    criteria_section: &str,
+    marker: Option<&str>,
+    id_pattern_src: &str,
+    gate_prefix: Option<&str>,
+    check_namespace: Option<&str>,
+    issues: &[Issue],
+    repo_default_format: ContentFormat,
+) -> Vec<GraphFinding> {
+    // Compile the id pattern (already validated at load for user-authored rules;
+    // this compile step is a pure guard for programmatic callers).
+    let id_pattern = match regex::Regex::new(id_pattern_src) {
+        Ok(re) => re,
+        Err(e) => return vec![config_error(rule, format!("invalid 'id-pattern': {e}"))],
+    };
+
+    issues
+        .iter()
+        .filter(|issue| rule.when.matches(issue))
+        .flat_map(|issue| {
+            let ids = match criterion_ids(
+                issue,
+                criteria_section,
+                marker,
+                &id_pattern,
+                repo_default_format,
+            ) {
+                Ok(ids) => ids,
+                Err(err) => return vec![config_error(rule, err.to_string())],
+            };
+            ids.into_iter()
+                .filter(|id| !criterion_is_checked(issue, id, gate_prefix, check_namespace))
+                .map(|id| {
+                    let missing = describe_missing(id.as_str(), gate_prefix, check_namespace);
+                    issue_finding(
+                        rule,
+                        &issue.id,
+                        format!("criterion '{id}' has no verification: {missing}"),
+                    )
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect()
+}
+
+/// Whether criterion `id` is considered "checked" on `issue`.
+///
+/// A criterion is checked when EITHER the issue has a `gates_required` entry
+/// equal to `"<gate_prefix><id>"` (gate-checked) OR the issue carries a label
+/// `"<check_namespace>:<id>"` (label-checked). Either mechanism alone satisfies.
+fn criterion_is_checked(
+    issue: &Issue,
+    id: &str,
+    gate_prefix: Option<&str>,
+    check_namespace: Option<&str>,
+) -> bool {
+    let gate_checked = gate_prefix
+        .map(|prefix| {
+            let gate_key = format!("{prefix}{id}");
+            issue.gates_required.iter().any(|g| g == &gate_key)
+        })
+        .unwrap_or(false);
+
+    let label_checked = check_namespace
+        .map(|ns| {
+            let label = format!("{ns}:{id}");
+            issue.labels.iter().any(|l| l == &label)
+        })
+        .unwrap_or(false);
+
+    gate_checked || label_checked
+}
+
+/// Build the "expected …" clause of an unmapped-criterion finding, naming only
+/// the configured mechanism(s).
+///
+/// - Both configured: `expected gate '<gate_prefix><id>' or label '<ns>:<id>'`
+/// - Only gate:       `expected gate '<gate_prefix><id>'`
+/// - Only label:      `expected label '<ns>:<id>'`
+fn describe_missing(id: &str, gate_prefix: Option<&str>, check_namespace: Option<&str>) -> String {
+    match (gate_prefix, check_namespace) {
+        (Some(prefix), Some(ns)) => format!("expected gate '{prefix}{id}' or label '{ns}:{id}'"),
+        (Some(prefix), None) => format!("expected gate '{prefix}{id}'"),
+        (None, Some(ns)) => format!("expected label '{ns}:{id}'"),
+        // At-least-one is enforced at load; this arm is unreachable in practice.
+        (None, None) => "expected a verification mechanism (none configured)".to_string(),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1739,6 +1882,204 @@ mod tests {
     }
 
     // --- type-hierarchy (injected HierarchyConfig) -------------------------
+
+    // --- criteria-to-check -------------------------------------------------
+
+    fn ctc_rule(extra: &str) -> Rule {
+        rule_from(&format!(
+            "[[rules]]\nname = \"ctc\"\nwhen = {{ type = \"epic\" }}\n\
+             severity = \"error\"\nassert = {{ criteria-to-check = {{ {extra} }} }}\n"
+        ))
+    }
+
+    /// Epic with a Success Criteria section carrying the given criterion lines.
+    fn epic_with_sc(items: &[&str]) -> Issue {
+        let body = format!(
+            "## Success Criteria\n\n{}\n",
+            items
+                .iter()
+                .map(|s| format!("- {s}"))
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
+        let mut epic = Issue::new("epic".to_string(), body);
+        epic.labels = vec!["type:epic".to_string()];
+        epic
+    }
+
+    #[test]
+    fn test_criteria_to_check_gate_mapped_id_passes() {
+        // A criterion satisfied via a gates_required entry must produce no finding.
+        let rule = ctc_rule("gate-prefix = \"verify:\"");
+        let mut epic = epic_with_sc(&["[hard] REQ-01: do the thing"]);
+        epic.gates_required = vec!["verify:REQ-01".to_string()];
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[epic],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        assert!(
+            findings.is_empty(),
+            "gate-mapped criterion must produce no finding: {findings:?}"
+        );
+    }
+
+    #[test]
+    fn test_criteria_to_check_label_mapped_id_passes() {
+        // A criterion satisfied via a label must produce no finding.
+        let rule = ctc_rule("check-namespace = \"checks\"");
+        let mut epic = epic_with_sc(&["REQ-01: do the thing"]);
+        epic.labels.push("checks:REQ-01".to_string());
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[epic],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        assert!(
+            findings.is_empty(),
+            "label-mapped criterion must produce no finding: {findings:?}"
+        );
+    }
+
+    #[test]
+    fn test_criteria_to_check_unmapped_id_reports_finding() {
+        // An unmapped criterion must be reported with its id in the message.
+        let rule = ctc_rule("gate-prefix = \"verify:\", check-namespace = \"checks\"");
+        let epic = epic_with_sc(&["REQ-01: do the thing"]);
+        let id = epic.id.clone();
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[epic],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        assert_eq!(findings.len(), 1, "one unmapped criterion: {findings:?}");
+        assert_eq!(findings[0].issue_id.as_deref(), Some(id.as_str()));
+        let msg = &findings[0].finding.message;
+        assert!(
+            msg.contains("REQ-01"),
+            "finding must name the criterion id: {msg}"
+        );
+        assert!(
+            msg.contains("verify:REQ-01"),
+            "finding must name the expected gate: {msg}"
+        );
+        assert!(
+            msg.contains("checks:REQ-01"),
+            "finding must name the expected label: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_criteria_to_check_marker_filtering() {
+        // Only [hard] items are required when marker = "[hard]".
+        let rule = ctc_rule("marker = \"[hard]\", gate-prefix = \"verify:\"");
+        let epic = epic_with_sc(&[
+            "[hard] REQ-01: must do",
+            "[aspirational] REQ-02: nice to have",
+        ]);
+        // REQ-01 is unmapped; REQ-02 is [aspirational] and must be ignored.
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[epic],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        assert_eq!(
+            findings.len(),
+            1,
+            "only [hard] REQ-01 should be reported: {findings:?}"
+        );
+        assert!(
+            findings[0].finding.message.contains("REQ-01"),
+            "finding must name REQ-01: {:?}",
+            findings[0].finding.message
+        );
+        assert!(
+            !findings[0].finding.message.contains("REQ-02"),
+            "REQ-02 is aspirational and must not be required: {:?}",
+            findings[0].finding.message
+        );
+    }
+
+    #[test]
+    fn test_criteria_to_check_only_gate_mechanism_message() {
+        // When only gate-prefix is configured the finding names only the gate.
+        let rule = ctc_rule("gate-prefix = \"verify:\"");
+        let epic = epic_with_sc(&["REQ-01: do the thing"]);
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[epic],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        assert_eq!(findings.len(), 1);
+        let msg = &findings[0].finding.message;
+        assert!(
+            msg.contains("verify:REQ-01"),
+            "gate-only finding must name the gate: {msg}"
+        );
+        assert!(
+            !msg.contains("or label"),
+            "gate-only finding must not mention label: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_criteria_to_check_only_label_mechanism_message() {
+        // When only check-namespace is configured the finding names only the label.
+        let rule = ctc_rule("check-namespace = \"checks\"");
+        let epic = epic_with_sc(&["REQ-01: do the thing"]);
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[epic],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        assert_eq!(findings.len(), 1);
+        let msg = &findings[0].finding.message;
+        assert!(
+            msg.contains("checks:REQ-01"),
+            "label-only finding must name the label: {msg}"
+        );
+        assert!(
+            !msg.contains("or gate"),
+            "label-only finding must not mention gate: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_criteria_to_check_missing_both_mechanisms_is_config_error() {
+        // At least one of gate-prefix / check-namespace is required.
+        // The loader enforces this; we verify it surfaces as a load error.
+        let toml = "[[rules]]\nname = \"bad\"\n\
+                   assert = { criteria-to-check = {} }\n";
+        let err = RuleSet::from_toml_str(toml, std::path::Path::new("/x")).unwrap_err();
+        match err {
+            crate::validation::rules::RuleConfigError::InvalidAssertion { rule, message } => {
+                assert_eq!(rule, "bad");
+                assert!(
+                    message.contains("gate-prefix") && message.contains("check-namespace"),
+                    "error must name both missing fields: {message}"
+                );
+            }
+            other => panic!("expected InvalidAssertion, got {other:?}"),
+        }
+    }
 
     #[test]
     fn test_type_hierarchy_orphan_leaf_fires_with_injected_config() {

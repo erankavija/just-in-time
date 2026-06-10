@@ -639,6 +639,41 @@ pub enum Assertion {
         /// defaults to `"[A-Z][A-Z0-9]*-[0-9]+"`.
         id_pattern: String,
     },
+    /// Every criterion in a configured section maps to a verifiable check.
+    /// Graph scope. "Checked" means the issue carries a required gate keyed
+    /// `<gate-prefix><id>` (in `gates_required`) OR a label `<check-namespace>:<id>`.
+    /// At least one of `gate_prefix` / `check_namespace` must be set (config error
+    /// otherwise). Criteria and marker filtering reuse the same `criterion_ids`
+    /// extractor as `label-coverage`.
+    ///
+    /// # Config shape in `rules.toml`
+    ///
+    /// ```toml
+    /// assert = { criteria-to-check = {
+    ///   criteria-section = "success_criteria",  # optional, default success_criteria
+    ///   marker = "[hard]",                       # optional: only marked items
+    ///   id-pattern = "REQ-[0-9]+",               # optional, default [A-Z][A-Z0-9]*-[0-9]+
+    ///   gate-prefix = "verify:",                 # at least one of gate-prefix / check-namespace
+    ///   check-namespace = "checks",              # at least one of gate-prefix / check-namespace
+    /// } }
+    /// ```
+    CriteriaToCheck {
+        /// Projection slug of the section holding criteria (default
+        /// `"success_criteria"`).
+        criteria_section: String,
+        /// Optional marker filter; when set, only items starting with this
+        /// marker contribute criterion ids.
+        marker: Option<String>,
+        /// Regex extracting the criterion id from an item's text (default
+        /// `"[A-Z][A-Z0-9]*-[0-9]+"`).
+        id_pattern: String,
+        /// Optional gate key prefix. A criterion `<id>` is "gate-checked" when
+        /// the issue has `"<gate_prefix><id>"` in `gates_required`.
+        gate_prefix: Option<String>,
+        /// Optional label namespace. A criterion `<id>` is "label-checked" when
+        /// the issue carries `"<check_namespace>:<id>"`.
+        check_namespace: Option<String>,
+    },
 }
 
 /// The legacy type-hierarchy warning expressed by an
@@ -691,6 +726,7 @@ impl Assertion {
             | Assertion::GateRecency { .. }
             | Assertion::TypeHierarchy { .. }
             | Assertion::CriteriaLabelMatch { .. } => Scope::Graph,
+            Assertion::CriteriaToCheck { .. } => Scope::Graph,
             _ => Scope::Local,
         }
     }
@@ -982,6 +1018,8 @@ struct RawAssert {
     type_hierarchy: Option<RawTypeHierarchy>,
     #[serde(default, rename = "criteria-label-match")]
     criteria_label_match: Option<RawCriteriaLabelMatch>,
+    #[serde(default, rename = "criteria-to-check")]
+    criteria_to_check: Option<RawCriteriaToCheck>,
 }
 
 /// The `gate-recency` assert payload: a max age plus an optional gate filter.
@@ -1078,6 +1116,50 @@ struct RawCriteriaLabelMatch {
     id_pattern: Option<String>,
 }
 
+/// The `criteria-to-check` assert payload. At least one of `gate-prefix` /
+/// `check-namespace` must be set (caught in [`RawCriteriaToCheck::into_assertion`]).
+/// `deny_unknown_fields` ensures a stray key surfaces as a parse error.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawCriteriaToCheck {
+    #[serde(default, rename = "criteria-section")]
+    criteria_section: Option<String>,
+    #[serde(default)]
+    marker: Option<String>,
+    #[serde(default, rename = "id-pattern")]
+    id_pattern: Option<String>,
+    #[serde(default, rename = "gate-prefix")]
+    gate_prefix: Option<String>,
+    #[serde(default, rename = "check-namespace")]
+    check_namespace: Option<String>,
+}
+
+impl RawCriteriaToCheck {
+    /// Lower into an [`Assertion::CriteriaToCheck`], applying defaults and
+    /// enforcing the at-least-one-mechanism constraint.
+    fn into_assertion(self, rule: &str) -> Result<Assertion, RuleConfigError> {
+        if self.gate_prefix.is_none() && self.check_namespace.is_none() {
+            return Err(RuleConfigError::InvalidAssertion {
+                rule: rule.to_string(),
+                message: "criteria-to-check requires at least one of 'gate-prefix' or \
+                          'check-namespace'"
+                    .to_string(),
+            });
+        }
+        Ok(Assertion::CriteriaToCheck {
+            criteria_section: self
+                .criteria_section
+                .unwrap_or_else(|| "success_criteria".to_string()),
+            marker: self.marker,
+            id_pattern: self
+                .id_pattern
+                .unwrap_or_else(|| "[A-Z][A-Z0-9]*-[0-9]+".to_string()),
+            gate_prefix: self.gate_prefix,
+            check_namespace: self.check_namespace,
+        })
+    }
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawRequireLabel {
@@ -1152,7 +1234,8 @@ impl RawAssert {
             || self.dependency_shape.is_some()
             || self.gate_recency.is_some()
             || self.type_hierarchy.is_some()
-            || self.criteria_label_match.is_some();
+            || self.criteria_label_match.is_some()
+            || self.criteria_to_check.is_some();
         let raw_schema_present = self.json_schema.is_some();
 
         // Shorthand XOR file-schema: combining them in one rule is a config
@@ -1181,6 +1264,7 @@ impl RawAssert {
             self.gate_recency.is_some(),
             self.type_hierarchy.is_some(),
             self.criteria_label_match.is_some(),
+            self.criteria_to_check.is_some(),
         ]
         .into_iter()
         .filter(|present| *present)
@@ -1286,6 +1370,9 @@ impl RawAssert {
                     .id_pattern
                     .unwrap_or_else(|| "[A-Z][A-Z0-9]*-[0-9]+".to_string()),
             });
+        }
+        if let Some(ctc) = self.criteria_to_check {
+            return ctc.into_assertion(rule);
         }
 
         // Unreachable: total == 1 guarantees one branch above matched.

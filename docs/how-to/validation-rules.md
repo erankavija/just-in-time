@@ -13,12 +13,13 @@ checklists, or whatever your team needs. See
 [Methodology-Agnostic Validation](../concepts/validation-engine.md) for the
 "why".
 
-This guide shows you how to write rules, using three ready-to-copy examples:
+This guide shows you how to write rules, using ready-to-copy examples:
 
 - [`docs/examples/sdd/`](../examples/sdd/rules.toml) — Spec-Driven Development
 - [`docs/examples/bug-repro/`](../examples/bug-repro/rules.toml) — bug triage
 - [`docs/examples/release-checklist/`](../examples/release-checklist/rules.toml) — release gating
 - [`docs/examples/fresh-evidence/`](../examples/fresh-evidence/rules.toml) — fresh-evidence-before-done
+- [`docs/examples/nyquist/`](../examples/nyquist/rules.toml) — criteria-to-check mapping
 
 > The files under `docs/examples/` are EXAMPLES. They are not active on this
 > repository. To use one, copy its `rules.toml` to your project's `.jit/rules.toml`
@@ -149,6 +150,13 @@ checkers, and at state transitions (where enforcing failures block):
 | `dependency-shape`      | issues matching a selector depend on issues matching a target               |
 | `gate-recency`          | recorded gate results are no older than a configured age                    |
 | `criteria-label-match`  | a namespace label's value names a real criterion id (stray-req detection)   |
+| Kind                  | Asserts…                                                          |
+|-----------------------|-------------------------------------------------------------------|
+| `label-coverage`      | every source criterion is satisfied by at least one child         |
+| `label-reference`     | a `from:`-namespace label resolves to a declared `to:` source     |
+| `dependency-shape`    | issues matching a selector depend on issues matching a target     |
+| `gate-recency`        | recorded gate results are no older than a configured age          |
+| `criteria-to-check`   | every criterion in a section maps to a verifiable check (a required gate or a label) |
 
 **Escape hatch:** `checker-command` runs an external command. It is applied by
 `jit validate`, not on the write path.
@@ -289,6 +297,49 @@ result`. Use `max-age-hours` for sub-day windows, and omit `gates` to require
 freshness for ALL of the issue's required gates. Recency is relative to the clock,
 so real rulesets usually keep these rules at `severity = "warn"` (the example
 uses `enforce = true` to demonstrate blocking completion).
+
+### Nyquist — "every criterion has a verification path"
+
+[`docs/examples/nyquist/rules.toml`](../examples/nyquist/rules.toml) uses
+`criteria-to-check` (a graph rule) to assert that every `[hard]` criterion in
+an epic's `## Success Criteria` section has at least one verifiable check before
+the epic is marked done:
+
+```toml
+[[rules]]
+name = "nyquist-criteria-verified-at-done"
+when = { type = "epic", state = "done" }
+severity = "error"
+enforce = true
+assert = { criteria-to-check = {
+  marker = "[hard]",
+  gate-prefix = "verify:",
+  check-namespace = "checks",
+} }
+```
+
+A criterion `REQ-01` is "checked" when the issue has `"verify:REQ-01"` in
+`gates_required` OR a label `"checks:REQ-01"`. Either mechanism alone satisfies
+the rule. An unmapped criterion yields a finding naming the criterion id and
+the expected gate or label:
+
+```
+criterion 'REQ-01' has no verification: expected gate 'verify:REQ-01' or label 'checks:REQ-01'
+```
+
+When only one mechanism is configured the message names only that one:
+
+```
+criterion 'REQ-01' has no verification: expected gate 'verify:REQ-01'
+criterion 'REQ-01' has no verification: expected label 'checks:REQ-01'
+```
+
+The example ships a second (always-on, warn-only) variant of the rule that fires
+during planning so authors catch missing verification paths early, long before the
+done transition. Configure `criteria-section`, `marker`, `id-pattern`,
+`gate-prefix`, and `check-namespace` to match your team's conventions; omit
+`gate-prefix` or `check-namespace` to require only one mechanism. At least one
+of the two must be set (the loader rejects a rule with neither).
 
 None of these is built into JIT. They are configuration over one engine.
 

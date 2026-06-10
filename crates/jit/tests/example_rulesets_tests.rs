@@ -92,7 +92,13 @@ fn fixed_now() -> chrono::DateTime<chrono::Utc> {
 
 #[test]
 fn test_all_example_rulesets_load() {
-    for name in ["sdd", "bug-repro", "release-checklist", "fresh-evidence"] {
+    for name in [
+        "sdd",
+        "bug-repro",
+        "release-checklist",
+        "fresh-evidence",
+        "nyquist",
+    ] {
         let set = load_example(name);
         assert!(
             !set.rules.is_empty(),
@@ -701,6 +707,157 @@ mod fresh_evidence {
             .expect("example must define fresh-evidence-before-done");
         assert_eq!(rule.severity, jit::validation::rules::Severity::Error);
         assert!(rule.enforce, "the example deliberately enforces at done");
+        assert_eq!(rule.scope, Scope::Graph);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 2f. nyquist — criteria-to-check rule kind.
+//
+// Kept in its own module so the nyquist example section is clearly separated
+// from the other methodology tests; sibling workers may also extend this file.
+// ---------------------------------------------------------------------------
+
+mod nyquist {
+    use super::*;
+
+    /// A well-formed epic body with two [hard] criteria and one [aspirational].
+    fn nyquist_compliant_body() -> String {
+        "## Success Criteria\n\n\
+            - [hard] REQ-01: the parser rejects invalid input\n\
+            - [hard] REQ-02: all edge cases are covered by tests\n\
+            - [aspirational] REQ-03: performance meets the latency target\n"
+            .to_string()
+    }
+
+    /// An epic with [hard] criteria REQ-01 and REQ-02, both verified via gates.
+    fn epic_with_both_verified() -> Issue {
+        let mut epic = Issue::new("Feature X".to_string(), nyquist_compliant_body());
+        epic.labels = vec!["type:epic".to_string()];
+        // Both [hard] criteria are verified via gates_required.
+        epic.gates_required = vec!["verify:REQ-01".to_string(), "verify:REQ-02".to_string()];
+        epic
+    }
+
+    /// An epic with [hard] criteria REQ-01 and REQ-02, both verified via labels.
+    fn epic_with_label_verification() -> Issue {
+        let mut epic = Issue::new("Feature Y".to_string(), nyquist_compliant_body());
+        epic.labels = vec![
+            "type:epic".to_string(),
+            "checks:REQ-01".to_string(),
+            "checks:REQ-02".to_string(),
+        ];
+        epic
+    }
+
+    #[test]
+    fn test_nyquist_compliant_via_gates_passes_graph() {
+        let set = load_example("nyquist");
+        let rules = graph_rules(&set);
+        let epic = epic_with_both_verified();
+        let findings = issue_graph_findings(&rules, std::slice::from_ref(&epic));
+        assert!(
+            findings.is_empty(),
+            "an epic with all [hard] criteria gate-verified must pass: {findings:?}"
+        );
+    }
+
+    #[test]
+    fn test_nyquist_compliant_via_labels_passes_graph() {
+        let set = load_example("nyquist");
+        let rules = graph_rules(&set);
+        let epic = epic_with_label_verification();
+        let findings = issue_graph_findings(&rules, std::slice::from_ref(&epic));
+        assert!(
+            findings.is_empty(),
+            "an epic with all [hard] criteria label-verified must pass: {findings:?}"
+        );
+    }
+
+    #[test]
+    fn test_nyquist_unmapped_criterion_reports_finding() {
+        let set = load_example("nyquist");
+        let rules = graph_rules(&set);
+        // Only REQ-01 is verified; REQ-02 is unmapped.
+        let mut epic = Issue::new("Feature Z".to_string(), nyquist_compliant_body());
+        epic.labels = vec!["type:epic".to_string()];
+        epic.gates_required = vec!["verify:REQ-01".to_string()];
+
+        let findings = issue_graph_findings(&rules, std::slice::from_ref(&epic));
+        // REQ-02 must be reported as unmapped; REQ-01 must not.
+        assert!(
+            findings
+                .iter()
+                .any(|f| f.finding.message.contains("REQ-02")),
+            "unmapped criterion REQ-02 must be reported: {findings:?}"
+        );
+        assert!(
+            !findings
+                .iter()
+                .any(|f| f.finding.message.contains("REQ-01")),
+            "verified criterion REQ-01 must not be reported: {findings:?}"
+        );
+    }
+
+    #[test]
+    fn test_nyquist_finding_names_both_mechanisms() {
+        // When both gate-prefix and check-namespace are configured (as in the
+        // nyquist example), the unmapped-criterion finding mentions both.
+        let set = load_example("nyquist");
+        let rules = graph_rules(&set);
+        let mut epic = Issue::new("Feature W".to_string(), nyquist_compliant_body());
+        epic.labels = vec!["type:epic".to_string()]; // no gates, no checks labels
+
+        let findings = issue_graph_findings(&rules, std::slice::from_ref(&epic));
+        let req01_finding = findings
+            .iter()
+            .find(|f| f.finding.message.contains("REQ-01"));
+        assert!(
+            req01_finding.is_some(),
+            "REQ-01 must be reported as unmapped: {findings:?}"
+        );
+        let msg = &req01_finding.unwrap().finding.message;
+        assert!(
+            msg.contains("verify:REQ-01"),
+            "finding must name the expected gate: {msg}"
+        );
+        assert!(
+            msg.contains("checks:REQ-01"),
+            "finding must name the expected label: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_nyquist_marker_filters_aspirational_criteria() {
+        // [aspirational] criteria must NOT be required; the marker = "[hard]"
+        // filter must exclude REQ-03 (marked [aspirational]).
+        let set = load_example("nyquist");
+        let rules = graph_rules(&set);
+        // An epic that verifies REQ-01 and REQ-02 but leaves REQ-03 unmapped.
+        let epic = epic_with_both_verified();
+
+        let findings = issue_graph_findings(&rules, std::slice::from_ref(&epic));
+        // REQ-03 is [aspirational] and must not be required.
+        assert!(
+            !findings
+                .iter()
+                .any(|f| f.finding.message.contains("REQ-03")),
+            "[aspirational] criterion REQ-03 must not be required: {findings:?}"
+        );
+    }
+
+    #[test]
+    fn test_nyquist_done_scoped_rule_has_enforce_shape() {
+        // The done-scoped rule must carry severity=error + enforce=true so that
+        // transition enforcement (bc86f54c) can block the done transition.
+        let set = load_example("nyquist");
+        let rule = set
+            .rules
+            .iter()
+            .find(|r| r.name == "nyquist-criteria-verified-at-done")
+            .expect("example must define nyquist-criteria-verified-at-done");
+        assert_eq!(rule.severity, jit::validation::rules::Severity::Error);
+        assert!(rule.enforce, "the done-scoped rule must enforce");
         assert_eq!(rule.scope, Scope::Graph);
     }
 }

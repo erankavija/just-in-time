@@ -69,10 +69,12 @@ that the engine carries none of them intrinsically:
 | [`bug-repro/`](../examples/bug-repro/rules.toml)                  | Bug triage: every bug must document how to reproduce it |
 | [`release-checklist/`](../examples/release-checklist/rules.toml)  | Release gating: checklist, release notes, QA sign-off dependency |
 | [`fresh-evidence/`](../examples/fresh-evidence/rules.toml)        | Fresh-evidence-before-done: a `code-review` gate result must be recent (`gate-recency`) to complete |
+| [`nyquist/`](../examples/nyquist/rules.toml)                      | Nyquist verification discipline: every `[hard]` criterion must have an explicit verification path (a required gate or a label) before done |
 
 SDD is the *first* application, not a privileged one. The bug-triage,
-release-checklist, and fresh-evidence examples use the **same grammar and the
-same engine** with zero code changes — that equivalence is the whole point.
+release-checklist, fresh-evidence, and nyquist examples use the **same grammar
+and the same engine** with zero code changes — that equivalence is the whole
+point.
 
 ## Spec-Driven Development as configuration
 

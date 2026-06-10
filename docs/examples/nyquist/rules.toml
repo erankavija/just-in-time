@@ -1,0 +1,75 @@
+# Example ruleset: Nyquist verification discipline
+#
+# A methodology where every [hard] criterion in the success-criteria section must
+# have an explicit VERIFICATION PATH before the work is considered complete.
+# "Verification" means one of:
+#   - the issue has a required gate keyed "verify:<id>", OR
+#   - the issue carries a label "checks:<id>"
+# either mechanism satisfies the requirement.
+#
+# Engine kind used:
+#   criteria-to-check  (graph)  each criterion id extracted from the configured
+#                               section must map to at least one of the configured
+#                               mechanisms (a required gate or a label).
+#
+# The name "Nyquist" is a team convention, NOT a built-in engine concept.
+# The engine ships the generic `criteria-to-check` primitive; the methodology
+# lives entirely in this file. To adapt: change the marker, id-pattern, gate
+# prefix, or check namespace to match your team's conventions.
+#
+# How it works in practice:
+#
+#   1. Author an epic with a "## Success Criteria" section. Each [hard] item
+#      must carry a stable id, e.g.:
+#
+#        ## Success Criteria
+#        - [hard] REQ-01: the parser rejects invalid input
+#        - [hard] REQ-02: all edge cases are covered by tests
+#        - [aspirational] REQ-03: performance meets the latency target
+#
+#   2. For each [hard] criterion, declare a verification path. Choose either:
+#      a) Add the gate to gates_required:  "verify:REQ-01"
+#      b) Add a checks: label:             "checks:REQ-01"
+#
+#   3. `jit validate` reports any [hard] criterion with no verification path.
+#      The always-on variant (below) fires during planning; the done-scoped
+#      enforce=true variant blocks the transition to done.
+#
+# Rule structure:
+#   nyquist-criteria-have-checks (always-on, warn)
+#     Reports unmapped criteria at any lifecycle stage so authors catch missing
+#     verification paths early, during planning.
+#
+#   nyquist-criteria-verified-at-done (done-scoped, error, enforce=true)
+#     Blocks the transition to done until every [hard] criterion has a
+#     verification path. With enforce=true, `jit issue update --state done`
+#     exits 4 and names the unmapped criteria; `--force` bypasses the block
+#     (recorded as a graph-rule-bypassed event in the audit log).
+#
+# To adapt this ruleset for your project:
+#   - Change `marker` (or remove it to require checks for ALL criteria items).
+#   - Change `id-pattern` if your criterion ids use a different format.
+#   - Use only `gate-prefix` if you always express checks through gates.
+#   - Use only `check-namespace` if you express them through labels.
+#   - Use both (as here) if either mechanism is acceptable.
+#   - Adjust severity/enforce to suit your team's workflow.
+
+# Always-on: warn during planning so authors can catch missing verification
+# paths early. Fires at any lifecycle state.
+[[rules]]
+name = "nyquist-criteria-have-checks"
+when = { type = "epic" }
+severity = "warn"
+enforce = false
+assert = { criteria-to-check = { marker = "[hard]", gate-prefix = "verify:", check-namespace = "checks" } }
+
+# Transition guard: block done until every [hard] criterion is verified.
+# `enforce = true` causes `jit issue update --state done` to exit 4 while any
+# [hard] criterion lacks a verification path. The finding names the criterion id
+# and the expected gate or label so the author knows exactly what is missing.
+[[rules]]
+name = "nyquist-criteria-verified-at-done"
+when = { type = "epic", state = "done" }
+severity = "error"
+enforce = true
+assert = { criteria-to-check = { marker = "[hard]", gate-prefix = "verify:", check-namespace = "checks" } }

@@ -312,10 +312,10 @@ fn render_assertion(
             marker,
             id_pattern,
         } => {
-            // namespace is required; always emit it first.
+            // namespace is required; always emit it first. Only emit optional
+            // fields when they differ from their defaults, so round-tripped
+            // rules stay canonical.
             let mut parts = vec![format!("namespace = {}", toml_basic_string(namespace))];
-            // Only emit optional fields when they differ from their defaults, so
-            // round-tripped rules stay canonical.
             if criteria_section != "success_criteria" {
                 parts.push(format!(
                     "criteria-section = {}",
@@ -329,6 +329,36 @@ fn render_assertion(
                 parts.push(format!("id-pattern = {}", toml_literal_string(id_pattern)));
             }
             format!("{{ criteria-label-match = {{ {} }} }}", parts.join(", "))
+        }
+        Assertion::CriteriaToCheck {
+            criteria_section,
+            marker,
+            id_pattern,
+            gate_prefix,
+            check_namespace,
+        } => {
+            // Emit only fields that differ from their defaults so the round-trip
+            // is stable (a reload with defaults applied produces the same output).
+            let mut parts: Vec<String> = Vec::new();
+            if criteria_section != "success_criteria" {
+                parts.push(format!(
+                    "criteria-section = {}",
+                    toml_basic_string(criteria_section)
+                ));
+            }
+            if let Some(m) = marker {
+                parts.push(format!("marker = {}", toml_basic_string(m)));
+            }
+            if id_pattern != "[A-Z][A-Z0-9]*-[0-9]+" {
+                parts.push(format!("id-pattern = {}", toml_literal_string(id_pattern)));
+            }
+            if let Some(prefix) = gate_prefix {
+                parts.push(format!("gate-prefix = {}", toml_basic_string(prefix)));
+            }
+            if let Some(ns) = check_namespace {
+                parts.push(format!("check-namespace = {}", toml_basic_string(ns)));
+            }
+            format!("{{ criteria-to-check = {{ {} }} }}", parts.join(", "))
         }
     }
 }
@@ -556,6 +586,36 @@ assert = { require-section = { heading = "Goals" } }
 "#;
         let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
         assert_eq!(set.rules[0].severity, Severity::Off);
+        assert_round_trips(&set);
+    }
+
+    #[test]
+    fn test_round_trip_criteria_to_check() {
+        // The criteria-to-check kind round-trips all its optional fields.
+        let toml = r#"
+[[rules]]
+name = "ctc-both"
+when = { type = "epic" }
+severity = "error"
+enforce = true
+assert = { criteria-to-check = { marker = "[hard]", gate-prefix = "verify:", check-namespace = "checks" } }
+
+[[rules]]
+name = "ctc-gate-only"
+severity = "warn"
+assert = { criteria-to-check = { gate-prefix = "verify:" } }
+
+[[rules]]
+name = "ctc-label-only"
+severity = "warn"
+assert = { criteria-to-check = { check-namespace = "checks", id-pattern = "SC-[0-9]+" } }
+
+[[rules]]
+name = "ctc-custom-section"
+severity = "warn"
+assert = { criteria-to-check = { criteria-section = "acceptance_criteria", gate-prefix = "gate:" } }
+"#;
+        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
         assert_round_trips(&set);
     }
 
