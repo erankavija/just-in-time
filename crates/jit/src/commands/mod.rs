@@ -502,6 +502,11 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///   is returned (exit 4), unless `force` is set.
     /// - With `force`, blocking findings do NOT block; one
     ///   [`Event::GraphRuleBypassed`] is appended per overridden rule.
+    /// - A `config-error` finding (a malformed rule: bad regex, missing key) from
+    ///   an `enforce = true` / `error` rule whose selector applies to this issue
+    ///   also BLOCKS — a broken guard must not silently pass. The blocker message
+    ///   makes clear the rule itself is misconfigured. A config error from a
+    ///   non-enforcing rule stays a warning.
     /// - Non-enforcing or non-`error` findings (and findings attributed to OTHER
     ///   issues in the slice) never block; their `[rule] message` strings are
     ///   returned as warnings for the caller to surface.
@@ -533,7 +538,8 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Neighborhood slice: the issue plus its transitive dependency closure in
         // BOTH directions. This is what coverage/reference rules need (the issue's
-        // children/parents) without re-scanning the whole repository.
+        // children/parents); rules are evaluated over this narrowed slice rather
+        // than the whole issue set.
         let slice = self.transition_neighborhood(issue)?;
 
         let namespaces = self.cached_namespaces().map_err(|e| anyhow!("{e}"))?;
@@ -552,12 +558,30 @@ impl<S: IssueStore> CommandExecutor<S> {
         let mut blocking: Vec<(String, String)> = Vec::new();
         let mut warnings: Vec<String> = Vec::new();
         for gf in &findings {
+            // A config-error finding (issue_id = None, e.g. a bad id-pattern regex
+            // or a missing key) carries no issue attribution, but it means the
+            // rule itself is broken. If that rule enforces (and is error-severity),
+            // the broken guard must BLOCK the transition rather than degrade to a
+            // warning — a typo in an `enforce = true` rule must not silently
+            // disable the guard. (The rule is already known to apply to this issue:
+            // `rules` was filtered by `when.matches(issue)`.)
+            let is_config_error = gf.is_config_error();
             let attributed_to_self = gf.issue_id.as_deref() == Some(issue.id.as_str());
-            let is_blocker = attributed_to_self
+            let pertains = attributed_to_self || is_config_error;
+            let is_blocker = pertains
                 && gf.finding.severity == Severity::Error
                 && enforcing.contains(gf.finding.rule.as_str());
             if is_blocker {
-                blocking.push((gf.finding.rule.clone(), gf.finding.message.clone()));
+                let message = if is_config_error {
+                    // Make clear the rule itself is misconfigured, not the issue.
+                    format!(
+                        "rule '{}' is misconfigured: {}; fix the rule or use --force",
+                        gf.finding.rule, gf.finding.message
+                    )
+                } else {
+                    gf.finding.message.clone()
+                };
+                blocking.push((gf.finding.rule.clone(), message));
             } else {
                 warnings.push(format!("[{}] {}", gf.finding.rule, gf.finding.message));
             }
@@ -601,8 +625,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// The passed `issue` already carries its TARGET state, so the slice contains
     /// that projected shape (not the stale persisted copy) for the issue under
     /// transition; all OTHER members are the persisted issues from the store.
-    /// Built from [`DependencyGraph`] reachability rather than `list_issues()`
-    /// wholesale so a `done` transition does not re-scan the whole repository.
+    /// Built from [`DependencyGraph`] reachability so the rule evaluators see only
+    /// the reachable slice, not every issue. (The graph itself is built from
+    /// `list_issues()`, so the read is repo-wide; the narrowing is in what gets
+    /// materialized and evaluated.)
     fn transition_neighborhood(&self, issue: &Issue) -> Result<Vec<Issue>> {
         use std::collections::HashSet;
 
@@ -611,6 +637,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         let graph = DependencyGraph::new(&refs);
 
         // Ids in the neighborhood: self + transitive deps + transitive dependents.
+        // Building the graph still reads every issue (`list_issues()`), but only
+        // the reachable slice is materialized and handed to the rule evaluators.
         let mut ids: HashSet<String> = HashSet::new();
         ids.insert(issue.id.clone());
         for dep in graph.get_transitive_dependents(&issue.id) {

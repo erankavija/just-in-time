@@ -884,9 +884,13 @@ pub enum Event {
     ///
     /// The transition-path counterpart of [`Event::LocalRuleBypassed`]: emitted
     /// once per enforce graph rule whose `error` finding was overridden by
-    /// `--force` during a `--state` transition, AFTER the save commits. Kept
-    /// distinct from the write-path bypass so the audit log can tell apart a
-    /// forced write from a forced transition.
+    /// `--force` during a `--state` transition. Unlike `LocalRuleBypassed` (which
+    /// the write path emits AFTER its save commits), this event is appended inside
+    /// `enforce_transition_graph_rules`, i.e. just BEFORE the caller persists the
+    /// issue save — the enforcement and its audit entry are produced together,
+    /// then the caller commits the transition. Kept distinct from the write-path
+    /// bypass so the audit log can tell apart a forced write from a forced
+    /// transition.
     GraphRuleBypassed {
         /// Event ID
         id: String,

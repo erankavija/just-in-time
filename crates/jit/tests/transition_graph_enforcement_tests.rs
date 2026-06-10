@@ -352,6 +352,185 @@ fn test_update_issue_state_path_enforces_done_graph_rule() {
     assert_eq!(after.state, State::InProgress, "blocked: nothing persisted");
 }
 
+/// A `dependency-shape` rule missing its `target` key: a CONFIG ERROR. The rule
+/// applies to `type:epic` issues at the done transition and `enforce = true`, so
+/// a broken (misconfigured) guard must BLOCK rather than silently degrade to a
+/// warning. Neighborhood-local (dependency-shape is not repo-wide), so it runs
+/// at transition time.
+const DONE_RULE_MISCONFIGURED: &str = r#"
+[[rules]]
+name = "epic-done-broken-shape"
+when = { type = "epic", state = "done" }
+severity = "error"
+enforce = true
+assert = { dependency-shape = { mode = "must" } }
+"#;
+
+#[test]
+fn test_enforce_rule_config_error_blocks_transition() {
+    // A typo in an `enforce = true` rule (here: a dependency-shape rule with no
+    // `target`) must NOT silently disable the guard. The config error blocks the
+    // done transition with exit 4, and the rendered error makes clear the rule
+    // itself is misconfigured.
+    let executor = executor_with_rules(DONE_RULE_MISCONFIGURED);
+    let epic = seed_issue(&executor, "Epic", &["type:epic"], State::InProgress);
+
+    let result = executor.update_issue(
+        &epic,
+        None,
+        None,
+        None,
+        Some(State::Done),
+        vec![],
+        vec![],
+        None,
+        false,
+    );
+
+    let err = result.expect_err("a misconfigured enforce rule must block the transition");
+    let blocked = err
+        .downcast_ref::<TransitionBlockedError>()
+        .expect("config error from an enforce rule maps to exit 4");
+    let rendered = blocked.to_string();
+    assert!(
+        rendered.contains("epic-done-broken-shape"),
+        "blocked error must name the broken rule: {rendered}"
+    );
+    assert!(
+        rendered.contains("misconfigured"),
+        "blocked error must flag the rule as misconfigured: {rendered}"
+    );
+
+    // Nothing persisted: the issue is still in progress.
+    let after = executor.storage().load_issue(&epic).unwrap();
+    assert_eq!(
+        after.state,
+        State::InProgress,
+        "a config-error block must persist nothing"
+    );
+}
+
+#[test]
+fn test_warn_rule_config_error_does_not_block_transition() {
+    // The same misconfigured rule, but `enforce = false`: a config error from a
+    // non-enforcing rule stays a warning and does not block the transition.
+    let rules = r#"
+[[rules]]
+name = "epic-done-broken-shape-warn"
+when = { type = "epic", state = "done" }
+severity = "error"
+enforce = false
+assert = { dependency-shape = { mode = "must" } }
+"#;
+    let executor = executor_with_rules(rules);
+    let epic = seed_issue(&executor, "Epic", &["type:epic"], State::InProgress);
+
+    let warnings = executor
+        .update_issue(
+            &epic,
+            None,
+            None,
+            None,
+            Some(State::Done),
+            vec![],
+            vec![],
+            None,
+            false,
+        )
+        .expect("a non-enforcing rule's config error must not block");
+
+    let after = executor.storage().load_issue(&epic).unwrap();
+    assert_eq!(
+        after.state,
+        State::Done,
+        "non-enforcing config error does not block"
+    );
+    assert!(
+        warnings
+            .iter()
+            .any(|w| w.contains("epic-done-broken-shape-warn") && w.contains("config error")),
+        "the config error must surface as a warning: {warnings:?}"
+    );
+}
+
+#[test]
+fn test_enforce_at_done_rule_blocks_gated_auto_done_path() {
+    // An enforce-at-done coverage/shape rule must also guard the Gated -> Done
+    // auto-transition path (gates pass via postcheck, then the issue would
+    // auto-complete). Without enforcement on this path an auto gate-pass could
+    // complete an issue past an enforce-at-done rule. Here: an epic with a
+    // PASSED gate (so it would auto-done) but NO design dependency (so the
+    // enforce-at-done rule fails) must stay Gated with the block surfaced.
+    use jit::domain::{GateState, GateStatus};
+
+    let executor = executor_with_rules(DONE_NEEDS_DESIGN);
+
+    let mut issue = Issue::new("Epic".to_string(), String::new());
+    issue.labels = vec!["type:epic".to_string()];
+    issue.state = State::Gated;
+    issue.gates_required = vec!["tests".to_string()];
+    issue.gates_status.insert(
+        "tests".to_string(),
+        GateState {
+            status: GateStatus::Passed,
+            updated_by: Some("ci:test".to_string()),
+            updated_at: chrono::Utc::now(),
+        },
+    );
+    let epic = issue.id.clone();
+    executor.storage().save_issue(issue).unwrap();
+
+    // Drive the Gated arm: it runs postchecks, which try to auto-transition to
+    // done. The enforce-at-done graph rule must block that auto-done.
+    let result = executor.update_issue_state(&epic, State::Gated);
+    let err = result.expect_err("enforce-at-done rule must block the gated auto-done path");
+    let blocked = err
+        .downcast_ref::<TransitionBlockedError>()
+        .expect("graph-rule block maps to exit 4");
+    assert!(
+        blocked.to_string().contains("epic-done-needs-design-dep"),
+        "the block must name the failing done rule: {blocked}"
+    );
+
+    // The issue stays gated: the auto-done never persisted.
+    let after = executor.storage().load_issue(&epic).unwrap();
+    assert_eq!(
+        after.state,
+        State::Gated,
+        "a blocked auto-done leaves the issue gated"
+    );
+    // No issue_completed event was emitted.
+    let events = executor.storage().read_events().unwrap();
+    assert!(
+        !events.iter().any(|e| e.get_type() == "issue_completed"),
+        "a blocked auto-done must not log completion"
+    );
+}
+
+#[test]
+fn test_update_issue_state_enforces_non_terminal_arm_transition() {
+    // M3: the `_` arm (e.g. Ready -> InProgress) previously skipped graph
+    // enforcement. An enforcing rule scoped to the in-progress state must now
+    // block this state-only transition too.
+    let rules = r#"
+[[rules]]
+name = "inprogress-needs-design-dep"
+when = { type = "epic", state = "in_progress" }
+severity = "error"
+enforce = true
+assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
+"#;
+    let executor = executor_with_rules(rules);
+    let epic = seed_issue(&executor, "Epic", &["type:epic"], State::Ready);
+
+    let result = executor.update_issue_state(&epic, State::InProgress);
+    let err = result.expect_err("the `_` arm must enforce graph rules");
+    assert!(err.downcast_ref::<TransitionBlockedError>().is_some());
+
+    let after = executor.storage().load_issue(&epic).unwrap();
+    assert_eq!(after.state, State::Ready, "blocked: nothing persisted");
+}
+
 #[test]
 fn test_done_rule_does_not_fire_on_non_done_transition() {
     // A `state = "done"` rule must not fire when transitioning to ready: the

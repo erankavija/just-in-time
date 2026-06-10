@@ -482,11 +482,17 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
-        // Transition-time graph-rule enforcement (CC-2) for the Ready and Done
-        // arms, after the dependency and gate guards above. This state-only path
-        // carries no content edits and no `--force`, so a blocking enforce rule
-        // returns a `TransitionBlockedError` (exit 4) and persists nothing.
-        if matches!(new_state, State::Ready | State::Done) && old_state != issue.state {
+        // Transition-time graph-rule enforcement (CC-2) for EVERY genuine state
+        // change that reaches here (Ready, Done, and the `_` arm's
+        // InProgress/Backlog/etc transitions — e.g. claim-driven
+        // Ready -> InProgress), after the dependency and gate guards above.
+        // `Rejected` is excluded: that arm deliberately bypasses all validation
+        // (abandonment must not be gated on coverage), and `Gated` returned early
+        // above (its auto-done path enforces inside `auto_transition_to_done`).
+        // This state-only path carries no content edits and no `--force`, so a
+        // blocking enforce rule returns a `TransitionBlockedError` (exit 4) and
+        // persists nothing.
+        if new_state != State::Rejected && old_state != issue.state {
             warnings.extend(self.enforce_transition_graph_rules(&issue, issue.state, false)?);
         }
 
@@ -712,6 +718,15 @@ impl<S: IssueStore> CommandExecutor<S> {
         if issue.should_auto_transition_to_done() {
             let old_state = issue.state;
             issue.state = State::Done;
+
+            // Transition-time graph-rule enforcement (CC-2) on the gates-pass
+            // auto-done path: runs AFTER gates pass but BEFORE the Done shape
+            // persists. A blocking enforce rule (e.g. an enforce-at-done coverage
+            // rule) returns a `TransitionBlockedError` (exit 4) and persists
+            // nothing, leaving the issue in its prior (Gated) state with the
+            // findings reported. This path carries no `--force`. Without this an
+            // auto gate-pass could complete an issue past an enforce-at-done rule.
+            self.enforce_transition_graph_rules(&issue, State::Done, false)?;
 
             let issue_id = issue.id.clone();
             self.storage.save_issue(issue)?;
