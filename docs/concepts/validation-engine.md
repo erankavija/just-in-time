@@ -73,6 +73,10 @@ that the engine carries none of them intrinsically:
 
 SDD is the *first* application, not a privileged one. The bug-triage,
 release-checklist, fresh-evidence, and nyquist examples use the **same grammar
+| [`cross-epic/`](../examples/cross-epic/rules.toml)                | Cross-epic collision detection: the `label-uniqueness` kind catches two unlinked epics both declaring the same `req:` id |
+
+SDD is the *first* application, not a privileged one. The bug-triage,
+release-checklist, fresh-evidence, and cross-epic examples use the **same grammar
 and the same engine** with zero code changes — that equivalence is the whole
 point.
 

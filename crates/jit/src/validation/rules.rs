@@ -674,6 +674,26 @@ pub enum Assertion {
         /// the issue carries `"<check_namespace>:<id>"`.
         check_namespace: Option<String>,
     },
+    /// Assert that each value in a label namespace is owned by at most one issue
+    /// across the entire repository. Graph scope, repo-wide.
+    ///
+    /// Config shape:
+    /// ```toml
+    /// assert = { label-uniqueness = { namespace = "req", scope = "all" } }
+    /// ```
+    ///
+    /// Semantics: group all issues matching the rule's `when` selector by each
+    /// `namespace:<value>` label they carry; any value declared by two or more
+    /// issues yields one finding naming the value and the colliding short-ids.
+    ///
+    /// `scope = "all"` is required for this kind. Repo-wide rules run only in
+    /// `jit validate` (not at transition time), because transition enforcement
+    /// evaluates only the issue's dependency neighborhood.
+    LabelUniqueness {
+        /// The label namespace whose values must be unique across all matching
+        /// issues (e.g. `"req"`).
+        namespace: String,
+    },
 }
 
 /// The legacy type-hierarchy warning expressed by an
@@ -725,7 +745,8 @@ impl Assertion {
             | Assertion::DependencyShape { .. }
             | Assertion::GateRecency { .. }
             | Assertion::TypeHierarchy { .. }
-            | Assertion::CriteriaLabelMatch { .. } => Scope::Graph,
+            | Assertion::CriteriaLabelMatch { .. }
+            | Assertion::LabelUniqueness { .. } => Scope::Graph,
             Assertion::CriteriaToCheck { .. } => Scope::Graph,
             _ => Scope::Local,
         }
@@ -770,6 +791,7 @@ impl Assertion {
     /// ```
     pub fn is_repo_wide_at_transition(&self) -> bool {
         match self {
+            Assertion::LabelUniqueness { .. } => true,
             // A label-reference rule is repo-wide unless explicitly scoped to
             // linked issues (which the neighborhood slice fully contains).
             Assertion::LabelReference { config } => {
@@ -1020,6 +1042,8 @@ struct RawAssert {
     criteria_label_match: Option<RawCriteriaLabelMatch>,
     #[serde(default, rename = "criteria-to-check")]
     criteria_to_check: Option<RawCriteriaToCheck>,
+    #[serde(default, rename = "label-uniqueness")]
+    label_uniqueness: Option<RawLabelUniqueness>,
 }
 
 /// The `gate-recency` assert payload: a max age plus an optional gate filter.
@@ -1160,6 +1184,19 @@ impl RawCriteriaToCheck {
     }
 }
 
+/// The `label-uniqueness` assert payload.
+///
+/// `namespace` names the label namespace whose values must be unique across all
+/// matching issues. `scope` must be `"all"` (the only permitted value for this
+/// kind; `"linked"` is not supported because uniqueness is inherently a
+/// repo-wide property).
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawLabelUniqueness {
+    namespace: String,
+    scope: String,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawRequireLabel {
@@ -1235,7 +1272,8 @@ impl RawAssert {
             || self.gate_recency.is_some()
             || self.type_hierarchy.is_some()
             || self.criteria_label_match.is_some()
-            || self.criteria_to_check.is_some();
+            || self.criteria_to_check.is_some()
+            || self.label_uniqueness.is_some();
         let raw_schema_present = self.json_schema.is_some();
 
         // Shorthand XOR file-schema: combining them in one rule is a config
@@ -1265,6 +1303,7 @@ impl RawAssert {
             self.type_hierarchy.is_some(),
             self.criteria_label_match.is_some(),
             self.criteria_to_check.is_some(),
+            self.label_uniqueness.is_some(),
         ]
         .into_iter()
         .filter(|present| *present)
@@ -1373,6 +1412,35 @@ impl RawAssert {
         }
         if let Some(ctc) = self.criteria_to_check {
             return ctc.into_assertion(rule);
+        }
+        if let Some(lu) = self.label_uniqueness {
+            // `scope = "all"` is the only permitted value. `"linked"` is rejected
+            // because uniqueness is inherently a repo-wide concept; the design
+            // explicitly reserves `"all"` for this kind to avoid synonym confusion
+            // with `label-reference`'s `"global"`. An absent scope is also rejected
+            // (future-proofing: scope is required, not defaulted).
+            match lu.scope.as_str() {
+                "all" => {}
+                "linked" => {
+                    return Err(RuleConfigError::InvalidAssertion {
+                        rule: rule.to_string(),
+                        message: "label-uniqueness does not support scope = \"linked\"; \
+                                  uniqueness is repo-wide — use scope = \"all\""
+                            .to_string(),
+                    });
+                }
+                other => {
+                    return Err(RuleConfigError::InvalidAssertion {
+                        rule: rule.to_string(),
+                        message: format!(
+                            "label-uniqueness 'scope' must be \"all\", found \"{other}\""
+                        ),
+                    });
+                }
+            }
+            return Ok(Assertion::LabelUniqueness {
+                namespace: lu.namespace,
+            });
         }
 
         // Unreachable: total == 1 guarantees one branch above matched.
@@ -2427,5 +2495,96 @@ assert = { label-value-pattern = { namespace = "sc", regex = '^\[hard\]\s+\w+' }
         assert_eq!(regex, r"^\[hard\]\s+\w+");
         let json = serde_json::to_value(&regex).unwrap();
         assert_eq!(json, serde_json::json!(r"^\[hard\]\s+\w+"));
+    }
+
+    #[test]
+    fn test_label_uniqueness_scope_all_parses_as_graph_rule() {
+        let toml = r#"
+[[rules]]
+name = "unique-req"
+when = { type = "epic" }
+severity = "error"
+assert = { label-uniqueness = { namespace = "req", scope = "all" } }
+"#;
+        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        assert_eq!(set.rules[0].scope, Scope::Graph);
+        match &set.rules[0].assert {
+            Assertion::LabelUniqueness { namespace } => {
+                assert_eq!(namespace, "req");
+            }
+            other => panic!("expected LabelUniqueness, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_label_uniqueness_missing_scope_is_rejected() {
+        // scope is required for label-uniqueness.
+        let toml = r#"
+[[rules]]
+name = "no-scope"
+assert = { label-uniqueness = { namespace = "req" } }
+"#;
+        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        // Missing required field "scope" is a TOML parse error (deny_unknown_fields
+        // does not apply here, but the missing field surfaces via serde).
+        assert!(
+            matches!(err, RuleConfigError::Toml(_)),
+            "missing scope must be a parse error, got {err:?}"
+        );
+    }
+
+    #[test]
+    fn test_label_uniqueness_scope_linked_is_rejected() {
+        // scope = "linked" is explicitly not supported for this kind.
+        let toml = r#"
+[[rules]]
+name = "linked-scope"
+assert = { label-uniqueness = { namespace = "req", scope = "linked" } }
+"#;
+        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        match err {
+            RuleConfigError::InvalidAssertion { rule, message } => {
+                assert_eq!(rule, "linked-scope");
+                assert!(
+                    message.contains("linked") && message.contains("all"),
+                    "error must mention 'linked' and 'all': {message}"
+                );
+            }
+            other => panic!("expected InvalidAssertion, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_label_uniqueness_unknown_scope_is_rejected() {
+        let toml = r#"
+[[rules]]
+name = "bad-scope"
+assert = { label-uniqueness = { namespace = "req", scope = "global" } }
+"#;
+        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        match err {
+            RuleConfigError::InvalidAssertion { rule, message } => {
+                assert_eq!(rule, "bad-scope");
+                assert!(
+                    message.contains("global") && message.contains("all"),
+                    "error must mention the bad value and the valid value: {message}"
+                );
+            }
+            other => panic!("expected InvalidAssertion, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_label_uniqueness_is_repo_wide_at_transition() {
+        let toml = r#"
+[[rules]]
+name = "unique-req"
+assert = { label-uniqueness = { namespace = "req", scope = "all" } }
+"#;
+        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        assert!(
+            set.rules[0].assert.is_repo_wide_at_transition(),
+            "label-uniqueness must be skipped at transition time"
+        );
     }
 }

@@ -82,6 +82,7 @@ pub fn desugar(assertion: &Assertion) -> Option<Value> {
         | Assertion::TypeHierarchy { .. }
         | Assertion::CriteriaLabelMatch { .. }
         | Assertion::CriteriaToCheck { .. } => None,
+        Assertion::LabelUniqueness { .. } => None,
     }
 }
 
@@ -686,6 +687,10 @@ mod tests {
             id_pattern: "[A-Z][A-Z0-9]*-[0-9]+".to_string(),
             gate_prefix: Some("verify:".to_string()),
             check_namespace: None,
+        })
+        .is_none());
+        assert!(desugar(&Assertion::LabelUniqueness {
+            namespace: "req".to_string(),
         })
         .is_none());
     }

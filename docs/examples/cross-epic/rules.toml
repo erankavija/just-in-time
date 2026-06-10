@@ -1,0 +1,59 @@
+# docs/examples/cross-epic/rules.toml
+#
+# Cross-epic contradiction example: detecting requirement-id ownership collisions
+# across unlinked parent issues.
+#
+# PROBLEM: Two independent epics in the same repository both declare req:REQ-01.
+# Each epic's implementation team satisfies "their" REQ-01, but the two ownership
+# claims are semantically contradictory — only one epic can own any given
+# requirement id. Without a cross-epic uniqueness check this collision is
+# invisible in per-issue validation.
+#
+# SOLUTION: The `label-uniqueness` rule kind checks that each value in a label
+# namespace appears on at most one matching issue across the whole repository.
+# It is repo-wide by design (scope = "all") and must run via `jit validate`.
+#
+# VALIDATE-ONLY LIMITATION: label-uniqueness rules run only in `jit validate`,
+# NOT at transition time. This is intentional: transition enforcement evaluates
+# only the issue's dependency neighborhood (not the whole repository), and
+# repo-wide uniqueness cannot be determined from a neighborhood slice alone.
+# Run `jit validate` after adding new `req:*` labels to catch collisions early.
+#
+# PERFORMANCE: The evaluator uses a single pass (one HashMap over all matching
+# issues), so it is O(n * k) in issues and labels per issue — suitable for
+# repositories with hundreds of issues. No N^2 scan.
+
+[[rules]]
+name = "cross-epic-req-uniqueness"
+# Match epics only: requirement-id ownership is an epic-level declaration.
+# Tasks and stories inherit via `satisfies:*`; they do not own requirements.
+when = { type = "epic" }
+severity = "error"
+# scope = "all" is required and is the only valid value for label-uniqueness.
+# (label-reference uses "global" for its own whole-repo scope; "all" is
+# reserved for label-uniqueness to keep the two semantics distinct.)
+assert = { label-uniqueness = { namespace = "req", scope = "all" } }
+
+# ---------------------------------------------------------------------------
+# Why this matters
+# ---------------------------------------------------------------------------
+#
+# In a multi-team repository two epics may independently choose REQ-01 as their
+# first requirement id, especially if teams use per-epic numbering. Once both
+# epics have children that `satisfies:REQ-01`, the `sdd-req-is-satisfied` rule
+# (label-reference, linked scope) will resolve the reference only within each
+# epic's linked neighborhood — so NEITHER epic surfaces a finding, and the
+# contradiction is hidden.
+#
+# cross-epic-req-uniqueness catches this at repository scale.
+#
+# Example collision:
+#   Epic A (id: aaaa) declares req:REQ-01 (their login requirement)
+#   Epic B (id: bbbb) declares req:REQ-01 (their search requirement)
+#
+# jit validate would report:
+#   error  cross-epic-req-uniqueness  label 'req:REQ-01' is declared by
+#          multiple issues: aaaa bbbb
+#
+# RESOLUTION: rename one epic's requirement id so both are globally unique
+# (e.g. rename Epic B's REQ-01 to AUTH-01 and REQ-02 to AUTH-02).

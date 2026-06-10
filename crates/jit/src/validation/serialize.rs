@@ -360,6 +360,14 @@ fn render_assertion(
             }
             format!("{{ criteria-to-check = {{ {} }} }}", parts.join(", "))
         }
+        Assertion::LabelUniqueness { namespace } => {
+            // scope = "all" is the only valid value; round-trip it explicitly
+            // so the reloaded rule is identical to the original.
+            format!(
+                "{{ label-uniqueness = {{ namespace = {}, scope = \"all\" }} }}",
+                toml_basic_string(namespace)
+            )
+        }
     }
 }
 
@@ -782,5 +790,32 @@ assert = { json-schema = "schemas/second.json" }
         let first = serialize_ruleset(&set).rules_toml;
         let second = serialize_ruleset(&reloaded).rules_toml;
         assert_eq!(first, second, "serialization must be canonical/stable");
+    }
+
+    #[test]
+    fn test_round_trip_label_uniqueness() {
+        // label-uniqueness serializes to `scope = "all"` and reloads cleanly.
+        let toml = r#"
+[[rules]]
+name = "unique-req"
+when = { type = "epic" }
+severity = "error"
+assert = { label-uniqueness = { namespace = "req", scope = "all" } }
+"#;
+        let set = RuleSet::from_toml_str(toml, std::path::Path::new("/nonexistent")).unwrap();
+        let out = serialize_ruleset(&set);
+        // The rendered form must contain the namespace and scope.
+        assert!(
+            out.rules_toml.contains("namespace = \"req\""),
+            "serialized namespace missing: {}",
+            out.rules_toml
+        );
+        assert!(
+            out.rules_toml.contains("scope = \"all\""),
+            "serialized scope missing: {}",
+            out.rules_toml
+        );
+        // Full round-trip.
+        assert_round_trips(&set);
     }
 }

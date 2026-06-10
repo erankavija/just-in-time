@@ -136,6 +136,39 @@ Valid state tokens: `backlog`, `ready`, `in_progress`, `gated`, `done`,
 `rejected`, `archived`. An unknown state name is rejected at load with an error
 naming the rule and listing the valid tokens.
 
+### Graph rule scope semantics (`.jit/rules.toml` `scope`)
+
+Several graph rule kinds accept a `scope` key in their `assert` table that
+controls which issues are consulted when resolving labels or checking uniqueness.
+The three scope values and the kinds that accept them are:
+
+| Scope value | Meaning                                 | Accepted by         |
+|-------------|-----------------------------------------|---------------------|
+| `"linked"`  | Only issues linked by a dependency edge | `label-reference`   |
+| `"global"`  | Any issue in the repository             | `label-reference`   |
+| `"all"`     | Any issue in the repository (repo-wide) | `label-uniqueness`  |
+
+**`"linked"` vs `"global"` (label-reference):** `scope = "linked"` constrains
+reference resolution to issues connected by a dependency edge in either
+direction. `scope = "global"` (the default) resolves against any issue in the
+repository. Use `"linked"` when a reference should only resolve within the same
+epic's dependency graph; use `"global"` when the reference must resolve globally
+regardless of graph structure.
+
+**`"all"` (label-uniqueness only):** `"all"` is reserved exclusively for
+`label-uniqueness`. It means "across the entire repository" and is the only
+permitted scope for that kind. `"all"` is a distinct token from `"global"` to
+keep the two semantics explicit: `label-reference`'s `global` resolves
+references; `label-uniqueness`'s `all` detects ownership collisions.
+
+**Transition-time limitation:** rules that use `scope = "all"` (i.e.
+`label-uniqueness`) run ONLY in `jit validate`. They are skipped at transition
+time because transition enforcement evaluates only the issue's dependency
+neighborhood, not the whole repository, and repo-wide uniqueness cannot be
+determined from a neighborhood slice. `label-reference` with `scope = "global"`
+is similarly skipped at transition time for the same reason. Run `jit validate`
+after adding or changing labels that are subject to uniqueness rules.
+
 ---
 
 ## Runtime Configuration

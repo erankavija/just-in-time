@@ -50,6 +50,8 @@ use crate::graph::DependencyGraph;
 use crate::type_hierarchy::{
     validate_orphans, validate_strategic_labels, HierarchyConfig, ValidationWarning,
 };
+use std::collections::HashMap;
+
 use crate::validation::engine::Finding;
 use crate::validation::rules::{
     Assertion, Rule, Scope, Selector, Severity, StatePredicate, TypeHierarchyKind,
@@ -366,10 +368,76 @@ fn evaluate_one(
             issues,
             repo_default_format,
         ),
+        Assertion::LabelUniqueness { namespace } => {
+            evaluate_label_uniqueness(rule, namespace, issues)
+        }
         // Non-graph kinds are never dispatched here (filtered by scope), but be
         // exhaustive and total rather than panic.
         _ => Vec::new(),
     }
+}
+
+/// Evaluate a `label-uniqueness` rule.
+///
+/// Every value in the configured namespace must appear on at most one matching
+/// issue. If two or more matching issues carry `namespace:<value>`, one finding
+/// is produced per colliding value, naming the value and the short-ids of all
+/// colliding issues.
+///
+/// The evaluation is a single pass: one `HashMap<value, Vec<short_id>>` is
+/// built over the matching issue slice, and groups with length >= 2 are
+/// reported. This is O(n * k) in issues and labels per issue — no N² scan.
+///
+/// # Rule-wide semantics
+///
+/// This kind is always `scope = "all"` (validated at load). It is therefore
+/// repo-wide and must NOT run at transition time (only in `jit validate`).
+/// `Assertion::is_repo_wide_at_transition` returns `true` for this variant so
+/// the transition enforcer skips it automatically.
+///
+/// # Finding format
+///
+/// `"label 'req:REQ-01' is declared by multiple issues: abc1 def2"` — names
+/// the value and the short-ids of all declaring issues (space-separated, in
+/// the order they appear in the issue slice). One finding per colliding value.
+fn evaluate_label_uniqueness(rule: &Rule, namespace: &str, issues: &[Issue]) -> Vec<GraphFinding> {
+    // Single pass: collect the short-ids of every matching issue that carries
+    // each value in the namespace. Using HashMap for O(1) insertion; the
+    // entries are collected into a BTreeMap at the end for deterministic order.
+    let mut value_to_ids: HashMap<String, Vec<String>> = HashMap::new();
+
+    for issue in issues {
+        if !rule.when.matches(issue) {
+            continue;
+        }
+        for value in values_in_namespace(issue, namespace) {
+            value_to_ids
+                .entry(value.to_string())
+                .or_default()
+                .push(issue.short_id().to_string());
+        }
+    }
+
+    // Report one finding per value owned by 2 or more issues. Sort by value
+    // for deterministic output regardless of HashMap iteration order.
+    let mut collisions: Vec<(String, Vec<String>)> = value_to_ids
+        .into_iter()
+        .filter(|(_, ids)| ids.len() >= 2)
+        .collect();
+    collisions.sort_by(|(a, _), (b, _)| a.cmp(b));
+
+    collisions
+        .into_iter()
+        .map(|(value, ids)| {
+            GraphFinding::unattributed(finding(
+                rule,
+                format!(
+                    "label '{namespace}:{value}' is declared by multiple issues: {}",
+                    ids.join(" ")
+                ),
+            ))
+        })
+        .collect()
 }
 
 /// Build a [`Finding`] carrying this rule's name and severity.
@@ -2295,6 +2363,195 @@ mod tests {
         assert!(
             findings.is_empty(),
             "no namespace labels -> no findings: {findings:?}"
+        );
+    }
+
+    fn uniqueness_rule(namespace: &str) -> Rule {
+        rule_from(&format!(
+            "[[rules]]\nname = \"uniqueness\"\nseverity = \"error\"\n\
+             assert = {{ label-uniqueness = {{ namespace = \"{namespace}\", scope = \"all\" }} }}\n"
+        ))
+    }
+
+    #[test]
+    fn test_label_uniqueness_collision_across_two_unlinked_issues() {
+        // Two unlinked epics both declaring req:REQ-01 — one finding naming the
+        // value and both short-ids.
+        let rule = uniqueness_rule("req");
+        let mut epic_a = issue("epic-a", &["type:epic", "req:REQ-01"]);
+        let epic_b = issue("epic-b", &["type:epic", "req:REQ-01"]);
+        // Deliberately no dependency edge between them.
+        let id_a = epic_a.short_id().to_string();
+        let id_b = epic_b.short_id().to_string();
+        // Set distinct short ids so the message is testable.
+        epic_a.id = format!("aaa-{}", epic_a.id);
+
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[epic_a, epic_b],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        assert_eq!(findings.len(), 1, "one collision: {findings:?}");
+        let msg = &findings[0].finding.message;
+        assert!(msg.contains("req:REQ-01"), "message names the value: {msg}");
+        assert!(
+            msg.contains(&id_a) || msg.contains(&id_b),
+            "message names colliding ids: {msg}"
+        );
+        // Config errors never have issue_id; uniqueness findings have no specific
+        // attributed issue either (they are cross-issue).
+        assert!(!findings[0].is_config_error());
+    }
+
+    #[test]
+    fn test_label_uniqueness_no_finding_for_unique_values() {
+        // Two epics each declaring a distinct req — no collision.
+        let rule = uniqueness_rule("req");
+        let epic_a = issue("epic-a", &["type:epic", "req:REQ-01"]);
+        let epic_b = issue("epic-b", &["type:epic", "req:REQ-02"]);
+
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[epic_a, epic_b],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        assert!(
+            findings.is_empty(),
+            "distinct req values must not collide: {findings:?}"
+        );
+    }
+
+    #[test]
+    fn test_label_uniqueness_when_selector_filters_issues() {
+        // The rule has `when = { type = "epic" }` via `rule_from`.
+        // A task also carrying req:REQ-01 is NOT included because it fails the
+        // `when` selector — only matching issues are checked for uniqueness.
+        let rule = rule_from(
+            "[[rules]]\nname = \"uniqueness\"\nwhen = { type = \"epic\" }\n\
+             severity = \"error\"\n\
+             assert = { label-uniqueness = { namespace = \"req\", scope = \"all\" } }\n",
+        );
+        let epic = issue("epic", &["type:epic", "req:REQ-01"]);
+        let task = issue("task", &["type:task", "req:REQ-01"]); // not matched
+
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[epic, task],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        assert!(
+            findings.is_empty(),
+            "a task not matching the when-selector must not trigger uniqueness: {findings:?}"
+        );
+    }
+
+    #[test]
+    fn test_label_uniqueness_finding_names_value_and_both_short_ids() {
+        // Verify the finding message format precisely: names the value and both
+        // short-ids so actionable remediation is possible.
+        let rule = uniqueness_rule("req");
+        let mut epic_a = issue("epic-a", &["req:REQ-42"]);
+        let mut epic_b = issue("epic-b", &["req:REQ-42"]);
+        // Use deterministic prefixes so we can assert them in the message.
+        epic_a.id = "aaaa0000-0000-0000-0000-000000000000".to_string();
+        epic_b.id = "bbbb0000-0000-0000-0000-000000000000".to_string();
+
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[epic_a.clone(), epic_b.clone()],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        assert_eq!(findings.len(), 1);
+        let msg = &findings[0].finding.message;
+        assert!(
+            msg.contains("req:REQ-42"),
+            "message must name the value: {msg}"
+        );
+        assert!(
+            msg.contains(&epic_a.short_id()),
+            "message must contain short-id of first issue: {msg}"
+        );
+        assert!(
+            msg.contains(&epic_b.short_id()),
+            "message must contain short-id of second issue: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_label_uniqueness_is_repo_wide_at_transition() {
+        // label-uniqueness must return true from is_repo_wide_at_transition so
+        // the transition enforcer skips it and it only runs in `jit validate`.
+        let rule = uniqueness_rule("req");
+        assert!(
+            rule.assert.is_repo_wide_at_transition(),
+            "label-uniqueness must be skipped at transition time"
+        );
+    }
+
+    #[test]
+    fn test_label_uniqueness_large_fixture_correctness() {
+        // Performance and correctness: build 400 issues (300 with unique req values,
+        // 100 forming 50 collision pairs) and assert the evaluation finds exactly 50
+        // collision findings and the correct values.
+        //
+        // Design note: this is O(n * k) — a single HashMap pass over issues × labels.
+        // No N² scan. The assertion on finding count confirms correctness on a
+        // realistic repo-scale fixture. Timing is not asserted (CI variability), but
+        // the single-pass design makes this fast even for larger repos.
+        let rule = uniqueness_rule("req");
+
+        let mut issues: Vec<Issue> = Vec::with_capacity(400);
+
+        // 300 issues with unique values (no collision).
+        for i in 0..300u32 {
+            let label = format!("req:UNIQ-{i:04}");
+            issues.push(issue(&format!("unique-{i}"), &[label.as_str()]));
+        }
+        // 50 collision pairs: two issues per colliding value.
+        for i in 0..50u32 {
+            let label = format!("req:COLL-{i:04}");
+            issues.push(issue(&format!("coll-a-{i}"), &[label.as_str()]));
+            issues.push(issue(&format!("coll-b-{i}"), &[label.as_str()]));
+        }
+        assert_eq!(issues.len(), 400);
+
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &issues,
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+
+        // Exactly 50 findings — one per colliding value, none for the unique ones.
+        assert_eq!(
+            findings.len(),
+            50,
+            "expected 50 collision findings, got {}: {findings:?}",
+            findings.len()
+        );
+        // Every finding names a COLL- value.
+        assert!(
+            findings.iter().all(|f| f.finding.message.contains("COLL-")),
+            "all findings must name a collision value: {findings:?}"
+        );
+        // No finding names a UNIQ- value.
+        assert!(
+            !findings.iter().any(|f| f.finding.message.contains("UNIQ-")),
+            "unique values must not produce findings: {findings:?}"
         );
     }
 }

@@ -98,6 +98,7 @@ fn test_all_example_rulesets_load() {
         "release-checklist",
         "fresh-evidence",
         "nyquist",
+        "cross-epic",
     ] {
         let set = load_example(name);
         assert!(
@@ -859,5 +860,170 @@ mod nyquist {
         assert_eq!(rule.severity, jit::validation::rules::Severity::Error);
         assert!(rule.enforce, "the done-scoped rule must enforce");
         assert_eq!(rule.scope, Scope::Graph);
+    }
+}
+
+mod cross_epic {
+    use super::*;
+
+    /// A pair of unlinked epics both declaring the same req value — the
+    /// archetypal cross-epic collision the example is designed to catch.
+    fn two_epics_colliding_on(req_value: &str) -> (Issue, Issue) {
+        let label = format!("req:{req_value}");
+        let mut epic_a = Issue::new(format!("Epic A ({req_value})"), String::new());
+        epic_a.labels = vec!["type:epic".to_string(), label.clone()];
+        let mut epic_b = Issue::new(format!("Epic B ({req_value})"), String::new());
+        epic_b.labels = vec!["type:epic".to_string(), label];
+        // No dependency edge — the point is that the collision is cross-epic.
+        (epic_a, epic_b)
+    }
+
+    #[test]
+    fn test_cross_epic_ruleset_loads() {
+        let set = load_example("cross-epic");
+        assert!(
+            !set.rules.is_empty(),
+            "cross-epic example must define at least one rule"
+        );
+        // The rule must be graph-scoped (label-uniqueness is always graph-scoped).
+        assert!(
+            set.rules.iter().any(|r| r.scope == Scope::Graph),
+            "cross-epic example must define a graph rule"
+        );
+    }
+
+    #[test]
+    fn test_cross_epic_collision_detected() {
+        // Two unlinked epics both declaring req:REQ-01 → one finding.
+        let set = load_example("cross-epic");
+        let rules = graph_rules(&set);
+
+        let (epic_a, epic_b) = two_epics_colliding_on("REQ-01");
+        let findings = issue_graph_findings(&rules, &[epic_a, epic_b]);
+
+        assert_eq!(
+            findings.len(),
+            1,
+            "expected one collision finding for req:REQ-01: {findings:?}"
+        );
+        let msg = &findings[0].finding.message;
+        assert!(
+            msg.contains("req:REQ-01"),
+            "finding must name the colliding label value: {msg}"
+        );
+        assert_eq!(
+            findings[0].finding.rule, "cross-epic-req-uniqueness",
+            "finding must be attributed to the right rule"
+        );
+    }
+
+    #[test]
+    fn test_cross_epic_no_finding_for_unique_req_ids() {
+        // Two unlinked epics with DISTINCT req values → no finding.
+        let set = load_example("cross-epic");
+        let rules = graph_rules(&set);
+
+        let mut epic_a = Issue::new("Epic A".to_string(), String::new());
+        epic_a.labels = vec!["type:epic".to_string(), "req:REQ-01".to_string()];
+        let mut epic_b = Issue::new("Epic B".to_string(), String::new());
+        epic_b.labels = vec!["type:epic".to_string(), "req:REQ-02".to_string()];
+
+        let findings = issue_graph_findings(&rules, &[epic_a, epic_b]);
+        assert!(
+            findings.is_empty(),
+            "distinct req values must not collide: {findings:?}"
+        );
+    }
+
+    #[test]
+    fn test_cross_epic_finding_names_colliding_short_ids() {
+        // The finding message must name the short-ids of both colliding epics
+        // so the author knows which issues to fix.
+        let set = load_example("cross-epic");
+        let rules = graph_rules(&set);
+
+        let (epic_a, epic_b) = two_epics_colliding_on("REQ-01");
+        let id_a = epic_a.short_id().to_string();
+        let id_b = epic_b.short_id().to_string();
+
+        let findings = issue_graph_findings(&rules, &[epic_a, epic_b]);
+        assert_eq!(findings.len(), 1);
+        let msg = &findings[0].finding.message;
+        assert!(
+            msg.contains(&id_a),
+            "finding must name short-id of epic A ({id_a}): {msg}"
+        );
+        assert!(
+            msg.contains(&id_b),
+            "finding must name short-id of epic B ({id_b}): {msg}"
+        );
+    }
+
+    #[test]
+    fn test_cross_epic_rule_is_repo_wide_at_transition() {
+        // label-uniqueness must be skipped at transition time — verify the
+        // example rule carries the correct is_repo_wide_at_transition flag.
+        let set = load_example("cross-epic");
+        let rule = set
+            .rules
+            .iter()
+            .find(|r| r.name == "cross-epic-req-uniqueness")
+            .expect("example must define cross-epic-req-uniqueness");
+        assert!(
+            rule.assert.is_repo_wide_at_transition(),
+            "label-uniqueness must be skipped at transition time"
+        );
+    }
+
+    #[test]
+    fn test_cross_epic_large_fixture_50_collisions() {
+        // Performance and correctness on a repo-scale fixture: 300 unique-value
+        // epics + 100 colliding epics forming 50 collision pairs = 400 epics.
+        // The evaluator must find exactly 50 findings (one per colliding value).
+        //
+        // Design: single-pass O(n * k) HashMap; no N^2 scan. This test confirms
+        // correctness at scale. Timing is not asserted (CI variability is
+        // unpredictable), but the algorithm is documented as single-pass.
+        let set = load_example("cross-epic");
+        let rules = graph_rules(&set);
+
+        let mut issues: Vec<Issue> = Vec::with_capacity(400);
+
+        // 300 epics with unique req values.
+        for i in 0..300u32 {
+            let mut epic = Issue::new(format!("unique-epic-{i}"), String::new());
+            epic.labels = vec!["type:epic".to_string(), format!("req:UNIQ-{i:04}")];
+            issues.push(epic);
+        }
+        // 50 collision pairs: two epics per colliding value.
+        for i in 0..50u32 {
+            let label = format!("req:COLL-{i:04}");
+            let mut a = Issue::new(format!("coll-a-{i}"), String::new());
+            a.labels = vec!["type:epic".to_string(), label.clone()];
+            let mut b = Issue::new(format!("coll-b-{i}"), String::new());
+            b.labels = vec!["type:epic".to_string(), label];
+            issues.push(a);
+            issues.push(b);
+        }
+        assert_eq!(issues.len(), 400);
+
+        let findings = issue_graph_findings(&rules, &issues);
+
+        assert_eq!(
+            findings.len(),
+            50,
+            "expected 50 collision findings, got {}: {findings:?}",
+            findings.len()
+        );
+        // Every finding names a COLL- value.
+        assert!(
+            findings.iter().all(|f| f.finding.message.contains("COLL-")),
+            "all findings must name a collision value: {findings:?}"
+        );
+        // No finding names a UNIQ- value.
+        assert!(
+            !findings.iter().any(|f| f.finding.message.contains("UNIQ-")),
+            "unique values must not produce findings: {findings:?}"
+        );
     }
 }
