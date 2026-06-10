@@ -465,6 +465,20 @@ impl<S: IssueStore> CommandExecutor<S> {
                 // Run postchecks when moving to Gated
                 issue.state = State::Gated;
 
+                // Transition-time graph-rule enforcement (CC-2) for the explicit
+                // gated transition, before anything persists — a
+                // `when = { state = "gated" }` enforce rule must not be
+                // bypassable via `--state gated`. (The arm's auto-done path
+                // additionally enforces against `done` inside
+                // `auto_transition_to_done`.)
+                if old_state != State::Gated {
+                    warnings.extend(self.enforce_transition_graph_rules(
+                        &issue,
+                        State::Gated,
+                        false,
+                    )?);
+                }
+
                 let issue_id = issue.id.clone();
                 self.storage.save_issue(issue)?;
 
@@ -488,7 +502,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Ready -> InProgress), after the dependency and gate guards above.
         // `Rejected` is excluded: that arm deliberately bypasses all validation
         // (abandonment must not be gated on coverage), and `Gated` returned early
-        // above (its auto-done path enforces inside `auto_transition_to_done`).
+        // above after enforcing in its own arm (its auto-done path additionally
+        // enforces inside `auto_transition_to_done`).
         // This state-only path carries no content edits and no `--force`, so a
         // blocking enforce rule returns a `TransitionBlockedError` (exit 4) and
         // persists nothing.

@@ -532,6 +532,30 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 }
 
 #[test]
+fn test_update_issue_state_enforces_explicit_gated_transition() {
+    // The explicit `--state gated` arm previously saved and returned before
+    // graph enforcement, so a `state = "gated"` enforce rule was bypassable.
+    // It must now block before anything persists.
+    let rules = r#"
+[[rules]]
+name = "gated-needs-design-dep"
+when = { type = "epic", state = "gated" }
+severity = "error"
+enforce = true
+assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
+"#;
+    let executor = executor_with_rules(rules);
+    let epic = seed_issue(&executor, "Epic", &["type:epic"], State::InProgress);
+
+    let result = executor.update_issue_state(&epic, State::Gated);
+    let err = result.expect_err("the gated arm must enforce graph rules");
+    assert!(err.downcast_ref::<TransitionBlockedError>().is_some());
+
+    let after = executor.storage().load_issue(&epic).unwrap();
+    assert_eq!(after.state, State::InProgress, "blocked: nothing persisted");
+}
+
+#[test]
 fn test_done_rule_does_not_fire_on_non_done_transition() {
     // A `state = "done"` rule must not fire when transitioning to ready: the
     // selector does not match the issue in the ready target state.
