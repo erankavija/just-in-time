@@ -571,42 +571,29 @@ fn test_substitute_argv_prefix_collision() {
 
 #[test]
 fn test_jit_cmd_strips_jit_data_dir() {
-    // Verify that jit_cmd removes JIT_DATA_DIR even when it is set in the
-    // calling process's environment.  We inspect the Command's env via a
-    // round-trip: spawn `env` and check the output does not contain JIT_DATA_DIR.
-    // (We use a tempdir as the working directory so the command can actually run.)
-    use std::env;
+    // Verify jit_cmd explicitly removes the isolation-breaking variables and
+    // pins JIT_AGENT_ID, by inspecting the Command's configured env overrides
+    // directly (Command::get_envs reports removals as (key, None)). No
+    // process-global env mutation is needed, so this is safe under parallel
+    // test execution.
     let tmp = TempDir::new().expect("tempdir for env test");
+    let cmd = jit_cmd(tmp.path());
 
-    // Set JIT_DATA_DIR in this test process.
-    unsafe { env::set_var("JIT_DATA_DIR", "/tmp/should-not-appear") };
+    let envs: std::collections::HashMap<_, _> = cmd
+        .get_envs()
+        .map(|(k, v)| (k.to_os_string(), v.map(|v| v.to_os_string())))
+        .collect();
 
-    // Ask the child to print its environment.
-    let out = jit_cmd(tmp.path())
-        .arg("--version") // any valid jit subcommand; we only care about env
-        .env("PATH", env::var("PATH").unwrap_or_default()) // ensure binary is found
-        .output();
-
-    // Restore caller's environment regardless of outcome.
-    unsafe { env::remove_var("JIT_DATA_DIR") };
-
-    // The spawn itself may fail if the binary isn't built; treat that as a skip.
-    let out = match out {
-        Ok(o) => o,
-        Err(_) => return,
-    };
-
-    // JIT_DATA_DIR must not reach the child.  We verify indirectly: jit with
-    // JIT_DATA_DIR set to a nonexistent path would still exit 0 for --version,
-    // but we can assert the variable was removed by checking the child does NOT
-    // emit the sentinel value we set.
-    let combined = format!(
-        "{}{}",
-        String::from_utf8_lossy(&out.stdout),
-        String::from_utf8_lossy(&out.stderr)
-    );
-    assert!(
-        !combined.contains("/tmp/should-not-appear"),
-        "JIT_DATA_DIR sentinel leaked into child output: {combined}"
+    for removed in ["JIT_DATA_DIR", "JIT_ALLOW_DELETION", "JIT_WORKTREE_MODE"] {
+        assert_eq!(
+            envs.get(std::ffi::OsStr::new(removed)),
+            Some(&None),
+            "jit_cmd must remove {removed} from the child environment"
+        );
+    }
+    assert_eq!(
+        envs.get(std::ffi::OsStr::new("JIT_AGENT_ID")),
+        Some(&Some("agent:steering-harness".into())),
+        "jit_cmd must pin JIT_AGENT_ID for determinism"
     );
 }
