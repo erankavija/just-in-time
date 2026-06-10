@@ -145,8 +145,9 @@ assert = { criteria-label-match = { namespace = "req", criteria-section = "succe
 # --- Graph: every [hard] criterion is satisfied by a child (at done) --------
 # Coverage. The epic's canonical `## Success Criteria` items are the SOURCE set;
 # `marker = "[hard]"` means only hard criteria are required (aspirational ones
-# are advisory). A criterion id is covered when some child that depends on the
-# epic carries `satisfies:<id>` and is in state `done`.
+# are advisory). A criterion id is covered when some child the epic depends on
+# (containment: `jit dep add <epic> <child>`, the parent-depends-on-children
+# convention) carries `satisfies:<id>` and is in state `done`.
 #
 # `when = { type = "epic", state = "done" }` scopes this rule to the done
 # transition only. During planning (in_progress, ready, etc.) an in-flight epic
@@ -160,7 +161,7 @@ name = "sdd-hard-criteria-covered"
 when = { type = "epic", state = "done" }
 severity = "error"
 enforce = true
-assert = { label-coverage = { criteria-section = "success_criteria", marker = "[hard]", id-pattern = "REQ-[0-9]+", satisfies-namespace = "satisfies", child-state = "done", child-link = "dependents" } }
+assert = { label-coverage = { criteria-section = "success_criteria", marker = "[hard]", id-pattern = "REQ-[0-9]+", satisfies-namespace = "satisfies", child-state = "done", child-link = "dependencies" } }
 
 # --- Graph: every satisfies: reference resolves to a declared req: ----------
 # Reference integrity within the epic's own dependency graph. A child claiming

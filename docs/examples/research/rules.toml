@@ -165,7 +165,9 @@ assert = { criteria-label-match = { namespace = "hyp", criteria-section = "hypot
 # is not a validation failure; it is work in progress.
 #
 # When the goal transitions to done, every `[hard]` hypothesis in `## Hypotheses`
-# must be covered by at least one done experiment that (a) depends on the goal
+# must be covered by at least one done experiment that (a) the goal depends on
+# (containment: the goal lists its experiments as dependencies, the same
+# parent-depends-on-children convention `jit dep add <goal> <experiment>` wires)
 # and (b) carries `tests:<id>`. The block exits 4 and prints which hypothesis ids
 # are uncovered; `jit issue update --state done --force` bypasses the block and
 # records a graph-rule-bypassed event in the audit log.
@@ -178,7 +180,7 @@ name = "research-hard-hypotheses-covered-at-done"
 when = { type = "goal", state = "done" }
 severity = "error"
 enforce = true
-assert = { label-coverage = { criteria-section = "hypotheses", marker = "[hard]", id-pattern = "H-[0-9]+", satisfies-namespace = "tests", child-state = "done", child-link = "dependents" } }
+assert = { label-coverage = { criteria-section = "hypotheses", marker = "[hard]", id-pattern = "H-[0-9]+", satisfies-namespace = "tests", child-state = "done", child-link = "dependencies" } }
 
 # --- Graph: tests: resolves to a declared hyp: ----------------------------
 # Reference integrity in the OTHER direction: an experiment's `tests:<id>` label

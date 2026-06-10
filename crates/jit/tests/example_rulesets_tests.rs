@@ -199,12 +199,12 @@ fn test_sdd_graph_coverage_and_reference_pass_when_satisfied() {
     // are active and must produce no findings when the criterion is covered.
     let mut epic = sdd_compliant_epic();
     epic.state = State::Done;
-    // A done child that depends on the epic and satisfies the one [hard]
+    // A done child the epic depends on (containment), satisfying the one [hard]
     // criterion REQ-01.
     let mut child = Issue::new("implement REQ-01".to_string(), String::new());
     child.labels = vec!["type:task".to_string(), "satisfies:REQ-01".to_string()];
-    child.dependencies = vec![epic.id.clone()];
     child.state = State::Done;
+    epic.dependencies.push(child.id.clone());
 
     let findings = issue_graph_findings(&rules, &[epic, child]);
     assert!(
@@ -235,13 +235,13 @@ fn test_sdd_graph_reference_warns_on_dangling_satisfies() {
     let set = load_example("sdd");
     let rules = graph_rules(&set);
 
-    let epic = sdd_compliant_epic(); // declares req:REQ-01
+    let mut epic = sdd_compliant_epic(); // declares req:REQ-01
 
     // Child satisfies a req id that is declared NOWHERE -> dangling reference.
     let mut child = Issue::new("rogue".to_string(), String::new());
     child.labels = vec!["type:task".to_string(), "satisfies:REQ-99".to_string()];
-    child.dependencies = vec![epic.id.clone()];
     child.state = State::Done;
+    epic.dependencies.push(child.id.clone());
 
     let findings = issue_graph_findings(&rules, &[epic, child]);
     assert!(
@@ -270,8 +270,8 @@ fn test_sdd_graph_stray_req_label_is_reported() {
     // A done child satisfies only REQ-01.
     let mut child = Issue::new("implement REQ-01".to_string(), String::new());
     child.labels = vec!["type:task".to_string(), "satisfies:REQ-01".to_string()];
-    child.dependencies = vec![epic.id.clone()];
     child.state = State::Done;
+    epic.dependencies.push(child.id.clone());
 
     let findings = issue_graph_findings(&rules, &[epic, child]);
     // The always-on stray check catches REQ-77 immediately.
@@ -716,11 +716,11 @@ mod sdd_lifecycle {
         epic.labels = vec!["type:epic".to_string(), "req:REQ-01".to_string()];
         epic.state = State::InProgress;
 
-        // A child that depends on the epic but is still in progress (not done).
+        // A child the epic depends on (containment), still in progress (not done).
         let mut child = Issue::new("implement REQ-01".to_string(), String::new());
         child.labels = vec!["type:task".to_string(), "satisfies:REQ-01".to_string()];
-        child.dependencies = vec![epic.id.clone()];
         child.state = State::InProgress;
+        epic.dependencies.push(child.id.clone());
 
         let findings = issue_graph_findings(&rules, &[epic, child]);
         let error_findings: Vec<_> = findings
@@ -808,8 +808,8 @@ mod sdd_lifecycle {
         // A child in progress (not done) so the in-flight state is realistic.
         let mut child = Issue::new("implement REQ-01".to_string(), String::new());
         child.labels = vec!["type:task".to_string(), "satisfies:REQ-01".to_string()];
-        child.dependencies = vec![epic.id.clone()];
         child.state = State::InProgress;
+        epic.dependencies.push(child.id.clone());
 
         let findings = issue_graph_findings(&rules, &[epic, child]);
 
@@ -852,14 +852,14 @@ mod sdd_lifecycle {
         let epic_id = epic.id.clone();
         executor.storage().save_issue(epic).unwrap();
 
-        // Seed a done child that depends on the epic and satisfies REQ-01.
+        // Seed a done child the epic depends on (containment) satisfying REQ-01.
         let mut child = Issue::new("implement REQ-01".to_string(), String::new());
         child.labels = vec!["type:task".to_string(), "satisfies:REQ-01".to_string()];
         child.state = State::Done;
         let child_id = child.id.clone();
         executor.storage().save_issue(child).unwrap();
-        // Wire the dependency: child depends on the epic (epic is the parent).
-        executor.add_dependency(&child_id, &epic_id).unwrap();
+        // Wire containment: the epic depends on its child.
+        executor.add_dependency(&epic_id, &child_id).unwrap();
 
         // Transition to done: must succeed.
         let result = executor.update_issue(
@@ -1344,7 +1344,7 @@ mod research {
             - accuracy reached 96.3%, exceeding the 95% threshold\n";
         let mut exp = Issue::new("Scale training data".to_string(), body.to_string());
         exp.labels = vec!["type:experiment".to_string(), "tests:H-1".to_string()];
-        exp.dependencies = vec![goal_id.to_string()];
+        let _ = goal_id; // containment is wired by the caller: goal depends on exp
         exp.state = State::Done;
         exp
     }
@@ -1661,13 +1661,14 @@ assert = { label-coverage = { criteria-section = "hypotheses", marker = "[hard]"
 
     #[test]
     fn test_research_happy_path_covered_goal_completes() {
-        // Goal with [hard] H-1; one done experiment that depends on the goal and
+        // Goal with [hard] H-1; one done experiment the goal depends on, which
         // carries tests:H-1. Graph findings must be empty; done transition succeeds.
         let set = load_example("research");
         let rules = graph_rules(&set);
 
-        let goal = compliant_goal();
+        let mut goal = compliant_goal();
         let exp = compliant_experiment(&goal.id);
+        goal.dependencies.push(exp.id.clone());
 
         let findings = issue_graph_findings(&rules, &[goal.clone(), exp]);
         let error_findings: Vec<_> = findings
@@ -1688,8 +1689,9 @@ assert = { label-coverage = { criteria-section = "hypotheses", marker = "[hard]"
         let set = load_example("research");
         let rules = graph_rules(&set);
 
-        let goal = compliant_goal(); // declares hyp:H-1
+        let mut goal = compliant_goal(); // declares hyp:H-1
         let mut exp = compliant_experiment(&goal.id);
+        goal.dependencies.push(exp.id.clone());
         // Override the tests: label to reference a nonexistent hypothesis.
         exp.labels = vec![
             "type:experiment".to_string(),
