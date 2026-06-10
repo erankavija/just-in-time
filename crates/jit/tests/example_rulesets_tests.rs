@@ -1581,7 +1581,7 @@ name = "research-hard-hypotheses-covered-at-done"
 when = { type = "goal", state = "done" }
 severity = "error"
 enforce = true
-assert = { label-coverage = { criteria-section = "hypotheses", marker = "[hard]", id-pattern = "H-[0-9]+", satisfies-namespace = "tests", child-state = "done", child-link = "dependents" } }
+assert = { label-coverage = { criteria-section = "hypotheses", marker = "[hard]", id-pattern = "H-[0-9]+", satisfies-namespace = "tests", child-state = "done", child-link = "dependencies" } }
 "#;
         std::fs::write(storage.root().join("rules.toml"), rules_toml).unwrap();
         CommandExecutor::new(storage)

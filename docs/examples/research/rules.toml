@@ -14,7 +14,7 @@
 #   type:goal       — a research goal. Its body states what the program is
 #                     trying to establish. It owns the canonical list of
 #                     hypotheses in a structured `## Hypotheses` section
-#                     (each item `H-N: <statement>`) and a `## Success Criteria`
+#                     (each item `[hard]|[exploratory] H-N: <statement>`) and a `## Success Criteria`
 #                     section that narrows the goal to falsifiable outcomes.
 #                     Goals carry `hyp:<id>` labels, one per hypothesis the goal
 #                     is responsible for.
@@ -34,7 +34,7 @@
 #   1. Structure — a goal body must have `## Hypotheses` and `## Success Criteria`
 #      sections (require-section, enforce = true). An experiment body must have
 #      `## Method` and `## Evidence` sections. Raw JSON schemas validate that the
-#      items in `## Hypotheses` are shaped `H-N: <text>` (TOML cannot express
+#      items in `## Hypotheses` are shaped `[hard]|[exploratory] H-N: <text>` (TOML cannot express
 #      `pattern` over list items faithfully).
 #   2. Stray-hypothesis detection — a `hyp:<id>` label on a goal must name a real
 #      hypothesis in the `## Hypotheses` section (criteria-label-match). A
@@ -103,7 +103,8 @@ assert = { require-section = { heading = "Success Criteria" } }
 
 # --- Local: a goal body has well-formed Hypotheses items --------------------
 # Content schema over the parsed projection's `sections`. Requires at least one
-# hypothesis item and validates that each item is shaped `H-N: <text>`. Raw JSON
+# hypothesis item and validates that each item is shaped
+# `[hard]|[exploratory] H-N: <text>`. Raw JSON
 # Schema lives in a file because TOML cannot express `pattern` over list items
 # faithfully. See schemas/research-bodies.json.
 [[rules]]

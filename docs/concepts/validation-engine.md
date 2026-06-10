@@ -112,7 +112,7 @@ in progress produces **zero error-severity graph findings** from `jit validate`.
 A `label-coverage` graph rule (`sdd-hard-criteria-covered`) and a `label-reference`
 graph rule (`sdd-req-is-satisfied`) are both scoped with
 `when = { type = "epic", state = "done" }` and carry `enforce = true`. They run
-over the epic's dependency neighborhood (the epic plus its transitive dependents)
+over the epic's dependency neighborhood (the epic plus, transitively, the children it depends on per the containment convention)
 when `--state done` is requested. An uncovered `[hard]` criterion or an unsatisfied
 `req:` label **blocks the transition** (exit 4, `TransitionBlockedError`); the
 epic stays in its current state. `--force` bypasses the block and records a bypass

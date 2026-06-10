@@ -72,9 +72,10 @@
 #   Exact string comparison: `REQ-03` in the criteria and `req:REQ-3` on the
 #   label differ, so `req:REQ-3` is a stray. No silent normalization.
 #
-# AUTHORING WORKFLOW: write the criteria first; for each `REQ-N:` you keep, add
-# the matching `req:REQ-N` label on the epic and a `satisfies:REQ-N` label on
-# the implementing child. The local rules (1)(2) let you save iteratively during
+# AUTHORING WORKFLOW: write the criteria first; for each `[hard]` `REQ-N:` you
+# keep, add the matching `req:REQ-N` label on the epic and a `satisfies:REQ-N`
+# label on the implementing child. (The stray check is marker-scoped to
+# `[hard]`: an aspirational criterion's id on a `req:` label reads as stray.) The local rules (1)(2) let you save iteratively during
 # planning. Coverage and derivation rules (3)(4) are the final completion gate.
 #
 # Engine kinds used here (all real, see crates/jit/src/validation/):
