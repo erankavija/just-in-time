@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "311837a0-94a8-49e4-9c1f-cf540982cffc",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "7aacfd89-8ed8-4fb7-97a0-bc1ab7af0d1f",
+  "commit": "8b3b693e7b41279fc703e99cf865c149c41720ca",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-06-10T19:26:32.656994728Z",
+  "completed_at": "2026-06-10T19:27:39.574532103Z",
+  "duration_ms": 66917,
+  "exit_code": 1,
+  "stdout": "**Acceptance Criteria**\n\n- Scenario harness exists in `crates/jit/tests/steering_scenarios.rs` and drives the real `jit` binary in temp repos.\n- Fixtures cover sloppy spec bodies, prose without bullets, typo headings, stray req labels, pending req labels, and premature done transitions under `crates/jit/tests/fixtures/steering/*/scenario.toml`.\n- Each fixture asserts exit codes, message substrings, and an `enforcement_point` annotation.\n- Adding scenarios is data-driven via new fixture directories.\n- Cargo gate evidence shows `cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace` passed. I also ran `cargo test -p jit --test steering_scenarios -- --nocapture`, which passed.\n\n**Blocking Findings**\n\n- `crates/jit/tests/steering_scenarios.rs:582` and `crates/jit/tests/steering_scenarios.rs:591` introduce `unsafe` blocks around `std::env::set_var` and `std::env::remove_var`. This violates the review requirement: “No unsafe code anywhere in the workspace.” It also adds process-global environment mutation in a test binary, which is risky under parallel test execution. This must be removed or rewritten without unsafe/global env mutation.\n\n**Architecture And Separation Of Concerns**\n\n- No production architecture boundary violation found. The new code is an integration test harness and fixtures only.\n- The harness correctly drives CLI behavior from outside the library boundary.\n\n**Functional Paradigm**\n\n- Mostly acceptable for a test harness. There are imperative loops, but they are pragmatic for process execution and assertion sequencing.\n\n**Correctness And Invariants**\n\n- No production invariant regression found.\n- `./scripts/jit-validate.sh` passed locally with label warnings only.\n- Dependency `490f1f99` is done.\n\n**Safety**\n\n- Fails due to new unsafe blocks in `crates/jit/tests/steering_scenarios.rs:582` and `:591`.\n\n**Testing**\n\n- Cargo gate history passed.\n- Local targeted test passed: `11 passed`.\n- The harness is included in standard cargo integration tests.\n\n**Error Handling**\n\n- Test panic messages include useful scenario, step, argv, stdout, and stderr context.\n- No library `unwrap()` concern introduced; changes are test-only.\n\n**CLI Contract**\n\n- No new CLI command added. Existing scenario steps use CLI behavior and include JSON where needed.\n\n**Documentation**\n\n- Fixture README documents schema and scenario addition workflow.\n\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 2923 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.137.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019eb300-2d92-7201-b835-59def2e1cf7e\n--------\nuser\n--- 2910 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

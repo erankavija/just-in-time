@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "0fbd2988-2a82-47e6-bff0-8233a4793d36",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "7aacfd89-8ed8-4fb7-97a0-bc1ab7af0d1f",
+  "commit": "88e27b0cf4de49d5da6eddf66b634af09631cb22",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-06-10T19:31:15.820422091Z",
+  "completed_at": "2026-06-10T19:32:37.375340824Z",
+  "duration_ms": 81554,
+  "exit_code": 0,
+  "stdout": "## Acceptance Criteria\n\nPass.\n\n- `crates/jit/tests/steering_scenarios.rs:141-151` drives the real `jit` binary through `CARGO_BIN_EXE_jit`, with each command anchored in an isolated temp repo.\n- `crates/jit/tests/steering_scenarios.rs:153-192` initializes a fresh repo per scenario and installs shipped example rulesets from `docs/examples/<ruleset>`.\n- Fixtures under `crates/jit/tests/fixtures/steering/*/scenario.toml` cover sloppy/prose-without-bullets, typo headings, stray req labels, pending req labels, premature done transitions, plus a happy path.\n- `crates/jit/tests/steering_scenarios.rs:352-397` asserts exit codes, output substrings, and enforcement point annotations.\n- `crates/jit/tests/steering_scenarios.rs:421-456` enumerates fixture directories, so adding scenarios is data-driven.\n- Cargo gate `a266502e` passed on commit `88e27b0`: `cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace`.\n\n## Architecture And Separation Of Concerns\n\nPass. The change is an integration test harness plus fixtures only. It exercises the CLI externally and does not move I/O, storage, domain logic, or output formatting across production boundaries.\n\n## Functional Paradigm\n\nPass. The harness uses some imperative control flow for process execution and assertions, which is appropriate for integration tests. Helper logic such as argument substitution remains localized and deterministic.\n\n## Correctness And Invariants\n\nPass. No production invariant changes were introduced. The harness uses temp repositories and strips storage-affecting JIT environment variables in `crates/jit/tests/steering_scenarios.rs:141-151`, avoiding accidental writes to the developer repo.\n\n`./scripts/jit-validate.sh` passed locally with label warnings only.\n\n## Safety\n\nPass. The prior blocking unsafe usage is resolved. `crates/jit/tests/steering_scenarios.rs:572-599` now inspects `Command::get_envs()` instead of mutating process-global environment, and `rg` found no `unsafe`, `set_var`, or `remove_var` usage in the new harness.\n\n## Testing\n\nPass.\n\n- Provided cargo-ci history passed on the reviewed commit.\n- I also ran `cargo test -p jit --test steering_scenarios -- --nocapture`: 11 passed.\n- I ran `./scripts/jit-validate.sh`: passed with allowed label warnings.\n\n## Error Handling\n\nPass. Harness failures include scenario name, step index, argv, stdout, and stderr context, for example in `crates/jit/tests/steering_scenarios.rs:324-330` and `:355-360`.\n\n## CLI Contract\n\nPass. No new CLI command was introduced. The harness exercises existing CLI behavior; relevant readback uses `--json` in `happy-path-done/scenario.toml:66-69`.\n\n## Documentation\n\nPass. Fixture schema and workflow are documented in `crates/jit/tests/fixtures/steering/README.md:1-57`, including the data-driven scenario addition process.\n\n## Prior Review Feedback\n\nResolved. The previous code-review failure cited unsafe blocks around environment mutation. Current code replaces that with child-command environment overrides and a `Command::get_envs()` assertion in `crates/jit/tests/steering_scenarios.rs:572-599`.\n\n## JIT Issue Management\n\nPass. Dependency `490f1f99` is marked done. Required gate evidence shows `cargo-ci` passed; this review finds no remaining blocker.\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

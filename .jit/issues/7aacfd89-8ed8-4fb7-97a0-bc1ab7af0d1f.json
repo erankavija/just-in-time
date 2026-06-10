@@ -2,7 +2,7 @@
   "id": "7aacfd89-8ed8-4fb7-97a0-bc1ab7af0d1f",
   "title": "Deterministic steering-scenario harness",
   "description": "Build a deterministic scenario harness that exercises validation steering end to end against the shipped examples, so rule and message changes are regression-tested.\n\n## Success Criteria\n\n- [ ] A scripted scenario suite drives the jit binary in isolated temp repositories through the evaluation scenarios: sloppy spec bodies, prose-without-bullets, typo'd headings, stray and pending req labels, premature done transitions\n- [ ] Each scenario asserts the finding messages, exit codes, and enforcement point (write, validate, or transition)\n- [ ] The suite runs in CI as part of the standard test layers\n- [ ] Adding a scenario requires only data/fixtures, not new harness code",
-  "state": "in_progress",
+  "state": "done",
   "priority": "high",
   "assignee": "agent:claude",
   "dependencies": [
@@ -12,7 +12,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-10T19:31:15.820422091Z"
+    },
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-10T19:28:29.058855541Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -20,5 +31,5 @@
     "epic:validation-lifecycle"
   ],
   "created_at": "2026-06-09T21:52:58.580102409+00:00",
-  "updated_at": "2026-06-10T18:53:36.229880878+00:00"
+  "updated_at": "2026-06-10T19:32:50.345853765+00:00"
 }
