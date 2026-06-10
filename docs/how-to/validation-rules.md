@@ -142,12 +142,13 @@ ending in `.json`.
 **Graph kinds** need cross-issue context and run in `jit validate`, gate
 checkers, and at state transitions (where enforcing failures block):
 
-| Kind               | Asserts…                                                       |
-|--------------------|----------------------------------------------------------------|
-| `label-coverage`   | every source criterion is satisfied by at least one child      |
-| `label-reference`  | a `from:`-namespace label resolves to a declared `to:` source  |
-| `dependency-shape` | issues matching a selector depend on issues matching a target  |
-| `gate-recency`     | recorded gate results are no older than a configured age        |
+| Kind                    | Asserts…                                                                    |
+|-------------------------|-----------------------------------------------------------------------------|
+| `label-coverage`        | every source criterion is satisfied by at least one child                   |
+| `label-reference`       | a `from:`-namespace label resolves to a declared `to:` source               |
+| `dependency-shape`      | issues matching a selector depend on issues matching a target               |
+| `gate-recency`          | recorded gate results are no older than a configured age                    |
+| `criteria-label-match`  | a namespace label's value names a real criterion id (stray-req detection)   |
 
 **Escape hatch:** `checker-command` runs an external command. It is applied by
 `jit validate`, not on the write path.

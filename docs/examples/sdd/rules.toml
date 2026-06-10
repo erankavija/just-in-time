@@ -35,23 +35,25 @@
 #                      (3) and (4) this closes the derivation loop so a `req:`
 #                      label cannot float free of the canonical criteria.
 #
-# NOTE ON THE LIMIT OF (5): the engine compares a `req:` label value against the
-# `satisfies:` labels actually present, not directly against the criterion text
-# in `## Success Criteria` (no rule kind compares a label value to ids extracted
-# from description prose). So a `req:REQ-77` is caught when no child satisfies it;
-# the criteria-as-canonical discipline (only ever declare a `req:` for a REQ id
-# that exists in the body) remains an AUTHORING convention reinforced by (2)+(3).
+# NOTE ON THE LIMIT OF (5): rule (5) compares a `req:` label value against the
+# `satisfies:` labels actually present. Rule (5b) below (criteria-label-match)
+# compares it directly against ids extracted from `## Success Criteria` prose, so
+# a `req:REQ-77` that exists in no criterion is a STRAY and reported immediately,
+# without needing a child to (fail to) satisfy it. The two findings are textually
+# distinct: a stray says "names no criterion in section '...' (stray or invented)";
+# an unsatisfied one says "is not satisfied by any ... child".
 #
 # AUTHORING WORKFLOW (the derivation discipline the methodology asks for): write
 # the criteria first; for each `REQ-N:` you keep, add the matching `req:REQ-N`
 # label on the epic and a `satisfies:REQ-N` label on the implementing child.
 #
 # Engine kinds used here (all real, see crates/jit/src/validation/):
-#   require-section       (local)  structural: the criteria section must exist
-#   json-schema           (local)  content: schemas/spec-body.json over `sections`
-#   label-value-pattern   (local)  req ids look like REQ-01
-#   label-coverage        (graph)  criteria -> satisfies coverage of [hard] items
-#   label-reference       (graph)  satisfies -> req AND req -> satisfies integrity
+#   require-section        (local)  structural: the criteria section must exist
+#   json-schema            (local)  content: schemas/spec-body.json over `sections`
+#   label-value-pattern    (local)  req ids look like REQ-01
+#   label-coverage         (graph)  criteria -> satisfies coverage of [hard] items
+#   label-reference        (graph)  satisfies -> req AND req -> satisfies integrity
+#   criteria-label-match   (graph)  req label value -> real criterion id (stray check)
 
 # --- Local: the spec must have a Success Criteria section -------------------
 # Structural shorthand. Runs on the write path; `enforce = true` blocks a write
@@ -126,3 +128,26 @@ name = "sdd-req-is-satisfied"
 when = { label = "req:*" }
 severity = "error"
 assert = { label-reference = { from = "req", to = "satisfies", scope = "linked" } }
+
+# --- Graph: every req: label names a real criterion id ----------------------
+# Stray-req DISAMBIGUATION (CC-3). This rule directly compares a `req:<id>`
+# label value against the criterion ids extracted from `## Success Criteria`,
+# using the same `[hard]` marker filter as the coverage rule. Two DISTINCT
+# failure modes are now separable by an agent:
+#
+#   * STRAY (this rule)     — "label 'req:REQ-77' on issue XY names no criterion
+#                             in section 'Success Criteria' (stray or invented)"
+#                             The id does not appear in the criteria prose at all.
+#
+#   * UNSATISFIED (sdd-req-is-satisfied above)
+#                           — "issue XY references 'req:REQ-01' but no
+#                             'satisfies:REQ-01' source is declared in linked scope"
+#                             The id is real, but no child has satisfied it yet.
+#
+# Exact string comparison: `REQ-03` in the criteria and `req:REQ-3` on the label
+# differ, so `req:REQ-3` is a stray. No silent normalization.
+[[rules]]
+name = "sdd-req-matches-a-criterion"
+when = { type = "epic" }
+severity = "error"
+assert = { criteria-label-match = { namespace = "req", criteria-section = "success_criteria", marker = "[hard]", id-pattern = 'REQ-[0-9]+' } }

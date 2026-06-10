@@ -501,6 +501,117 @@ fn test_release_graph_requires_qa_signoff_dependency() {
 }
 
 // ---------------------------------------------------------------------------
+// 2d'. SDD — graph `criteria-label-match` rule: stray-req disambiguation.
+//
+// Kept in a clearly separated section so the sibling tasks (490f1f99,
+// 690f618a, 765688e1, etc.) that also touch this file can merge cleanly.
+// ---------------------------------------------------------------------------
+
+mod sdd_criteria_label_match {
+    use super::*;
+
+    /// An epic whose criteria section contains only REQ-01 (as a [hard] item).
+    fn epic_with_req_labels(labels: &[&str]) -> Issue {
+        let body = "## Requirements\n\n\
+                    - REQ-01: the loader rejects mixed shorthand and raw schema\n\n\
+                    ## Scenarios\n\n\
+                    - Given a rule mixing shorthand and a raw schema When the loader runs Then it errors\n\n\
+                    ## Success Criteria\n\n\
+                    - [hard] REQ-01: the loader rejects mixed shorthand and raw schema\n";
+        let mut epic = Issue::new("epic".to_string(), body.to_string());
+        epic.labels = labels.iter().map(|s| s.to_string()).collect();
+        epic
+    }
+
+    #[test]
+    fn test_sdd_criteria_label_match_rule_is_present_and_graph_scoped() {
+        // The SDD example must now include a `criteria-label-match` rule named
+        // `sdd-req-matches-a-criterion` and it must be Graph-scoped.
+        let set = load_example("sdd");
+        let rule = set
+            .rules
+            .iter()
+            .find(|r| r.name == "sdd-req-matches-a-criterion")
+            .expect("sdd example must define sdd-req-matches-a-criterion");
+        assert_eq!(rule.scope, Scope::Graph);
+        assert_eq!(rule.severity, jit::validation::rules::Severity::Error);
+    }
+
+    #[test]
+    fn test_sdd_stray_req_label_yields_criteria_label_match_finding() {
+        // A `req:REQ-77` on an epic whose Success Criteria contains only REQ-01
+        // is stray: the `sdd-req-matches-a-criterion` rule fires for it.
+        let set = load_example("sdd");
+        let rules = graph_rules(&set);
+
+        let epic = epic_with_req_labels(&["type:epic", "req:REQ-01", "req:REQ-77"]);
+        // REQ-77 is absent from Success Criteria -> stray
+        // REQ-01 is present  -> matched, no finding
+
+        let findings = issue_graph_findings(&rules, std::slice::from_ref(&epic));
+        assert!(
+            findings
+                .iter()
+                .any(|f| f.finding.rule == "sdd-req-matches-a-criterion"
+                    && f.finding.message.contains("req:REQ-77")
+                    && f.finding.message.contains("stray or invented")),
+            "a stray req: label must be reported by criteria-label-match: {findings:?}"
+        );
+        // The matched label (REQ-01) must produce no finding from this rule.
+        assert!(
+            !findings
+                .iter()
+                .any(|f| f.finding.rule == "sdd-req-matches-a-criterion"
+                    && f.finding.message.contains("req:REQ-01")),
+            "a matched req: label must not produce a finding: {findings:?}"
+        );
+        // Confirm the finding text differs from the label-reference (unsatisfied) wording.
+        let stray_finding = findings
+            .iter()
+            .find(|f| {
+                f.finding.rule == "sdd-req-matches-a-criterion"
+                    && f.finding.message.contains("REQ-77")
+            })
+            .expect("stray finding must exist");
+        assert!(
+            !stray_finding.finding.message.contains("is not satisfied"),
+            "stray finding text must not say 'is not satisfied': {}",
+            stray_finding.finding.message
+        );
+    }
+
+    #[test]
+    fn test_sdd_id_format_mismatch_req_3_vs_req_03_is_stray() {
+        // Exact string comparison: criterion `REQ-03` in the body vs label
+        // `req:REQ-3` on the epic — they differ, so `req:REQ-3` is a stray.
+        // This must produce a finding from `sdd-req-matches-a-criterion`, NOT
+        // be silently accepted by a normalization step.
+        let body = "## Requirements\n\n\
+                    - REQ-03: check padding\n\n\
+                    ## Scenarios\n\n\
+                    - Given x When y Then z\n\n\
+                    ## Success Criteria\n\n\
+                    - [hard] REQ-03: check padding\n";
+        let mut epic = Issue::new("epic".to_string(), body.to_string());
+        epic.labels = vec![
+            "type:epic".to_string(),
+            "req:REQ-3".to_string(), // no leading zero -> stray
+        ];
+
+        let set = load_example("sdd");
+        let rules = graph_rules(&set);
+        let findings = issue_graph_findings(&rules, std::slice::from_ref(&epic));
+        assert!(
+            findings
+                .iter()
+                .any(|f| f.finding.rule == "sdd-req-matches-a-criterion"
+                    && f.finding.message.contains("req:REQ-3")),
+            "REQ-3 vs REQ-03: no normalization, so REQ-3 must be stray: {findings:?}"
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
 // 2e. fresh-evidence (non-SDD) — graph `gate-recency` rule.
 //
 // Kept in its own module (separate from the SDD/bug-repro/release sections

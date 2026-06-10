@@ -336,6 +336,20 @@ fn evaluate_one(
         Assertion::TypeHierarchy { kind } => {
             evaluate_type_hierarchy(rule, *kind, hierarchy, issues)
         }
+        Assertion::CriteriaLabelMatch {
+            namespace,
+            criteria_section,
+            marker,
+            id_pattern,
+        } => evaluate_criteria_label_match(
+            rule,
+            namespace,
+            criteria_section,
+            marker.as_deref(),
+            id_pattern,
+            issues,
+            repo_default_format,
+        ),
         // Non-graph kinds are never dispatched here (filtered by scope), but be
         // exhaustive and total rather than panic.
         _ => Vec::new(),
@@ -945,6 +959,103 @@ fn evaluate_type_hierarchy(
                 .collect::<Vec<_>>()
         })
         .collect()
+}
+
+// ---------------------------------------------------------------------------
+// criteria-label-match
+// ---------------------------------------------------------------------------
+
+/// Evaluate a `criteria-label-match` rule (CC-3).
+///
+/// For each issue matching the rule's selector, extract criterion ids from its
+/// configured section (reusing [`criterion_ids`], the same extractor as
+/// `label-coverage`) and compare the issue's `namespace:<value>` labels against
+/// that set. A `<value>` absent from the extracted id set is a stray or invented
+/// label — one that was not derived from the canonical criteria — and yields one
+/// finding per unmatched value.
+///
+/// This is distinct from the declared-but-unsatisfied finding that
+/// `label-coverage` emits: coverage asks "is criterion X covered by a child?";
+/// this rule asks "does label `req:X` name a real criterion at all?". The two
+/// findings use clearly different wording so an agent can tell them apart.
+///
+/// # Config
+///
+/// Parsed and validated at load into [`Assertion::CriteriaLabelMatch`] fields;
+/// this evaluator receives the resolved values directly, so it never produces a
+/// `config-error` finding from missing keys (only from an invalid `id-pattern`
+/// regex, caught at load).
+///
+/// # Finding text
+///
+/// For a stray label `req:REQ-77` on issue `abc123` with section `Success Criteria`:
+/// `"label 'req:REQ-77' on issue abc123 names no criterion in section 'Success Criteria' (stray or invented)"`
+fn evaluate_criteria_label_match(
+    rule: &Rule,
+    namespace: &str,
+    criteria_section: &str,
+    marker: Option<&str>,
+    id_pattern_src: &str,
+    issues: &[Issue],
+    repo_default_format: ContentFormat,
+) -> Vec<GraphFinding> {
+    let id_pattern = match regex::Regex::new(id_pattern_src) {
+        Ok(re) => re,
+        Err(e) => return vec![config_error(rule, format!("invalid 'id-pattern': {e}"))],
+    };
+
+    // The section heading displayed in the finding is the human-readable form of
+    // the slug: convert underscores back to spaces and title-case each word so
+    // `success_criteria` renders as `Success Criteria` in the message.
+    let section_heading = slug_to_heading(criteria_section);
+
+    issues
+        .iter()
+        .filter(|issue| rule.when.matches(issue))
+        .flat_map(|issue| {
+            let criterion_id_set: std::collections::BTreeSet<String> = match criterion_ids(
+                issue,
+                criteria_section,
+                marker,
+                &id_pattern,
+                repo_default_format,
+            ) {
+                Ok(ids) => ids.into_iter().collect(),
+                Err(err) => return vec![config_error(rule, err.to_string())],
+            };
+
+            values_in_namespace(issue, namespace)
+                .filter(|value| !criterion_id_set.contains(*value))
+                .map(|value| {
+                    issue_finding(
+                        rule,
+                        &issue.id,
+                        format!(
+                            "label '{namespace}:{value}' on issue {} names no criterion in \
+                             section '{section_heading}' (stray or invented)",
+                            issue.short_id()
+                        ),
+                    )
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect()
+}
+
+/// Convert a section slug back to a human-readable heading for use in finding
+/// messages. Replaces underscores with spaces and title-cases each word.
+/// `success_criteria` -> `Success Criteria`.
+fn slug_to_heading(slug: &str) -> String {
+    slug.split('_')
+        .map(|word| {
+            let mut chars = word.chars();
+            match chars.next() {
+                None => String::new(),
+                Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 /// Render a [`ValidationWarning`] into a finding message, preserving the legacy
@@ -1651,5 +1762,198 @@ mod tests {
         assert_eq!(findings[0].finding.rule, "default:orphan-leaf");
         assert_eq!(findings[0].issue_id.as_deref(), Some(task.id.as_str()));
         assert_eq!(findings[0].finding.severity, Severity::Warn);
+    }
+
+    // --- criteria-label-match -----------------------------------------------
+
+    fn clm_rule(extra: &str) -> Rule {
+        rule_from(&format!(
+            "[[rules]]\nname = \"clm\"\nwhen = {{ type = \"epic\" }}\n\
+             severity = \"error\"\nassert = {{ criteria-label-match = {{ {extra} }} }}\n"
+        ))
+    }
+
+    /// An epic with `## Success Criteria` items shaped `[hard] <id>: text`.
+    fn epic_with_clm_criteria(ids: &[&str]) -> Issue {
+        let body = format!(
+            "## Success Criteria\n\n{}\n",
+            ids.iter()
+                .map(|id| format!("- [hard] {id}: do the thing"))
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
+        let mut epic = Issue::new("epic".to_string(), body);
+        epic.labels = vec!["type:epic".to_string()];
+        epic
+    }
+
+    #[test]
+    fn test_criteria_label_match_stray_label_yields_finding() {
+        // A `req:REQ-77` label on an epic whose Success Criteria has only REQ-01
+        // is stray: no matching criterion id -> finding with the stray message.
+        let rule = clm_rule(r#"namespace = "req", marker = "[hard]""#);
+        let mut epic = epic_with_clm_criteria(&["REQ-01"]);
+        epic.labels.push("req:REQ-77".to_string()); // stray
+        epic.labels.push("req:REQ-01".to_string()); // matches criterion
+
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[epic.clone()],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        // REQ-77 is stray; REQ-01 matches.
+        assert_eq!(
+            findings.len(),
+            1,
+            "only the stray id must yield a finding: {findings:?}"
+        );
+        let msg = &findings[0].finding.message;
+        assert!(
+            msg.contains("req:REQ-77"),
+            "finding must name the stray label: {msg}"
+        );
+        assert!(
+            msg.contains("names no criterion"),
+            "finding must say 'names no criterion': {msg}"
+        );
+        assert!(
+            msg.contains("stray or invented"),
+            "finding must say 'stray or invented': {msg}"
+        );
+        assert!(
+            msg.contains("Success Criteria"),
+            "finding must name the section: {msg}"
+        );
+        assert_eq!(findings[0].finding.severity, Severity::Error);
+        assert_eq!(
+            findings[0].issue_id.as_deref(),
+            Some(epic.id.as_str()),
+            "finding must be attributed to the epic"
+        );
+    }
+
+    #[test]
+    fn test_criteria_label_match_matched_label_produces_no_finding() {
+        // A `req:REQ-01` on an epic whose criteria contain REQ-01 is fine.
+        let rule = clm_rule(r#"namespace = "req", marker = "[hard]""#);
+        let mut epic = epic_with_clm_criteria(&["REQ-01"]);
+        epic.labels.push("req:REQ-01".to_string());
+
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[epic],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        assert!(
+            findings.is_empty(),
+            "matched label must produce no finding: {findings:?}"
+        );
+    }
+
+    #[test]
+    fn test_criteria_label_match_id_format_mismatch_is_stray() {
+        // Exact string comparison: criterion text `REQ-03` vs label `req:REQ-3`
+        // are NOT equal, so `req:REQ-3` is a stray (no normalization).
+        let rule = clm_rule(r#"namespace = "req", marker = "[hard]""#);
+        let mut epic = epic_with_clm_criteria(&["REQ-03"]);
+        epic.labels.push("req:REQ-3".to_string()); // differs by leading zero
+
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[epic],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        assert_eq!(
+            findings.len(),
+            1,
+            "REQ-3 vs REQ-03 must be a stray (exact compare): {findings:?}"
+        );
+        assert!(findings[0].finding.message.contains("req:REQ-3"));
+    }
+
+    #[test]
+    fn test_criteria_label_match_marker_filters_ids() {
+        // With marker = "[hard]", an id only on an unmarked item is NOT in the
+        // extracted id set, so a label matching it is a stray.
+        let rule = clm_rule(r#"namespace = "req", marker = "[hard]""#);
+        // Body: REQ-01 is [hard]; REQ-99 is [aspirational] (no marker match).
+        let body = "## Success Criteria\n\n\
+                    - [hard] REQ-01: required\n\
+                    - [aspirational] REQ-99: nice-to-have\n";
+        let mut epic = Issue::new("epic".to_string(), body.to_string());
+        epic.labels = vec![
+            "type:epic".to_string(),
+            "req:REQ-01".to_string(), // matches [hard] criterion -> not stray
+            "req:REQ-99".to_string(), // only on [aspirational] item -> stray under marker filter
+        ];
+
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[epic],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        assert_eq!(
+            findings.len(),
+            1,
+            "label matching only an unmarked item must be stray when marker is set: {findings:?}"
+        );
+        assert!(findings[0].finding.message.contains("req:REQ-99"));
+    }
+
+    #[test]
+    fn test_criteria_label_match_custom_section_name_in_finding() {
+        // A non-default criteria-section name is reflected in the finding text.
+        let rule = clm_rule(r#"namespace = "req", criteria-section = "hard_requirements""#);
+        let body = "## Hard Requirements\n\n- REQ-01: do it\n";
+        let mut epic = Issue::new("epic".to_string(), body.to_string());
+        epic.labels = vec!["type:epic".to_string(), "req:REQ-77".to_string()]; // stray
+
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[epic],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        assert_eq!(findings.len(), 1, "stray id must be reported: {findings:?}");
+        let msg = &findings[0].finding.message;
+        // The section slug `hard_requirements` must render as `Hard Requirements`.
+        assert!(
+            msg.contains("Hard Requirements"),
+            "finding must name the section as its human-readable heading: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_criteria_label_match_no_namespace_labels_produces_no_finding() {
+        // An issue with no `req:*` labels at all has nothing to check.
+        let rule = clm_rule(r#"namespace = "req""#);
+        let epic = epic_with_clm_criteria(&["REQ-01"]); // labels: just type:epic
+
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[epic],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        assert!(
+            findings.is_empty(),
+            "no namespace labels -> no findings: {findings:?}"
+        );
     }
 }

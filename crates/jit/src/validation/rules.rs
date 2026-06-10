@@ -617,6 +617,28 @@ pub enum Assertion {
         /// Which legacy hierarchy check this rule performs.
         kind: TypeHierarchyKind,
     },
+    /// Compare a label namespace's values against criterion ids extracted from a
+    /// configured section of the issue body. Graph scope (per-issue; the body
+    /// projection is needed but no other issues are). CC-3.
+    ///
+    /// A `namespace:<value>` label whose `<value>` is NOT in the extracted
+    /// criterion-id set yields a stray-label finding, distinct from the
+    /// declared-but-unsatisfied finding that `label-coverage` / `label-reference`
+    /// emit for uncovered criteria or dangling references.
+    CriteriaLabelMatch {
+        /// Label namespace whose values are checked (e.g. `"req"`). Required.
+        namespace: String,
+        /// Projection slug of the section holding the criteria (optional;
+        /// defaults to `"success_criteria"`).
+        criteria_section: String,
+        /// When set, only items whose text begins with this marker count.
+        /// Items without the marker are not present in the extracted id set,
+        /// so a label matching an unmarked id is a stray. Optional.
+        marker: Option<String>,
+        /// Regex that extracts a criterion id from an item's text. Optional;
+        /// defaults to `"[A-Z][A-Z0-9]*-[0-9]+"`.
+        id_pattern: String,
+    },
 }
 
 /// The legacy type-hierarchy warning expressed by an
@@ -667,7 +689,8 @@ impl Assertion {
             | Assertion::LabelReference { .. }
             | Assertion::DependencyShape { .. }
             | Assertion::GateRecency { .. }
-            | Assertion::TypeHierarchy { .. } => Scope::Graph,
+            | Assertion::TypeHierarchy { .. }
+            | Assertion::CriteriaLabelMatch { .. } => Scope::Graph,
             _ => Scope::Local,
         }
     }
@@ -719,6 +742,8 @@ impl Assertion {
             // Type-hierarchy checks reason over the whole set's relations.
             Assertion::TypeHierarchy { .. } => true,
             // The remaining graph kinds are per-issue / neighborhood-local.
+            // `CriteriaLabelMatch` only needs the issue's own body projection
+            // and labels, so it is safe at transition time.
             _ => false,
         }
     }
@@ -955,6 +980,8 @@ struct RawAssert {
     gate_recency: Option<RawGateRecency>,
     #[serde(default, rename = "type-hierarchy")]
     type_hierarchy: Option<RawTypeHierarchy>,
+    #[serde(default, rename = "criteria-label-match")]
+    criteria_label_match: Option<RawCriteriaLabelMatch>,
 }
 
 /// The `gate-recency` assert payload: a max age plus an optional gate filter.
@@ -1032,6 +1059,25 @@ struct RawTypeHierarchy {
     kind: String,
 }
 
+/// The `criteria-label-match` assert payload: compares a label namespace's
+/// values against criterion ids extracted from a configured section (CC-3).
+/// `deny_unknown_fields` rejects stray keys so a typo surfaces at load.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawCriteriaLabelMatch {
+    /// Label namespace whose values are checked against criterion ids. Required.
+    namespace: String,
+    /// Projection slug of the criteria section. Optional; default `success_criteria`.
+    #[serde(default, rename = "criteria-section")]
+    criteria_section: Option<String>,
+    /// Marker prefix; only items starting with it contribute ids. Optional.
+    #[serde(default)]
+    marker: Option<String>,
+    /// Regex extracting the criterion id from an item. Optional; default pattern.
+    #[serde(default, rename = "id-pattern")]
+    id_pattern: Option<String>,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawRequireLabel {
@@ -1105,7 +1151,8 @@ impl RawAssert {
             || self.label_reference.is_some()
             || self.dependency_shape.is_some()
             || self.gate_recency.is_some()
-            || self.type_hierarchy.is_some();
+            || self.type_hierarchy.is_some()
+            || self.criteria_label_match.is_some();
         let raw_schema_present = self.json_schema.is_some();
 
         // Shorthand XOR file-schema: combining them in one rule is a config
@@ -1133,6 +1180,7 @@ impl RawAssert {
             self.dependency_shape.is_some(),
             self.gate_recency.is_some(),
             self.type_hierarchy.is_some(),
+            self.criteria_label_match.is_some(),
         ]
         .into_iter()
         .filter(|present| *present)
@@ -1217,6 +1265,27 @@ impl RawAssert {
                 }
             };
             return Ok(Assertion::TypeHierarchy { kind });
+        }
+        if let Some(clm) = self.criteria_label_match {
+            // `namespace` is required. An empty namespace would match all labels,
+            // which is nonsensical, so reject it explicitly.
+            if clm.namespace.is_empty() {
+                return Err(RuleConfigError::InvalidAssertion {
+                    rule: rule.to_string(),
+                    message: "criteria-label-match 'namespace' must be a non-empty string"
+                        .to_string(),
+                });
+            }
+            return Ok(Assertion::CriteriaLabelMatch {
+                namespace: clm.namespace,
+                criteria_section: clm
+                    .criteria_section
+                    .unwrap_or_else(|| "success_criteria".to_string()),
+                marker: clm.marker,
+                id_pattern: clm
+                    .id_pattern
+                    .unwrap_or_else(|| "[A-Z][A-Z0-9]*-[0-9]+".to_string()),
+            });
         }
 
         // Unreachable: total == 1 guarantees one branch above matched.
@@ -1993,6 +2062,91 @@ assert = { gate-recency = { max-age-days = 384307168202282326 } }
 [[rules]]
 name = "bad"
 assert = { gate-recency = { max-age-days = 7, extra = 1 } }
+"#;
+        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        assert!(matches!(err, RuleConfigError::Toml(_)));
+    }
+
+    // --- criteria-label-match assert kind ------------------------------------
+
+    #[test]
+    fn test_criteria_label_match_minimal_parses_as_graph_rule() {
+        // The only required field is `namespace`; all others are optional.
+        let toml = r#"
+[[rules]]
+name = "stray-req"
+when = { type = "epic" }
+severity = "error"
+assert = { criteria-label-match = { namespace = "req" } }
+"#;
+        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        assert_eq!(set.rules[0].scope, Scope::Graph);
+        match &set.rules[0].assert {
+            Assertion::CriteriaLabelMatch {
+                namespace,
+                criteria_section,
+                marker,
+                id_pattern,
+            } => {
+                assert_eq!(namespace, "req");
+                assert_eq!(criteria_section, "success_criteria"); // default
+                assert!(marker.is_none());
+                assert_eq!(id_pattern, "[A-Z][A-Z0-9]*-[0-9]+"); // default
+            }
+            other => panic!("expected CriteriaLabelMatch, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_criteria_label_match_all_fields_parse() {
+        let toml = r#"
+[[rules]]
+name = "stray-req-full"
+when = { type = "epic" }
+severity = "error"
+assert = { criteria-label-match = { namespace = "req", criteria-section = "success_criteria", marker = "[hard]", id-pattern = 'REQ-[0-9]+' } }
+"#;
+        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        match &set.rules[0].assert {
+            Assertion::CriteriaLabelMatch {
+                namespace,
+                criteria_section,
+                marker,
+                id_pattern,
+            } => {
+                assert_eq!(namespace, "req");
+                assert_eq!(criteria_section, "success_criteria");
+                assert_eq!(marker.as_deref(), Some("[hard]"));
+                assert_eq!(id_pattern, "REQ-[0-9]+");
+            }
+            other => panic!("expected CriteriaLabelMatch, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_criteria_label_match_empty_namespace_is_rejected() {
+        let toml = r#"
+[[rules]]
+name = "bad"
+assert = { criteria-label-match = { namespace = "" } }
+"#;
+        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        match err {
+            RuleConfigError::InvalidAssertion { rule, message } => {
+                assert_eq!(rule, "bad");
+                assert!(message.contains("namespace"), "message was: {message}");
+            }
+            other => panic!("expected InvalidAssertion, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_criteria_label_match_unknown_field_is_rejected() {
+        // `deny_unknown_fields` on RawCriteriaLabelMatch rejects stray keys.
+        let toml = r#"
+[[rules]]
+name = "bad"
+assert = { criteria-label-match = { namespace = "req", bogus-key = 1 } }
 "#;
         let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
         assert!(matches!(err, RuleConfigError::Toml(_)));

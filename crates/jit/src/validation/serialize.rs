@@ -306,6 +306,30 @@ fn render_assertion(
                 toml_basic_string(kind_token)
             )
         }
+        Assertion::CriteriaLabelMatch {
+            namespace,
+            criteria_section,
+            marker,
+            id_pattern,
+        } => {
+            // namespace is required; always emit it first.
+            let mut parts = vec![format!("namespace = {}", toml_basic_string(namespace))];
+            // Only emit optional fields when they differ from their defaults, so
+            // round-tripped rules stay canonical.
+            if criteria_section != "success_criteria" {
+                parts.push(format!(
+                    "criteria-section = {}",
+                    toml_basic_string(criteria_section)
+                ));
+            }
+            if let Some(m) = marker {
+                parts.push(format!("marker = {}", toml_basic_string(m)));
+            }
+            if id_pattern != "[A-Z][A-Z0-9]*-[0-9]+" {
+                parts.push(format!("id-pattern = {}", toml_literal_string(id_pattern)));
+            }
+            format!("{{ criteria-label-match = {{ {} }} }}", parts.join(", "))
+        }
     }
 }
 
@@ -401,7 +425,7 @@ mod tests {
     use super::*;
     use crate::domain::{LabelNamespace, LabelNamespaces};
     use crate::validation::defaults::default_ruleset;
-    use crate::validation::rules::{RuleSet, Severity};
+    use crate::validation::rules::{RuleSet, Scope, Severity};
     use std::collections::HashMap;
     use std::path::Path;
 
@@ -603,6 +627,29 @@ assert = { require-section = { heading = "Plan" } }
         assert!(out
             .rules_toml
             .contains(r#"state = ["ready", "in_progress", "gated"]"#));
+        assert_round_trips(&set);
+    }
+
+    #[test]
+    fn test_round_trip_criteria_label_match() {
+        // The criteria-label-match kind must serialize and reload with all
+        // fields preserved, matching the gate-recency pattern for round-trip tests.
+        let toml = r#"
+[[rules]]
+name = "req-matches-criterion"
+when = { type = "epic" }
+severity = "error"
+assert = { criteria-label-match = { namespace = "req", marker = "[hard]" } }
+
+[[rules]]
+name = "req-custom-section"
+when = { type = "epic" }
+severity = "warn"
+assert = { criteria-label-match = { namespace = "req", criteria-section = "hard_requirements", id-pattern = 'REQ-[0-9]+' } }
+"#;
+        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        assert_eq!(set.rules.len(), 2);
+        assert_eq!(set.rules[0].scope, Scope::Graph);
         assert_round_trips(&set);
     }
 

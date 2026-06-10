@@ -79,7 +79,8 @@ pub fn desugar(assertion: &Assertion) -> Option<Value> {
         | Assertion::LabelReference { .. }
         | Assertion::DependencyShape { .. }
         | Assertion::GateRecency { .. }
-        | Assertion::TypeHierarchy { .. } => None,
+        | Assertion::TypeHierarchy { .. }
+        | Assertion::CriteriaLabelMatch { .. } => None,
     }
 }
 
