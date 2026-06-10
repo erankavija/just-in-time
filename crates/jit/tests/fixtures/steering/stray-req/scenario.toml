@@ -1,0 +1,36 @@
+# Scenario: stray-req
+#
+# A well-formed in-flight epic carries req:REQ-77 which does not correspond to
+# any criterion id in its Success Criteria section. The sdd-req-matches-a-criterion
+# rule (always-on, graph scope) reports the stray label. The create uses --force
+# to bypass the orphan-leaf hierarchy warning; after that, jit validate catches
+# the stray req and exits 1 with a distinct message.
+ruleset = "sdd"
+
+[[steps]]
+argv = [
+  "issue", "create",
+  "--title", "Stray Req Epic",
+  "--label", "type:epic",
+  "--label", "req:REQ-01",
+  "--label", "req:REQ-77",
+  "--force",
+  "--description", """
+## Requirements
+
+- REQ-01: the system validates specs
+
+## Scenarios
+
+- Given a spec When parsed Then valid
+
+## Success Criteria
+
+- [hard] REQ-01: the system validates specs""",
+]
+capture = "none"
+
+[[steps]]
+argv = ["validate"]
+capture = "none"
+expect = { exit = 1, contains = ["names no criterion", "stray or invented"], enforcement_point = "validate" }

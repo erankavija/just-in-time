@@ -1,0 +1,29 @@
+# Scenario: sloppy-spec-body
+#
+# An epic is created with prose (no bullet items) under Success Criteria.
+# The write path runs sdd-epic-has-criteria-section and sdd-criteria-are-well-formed,
+# both of which are enforce=true. The create is blocked at write time with exit 4
+# and the message names the failing section and instructs the author to use
+# Markdown bullets.
+ruleset = "sdd"
+
+[[steps]]
+argv = [
+  "issue", "create",
+  "--title", "Sloppy Spec Epic",
+  "--label", "type:epic",
+  "--description", """
+## Requirements
+
+- REQ-01: the system validates specs
+
+## Scenarios
+
+- Given a spec When parsed Then valid
+
+## Success Criteria
+
+Some prose text instead of bullet items here""",
+]
+capture = "none"
+expect = { exit = 4, contains = ["no list items", "Markdown bullets", "Success Criteria"], enforcement_point = "write" }

@@ -1,0 +1,28 @@
+# Scenario: typo-heading
+#
+# An epic is created with "## Sucess Criteria" (one 'c' missing). The
+# require-section rule cannot find the canonical "Success Criteria" slug, and
+# the message renderer detects the near-miss heading via Levenshtein and emits a
+# did-you-mean hint. Blocked at write time, exit 4.
+ruleset = "sdd"
+
+[[steps]]
+argv = [
+  "issue", "create",
+  "--title", "Typo Heading Epic",
+  "--label", "type:epic",
+  "--description", """
+## Requirements
+
+- REQ-01: the system validates specs
+
+## Scenarios
+
+- Given a spec When parsed Then valid
+
+## Sucess Criteria
+
+- [hard] REQ-01: the system validates specs""",
+]
+capture = "none"
+expect = { exit = 4, contains = ["did you mean", "Sucess Criteria"], enforcement_point = "write" }

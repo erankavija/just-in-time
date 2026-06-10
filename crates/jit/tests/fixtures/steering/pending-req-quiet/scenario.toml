@@ -1,0 +1,42 @@
+# Scenario: pending-req-quiet
+#
+# A well-formed in-flight epic carries req:REQ-01 which matches a [hard]
+# criterion in Success Criteria, but has no children yet. The lifecycle-scoped
+# coverage and derivation rules are state=done scoped and therefore silent during
+# planning. jit validate must exit 0 with zero error-severity findings.
+#
+# This is the "chicken-and-egg" case from the June 2026 evaluation: an author
+# should be able to save an epic mid-planning without seeing a wall of errors.
+ruleset = "sdd"
+
+[[steps]]
+argv = [
+  "issue", "create",
+  "--title", "In-Flight Epic",
+  "--label", "type:epic",
+  "--label", "req:REQ-01",
+  "--force",
+  "--description", """
+## Requirements
+
+- REQ-01: the system validates specs
+
+## Scenarios
+
+- Given a spec When parsed Then valid
+
+## Success Criteria
+
+- [hard] REQ-01: the system validates specs""",
+]
+capture = "id"
+id_slot = "epic"
+
+[[steps]]
+argv = ["issue", "update", "$epic", "--state", "in_progress"]
+capture = "none"
+
+[[steps]]
+argv = ["validate"]
+capture = "none"
+expect = { exit = 0, contains = ["validation passed"], enforcement_point = "validate" }

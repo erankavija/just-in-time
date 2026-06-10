@@ -1,0 +1,40 @@
+# Scenario: premature-done
+#
+# A well-formed in-flight epic with req:REQ-01 and no children attempts to
+# transition to done. The transition-time graph evaluation (CC-2) runs the
+# done-scoped sdd-hard-criteria-covered and sdd-req-is-satisfied rules against
+# the epic's dependency neighborhood. Both are enforce=true and fire because no
+# child satisfies REQ-01. The transition is blocked, exit 4.
+ruleset = "sdd"
+
+[[steps]]
+argv = [
+  "issue", "create",
+  "--title", "Premature Done Epic",
+  "--label", "type:epic",
+  "--label", "req:REQ-01",
+  "--force",
+  "--description", """
+## Requirements
+
+- REQ-01: the system validates specs
+
+## Scenarios
+
+- Given a spec When parsed Then valid
+
+## Success Criteria
+
+- [hard] REQ-01: the system validates specs""",
+]
+capture = "id"
+id_slot = "epic"
+
+[[steps]]
+argv = ["issue", "update", "$epic", "--state", "in_progress"]
+capture = "none"
+
+[[steps]]
+argv = ["issue", "update", "$epic", "--state", "done"]
+capture = "none"
+expect = { exit = 4, contains = ["sdd-hard-criteria-covered"], enforcement_point = "transition" }

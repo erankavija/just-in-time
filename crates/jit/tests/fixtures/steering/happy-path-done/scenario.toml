@@ -1,0 +1,63 @@
+# Scenario: happy-path-done
+#
+# The correct end-to-end SDD flow: epic with req:REQ-01 + a child issue carrying
+# satisfies:REQ-01. The epic depends on the child (jit dep add epic child).
+# The child walks to done, then the epic transitions to done. The coverage and
+# derivation rules are satisfied, exit 0.
+ruleset = "sdd"
+
+[[steps]]
+argv = [
+  "issue", "create",
+  "--title", "Happy Path Epic",
+  "--label", "type:epic",
+  "--label", "req:REQ-01",
+  "--force",
+  "--description", """
+## Requirements
+
+- REQ-01: the system validates specs
+
+## Scenarios
+
+- Given a spec When parsed Then valid
+
+## Success Criteria
+
+- [hard] REQ-01: the system validates specs""",
+]
+capture = "id"
+id_slot = "epic"
+
+[[steps]]
+argv = ["issue", "update", "$epic", "--state", "in_progress"]
+capture = "none"
+
+[[steps]]
+argv = [
+  "issue", "create",
+  "--title", "Implementing child",
+  "--label", "satisfies:REQ-01",
+  "--force",
+  "--description", "Implements REQ-01.",
+]
+capture = "id"
+id_slot = "child"
+
+# epic depends on child: epic is FROM (blocked), child is TO (blocking)
+[[steps]]
+argv = ["dep", "add", "$epic", "$child"]
+capture = "none"
+
+[[steps]]
+argv = ["issue", "update", "$child", "--state", "in_progress"]
+capture = "none"
+
+[[steps]]
+argv = ["issue", "update", "$child", "--state", "done"]
+capture = "none"
+
+[[steps]]
+argv = ["issue", "update", "$epic", "--state", "done"]
+capture = "none"
+expect = { exit = 0, enforcement_point = "transition" }
