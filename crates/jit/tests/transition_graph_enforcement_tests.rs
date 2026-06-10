@@ -600,10 +600,8 @@ fn test_bulk_update_blocked_by_enforcing_done_graph_rule() {
 #[test]
 fn test_bulk_update_warn_rule_passes_with_warning() {
     // A non-enforcing (warn) graph rule must NOT block the bulk transition: the
-    // issue completes the state change. (Bulk does not surface per-issue warnings
-    // in its result, but the transition succeeding while the rule is violated is
-    // the assertion — an enforcing rule would have blocked it, as the test above
-    // shows.)
+    // issue completes the state change, AND the warning is surfaced in
+    // BulkUpdateResult::warnings with issue-id attribution.
     use jit::commands::UpdateOperations;
     use jit::query_engine::QueryFilter;
 
@@ -631,6 +629,24 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         "a non-enforcing rule must not block the bulk transition"
     );
     assert_eq!(result.summary.total_errors, 0);
+
+    // The warning must be surfaced with the issue id and rule name.
+    assert_eq!(
+        result.warnings.len(),
+        1,
+        "non-enforcing rule must surface a per-issue warning in BulkUpdateResult::warnings"
+    );
+    assert_eq!(
+        result.warnings[0].0, epic,
+        "warning must be attributed to the correct issue id"
+    );
+    assert!(
+        result.warnings[0]
+            .1
+            .contains("epic-done-should-have-design"),
+        "warning message must name the failing rule: {}",
+        result.warnings[0].1
+    );
 
     let after = executor.storage().load_issue(&epic).unwrap();
     assert_eq!(

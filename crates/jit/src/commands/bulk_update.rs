@@ -40,6 +40,11 @@ pub struct BulkUpdateResult {
     pub skipped: Vec<(String, String)>,
     /// IDs that failed with errors (id, error)
     pub errors: Vec<(String, String)>,
+    /// Per-issue non-enforcing graph-rule warnings (id, message).
+    /// Warnings never block the transition; they are informational findings
+    /// from rules with `enforce = false`.  Empty when no rules fired.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub warnings: Vec<(String, String)>,
     /// Summary statistics
     pub summary: BulkUpdateSummary,
 }
@@ -61,6 +66,7 @@ impl BulkUpdateResult {
             modified: Vec::new(),
             skipped: Vec::new(),
             errors: Vec::new(),
+            warnings: Vec::new(),
             summary: BulkUpdateSummary {
                 total_matched: 0,
                 total_modified: 0,
@@ -167,7 +173,10 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         for issue in matched {
             match self.apply_operations_to_issue(issue, operations, force) {
-                Ok(modified) => {
+                Ok((modified, issue_warnings)) => {
+                    for msg in issue_warnings {
+                        result.warnings.push((issue.id.clone(), msg));
+                    }
                     if modified {
                         result.modified.push(issue.id.clone());
                     } else {
@@ -191,7 +200,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Best-effort operation: applies all changes that pass validation,
     /// tracks which fields were modified, and logs appropriate events.
     ///
-    /// Returns Ok(true) if modifications were made, Ok(false) if no changes, Err on failure.
+    /// Returns `Ok((modified, warnings))` where `modified` is `true` when the issue
+    /// was changed and `warnings` carries non-enforcing graph-rule findings from the
+    /// state transition (if any).  Returns `Err` on hard failures so the caller can
+    /// record the issue in its `errors` list and continue best-effort.
     ///
     /// Note: this does NOT call `update_issue_state()` (it skips that path's
     /// prechecks/postchecks/gate-diversion — see the DESIGN DECISION below), but
@@ -206,7 +218,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue: &Issue,
         operations: &UpdateOperations,
         force: bool,
-    ) -> Result<bool> {
+    ) -> Result<(bool, Vec<String>)> {
         // Validate first (includes local rule enforcement on the post-update
         // shape, so `jit issue update --filter` cannot bypass enforce rules).
         // Bypass events are deferred and only emitted after the save succeeds.
@@ -219,13 +231,18 @@ impl<S: IssueStore> CommandExecutor<S> {
             // enforce rule must still be audited even on a no-op write.
             // (`log_rule_bypasses` is a no-op when `bypassed_rules` is empty.)
             self.log_rule_bypasses(&issue.id, &validation.bypassed_rules)?;
-            return Ok(false);
+            return Ok((false, Vec::new()));
         }
 
         // Load fresh copy of issue
         let mut updated = self.storage.load_issue(&issue.id)?;
 
         let mut modified_fields = Vec::new();
+        // Warnings from non-enforcing graph rules fired during the state transition.
+        let mut transition_warnings: Vec<String> = Vec::new();
+        // Pending state-change event: captured here, emitted AFTER save_issue so a
+        // failed write never leaves a ghost event in the log.
+        let mut pending_state_event: Option<Event> = None;
 
         // Apply state change
         //
@@ -253,19 +270,23 @@ impl<S: IssueStore> CommandExecutor<S> {
                 // Route the literal state change through the single chokepoint so
                 // graph-rule enforcement (CC-2) runs on the bulk path too. A
                 // blocking enforce rule returns an error, failing this issue's
-                // update (recorded in `errors` by the caller). `persist = false`:
-                // the combined save and the state-change event are emitted below
-                // alongside the other field edits.
-                self.apply_state_transition(&mut updated, new_state, force, false, |_| {})?;
+                // update (recorded in `errors` by the caller). Non-enforcing rules
+                // return warnings that are surfaced in `BulkUpdateResult::warnings`.
+                // `persist = false`: the combined save and the state-change event
+                // are emitted below alongside the other field edits, ensuring the
+                // event is only appended AFTER save_issue commits successfully.
+                let warnings =
+                    self.apply_state_transition(&mut updated, new_state, force, false, |_| {})?;
+                transition_warnings.extend(warnings);
                 modified_fields.push("state".to_string());
 
-                // Log state change event (in addition to update event)
-                // This maintains consistency with single-issue state transitions
-                self.storage.append_event(&Event::new_issue_state_changed(
+                // Defer the state-change event until after save_issue succeeds so a
+                // failed write never leaves a ghost event in the event log.
+                pending_state_event = Some(Event::new_issue_state_changed(
                     issue.id.clone(),
                     old_state,
                     new_state,
-                ))?;
+                ));
             }
         }
 
@@ -323,6 +344,12 @@ impl<S: IssueStore> CommandExecutor<S> {
         if !modified_fields.is_empty() {
             self.storage.save_issue(updated)?;
 
+            // Emit the deferred state-change event AFTER the save commits, so a
+            // failed write never leaves a ghost event in the event log.
+            if let Some(event) = pending_state_event {
+                self.storage.append_event(&event)?;
+            }
+
             // Log update event
             self.storage.append_event(&Event::new_issue_updated(
                 issue.id.clone(),
@@ -337,7 +364,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // a no-op write. No-op on an empty `bypassed_rules`.
         self.log_rule_bypasses(&issue.id, &validation.bypassed_rules)?;
 
-        Ok(!modified_fields.is_empty())
+        Ok((!modified_fields.is_empty(), transition_warnings))
     }
 
     /// Preview bulk update without applying changes (dry-run)
@@ -579,6 +606,7 @@ mod tests {
         assert!(result.modified.is_empty());
         assert!(result.skipped.is_empty());
         assert!(result.errors.is_empty());
+        assert!(result.warnings.is_empty());
         assert_eq!(result.summary.total_matched, 0);
     }
 

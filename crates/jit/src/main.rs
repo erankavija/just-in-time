@@ -736,6 +736,13 @@ fn run() -> Result<()> {
                                 ));
                             }
 
+                            if !result.warnings.is_empty() {
+                                println!("\n⚠ Warnings ({} issue(s)):", result.warnings.len());
+                                for (id, warning) in &result.warnings {
+                                    println!("  • {}: {}", &id[..8.min(id.len())], warning);
+                                }
+                            }
+
                             if !result.skipped.is_empty() {
                                 println!("\nℹ Skipped {} issue(s):", result.summary.total_skipped);
                                 for (id, reason) in &result.skipped {
