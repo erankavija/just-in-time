@@ -21,6 +21,7 @@ This guide shows you how to write rules, using ready-to-copy examples:
 - [`docs/examples/fresh-evidence/`](../examples/fresh-evidence/rules.toml) — fresh-evidence-before-done
 - [`docs/examples/nyquist/`](../examples/nyquist/rules.toml) — criteria-to-check mapping
 - [`docs/examples/cross-epic/`](../examples/cross-epic/rules.toml) — cross-epic requirement-id collision detection
+- [`docs/examples/research/`](../examples/research/rules.toml) — research program: non-software hierarchy with `type:goal` / `type:experiment` and `hyp:` / `tests:` namespaces
 
 > The files under `docs/examples/` are EXAMPLES. They are not active on this
 > repository. To use one, copy its `rules.toml` to your project's `.jit/rules.toml`
@@ -349,6 +350,48 @@ done transition. Configure `criteria-section`, `marker`, `id-pattern`,
 `gate-prefix`, and `check-namespace` to match your team's conventions; omit
 `gate-prefix` or `check-namespace` to require only one mechanism. At least one
 of the two must be set (the loader rejects a rule with neither).
+
+### Research program — a non-software hierarchy
+
+[`docs/examples/research/rules.toml`](../examples/research/rules.toml) models a
+research program using only research vocabulary. There is no "epic" or
+"milestone" anywhere in the ruleset. The two issue types are `type:goal` and
+`type:experiment`; the label namespaces are `hyp:` (declared hypotheses on a
+goal) and `tests:` (which hypothesis an experiment addresses).
+
+A goal body has two required sections:
+
+```markdown
+## Hypotheses
+
+- [hard] H-1: increasing training data improves accuracy
+- [exploratory] H-2: model size is the primary performance driver
+
+## Success Criteria
+
+- accuracy exceeds 95% on the held-out test set
+```
+
+An experiment body has `## Method` (the protocol) and `## Evidence` (observations).
+
+The ruleset demonstrates the full set of lifecycle-aware primitives in research
+vocabulary:
+
+- **`require-section`** (local, enforced) — a goal must have `## Hypotheses` and
+  `## Success Criteria`; an experiment must have `## Method` and `## Evidence`.
+- **`json-schema`** (local, enforced) — Hypotheses items must be shaped
+  `[hard] H-N: <text>` or `[exploratory] H-N: <text>`, with at least one
+  `[hard]` item. See [`schemas/research-bodies.json`](../examples/research/schemas/research-bodies.json).
+- **`criteria-label-match`** (graph) — every `hyp:<id>` label on a goal must
+  name a real hypothesis id extracted from `## Hypotheses`. A fabricated
+  `hyp:H-99` not present in the body is reported immediately as stray.
+- **`label-coverage`** (graph, scoped `state = "done"`, `enforce = true`) — when
+  a goal reaches done, every `[hard]` hypothesis must be tested by at least one
+  done experiment carrying `tests:<id>`. An in-flight goal produces zero error
+  findings because the rule does not match until the done transition.
+- **`label-reference`** (graph, warn) — every `tests:<id>` on an experiment
+  resolves to a declared `hyp:<id>` on the linked goal. A typo surfaces as a
+  warning without blocking.
 
 None of these is built into JIT. They are configuration over one engine.
 

@@ -1,0 +1,195 @@
+# Example ruleset: Research program
+#
+# This is an EXAMPLE configuration, not the rules active on this repository. To
+# use it, copy this file to `.jit/rules.toml` and the `schemas/` directory to
+# `.jit/schemas/` in your own project.
+#
+# This example demonstrates that the validation engine carries NO software
+# assumptions. Every type name, label namespace, and section heading here is
+# from research methodology, not from any software-development vocabulary.
+# No `type:` selector here names a software-development construct.
+#
+# THE DOMAIN: a research program modeled as a two-level hierarchy.
+#
+#   type:goal       — a research goal. Its body states what the program is
+#                     trying to establish. It owns the canonical list of
+#                     hypotheses in a structured `## Hypotheses` section
+#                     (each item `H-N: <statement>`) and a `## Success Criteria`
+#                     section that narrows the goal to falsifiable outcomes.
+#                     Goals carry `hyp:<id>` labels, one per hypothesis the goal
+#                     is responsible for.
+#
+#   type:experiment — a concrete experiment designed to test one or more
+#                     hypotheses. Its body has a `## Method` section (the
+#                     experimental protocol) and an `## Evidence` section
+#                     (observations and results). Experiments carry `tests:<id>`
+#                     labels naming the hypotheses they test. Experiments depend
+#                     on the goal they advance.
+#
+# LABEL NAMESPACES:
+#   hyp:     on goals      — declared hypotheses (e.g. hyp:H-1)
+#   tests:   on experiments — which hypothesis the experiment tests (e.g. tests:H-1)
+#
+# WHAT THE ENGINE ENFORCES:
+#   1. Structure — a goal body must have `## Hypotheses` and `## Success Criteria`
+#      sections (require-section, enforce = true). An experiment body must have
+#      `## Method` and `## Evidence` sections. Raw JSON schemas validate that the
+#      items in `## Hypotheses` are shaped `H-N: <text>` (TOML cannot express
+#      `pattern` over list items faithfully).
+#   2. Stray-hypothesis detection — a `hyp:<id>` label on a goal must name a real
+#      hypothesis in the `## Hypotheses` section (criteria-label-match). A
+#      fabricated `hyp:H-99` that does not appear in the body prose is caught
+#      immediately.
+#   3. Hypothesis coverage at done — when a goal reaches done, every hypothesis
+#      declared as `[hard]` in `## Hypotheses` must be tested by at least one
+#      done experiment that carries `tests:<id>` (label-coverage, enforce = true
+#      at state = "done"). An in-flight goal produces ZERO error findings from
+#      this rule; it only fires at the done transition.
+#   4. tests: reference integrity — every `tests:<id>` on an experiment resolves
+#      to a declared `hyp:<id>` on the linked goal (label-reference, warn). A
+#      typo'd hypothesis id surfaces without blocking.
+#
+# LIFECYCLE NOTE:
+#   Rules (2) and (4) are always-on (no state predicate) because a stray or
+#   dangling label is wrong at any lifecycle phase. Rule (3) is scoped
+#   `state = "done"` with `enforce = true`: an in-flight goal is quiet, but the
+#   goal cannot complete until every [hard] hypothesis is covered. This mirrors
+#   the lifecycle-aware pattern from CC-8 / the SDD example.
+#
+# ADAPTATION KNOBS:
+#   - Change the hypothesis id format by adjusting `id-pattern` on the
+#     criteria-label-match and label-coverage rules (e.g. `H-[A-Z]+` for
+#     alphabetical ids, `[0-9]+` for plain numbers).
+#   - Add a `tests:` format rule (`label-value-pattern`) if your team uses a
+#     different id format for the `tests:` namespace.
+#   - Add `evidence:` labels and a `label-reference` rule if you cross-reference
+#     recorded evidence back to hypotheses.
+#   - Remove the [hard] marker filter to require coverage of ALL hypotheses, not
+#     just the ones marked critical.
+#   - Adjust the `## Success Criteria` schema to enforce additional structure
+#     (e.g. each item must name a hypothesis id).
+
+# ---------------------------------------------------------------------------
+# SECTION SLUGS (for reference when authoring schemas and rule configs):
+#   "## Hypotheses"       => "hypotheses"
+#   "## Success Criteria" => "success_criteria"
+#   "## Method"           => "method"
+#   "## Evidence"         => "evidence"
+# ---------------------------------------------------------------------------
+
+# --- Local: a goal must have a Hypotheses section ---------------------------
+# The Hypotheses section is the canonical source of truth: hypothesis ids
+# written in the body drive every label and experiment below. Without it, the
+# goal has no scientific structure. enforce = true blocks writes of a structurally
+# incomplete goal body so the derivation discipline is active from the first save.
+[[rules]]
+name = "research-goal-has-hypotheses-section"
+when = { type = "goal" }
+severity = "error"
+enforce = true
+assert = { require-section = { heading = "Hypotheses" } }
+
+# --- Local: a goal must have a Success Criteria section ---------------------
+# Success Criteria pin the goal to falsifiable outcomes. Without them the goal
+# is a vague aspiration rather than a testable claim. enforce = true mirrors
+# the discipline in the SDD ruleset: write the criteria first; they drive
+# everything that follows.
+[[rules]]
+name = "research-goal-has-success-criteria-section"
+when = { type = "goal" }
+severity = "error"
+enforce = true
+assert = { require-section = { heading = "Success Criteria" } }
+
+# --- Local: a goal body has well-formed Hypotheses items --------------------
+# Content schema over the parsed projection's `sections`. Requires at least one
+# hypothesis item and validates that each item is shaped `H-N: <text>`. Raw JSON
+# Schema lives in a file because TOML cannot express `pattern` over list items
+# faithfully. See schemas/research-bodies.json.
+[[rules]]
+name = "research-goal-hypotheses-well-formed"
+when = { type = "goal" }
+severity = "error"
+enforce = true
+assert = { json-schema = "schemas/research-bodies.json" }
+
+# --- Local: an experiment must have a Method section ----------------------
+# An experiment without a documented method is not reproducible; Method is
+# required structure. enforce = true blocks writes of a bare experiment issue.
+[[rules]]
+name = "research-experiment-has-method-section"
+when = { type = "experiment" }
+severity = "error"
+enforce = true
+assert = { require-section = { heading = "Method" } }
+
+# --- Local: an experiment must have an Evidence section -------------------
+# An experiment with no Evidence section cannot contribute to hypothesis
+# coverage. enforce = true is deliberate: record the section as soon as the
+# experiment exists, even if it is initially empty of bullet items (the schema
+# above does not apply here, so an empty Evidence section is allowed).
+[[rules]]
+name = "research-experiment-has-evidence-section"
+when = { type = "experiment" }
+severity = "error"
+enforce = true
+assert = { require-section = { heading = "Evidence" } }
+
+# --- Graph: stray hyp: label on a goal ------------------------------------
+# A `hyp:<id>` label claims that the goal owns a hypothesis with that id. This
+# rule compares the label value directly against the hypothesis ids extracted
+# from `## Hypotheses`, catching a fabricated or typo'd `hyp:H-99` immediately.
+# Two DISTINCT failure modes are now separable:
+#
+#   STRAY (this rule)       — "label 'hyp:H-99' on issue XY names no hypothesis
+#                              in section 'Hypotheses' (stray or invented)"
+#                              The id does not appear in the body at all.
+#
+#   UNCOVERED (see below)   — "hypothesis 'H-01' in section 'Hypotheses' is not
+#                              covered by any done experiment that tests: it"
+#                              The hypothesis exists, but no experiment covers it
+#                              yet. This is expected during in-flight work.
+#
+# Exact string comparison: `H-1` in the body vs `hyp:H-01` on the label differ,
+# so `hyp:H-01` is a stray. No silent normalization.
+[[rules]]
+name = "research-hyp-label-matches-hypothesis"
+when = { type = "goal" }
+severity = "error"
+assert = { criteria-label-match = { namespace = "hyp", criteria-section = "hypotheses", id-pattern = 'H-[0-9]+' } }
+
+# --- Graph: hypothesis coverage at done ------------------------------------
+# LIFECYCLE-SCOPED: this rule fires ONLY when the goal reaches the `done` state.
+# During in-flight work (backlog, ready, in_progress, gated) the goal produces
+# ZERO error findings from this rule — a goal whose experiments are not yet done
+# is not a validation failure; it is work in progress.
+#
+# When the goal transitions to done, every `[hard]` hypothesis in `## Hypotheses`
+# must be covered by at least one done experiment that (a) depends on the goal
+# and (b) carries `tests:<id>`. The block exits 4 and prints which hypothesis ids
+# are uncovered; `jit issue update --state done --force` bypasses the block and
+# records a graph-rule-bypassed event in the audit log.
+#
+# Adapt `marker` to `"[aspirational]"` or remove it to require coverage of
+# ALL hypotheses (the default criteria-section is `success_criteria`; here it is
+# `hypotheses`).
+[[rules]]
+name = "research-hard-hypotheses-covered-at-done"
+when = { type = "goal", state = "done" }
+severity = "error"
+enforce = true
+assert = { label-coverage = { criteria-section = "hypotheses", marker = "[hard]", id-pattern = "H-[0-9]+", satisfies-namespace = "tests", child-state = "done", child-link = "dependents" } }
+
+# --- Graph: tests: resolves to a declared hyp: ----------------------------
+# Reference integrity in the OTHER direction: an experiment's `tests:<id>` label
+# must resolve to a declared `hyp:<id>` on the linked goal (the goal that the
+# experiment depends on). A typo'd `tests:H-99` on an experiment surfaces here
+# as a warning so authors can catch it without blocking the whole validate run.
+# `scope = "linked"` keeps resolution inside the goal/experiment graph so an
+# experiment cannot accidentally "test" a hypothesis belonging to an unrelated
+# goal with an identically-numbered hypothesis.
+[[rules]]
+name = "research-tests-references-a-hyp"
+when = { label = "tests:*" }
+severity = "warn"
+assert = { label-reference = { from = "tests", to = "hyp", scope = "linked" } }

@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "Research goal body schema. Validates the STRUCTURE of a research goal's body as exposed by the jit projection under `sections`. A compliant goal must have a `## Hypotheses` section with at least one item shaped `H-N: <text>`, and at least one of those items must be marked `[hard]` (the hard-hypothesis check). A `## Success Criteria` section is required by a separate `require-section` rule; it is not re-checked here. Section keys are the slugified headings the jit projection emits: `## Hypotheses` -> `hypotheses`.",
+  "type": "object",
+  "required": ["sections"],
+  "properties": {
+    "sections": {
+      "type": "object",
+      "required": ["hypotheses"],
+      "properties": {
+        "hypotheses": {
+          "type": "object",
+          "required": ["items"],
+          "properties": {
+            "items": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "pattern": "^\\[(hard|exploratory)\\]\\s+H-[0-9]+:\\s+\\S"
+              },
+              "contains": {
+                "type": "string",
+                "pattern": "^\\[hard\\]"
+              },
+              "minContains": 1
+            }
+          }
+        }
+      }
+    }
+  }
+}

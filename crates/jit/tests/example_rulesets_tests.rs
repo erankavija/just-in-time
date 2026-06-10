@@ -20,6 +20,11 @@ use jit::validation::graph::{evaluate_graph, GraphFinding};
 use jit::validation::local::evaluate_local;
 use jit::validation::rules::{Rule, RuleSet, Scope};
 
+// Transition-enforcement tests (research module) drive the executor directly.
+use jit::commands::CommandExecutor;
+use jit::errors::TransitionBlockedError;
+use jit::storage::{InMemoryStorage, IssueStore};
+
 /// Absolute path to a `docs/examples/<name>` directory, resolved from the crate
 /// manifest dir so the test is independent of the working directory.
 fn example_dir(name: &str) -> PathBuf {
@@ -99,6 +104,7 @@ fn test_all_example_rulesets_load() {
         "fresh-evidence",
         "nyquist",
         "cross-epic",
+        "research",
     ] {
         let set = load_example(name);
         assert!(
@@ -1291,5 +1297,438 @@ mod cross_epic {
             !findings.iter().any(|f| f.finding.message.contains("UNIQ-")),
             "unique values must not produce findings: {findings:?}"
         );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 2g. research — non-software hierarchy (type:goal / type:experiment).
+//
+// Demonstrates that the validation engine carries NO software assumptions:
+// no "epic", no "milestone" — only research vocabulary. Tests are kept in
+// their own clearly separated module so sibling workers can merge cleanly.
+// ---------------------------------------------------------------------------
+
+mod research {
+    use super::*;
+
+    // -----------------------------------------------------------------------
+    // Shared fixtures
+    // -----------------------------------------------------------------------
+
+    /// A well-formed goal body: `## Hypotheses` with at least one `[hard]` item
+    /// and `## Success Criteria`.
+    fn compliant_goal_body() -> String {
+        "## Hypotheses\n\n\
+            - [hard] H-1: increasing training data improves accuracy\n\
+            - [exploratory] H-2: model size is the primary performance driver\n\n\
+            ## Success Criteria\n\n\
+            - accuracy exceeds 95% on the held-out test set\n"
+            .to_string()
+    }
+
+    /// A `type:goal` issue with a well-formed body and `hyp:H-1` derived from
+    /// the single `[hard]` hypothesis in the body.
+    fn compliant_goal() -> Issue {
+        let mut goal = Issue::new("Improve accuracy".to_string(), compliant_goal_body());
+        goal.labels = vec!["type:goal".to_string(), "hyp:H-1".to_string()];
+        goal
+    }
+
+    /// A `type:experiment` that tests hypothesis H-1 and has the required
+    /// `## Method` and `## Evidence` sections.
+    fn compliant_experiment(goal_id: &str) -> Issue {
+        let body = "## Method\n\n\
+            - train with 10x the original dataset size\n\
+            - evaluate on the held-out test set\n\n\
+            ## Evidence\n\n\
+            - accuracy reached 96.3%, exceeding the 95% threshold\n";
+        let mut exp = Issue::new("Scale training data".to_string(), body.to_string());
+        exp.labels = vec!["type:experiment".to_string(), "tests:H-1".to_string()];
+        exp.dependencies = vec![goal_id.to_string()];
+        exp.state = State::Done;
+        exp
+    }
+
+    // -----------------------------------------------------------------------
+    // 1. Ruleset loads and is non-empty
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_research_ruleset_loads() {
+        let set = load_example("research");
+        assert!(
+            !set.rules.is_empty(),
+            "research example must define at least one rule"
+        );
+        // Must have both local and graph rules.
+        assert!(
+            set.rules.iter().any(|r| r.scope == Scope::Local),
+            "research example must define at least one local rule"
+        );
+        assert!(
+            set.rules.iter().any(|r| r.scope == Scope::Graph),
+            "research example must define at least one graph rule"
+        );
+    }
+
+    #[test]
+    fn test_research_no_rule_references_epic_or_milestone() {
+        // The whole point of this example: no software-development type names.
+        // We check the rule selectors and assert kinds do NOT mention epic or
+        // milestone anywhere by inspecting the rendered TOML round-trip of the
+        // rules file itself.
+        let dir = example_dir("research");
+        let rules_toml = std::fs::read_to_string(dir.join("rules.toml"))
+            .expect("research rules.toml must be readable");
+        assert!(
+            !rules_toml.contains("epic"),
+            "no rule in the research example must reference 'epic': {rules_toml}"
+        );
+        assert!(
+            !rules_toml.contains("milestone"),
+            "no rule in the research example must reference 'milestone': {rules_toml}"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // 2. Local rules: structure is enforced on write
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_research_compliant_goal_passes_local() {
+        let set = load_example("research");
+        assert!(
+            !has_local_finding(&compliant_goal(), &set),
+            "a well-formed goal body must produce no local findings"
+        );
+    }
+
+    #[test]
+    fn test_research_goal_missing_hypotheses_section_is_blocked() {
+        let set = load_example("research");
+        let mut goal = compliant_goal();
+        // Replace the body with one that has no ## Hypotheses section.
+        goal.description = "## Success Criteria\n\n- good results\n".to_string();
+        let eval = evaluate_local(&goal, &set, ContentFormat::Markdown).unwrap();
+        assert!(
+            eval.is_blocking(),
+            "a goal with no Hypotheses section must be blocked on write"
+        );
+    }
+
+    #[test]
+    fn test_research_goal_missing_success_criteria_section_is_blocked() {
+        let set = load_example("research");
+        let mut goal = compliant_goal();
+        // Body has only ## Hypotheses, no ## Success Criteria.
+        goal.description = "## Hypotheses\n\n- [hard] H-1: statement\n".to_string();
+        let eval = evaluate_local(&goal, &set, ContentFormat::Markdown).unwrap();
+        assert!(
+            eval.is_blocking(),
+            "a goal with no Success Criteria section must be blocked on write"
+        );
+    }
+
+    #[test]
+    fn test_research_goal_malformed_hypotheses_items_blocked() {
+        let set = load_example("research");
+        let mut goal = compliant_goal();
+        // Items are missing both marker and H-N id format.
+        goal.description = "## Hypotheses\n\n\
+            - this is a freeform note with no id\n\n\
+            ## Success Criteria\n\n\
+            - some outcome\n"
+            .to_string();
+        let eval = evaluate_local(&goal, &set, ContentFormat::Markdown).unwrap();
+        assert!(
+            eval.is_blocking(),
+            "hypothesis items without marker and H-N id must be blocked"
+        );
+    }
+
+    #[test]
+    fn test_research_goal_no_hard_hypothesis_is_blocked() {
+        let set = load_example("research");
+        let mut goal = compliant_goal();
+        // Only [exploratory] items — no [hard] criterion. The schema requires at
+        // least one [hard] item via `contains` + `minContains`.
+        goal.description = "## Hypotheses\n\n\
+            - [exploratory] H-1: a tentative idea\n\n\
+            ## Success Criteria\n\n\
+            - some outcome\n"
+            .to_string();
+        let eval = evaluate_local(&goal, &set, ContentFormat::Markdown).unwrap();
+        assert!(
+            eval.is_blocking(),
+            "a goal with no [hard] hypothesis must be blocked"
+        );
+    }
+
+    #[test]
+    fn test_research_compliant_experiment_passes_local() {
+        let set = load_example("research");
+        let exp = compliant_experiment("dummy-goal-id");
+        assert!(
+            !has_local_finding(&exp, &set),
+            "a well-formed experiment body must produce no local findings"
+        );
+    }
+
+    #[test]
+    fn test_research_experiment_missing_method_section_is_blocked() {
+        let set = load_example("research");
+        let mut exp = compliant_experiment("dummy-goal-id");
+        exp.description = "## Evidence\n\n- observations\n".to_string();
+        let eval = evaluate_local(&exp, &set, ContentFormat::Markdown).unwrap();
+        assert!(
+            eval.is_blocking(),
+            "an experiment with no Method section must be blocked"
+        );
+    }
+
+    #[test]
+    fn test_research_experiment_missing_evidence_section_is_blocked() {
+        let set = load_example("research");
+        let mut exp = compliant_experiment("dummy-goal-id");
+        exp.description = "## Method\n\n- the protocol\n".to_string();
+        let eval = evaluate_local(&exp, &set, ContentFormat::Markdown).unwrap();
+        assert!(
+            eval.is_blocking(),
+            "an experiment with no Evidence section must be blocked"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // 3. Graph rules: stray hyp: label detection (criteria-label-match)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_research_stray_hyp_label_is_reported() {
+        // A `hyp:H-99` label on a goal whose Hypotheses section contains only
+        // H-1 is stray: the `research-hyp-label-matches-hypothesis` rule fires.
+        let set = load_example("research");
+        let rules = graph_rules(&set);
+
+        let mut goal = compliant_goal();
+        // Add a fabricated hypothesis label H-99 — it does not appear in the body.
+        goal.labels.push("hyp:H-99".to_string());
+
+        let findings = issue_graph_findings(&rules, std::slice::from_ref(&goal));
+        assert!(
+            findings.iter().any(
+                |f| f.finding.rule == "research-hyp-label-matches-hypothesis"
+                    && f.finding.message.contains("hyp:H-99")
+                    && f.finding.message.contains("stray or invented")
+            ),
+            "a fabricated hyp: label must be reported as stray: {findings:?}"
+        );
+        // The legitimate hyp:H-1 must not be flagged.
+        assert!(
+            !findings.iter().any(
+                |f| f.finding.rule == "research-hyp-label-matches-hypothesis"
+                    && f.finding.message.contains("hyp:H-1")
+            ),
+            "a matched hyp: label must not be reported: {findings:?}"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // 4. In-flight goal produces ZERO error findings (lifecycle silence)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_research_inflight_goal_produces_zero_error_findings() {
+        // The coverage rule is scoped `state = "done"`. A goal in_progress with
+        // no covering experiments must produce zero ERROR findings from graph
+        // rules (the done-scoped rule simply does not match).
+        let set = load_example("research");
+        let rules = graph_rules(&set);
+
+        let mut goal = compliant_goal();
+        goal.state = State::InProgress;
+        // No experiments at all — would fail coverage if the rule fired.
+
+        let findings = issue_graph_findings(&rules, std::slice::from_ref(&goal));
+        let error_findings: Vec<_> = findings
+            .iter()
+            .filter(|f| f.finding.severity == jit::validation::rules::Severity::Error)
+            .collect();
+        assert!(
+            error_findings.is_empty(),
+            "an in-flight goal must produce zero error-severity findings from \
+             graph rules (done-scoped coverage must not fire): {error_findings:?}"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // 5. Done-scoped coverage rule blocks transition via executor
+    // -----------------------------------------------------------------------
+
+    /// Build an in-memory executor whose rules.toml is the research coverage
+    /// rule only (local schema rules are omitted to keep the test self-contained;
+    /// coverage is the graph rule under test here).
+    fn research_coverage_executor() -> CommandExecutor<InMemoryStorage> {
+        std::env::set_var("JIT_TEST_MODE", "1");
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+        std::fs::create_dir_all(storage.root()).unwrap();
+        std::fs::write(storage.root().join("config.toml"), "").unwrap();
+        // Write only the done-scoped coverage rule: no local schema rules needed
+        // because the graph test does not write through the write-path validator.
+        let rules_toml = r#"
+[[rules]]
+name = "research-hard-hypotheses-covered-at-done"
+when = { type = "goal", state = "done" }
+severity = "error"
+enforce = true
+assert = { label-coverage = { criteria-section = "hypotheses", marker = "[hard]", id-pattern = "H-[0-9]+", satisfies-namespace = "tests", child-state = "done", child-link = "dependents" } }
+"#;
+        std::fs::write(storage.root().join("rules.toml"), rules_toml).unwrap();
+        CommandExecutor::new(storage)
+    }
+
+    /// Save an issue directly into storage at a given state, bypassing validation.
+    fn seed(
+        executor: &CommandExecutor<InMemoryStorage>,
+        title: &str,
+        labels: &[&str],
+        body: &str,
+        state: State,
+    ) -> String {
+        let mut issue = Issue::new(title.to_string(), body.to_string());
+        issue.labels = labels.iter().map(|s| s.to_string()).collect();
+        issue.state = state;
+        let id = issue.id.clone();
+        executor.storage().save_issue(issue).unwrap();
+        id
+    }
+
+    #[test]
+    fn test_research_done_transition_blocked_when_hypothesis_uncovered() {
+        // A `type:goal` in state `in_progress` with a `[hard]` hypothesis H-1
+        // but NO done experiment that `tests:H-1`. The done transition must be
+        // blocked by the enforcing coverage rule (exit 4 semantics via
+        // TransitionBlockedError).
+        let executor = research_coverage_executor();
+
+        let goal_id = seed(
+            &executor,
+            "Improve accuracy",
+            &["type:goal", "hyp:H-1"],
+            &compliant_goal_body(),
+            State::InProgress,
+        );
+
+        let result = executor.update_issue(
+            &goal_id,
+            None,
+            None,
+            None,
+            Some(State::Done),
+            vec![],
+            vec![],
+            None,
+            false,
+        );
+
+        let err = result.expect_err("uncovered [hard] hypothesis must block the done transition");
+        let blocked = err
+            .downcast_ref::<TransitionBlockedError>()
+            .expect("error must be a TransitionBlockedError (maps to exit 4)");
+
+        let rendered = blocked.to_string();
+        assert!(
+            rendered.contains("research-hard-hypotheses-covered-at-done"),
+            "blocking error must name the failing rule: {rendered}"
+        );
+        assert!(
+            rendered.contains("H-1"),
+            "blocking error must name the uncovered hypothesis: {rendered}"
+        );
+
+        // The goal must remain in_progress — nothing was saved.
+        let after = executor.storage().load_issue(&goal_id).unwrap();
+        assert_eq!(
+            after.state,
+            State::InProgress,
+            "a blocked done transition must not persist the state change"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // 6. Happy path: covered goal reaches done, no findings
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_research_happy_path_covered_goal_completes() {
+        // Goal with [hard] H-1; one done experiment that depends on the goal and
+        // carries tests:H-1. Graph findings must be empty; done transition succeeds.
+        let set = load_example("research");
+        let rules = graph_rules(&set);
+
+        let goal = compliant_goal();
+        let exp = compliant_experiment(&goal.id);
+
+        let findings = issue_graph_findings(&rules, &[goal.clone(), exp]);
+        let error_findings: Vec<_> = findings
+            .iter()
+            .filter(|f| f.finding.severity == jit::validation::rules::Severity::Error)
+            .collect();
+        assert!(
+            error_findings.is_empty(),
+            "a covered done goal must yield no error findings: {error_findings:?}"
+        );
+    }
+
+    #[test]
+    fn test_research_tests_references_a_hyp_warns_on_dangling_tests_label() {
+        // An experiment that claims `tests:H-99`, but the linked goal only
+        // declares `hyp:H-1`. The `research-tests-references-a-hyp` rule (warn)
+        // must surface the dangling reference without blocking.
+        let set = load_example("research");
+        let rules = graph_rules(&set);
+
+        let goal = compliant_goal(); // declares hyp:H-1
+        let mut exp = compliant_experiment(&goal.id);
+        // Override the tests: label to reference a nonexistent hypothesis.
+        exp.labels = vec![
+            "type:experiment".to_string(),
+            "tests:H-99".to_string(), // no hyp:H-99 on the goal
+        ];
+
+        let findings = issue_graph_findings(&rules, &[goal, exp]);
+        assert!(
+            findings
+                .iter()
+                .any(|f| f.finding.rule == "research-tests-references-a-hyp"
+                    && f.finding.message.contains("H-99")),
+            "a dangling tests: reference must be reported by research-tests-references-a-hyp: \
+             {findings:?}"
+        );
+        // Verify the finding is a warn (not error) so it does not block.
+        let dangling = findings
+            .iter()
+            .find(|f| f.finding.rule == "research-tests-references-a-hyp")
+            .expect("dangling tests: finding must exist");
+        assert_eq!(
+            dangling.finding.severity,
+            jit::validation::rules::Severity::Warn,
+            "dangling tests: reference must be a warning, not an error"
+        );
+    }
+
+    #[test]
+    fn test_research_done_scoped_coverage_rule_has_enforce_shape() {
+        // The done-scoped rule must carry severity=error + enforce=true so that
+        // transition enforcement blocks the done transition when uncovered.
+        let set = load_example("research");
+        let rule = set
+            .rules
+            .iter()
+            .find(|r| r.name == "research-hard-hypotheses-covered-at-done")
+            .expect("research example must define research-hard-hypotheses-covered-at-done");
+        assert_eq!(rule.severity, jit::validation::rules::Severity::Error);
+        assert!(rule.enforce, "the done-scoped coverage rule must enforce");
+        assert_eq!(rule.scope, Scope::Graph);
     }
 }
