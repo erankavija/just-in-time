@@ -782,13 +782,14 @@ impl<S: IssueStore> CommandExecutor<S> {
         // handled below (not by the chokepoint) because this path may carry
         // field edits in the same save and is a no-op for an already-gated
         // issue.
+        let mut diversion_warnings = Vec::new();
         if old_state != State::Gated {
             issue.state = old_state;
-            // Non-blocking findings are deliberately dropped here: this path
-            // always returns the gate-blocking error below, which is the
-            // dominant signal, and the same findings resurface in
-            // `jit validate` and at the next transition attempt.
-            let _ = self.apply_state_transition(issue, State::Gated, false, false, |_| {})?;
+            // Non-blocking findings ride on the gate-blocking error returned
+            // below (TransitionBlockedError::with_warnings) so they surface in
+            // both the rendered message and the JSON details.
+            diversion_warnings =
+                self.apply_state_transition(issue, State::Gated, false, false, |_| {})?;
         }
         issue.state = State::Gated;
 
@@ -820,6 +821,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             State::Gated,
             gate_blockers,
         )
+        .with_warnings(diversion_warnings)
         .into())
     }
 }

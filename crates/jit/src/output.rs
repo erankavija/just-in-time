@@ -483,6 +483,7 @@ impl JsonError {
                 "requested_state": state_name(blocked.requested_state()),
                 "actual_state": state_name(blocked.actual_state()),
                 "blockers": blocked.blockers().iter().map(transition_blocker_json).collect::<Vec<_>>(),
+                "warnings": blocked.warnings(),
                 "remediation": blocked.remediation_commands(),
             }))
             .with_suggestions(blocked.remediation_commands())

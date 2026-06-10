@@ -115,6 +115,11 @@ pub struct TransitionBlockedError {
     requested_state: State,
     actual_state: State,
     blockers: Vec<TransitionBlocker>,
+    /// Non-blocking findings (warn-severity or non-enforcing rules) observed
+    /// while evaluating the blocked transition. Carried on the error so paths
+    /// that must return an error (e.g. the gate diversion) still surface them
+    /// in both the rendered message and the JSON details.
+    warnings: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -152,6 +157,7 @@ impl TransitionBlockedError {
             requested_state,
             actual_state,
             blockers,
+            warnings: Vec::new(),
         }
     }
 
@@ -169,6 +175,7 @@ impl TransitionBlockedError {
                 .into_iter()
                 .map(|(gate_key, status)| TransitionBlocker::Gate { gate_key, status })
                 .collect(),
+            warnings: Vec::new(),
         }
     }
 
@@ -191,7 +198,18 @@ impl TransitionBlockedError {
                 .into_iter()
                 .map(|(rule, message)| TransitionBlocker::GraphRule { rule, message })
                 .collect(),
+            warnings: Vec::new(),
         }
+    }
+
+    /// Attach non-blocking findings observed during the blocked transition.
+    pub(crate) fn with_warnings(mut self, warnings: Vec<String>) -> Self {
+        self.warnings = warnings;
+        self
+    }
+
+    pub(crate) fn warnings(&self) -> &[String] {
+        &self.warnings
     }
 
     pub(crate) fn issue_id(&self) -> &str {
@@ -308,6 +326,13 @@ impl fmt::Display for TransitionBlockedError {
         writeln!(f, "\nBlockers:")?;
         for blocker in &self.blockers {
             writeln!(f, "  - {}", blocker)?;
+        }
+
+        if !self.warnings.is_empty() {
+            writeln!(f, "\nWarnings (non-blocking):")?;
+            for warning in &self.warnings {
+                writeln!(f, "  - {}", warning)?;
+            }
         }
 
         writeln!(f, "\nTo fix:")?;
