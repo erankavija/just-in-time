@@ -991,13 +991,28 @@ impl RawGateRecency {
                     message: "gate-recency requires 'max-age-days' or 'max-age-hours'".to_string(),
                 });
             }
-            (Some(days), None) => days.saturating_mul(24),
+            (Some(days), None) => {
+                days.checked_mul(24)
+                    .ok_or_else(|| RuleConfigError::InvalidAssertion {
+                        rule: rule.to_string(),
+                        message: "gate-recency 'max-age-days' is too large".to_string(),
+                    })?
+            }
             (None, Some(hours)) => hours,
         };
         if max_age_hours == 0 {
             return Err(RuleConfigError::InvalidAssertion {
                 rule: rule.to_string(),
                 message: "gate-recency max age must be greater than zero".to_string(),
+            });
+        }
+        // The evaluator compares against `chrono` hour counts, which are i64.
+        // Reject ages beyond that range at load so the comparison can never
+        // wrap a huge-but-parseable age into a negative threshold.
+        if max_age_hours > i64::MAX as u64 {
+            return Err(RuleConfigError::InvalidAssertion {
+                rule: rule.to_string(),
+                message: "gate-recency max age is too large".to_string(),
             });
         }
         Ok(Assertion::GateRecency {
@@ -1945,6 +1960,27 @@ assert = { gate-recency = { max-age-days = 0 } }
                     message.contains("greater than zero"),
                     "message was: {message}"
                 );
+            }
+            other => panic!("expected InvalidAssertion, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_gate_recency_overflowing_age_is_rejected() {
+        // A huge-but-parseable age must be rejected at load: a `max-age-days`
+        // whose hour normalization exceeds i64::MAX would otherwise wrap into a
+        // negative threshold in the evaluator (which compares chrono's i64 hour
+        // counts) and report every fresh result as stale. TOML integers are
+        // i64, so the days form is the only way such an age can parse.
+        let toml = r#"
+[[rules]]
+name = "huge"
+assert = { gate-recency = { max-age-days = 384307168202282326 } }
+"#;
+        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        match err {
+            RuleConfigError::InvalidAssertion { message, .. } => {
+                assert!(message.contains("too large"), "message was: {message}");
             }
             other => panic!("expected InvalidAssertion, got {other:?}"),
         }
