@@ -189,7 +189,10 @@ fn test_sdd_graph_coverage_and_reference_pass_when_satisfied() {
     let set = load_example("sdd");
     let rules = graph_rules(&set);
 
-    let epic = sdd_compliant_epic();
+    // Epic in `done` state: the lifecycle-scoped coverage and derivation rules
+    // are active and must produce no findings when the criterion is covered.
+    let mut epic = sdd_compliant_epic();
+    epic.state = State::Done;
     // A done child that depends on the epic and satisfies the one [hard]
     // criterion REQ-01.
     let mut child = Issue::new("implement REQ-01".to_string(), String::new());
@@ -209,13 +212,15 @@ fn test_sdd_graph_coverage_fails_when_hard_criterion_uncovered() {
     let set = load_example("sdd");
     let rules = graph_rules(&set);
 
-    // Epic with a [hard] criterion REQ-01 but no satisfying child at all.
-    let epic = sdd_compliant_epic();
+    // Epic in `done` state with a [hard] criterion REQ-01 but no satisfying
+    // child: the lifecycle-scoped coverage rule fires only at done.
+    let mut epic = sdd_compliant_epic();
+    epic.state = State::Done;
     let findings = issue_graph_findings(&rules, std::slice::from_ref(&epic));
     assert!(
         findings.iter().any(|f| f.finding.message.contains("REQ-01")
             && f.finding.rule == "sdd-hard-criteria-covered"),
-        "an uncovered [hard] criterion must be reported by coverage: {findings:?}"
+        "an uncovered [hard] criterion must be reported by coverage at done: {findings:?}"
     );
 }
 
@@ -242,14 +247,18 @@ fn test_sdd_graph_reference_warns_on_dangling_satisfies() {
 
 #[test]
 fn test_sdd_graph_stray_req_label_is_reported() {
-    // Finding 1: a `req:` label that no child satisfies is stray/invented — it
-    // does NOT correspond to any implemented criterion. The `sdd-req-is-satisfied`
-    // rule (req -> satisfies integrity) catches it.
+    // A `req:REQ-77` label whose id is absent from the criteria prose is a stray.
+    // After the lifecycle-aware rework, two rules cover this:
+    //   * sdd-req-matches-a-criterion (always-on, any state): fires because
+    //     REQ-77 is not in the Success Criteria section.
+    //   * sdd-req-is-satisfied (done-scoped, enforce=true): fires at done because
+    //     no child satisfies REQ-77.
     let set = load_example("sdd");
     let rules = graph_rules(&set);
 
-    // Epic declares the legitimate req:REQ-01 AND a stray req:REQ-77.
+    // Epic in `done` state: both stray detection and derivation rules are active.
     let mut epic = sdd_compliant_epic();
+    epic.state = State::Done;
     epic.labels.push("req:REQ-77".to_string());
 
     // A done child satisfies only REQ-01.
@@ -259,20 +268,34 @@ fn test_sdd_graph_stray_req_label_is_reported() {
     child.state = State::Done;
 
     let findings = issue_graph_findings(&rules, &[epic, child]);
+    // The always-on stray check catches REQ-77 immediately.
+    assert!(
+        findings.iter().any(|f| f.finding.message.contains("REQ-77")
+            && f.finding.rule == "sdd-req-matches-a-criterion"),
+        "a stray req: label must be reported by criteria-label-match: {findings:?}"
+    );
+    // At done, the derivation rule also fires for REQ-77.
     assert!(
         findings
             .iter()
             .any(|f| f.finding.message.contains("REQ-77")
                 && f.finding.rule == "sdd-req-is-satisfied"),
-        "a stray req: label with no satisfying child must be reported: {findings:?}"
+        "an unsatisfied req: label must be reported by sdd-req-is-satisfied at done: {findings:?}"
     );
-    // The legitimate req:REQ-01 must NOT be reported as stray.
+    // The legitimate req:REQ-01 must NOT be flagged as stray or unsatisfied.
     assert!(
         !findings
             .iter()
             .any(|f| f.finding.rule == "sdd-req-is-satisfied"
                 && f.finding.message.contains("REQ-01")),
-        "a satisfied req: label must not be flagged as stray: {findings:?}"
+        "a satisfied req: label must not be flagged as unsatisfied: {findings:?}"
+    );
+    assert!(
+        !findings
+            .iter()
+            .any(|f| f.finding.rule == "sdd-req-matches-a-criterion"
+                && f.finding.message.contains("REQ-01")),
+        "a criterion-matching req: label must not be flagged as stray: {findings:?}"
     );
 }
 
@@ -280,11 +303,13 @@ fn test_sdd_graph_stray_req_label_is_reported() {
 fn test_sdd_graph_req_resolution_is_scoped_to_linked_graph() {
     // `scope = "linked"`: an epic's `req:REQ-01` is NOT satisfied by a
     // `satisfies:REQ-01` on an UNRELATED issue (no dependency edge to the epic).
-    // Cross-epic matches must not count, so the stray-req rule still fires.
+    // Cross-epic matches must not count, so the done-scoped derivation rule fires.
     let set = load_example("sdd");
     let rules = graph_rules(&set);
 
-    let epic = sdd_compliant_epic(); // declares req:REQ-01
+    // Epic in `done` state so the derivation rule is active.
+    let mut epic = sdd_compliant_epic(); // declares req:REQ-01
+    epic.state = State::Done;
 
     // An unrelated issue satisfies REQ-01 but is NOT linked to this epic.
     let mut unrelated = Issue::new("unrelated".to_string(), String::new());
@@ -304,23 +329,23 @@ fn test_sdd_graph_req_resolution_is_scoped_to_linked_graph() {
 
 #[test]
 fn test_sdd_graph_missing_req_surfaces_via_coverage_chain() {
-    // Finding 1 (other direction): a [hard] criterion for which NO `req:` is
-    // declared and NO child satisfies it surfaces through the criteria -> satisfies
-    // coverage rule. This is the enforceable criteria -> req chain: a hard
-    // criterion cannot silently lack a derived label.
+    // A [hard] criterion for which NO `req:` is declared and NO child satisfies it
+    // surfaces through the criteria -> satisfies coverage rule at done. The epic
+    // carries no `req:` label (so the criteria-label-match rule produces no stray
+    // finding), but coverage still fires because REQ-01 has no satisfying child.
     let set = load_example("sdd");
     let rules = graph_rules(&set);
 
-    // Epic body has [hard] REQ-01, but the epic declares NO req: label and there
-    // is no satisfying child.
+    // Epic in `done` state: coverage rule is active. No req: label, no child.
     let mut epic = sdd_compliant_epic();
     epic.labels = vec!["type:epic".to_string()];
+    epic.state = State::Done;
 
     let findings = issue_graph_findings(&rules, std::slice::from_ref(&epic));
     assert!(
         findings.iter().any(|f| f.finding.message.contains("REQ-01")
             && f.finding.rule == "sdd-hard-criteria-covered"),
-        "a hard criterion with no derived/satisfying label must be reported: {findings:?}"
+        "a hard criterion with no derived/satisfying label must be reported at done: {findings:?}"
     );
 }
 
@@ -614,6 +639,246 @@ mod sdd_criteria_label_match {
                 .any(|f| f.finding.rule == "sdd-req-matches-a-criterion"
                     && f.finding.message.contains("req:REQ-3")),
             "REQ-3 vs REQ-03: no normalization, so REQ-3 must be stray: {findings:?}"
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 2d''. SDD — June 2026 lifecycle evaluation scenarios.
+//
+// These four scenarios correspond to the evaluation scenarios described in the
+// issue specification (task 490f1f99). Scenarios (b) and (d) use the executor
+// pattern from transition_graph_enforcement_tests.rs so the done transition
+// is exercised end-to-end (real enforcement, real exit-4 path).
+// ---------------------------------------------------------------------------
+
+mod sdd_lifecycle {
+    use super::*;
+    use jit::commands::CommandExecutor;
+    use jit::errors::TransitionBlockedError;
+    use jit::storage::{InMemoryStorage, IssueStore};
+
+    /// Load the SDD example ruleset from disk and write it into an executor's
+    /// in-memory storage root so the executor picks it up as the operative set.
+    fn executor_with_sdd_example() -> CommandExecutor<InMemoryStorage> {
+        std::env::set_var("JIT_TEST_MODE", "1");
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+        std::fs::create_dir_all(storage.root()).unwrap();
+        std::fs::write(storage.root().join("config.toml"), "").unwrap();
+
+        // Read the example rules.toml and copy the schemas/ dir into the storage root.
+        let sdd_dir = example_dir("sdd");
+        let rules_toml = std::fs::read_to_string(sdd_dir.join("rules.toml")).unwrap();
+        std::fs::write(storage.root().join("rules.toml"), rules_toml).unwrap();
+
+        // Copy the schemas/ directory so json-schema references resolve.
+        let schemas_src = sdd_dir.join("schemas");
+        let schemas_dst = storage.root().join("schemas");
+        std::fs::create_dir_all(&schemas_dst).unwrap();
+        for entry in std::fs::read_dir(&schemas_src).unwrap() {
+            let entry = entry.unwrap();
+            std::fs::copy(entry.path(), schemas_dst.join(entry.file_name())).unwrap();
+        }
+
+        CommandExecutor::new(storage)
+    }
+
+    /// A well-formed SDD spec body: Requirements, Scenarios, and Success Criteria.
+    fn sdd_spec_body() -> String {
+        "## Requirements\n\n\
+            - REQ-01: the loader rejects mixed shorthand and raw schema\n\n\
+            ## Scenarios\n\n\
+            - Given a rule mixing shorthand and a raw schema When the loader runs Then it errors\n\n\
+            ## Success Criteria\n\n\
+            - [hard] REQ-01: the loader rejects mixed shorthand and raw schema\n"
+            .to_string()
+    }
+
+    // Scenario (a): in-flight epic -> zero error-severity findings.
+    //
+    // An in-progress epic with a well-formed spec body, `req:` labels matching
+    // the criteria, and children that exist but are not yet `done` must produce
+    // ZERO error-severity findings from graph evaluation.
+    #[test]
+    fn test_sdd_in_flight_epic_yields_zero_error_findings() {
+        let set = load_example("sdd");
+        let rules = graph_rules(&set);
+
+        // In-progress epic: correct structure, correct req: label.
+        let mut epic = Issue::new("Feature X".to_string(), sdd_spec_body());
+        epic.labels = vec!["type:epic".to_string(), "req:REQ-01".to_string()];
+        epic.state = State::InProgress;
+
+        // A child that depends on the epic but is still in progress (not done).
+        let mut child = Issue::new("implement REQ-01".to_string(), String::new());
+        child.labels = vec!["type:task".to_string(), "satisfies:REQ-01".to_string()];
+        child.dependencies = vec![epic.id.clone()];
+        child.state = State::InProgress;
+
+        let findings = issue_graph_findings(&rules, &[epic, child]);
+        let error_findings: Vec<_> = findings
+            .iter()
+            .filter(|f| f.finding.severity == jit::validation::rules::Severity::Error)
+            .collect();
+        assert!(
+            error_findings.is_empty(),
+            "an in-flight epic with matching req: labels and in-progress children \
+             must yield zero error-severity graph findings: {error_findings:?}"
+        );
+    }
+
+    // Scenario (b): premature done -> TransitionBlockedError.
+    //
+    // An epic with an uncovered [hard] criterion that attempts --state done via
+    // the executor must be blocked with TransitionBlockedError (exit 4).
+    #[test]
+    fn test_sdd_premature_done_blocked_by_coverage_rule() {
+        let executor = executor_with_sdd_example();
+
+        // Seed an epic with a well-formed spec body and req:REQ-01, but NO child
+        // that satisfies it. The epic is in-progress.
+        let mut epic = Issue::new("Feature X".to_string(), sdd_spec_body());
+        epic.labels = vec!["type:epic".to_string(), "req:REQ-01".to_string()];
+        epic.state = State::InProgress;
+        let epic_id = epic.id.clone();
+        executor.storage().save_issue(epic).unwrap();
+
+        // Attempt to transition to done: must be blocked.
+        let result = executor.update_issue(
+            &epic_id,
+            None,
+            None,
+            None,
+            Some(State::Done),
+            vec![],
+            vec![],
+            None,
+            false,
+        );
+
+        let err = result.expect_err("epic with uncovered [hard] criterion must not reach done");
+        let blocked = err
+            .downcast_ref::<TransitionBlockedError>()
+            .expect("the block must be a TransitionBlockedError (exit 4)");
+
+        let rendered = blocked.to_string();
+        // The coverage rule is what blocks.
+        assert!(
+            rendered.contains("sdd-hard-criteria-covered"),
+            "blocked error must name the failing coverage rule: {rendered}"
+        );
+
+        // The issue must not have been persisted as done.
+        let after = executor.storage().load_issue(&epic_id).unwrap();
+        assert_eq!(
+            after.state,
+            State::InProgress,
+            "a blocked done transition must persist nothing"
+        );
+    }
+
+    // Scenario (c): stray req:REQ-77 on in-flight epic -> criteria-label-match finding.
+    //
+    // An in-progress epic with a stray req:REQ-77 (absent from the criteria prose)
+    // must yield a finding from the always-on sdd-req-matches-a-criterion rule.
+    // The done-scoped rules (sdd-hard-criteria-covered, sdd-req-is-satisfied) must
+    // NOT fire because the epic is not in state done.
+    #[test]
+    fn test_sdd_stray_req_on_in_flight_epic_yields_only_criteria_label_match() {
+        let set = load_example("sdd");
+        let rules = graph_rules(&set);
+
+        // In-progress epic with a stray req:REQ-77 (not in the criteria prose)
+        // alongside the legitimate req:REQ-01.
+        let mut epic = Issue::new("Feature X".to_string(), sdd_spec_body());
+        epic.labels = vec![
+            "type:epic".to_string(),
+            "req:REQ-01".to_string(),
+            "req:REQ-77".to_string(), // stray: not in criteria
+        ];
+        epic.state = State::InProgress;
+
+        // A child in progress (not done) so the in-flight state is realistic.
+        let mut child = Issue::new("implement REQ-01".to_string(), String::new());
+        child.labels = vec!["type:task".to_string(), "satisfies:REQ-01".to_string()];
+        child.dependencies = vec![epic.id.clone()];
+        child.state = State::InProgress;
+
+        let findings = issue_graph_findings(&rules, &[epic, child]);
+
+        // The stray must be caught by the always-on rule.
+        assert!(
+            findings
+                .iter()
+                .any(|f| f.finding.rule == "sdd-req-matches-a-criterion"
+                    && f.finding.message.contains("req:REQ-77")),
+            "stray req:REQ-77 on in-flight epic must be caught by criteria-label-match: {findings:?}"
+        );
+
+        // The done-scoped rules must NOT fire for an in-progress epic.
+        assert!(
+            !findings
+                .iter()
+                .any(|f| f.finding.rule == "sdd-hard-criteria-covered"),
+            "sdd-hard-criteria-covered must not fire for an in-progress epic: {findings:?}"
+        );
+        assert!(
+            !findings
+                .iter()
+                .any(|f| f.finding.rule == "sdd-req-is-satisfied"),
+            "sdd-req-is-satisfied must not fire for an in-progress epic: {findings:?}"
+        );
+    }
+
+    // Scenario (d): happy path -> done transition succeeds.
+    //
+    // An epic with a covered [hard] criterion (done child with satisfies:REQ-01)
+    // must be able to transition to done without being blocked.
+    #[test]
+    fn test_sdd_happy_path_done_transition_succeeds() {
+        let executor = executor_with_sdd_example();
+
+        // Seed the epic.
+        let mut epic = Issue::new("Feature X".to_string(), sdd_spec_body());
+        epic.labels = vec!["type:epic".to_string(), "req:REQ-01".to_string()];
+        epic.state = State::InProgress;
+        let epic_id = epic.id.clone();
+        executor.storage().save_issue(epic).unwrap();
+
+        // Seed a done child that depends on the epic and satisfies REQ-01.
+        let mut child = Issue::new("implement REQ-01".to_string(), String::new());
+        child.labels = vec!["type:task".to_string(), "satisfies:REQ-01".to_string()];
+        child.state = State::Done;
+        let child_id = child.id.clone();
+        executor.storage().save_issue(child).unwrap();
+        // Wire the dependency: child depends on the epic (epic is the parent).
+        executor.add_dependency(&child_id, &epic_id).unwrap();
+
+        // Transition to done: must succeed.
+        let result = executor.update_issue(
+            &epic_id,
+            None,
+            None,
+            None,
+            Some(State::Done),
+            vec![],
+            vec![],
+            None,
+            false,
+        );
+
+        assert!(
+            result.is_ok(),
+            "an epic with covered [hard] criteria must reach done without blocking: {:?}",
+            result.err()
+        );
+
+        let after = executor.storage().load_issue(&epic_id).unwrap();
+        assert_eq!(
+            after.state,
+            State::Done,
+            "the epic must be persisted as done after a successful transition"
         );
     }
 }

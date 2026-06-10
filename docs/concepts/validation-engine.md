@@ -91,20 +91,45 @@ of truth**, and labels are **derived** from it.
   sections, with at least one `[hard]` criterion.
 - `req:<id>` (on the epic) and `satisfies:<id>` (on children) are derived from
   those criteria — never an independent source.
-- A `label-coverage` graph rule treats the canonical criteria as the *source
-  set* and checks that each `[hard]` one is satisfied by a child.
-- Two `label-reference` graph rules check the references in both directions:
-  every `satisfies:` resolves to a declared `req:` (no dangling reference), and
-  every declared `req:` is used by some `satisfies:` (no stray/invented `req:`
-  label). The engine enforces these label-to-label relationships; it does not
-  compare a `req:` value against ids parsed from the criteria prose (no rule kind
-  does that). Together with coverage, the rules keep `req:`/`satisfies:` labels
-  consistent with the criteria as an authoring workflow.
+
+### Lifecycle-aware enforcement
+
+The ruleset is divided by lifecycle phase so planning is quiet and the done
+transition is the single enforcement point:
+
+**Planning phase (any state other than `done`):**
+Local rules run on every write and catch structural problems immediately — a
+missing `## Success Criteria` section or a malformed requirement item blocks the
+save. A `criteria-label-match` rule (`sdd-req-matches-a-criterion`) fires at any
+state and compares each `req:<id>` label value directly against the ids extracted
+from the criteria prose; a fabricated `req:REQ-77` absent from the criteria is
+reported as a stray immediately, without waiting for a done transition. An
+in-flight epic with correct structure, matching `req:` labels, and children still
+in progress produces **zero error-severity graph findings** from `jit validate`.
+
+**Done transition:**
+A `label-coverage` graph rule (`sdd-hard-criteria-covered`) and a `label-reference`
+graph rule (`sdd-req-is-satisfied`) are both scoped with
+`when = { type = "epic", state = "done" }` and carry `enforce = true`. They run
+over the epic's dependency neighborhood (the epic plus its transitive dependents)
+when `--state done` is requested. An uncovered `[hard]` criterion or an unsatisfied
+`req:` label **blocks the transition** (exit 4, `TransitionBlockedError`); the
+epic stays in its current state. `--force` bypasses the block and records a bypass
+event in the audit log.
+
+**Dangling `satisfies:` (always-on, warn):**
+A `label-reference` rule (`sdd-satisfies-references-a-req`) fires for any issue
+at any state whose `satisfies:<id>` label has no matching `req:<id>` declared in
+its linked graph — a typo surfaces immediately as a warning.
+
+This split means two issues an agent can face are now textually and structurally
+separate: a *stray req* (id not in the criteria prose, caught immediately by
+`criteria-label-match`) versus an *unsatisfied req* (real id, no child yet, caught
+only at done by `label-reference`).
 
 If JIT had hard-coded SDD, none of this would be inspectable or changeable. As
 configuration, a team can tune it (require `[aspirational]` coverage too, change
-the id format, point coverage at "any" issue rather than dependents) or replace
-it wholesale.
+the id format, add or remove the lifecycle scoping) or replace it wholesale.
 
 ## Why this matters
 

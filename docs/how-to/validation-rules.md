@@ -231,32 +231,39 @@ The epic carries `req:REQ-01`; a child that implements it carries
   which uses `pattern` over `sections.<slug>.items` plus a `contains` +
   `minContains` hard-criterion check.
 - **`label-value-pattern`** (local) — `req:` ids look like `REQ-01`.
-- **`label-coverage`** (graph) — every `[hard]` criterion is satisfied by some
-  `done` child carrying `satisfies:<id>`. This is the canonical criteria →
-  `satisfies:` coverage check.
-- **`label-reference`** (graph, `satisfies` → `req`) — every `satisfies:<id>`
-  points at a declared `req:<id>` (reference integrity); a typo surfaces as a
-  warning.
-- **`label-reference`** (graph, `req` → `satisfies`) — every declared `req:<id>`
-  is actually used by some `satisfies:<id>` child. A `req:` label that nothing
-  satisfies is a **stray/invented** label — exactly the "criteria are canonical,
-  labels derived" violation — and is reported as an error.
+- **`criteria-label-match`** (graph, always-on) — every `req:<id>` label value
+  is compared directly against the criterion ids extracted from `## Success
+  Criteria` prose. A `req:REQ-77` absent from the criteria is reported as a
+  **stray** immediately at any lifecycle phase.
+- **`label-coverage`** (graph, at done, `enforce = true`) — every `[hard]`
+  criterion is satisfied by some `done` child carrying `satisfies:<id>`. Scoped
+  to `state = "done"` so planning is quiet; the done transition is blocked if any
+  `[hard]` criterion is uncovered.
+- **`label-reference`** (graph, `req` → `satisfies`, at done, `enforce = true`)
+  — every declared `req:<id>` is actually used by some `satisfies:<id>` child at
+  done. An unsatisfied `req:` label blocks the done transition.
+- **`label-reference`** (graph, `satisfies` → `req`, always-on, warn) — every
+  `satisfies:<id>` points at a declared `req:<id>` (reference integrity); a typo
+  surfaces as a warning at any state.
 
-### What is enforced vs. authoring discipline
+### Lifecycle behavior
 
-Precisely, the engine enforces: (1) `req:` **format**; (2) the
-Requirements/Scenarios/Success-Criteria **structure** with a `[hard]` criterion;
-(3) **coverage** of each `[hard]` criterion id by a `satisfies:` child;
-(4) `satisfies:` → `req:` reference integrity; and (5) `req:` → `satisfies:`
-integrity (no stray `req:`). Together (3)–(5) close the derivation loop so a
-`req:` label cannot float free of the canonical criteria.
+The SDD ruleset is designed so **planning is quiet and the done transition is
+where coverage bites**:
 
-One direction is an authoring convention rather than a hard check: the engine
-compares a `req:` value against the `satisfies:` labels present, not directly
-against the REQ ids in the criteria prose (no rule kind compares a label value to
-ids extracted from description text). So always derive a `req:` from a criterion
-that actually exists in the body — and rule (5) catches a `req:` that no child
-ever satisfies.
+- During planning (any state other than `done`) an in-flight epic with incomplete
+  children — correct structure, matching `req:` labels, children still in progress
+  — produces **zero error-severity graph findings** from `jit validate`. Only the
+  stray-req check (`criteria-label-match`) fires immediately for fabricated ids.
+- The done transition runs coverage and derivation rules with `enforce = true`,
+  blocking (exit 4) if any `[hard]` criterion is uncovered or any `req:` is
+  unsatisfied.
+- `--force` bypasses the block and logs a bypass event in the audit log.
+
+Two finding types are now textually distinct: a **stray req** (id not in the
+criteria prose, `sdd-req-matches-a-criterion`) versus an **unsatisfied req** (id
+is real, no child yet, `sdd-req-is-satisfied`). Together all five rules close the
+derivation loop so a `req:` label cannot float free of the canonical criteria.
 
 ## The engine is methodology-agnostic
 

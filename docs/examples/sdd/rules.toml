@@ -18,43 +18,72 @@
 #   * a child issue that implements REQ-01 carries `satisfies:REQ-01`;
 #   * the graph rules below CHECK the labels against the canonical criteria.
 #
-# WHAT THE ENGINE ENFORCES (precisely):
-#   1. format        — `req:` values look like `REQ-01` (label-value-pattern).
-#   2. structure     — the body has well-formed Requirements / Scenarios /
-#                      Success Criteria sections, with >= 1 `[hard]` criterion
-#                      (json-schema over the projection's `sections`).
-#   3. coverage      — every `[hard]` criterion id in `## Success Criteria` is
-#                      satisfied by a `done` child carrying `satisfies:<id>`
-#                      (label-coverage; criteria -> satisfies).
-#   4. satisfies->req — every `satisfies:<id>` resolves to a declared `req:<id>`
-#                      (label-reference reference-integrity).
-#   5. req->satisfies — every declared `req:<id>` is actually USED by some
-#                      `satisfies:<id>` child; a `req:` label that nothing
-#                      satisfies is a STRAY/invented label and is reported
-#                      (label-reference; the inverse direction). Combined with
-#                      (3) and (4) this closes the derivation loop so a `req:`
-#                      label cannot float free of the canonical criteria.
+# LIFECYCLE ENFORCEMENT (when each rule bites):
 #
-# NOTE ON THE LIMIT OF (5): rule (5) compares a `req:` label value against the
-# `satisfies:` labels actually present. Rule (5b) below (criteria-label-match)
-# compares it directly against ids extracted from `## Success Criteria` prose, so
-# a `req:REQ-77` that exists in no criterion is a STRAY and reported immediately,
-# without needing a child to (fail to) satisfy it. The two findings are textually
-# distinct: a stray says "names no criterion in section '...' (stray or invented)";
-# an unsatisfied one says "references 'req:...' but no 'satisfies:...' source is
-# declared in linked scope".
+#   PLANNING (backlog / in_progress / gated / ready)
+#     — Local rules (1) and (2) run on every write: structure errors block
+#       immediately. A stray `req:` label (5b) is caught immediately because
+#       `sdd-req-matches-a-criterion` is always-on. Coverage (3) and derivation
+#       (4) do NOT fire during planning; an in-flight epic with uncovered or
+#       unsatisfied requirements produces ZERO error-severity graph findings.
 #
-# AUTHORING WORKFLOW (the derivation discipline the methodology asks for): write
-# the criteria first; for each `REQ-N:` you keep, add the matching `req:REQ-N`
-# label on the epic and a `satisfies:REQ-N` label on the implementing child.
+#   DONE TRANSITION
+#     — `sdd-hard-criteria-covered` (3) and `sdd-req-is-satisfied` (4) run with
+#       `when = { state = "done" }` and `enforce = true`. They evaluate the epic
+#       in its target state (done) against its dependency neighborhood. An
+#       uncovered `[hard]` criterion or an unsatisfied `req:` label BLOCKS the
+#       transition (exit 4, TransitionBlockedError). Use `--force` to override
+#       (the bypass is audit-logged).
+#
+#   DANGLING satisfies: (always-on, warn)
+#     — `sdd-satisfies-references-a-req` fires for any issue (any state) that
+#       carries `satisfies:<id>` pointing at a `req:<id>` declared nowhere in
+#       its linked graph. A typo'd child is a warning immediately.
+#
+# WHAT THE ENGINE ENFORCES (rule summary):
+#   (1) format        — `req:` values look like `REQ-01` (label-value-pattern).
+#   (2) structure     — the body has well-formed Requirements / Scenarios /
+#                       Success Criteria sections, with >= 1 `[hard]` criterion
+#                       (json-schema over the projection's `sections`).
+#   (3) coverage      — at done: every `[hard]` criterion id in `## Success
+#                       Criteria` is satisfied by a `done` child carrying
+#                       `satisfies:<id>` (label-coverage; enforce=true blocks).
+#   (4) req->satisfies — at done: every declared `req:<id>` is actually USED by
+#                       some `satisfies:<id>` child; a `req:` label that nothing
+#                       satisfies is a STRAY/invented label (label-reference;
+#                       enforce=true blocks).
+#   (5) satisfies->req — always-on warn: every `satisfies:<id>` resolves to a
+#                       declared `req:<id>` (reference integrity). A typo
+#                       surfaces without blocking.
+#   (5b) stray-req    — always-on error: a `req:` label value is compared
+#                       directly against ids extracted from `## Success Criteria`
+#                       prose (criteria-label-match). A `req:REQ-77` absent from
+#                       the criteria section is reported immediately at any
+#                       lifecycle phase, without waiting for children to fail.
+#
+# DISAMBIGUATION: stray vs. unsatisfied
+#   * STRAY (5b, sdd-req-matches-a-criterion):
+#       "label 'req:REQ-77' on issue XY names no criterion in section
+#       'Success Criteria' (stray or invented)"  — the id does not appear in
+#       the criteria prose at all.
+#   * UNSATISFIED (4, sdd-req-is-satisfied, only at done):
+#       "issue XY references 'req:REQ-01' but no 'satisfies:REQ-01' source is
+#       declared in linked scope" — the id is real, but no child has satisfied it.
+#   Exact string comparison: `REQ-03` in the criteria and `req:REQ-3` on the
+#   label differ, so `req:REQ-3` is a stray. No silent normalization.
+#
+# AUTHORING WORKFLOW: write the criteria first; for each `REQ-N:` you keep, add
+# the matching `req:REQ-N` label on the epic and a `satisfies:REQ-N` label on
+# the implementing child. The local rules (1)(2) let you save iteratively during
+# planning. Coverage and derivation rules (3)(4) are the final completion gate.
 #
 # Engine kinds used here (all real, see crates/jit/src/validation/):
 #   require-section        (local)  structural: the criteria section must exist
 #   json-schema            (local)  content: schemas/spec-body.json over `sections`
 #   label-value-pattern    (local)  req ids look like REQ-01
-#   label-coverage         (graph)  criteria -> satisfies coverage of [hard] items
-#   label-reference        (graph)  satisfies -> req AND req -> satisfies integrity
 #   criteria-label-match   (graph)  req label value -> real criterion id (stray check)
+#   label-coverage         (graph)  criteria -> satisfies coverage of [hard] items at done
+#   label-reference        (graph)  req->satisfies derivation at done; satisfies->req warn
 
 # --- Local: the spec must have a Success Criteria section -------------------
 # Structural shorthand. Runs on the write path; `enforce = true` blocks a write
@@ -87,20 +116,50 @@ when = { label = "req:*" }
 severity = "error"
 assert = { label-value-pattern = { namespace = "req", regex = '^REQ-[0-9]+$' } }
 
-# --- Graph: every [hard] criterion is satisfied by a child -----------------
+# --- Graph: stray-req disambiguation (always-on) ----------------------------
+# Before we touch the lifecycle-scoped rules, this rule directly compares a
+# `req:<id>` label value against the criterion ids extracted from
+# `## Success Criteria`, using the same `[hard]` marker filter as the coverage
+# rule. It is always-on (no state predicate) so a stray `req:` label is caught
+# immediately at any lifecycle phase, without waiting for a done transition.
+#
+# Two DISTINCT failure modes are separable by an agent:
+#
+#   * STRAY (this rule) — "label 'req:REQ-77' on issue XY names no criterion in
+#                         section 'Success Criteria' (stray or invented)"
+#                         The id does not appear in the criteria prose at all.
+#
+#   * UNSATISFIED (sdd-req-is-satisfied below, done-scoped)
+#                       — "issue XY references 'req:REQ-01' but no
+#                         'satisfies:REQ-01' source is declared in linked scope"
+#                         The id is real, but no child has satisfied it yet.
+#
+# Exact string comparison: `REQ-03` in the criteria vs `req:REQ-3` on the label
+# differ, so `req:REQ-3` is a stray. No silent normalization.
+[[rules]]
+name = "sdd-req-matches-a-criterion"
+when = { type = "epic" }
+severity = "error"
+assert = { criteria-label-match = { namespace = "req", criteria-section = "success_criteria", marker = "[hard]", id-pattern = 'REQ-[0-9]+' } }
+
+# --- Graph: every [hard] criterion is satisfied by a child (at done) --------
 # Coverage. The epic's canonical `## Success Criteria` items are the SOURCE set;
 # `marker = "[hard]"` means only hard criteria are required (aspirational ones
 # are advisory). A criterion id is covered when some child that depends on the
-# epic carries `satisfies:<id>` and is in state `done`. Graph rules run in
-# `jit validate`, in gate checkers, AND at issue state transitions (over the
-# issue's dependency neighborhood, never on the plain field-edit write path).
-# This rule is not `enforce = true`, so at a transition it only REPORTS; add
-# `enforce = true` (and e.g. `when = { type = "epic", state = "done" }`) to block
-# the done transition until every [hard] criterion is covered.
+# epic carries `satisfies:<id>` and is in state `done`.
+#
+# `when = { type = "epic", state = "done" }` scopes this rule to the done
+# transition only. During planning (in_progress, ready, etc.) an in-flight epic
+# with incomplete children produces ZERO findings from this rule.
+#
+# `enforce = true` means the done transition is BLOCKED (exit 4,
+# TransitionBlockedError) if any [hard] criterion is uncovered. Graph rules run
+# over the issue's dependency neighborhood at transition time, not the whole repo.
 [[rules]]
 name = "sdd-hard-criteria-covered"
-when = { type = "epic" }
+when = { type = "epic", state = "done" }
 severity = "error"
+enforce = true
 assert = { label-coverage = { criteria-section = "success_criteria", marker = "[hard]", id-pattern = "REQ-[0-9]+", satisfies-namespace = "satisfies", child-state = "done", child-link = "dependents" } }
 
 # --- Graph: every satisfies: reference resolves to a declared req: ----------
@@ -109,46 +168,28 @@ assert = { label-coverage = { criteria-section = "success_criteria", marker = "[
 # dependency edge) declares `req:REQ-09`. `scope = "linked"` keeps resolution
 # inside the epic/child graph so a child cannot accidentally satisfy some
 # unrelated epic's identically-numbered requirement. Warn (not error) so a typo
-# surfaces without blocking the whole validate run.
+# surfaces without blocking the whole validate run. This rule fires at any state
+# (no state predicate): a dangling `satisfies:` is always wrong.
 [[rules]]
 name = "sdd-satisfies-references-a-req"
 when = { label = "satisfies:*" }
 severity = "warn"
 assert = { label-reference = { from = "satisfies", to = "req", scope = "linked" } }
 
-# --- Graph: every declared req: is actually used by a satisfies: -------------
-# Stray-label / derivation integrity (the INVERSE of the rule above). A `req:`
-# label is meant to be DERIVED from a canonical criterion and then implemented by
-# a child. If an epic declares `req:REQ-77` that NO linked child satisfies, the
-# label is stray or invented — exactly the "criteria are canonical, labels
-# derived" violation. Reported as an error so a fabricated `req:` cannot float
-# free. `scope = "linked"` resolves only within the epic's own dependency graph,
-# so an unrelated issue elsewhere carrying `satisfies:REQ-77` does NOT count.
+# --- Graph: every declared req: is actually used by a satisfies: (at done) ---
+# Derivation integrity (the INVERSE of the rule above). A `req:` label is meant
+# to be DERIVED from a canonical criterion and then implemented by a child. If an
+# epic at done declares `req:REQ-01` that NO linked child satisfies, the label
+# is unsatisfied — a derivation-loop violation. `scope = "linked"` resolves only
+# within the epic's own dependency graph.
+#
+# `when = { type = "epic", state = "done" }` and `enforce = true`: the done
+# transition is BLOCKED if any declared `req:` has no satisfying child. During
+# planning this rule is silent. See also `sdd-req-matches-a-criterion` (above)
+# for the always-on stray-req check that catches fabricated ids immediately.
 [[rules]]
 name = "sdd-req-is-satisfied"
-when = { label = "req:*" }
+when = { type = "epic", state = "done" }
 severity = "error"
+enforce = true
 assert = { label-reference = { from = "req", to = "satisfies", scope = "linked" } }
-
-# --- Graph: every req: label names a real criterion id ----------------------
-# Stray-req DISAMBIGUATION (CC-3). This rule directly compares a `req:<id>`
-# label value against the criterion ids extracted from `## Success Criteria`,
-# using the same `[hard]` marker filter as the coverage rule. Two DISTINCT
-# failure modes are now separable by an agent:
-#
-#   * STRAY (this rule)     — "label 'req:REQ-77' on issue XY names no criterion
-#                             in section 'Success Criteria' (stray or invented)"
-#                             The id does not appear in the criteria prose at all.
-#
-#   * UNSATISFIED (sdd-req-is-satisfied above)
-#                           — "issue XY references 'req:REQ-01' but no
-#                             'satisfies:REQ-01' source is declared in linked scope"
-#                             The id is real, but no child has satisfied it yet.
-#
-# Exact string comparison: `REQ-03` in the criteria and `req:REQ-3` on the label
-# differ, so `req:REQ-3` is a stray. No silent normalization.
-[[rules]]
-name = "sdd-req-matches-a-criterion"
-when = { type = "epic" }
-severity = "error"
-assert = { criteria-label-match = { namespace = "req", criteria-section = "success_criteria", marker = "[hard]", id-pattern = 'REQ-[0-9]+' } }
