@@ -391,6 +391,104 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 }
 
 #[test]
+fn test_gated_diversion_surfaces_non_enforcing_warning_on_error() {
+    // A non-enforcing gated-keyed rule must not block the diversion, but its
+    // finding must ride on the gate-blocking error (rendered Warnings section)
+    // rather than being dropped.
+    let rules = r#"
+[[rules]]
+name = "gated-should-have-design"
+when = { type = "epic", state = "gated" }
+severity = "error"
+enforce = false
+assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
+"#;
+    let executor = executor_with_rules(rules);
+
+    let mut issue = Issue::new("Epic".to_string(), String::new());
+    issue.labels = vec!["type:epic".to_string()];
+    issue.state = State::InProgress;
+    issue.gates_required = vec!["tests".to_string()];
+    let epic = issue.id.clone();
+    executor.storage().save_issue(issue).unwrap();
+    executor.add_gate(&epic, "tests".to_string()).unwrap();
+
+    let result = executor.update_issue(
+        &epic,
+        None,
+        None,
+        None,
+        Some(State::Done),
+        vec![],
+        vec![],
+        None,
+        false,
+    );
+    let err = result.expect_err("unpassed gate still blocks done");
+    let blocked = err.downcast_ref::<TransitionBlockedError>().unwrap();
+    let rendered = blocked.to_string();
+    assert!(
+        rendered.contains("Warnings (non-blocking):")
+            && rendered.contains("gated-should-have-design"),
+        "the non-enforcing finding must surface on the gate-blocked error: {rendered}"
+    );
+    // The diversion itself still lands (warn does not block).
+    let after = executor.storage().load_issue(&epic).unwrap();
+    assert_eq!(after.state, State::Gated);
+}
+
+#[test]
+fn test_gated_diversion_force_bypasses_gated_keyed_enforce_rule() {
+    // --force must propagate into the diversion's graph enforcement: the
+    // gated-keyed enforce rule is bypassed (logged), the diversion lands in
+    // gated, and the returned error is the GATE block (gates are never
+    // forceable), not a graph-rule block.
+    let rules = r#"
+[[rules]]
+name = "gated-needs-design-dep"
+when = { type = "epic", state = "gated" }
+severity = "error"
+enforce = true
+assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
+"#;
+    let executor = executor_with_rules(rules);
+
+    let mut issue = Issue::new("Epic".to_string(), String::new());
+    issue.labels = vec!["type:epic".to_string()];
+    issue.state = State::InProgress;
+    issue.gates_required = vec!["tests".to_string()];
+    let epic = issue.id.clone();
+    executor.storage().save_issue(issue).unwrap();
+    executor.add_gate(&epic, "tests".to_string()).unwrap();
+
+    let result = executor.update_issue(
+        &epic,
+        None,
+        None,
+        None,
+        Some(State::Done),
+        vec![],
+        vec![],
+        None,
+        true, // --force
+    );
+    let err = result.expect_err("gates are never forceable");
+    let blocked = err.downcast_ref::<TransitionBlockedError>().unwrap();
+    assert!(
+        !blocked.to_string().contains("gated-needs-design-dep")
+            || blocked.to_string().contains("Warnings"),
+        "with --force the graph rule must not be the blocker: {blocked}"
+    );
+    let after = executor.storage().load_issue(&epic).unwrap();
+    assert_eq!(after.state, State::Gated, "forced diversion lands gated");
+    let events = executor.storage().read_events().unwrap();
+    assert!(
+        events.iter().any(|e| e.get_type() == "graph_rule_bypassed"),
+        "the forced override of the gated-keyed rule must be audited"
+    );
+}
+
+#[test]
 fn test_update_issue_state_path_enforces_done_graph_rule() {
     // The state-only path (`update_issue_state`) must also enforce graph rules
     // at the Done arm.

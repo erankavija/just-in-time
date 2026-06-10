@@ -311,9 +311,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Gate-blocked `--state done`: persist the projected Gated shape (only
         // when something changed) and return the gate-blocking error. Bypass
         // events are emitted from inside that path (after its save when it
-        // persists, otherwise for the forced no-op override). This is a gate
-        // diversion, not a graph-enforced transition, so it does not route
-        // through the chokepoint.
+        // persists, otherwise for the forced no-op override). The diversion
+        // routes through the chokepoint against the GATED target state, with
+        // the user's --force preserved for graph-rule bypass.
         if gate_blocked {
             let persist = has_field_edits || old_state != State::Gated;
             return self.handle_gate_blocking(
@@ -321,6 +321,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 old_state,
                 persist,
                 &validation.bypassed_rules,
+                force,
             );
         }
 
@@ -475,8 +476,8 @@ impl<S: IssueStore> CommandExecutor<S> {
                 if issue.has_unpassed_gates() {
                     let persist = old_state != State::Gated;
                     // This path runs no local-rule validation, so there are no
-                    // bypassed rules to log.
-                    return self.handle_gate_blocking(&mut issue, old_state, persist, &[]);
+                    // bypassed rules to log; it also carries no --force flag.
+                    return self.handle_gate_blocking(&mut issue, old_state, persist, &[], false);
                 }
             }
             State::Gated => {
@@ -758,6 +759,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         old_state: State,
         persist: bool,
         bypassed_rules: &[String],
+        force: bool,
     ) -> Result<Vec<String>> {
         let unpassed = issue.get_unpassed_gates();
         let gate_blockers = unpassed
@@ -789,7 +791,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             // below (TransitionBlockedError::with_warnings) so they surface in
             // both the rendered message and the JSON details.
             diversion_warnings =
-                self.apply_state_transition(issue, State::Gated, false, false, |_| {})?;
+                self.apply_state_transition(issue, State::Gated, force, false, |_| {})?;
         }
         issue.state = State::Gated;
 
