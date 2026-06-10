@@ -520,6 +520,12 @@ def run_one(
         #    (or match their own non-failing expectation). Capture ids.
         for step in scenario.steps[:target_idx]:
             res = run_jit(substitute_argv(step.argv, ids), repo)
+            expected_exit = step.expect.exit if step.expect else 0
+            if res.exit != expected_exit:
+                raise RuntimeError(
+                    f"setup step {step.argv} exited {res.exit} "
+                    f"(expected {expected_exit}); stderr: {res.stderr[-500:]}"
+                )
             uuid = first_uuid(res.combined)
             if uuid is not None:
                 if step.id_slot:
@@ -779,7 +785,7 @@ def write_results_json(
         "per_scenario": {s.name: s.to_json() for s in stats},
     }
     out_path = out_dir / f"results-{ts}.json"
-    out_path.write_text(json.dumps(payload, indent=2) + "\n")
+    _atomic_write_text(out_path, json.dumps(payload, indent=2) + "\n")
     return out_path
 
 
@@ -849,6 +855,14 @@ def run_eval(
     return all_stats
 
 
+
+def _atomic_write_text(path: Path, text: str) -> None:
+    """Write via temp file + rename so an interrupted run cannot leave a
+    truncated results artifact (project atomic-write convention)."""
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(text)
+    tmp.replace(path)
+
 def _write_partial_results(
     stats: list[ScenarioStats],
     runs: int,
@@ -872,7 +886,7 @@ def _write_partial_results(
         "per_scenario": {s.name: s.to_json() for s in stats},
     }
     partial_path = out_dir / "results-partial.json"
-    partial_path.write_text(json.dumps(payload, indent=2) + "\n")
+    _atomic_write_text(partial_path, json.dumps(payload, indent=2) + "\n")
 
 
 def run_smoke(agent_timeout: int) -> int:
@@ -930,7 +944,14 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         "--runs",
         type=int,
         default=DEFAULT_RUNS,
-        help=f"runs per scenario (default {DEFAULT_RUNS}; report mean, not peak).",
+        help=f"runs per scenario (default {DEFAULT_RUNS}; minimum 3 for "
+        "reportable results — means over fewer runs are not comparable).",
+    )
+    p.add_argument(
+        "--allow-few-runs",
+        action="store_true",
+        help="debugging escape hatch: permit --runs below 3. Results produced "
+        "this way are NOT reportable (the methodology requires n >= 3).",
     )
     p.add_argument(
         "--cap",
@@ -967,6 +988,13 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
 
 def main(argv: Optional[list[str]] = None) -> int:
     args = parse_args(argv)
+    if args.runs < 1:
+        raise SystemExit("--runs must be at least 1")
+    if not args.smoke and args.runs < 3 and not args.allow_few_runs:
+        raise SystemExit(
+            "--runs must be at least 3 for reportable results "
+            "(use --allow-few-runs for non-reportable debugging runs)"
+        )
     warn_inherited_jit_env()
     ensure_jit_binary()
 
