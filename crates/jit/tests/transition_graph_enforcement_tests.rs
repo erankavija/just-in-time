@@ -7,8 +7,9 @@
 //! non-enforcing or non-attributed findings surface as warnings without
 //! blocking; `--force` bypasses with a dedicated audit event; the evaluation is
 //! scoped to the issue's dependency neighborhood, not the whole repository; and
-//! a done transition diverted to `gated` by unpassed gates never reaches graph
-//! enforcement.
+//! a done transition diverted to `gated` by unpassed gates enforces against
+//! the GATED target state (done-keyed rules do not fire; gated-keyed rules
+//! block the diversion).
 
 use jit::commands::CommandExecutor;
 use jit::domain::{Event, Issue, State};
@@ -293,9 +294,12 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 #[test]
 fn test_gated_diversion_runs_before_graph_enforcement() {
     // An epic with an UNPASSED gate AND a violated enforcing done-graph rule.
-    // The unpassed gate diverts the done transition to `gated` and returns the
-    // gate error; graph enforcement must NOT run, so no TransitionBlocked
-    // (graph) event is logged and the issue lands in `gated`.
+    // The unpassed gate diverts the done transition to `gated`, so graph rules
+    // are enforced against the GATED target state — the done-keyed rule does
+    // not match, no TransitionBlocked (graph) event is logged, and the issue
+    // lands in `gated` with the gate error. (A gated-keyed rule WOULD block
+    // the diversion; see
+    // `test_gated_diversion_enforces_gated_keyed_graph_rule`.)
     let executor = executor_with_rules(DONE_NEEDS_DESIGN);
 
     let mut issue = Issue::new("Epic".to_string(), String::new());
@@ -333,7 +337,56 @@ fn test_gated_diversion_runs_before_graph_enforcement() {
     let events = executor.storage().read_events().unwrap();
     assert!(
         !events.iter().any(|e| e.get_type() == "transition_blocked"),
-        "graph enforcement must not run when the done transition is gate-diverted"
+        "a done-keyed rule must not fire on a diversion whose target is gated"
+    );
+}
+
+#[test]
+fn test_gated_diversion_enforces_gated_keyed_graph_rule() {
+    // The gate-diversion path lands in `gated`, so a gated-keyed enforcing
+    // rule must block the diversion itself — the same enforcement an explicit
+    // `--state gated` transition gets. Nothing persists on the block.
+    let rules = r#"
+[[rules]]
+name = "gated-needs-design-dep"
+when = { type = "epic", state = "gated" }
+severity = "error"
+enforce = true
+assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
+"#;
+    let executor = executor_with_rules(rules);
+
+    let mut issue = Issue::new("Epic".to_string(), String::new());
+    issue.labels = vec!["type:epic".to_string()];
+    issue.state = State::InProgress;
+    issue.gates_required = vec!["tests".to_string()];
+    let epic = issue.id.clone();
+    executor.storage().save_issue(issue).unwrap();
+    executor.add_gate(&epic, "tests".to_string()).unwrap();
+
+    let result = executor.update_issue(
+        &epic,
+        None,
+        None,
+        None,
+        Some(State::Done),
+        vec![],
+        vec![],
+        None,
+        false,
+    );
+    let err = result.expect_err("the gated-keyed rule must block the diversion");
+    let blocked = err.downcast_ref::<TransitionBlockedError>().unwrap();
+    assert!(
+        blocked.to_string().contains("gated-needs-design-dep"),
+        "the block must be the graph rule, not the gate error: {blocked}"
+    );
+
+    let after = executor.storage().load_issue(&epic).unwrap();
+    assert_eq!(
+        after.state,
+        State::InProgress,
+        "a blocked diversion must persist nothing"
     );
 }
 

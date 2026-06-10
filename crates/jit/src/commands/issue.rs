@@ -771,14 +771,25 @@ impl<S: IssueStore> CommandExecutor<S> {
                 (gate_key, status)
             })
             .collect();
-        // INTENTIONAL direct state write (does NOT route through
-        // `apply_state_transition`): this is the GATE-diversion path, where an
-        // unpassed gate diverts a `--state done` request to `gated` and returns a
-        // gate-blocking error. Gate diversion deliberately takes precedence over
-        // graph-rule enforcement (see
-        // `test_gated_diversion_runs_before_graph_enforcement`), so it must NOT
-        // run the chokepoint's CC-2 enforcement; it only stamps the gated state on
-        // the way to returning the gate error.
+        // The gate-diversion path lands the issue in `gated`, so it enforces
+        // graph rules against THAT target state via the chokepoint, exactly
+        // like an explicit `--state gated` transition. Rules keyed on the
+        // originally requested state (e.g. `state = "done"`) still do not fire
+        // here — the diversion's target is `gated`, not `done` (see
+        // `test_gated_diversion_runs_before_graph_enforcement`). A blocking
+        // `state = "gated"` enforce rule therefore blocks the diversion before
+        // anything persists. Persistence and the state-changed event are
+        // handled below (not by the chokepoint) because this path may carry
+        // field edits in the same save and is a no-op for an already-gated
+        // issue.
+        if old_state != State::Gated {
+            issue.state = old_state;
+            // Non-blocking findings are deliberately dropped here: this path
+            // always returns the gate-blocking error below, which is the
+            // dominant signal, and the same findings resurface in
+            // `jit validate` and at the next transition attempt.
+            let _ = self.apply_state_transition(issue, State::Gated, false, false, |_| {})?;
+        }
         issue.state = State::Gated;
 
         let issue_id = issue.id.clone();
