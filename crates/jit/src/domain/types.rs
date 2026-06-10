@@ -860,6 +860,45 @@ pub enum Event {
         /// Name of the enforce rule that was bypassed
         rule: String,
     },
+    /// A state transition was blocked by an enforcing graph rule (CC-2).
+    ///
+    /// Emitted once per blocking rule, BEFORE the transition error is returned —
+    /// the attempted transition is the auditable act. Distinct from a gate or
+    /// dependency block: this records that a `Scope::Graph` rule with `enforce =
+    /// true` produced an `error` finding attributed to the issue in its target
+    /// state, so the transition into `target` was refused.
+    TransitionBlocked {
+        /// Event ID
+        id: String,
+        /// Issue whose transition was blocked
+        issue_id: String,
+        /// When this occurred
+        timestamp: DateTime<Utc>,
+        /// State the issue was attempting to enter
+        target: State,
+        /// Name of the enforcing graph rule that blocked the transition
+        rule: String,
+    },
+    /// An enforcing graph rule was bypassed via `--force` at a state transition
+    /// (CC-2).
+    ///
+    /// The transition-path counterpart of [`Event::LocalRuleBypassed`]: emitted
+    /// once per enforce graph rule whose `error` finding was overridden by
+    /// `--force` during a `--state` transition, AFTER the save commits. Kept
+    /// distinct from the write-path bypass so the audit log can tell apart a
+    /// forced write from a forced transition.
+    GraphRuleBypassed {
+        /// Event ID
+        id: String,
+        /// Issue whose transition bypassed the rule
+        issue_id: String,
+        /// When this occurred
+        timestamp: DateTime<Utc>,
+        /// State the issue transitioned into
+        target: State,
+        /// Name of the enforce graph rule that was bypassed
+        rule: String,
+    },
 }
 
 impl Event {
@@ -1028,6 +1067,64 @@ impl Event {
         }
     }
 
+    /// Create a transition-blocked event.
+    ///
+    /// Records that an enforcing graph rule blocked the issue's transition into
+    /// `target` (CC-2). Appended before the blocking error is returned, one per
+    /// blocking rule.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::{Event, State};
+    ///
+    /// let event = Event::new_transition_blocked(
+    ///     "issue-123".to_string(),
+    ///     State::Done,
+    ///     "sdd-hard-criteria-covered".to_string(),
+    /// );
+    /// assert_eq!(event.get_issue_id(), "issue-123");
+    /// assert_eq!(event.get_type(), "transition_blocked");
+    /// ```
+    pub fn new_transition_blocked(issue_id: String, target: State, rule: String) -> Self {
+        Event::TransitionBlocked {
+            id: Uuid::new_v4().to_string(),
+            issue_id,
+            timestamp: Utc::now(),
+            target,
+            rule,
+        }
+    }
+
+    /// Create a graph-rule-bypassed event.
+    ///
+    /// Records that a `--force` transition deliberately bypassed an enforcing
+    /// graph rule whose `error` finding would otherwise have blocked the
+    /// transition into `target` (CC-2).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::{Event, State};
+    ///
+    /// let event = Event::new_graph_rule_bypassed(
+    ///     "issue-123".to_string(),
+    ///     State::Done,
+    ///     "sdd-hard-criteria-covered".to_string(),
+    /// );
+    /// assert_eq!(event.get_issue_id(), "issue-123");
+    /// assert_eq!(event.get_type(), "graph_rule_bypassed");
+    /// ```
+    pub fn new_graph_rule_bypassed(issue_id: String, target: State, rule: String) -> Self {
+        Event::GraphRuleBypassed {
+            id: Uuid::new_v4().to_string(),
+            issue_id,
+            timestamp: Utc::now(),
+            target,
+            rule,
+        }
+    }
+
     /// Get the issue ID associated with this event
     pub fn get_issue_id(&self) -> &str {
         match self {
@@ -1044,6 +1141,8 @@ impl Event {
             Event::DocumentArchived { .. } => "", // No associated issue
             Event::DependencyReduced { issue_id, .. } => issue_id,
             Event::LocalRuleBypassed { issue_id, .. } => issue_id,
+            Event::TransitionBlocked { issue_id, .. } => issue_id,
+            Event::GraphRuleBypassed { issue_id, .. } => issue_id,
         }
     }
 
@@ -1063,6 +1162,8 @@ impl Event {
             Event::DocumentArchived { .. } => "document_archived",
             Event::DependencyReduced { .. } => "dependency_reduced",
             Event::LocalRuleBypassed { .. } => "local_rule_bypassed",
+            Event::TransitionBlocked { .. } => "transition_blocked",
+            Event::GraphRuleBypassed { .. } => "graph_rule_bypassed",
         }
     }
 }

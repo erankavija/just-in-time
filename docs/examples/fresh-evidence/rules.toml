@@ -14,12 +14,14 @@
 #
 # How it blocks:
 #   This rule is scoped to `state = "done"` with `severity = "error"` and
-#   `enforce = true`. Once TRANSITION ENFORCEMENT lands (jit issue bc86f54c), an
-#   enforce-at-done error rule blocks the transition INTO `done`: you cannot move
-#   an issue to done while its required gate evidence is stale. Until that lands,
-#   the rule still REPORTS via `jit validate` (graph rules run in `jit validate`
-#   and gate checkers, never on the plain write path), so a done issue with stale
-#   evidence shows up as a finding even before the transition gate exists.
+#   `enforce = true`. Transition enforcement (jit issue bc86f54c) evaluates the
+#   graph rules applicable to an issue in its TARGET state at every transition, so
+#   an enforce-at-done error rule blocks the transition INTO `done`: you cannot
+#   move an issue to done while its required gate evidence is stale. The block
+#   exits 4 and prints the finding; `jit issue update --state done --force`
+#   bypasses it (recorded as a graph-rule-bypassed event). The same rule also
+#   REPORTS via `jit validate`, which scans the whole repository, so a done issue
+#   whose evidence has since gone stale still surfaces there.
 #
 # Design note (R-3): in REAL rulesets, recency rules should usually default to
 # `severity = "warn"` — wall-clock-relative findings flicker as time passes

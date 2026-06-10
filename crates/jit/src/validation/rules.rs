@@ -670,6 +670,57 @@ impl Assertion {
             _ => Scope::Local,
         }
     }
+
+    /// Whether this graph assertion has REPO-WIDE semantics that make it unsafe
+    /// to evaluate over only a neighborhood slice at transition time (CC-2a).
+    ///
+    /// Transition-time enforcement evaluates rules over the issue's dependency
+    /// neighborhood, not the whole repository. A rule that resolves references
+    /// against ANY issue in the repo (`label-reference` with the default
+    /// `scope = "global"`) would produce false "dangling reference" findings on a
+    /// slice that omits the declaring issue, so it is skipped at transition time
+    /// and remains a `jit validate` concern. A `scope = "linked"` reference rule
+    /// resolves only against linked issues, all of which the neighborhood slice
+    /// includes, so it runs.
+    ///
+    /// `type-hierarchy` checks (orphan-leaf / strategic-consistency) reason about
+    /// each issue against the WHOLE set's parent/child relations, so they are
+    /// likewise treated as repo-wide and validate-only. The per-issue graph kinds
+    /// (`label-coverage`, `dependency-shape`, `gate-recency`) only need the
+    /// issue's neighborhood and so run at transition time.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::validation::rules::RuleSet;
+    /// use std::path::Path;
+    ///
+    /// let toml = r#"
+    /// [[rules]]
+    /// name = "global-ref"
+    /// assert = { label-reference = { from = "satisfies", to = "req" } }
+    ///
+    /// [[rules]]
+    /// name = "linked-ref"
+    /// assert = { label-reference = { from = "satisfies", to = "req", scope = "linked" } }
+    /// "#;
+    /// let set = RuleSet::from_toml_str(toml, Path::new("/x")).unwrap();
+    /// assert!(set.rules[0].assert.is_repo_wide_at_transition());
+    /// assert!(!set.rules[1].assert.is_repo_wide_at_transition());
+    /// ```
+    pub fn is_repo_wide_at_transition(&self) -> bool {
+        match self {
+            // A label-reference rule is repo-wide unless explicitly scoped to
+            // linked issues (which the neighborhood slice fully contains).
+            Assertion::LabelReference { config } => {
+                config.get("scope").and_then(|v| v.as_str()) != Some("linked")
+            }
+            // Type-hierarchy checks reason over the whole set's relations.
+            Assertion::TypeHierarchy { .. } => true,
+            // The remaining graph kinds are per-issue / neighborhood-local.
+            _ => false,
+        }
+    }
 }
 
 /// A fully parsed validation rule.

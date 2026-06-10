@@ -131,6 +131,13 @@ pub(crate) enum TransitionBlocker {
         gate_key: String,
         status: GateStatus,
     },
+    /// An enforcing graph rule (`enforce = true`, severity error) produced a
+    /// finding attributed to this issue in its target state, blocking the
+    /// transition (CC-2). Carries the rule name and the rule's finding message.
+    GraphRule {
+        rule: String,
+        message: String,
+    },
 }
 
 impl TransitionBlockedError {
@@ -161,6 +168,28 @@ impl TransitionBlockedError {
             blockers: gates
                 .into_iter()
                 .map(|(gate_key, status)| TransitionBlocker::Gate { gate_key, status })
+                .collect(),
+        }
+    }
+
+    /// A transition blocked by one or more enforcing graph rules (CC-2).
+    ///
+    /// Each `(rule, message)` pair becomes a [`TransitionBlocker::GraphRule`].
+    /// The error maps to exit 4 via [`TransitionBlockedError::error_code`] and
+    /// the existing downcast in `main.rs`.
+    pub(crate) fn graph_rules(
+        issue_id: String,
+        requested_state: State,
+        actual_state: State,
+        rules: Vec<(String, String)>,
+    ) -> Self {
+        Self {
+            issue_id,
+            requested_state,
+            actual_state,
+            blockers: rules
+                .into_iter()
+                .map(|(rule, message)| TransitionBlocker::GraphRule { rule, message })
                 .collect(),
         }
     }
@@ -206,6 +235,16 @@ impl TransitionBlockedError {
                 requested,
                 self.blockers.len()
             )
+        } else if self
+            .blockers
+            .iter()
+            .all(|blocker| matches!(blocker, TransitionBlocker::GraphRule { .. }))
+        {
+            format!(
+                "Graph rule validation failed: Cannot transition to '{}': {} enforcing rule(s) failed",
+                requested,
+                self.blockers.len()
+            )
         } else {
             format!(
                 "Cannot transition to '{}': issue blocked by {} incomplete dependencies",
@@ -220,6 +259,9 @@ impl TransitionBlockedError {
             Some(TransitionBlocker::Gate { .. }) => {
                 format!("jit gate check-all {}", self.issue_id)
             }
+            Some(TransitionBlocker::GraphRule { .. }) => {
+                format!("jit validate --explain {}", self.issue_id)
+            }
             _ => format!("jit graph deps {}", self.issue_id),
         };
 
@@ -233,6 +275,12 @@ impl TransitionBlockedError {
                 }
                 TransitionBlocker::Gate { gate_key, .. } => {
                     format!("jit gate pass {} {}", self.issue_id, gate_key)
+                }
+                TransitionBlocker::GraphRule { rule, .. } => {
+                    format!(
+                        "jit issue update {} ...  # satisfy or fix rule '{}', or re-run with --force",
+                        self.issue_id, rule
+                    )
                 }
             }))
             .collect()
@@ -299,6 +347,9 @@ impl fmt::Display for TransitionBlocker {
             }
             Self::Gate { gate_key, status } => {
                 write!(f, "{} [{}]", gate_key, gate_status_name(*status))
+            }
+            Self::GraphRule { rule, message } => {
+                write!(f, "[{}] {}", rule, message)
             }
         }
     }
@@ -439,6 +490,36 @@ mod tests {
         assert!(msg.contains("Possible causes:"));
         assert!(msg.contains("• Something went wrong"));
         assert!(!msg.contains("To fix:"));
+    }
+
+    #[test]
+    fn test_graph_rule_block_renders_rule_and_message_and_validation_code() {
+        let error = TransitionBlockedError::graph_rules(
+            "issue-123".to_string(),
+            State::Done,
+            State::InProgress,
+            vec![(
+                "epic-done-needs-design-dep".to_string(),
+                "must depend on a type:design issue".to_string(),
+            )],
+        );
+
+        // A graph-rule block is a validation failure (exit 4 via error_code).
+        assert_eq!(
+            error.error_code(),
+            crate::output::ErrorCode::VALIDATION_FAILED
+        );
+
+        let rendered = error.to_string();
+        assert!(rendered.contains("Graph rule validation failed"));
+        assert!(rendered.contains("epic-done-needs-design-dep"));
+        assert!(rendered.contains("must depend on a type:design issue"));
+        // The remediation suggests explaining the rule and a forced override.
+        assert!(rendered.contains("jit validate --explain issue-123"));
+        assert!(rendered.contains("--force"));
+        // It is NOT misreported as a gate or dependency block.
+        assert!(!rendered.contains("incomplete dependencies"));
+        assert!(!rendered.contains("gate(s) not passed"));
     }
 
     #[test]

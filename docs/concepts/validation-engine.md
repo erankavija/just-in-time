@@ -37,6 +37,28 @@ parsed sections of its description). Ergonomic shorthand kinds
 across the dependency DAG. There is no methodology subsystem to grow — only
 rules.
 
+### Where rules run
+
+- **Local (per-issue) rules** run on the **write path** — issue create and
+  update — against the issue's final shape. An `error` finding from an
+  `enforce = true` local rule blocks the write (exit 4).
+- **Graph rules** run in three places:
+  - **`jit validate`** evaluates them across the **whole repository**.
+  - **Gate checkers** can run them as a quality gate.
+  - **State transitions** evaluate the graph rules applicable to the issue **in
+    its target state** (so `when = { state = "done" }` runs only at the done
+    transition), scoped to the issue's **dependency neighborhood** (the issue
+    plus its transitive dependencies and dependents) rather than the whole repo.
+    An `error` finding from an `enforce = true` graph rule attributed to the
+    issue **blocks the transition** (exit 4) and is recorded in the event log;
+    `--force` bypasses it (also recorded). Non-enforcing or non-error findings
+    are reported as warnings without blocking. Repo-wide graph rules — a
+    `label-reference` with the default `scope = "global"`, and the built-in
+    type-hierarchy checks — need the whole repository and so are skipped at
+    transition time, remaining `jit validate` concerns; a `scope = "linked"`
+    reference rule resolves only against linked issues and does run at the
+    transition.
+
 Because the conventions are data, a methodology is *shipped*, not *built*. JIT
 ships several worked examples (under `docs/examples/`) precisely to demonstrate
 that the engine carries none of them intrinsically:

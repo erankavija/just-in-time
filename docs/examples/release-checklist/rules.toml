@@ -29,7 +29,11 @@ enforce = true
 assert = { require-doc-type = { doc-type = "release-notes" } }
 
 # Graph: a release must depend (directly or transitively) on a QA sign-off issue.
-# Runs only in `jit validate` / gate checkers.
+# Graph rules run in `jit validate`, in gate checkers, and at issue state
+# transitions (over the issue's dependency neighborhood). This rule has no
+# `enforce = true`, so at a transition it only REPORTS (a non-blocking warning);
+# add `enforce = true` (and optionally `when = { state = "done" }`) to block the
+# transition until the QA sign-off dependency exists.
 [[rules]]
 name = "release-depends-on-qa-signoff"
 when = { type = "release" }

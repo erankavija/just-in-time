@@ -478,6 +478,158 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(())
     }
 
+    /// Enforce the graph rules applicable to an issue at a state transition (CC-2).
+    ///
+    /// Runs AFTER the dependency and gate guards and AFTER `validate_for_write`
+    /// succeeds, on BOTH transition paths (`update_issue` and
+    /// `update_issue_state`). `issue` MUST already carry its TARGET state so a
+    /// rule selector keyed on `state` (e.g. `when = { state = "done" }`) matches
+    /// only at the transition that lands that state.
+    ///
+    /// Behavior (CC-2 / CC-2a):
+    ///
+    /// - Selects `Scope::Graph` rules (severity != `off`) whose `when` matches the
+    ///   issue in its target state, SKIPPING rules with repo-wide semantics
+    ///   ([`Assertion::is_repo_wide_at_transition`]) — those stay `jit validate`
+    ///   concerns because they need the whole repository, not a slice.
+    /// - Evaluates the selected rules over the issue's dependency NEIGHBORHOOD
+    ///   (the issue plus its transitive dependencies and dependents), not
+    ///   `list_issues()` wholesale, via [`DependencyGraph`] reachability.
+    /// - A finding from an `enforce = true` rule with `error` severity ATTRIBUTED
+    ///   to this issue BLOCKS the transition: a [`Event::TransitionBlocked`] is
+    ///   appended per blocking rule (the attempted transition is the auditable
+    ///   act) and a [`TransitionBlockedError`](crate::errors::TransitionBlockedError)
+    ///   is returned (exit 4), unless `force` is set.
+    /// - With `force`, blocking findings do NOT block; one
+    ///   [`Event::GraphRuleBypassed`] is appended per overridden rule.
+    /// - Non-enforcing or non-`error` findings (and findings attributed to OTHER
+    ///   issues in the slice) never block; their `[rule] message` strings are
+    ///   returned as warnings for the caller to surface.
+    fn enforce_transition_graph_rules(
+        &self,
+        issue: &Issue,
+        target: State,
+        force: bool,
+    ) -> Result<Vec<String>> {
+        use crate::validation::graph::evaluate_graph;
+        use crate::validation::rules::{Scope, Severity};
+
+        let ruleset = self.effective_rules()?;
+
+        // Graph rules that apply to THIS issue in its target state, minus the
+        // repo-wide ones that cannot be evaluated correctly on a slice.
+        let rules: Vec<&crate::validation::rules::Rule> = ruleset
+            .rules
+            .iter()
+            .filter(|rule| rule.scope == Scope::Graph && rule.severity != Severity::Off)
+            .filter(|rule| !rule.assert.is_repo_wide_at_transition())
+            .filter(|rule| rule.when.matches(issue))
+            .collect();
+
+        // Nothing to enforce: skip the (potentially large) store read entirely.
+        if rules.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // Neighborhood slice: the issue plus its transitive dependency closure in
+        // BOTH directions. This is what coverage/reference rules need (the issue's
+        // children/parents) without re-scanning the whole repository.
+        let slice = self.transition_neighborhood(issue)?;
+
+        let namespaces = self.cached_namespaces().map_err(|e| anyhow!("{e}"))?;
+        let hierarchy = crate::validation::defaults::hierarchy_config(namespaces);
+        let repo_format = self.repo_content_format()?;
+
+        let findings = evaluate_graph(&rules, &slice, &hierarchy, repo_format, chrono::Utc::now());
+
+        // Which selected rules enforce (block on an attributed error finding).
+        let enforcing: std::collections::HashSet<&str> = rules
+            .iter()
+            .filter(|r| r.enforce)
+            .map(|r| r.name.as_str())
+            .collect();
+
+        let mut blocking: Vec<(String, String)> = Vec::new();
+        let mut warnings: Vec<String> = Vec::new();
+        for gf in &findings {
+            let attributed_to_self = gf.issue_id.as_deref() == Some(issue.id.as_str());
+            let is_blocker = attributed_to_self
+                && gf.finding.severity == Severity::Error
+                && enforcing.contains(gf.finding.rule.as_str());
+            if is_blocker {
+                blocking.push((gf.finding.rule.clone(), gf.finding.message.clone()));
+            } else {
+                warnings.push(format!("[{}] {}", gf.finding.rule, gf.finding.message));
+            }
+        }
+
+        if !blocking.is_empty() {
+            if force {
+                // Forced override: record one bypass event per blocked rule. The
+                // caller commits the issue save right after this returns; the
+                // append-only audit log records the deliberate override.
+                for (rule, _) in &blocking {
+                    let event =
+                        Event::new_graph_rule_bypassed(issue.id.clone(), target, rule.clone());
+                    self.storage.append_event(&event)?;
+                }
+            } else {
+                // Blocked: log the attempted transition (one event per blocking
+                // rule) BEFORE returning the error, then persist nothing.
+                for (rule, _) in &blocking {
+                    let event =
+                        Event::new_transition_blocked(issue.id.clone(), target, rule.clone());
+                    self.storage.append_event(&event)?;
+                }
+                return Err(crate::errors::TransitionBlockedError::graph_rules(
+                    issue.id.clone(),
+                    target,
+                    issue.state,
+                    blocking,
+                )
+                .into());
+            }
+        }
+
+        Ok(warnings)
+    }
+
+    /// Build the dependency-neighborhood issue slice for transition-time graph
+    /// evaluation (CC-2a): the issue itself, every issue it transitively depends
+    /// on, and every issue that transitively depends on it.
+    ///
+    /// The passed `issue` already carries its TARGET state, so the slice contains
+    /// that projected shape (not the stale persisted copy) for the issue under
+    /// transition; all OTHER members are the persisted issues from the store.
+    /// Built from [`DependencyGraph`] reachability rather than `list_issues()`
+    /// wholesale so a `done` transition does not re-scan the whole repository.
+    fn transition_neighborhood(&self, issue: &Issue) -> Result<Vec<Issue>> {
+        use std::collections::HashSet;
+
+        let all = self.storage.list_issues()?;
+        let refs: Vec<&Issue> = all.iter().collect();
+        let graph = DependencyGraph::new(&refs);
+
+        // Ids in the neighborhood: self + transitive deps + transitive dependents.
+        let mut ids: HashSet<String> = HashSet::new();
+        ids.insert(issue.id.clone());
+        for dep in graph.get_transitive_dependents(&issue.id) {
+            ids.insert(dep.id.clone());
+        }
+        for dep in graph.get_transitive_dependencies(&issue.id) {
+            ids.insert(dep.id.clone());
+        }
+
+        // Materialize the slice, substituting the target-state projection of the
+        // issue under transition for its persisted copy.
+        let slice = all
+            .into_iter()
+            .filter(|i| ids.contains(&i.id))
+            .map(|i| if i.id == issue.id { issue.clone() } else { i })
+            .collect();
+        Ok(slice)
+    }
+
     /// Initialize a new jit repository in the current directory.
     /// Returns the worktree identity if in a git repository, None otherwise.
     pub fn init(&self) -> Result<Option<WorktreeIdentity>> {

@@ -514,6 +514,11 @@ fn transition_blocker_json(blocker: &TransitionBlocker) -> serde_json::Value {
             "gate_key": gate_key,
             "status": gate_status_name(*status),
         }),
+        TransitionBlocker::GraphRule { rule, message } => serde_json::json!({
+            "type": "graph_rule",
+            "rule": rule,
+            "message": message,
+        }),
     }
 }
 

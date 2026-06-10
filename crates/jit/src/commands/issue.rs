@@ -305,6 +305,16 @@ impl<S: IssueStore> CommandExecutor<S> {
             );
         }
 
+        // Transition-time graph-rule enforcement (CC-2): runs AFTER deps/gate
+        // guards and AFTER local `validate_for_write`. A gate-diverted done
+        // transition returned above and never reaches here. Only a genuine state
+        // transition triggers it (a pure field edit evaluates no graph rules).
+        // A blocking enforce rule returns a `TransitionBlockedError` (exit 4) and
+        // persists nothing; non-blocking findings surface as warnings.
+        if state.is_some() && old_state != issue.state {
+            warnings.extend(self.enforce_transition_graph_rules(&issue, issue.state, force)?);
+        }
+
         // Persist only when something actually changed: real field edits or a
         // genuine state transition. A pure no-op `issue update` (e.g. only
         // idempotent gate/assignee flags, already handled upstream) must not
@@ -470,6 +480,14 @@ impl<S: IssueStore> CommandExecutor<S> {
             _ => {
                 issue.state = new_state;
             }
+        }
+
+        // Transition-time graph-rule enforcement (CC-2) for the Ready and Done
+        // arms, after the dependency and gate guards above. This state-only path
+        // carries no content edits and no `--force`, so a blocking enforce rule
+        // returns a `TransitionBlockedError` (exit 4) and persists nothing.
+        if matches!(new_state, State::Ready | State::Done) && old_state != issue.state {
+            warnings.extend(self.enforce_transition_graph_rules(&issue, issue.state, false)?);
         }
 
         // Save and log

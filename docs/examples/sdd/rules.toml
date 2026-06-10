@@ -88,8 +88,12 @@ assert = { label-value-pattern = { namespace = "req", regex = '^REQ-[0-9]+$' } }
 # Coverage. The epic's canonical `## Success Criteria` items are the SOURCE set;
 # `marker = "[hard]"` means only hard criteria are required (aspirational ones
 # are advisory). A criterion id is covered when some child that depends on the
-# epic carries `satisfies:<id>` and is in state `done`. Runs only in
-# `jit validate` / gate checkers, never on write.
+# epic carries `satisfies:<id>` and is in state `done`. Graph rules run in
+# `jit validate`, in gate checkers, AND at issue state transitions (over the
+# issue's dependency neighborhood, never on the plain field-edit write path).
+# This rule is not `enforce = true`, so at a transition it only REPORTS; add
+# `enforce = true` (and e.g. `when = { type = "epic", state = "done" }`) to block
+# the done transition until every [hard] criterion is covered.
 [[rules]]
 name = "sdd-hard-criteria-covered"
 when = { type = "epic" }

@@ -146,6 +146,61 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
             .collect()
     }
 
+    /// Get all nodes the given node transitively DEPENDS ON.
+    ///
+    /// Follows outgoing dependency edges from `node_id` to their closure,
+    /// excluding `node_id` itself. The mirror of
+    /// [`get_transitive_dependents`](Self::get_transitive_dependents), it answers
+    /// "what does this node (transitively) require?" — used to assemble an issue's
+    /// dependency neighborhood for transition-time graph-rule evaluation.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::Issue;
+    /// use jit::graph::DependencyGraph;
+    ///
+    /// let a = Issue::new("A".into(), "".into());
+    /// let mut b = Issue::new("B".into(), "".into());
+    /// let mut c = Issue::new("C".into(), "".into());
+    /// b.dependencies.push(a.id.clone()); // B depends on A
+    /// c.dependencies.push(b.id.clone()); // C depends on B (and transitively A)
+    ///
+    /// let graph = DependencyGraph::new(&[&a, &b, &c]);
+    /// let mut deps: Vec<&str> = graph
+    ///     .get_transitive_dependencies(&c.id)
+    ///     .iter()
+    ///     .map(|i| i.id.as_str())
+    ///     .collect();
+    /// deps.sort();
+    /// let mut expected = vec![a.id.as_str(), b.id.as_str()];
+    /// expected.sort();
+    /// assert_eq!(deps, expected);
+    /// ```
+    pub fn get_transitive_dependencies(&self, node_id: &str) -> Vec<&'a T> {
+        let mut result: HashSet<&str> = HashSet::new();
+        let mut stack = vec![node_id];
+        let mut visited: HashSet<&str> = HashSet::new();
+
+        while let Some(current) = stack.pop() {
+            if !visited.insert(current) {
+                continue;
+            }
+            if let Some(node) = self.nodes.get(current) {
+                for dep in node.dependencies() {
+                    result.insert(dep.as_str());
+                    stack.push(dep.as_str());
+                }
+            }
+        }
+
+        result
+            .into_iter()
+            .filter(|id| *id != node_id)
+            .filter_map(|id| self.nodes.get(id).copied())
+            .collect()
+    }
+
     /// Get all isolated nodes (nodes with no dependencies and no dependents)
     ///
     /// An isolated node is one that has no incoming or outgoing edges in the
