@@ -211,3 +211,22 @@ Report both metrics over ≥3 runs, not the best/peak run.
 
 Always use n ≥ 3 runs and report the mean, not the peak — a single lucky run is
 not evidence.
+
+## Testing the harness itself
+
+Unit tests (stdlib `unittest`, no jit subprocesses, no network):
+
+```bash
+python3 -m unittest discover -s dev/eval/steering -p 'test_*.py'
+```
+
+They cover the run-count policy (`--runs` < 3 rejected without
+`--allow-few-runs`), atomic result writes, expect-assertion checking (setup
+steps validate exit codes AND `contains`/`not_contains`), aggregation and
+stability math (including the penalized mean), env sanitization, schema
+strictness, and results reportability. The end-to-end loop self-test is
+`run_eval.py --smoke`.
+
+Runs below 3 (debug only, via `--allow-few-runs`) write a
+`results-debug-*.json` artifact carrying `"reportable": false` — these are
+never comparable output and must not be cited as eval results.

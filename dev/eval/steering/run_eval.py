@@ -244,6 +244,23 @@ def run_jit(argv: list[str], cwd: Path) -> CmdResult:
 # ---------------------------------------------------------------------------
 
 
+
+def check_expect_assertions(res: CmdResult, expect: Optional["Expect"]) -> Optional[str]:
+    """Return a failure description if `res` violates `expect` (exit code,
+    contains, not_contains); None when it conforms. Steps without an expect
+    must exit 0."""
+    expected_exit = expect.exit if expect and expect.exit is not None else 0
+    if res.exit != expected_exit:
+        return f"exited {res.exit} (expected {expected_exit})"
+    if expect:
+        for needle in expect.contains:
+            if needle not in res.combined:
+                return f"output missing expected substring {needle!r}"
+        for needle in expect.not_contains:
+            if needle in res.combined:
+                return f"output contains forbidden substring {needle!r}"
+    return None
+
 def setup_scenario_repo(ruleset: str) -> Path:
     """Create a fresh isolated temp repo and install the named ruleset.
 
@@ -520,11 +537,10 @@ def run_one(
         #    (or match their own non-failing expectation). Capture ids.
         for step in scenario.steps[:target_idx]:
             res = run_jit(substitute_argv(step.argv, ids), repo)
-            expected_exit = step.expect.exit if step.expect else 0
-            if res.exit != expected_exit:
+            failure = check_expect_assertions(res, step.expect)
+            if failure is not None:
                 raise RuntimeError(
-                    f"setup step {step.argv} exited {res.exit} "
-                    f"(expected {expected_exit}); stderr: {res.stderr[-500:]}"
+                    f"setup step {step.argv} {failure}; stderr: {res.stderr[-500:]}"
                 )
             uuid = first_uuid(res.combined)
             if uuid is not None:
@@ -771,6 +787,7 @@ def write_results_json(
     out_dir: Path,
     skipped_scenarios: list[str],
     timestamp: Optional[str] = None,
+    reportable: bool = True,
 ) -> Path:
     ts = timestamp or _dt.datetime.now(_dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     payload = {
@@ -780,11 +797,15 @@ def write_results_json(
         "cap": cap,
         "agent_timeout": agent_timeout,
         "timestamp": ts,
+        # Runs below the n>=3 methodology floor are debugging artifacts, named
+        # and marked so they cannot pass as comparable results.
+        "reportable": reportable,
         "scenarios": [s.name for s in stats],
         "skipped_scenarios": skipped_scenarios,
         "per_scenario": {s.name: s.to_json() for s in stats},
     }
-    out_path = out_dir / f"results-{ts}.json"
+    prefix = "results" if reportable else "results-debug"
+    out_path = out_dir / f"{prefix}-{ts}.json"
     _atomic_write_text(out_path, json.dumps(payload, indent=2) + "\n")
     return out_path
 
@@ -1035,9 +1056,24 @@ def main(argv: Optional[list[str]] = None) -> int:
     print_table(stats)
 
     out_dir.mkdir(parents=True, exist_ok=True)
+    reportable = args.runs >= 3
     out_path = write_results_json(
-        stats, args.runs, args.cap, args.agent_timeout, model_id, out_dir, skipped
+        stats,
+        args.runs,
+        args.cap,
+        args.agent_timeout,
+        model_id,
+        out_dir,
+        skipped,
+        reportable=reportable,
     )
+    if not reportable:
+        print(
+            "\nWARNING: fewer than 3 runs — this artifact is marked "
+            "reportable=false and named results-debug-*; it is NOT comparable "
+            "output.",
+            file=sys.stderr,
+        )
     print(f"\nresults written to {out_path}")
     return 0
 
