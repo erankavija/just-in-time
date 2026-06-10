@@ -2,7 +2,7 @@
   "epic_id": "94d26c42-3f4f-4a5e-99cc-0e82475a7635",
   "epic_short_id": "94d26c42",
   "design_doc": "dev/active/94d26c42-validation-lifecycle-design.md",
-  "current_wave": 2,
+  "current_wave": 3,
   "waves": [
     {
       "wave_number": 1,
@@ -36,7 +36,7 @@
           "title": "Gate-result recency predicate with fresh-evidence example",
           "classification": "implementation",
           "model": "opus",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "bc86f54c-6372-44fe-b375-3e3a882a73e0",
@@ -44,7 +44,7 @@
           "title": "Blocking graph-rule evaluation at state transitions",
           "classification": "implementation",
           "model": "opus",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -129,15 +129,22 @@
   ],
   "open_question_resolutions": "Architect recommendations R-1 through R-6 accepted as-is (routine per escalation policy): minimal --explain rendering; now-parameter clock injection; recency rules default warn with documented done-blocking opt-in; defer cross-rule index caching; pin LLM eval model in README; reserve scope=all for label-uniqueness only.",
   "created_during_execution": [],
-  "escalations": [],
+  "escalations": [
+    "bc86f54c neighborhood criterion literally unsatisfiable without reverse-edge index; user approved amending the criterion (2026-06-10).",
+    "bc86f54c same-finding-class x3 (transition paths bypassing enforcement); user chose chokepoint refactor (apply_state_transition), which closed the class."
+  ],
   "rework_counts": {
     "cca3e80b": 2,
-    "5a25c590": 2
+    "5a25c590": 2,
+    "765688e1": 2,
+    "bc86f54c": 3
   },
   "started_at": "2026-06-10T00:00:00Z",
   "traps": [
     "Workers must NEVER git-restore/stage anything under .jit/ - rework2-cca3e80b's restore wiped the lead's recorded gate results (re-run was cheap this time; may not be next time). Dispatch prompts now must say: never run git restore on .jit paths.",
     "code-review gate enforces literal acceptance-criteria readings: --explain criterion required visible non-match reporting (R-1 minimal option was insufficient); 'instance path on findings' applies to specialized messages too; public APIs need # Examples doctests.",
-    "version_cli_tests flake under full parallel cargo test (binary-build contention + aws-lc-sys in no-network sandbox); pass serially - do not chase as regressions."
+    "version_cli_tests flake under full parallel cargo test (binary-build contention + aws-lc-sys in no-network sandbox); pass serially - do not chase as regressions.",
+    "All issue state changes MUST route through CommandExecutor::apply_state_transition (commands/mod.rs). Direct issue.state writes in command code are the recurring review-blocker class; the only sanctioned exceptions are documented inline (create initial state, dependency.rs ready->backlog demotion, validation projections).",
+    "The code-review gate keeps finding the next unguarded transition path; before re-running it after transition-semantics changes, grep commands/ for '.state = ' and check each site routes through the chokepoint."
   ]
 }

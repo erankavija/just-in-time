@@ -2,7 +2,7 @@
   "id": "bc86f54c-6372-44fe-b375-3e3a882a73e0",
   "title": "Blocking graph-rule evaluation at state transitions",
   "description": "Evaluate graph rules at issue state transitions and block the transition when an enforcing rule fails, closing the bypass where an issue reaches `done` despite failing coverage rules.\n\n## Background\n\nGraph rules currently run only in `jit validate` and gate checkers; the write path runs local rules only. The done transition is therefore unguarded by coverage and reference-integrity rules.\n\n## Success Criteria\n\n- [ ] Transitioning an issue evaluates the graph rules applicable to it in its target state; a failing rule with `enforce = true` blocks the transition with exit 4 and prints the findings\n- [ ] Non-enforcing failures are reported on the transition without blocking it\n- [ ] Transition-time rule evaluation runs over only the affected issue's graph neighborhood slice (the issue plus its transitive dependency closure); building that slice may read the store, since reverse edges are not indexed (amended 2026-06-10 with user approval; a persisted reverse-edge index is future work)\n- [ ] Blocked transitions are recorded in the event log\n- [ ] Documentation describing where rules run (concepts doc and rules.toml comments) matches the new behavior",
-  "state": "in_progress",
+  "state": "done",
   "priority": "high",
   "assignee": "agent:claude",
   "dependencies": [
@@ -14,14 +14,14 @@
   ],
   "gates_status": {
     "code-review": {
-      "status": "failed",
+      "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-06-10T00:46:53.957543103Z"
+      "updated_at": "2026-06-10T14:34:47.087530506Z"
     },
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-06-10T00:34:42.320903770Z"
+      "updated_at": "2026-06-10T14:31:41.542249511Z"
     }
   },
   "context": {},
@@ -31,5 +31,5 @@
     "epic:validation-lifecycle"
   ],
   "created_at": "2026-06-09T21:52:58.401969838+00:00",
-  "updated_at": "2026-06-10T06:53:37.410068830+00:00"
+  "updated_at": "2026-06-10T14:37:06.987197371+00:00"
 }
