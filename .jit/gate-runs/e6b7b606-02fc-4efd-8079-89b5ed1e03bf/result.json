@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "e6b7b606-02fc-4efd-8079-89b5ed1e03bf",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "690f618a-6b40-44b2-969d-582335cf768f",
+  "commit": "d4190210e32473ed2524d9ec4a47aac2410625f4",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-06-10T15:48:06.474123040Z",
+  "completed_at": "2026-06-10T15:49:42.746645924Z",
+  "duration_ms": 96272,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nNo blocking findings.\n\n- Rule kind added as `Assertion::CriteriaToCheck` in `crates/jit/src/validation/rules.rs:642`, with parsing/defaults in `crates/jit/src/validation/rules.rs:1143` and evaluation in `crates/jit/src/validation/graph.rs:1015`.\n- Marker-filtered criteria extraction is wired through `criterion_ids(...)` at `crates/jit/src/validation/graph.rs:1069`.\n- Verification can be either a configured gate prefix or check label namespace, implemented in `criterion_is_checked` at `crates/jit/src/validation/graph.rs:1099`.\n- Unmapped findings name the criterion and missing mapping at `crates/jit/src/validation/graph.rs:1081`.\n- Nyquist example ships at `docs/examples/nyquist/rules.toml:1` and demonstrates both planning warning and done-blocking variants.\n- Methodology-specific naming is confined to docs/tests/examples; engine code uses generic `criteria-to-check`.\n\n**Architecture And Separation**\n\nNo blocking findings. The implementation stays in validation domain/rules/graph code and does not add storage, CLI parsing, or output formatting concerns. `graph.rs` operates over an injected `&[Issue]`, preserving the storage boundary.\n\n**Functional Paradigm**\n\nNo blocking findings. The new evaluation path primarily uses iterator combinators in `crates/jit/src/validation/graph.rs:1065`; the remaining helper logic is straightforward expression-oriented code.\n\n**Correctness And Invariants**\n\nNo blocking findings. The rule is graph scoped and has no file writes, event logging, PID handling, or state transition mutation. Gate semantics are not weakened. Assignee/label formats are not changed.\n\n**Safety**\n\nNo blocking findings. No unsafe code was introduced in the reviewed changes.\n\n**Testing**\n\nNo blocking findings. Coverage includes parser/config tests, graph rule unit tests, serializer round-trip tests, and example ruleset tests:\n- `crates/jit/src/validation/graph.rs:1983`\n- `crates/jit/src/validation/graph.rs:2023`\n- `crates/jit/src/validation/graph.rs:2053`\n- `crates/jit/src/validation/graph.rs:2138`\n- `crates/jit/tests/example_rulesets_tests.rs:754`\n\nRecorded `cargo-ci` gate passed for issue `690f618a`: `cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace`, exit code 0.\n\n**Error Handling**\n\nNo blocking findings. Invalid `criteria-to-check` config returns `RuleConfigError::InvalidAssertion` with field-specific context at `crates/jit/src/validation/rules.rs:1165`.\n\n**CLI Contract**\n\nNo blocking findings. No CLI command surface was added or changed.\n\n**Documentation**\n\nNo blocking findings. Public API additions include doc comments and examples/config documentation in `crates/jit/src/validation/rules.rs:642`, with user-facing docs in `docs/how-to/validation-rules.md:303` and `docs/concepts/validation-engine.md:72`.\n\n**JIT Issue Management**\n\nNo blocking findings. The issue has no dependencies. `./scripts/jit-validate.sh` passed; it reported allowed warnings only.\n\n**Prior Review Feedback**\n\nNo prior run history was provided, so there are no unresolved prior findings to check.\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

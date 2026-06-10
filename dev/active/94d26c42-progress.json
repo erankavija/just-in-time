@@ -2,7 +2,7 @@
   "epic_id": "94d26c42-3f4f-4a5e-99cc-0e82475a7635",
   "epic_short_id": "94d26c42",
   "design_doc": "dev/active/94d26c42-validation-lifecycle-design.md",
-  "current_wave": 3,
+  "current_wave": 4,
   "waves": [
     {
       "wave_number": 1,
@@ -58,7 +58,7 @@
           "title": "Distinguish stray req labels from unsatisfied ones",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "690f618a-6b40-44b2-969d-582335cf768f",
@@ -66,7 +66,7 @@
           "title": "Criteria-to-check mapping rule kind with Nyquist example",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "3a86f34e-23da-44a8-9b16-4217ea4dfe80",
@@ -74,7 +74,7 @@
           "title": "Repo-wide graph rule scope with cross-epic example",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -137,7 +137,10 @@
     "cca3e80b": 2,
     "5a25c590": 2,
     "765688e1": 2,
-    "bc86f54c": 3
+    "bc86f54c": 3,
+    "59782dde": 0,
+    "690f618a": 0,
+    "3a86f34e": 1
   },
   "started_at": "2026-06-10T00:00:00Z",
   "traps": [
@@ -145,6 +148,7 @@
     "code-review gate enforces literal acceptance-criteria readings: --explain criterion required visible non-match reporting (R-1 minimal option was insufficient); 'instance path on findings' applies to specialized messages too; public APIs need # Examples doctests.",
     "version_cli_tests flake under full parallel cargo test (binary-build contention + aws-lc-sys in no-network sandbox); pass serially - do not chase as regressions.",
     "All issue state changes MUST route through CommandExecutor::apply_state_transition (commands/mod.rs). Direct issue.state writes in command code are the recurring review-blocker class; the only sanctioned exceptions are documented inline (create initial state, dependency.rs ready->backlog demotion, validation projections).",
-    "The code-review gate keeps finding the next unguarded transition path; before re-running it after transition-semantics changes, grep commands/ for '.state = ' and check each site routes through the chokepoint."
+    "The code-review gate keeps finding the next unguarded transition path; before re-running it after transition-semantics changes, grep commands/ for '.state = ' and check each site routes through the chokepoint.",
+    "Parallel workers appending to the same enum/match/test files produce conflicts that split FUNCTIONS across hunks - naive keep-both interleaves code. Resolution that works: take main's file whole, extract the second branch's additions from its original commit (git show <sha>:file), splice programmatically, then fmt+test. Also: doc tables triple-merge; collapse to one table and re-read the rendered region."
   ]
 }
