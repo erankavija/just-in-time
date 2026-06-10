@@ -982,8 +982,9 @@ mod cross_epic {
         // The evaluator must find exactly 50 findings (one per colliding value).
         //
         // Design: single-pass O(n * k) HashMap; no N^2 scan. This test confirms
-        // correctness at scale. Timing is not asserted (CI variability is
-        // unpredictable), but the algorithm is documented as single-pass.
+        // correctness at scale; the elapsed time is measured (with a generous
+        // anti-regression bound) in
+        // validation::graph::tests::test_label_uniqueness_large_fixture_correctness.
         let set = load_example("cross-epic");
         let rules = graph_rules(&set);
 

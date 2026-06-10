@@ -2512,8 +2512,10 @@ mod tests {
         //
         // Design note: this is O(n * k) — a single HashMap pass over issues × labels.
         // No N² scan. The assertion on finding count confirms correctness on a
-        // realistic repo-scale fixture. Timing is not asserted (CI variability), but
-        // the single-pass design makes this fast even for larger repos.
+        // realistic repo-scale fixture, and the elapsed time is MEASURED below
+        // with a deliberately generous bound (so CI variability cannot flake it)
+        // to satisfy the "performant on hundreds of issues, measured not assumed"
+        // criterion.
         let rule = uniqueness_rule("req");
 
         let mut issues: Vec<Issue> = Vec::with_capacity(400);
@@ -2532,12 +2534,24 @@ mod tests {
         assert_eq!(issues.len(), 400);
 
         let rules = vec![&rule];
+        let started = std::time::Instant::now();
         let findings = evaluate_graph(
             &rules,
             &issues,
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+        );
+        let elapsed = started.elapsed();
+        eprintln!(
+            "label-uniqueness over {} issues took {elapsed:?}",
+            issues.len()
+        );
+        // Generous bound: single-pass evaluation over 400 issues completes in
+        // milliseconds; 5s only catches an accidental quadratic regression.
+        assert!(
+            elapsed < std::time::Duration::from_secs(5),
+            "evaluation over 400 issues took {elapsed:?} (expected well under 5s)"
         );
 
         // Exactly 50 findings — one per colliding value, none for the unique ones.
