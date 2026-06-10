@@ -48,9 +48,17 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue.labels = labels;
         issue.content_format = content_format;
 
-        // Auto-transition to Ready if no dependencies (gates don't block Ready)
-        // BEFORE validating, so rules keyed on the final state (e.g.
-        // `when = { state = "ready" }`) see the shape that will be persisted.
+        // Auto-promote a brand-new issue to Ready if it has no dependencies
+        // (gates don't block Ready), BEFORE validating, so rules keyed on the
+        // final state (e.g. `when = { state = "ready" }`) see the shape that
+        // will be persisted.
+        //
+        // INTENTIONAL direct state write (does NOT route through
+        // `apply_state_transition`): this is the INITIAL state of an issue being
+        // constructed, not a transition of an existing persisted issue. There is
+        // no prior state to transition from, no dependency neighborhood yet (the
+        // issue has no dependencies by construction here), and `validate_for_write`
+        // below covers create-time validation.
         if issue.dependencies.is_empty() {
             issue.state = State::Ready;
         }
@@ -232,11 +240,14 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let old_state = issue.state;
 
-        // Resolve the requested state transition into the in-memory issue FIRST
-        // (running dependency/gate guards) so validation sees the FINAL shape.
-        // `gate_blocked` marks the gate-diversion-to-Gated case, which still
-        // persists/returns an error but must validate the projected Gated shape.
+        // Resolve the requested state transition's TARGET (running dependency/gate
+        // guards) WITHOUT mutating `issue.state` yet, so the actual state change is
+        // performed by the chokepoint (`apply_state_transition`) and cannot bypass
+        // graph enforcement. `issue.state` is projected into the target only for
+        // the `validate_for_write` shape below, then restored. `gate_blocked` marks
+        // the gate-diversion-to-Gated case, which still persists/returns an error.
         let mut gate_blocked = false;
+        let mut target_state: Option<State> = None;
         if let Some(s) = state {
             if s == State::Ready {
                 // Check dependencies only (gates don't block Ready)
@@ -254,7 +265,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     .into());
                 }
 
-                issue.state = State::Ready;
+                target_state = Some(State::Ready);
             } else if s == State::Done {
                 // Check both dependencies and gates
                 let issues = self.storage.list_issues()?;
@@ -273,28 +284,36 @@ impl<S: IssueStore> CommandExecutor<S> {
 
                 // If gates not passed, the final shape is Gated, not Done.
                 if issue.has_unpassed_gates() {
-                    issue.state = State::Gated;
+                    target_state = Some(State::Gated);
                     gate_blocked = true;
                 } else {
-                    issue.state = State::Done;
+                    target_state = Some(State::Done);
                 }
             } else {
-                issue.state = s;
+                target_state = Some(s);
             }
         }
 
         // Single write-time validation entry point against the FINAL shape
-        // (field edits + resolved state transition applied). Runs BEFORE any
-        // persistence so a blocked write changes nothing; any `--force` bypass
-        // events are deferred to the caller (emitted after the save in the
-        // persisted case, or unconditionally for a forced no-op override).
+        // (field edits + resolved state transition applied). The target state is
+        // projected onto a temporary value only for validation; the real
+        // mutation happens via the chokepoint below. Runs BEFORE any persistence
+        // so a blocked write changes nothing; any `--force` bypass events are
+        // deferred (emitted after the save in the persisted case, or
+        // unconditionally for a forced no-op override).
+        if let Some(t) = target_state {
+            issue.state = t;
+        }
         let validation = self.validate_for_write(&issue, force)?;
+        issue.state = old_state;
         warnings.extend(validation.warnings);
 
         // Gate-blocked `--state done`: persist the projected Gated shape (only
         // when something changed) and return the gate-blocking error. Bypass
         // events are emitted from inside that path (after its save when it
-        // persists, otherwise for the forced no-op override).
+        // persists, otherwise for the forced no-op override). This is a gate
+        // diversion, not a graph-enforced transition, so it does not route
+        // through the chokepoint.
         if gate_blocked {
             let persist = has_field_edits || old_state != State::Gated;
             return self.handle_gate_blocking(
@@ -305,14 +324,15 @@ impl<S: IssueStore> CommandExecutor<S> {
             );
         }
 
-        // Transition-time graph-rule enforcement (CC-2): runs AFTER deps/gate
-        // guards and AFTER local `validate_for_write`. A gate-diverted done
-        // transition returned above and never reaches here. Only a genuine state
-        // transition triggers it (a pure field edit evaluates no graph rules).
+        // Apply the resolved state transition through the SINGLE chokepoint, which
+        // runs transition-time graph-rule enforcement (CC-2) and mutates
+        // `issue.state`. `persist = false`: this path batches the state change
+        // with any field edits into one combined save below (and emits the
+        // state-change event there), so the chokepoint only enforces + mutates.
         // A blocking enforce rule returns a `TransitionBlockedError` (exit 4) and
         // persists nothing; non-blocking findings surface as warnings.
-        if state.is_some() && old_state != issue.state {
-            warnings.extend(self.enforce_transition_graph_rules(&issue, issue.state, force)?);
+        if let Some(t) = target_state {
+            warnings.extend(self.apply_state_transition(&mut issue, t, force, false, |_| {})?);
         }
 
         // Persist only when something actually changed: real field edits or a
@@ -386,7 +406,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// local-rule enforcement: `claim` carries no content edits and `reject`
     /// deliberately bypasses validation. Local rules are enforced on the
     /// content-bearing write paths (`create_issue`, `update_issue`, bulk update)
-    /// via `validate_for_write`.
+    /// via `validate_for_write`. Transition-time GRAPH-rule enforcement (CC-2) and
+    /// the actual state mutation/save/event are delegated to the single
+    /// `apply_state_transition` chokepoint (which skips enforcement for
+    /// `Rejected`), so this path never sets `issue.state` directly.
     pub fn update_issue_state(&self, id: &str, new_state: State) -> Result<Vec<String>> {
         let full_id = self.storage.resolve_issue_id(id)?;
 
@@ -407,7 +430,12 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Reload issue after prechecks (which may have modified it)
         let mut issue = self.storage.load_issue(&full_id)?;
 
-        // Validate state transition
+        // Run the per-target pre-guards (dependency/gate/gate-diversion) that
+        // differ per path. The ACTUAL state mutation, graph-rule enforcement
+        // (CC-2), save, and audit logging are all performed by the single
+        // chokepoint (`apply_state_transition`); the rejection/no-op policy lives
+        // inside it, so this path never special-cases them. This state-only path
+        // carries no content edits and no `--force`.
         match new_state {
             State::Ready => {
                 // Check dependencies only (gates don't block Ready)
@@ -424,8 +452,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                     )
                     .into());
                 }
-
-                issue.state = State::Ready;
             }
             State::Done => {
                 // Check both dependencies and gates
@@ -451,84 +477,32 @@ impl<S: IssueStore> CommandExecutor<S> {
                     // This path runs no local-rule validation, so there are no
                     // bypassed rules to log.
                     return self.handle_gate_blocking(&mut issue, old_state, persist, &[]);
-                } else {
-                    issue.state = State::Done;
                 }
-            }
-            State::Rejected => {
-                // Rejected bypasses all validation - no gates or dependencies required
-                // This allows closing issues that won't be implemented without
-                // needing to pass quality gates or wait for dependencies
-                issue.state = State::Rejected;
             }
             State::Gated => {
-                // Run postchecks when moving to Gated
-                issue.state = State::Gated;
-
-                // Transition-time graph-rule enforcement (CC-2) for the explicit
-                // gated transition, before anything persists — a
-                // `when = { state = "gated" }` enforce rule must not be
-                // bypassable via `--state gated`. (The arm's auto-done path
-                // additionally enforces against `done` inside
-                // `auto_transition_to_done`.)
-                if old_state != State::Gated {
-                    warnings.extend(self.enforce_transition_graph_rules(
-                        &issue,
-                        State::Gated,
-                        false,
-                    )?);
-                }
-
-                let issue_id = issue.id.clone();
-                self.storage.save_issue(issue)?;
-
-                // Log state change event
-                let event =
-                    Event::new_issue_state_changed(issue_id.clone(), old_state, State::Gated);
-                self.storage.append_event(&event)?;
+                // Move to Gated through the chokepoint (enforces a
+                // `when = { state = "gated" }` rule, saves, and logs), then run
+                // postchecks which may auto-transition to Done (also enforced via
+                // the chokepoint inside `auto_transition_to_done`).
+                warnings.extend(self.apply_state_transition(
+                    &mut issue,
+                    State::Gated,
+                    false,
+                    true,
+                    |_| {},
+                )?);
 
                 // Run postchecks (which may auto-transition to Done)
                 self.run_postchecks(&full_id)?;
                 return Ok(warnings);
             }
-            _ => {
-                issue.state = new_state;
-            }
+            _ => {}
         }
 
-        // Transition-time graph-rule enforcement (CC-2) for EVERY genuine state
-        // change that reaches here (Ready, Done, and the `_` arm's
-        // InProgress/Backlog/etc transitions — e.g. claim-driven
-        // Ready -> InProgress), after the dependency and gate guards above.
-        // `Rejected` is excluded: that arm deliberately bypasses all validation
-        // (abandonment must not be gated on coverage), and `Gated` returned early
-        // above after enforcing in its own arm (its auto-done path additionally
-        // enforces inside `auto_transition_to_done`).
-        // This state-only path carries no content edits and no `--force`, so a
-        // blocking enforce rule returns a `TransitionBlockedError` (exit 4) and
-        // persists nothing.
-        if new_state != State::Rejected && old_state != issue.state {
-            warnings.extend(self.enforce_transition_graph_rules(&issue, issue.state, false)?);
-        }
-
-        // Save and log
-        if old_state != issue.state {
-            let issue_id = issue.id.clone();
-            let new_state = issue.state;
-
-            self.storage.save_issue(issue)?;
-
-            let event = Event::new_issue_state_changed(issue_id.clone(), old_state, new_state);
-            self.storage.append_event(&event)?;
-
-            // Log completion event if transitioning to Done
-            if new_state == State::Done {
-                let event = Event::new_issue_completed(issue_id);
-                self.storage.append_event(&event)?;
-            }
-        } else {
-            self.storage.save_issue(issue)?;
-        }
+        // Apply the transition through the chokepoint: enforce (CC-2), mutate,
+        // save, and log. `Rejected`'s validation bypass and the no-op guard are
+        // handled inside it.
+        warnings.extend(self.apply_state_transition(&mut issue, new_state, false, true, |_| {})?);
 
         Ok(warnings)
     }
@@ -647,31 +621,30 @@ impl<S: IssueStore> CommandExecutor<S> {
         let full_id = self.storage.resolve_issue_id(id)?;
         let mut issue = self.storage.load_issue(&full_id)?;
         let old_assignee = issue.assignee.clone();
-        let old_state = issue.state;
 
-        issue.assignee = None;
-
-        // If in progress, transition back to ready
+        // If in progress, transition back to ready THROUGH the chokepoint, which
+        // enforces graph rules, clears the assignee in the same save (via the
+        // pre-save hook), and logs the state-change event. Releasing back to Ready
+        // is a regression and ordinarily matches no done/gated-scoped enforce
+        // rule, but routing it here keeps the invariant that no command sets
+        // `issue.state` directly.
         if issue.state == State::InProgress {
-            issue.state = State::Ready;
+            self.apply_state_transition(&mut issue, State::Ready, false, true, |issue| {
+                issue.assignee = None;
+            })?;
+        } else {
+            // No state change: just clear the assignee and save.
+            issue.assignee = None;
+            self.storage.save_issue(issue)?;
         }
 
-        let new_state = issue.state;
-        self.storage.save_issue(issue)?;
-
-        // Log event
+        // Log release event (after any state-change event the chokepoint emitted).
         let event = Event::new_issue_released(
             full_id.clone(),
             old_assignee.unwrap_or_default(),
             reason.to_string(),
         );
         self.storage.append_event(&event)?;
-
-        // Log state change if it occurred
-        if old_state != new_state {
-            let event = Event::new_issue_state_changed(full_id, old_state, new_state);
-            self.storage.append_event(&event)?;
-        }
 
         Ok(())
     }
@@ -710,16 +683,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         let mut issue = self.storage.load_issue(&full_id)?;
 
         if issue.should_auto_transition_to_ready(&resolved) {
-            let old_state = issue.state;
-            issue.state = State::Ready;
-
-            let issue_id = issue.id.clone();
-            self.storage.save_issue(issue)?;
-
-            // Log state change event
-            let event = Event::new_issue_state_changed(issue_id, old_state, State::Ready);
-            self.storage.append_event(&event)?;
-
+            // Route the auto-promotion through the chokepoint (enforce + save +
+            // log). Dependencies are already satisfied (the predicate checked),
+            // so this is the dep guard for this path.
+            self.apply_state_transition(&mut issue, State::Ready, false, true, |_| {})?;
             Ok(true)
         } else {
             Ok(false)
@@ -731,28 +698,15 @@ impl<S: IssueStore> CommandExecutor<S> {
         let mut issue = self.storage.load_issue(&full_id)?;
 
         if issue.should_auto_transition_to_done() {
-            let old_state = issue.state;
-            issue.state = State::Done;
-
-            // Transition-time graph-rule enforcement (CC-2) on the gates-pass
-            // auto-done path: runs AFTER gates pass but BEFORE the Done shape
-            // persists. A blocking enforce rule (e.g. an enforce-at-done coverage
+            // Route the gates-pass auto-done through the chokepoint. It runs
+            // transition-time graph-rule enforcement (CC-2) BEFORE the Done shape
+            // persists: a blocking enforce rule (e.g. an enforce-at-done coverage
             // rule) returns a `TransitionBlockedError` (exit 4) and persists
-            // nothing, leaving the issue in its prior (Gated) state with the
-            // findings reported. This path carries no `--force`. Without this an
-            // auto gate-pass could complete an issue past an enforce-at-done rule.
-            self.enforce_transition_graph_rules(&issue, State::Done, false)?;
-
-            let issue_id = issue.id.clone();
-            self.storage.save_issue(issue)?;
-
-            // Log state change event
-            let event = Event::new_issue_state_changed(issue_id.clone(), old_state, State::Done);
-            self.storage.append_event(&event)?;
-
-            // Log completion event
-            let event = Event::new_issue_completed(issue_id);
-            self.storage.append_event(&event)?;
+            // nothing, leaving the issue Gated with the findings reported. Without
+            // this an auto gate-pass could complete an issue past an
+            // enforce-at-done rule. This path carries no `--force`. The chokepoint
+            // also emits the state-change AND `issue_completed` events.
+            self.apply_state_transition(&mut issue, State::Done, false, true, |_| {})?;
 
             // Check if any dependent issues can now transition to ready
             self.check_auto_transitions()?;
@@ -817,6 +771,14 @@ impl<S: IssueStore> CommandExecutor<S> {
                 (gate_key, status)
             })
             .collect();
+        // INTENTIONAL direct state write (does NOT route through
+        // `apply_state_transition`): this is the GATE-diversion path, where an
+        // unpassed gate diverts a `--state done` request to `gated` and returns a
+        // gate-blocking error. Gate diversion deliberately takes precedence over
+        // graph-rule enforcement (see
+        // `test_gated_diversion_runs_before_graph_enforcement`), so it must NOT
+        // run the chokepoint's CC-2 enforcement; it only stamps the gated state on
+        // the way to returning the gate error.
         issue.state = State::Gated;
 
         let issue_id = issue.id.clone();

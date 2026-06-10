@@ -193,8 +193,14 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// Returns Ok(true) if modifications were made, Ok(false) if no changes, Err on failure.
     ///
-    /// Note: State transitions bypass update_issue_state() to avoid duplicate validation,
-    /// but we still log IssueStateChanged events for consistency.
+    /// Note: this does NOT call `update_issue_state()` (it skips that path's
+    /// prechecks/postchecks/gate-diversion — see the DESIGN DECISION below), but
+    /// the literal state change is still routed through the single
+    /// `apply_state_transition` chokepoint so transition-time graph-rule
+    /// enforcement (CC-2) cannot be bypassed by the bulk path (jit bc86f54c).
+    /// A blocking enforce rule fails THIS issue's update like any other per-issue
+    /// failure; `apply_bulk_update` records it in `errors` and continues
+    /// best-effort with the remaining matched issues.
     fn apply_operations_to_issue(
         &mut self,
         issue: &Issue,
@@ -244,7 +250,13 @@ impl<S: IssueStore> CommandExecutor<S> {
         if let Some(new_state) = operations.state {
             if updated.state != new_state {
                 let old_state = updated.state;
-                updated.state = new_state;
+                // Route the literal state change through the single chokepoint so
+                // graph-rule enforcement (CC-2) runs on the bulk path too. A
+                // blocking enforce rule returns an error, failing this issue's
+                // update (recorded in `errors` by the caller). `persist = false`:
+                // the combined save and the state-change event are emitted below
+                // alongside the other field edits.
+                self.apply_state_transition(&mut updated, new_state, force, false, |_| {})?;
                 modified_fields.push("state".to_string());
 
                 // Log state change event (in addition to update event)

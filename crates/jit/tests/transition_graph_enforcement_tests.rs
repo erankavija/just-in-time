@@ -556,6 +556,151 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 }
 
 #[test]
+fn test_bulk_update_blocked_by_enforcing_done_graph_rule() {
+    // The reviewer's exact scenario (jit bc86f54c): a bulk
+    // `jit issue update --filter ... --state done` must NOT bypass an enforcing
+    // graph rule that blocks the same single-issue transition. The state change
+    // now routes through the chokepoint, so the bulk update for the violating
+    // issue fails (recorded in `errors`) and the issue stays unchanged.
+    use jit::commands::UpdateOperations;
+    use jit::query_engine::QueryFilter;
+
+    let mut executor = executor_with_rules(DONE_NEEDS_DESIGN);
+    let epic = seed_issue(&executor, "Epic", &["type:epic"], State::InProgress);
+
+    let filter = QueryFilter::parse("label:type:epic").unwrap();
+    let ops = UpdateOperations {
+        state: Some(State::Done),
+        ..Default::default()
+    };
+    let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
+
+    assert_eq!(result.summary.total_matched, 1);
+    assert_eq!(
+        result.summary.total_modified, 0,
+        "the enforcing done-rule must block the bulk transition"
+    );
+    assert_eq!(result.summary.total_errors, 1);
+    assert_eq!(result.errors[0].0, epic);
+    assert!(
+        result.errors[0].1.contains("epic-done-needs-design-dep"),
+        "the per-issue error must name the failing rule: {}",
+        result.errors[0].1
+    );
+
+    // The issue is unchanged: still InProgress, not Done.
+    let after = executor.storage().load_issue(&epic).unwrap();
+    assert_eq!(
+        after.state,
+        State::InProgress,
+        "a blocked bulk transition must persist nothing for that issue"
+    );
+}
+
+#[test]
+fn test_bulk_update_warn_rule_passes_with_warning() {
+    // A non-enforcing (warn) graph rule must NOT block the bulk transition: the
+    // issue completes the state change. (Bulk does not surface per-issue warnings
+    // in its result, but the transition succeeding while the rule is violated is
+    // the assertion — an enforcing rule would have blocked it, as the test above
+    // shows.)
+    use jit::commands::UpdateOperations;
+    use jit::query_engine::QueryFilter;
+
+    let rules = r#"
+[[rules]]
+name = "epic-done-should-have-design"
+when = { type = "epic", state = "done" }
+severity = "error"
+enforce = false
+assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
+"#;
+    let mut executor = executor_with_rules(rules);
+    let epic = seed_issue(&executor, "Epic", &["type:epic"], State::InProgress);
+
+    let filter = QueryFilter::parse("label:type:epic").unwrap();
+    let ops = UpdateOperations {
+        state: Some(State::Done),
+        ..Default::default()
+    };
+    let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
+
+    assert_eq!(result.summary.total_matched, 1);
+    assert_eq!(
+        result.summary.total_modified, 1,
+        "a non-enforcing rule must not block the bulk transition"
+    );
+    assert_eq!(result.summary.total_errors, 0);
+
+    let after = executor.storage().load_issue(&epic).unwrap();
+    assert_eq!(
+        after.state,
+        State::Done,
+        "non-enforcing rule does not block"
+    );
+}
+
+#[test]
+fn test_bulk_update_force_bypasses_enforcing_done_graph_rule() {
+    // `--force` on the bulk path must bypass the enforcing graph rule through the
+    // chokepoint, completing the transition and recording the override.
+    use jit::commands::UpdateOperations;
+    use jit::query_engine::QueryFilter;
+
+    let mut executor = executor_with_rules(DONE_NEEDS_DESIGN);
+    let epic = seed_issue(&executor, "Epic", &["type:epic"], State::InProgress);
+
+    let filter = QueryFilter::parse("label:type:epic").unwrap();
+    let ops = UpdateOperations {
+        state: Some(State::Done),
+        ..Default::default()
+    };
+    let result = executor.apply_bulk_update(&filter, &ops, true).unwrap();
+
+    assert_eq!(result.summary.total_modified, 1);
+    assert_eq!(result.summary.total_errors, 0);
+
+    let after = executor.storage().load_issue(&epic).unwrap();
+    assert_eq!(
+        after.state,
+        State::Done,
+        "forced bulk transition lands done"
+    );
+
+    let events = executor.storage().read_events().unwrap();
+    assert!(
+        events.iter().any(|e| e.get_type() == "graph_rule_bypassed"),
+        "a forced bulk override must log a GraphRuleBypassed event"
+    );
+}
+
+#[test]
+fn test_rejected_transition_bypasses_enforcement_through_chokepoint() {
+    // Rejection deliberately bypasses graph-rule enforcement (the policy is
+    // encoded inside the chokepoint). An enforcing rule that WOULD block a done
+    // transition must NOT block a transition to Rejected, regardless of which
+    // entry point is used.
+    let executor = executor_with_rules(DONE_NEEDS_DESIGN);
+    let epic = seed_issue(&executor, "Epic", &["type:epic"], State::InProgress);
+
+    // The state-only path (`jit issue reject`) routes through the chokepoint.
+    let result = executor.update_issue_state(&epic, State::Rejected);
+    assert!(
+        result.is_ok(),
+        "rejection must bypass enforcement even with a violated enforce rule"
+    );
+    let after = executor.storage().load_issue(&epic).unwrap();
+    assert_eq!(after.state, State::Rejected);
+
+    // No TransitionBlocked event was logged: enforcement never ran on rejection.
+    let events = executor.storage().read_events().unwrap();
+    assert!(
+        !events.iter().any(|e| e.get_type() == "transition_blocked"),
+        "rejection must not run graph enforcement"
+    );
+}
+
+#[test]
 fn test_done_rule_does_not_fire_on_non_done_transition() {
     // A `state = "done"` rule must not fire when transitioning to ready: the
     // selector does not match the issue in the ready target state.

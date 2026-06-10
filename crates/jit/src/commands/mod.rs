@@ -478,13 +478,103 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(())
     }
 
+    /// The SINGLE chokepoint through which ALL issue state changes must flow.
+    ///
+    /// ALL issue state changes must flow through this function; do not set
+    /// `issue.state` directly in command code. Centralizing the transition here
+    /// guarantees that transition-time graph-rule enforcement (CC-2) cannot be
+    /// bypassed by a new code path that forgets to wire it in — the bug class that
+    /// motivated this refactor (jit bc86f54c), where bulk update set
+    /// `issue.state` directly and slipped past an enforcing graph rule.
+    ///
+    /// Responsibilities, in order:
+    ///
+    /// 1. **No-op guard.** If `issue.state == target` there is nothing to
+    ///    transition: returns `Ok(vec![])` without enforcing, saving, or logging.
+    /// 2. **Graph-rule enforcement.** Runs
+    ///    [`enforce_transition_graph_rules`](Self::enforce_transition_graph_rules)
+    ///    on the issue projected into its TARGET state, EXCEPT when `target` is
+    ///    [`State::Rejected`] — rejection deliberately bypasses validation
+    ///    (abandoning an issue must not be gated on coverage). That policy is
+    ///    encoded HERE, not at call sites, so no caller can accidentally enforce
+    ///    (or fail to skip) on rejection. A blocking enforce rule returns a
+    ///    [`TransitionBlockedError`](crate::errors::TransitionBlockedError) (exit
+    ///    4) and persists NOTHING; non-blocking findings are returned as warnings.
+    /// 3. **State mutation.** Sets `issue.state = target`.
+    /// 4. **Persistence + audit (when `persist`).** When `persist` is true, saves
+    ///    the issue and appends the `issue_state_changed` event (plus
+    ///    `issue_completed` when landing [`State::Done`]). Including the event
+    ///    write here — not only at call sites — means a future caller that forgets
+    ///    to log cannot leave a state change unaudited.
+    ///
+    /// # The `persist` flag
+    ///
+    /// Persistence conventions differ per caller: the state-only paths
+    /// (`update_issue_state`, the auto-transition helpers, `release_issue`) want
+    /// the chokepoint to own the save + event, so they pass `persist = true`. The
+    /// batch paths that combine a state change with other field edits in ONE save
+    /// (`update_issue`, bulk update) pass `persist = false`: they enforce + mutate
+    /// through the chokepoint, then perform their own combined save and emit the
+    /// `issue_state_changed` event themselves (with their existing idempotency and
+    /// bypass-event ordering). Enforcement and the no-op/rejection policy are
+    /// always centralized regardless of `persist`.
+    ///
+    /// `pre_save` runs after a successful (non-blocked) enforcement and state
+    /// mutation but BEFORE the save when `persist` is true, letting a caller stamp
+    /// additional fields (e.g. clearing the assignee on release) into the same
+    /// write. It is unused (a no-op closure) for callers that only change state.
+    fn apply_state_transition(
+        &self,
+        issue: &mut Issue,
+        target: State,
+        force: bool,
+        persist: bool,
+        pre_save: impl FnOnce(&mut Issue),
+    ) -> Result<Vec<String>> {
+        let old_state = issue.state;
+
+        // No-op: nothing to transition, enforce, save, or log.
+        if old_state == target {
+            return Ok(Vec::new());
+        }
+
+        // Rejection deliberately bypasses graph-rule enforcement; every other
+        // target runs it against the TARGET-state projection of the issue.
+        let warnings = if target == State::Rejected {
+            Vec::new()
+        } else {
+            let mut projected = issue.clone();
+            projected.state = target;
+            self.enforce_transition_graph_rules(&projected, target, force)?
+        };
+
+        // Enforcement passed (or was bypassed/skipped): land the new state.
+        issue.state = target;
+
+        if persist {
+            pre_save(issue);
+            let issue_id = issue.id.clone();
+            self.storage.save_issue(issue.clone())?;
+
+            let event = Event::new_issue_state_changed(issue_id.clone(), old_state, target);
+            self.storage.append_event(&event)?;
+
+            if target == State::Done {
+                let event = Event::new_issue_completed(issue_id);
+                self.storage.append_event(&event)?;
+            }
+        }
+
+        Ok(warnings)
+    }
+
     /// Enforce the graph rules applicable to an issue at a state transition (CC-2).
     ///
-    /// Runs AFTER the dependency and gate guards and AFTER `validate_for_write`
-    /// succeeds, on BOTH transition paths (`update_issue` and
-    /// `update_issue_state`). `issue` MUST already carry its TARGET state so a
-    /// rule selector keyed on `state` (e.g. `when = { state = "done" }`) matches
-    /// only at the transition that lands that state.
+    /// Invoked exclusively by [`apply_state_transition`](Self::apply_state_transition),
+    /// the single chokepoint for state changes; command code never calls this
+    /// directly. `issue` MUST already carry its TARGET state so a rule selector
+    /// keyed on `state` (e.g. `when = { state = "done" }`) matches only at the
+    /// transition that lands that state.
     ///
     /// Behavior (CC-2 / CC-2a):
     ///
