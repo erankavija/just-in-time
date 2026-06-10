@@ -828,7 +828,9 @@ fn depends_on_target(
 ///
 /// - missing: `gate '<key>' has no recorded result`
 /// - stale: `gate '<key>' result is <N> days old (max <M>)` (rendered in days
-///   when the configured max is a whole number of days, else in hours)
+///   when the configured max is a whole number of days, else in hours; the day
+///   age is rounded UP so a stale finding's displayed age always exceeds the
+///   displayed max)
 ///
 /// This kind takes no raw config table (its payload is parsed and validated at
 /// load), so it never produces a `config-error` finding.
@@ -848,9 +850,17 @@ fn evaluate_gate_recency(
     } else {
         max_age_hours
     };
+    // Render the displayed age in the chosen unit. For days, round UP (ceiling):
+    // a finding is only produced when `age_hours > max_age_hours`, and truncating
+    // (`hours / 24`) could render an age EQUAL to the displayed max (e.g. 180h
+    // vs a 7-day/168h max both show "7 days"), making a BLOCKING finding read as
+    // if it were within limit. Ceiling keeps the displayed age strictly above the
+    // displayed max on every stale finding.
     let age_in_unit = |hours: i64| -> i64 {
         if in_days {
-            hours / 24
+            // Ceiling division. Only called on the stale branch, where
+            // `hours > max_age_hours >= 0`, so `hours` is non-negative.
+            (hours + 23) / 24
         } else {
             hours
         }
@@ -1484,6 +1494,111 @@ mod tests {
             fixed_now(),
         );
         assert_eq!(a, b);
+    }
+
+    #[test]
+    fn test_gate_recency_stale_age_ceiling_renders_above_max() {
+        // M2 regression: 180h with a 7-day (168h) max is stale, but truncating
+        // (180 / 24 = 7) would render "7 days old (max 7)" — a blocking finding
+        // whose displayed age equals the displayed max. Ceiling division renders
+        // the age as 8 so it is strictly greater than the max.
+        let rule = recency_rule("max-age-days = 7, gates = [\"code-review\"]");
+        let i = issue_with_gate("code-review", 180); // 180h > 168h, < 192h
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[i],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        assert_eq!(findings.len(), 1);
+        assert_eq!(
+            findings[0].finding.message, "gate 'code-review' result is 8 days old (max 7)",
+            "stale age must render strictly above the max (ceiling), not equal to it"
+        );
+    }
+
+    #[test]
+    fn test_gate_recency_exact_max_age_days_is_fresh() {
+        // Exact boundary: age == max-age (7 days == 168h) is NOT stale (the check
+        // is strictly greater-than), so no finding is produced.
+        let rule = recency_rule("max-age-days = 7, gates = [\"code-review\"]");
+        let i = issue_with_gate("code-review", 7 * 24); // exactly 168h
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[i],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        assert!(
+            findings.is_empty(),
+            "a gate at exactly max-age is fresh: {findings:?}"
+        );
+    }
+
+    #[test]
+    fn test_gate_recency_just_over_max_age_days_is_stale_with_age_above_max() {
+        // Just over the boundary: 169h > 168h is stale, and the rendered age (8)
+        // exceeds the rendered max (7).
+        let rule = recency_rule("max-age-days = 7, gates = [\"code-review\"]");
+        let i = issue_with_gate("code-review", 7 * 24 + 1); // 169h
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[i],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        assert_eq!(findings.len(), 1);
+        assert_eq!(
+            findings[0].finding.message,
+            "gate 'code-review' result is 8 days old (max 7)"
+        );
+    }
+
+    #[test]
+    fn test_gate_recency_exact_max_age_hours_is_fresh() {
+        // N3 boundary (hours unit): age == max-age-hours is fresh, no finding.
+        let rule = recency_rule("max-age-hours = 12, gates = [\"code-review\"]");
+        let i = issue_with_gate("code-review", 12); // exactly 12h
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[i],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        assert!(
+            findings.is_empty(),
+            "a gate at exactly max-age-hours is fresh: {findings:?}"
+        );
+    }
+
+    #[test]
+    fn test_gate_recency_vacuous_pass_no_gates() {
+        // N2 vacuous pass: an issue with no `gates_required` and an empty `gates`
+        // filter has nothing to check, so it yields zero findings.
+        let rule = recency_rule("max-age-days = 7");
+        let mut i = issue("work", &[]);
+        i.state = State::Done;
+        // No gates_required, no gates_status.
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[i],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        assert!(
+            findings.is_empty(),
+            "an issue with no gates produces no recency findings: {findings:?}"
+        );
     }
 
     // --- dispatch / scope filtering ----------------------------------------
