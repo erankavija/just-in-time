@@ -2,7 +2,7 @@
   "id": "94d26c42-3f4f-4a5e-99cc-0e82475a7635",
   "title": "Lifecycle-aware validation enforcement and steering quality",
   "description": "Make validation enforcement fire at the right lifecycle moments and make findings actionable enough that an agent can self-correct, so structural validation actually steers agents instead of training them to ignore it.\n\n## Background\n\nA June 2026 evaluation of the SDD example ruleset in an isolated repo found that the graph rules (criteria coverage, req/satisfies integrity) report error-severity findings during the entire legitimate planning phase, while the one moment they should bite is unenforced: an epic with declared `req:` labels, an uncovered `[hard]` criterion, and zero children transitions to `done` with exit 0. A fabricated `req:` id and a not-yet-implemented one produce identical findings. Schema findings for unparsed sections are content-free (`[] has less than 1 item`). The engine also lacks primitives for requirement-to-check mapping, evidence freshness, and cross-graph analysis, and there is no way to measure whether rule changes improve agent steering.\n\n## Success Criteria\n\n- [ ] A correctly authored in-flight parent issue with declared `req:` labels and incomplete children produces zero error-severity findings from `jit validate`\n- [ ] An issue cannot transition to `done` while an enforcing graph rule fails for it (blocked, exit 4, findings shown)\n- [ ] A `req:` label whose id is absent from the canonical criteria section yields a finding distinct from a declared-but-unsatisfied one\n- [ ] Schema findings name the failing section/field; the empty-section case states that items must be Markdown bullets\n- [ ] Criteria-to-check mapping, gate-result recency, and repo-wide graph scope are each available as engine primitives and demonstrated by an example ruleset under docs/examples/\n- [ ] A non-software example ruleset demonstrates the engine on a hierarchy without epics or milestones\n- [ ] A deterministic steering-scenario suite runs in CI, and an LLM-agent eval measures iterations-to-green against the same scenarios",
-  "state": "in_progress",
+  "state": "done",
   "priority": "high",
   "assignee": "agent:project-lead",
   "dependencies": [
@@ -18,20 +18,20 @@
   ],
   "gates_status": {
     "code-review": {
-      "status": "failed",
+      "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-06-10T20:14:26.786452773Z"
+      "updated_at": "2026-06-11T05:28:56.507559863Z"
     },
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-06-10T20:12:33.329821192Z"
+      "updated_at": "2026-06-11T05:27:00.781481134Z"
     }
   },
   "context": {},
   "documents": [
     {
-      "path": "dev/active/94d26c42-validation-lifecycle-design.md",
+      "path": "dev/archive/features/94d26c42-validation-lifecycle-design.md",
       "commit": null,
       "label": "Design Document",
       "doc_type": "design",
@@ -44,5 +44,5 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-06-09T21:52:58.354367064+00:00",
-  "updated_at": "2026-06-10T20:16:45.081851259+00:00"
+  "updated_at": "2026-06-11T05:32:24.072638938+00:00"
 }

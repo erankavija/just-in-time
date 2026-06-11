@@ -157,5 +157,7 @@
     "Coverage examples must use child-link='dependencies' (epic depends on children, jit dep add <epic> <child>). child-link='dependents' is self-defeating with jit's dependency guard: a child depending on the epic can never reach done first. Verified E2E 2026-06-10; June happy-path now passes via CLI.",
     "Workers running ad-hoc jit commands during exploration contaminate production .jit even with hard rules in the prompt (worker honestly reported; lead restored). Steering-harness jit_cmd() now strips JIT_DATA_DIR etc \u2014 any future subprocess-spawning test must use an env-sanitizing helper.",
     "std::env::set_var/remove_var are unsafe in this toolchain and the workspace denies unsafe; test env assertions must use Command::get_envs() instead of global mutation."
-  ]
+  ],
+  "completed_at": "2026-06-11T05:35:00Z",
+  "final_status": "epic done; all 11 children done, cargo-ci and code-review passed at commit f230553"
 }

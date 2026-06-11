@@ -2698,3 +2698,8 @@
 {"type":"issue_state_changed","id":"708e370c-82f4-488f-b68b-b3d7ffa02bc6","issue_id":"94d26c42-3f4f-4a5e-99cc-0e82475a7635","timestamp":"2026-06-10T20:12:33.322380110Z","from":"ready","to":"in_progress"}
 {"type":"gate_passed","id":"e3a34d28-d926-4c13-b27c-757a37885a35","issue_id":"94d26c42-3f4f-4a5e-99cc-0e82475a7635","timestamp":"2026-06-10T20:14:17.635306524Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
 {"type":"gate_failed","id":"b0ce8ca0-4bb4-4cb2-89c0-048f6cab7217","issue_id":"94d26c42-3f4f-4a5e-99cc-0e82475a7635","timestamp":"2026-06-10T20:16:45.082014959Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"f9ecdc80-33a6-48df-8498-6a963ca1aeb2","issue_id":"94d26c42-3f4f-4a5e-99cc-0e82475a7635","timestamp":"2026-06-11T05:28:50.989462625Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"b7e7d1c6-e625-472e-8376-dbb011f5ce42","issue_id":"94d26c42-3f4f-4a5e-99cc-0e82475a7635","timestamp":"2026-06-11T05:30:35.217546815Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"issue_state_changed","id":"a6c8744d-e531-466c-bdd0-75b9325b7e63","issue_id":"94d26c42-3f4f-4a5e-99cc-0e82475a7635","timestamp":"2026-06-11T05:32:06.324569320Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"de48ec89-2aee-49e6-b9d0-cd7c48123724","issue_id":"94d26c42-3f4f-4a5e-99cc-0e82475a7635","timestamp":"2026-06-11T05:32:06.324599260Z"}
+{"type":"document_archived","id":"ccad4ee8-aa0a-4c5d-89ab-4477239b0118","timestamp":"2026-06-11T05:32:24.072849968Z","source":"dev/active/94d26c42-validation-lifecycle-design.md","destination":"dev/archive/features/94d26c42-validation-lifecycle-design.md","category":"design","issues_updated":1}

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "7111782b-0ce5-4143-9525-36503af3f2f1",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "94d26c42-3f4f-4a5e-99cc-0e82475a7635",
+  "commit": "f230553e9caa5ea8bac14fca2240a4039e965294",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-06-11T05:28:56.507559863Z",
+  "completed_at": "2026-06-11T05:30:35.217205294Z",
+  "duration_ms": 98709,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nNo blocking findings. The prior review blocker is addressed: the LLM eval now discovers every fixture with a failing target step, including transition scenarios, via `Scenario.target_index()` / `is_driven()` in [run_eval.py](/home/vkaskivuo/Projects/just-in-time/dev/eval/steering/run_eval.py:162) and [discover_scenarios()](/home/vkaskivuo/Projects/just-in-time/dev/eval/steering/run_eval.py:776). The `premature-done` transition repair is explicitly driven by the oracle in [run_eval.py](/home/vkaskivuo/Projects/just-in-time/dev/eval/steering/run_eval.py:483), and smoke asserts it greens in 4 iterations.\n\nThe deterministic suite still enumerates all fixture dirs from [steering_scenarios.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/steering_scenarios.rs:412). Happy-path fixtures are skipped only by the LLM eval because iterations-to-green has no failing starting point, and the skipped list is reported.\n\n**Prior Review Feedback**\n\nResolved. The previous failure was that `premature-done` was skipped by the eval. It is now included in `ORACLE_EXPECTED_ITERATIONS` and verified by `--smoke`.\n\n**Architecture And Separation Of Concerns**\n\nNo blocking issue found. The latest delta is confined to eval harness/docs/JIT metadata. It does not move Rust domain, storage, command, CLI, or output responsibilities across boundaries.\n\n**Functional Paradigm**\n\nNo blocking issue found. The Python harness uses straightforward orchestration loops around subprocess execution and scenario aggregation, which is appropriate for an eval runner.\n\n**Correctness And Invariants**\n\nNo blocking issue found. Eval result writes use temp-file plus rename in [_atomic_write_text](/home/vkaskivuo/Projects/just-in-time/dev/eval/steering/run_eval.py:903). Child `jit` processes strip storage-affecting `JIT_*` environment variables and pin `JIT_AGENT_ID` in [child_env](/home/vkaskivuo/Projects/just-in-time/dev/eval/steering/run_eval.py:197). No PID-handling code is introduced.\n\n**Safety**\n\nNo unsafe Rust code introduced by this change set.\n\n**Testing**\n\nProvided gate evidence shows `cargo-ci` passed for commit `f230553e9caa5ea8bac14fca2240a4039e965294`. I also ran:\n\n- `python3 -m unittest discover -s dev/eval/steering -p 'test_*.py'`: 18 passed.\n- `python3 dev/eval/steering/run_eval.py --smoke`: passed; `premature-done` greened in 4 iterations.\n- `./scripts/jit-validate.sh`: passed with label warnings only, which are allowed.\n\n**Error Handling**\n\nNo blocking issue found. Setup and agent-loop failures are surfaced as run failures with context, and non-green runs are charged in penalized metrics rather than silently disappearing.\n\n**CLI Contract**\n\nNo new `jit` CLI command is introduced, so no `--json` contract change is implicated.\n\n**Documentation**\n\nNo blocking issue found. [README.md](/home/vkaskivuo/Projects/just-in-time/dev/eval/steering/README.md:23) documents the driven scenario set, the transition repair flow, skipped no-failure fixtures, isolation, and reporting.\n\n**JIT Issue Management**\n\nAll listed dependencies are `done`. `./scripts/jit-validate.sh` passed. Current issue metadata still shows `code-review` as failed because this review has not yet been recorded, while `cargo-ci` is passed for the current commit.\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
