@@ -15,7 +15,10 @@ eval runs an agent loop in a fully isolated temp repo:
      its error text.
   3. The agent proposes a correction (a replacement body, or a side-effect
      command). Apply it, re-run the failing command, repeat until green (exit 0)
-     or a cap is reached.
+     or a cap is reached. Multi-command repairs span iterations: every executed
+     command's result — side-effect AND the re-run — is appended to the history
+     the agent sees, so it can chain steps (e.g. create a child, read its uuid
+     from the create's stdout, then wire a dependency to it).
   4. Record iterations-to-green and rule-compliance.
 
 The agent is pluggable behind ``--agent-cmd``. See the module ``AGENT
@@ -159,9 +162,10 @@ class Scenario:
     def target_index(self) -> Optional[int]:
         """Index of the failing step: the last step whose expect.exit is nonzero.
 
-        A steering scenario is one with such a step. Scenarios whose steps all
-        succeed (happy-path-done, pending-req-quiet) have no target and are
-        skipped by the eval.
+        A *driven* steering scenario is one with such a step — a real failure to
+        converge from. Scenarios whose steps all succeed (happy-path-done,
+        pending-req-quiet) have no failing target step: iterations-to-green is
+        undefined without a failure, so the eval skips them.
         """
         target = None
         for i, step in enumerate(self.steps):
@@ -169,26 +173,20 @@ class Scenario:
                 target = i
         return target
 
-    def is_failing_input_scenario(self) -> bool:
-        """True for the *failing-input* steering scenarios this eval drives.
+    def is_driven(self) -> bool:
+        """True iff this scenario has a failing target step the eval can drive.
 
-        Per the design (CC-9 / issue 6a6af4e3), the LLM eval drives the
-        failing-input scenarios — those whose fix is a content or label
-        correction surfaced at a write or validate enforcement point
-        (sloppy-spec-body, typo-heading, stray-req). Transition-target
-        scenarios (e.g. premature-done) require building out the dependency
-        graph rather than correcting an input and are out of scope here; the
-        deterministic harness covers them.
+        Per the epic criterion (CC-9 / issue 6a6af4e3), the LLM eval measures
+        iterations-to-green against the same scenarios as the deterministic
+        suite. A scenario is driven iff it has a failing target step
+        (``target_index()`` is not None) — this includes the content/label
+        fixes (sloppy-spec-body, typo-heading, stray-req) AND the transition
+        repair (premature-done), which the agent fixes by building out the
+        dependency graph. Only no-failing-target scenarios (happy-path-done,
+        pending-req-quiet) are skipped, because iterations-to-green is undefined
+        without a failure to converge from.
         """
-        idx = self.target_index()
-        if idx is None:
-            return False
-        target_argv = self.steps[idx].argv
-        is_transition = (
-            target_argv[:2] == ["issue", "update"]
-            and any(a in ("--state", "-s") for a in target_argv)
-        )
-        return not is_transition
+        return self.target_index() is not None
 
 
 # ---------------------------------------------------------------------------
@@ -342,8 +340,12 @@ def description_index(argv: list[str]) -> Optional[int]:
 #     "failing_argv": ["issue", "create", ...],   # the command that failed
 #     "failing_exit": 4,
 #     "failing_stderr": "<error text the agent may act on>",
-#     "history": [ {"argv": [...], "exit": 4, "stderr": "..."}, ... ]
+#     "history": [ {"argv": [...], "exit": 4, "stdout": "...", "stderr": "...",
+#                   "output": "<stdout+stderr>"}, ... ]
 #   }
+#
+# stdout is included because created issue uuids print there
+# ("Created issue: <uuid>"); the agent extracts them itself to chain commands.
 #
 # Action (stdout, a single JSON object):
 #   {"body": "<replacement --description body>"}    # re-runs failing cmd w/ new body
@@ -383,8 +385,19 @@ def build_task(
         "failing_argv": failing.argv,
         "failing_exit": failing.exit,
         "failing_stderr": failing.combined,
+        # Each history entry carries BOTH streams. stdout matters for multi-step
+        # repairs: created issue uuids are printed there ("Created issue: <uuid>")
+        # and the agent must extract them itself to wire up later commands.
+        # ``output`` is stdout+stderr concatenated for convenience.
         "history": [
-            {"argv": h.argv, "exit": h.exit, "stderr": h.combined} for h in history
+            {
+                "argv": h.argv,
+                "exit": h.exit,
+                "stdout": h.stdout,
+                "stderr": h.stderr,
+                "output": h.combined,
+            }
+            for h in history
         ],
     }
 
@@ -407,18 +420,48 @@ ORACLE_VALID_BODY = """## Requirements
 - [hard] REQ-01: the system validates specs"""
 
 
-def oracle_action(task: dict[str, Any], ids: dict[str, str]) -> AgentAction:
-    """Deterministic known-correct fix per scenario; expected to green in 1 step.
+def _is_transition_argv(argv: list[str], state: str) -> bool:
+    """True if argv is an `issue update <id> --state <state>` transition."""
+    if argv[:2] != ["issue", "update"]:
+        return False
+    for i, a in enumerate(argv):
+        if a == "--state" and i + 1 < len(argv) and argv[i + 1] == state:
+            return True
+    return False
 
-    Used to smoke-test the loop. The oracle keys off the failing command shape,
-    not scenario name strings, so it stays generic:
+
+def _oracle_child_uuid(history: list[dict[str, Any]]) -> Optional[str]:
+    """Extract the satisfies-child uuid the oracle created earlier, by reading
+    the stdout of its own `issue create ... satisfies:REQ-01` command.
+
+    The agent must extract created ids from prior output itself; this mirrors
+    that for the deterministic oracle (uuid is on the "Created issue:" line).
+    """
+    for h in history:
+        argv = h.get("argv", [])
+        if argv[:2] == ["issue", "create"] and "satisfies:REQ-01" in argv:
+            uuid = first_uuid(h.get("stdout", "") or h.get("output", ""))
+            if uuid is not None:
+                return uuid
+    return None
+
+
+def oracle_action(task: dict[str, Any], ids: dict[str, str]) -> AgentAction:
+    """Deterministic known-correct fix per scenario.
+
+    The oracle keys off the failing command shape, not scenario name strings, so
+    it stays generic. Single-step fixes green in 1 iteration:
       - a failing write (`issue create/update` with a --description) -> replace
         the body with a well-formed one.
       - a failing `validate` caused by a stray req label -> remove that label
         from the offending issue, then re-run validate.
+    The transition repair (premature-done) is multi-step: one side-effect
+    command per iteration, sequenced from the history (see below), greening in 4
+    iterations once the satisfied child reaches done.
     """
     failing_argv = task["failing_argv"]
     stderr = task["failing_stderr"]
+    history = task.get("history", [])
 
     # Stray-req style: validate fails naming a stray "req:<id>" label.
     if failing_argv[:1] == ["validate"]:
@@ -433,6 +476,42 @@ def oracle_action(task: dict[str, Any], ids: dict[str, str]) -> AgentAction:
             return AgentAction(
                 argv=["issue", "update", issue_id, "--remove-label", label]
             )
+
+    # Transition repair: a failing `issue update <epic> --state done`. Build out
+    # the dependency graph one command per iteration, deciding the next step from
+    # what the history shows already done. The epic uuid is failing_argv[2].
+    if _is_transition_argv(failing_argv, "done"):
+        epic = failing_argv[2]
+        child = _oracle_child_uuid(history)
+        if child is None:
+            # Step 1: create a child that satisfies the unmet criterion, with a
+            # well-formed body so the create itself passes the write rules.
+            return AgentAction(
+                argv=[
+                    "issue", "create",
+                    "--title", "Satisfy REQ-01",
+                    "--label", "satisfies:REQ-01",
+                    "--description", ORACLE_VALID_BODY,
+                ]
+            )
+        dep_added = any(
+            h.get("argv", [])[:2] == ["dep", "add"] for h in history
+        )
+        if not dep_added:
+            # Step 2: wire the epic to depend on the satisfying child.
+            return AgentAction(argv=["dep", "add", epic, child])
+        child_in_progress = any(
+            _is_transition_argv(h.get("argv", []), "in_progress")
+            and child in h.get("argv", [])
+            for h in history
+        )
+        if not child_in_progress:
+            # Step 3: walk the child into progress.
+            return AgentAction(
+                argv=["issue", "update", child, "--state", "in_progress"]
+            )
+        # Step 4: complete the child; the re-run of the epic done then greens.
+        return AgentAction(argv=["issue", "update", child, "--state", "done"])
 
     # Write-path body failures: hand back a well-formed body.
     if description_index(failing_argv) is not None:
@@ -493,11 +572,18 @@ def apply_action(
     action: AgentAction,
     repo: Path,
     ids: dict[str, str],
-) -> CmdResult:
-    """Apply the agent action and return the result of the *failing* command.
+) -> list[CmdResult]:
+    """Apply the agent action; return EVERY command it executed, in order.
 
-    - body action: rebuild the failing command with the new --description and run it.
+    The last element is always the re-run of the *failing* command, whose exit
+    code determines greenness.
+
+    - body action: rebuild the failing command with the new --description and
+      run it. Returns ``[retry]``.
     - argv action: run the side-effect command, then re-run the failing command.
+      Returns ``[side_effect, retry]`` so the side-effect's own stdout (which
+      carries any created issue's uuid) reaches the agent's history. Multi-step
+      repairs (e.g. premature-done) chain these across iterations.
     """
     if action.body is not None:
         idx = description_index(failing_step_argv)
@@ -508,16 +594,14 @@ def apply_action(
             )
         patched = list(failing_step_argv)
         patched[idx] = action.body
-        return run_jit(substitute_argv(patched, ids), repo)
+        return [run_jit(substitute_argv(patched, ids), repo)]
 
     if action.argv is not None:
         side = run_jit(substitute_argv(action.argv, ids), repo)
         # Re-run the original failing command to test for green regardless of the
         # side-effect command's own exit code.
         retry = run_jit(substitute_argv(failing_step_argv, ids), repo)
-        # Record the side-effect in the retry's combined output for transparency.
-        retry.stdout = f"[side-effect {side.argv} exit={side.exit}]\n" + retry.stdout
-        return retry
+        return [side, retry]
 
     raise RuntimeError("agent action has neither 'body' nor 'argv'")
 
@@ -578,7 +662,7 @@ def run_one(
                         _split_agent_cmd(agent_cmd), task, agent_timeout
                     )
 
-                result = apply_action(failing_step.argv, action, repo, ids)
+                results = apply_action(failing_step.argv, action, repo, ids)
             except subprocess.TimeoutExpired as exc:
                 reason = f"timeout on attempt {attempt}: {exc}"
                 run_history.append({"attempt": attempt, "error": reason})
@@ -598,17 +682,22 @@ def run_one(
                     history=run_history,
                 )
 
-            history.append(result)
+            # Append EVERY executed command (side-effect AND the re-run failing
+            # command) to the history the agent sees next iteration; the re-run
+            # is always last and decides greenness.
+            history.extend(results)
+            retry = results[-1]
             run_history.append(
                 {
-                    "argv": result.argv,
-                    "exit": result.exit,
+                    "argv": retry.argv,
+                    "exit": retry.exit,
                     "action": "body" if action.body is not None else "argv",
+                    "commands": [r.argv for r in results],
                 }
             )
-            failing = result
+            failing = retry
 
-            if result.exit == 0:
+            if retry.exit == 0:
                 return RunResult(green=True, iterations=attempt, history=run_history)
 
         return RunResult(green=False, iterations=cap, history=run_history)
@@ -685,10 +774,12 @@ class ScenarioStats:
 
 
 def discover_scenarios() -> tuple[list[Scenario], list[str]]:
-    """Load all fixtures; return (failing_input_scenarios, skipped_names).
+    """Load all fixtures; return (driven_scenarios, skipped_names).
 
-    ``skipped_names`` are scenario directory names that exist but are not
-    failing-input scenarios (e.g. happy-path or transition scenarios).
+    A scenario is driven iff it has a failing target step (``target_index()``
+    is not None). ``skipped_names`` are scenario directory names with no failing
+    target step (e.g. happy-path-done, pending-req-quiet) — iterations-to-green
+    is undefined without a failure to converge from, so they are excluded.
     """
     driven: list[Scenario] = []
     skipped: list[str] = []
@@ -698,7 +789,7 @@ def discover_scenarios() -> tuple[list[Scenario], list[str]]:
         if not (entry / "scenario.toml").exists():
             continue
         sc = Scenario.load(entry.name, entry)
-        if sc.is_failing_input_scenario():
+        if sc.is_driven():
             driven.append(sc)
         else:
             skipped.append(entry.name)
@@ -910,10 +1001,24 @@ def _write_partial_results(
     _atomic_write_text(partial_path, json.dumps(payload, indent=2) + "\n")
 
 
+# Per-scenario iteration count the oracle is expected to need, asserted exactly
+# by --smoke. The three message-fix scenarios green in 1 corrective iteration;
+# premature-done is a multi-step transition repair (create satisfying child ->
+# dep add -> child in_progress -> child done, then the epic-done re-run greens),
+# so the oracle needs exactly 4.
+ORACLE_EXPECTED_ITERATIONS: dict[str, int] = {
+    "sloppy-spec-body": 1,
+    "typo-heading": 1,
+    "stray-req": 1,
+    "premature-done": 4,
+}
+
+
 def run_smoke(agent_timeout: int) -> int:
-    """Oracle agent, 1 run; assert every steering scenario greens in exactly 1
-    corrective iteration. CI-runnable self-test of the eval loop (not wired into
-    cargo test; run manually per README).
+    """Oracle agent, 1 run; assert every driven scenario greens in exactly its
+    expected oracle iteration count (see ORACLE_EXPECTED_ITERATIONS).
+    CI-runnable self-test of the eval loop (not wired into cargo test; run
+    manually per README).
     """
     scenarios, skipped = discover_scenarios()
     if not scenarios:
@@ -921,7 +1026,7 @@ def run_smoke(agent_timeout: int) -> int:
         return 1
 
     if skipped:
-        print(f"skipped (not failing-input scenarios): {', '.join(skipped)}", file=sys.stderr)
+        print(f"skipped (no failing target step): {', '.join(skipped)}", file=sys.stderr)
 
     failures: list[str] = []
     for sc in scenarios:
@@ -929,16 +1034,25 @@ def run_smoke(agent_timeout: int) -> int:
         assert target is not None
         result = run_one(sc, target, "builtin:oracle", cap=DEFAULT_CAP,
                          agent_timeout=agent_timeout)
+        expected = ORACLE_EXPECTED_ITERATIONS.get(sc.name)
         status = "green" if result.green else "STUCK"
+        exp_str = str(expected) if expected is not None else "?"
         print(
-            f"smoke: {sc.name:<22} {status:<6} iterations={result.iterations}"
+            f"smoke: {sc.name:<22} {status:<6} "
+            f"iterations={result.iterations} (expected {exp_str})"
         )
         if not result.green:
             reason = result.failure_reason or "oracle did not reach green"
             failures.append(f"{sc.name}: {reason}")
-        elif result.iterations != 1:
+        elif expected is None:
             failures.append(
-                f"{sc.name}: oracle expected 1 iteration, got {result.iterations}"
+                f"{sc.name}: no expected oracle iteration count registered "
+                "in ORACLE_EXPECTED_ITERATIONS"
+            )
+        elif result.iterations != expected:
+            failures.append(
+                f"{sc.name}: oracle expected {expected} iteration(s), "
+                f"got {result.iterations}"
             )
 
     if failures:
@@ -946,7 +1060,10 @@ def run_smoke(agent_timeout: int) -> int:
         for f in failures:
             print(f"  - {f}")
         return 1
-    print("\nSMOKE PASS: all steering scenarios green in 1 oracle iteration")
+    print(
+        "\nSMOKE PASS: all driven scenarios green in their expected "
+        "oracle iteration count"
+    )
     return 0
 
 
@@ -1001,8 +1118,9 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     p.add_argument(
         "--smoke",
         action="store_true",
-        help="oracle agent, 1 run; assert every scenario greens in exactly 1 "
-        "iteration. Self-test of the eval loop.",
+        help="oracle agent, 1 run; assert every driven scenario greens in its "
+        "expected oracle iteration count (1 for message fixes, 4 for "
+        "premature-done). Self-test of the eval loop.",
     )
     return p.parse_args(argv)
 
@@ -1033,7 +1151,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     _, skipped = discover_scenarios()
     if skipped:
         print(
-            f"skipped (not failing-input scenarios): {', '.join(skipped)}",
+            f"skipped (no failing target step): {', '.join(skipped)}",
             file=sys.stderr,
         )
 

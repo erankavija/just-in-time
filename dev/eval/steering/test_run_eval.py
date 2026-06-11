@@ -21,10 +21,12 @@ from run_eval import (
     CmdResult,
     Expect,
     ScenarioStats,
+    Step,
     _atomic_write_text,
     check_expect_assertions,
     child_env,
     main,
+    oracle_action,
 )
 
 
@@ -150,6 +152,102 @@ class TestResultsReportability(unittest.TestCase):
             )
             self.assertTrue(path.name.startswith("results-2"))
             self.assertTrue(json.loads(path.read_text())["reportable"])
+
+
+class TestDrivenDiscovery(unittest.TestCase):
+    """target_index / is_driven on transition-style and happy-path scenarios."""
+
+    def _scenario(self, steps: list[Step]) -> re_mod.Scenario:
+        return re_mod.Scenario(name="s", ruleset="sdd", steps=steps)
+
+    def _step(self, argv: list[str], exit_code: int | None) -> Step:
+        expect = None if exit_code is None else Expect(
+            exit=exit_code, contains=[], not_contains=[]
+        )
+        return Step(argv=argv, capture="none", id_slot=None, expect=expect)
+
+    def test_transition_scenario_is_driven(self) -> None:
+        # premature-done shape: a failing `issue update <epic> --state done`.
+        sc = self._scenario(
+            [
+                self._step(["issue", "create", "--title", "E"], None),
+                self._step(["issue", "update", "$epic", "--state", "in_progress"], None),
+                self._step(["issue", "update", "$epic", "--state", "done"], 4),
+            ]
+        )
+        self.assertEqual(sc.target_index(), 2)
+        self.assertTrue(sc.is_driven())
+
+    def test_happy_path_is_skipped(self) -> None:
+        # All steps succeed -> no failing target step -> not driven.
+        sc = self._scenario(
+            [
+                self._step(["issue", "create", "--title", "E"], None),
+                self._step(["issue", "update", "$epic", "--state", "done"], 0),
+            ]
+        )
+        self.assertIsNone(sc.target_index())
+        self.assertFalse(sc.is_driven())
+
+
+class TestOracleSequencing(unittest.TestCase):
+    """The premature-done oracle emits one repair command per iteration, in
+    order, sequenced from the history it is given (no subprocesses)."""
+
+    EPIC = "cbb39085-3415-42c2-9d9c-551e9fb4c0be"
+    CHILD = "1f67bb58-4164-4845-a579-8740eb7a81d5"
+    FAILING = ["issue", "update", EPIC, "--state", "done"]
+
+    def _task(self, history: list[dict]) -> dict:
+        return {
+            "failing_argv": self.FAILING,
+            "failing_stderr": "sdd-hard-criteria-covered ... not satisfied",
+            "history": history,
+        }
+
+    def _hist(self, argv: list[str], exit_code: int = 0, stdout: str = "") -> dict:
+        return {"argv": argv, "exit": exit_code, "stdout": stdout, "output": stdout}
+
+    def test_step1_creates_satisfying_child(self) -> None:
+        action = oracle_action(self._task([self._hist(self.FAILING, 4)]), {})
+        self.assertIsNone(action.body)
+        assert action.argv is not None
+        self.assertEqual(action.argv[:2], ["issue", "create"])
+        self.assertIn("satisfies:REQ-01", action.argv)
+
+    def _child_create_hist(self) -> dict:
+        return self._hist(
+            ["issue", "create", "--label", "satisfies:REQ-01", "--description", "x"],
+            stdout=f"Created issue: {self.CHILD}\n",
+        )
+
+    def test_step2_adds_dependency_to_extracted_child(self) -> None:
+        history = [self._hist(self.FAILING, 4), self._child_create_hist()]
+        action = oracle_action(self._task(history), {})
+        self.assertEqual(action.argv, ["dep", "add", self.EPIC, self.CHILD])
+
+    def test_step3_walks_child_in_progress(self) -> None:
+        history = [
+            self._hist(self.FAILING, 4),
+            self._child_create_hist(),
+            self._hist(["dep", "add", self.EPIC, self.CHILD]),
+        ]
+        action = oracle_action(self._task(history), {})
+        self.assertEqual(
+            action.argv, ["issue", "update", self.CHILD, "--state", "in_progress"]
+        )
+
+    def test_step4_completes_child(self) -> None:
+        history = [
+            self._hist(self.FAILING, 4),
+            self._child_create_hist(),
+            self._hist(["dep", "add", self.EPIC, self.CHILD]),
+            self._hist(["issue", "update", self.CHILD, "--state", "in_progress"]),
+        ]
+        action = oracle_action(self._task(history), {})
+        self.assertEqual(
+            action.argv, ["issue", "update", self.CHILD, "--state", "done"]
+        )
 
 
 if __name__ == "__main__":

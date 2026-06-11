@@ -2,7 +2,7 @@
   "id": "6a6af4e3-ef20-4540-b039-fd6de2d60568",
   "title": "LLM-agent steering eval",
   "description": "Build an LLM-agent steering eval that measures whether validation actually helps a real agent converge on valid plans, using the deterministic scenario set.\n\n## Background\n\nNo current measurement shows whether rule changes improve agent outcomes. The eval must run in isolated temp repositories; sub-agents must never touch a production .jit.\n\n## Success Criteria\n\n- [ ] An eval drives a real agent through the steering scenarios in isolated temp repositories, recording iterations-to-green and rule-compliance per scenario\n- [ ] Results are reported as the mean over at least 3 runs per scenario, with per-scenario stability noted (always, sometimes, never complies)\n- [ ] The eval can be re-run after rule or message changes with a documented procedure and comparable output\n- [ ] Eval repositories are fully isolated from any production .jit state",
-  "state": "in_progress",
+  "state": "done",
   "priority": "high",
   "assignee": "agent:claude",
   "dependencies": [
@@ -12,7 +12,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-10T20:07:51.351431468Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-10T20:11:04.462879247Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -20,5 +31,5 @@
     "epic:validation-lifecycle"
   ],
   "created_at": "2026-06-09T21:52:58.601491125+00:00",
-  "updated_at": "2026-06-10T19:32:50.487104786+00:00"
+  "updated_at": "2026-06-10T20:12:15.924927813+00:00"
 }

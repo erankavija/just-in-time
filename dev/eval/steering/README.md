@@ -25,20 +25,26 @@ stays deterministic; this lives outside the test gate.
 
 ## What it drives
 
-The eval runs the **failing-input** steering scenarios — those whose fix is a
-content or label correction surfaced at a write or validate enforcement point:
+The eval drives every scenario that has a **failing target step** — a real
+failure to converge from — so it measures iterations-to-green against the same
+scenarios as the deterministic suite. This covers both the content/label fixes
+and the transition repair:
 
 | Scenario | Failure | Correct fix |
 |---|---|---|
 | `sloppy-spec-body` | Prose (no bullets) under Success Criteria; create blocked (exit 4) | Re-author the body with Markdown bullet criteria |
 | `typo-heading` | `## Sucess Criteria` typo; create blocked with a did-you-mean hint (exit 4) | Fix the heading spelling in the body |
 | `stray-req` | `req:REQ-77` names no criterion; `jit validate` exits 1 | Remove the stray label (or add the criterion) |
+| `premature-done` | Epic with `req:REQ-01` and no satisfying child transitions to done; blocked (exit 4) | Create a child labelled `satisfies:REQ-01`, `dep add <epic> <child>`, walk the child `in_progress` → `done`, then retry the epic's done transition |
 
-Transition/structure scenarios (e.g. `premature-done`) require building out the
-dependency graph rather than correcting an input, so they are out of scope for
-this eval and are covered by the deterministic harness instead. The runner
-auto-skips any scenario whose failing step is an `issue update --state`
-transition.
+The first three are single-command corrections (a new body or one label edit);
+`premature-done` is a multi-command repair the agent chains across iterations,
+reading the new child's uuid from the create command's stdout in its history.
+
+Only scenarios with **no failing target step** are skipped — `happy-path-done`
+and `pending-req-quiet` succeed on every step, so iterations-to-green is
+undefined for them (there is nothing to converge from). The runner auto-skips
+exactly those.
 
 ## Isolation
 
@@ -87,9 +93,17 @@ Task (stdin):
   "failing_argv": ["issue", "create", "--title", "...", "--description", "..."],
   "failing_exit": 4,
   "failing_stderr": "<the exact error text the agent may act on>",
-  "history": [{"argv": ["..."], "exit": 4, "stderr": "..."}]
+  "history": [
+    {"argv": ["..."], "exit": 0, "stdout": "Created issue: <uuid>\n",
+     "stderr": "", "output": "<stdout+stderr>"}
+  ]
 }
 ```
+
+Each `history` entry carries **both** streams. `stdout` matters for multi-step
+repairs: created issue uuids are printed there (`Created issue: <uuid>`), and
+the agent must extract them itself to wire up later commands. `output` is
+`stdout` + `stderr` concatenated for convenience.
 
 Action (stdout — a single JSON object; if the agent prints logs too, the **last
 non-empty line** must be the JSON action):
@@ -110,17 +124,27 @@ Semantics of the loop, per iteration:
   the rules or the correct answer.
 - A `body` action replaces the failing command's `--description` value; the
   failing command is then re-run with the new body.
-- An `argv` action is run as a side-effect command (e.g. remove a label); the
-  **original failing command is then re-run unchanged** to test for green.
+- An `argv` action is run as a side-effect command (e.g. remove a label, create
+  a child, add a dependency); the **original failing command is then re-run
+  unchanged** to test for green.
+- Every executed command's result — the side-effect AND the re-run — is appended
+  to the `history` the agent sees next iteration, so multi-command repairs (like
+  `premature-done`) chain naturally: the agent reads a created child's uuid from
+  a prior command's stdout and references it in the next.
 - The loop repeats until the failing command exits 0 (green) or the `--cap`
   (default 5) is reached.
 
 ### Built-in agents
 
-- `builtin:oracle` — applies the known-correct fix per scenario (well-formed
-  body for the write failures; remove-stray-label for the validate failure).
-  Deterministic; used by `--smoke` and as a loop sanity check. Expected to green
-  every scenario in exactly 1 iteration.
+- `builtin:oracle` — applies the known-correct fix per scenario, keyed off the
+  failing command's shape (not scenario name strings): a well-formed body for
+  the write failures; remove-stray-label for the validate failure; and, for the
+  `premature-done` transition, a four-step repair issued one command per
+  iteration (create a `satisfies:REQ-01` child with a valid body → `dep add
+  <epic> <child>` → child `in_progress` → child `done`), sequenced from the
+  history and parsing the child's uuid from its own create output. Deterministic;
+  used by `--smoke` and as a loop sanity check. Expected to green the three
+  message-fix scenarios in 1 iteration and `premature-done` in 4.
 
 ### Hooking a real model (`claude -p`)
 
