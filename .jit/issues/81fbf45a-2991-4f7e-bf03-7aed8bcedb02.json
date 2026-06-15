@@ -1,0 +1,24 @@
+{
+  "id": "81fbf45a-2991-4f7e-bf03-7aed8bcedb02",
+  "title": "Validation engine primitives for the bracket",
+  "description": "The validation-engine capabilities the bracket depends on: declaring bracket types, scoping validation to a container subtree, and making coverage see the whole subtree.\n\n## Background\n\nThe deterministic coverage-preview gate needs three engine capabilities that do not exist yet. They are independent and can be built in parallel.\n\n## Success Criteria\n\n- [ ] A ruleset can declare breakable container and bracket types via config, and a declared type passes both graph and write-path validation.\n- [ ] `jit validate` can be scoped to a container bracket subtree and returns a deterministic exit code.\n- [ ] `label-coverage` credits a criterion satisfied by any issue in the container transitive subtree, not only direct dependencies.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "c78168d8-152a-4809-bb54-8de877197331",
+    "4aa44224-b7b6-4e7d-8a1c-a63f6f726106",
+    "64c7df93-3fb6-4ee7-97e1-51d8254ed33a"
+  ],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:story",
+    "epic:planning-bracket",
+    "story:engine-primitives"
+  ],
+  "created_at": "2026-06-15T18:33:57.155445468+00:00",
+  "updated_at": "2026-06-15T18:35:40.699894102+00:00"
+}

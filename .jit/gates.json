@@ -1,57 +1,5 @@
 {
   "gates": {
-    "tdd-reminder": {
-      "version": 1,
-      "key": "tdd-reminder",
-      "title": "TDD Reminder",
-      "description": "Write tests first",
-      "stage": "precheck",
-      "mode": "manual",
-      "priority": 100,
-      "reserved": {},
-      "auto": false,
-      "example_integration": null
-    },
-    "tests": {
-      "version": 1,
-      "key": "tests",
-      "title": "All Tests Pass",
-      "description": "Full test suite must pass",
-      "stage": "postcheck",
-      "mode": "auto",
-      "checker": {
-        "type": "exec",
-        "command": "cargo test --lib",
-        "timeout_seconds": 300,
-        "working_dir": null,
-        "env": {},
-        "pass_context": false
-      },
-      "priority": 100,
-      "reserved": {},
-      "auto": true,
-      "example_integration": null
-    },
-    "npm-ci": {
-      "version": 1,
-      "key": "npm-ci",
-      "title": "NPM CI (test + lint + build)",
-      "description": "Web workspace checks: vitest suite, ESLint, and production build all clean. Web-side equivalent of cargo-ci.",
-      "stage": "postcheck",
-      "mode": "auto",
-      "checker": {
-        "type": "exec",
-        "command": "cd web && npm test -- --run && npm run lint && npm run build",
-        "timeout_seconds": 600,
-        "working_dir": null,
-        "env": {},
-        "pass_context": false
-      },
-      "priority": 100,
-      "reserved": {},
-      "auto": true,
-      "example_integration": null
-    },
     "fmt": {
       "version": 1,
       "key": "fmt",
@@ -72,17 +20,17 @@
       "auto": true,
       "example_integration": null
     },
-    "cargo-ci-features": {
+    "tests": {
       "version": 1,
-      "key": "cargo-ci-features",
-      "title": "Cargo CI (feature-gated parsers)",
-      "description": "Compiles and tests the optional html/xml content-parser features: feature-enabled clippy (zero warnings) and the cross-format parity test suite. Required on issues that touch feature-gated code so the default-only cargo-ci gate does not leave them unexercised.",
+      "key": "tests",
+      "title": "All Tests Pass",
+      "description": "Full test suite must pass",
       "stage": "postcheck",
       "mode": "auto",
       "checker": {
         "type": "exec",
-        "command": "cargo clippy -p jit --features html,xml --all-targets -- -D warnings && cargo test -p jit --features html,xml",
-        "timeout_seconds": 600,
+        "command": "cargo test --lib",
+        "timeout_seconds": 300,
         "working_dir": null,
         "env": {},
         "pass_context": false
@@ -115,20 +63,23 @@
       "auto": true,
       "example_integration": null
     },
-    "cargo-ci": {
+    "plan-review": {
       "version": 1,
-      "key": "cargo-ci",
-      "title": "Cargo CI (fmt + clippy + tests)",
-      "description": "Full Rust CI pipeline: formatting check, zero-warning clippy, and the workspace test suite must all pass.",
+      "key": "plan-review",
+      "title": "AI Plan Review",
+      "description": "AI-powered plan/design review before fan-out, against the planning issue's success criteria and linked design document",
       "stage": "postcheck",
       "mode": "auto",
       "checker": {
         "type": "exec",
-        "command": "cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace",
-        "timeout_seconds": 900,
+        "command": "./scripts/ai-review.sh",
+        "timeout_seconds": 1800,
         "working_dir": null,
-        "env": {},
-        "pass_context": false
+        "env": {
+          "REVIEWER_AGENT": "codex exec"
+        },
+        "pass_context": true,
+        "prompt_file": "./scripts/plan-review-prompt.md"
       },
       "priority": 100,
       "reserved": {},
@@ -153,6 +104,78 @@
       "priority": 100,
       "reserved": {},
       "auto": true,
+      "example_integration": null
+    },
+    "npm-ci": {
+      "version": 1,
+      "key": "npm-ci",
+      "title": "NPM CI (test + lint + build)",
+      "description": "Web workspace checks: vitest suite, ESLint, and production build all clean. Web-side equivalent of cargo-ci.",
+      "stage": "postcheck",
+      "mode": "auto",
+      "checker": {
+        "type": "exec",
+        "command": "cd web && npm test -- --run && npm run lint && npm run build",
+        "timeout_seconds": 600,
+        "working_dir": null,
+        "env": {},
+        "pass_context": false
+      },
+      "priority": 100,
+      "reserved": {},
+      "auto": true,
+      "example_integration": null
+    },
+    "cargo-ci-features": {
+      "version": 1,
+      "key": "cargo-ci-features",
+      "title": "Cargo CI (feature-gated parsers)",
+      "description": "Compiles and tests the optional html/xml content-parser features: feature-enabled clippy (zero warnings) and the cross-format parity test suite. Required on issues that touch feature-gated code so the default-only cargo-ci gate does not leave them unexercised.",
+      "stage": "postcheck",
+      "mode": "auto",
+      "checker": {
+        "type": "exec",
+        "command": "cargo clippy -p jit --features html,xml --all-targets -- -D warnings && cargo test -p jit --features html,xml",
+        "timeout_seconds": 600,
+        "working_dir": null,
+        "env": {},
+        "pass_context": false
+      },
+      "priority": 100,
+      "reserved": {},
+      "auto": true,
+      "example_integration": null
+    },
+    "cargo-ci": {
+      "version": 1,
+      "key": "cargo-ci",
+      "title": "Cargo CI (fmt + clippy + tests)",
+      "description": "Full Rust CI pipeline: formatting check, zero-warning clippy, and the workspace test suite must all pass.",
+      "stage": "postcheck",
+      "mode": "auto",
+      "checker": {
+        "type": "exec",
+        "command": "cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace",
+        "timeout_seconds": 900,
+        "working_dir": null,
+        "env": {},
+        "pass_context": false
+      },
+      "priority": 100,
+      "reserved": {},
+      "auto": true,
+      "example_integration": null
+    },
+    "tdd-reminder": {
+      "version": 1,
+      "key": "tdd-reminder",
+      "title": "TDD Reminder",
+      "description": "Write tests first",
+      "stage": "precheck",
+      "mode": "manual",
+      "priority": 100,
+      "reserved": {},
+      "auto": false,
       "example_integration": null
     }
   }

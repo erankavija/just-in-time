@@ -1,0 +1,21 @@
+{
+  "id": "1536006d-d0f2-4783-8027-cb1f7e8beaef",
+  "title": "Plan-document location resolver",
+  "description": "A boundary resolver that loads a plan document from either the issue body or a configured external path and feeds its content to the pure validation engine.\n\n## Success Criteria\n\n- [ ] An inline plan body and an external-file plan both resolve to the same projected content for validation.\n- [ ] File reading happens at the boundary; the validation engine performs no filesystem I/O.\n- [ ] A missing or unreadable external plan path produces a clear error.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "81fbf45a-2991-4f7e-bf03-7aed8bcedb02"
+  ],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "story:scaffolding-and-gates"
+  ],
+  "created_at": "2026-06-15T18:34:31.094250428+00:00",
+  "updated_at": "2026-06-15T18:35:40.863392169+00:00"
+}

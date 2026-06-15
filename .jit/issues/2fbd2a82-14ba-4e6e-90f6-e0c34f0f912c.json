@@ -1,0 +1,21 @@
+{
+  "id": "2fbd2a82-14ba-4e6e-90f6-e0c34f0f912c",
+  "title": "Plan-before-fan-out bracket: gated planning node before breakdown",
+  "description": "Make planning a first-class, reviewable, gated node in the DAG, sequenced before the implementation fan-out. A breakable container C is bracketed by a planning node P (agent plan-quality gate) and a breakdown node B (deterministic coverage-preview gate via validate --scope), with the impl subgraph spliced into the C->B link as a spine (P > B > impl > C). Front-end counterpart to epic 94d26c42's done-transition coverage enforcement.\n\n## Success Criteria\n- [hard] Breakable container scaffolds to a C->B->P spine with correctly typed, reduced nodes and a plan-quality gate on P.\n- [hard] Breakdown gate blocks when drafted children leave a [hard] criterion uncovered, evaluated transitively over the impl interior (exit 4).\n- [hard] Coverage traversal is transitive by default; child-type-exclude excludes bracket nodes and halts descent at them.\n- [hard] jit plan <existing> retrofits a container, moving upstream deps onto P.\n- [hard] Demonstrated on SDD (epic) and research (goal, no epic) with no methodology strings in Rust.\n- jit-breakdown and project-lead drive plan->review->breakdown->coverage->implement; steering suite regression-tests it.\n\nDesign: dev/active/planning-bracket-design.md",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "bd5c1feb-33c6-4f0d-8524-6031d8ee9060",
+    "cb8cdf1b-2375-4a0a-b864-683dfab97367"
+  ],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:epic"
+  ],
+  "created_at": "2026-06-14T15:13:23.772344129+00:00",
+  "updated_at": "2026-06-15T18:36:36.774170115+00:00"
+}

@@ -1,0 +1,21 @@
+{
+  "id": "6a82ca5d-234a-405e-9ba3-ee8c95ac5cd4",
+  "title": "Plan-review and coverage-preview gate presets",
+  "description": "Define a `plan-review` preset (agent gate on the planning node) and a `coverage-preview` preset (deterministic gate on the breakdown node running scoped validation), plus the preview coverage rule that omits child-state.\n\n## Success Criteria\n\n- [ ] Applying `plan-review` attaches an agent review gate to a planning node.\n- [ ] Applying `coverage-preview` attaches a gate whose checker runs scoped validation for the container resolved from the breakdown node.\n- [ ] The preview coverage rule omits `child-state` (any state) while the closure rule requires done.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "81fbf45a-2991-4f7e-bf03-7aed8bcedb02"
+  ],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "story:scaffolding-and-gates"
+  ],
+  "created_at": "2026-06-15T18:34:31.105103511+00:00",
+  "updated_at": "2026-06-15T18:35:40.879450483+00:00"
+}

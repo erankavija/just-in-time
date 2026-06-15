@@ -1,0 +1,22 @@
+{
+  "id": "cb8cdf1b-2375-4a0a-b864-683dfab97367",
+  "title": "Skill re-sequencing and steering eval",
+  "description": "Re-sequence the breakdown and project-lead skills around the bracket, and add a steering eval that regression-tests the flow.\n\n## Success Criteria\n\n- [ ] jit-breakdown produces the bracket spine when breaking down a breakable container.\n- [ ] project-lead drives plan, review, breakdown, coverage, then implement.\n- [ ] A steering suite regression-tests plan rejection, coverage-gap blocking, and a clean pass.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "af0a499f-ecec-4b08-a662-531afa0e3c01"
+  ],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:story",
+    "epic:planning-bracket",
+    "story:skills-and-eval"
+  ],
+  "created_at": "2026-06-15T18:33:57.172728383+00:00",
+  "updated_at": "2026-06-15T18:35:41.089508594+00:00"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "bd5c1feb-33c6-4f0d-8524-6031d8ee9060",
+  "title": "Example rulesets and documentation",
+  "description": "Demonstrate the bracket on two hierarchies and document it: an SDD example (epic) and a research example (goal, no epic), plus concept and how-to docs.\n\n## Success Criteria\n\n- [ ] The bracket is demonstrated end-to-end on the SDD example, blocking an uncovered criterion at the breakdown gate.\n- [ ] The bracket is demonstrated on a non-epic hierarchy, proving domain-agnosticism.\n- [ ] Concept and how-to documentation explain the spine, the two gates, and adoption.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "5c21327f-4254-4cde-a101-369a592b59dd",
+    "04656f7b-2af9-4f5a-ace1-ceef8a576d86"
+  ],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:story",
+    "epic:planning-bracket",
+    "story:examples-and-docs"
+  ],
+  "created_at": "2026-06-15T18:33:57.167398361+00:00",
+  "updated_at": "2026-06-15T18:35:41.089100873+00:00"
+}

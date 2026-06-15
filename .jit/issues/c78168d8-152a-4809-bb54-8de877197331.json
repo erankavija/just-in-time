@@ -1,0 +1,21 @@
+{
+  "id": "c78168d8-152a-4809-bb54-8de877197331",
+  "title": "Planning config block and type-schema regeneration",
+  "description": "Add a `[planning]` config block declaring breakable container types, bracket types, plan-doc location, and gate-preset names, and regenerate the baked type-hierarchy schema from config so a declared type passes write-path validation.\n\n## Background\n\nA type added to `[type_hierarchy].types` today passes graph validation but the write-path `default:type-hierarchy-known` rule reads a frozen schema and warns. Declaring bracket types must not require hand-editing that schema.\n\n## Success Criteria\n\n- [ ] `[planning]` declares breakable and bracket types, the plan-doc location template, and gate-preset names; malformed config is rejected at load.\n- [ ] Adding a type through config regenerates `.jit/schemas/default-type-hierarchy-known.json`, so creating an issue of that type emits no `type-hierarchy-known` warning on the write path.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "4b090868-1018-4cb2-acd7-de449a034e51"
+  ],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "story:engine-primitives"
+  ],
+  "created_at": "2026-06-15T18:34:31.076151133+00:00",
+  "updated_at": "2026-06-15T18:35:41.015727612+00:00"
+}
