@@ -23,7 +23,9 @@ study = "studies"
 
 [type_hierarchy]
 # Type name to hierarchy level mapping (lower = more strategic)
-types = { milestone = 1, epic = 2, story = 3, task = 4, bug = 4, enhancement = 4 }
+# planning/breakdown: bracket-infrastructure types (children of a breakable container).
+# Declared here so jit's own tracker dogfoods the plan-before-fan-out bracket (epic 2fbd2a82).
+types = { milestone = 1, epic = 2, story = 3, planning = 3, breakdown = 3, task = 4, bug = 4, enhancement = 4 }
 
 # Strategic types - used by 'query strategic' command
 strategic_types = ["milestone", "epic"]

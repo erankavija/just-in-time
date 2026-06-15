@@ -5,10 +5,12 @@
         "type": {
           "items": {
             "enum": [
+              "breakdown",
               "bug",
               "enhancement",
               "epic",
               "milestone",
+              "planning",
               "story",
               "task"
             ]
