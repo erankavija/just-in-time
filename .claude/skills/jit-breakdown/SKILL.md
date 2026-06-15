@@ -64,6 +64,12 @@ children of an epic carry an `epic:<name>` label.
 
 **Never hardcode type names — always use the configured hierarchy.**
 
+**Depth is size-driven, not fixed at one level.** This skill breaks one level at a
+time (parent → level+1), but a large parent should end up multi-level (e.g.
+epic → story → task), not a flat layer of leaves. The analysis agent flags any child
+that is itself several deliverables with `decompose_further: true`; Step 6f recurses
+on those into the next level. A small parent simply produces leaf children directly.
+
 ---
 
 ## Step 3: Determine the membership label
@@ -191,6 +197,25 @@ If any `jit issue create` or `jit dep add` fails:
 - Do **not** roll back already-created issues (partial state is recoverable).
 - Show the ref-to-UUID map so the user can complete the wiring manually.
 
+### 6f. Recurse into oversized children (multi-level breakdown)
+
+For each created child whose plan entry had `decompose_further: true` **and** a finer
+child type exists below it in the hierarchy, break that child down another level by
+re-running this skill with the child as the new parent:
+
+- **Spec source:** the child has no linked spec doc. Materialize one — write the
+  child's description plus the parent-spec section named in its `source` field to a
+  temp markdown file under `dev/active/`, link it with `jit doc add`, and pass it as
+  `[SPEC_DOC_PATH]`.
+- Re-run Steps 2–7 with the child as parent: child type is the next level down, and
+  the membership label is the child's own identifying label (a `type:story` child gets
+  a `story:<slug>` label that its tasks then carry).
+- Present each sub-breakdown for its own approval (Step 5) before creating anything.
+- Recursion ends when no child is flagged or the finest type is reached.
+
+This is what turns a large epic into epic → story → task rather than a flat layer of
+leaves. Keep depth proportional to size — do not force a story level onto small work.
+
 ---
 
 ## Step 7: Validation and summary
@@ -200,7 +225,19 @@ If any `jit issue create` or `jit dep add` fails:
    - Identify which edges are problematic.
    - Offer to remove offending edges with `jit dep rm` and re-validate.
 
-2. Show a summary:
+2. **Content lint — verify every created issue (all levels) meets the standards**
+   (`jit-manage/references/content-standards.md`). Via `jit issue show <id> --json`:
+   - **Success Criteria present** — the description has a `## Success Criteria` section
+     (or an accepted equivalent). Missing → fix the description before finishing.
+   - **Clean title** — no embedded metadata: reject ordinals (`T1`, `S0:`),
+     `feat(...)`/`type:` prefixes, or parent IDs. Position lives in the DAG and labels.
+   - **Correct type + membership** — `type:*` matches the level created; the membership
+     label (`epic:<slug>`, `story:<slug>`, …) is present and is a kebab slug, never a
+     JIT short ID; every `type:story`/`type:epic` carries its own identifying label.
+   Report violations and offer to fix them (`jit issue update --label … --remove-label …`
+   for labels, `jit issue update -d` for descriptions) before declaring done.
+
+3. Show a summary:
    ```
    Breakdown complete
      Parent issue      : <title> (<short-id>)
@@ -211,7 +248,7 @@ If any `jit issue create` or `jit dep add` fails:
      Warnings          : <any from jit validate>
    ```
 
-3. Optionally export a Mermaid sub-graph for the parent and its new children:
+4. Optionally export a Mermaid sub-graph for the parent and its new children:
    ```bash
    jit graph export --format mermaid
    ```

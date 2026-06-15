@@ -13,7 +13,8 @@ No prose before or after — the main agent parses the output directly.
       "type":        "string  — exactly one of the configured child type names",
       "priority":    "string  — 'low' | 'normal' | 'high' | 'critical'",
       "depends_on":  ["ref-of-sibling"],
-      "source":      "string  — section heading or excerpt from the spec that motivated this issue"
+      "source":      "string  — section heading or excerpt from the spec that motivated this issue",
+      "decompose_further": "boolean — true if this child is itself several distinct deliverables and should become a parent at the next level down (only when a finer child type exists below it)"
     }
   ],
   "notes": "string — ambiguities, assumptions, items that could not be classified, or open questions"
@@ -30,6 +31,14 @@ Suggested format: `C1`, `C2`, etc. (C for child) or a short mnemonic.
 **`type`**
 Must be one of the child type names at level+1 below the parent — these are
 passed to the agent in `[CHILD_TYPES_TABLE]`. Never invent new type names.
+
+**`decompose_further`**
+`true` when this child is not a single coherent unit but bundles several distinct
+deliverables — i.e. it should become a parent at the next level down rather than a
+leaf. Set it **only** when a finer child type exists below this one in the hierarchy.
+Heuristic: if the child's own Success Criteria would split into three or more groups
+addressing separate concerns, it is a story, not a task — set `true`. Default `false`.
+The skill recurses on every child flagged `true`.
 
 **`depends_on`**
 `["ref-X"]` means this issue **is blocked by** `ref-X` — it cannot start until

@@ -54,6 +54,13 @@ Output **only** the JSON object — no preamble, no explanation, no markdown fen
    independently. Do not merge unrelated concerns; do not split a single coherent
    deliverable into micro-tasks.
 
+   When a candidate child is itself several distinct deliverables and a finer child
+   type exists below it in the hierarchy, do **not** flatten it into one over-large
+   item: emit it as one child and set `decompose_further: true` (see schema). The
+   skill will recurse and break it into the next level (e.g. a story that owns several
+   tasks). Match decomposition **depth to size** — a large parent becomes
+   parent → story → task, a small one stops at the first level.
+
 2. **Use the narrowest child type that fits.** If there are multiple child types
    available, assign the type whose scope best matches the work item.
 
