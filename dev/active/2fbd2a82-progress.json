@@ -57,7 +57,13 @@
   ],
   "created_during_execution": [],
   "escalations": [],
-  "rework_counts": {},
+  "rework_counts": {"4aa44224": 1, "64c7df93": 1},
+  "wave1_gate_status": {
+    "c78168d8": "cargo-ci PASSED, code-review PASSED — DONE-ready",
+    "64c7df93": "cargo-ci PASSED; code-review FAIL: container-from-label resolves only full IDs, brackets:<short-id> convention breaks. Rework #1 in progress.",
+    "4aa44224": "cargo-ci PASSED; code-review FAIL: (1) bracket_scope_ids graph traversal in commands/ violates domain boundary; (2) validate_scope missing # Examples doc. Rework #1 pending after T3.",
+    "gate_env_note": "cargo-ci must run with RUST_TEST_THREADS=1 and TMPDIR=/home/vkaskivuo/.cache/jit-test-tmp to avoid pre-existing load-induced flake in prop_concurrent_different_issues_succeed (global claims.lock 5s timeout) and tmpfs quota in version_cli_tests. Honest run, all tests pass."
+  },
   "wave1_findings": {
     "64c7df93": "T3 content PASS (graph.rs only, in-scope; transitive walk + boundary-halt + container indirection correct; per-issue rules untouched w/ regression tests). Pending gate verification.",
     "4aa44224": "T2 content FAIL: hardcodes const BREAKDOWN_TYPE_LABEL=\"type:breakdown\" in validate.rs:1225 (production), violating the epic [hard] criterion 'no epic/planning/breakdown strings in Rust'. Must consume bracket type from T1 [planning] config. Rework AFTER T1 lands (needs T1 config API). Otherwise scope BFS logic is correct.",
