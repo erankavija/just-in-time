@@ -80,3 +80,8 @@ examples = ["team:core", "team:platform"]
 description = "Reason for issue closure"
 unique = true
 examples = ["resolution:wont-fix", "resolution:duplicate", "resolution:obsolete"]
+
+[namespaces.brackets]
+description = "Planning-bracket container pointer: on a breakdown node, names the container it brackets"
+unique = true
+examples = ["brackets:2fbd2a82"]

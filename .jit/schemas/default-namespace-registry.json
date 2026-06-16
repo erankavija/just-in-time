@@ -2,7 +2,7 @@
   "properties": {
     "raw_labels": {
       "items": {
-        "pattern": "^(component|epic|milestone|resolution|story|team|type):",
+        "pattern": "^(brackets|component|epic|milestone|resolution|story|team|type):",
         "type": "string"
       },
       "type": "array"
