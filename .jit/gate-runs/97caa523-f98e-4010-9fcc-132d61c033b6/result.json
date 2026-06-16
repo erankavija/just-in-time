@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "97caa523-f98e-4010-9fcc-132d61c033b6",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "6a82ca5d-234a-405e-9ba3-ee8c95ac5cd4",
+  "commit": "b95ea326147d74b24ea269475de6ab9533d34886",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-06-16T23:08:06.991543614Z",
+  "completed_at": "2026-06-16T23:09:52.989583390Z",
+  "duration_ms": 105998,
+  "exit_code": 0,
+  "stdout": "**Findings**\nNo blocking findings.\n\n**Acceptance Criteria**\n- `plan-review` is registered as a built-in preset and attaches a single `plan-review` auto gate via `./scripts/ai-review.sh`: [planning.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/gate_presets/planning.rs:64), [builtin.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/gate_presets/builtin.rs:316).\n- `coverage-preview` attaches a deterministic auto gate using `./scripts/coverage-preview.sh`: [planning.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/gate_presets/planning.rs:122).\n- The checker resolves the container from `brackets:<C-id>` and runs `jit validate --scope \"$container\"`: [coverage-preview.sh](/home/vkaskivuo/Projects/just-in-time/scripts/coverage-preview.sh:33), [coverage-preview.sh](/home/vkaskivuo/Projects/just-in-time/scripts/coverage-preview.sh:45).\n- `preview_coverage_rule` clones the closure `label-coverage` config, removes `child-state`, and adds `container-from-label = \"brackets\"`: [planning.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/gate_presets/planning.rs:232).\n\n**Prior Review Feedback**\n`run_history` is empty, so there are no prior review findings to verify.\n\n**Jit Issue Management**\nDependencies `4aa44224` and `64c7df93` are both `done` in the provided issue context. `./scripts/jit-validate.sh` passed locally; it reported label warnings only, which are allowed by the review brief.\n\n**Architecture**\nThe implementation keeps preset construction in `gate_presets`, validation rule construction as a pure helper, and gate application through existing command/storage paths. No new file persistence bypasses `IssueStore`, and no CLI/output concerns leak into domain logic.\n\n**Functional Paradigm**\nThe new Rust code is mostly expression-oriented preset construction. The small mutable TOML config in `preview_coverage_rule` is a pragmatic, scoped transformation of an existing config map.\n\n**Correctness And Invariants**\nNo unsafe code, PID handling, gate transition logic, assignee parsing, label parsing, or atomic storage writes are changed. Event logging remains handled by existing gate application flows. The new script propagates `jit validate --scope` exit codes, including validation failure exit `4`.\n\n**Safety**\nNo `unsafe` introduced.\n\n**Testing**\nEvidence from issue context: `cargo-ci` gate passed at `2026-06-16T22:57:08.882190647Z`.\n\nLocal checks run:\n- `cargo test -p jit --test planning_preset_tests --quiet`: 2 passed.\n- `cargo test -p jit gate_presets::planning --lib --quiet`: 7 passed.\n- `./scripts/jit-validate.sh`: passed with allowed label warnings.\n\n**Error Handling**\nRust fallible paths return `Result` with contextual messages. The shell checker emits clear errors when `JIT_ISSUE_ID` or the `brackets:` label is missing.\n\n**CLI Contract**\nNo new CLI command is introduced, so the `--json` command contract is unaffected.\n\n**Documentation**\nNew public preset/rule APIs include doc comments and examples. The shell checker documents its contract and exit-code behavior.\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
