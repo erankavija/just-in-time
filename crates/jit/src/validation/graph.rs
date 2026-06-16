@@ -651,34 +651,51 @@ fn evaluate_label_coverage(
         claims && state_ok
     };
 
-    let by_id: HashMap<&str, &Issue> = issues.iter().map(|i| (i.id.as_str(), i)).collect();
-
     issues
         .iter()
         .filter(|source| rule.when.matches(source))
         .flat_map(|source| {
             // The criteria-bearing container is the firing issue itself, unless
             // container indirection redirects to the issue named by the firing
-            // issue's `<container_ns>:<id>` label (D13). An unresolvable pointer
-            // is a config error (never a silent pass).
+            // issue's `<container_ns>:<id>` label (D13). An unresolvable or
+            // ambiguous pointer is a config error (never a silent pass).
             let container: &Issue = match container_ns {
                 None => source,
-                Some(ns) => {
-                    let mut targets = values_in_namespace(source, ns);
-                    match targets.next().and_then(|id| by_id.get(id).copied()) {
-                        Some(c) => c,
-                        None => {
+                Some(ns) => match values_in_namespace(source, ns).next() {
+                    Some(value) => match resolve_container(value, issues) {
+                        ContainerMatch::Unique(c) => c,
+                        ContainerMatch::Ambiguous => {
                             return vec![config_error(
                                 rule,
                                 format!(
-                                    "issue {} matched the rule but its '{ns}:<id>' container \
-                                     pointer is missing or names no known issue",
+                                    "issue {} matched the rule but its '{ns}:{value}' container \
+                                     pointer is ambiguous (matches multiple issue ids by prefix)",
                                     source.short_id()
                                 ),
                             )]
                         }
+                        ContainerMatch::None => {
+                            return vec![config_error(
+                                rule,
+                                format!(
+                                    "issue {} matched the rule but its '{ns}:{value}' container \
+                                     pointer names no known issue",
+                                    source.short_id()
+                                ),
+                            )]
+                        }
+                    },
+                    None => {
+                        return vec![config_error(
+                            rule,
+                            format!(
+                                "issue {} matched the rule but its '{ns}:<id>' container \
+                                 pointer is missing",
+                                source.short_id()
+                            ),
+                        )]
                     }
-                }
+                },
             };
 
             // Select the parser per container issue (content_format -> repo
@@ -930,6 +947,38 @@ fn evaluate_label_reference(
                 .collect::<Vec<_>>()
         })
         .collect()
+}
+
+/// Outcome of resolving a `container-from-label` value to a container issue.
+enum ContainerMatch<'a> {
+    /// Exactly one issue resolved.
+    Unique(&'a Issue),
+    /// The pointer is an id-prefix of more than one issue (ambiguous).
+    Ambiguous,
+    /// No issue in the slice matched the pointer.
+    None,
+}
+
+/// Resolve a `container-from-label` value against the in-memory `issues` slice,
+/// mirroring storage's full-id-or-unique-prefix semantics but purely over the
+/// slice (graph.rs stays I/O-free). Preference order:
+///   1. exact full-id match,
+///   2. exact short-id match (`i.short_id() == value`),
+///   3. unique id-prefix match (`i.id.starts_with(value)`); more than one prefix
+///      match is ambiguous.
+fn resolve_container<'a>(value: &str, issues: &'a [Issue]) -> ContainerMatch<'a> {
+    if let Some(c) = issues.iter().find(|i| i.id == value) {
+        return ContainerMatch::Unique(c);
+    }
+    if let Some(c) = issues.iter().find(|i| i.short_id() == value) {
+        return ContainerMatch::Unique(c);
+    }
+    let mut prefix = issues.iter().filter(|i| i.id.starts_with(value));
+    match (prefix.next(), prefix.next()) {
+        (Some(c), None) => ContainerMatch::Unique(c),
+        (Some(_), Some(_)) => ContainerMatch::Ambiguous,
+        _ => ContainerMatch::None,
+    }
 }
 
 /// Values of an issue's labels in the given namespace.
@@ -1894,6 +1943,111 @@ mod tests {
         assert_eq!(findings.len(), 1);
         assert!(findings[0].finding.message.contains("config error"));
         assert!(findings[0].finding.message.contains("brackets"));
+    }
+
+    #[test]
+    fn test_container_indirection_resolves_short_id_label() {
+        // Project convention writes `brackets:<SHORT-ID>` (e.g. brackets:2fbd2a82),
+        // not the full UUID. The container must resolve from the short id and have
+        // its criteria evaluated -- not be reported as a missing-container config
+        // error.
+        let rule = rule_from(
+            "[[rules]]\nname = \"preview\"\nwhen = { type = \"breakdown\" }\n\
+             severity = \"error\"\nassert = { label-coverage = { \
+             child-link = \"dependencies\", container-from-label = \"brackets\" } }\n",
+        );
+        let mut container = epic_with_criteria(&["REQ-01"]);
+        let impl_node = issue("impl", &["type:task"]); // does NOT satisfy REQ-01
+        let mut breakdown = issue("B", &["type:breakdown"]);
+        container.dependencies = vec![impl_node.id.clone()];
+        // SHORT id, per project convention -- not the full UUID.
+        breakdown
+            .labels
+            .push(format!("brackets:{}", container.short_id()));
+
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[container, impl_node, breakdown],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        // Container criteria ARE evaluated (REQ-01 uncovered), not a config error.
+        assert_eq!(
+            findings.len(),
+            1,
+            "short-id label must resolve container and evaluate criteria: {findings:?}"
+        );
+        assert!(findings[0].finding.message.contains("REQ-01"));
+        assert!(
+            !findings[0].finding.message.contains("config error"),
+            "short-id label must not be a config error: {findings:?}"
+        );
+    }
+
+    #[test]
+    fn test_container_indirection_full_id_label_still_resolves() {
+        // Backward compatibility: a full-id brackets label still resolves.
+        let rule = rule_from(
+            "[[rules]]\nname = \"preview\"\nwhen = { type = \"breakdown\" }\n\
+             severity = \"error\"\nassert = { label-coverage = { \
+             child-link = \"dependencies\", container-from-label = \"brackets\" } }\n",
+        );
+        let mut container = epic_with_criteria(&["REQ-01"]);
+        let impl_node = issue("impl", &["type:task"]);
+        let mut breakdown = issue("B", &["type:breakdown"]);
+        container.dependencies = vec![impl_node.id.clone()];
+        breakdown.labels.push(format!("brackets:{}", container.id));
+
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[container, impl_node, breakdown],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        assert_eq!(
+            findings.len(),
+            1,
+            "full-id label must still resolve: {findings:?}"
+        );
+        assert!(findings[0].finding.message.contains("REQ-01"));
+    }
+
+    #[test]
+    fn test_container_indirection_ambiguous_prefix_is_config_error() {
+        // A short pointer that is a prefix of two distinct issue ids is ambiguous
+        // and must surface as a config error, never a silent pass.
+        let rule = rule_from(
+            "[[rules]]\nname = \"preview\"\nwhen = { type = \"breakdown\" }\n\
+             severity = \"error\"\nassert = { label-coverage = { \
+             container-from-label = \"brackets\" } }\n",
+        );
+        let mut a = epic_with_criteria(&["REQ-01"]);
+        let mut b = epic_with_criteria(&["REQ-02"]);
+        // Force two ids sharing a common prefix that is neither a full nor a short
+        // id of either issue (so only the prefix branch matches, and matches both).
+        a.id = "abcd1111-0000-0000-0000-000000000000".to_string();
+        b.id = "abcd2222-0000-0000-0000-000000000000".to_string();
+        let mut breakdown = issue("B", &["type:breakdown"]);
+        breakdown.labels.push("brackets:abcd".to_string());
+
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[a, b, breakdown],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        assert_eq!(findings.len(), 1, "ambiguous prefix: {findings:?}");
+        assert!(findings[0].finding.message.contains("config error"));
+        assert!(
+            findings[0].finding.message.contains("ambiguous"),
+            "ambiguity must be reported clearly: {findings:?}"
+        );
     }
 
     // --- label-reference ---------------------------------------------------
