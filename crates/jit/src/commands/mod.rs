@@ -11,6 +11,8 @@
 //! - `graph`: Graph visualization and traversal
 //! - `query`: Issue query operations
 //! - `validate`: Validation and status operations
+//! - `plan_doc`: Plan-document location resolver (boundary; loads inline/external
+//!   plan content and feeds the pure projection engine)
 //! - `labels`: Label operations
 //! - `document`: Document reference operations
 //! - `events`: Event log operations
@@ -29,6 +31,7 @@ pub mod graph;
 pub mod hooks;
 mod issue;
 mod labels;
+pub mod plan_doc;
 mod query;
 mod search;
 pub mod serve;
