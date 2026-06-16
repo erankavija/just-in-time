@@ -639,7 +639,18 @@ impl<S: IssueStore> CommandExecutor<S> {
         let hierarchy = crate::validation::defaults::hierarchy_config(namespaces);
         let repo_format = self.repo_content_format()?;
 
-        let findings = evaluate_graph(&rules, &slice, &hierarchy, repo_format, chrono::Utc::now());
+        // Resolve external plan docs for the neighborhood so closure-time coverage
+        // honors a container whose criteria live in an external plan file too.
+        let plan_content = self.resolve_plan_content(&slice)?;
+
+        let findings = evaluate_graph(
+            &rules,
+            &slice,
+            &hierarchy,
+            repo_format,
+            chrono::Utc::now(),
+            &plan_content,
+        );
 
         // Which selected rules enforce (block on an attributed error finding).
         let enforcing: std::collections::HashSet<&str> = rules

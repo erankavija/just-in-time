@@ -72,6 +72,7 @@ fn issue_graph_findings_at(
         &jit::type_hierarchy::HierarchyConfig::default(),
         ContentFormat::Markdown,
         now,
+        &std::collections::HashMap::new(),
     );
     assert!(
         findings.iter().all(|f| !f.is_config_error()),

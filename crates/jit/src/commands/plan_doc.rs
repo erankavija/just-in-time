@@ -35,6 +35,19 @@ use crate::domain::{project, ContentFormat, Issue, Projection};
 /// resolver compares the template against this sentinel to choose the inline
 /// path. It is NOT a domain type name, so comparing against it keeps the engine
 /// domain-agnostic.
+///
+/// # Examples
+///
+/// ```
+/// use jit::commands::plan_doc::{resolve_plan_doc_location, PlanDocLocation, INLINE_LOCATION};
+///
+/// // The sentinel selects the inline path regardless of the container id.
+/// assert_eq!(INLINE_LOCATION, "inline");
+/// assert_eq!(
+///     resolve_plan_doc_location(INLINE_LOCATION, "abc123"),
+///     PlanDocLocation::Inline
+/// );
+/// ```
 pub const INLINE_LOCATION: &str = "inline";
 
 /// The `{id}` placeholder substituted with the container id in an external

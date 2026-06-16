@@ -202,6 +202,7 @@ fn test_html_graph_label_coverage_uses_html_parser_in_production() {
         &HierarchyConfig::default(),
         ContentFormat::Markdown,
         chrono::Utc::now(),
+        &std::collections::HashMap::new(),
     );
     assert_eq!(
         findings.len(),

@@ -364,6 +364,150 @@ fn test_scope_resolves_partial_container_id() {
 }
 
 // ---------------------------------------------------------------------------
+// External plan-doc resolution: a breakable container whose `## Success
+// Criteria` lives ONLY in an external plan file (its `description` has no
+// criteria) must validate against the criteria FROM THE FILE. The boundary
+// resolves the file and injects it; the pure engine reads the injected content.
+// (jit:1536006d)
+// ---------------------------------------------------------------------------
+
+/// A `[planning]` block whose `plan_doc_location` is EXTERNAL: the breakable
+/// container's plan/criteria live in `dev/active/{id}-plan.md`, NOT inline.
+const PLANNING_CONFIG_EXTERNAL: &str = r#"
+[planning]
+breakable_types = ["epic"]
+planning_type = "planning"
+breakdown_type = "breakdown"
+plan_doc_location = "dev/active/{id}-plan.md"
+plan_gate_preset = "plan-quality"
+coverage_gate_preset = "coverage-preview"
+"#;
+
+/// A `label-coverage` rule keyed on the breakable container itself (`type:epic`).
+/// The container declares the criteria; a dependency child satisfies them. This
+/// mirrors the SDD ruleset's `sdd-hard-criteria-covered`.
+const COVERAGE_ON_EPIC: &str = r#"
+[[rules]]
+name = "epic-criteria-covered"
+when = { type = "epic" }
+severity = "error"
+enforce = true
+assert = { label-coverage = { satisfies-namespace = "satisfies", child-link = "dependencies" } }
+"#;
+
+/// Wire `C -> impl`, where C is a breakable container whose `description` carries
+/// NO criteria — its `## Success Criteria` section lives ONLY in the external
+/// plan file written at `dev/active/{C.id}-plan.md`. `impl_satisfies` decides
+/// whether the dependency child claims `satisfies:REQ-77`.
+fn container_with_external_plan(
+    executor: &CommandExecutor<InMemoryStorage>,
+    impl_satisfies: bool,
+) -> String {
+    let impl_labels: Vec<&str> = if impl_satisfies {
+        vec!["type:task", "satisfies:REQ-77"]
+    } else {
+        vec!["type:task"]
+    };
+    let impl_id = seed(executor, "impl", &impl_labels, "", &[]);
+    // The container's OWN body has no criteria; coverage must come from the file.
+    let c = seed(
+        executor,
+        "container",
+        &["type:epic"],
+        "no criteria in the body — the plan lives in the external file",
+        std::slice::from_ref(&impl_id),
+    );
+
+    // Write the external plan doc carrying the criteria, at the {id}-substituted
+    // path under the repo root.
+    let plan_dir = executor.storage().root().join("dev/active");
+    std::fs::create_dir_all(&plan_dir).unwrap();
+    std::fs::write(
+        plan_dir.join(format!("{c}-plan.md")),
+        "## Success Criteria\n\n- [hard] REQ-77: declared only in the external plan\n",
+    )
+    .unwrap();
+    c
+}
+
+#[test]
+fn test_scope_reads_criteria_from_external_plan_uncovered_fails() {
+    // The criterion exists only in the external plan file; the child does NOT
+    // satisfy it -> the engine must read the FILE and report it uncovered. This
+    // is the failing-before-the-wiring case: with the resolver unwired the engine
+    // reads the (criteria-free) body and the scope is spuriously clean.
+    let executor = executor_with_rules_and_config(COVERAGE_ON_EPIC, PLANNING_CONFIG_EXTERNAL);
+    let c = container_with_external_plan(&executor, false);
+
+    let report = executor.validate_scope(&c).expect("scope validation runs");
+
+    assert!(
+        report.has_errors(),
+        "an uncovered criterion declared ONLY in the external plan must fail: {:?}",
+        report.findings
+    );
+    assert!(
+        report.findings.iter().any(|f| f.message.contains("REQ-77")),
+        "the finding names the criterion read from the external file: {:?}",
+        report.findings
+    );
+}
+
+#[test]
+fn test_scope_reads_criteria_from_external_plan_covered_clean() {
+    // Same external-plan criterion, now satisfied by the child -> clean. Proves
+    // the file content (not the empty body) drove coverage.
+    let executor = executor_with_rules_and_config(COVERAGE_ON_EPIC, PLANNING_CONFIG_EXTERNAL);
+    let c = container_with_external_plan(&executor, true);
+
+    let report = executor.validate_scope(&c).expect("scope validation runs");
+
+    assert!(
+        !report.has_errors(),
+        "a covered external-plan criterion must leave the scope clean: {:?}",
+        report.findings
+    );
+}
+
+#[test]
+fn test_scope_missing_external_plan_surfaces_error() {
+    // The container is breakable + the location is external, but the plan file is
+    // absent -> the boundary surfaces a PlanDocError rather than silently passing.
+    let executor = executor_with_rules_and_config(COVERAGE_ON_EPIC, PLANNING_CONFIG_EXTERNAL);
+    let impl_id = seed(&executor, "impl", &["type:task"], "", &[]);
+    let c = seed(
+        &executor,
+        "container",
+        &["type:epic"],
+        "body without criteria",
+        std::slice::from_ref(&impl_id),
+    );
+    // No plan file written.
+    let err = executor.validate_scope(&c).unwrap_err();
+    let message = err.to_string();
+    assert!(
+        message.contains("plan document") && message.contains(&c[..8]),
+        "a missing external plan must surface as a contextual error: {message}"
+    );
+}
+
+#[test]
+fn test_inline_config_still_validates_from_body() {
+    // With an inline `[planning]` location the engine must keep reading the
+    // issue body: the empty plan-content map reproduces the legacy behavior.
+    let executor = executor_with_rules(COVERAGE_ON_BREAKDOWN);
+    let (c, _b) = spine_with_breakdown_criteria(&executor, false);
+
+    let report = executor.validate_scope(&c).expect("scope validation runs");
+
+    assert!(
+        report.has_errors() && report.findings.iter().any(|f| f.message.contains("REQ-01")),
+        "inline criteria in the body must still validate: {:?}",
+        report.findings
+    );
+}
+
+// ---------------------------------------------------------------------------
 // CLI exit-code contract (subprocess): the gate-checker behaviour the
 // coverage-preview gate relies on — exit 4 with findings on failure, 0 clean.
 // ---------------------------------------------------------------------------

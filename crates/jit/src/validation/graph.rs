@@ -137,6 +137,7 @@ pub enum ChildLink {
 ///     &HierarchyConfig::default(),
 ///     ContentFormat::Markdown,
 ///     chrono::Utc::now(),
+///     &std::collections::HashMap::new(),
 /// );
 /// assert_eq!(findings.len(), 1);
 /// // The finding is attributed to the offending issue, not parsed from text.
@@ -282,6 +283,7 @@ impl ChildLink {
 ///     &HierarchyConfig::default(),
 ///     jit::domain::ContentFormat::Markdown,
 ///     chrono::Utc::now(),
+///     &std::collections::HashMap::new(),
 /// );
 /// assert_eq!(findings.len(), 1);
 /// assert_eq!(findings[0].finding.rule, "task-needs-design-dep");
@@ -303,17 +305,38 @@ impl ChildLink {
 /// entry point and the only place a wall-clock instant enters graph evaluation,
 /// so the engine stays pure and deterministic. Callers pass `Utc::now()` at the
 /// boundary; tests pass a fixed instant.
+///
+/// `plan_content` is the injected plan-document content map (issue-id → resolved
+/// criteria-source string). It keeps the engine PURE while still honoring a
+/// container whose criteria live in an EXTERNAL plan file: the boundary (the
+/// validate / gate-checker context) resolves each external plan via the
+/// [`plan_doc`](crate::commands::plan_doc) resolver and hands the loaded strings
+/// in here. When a `label-coverage` (or `criteria-*`) rule reads a source issue's
+/// criteria, the engine parses the injected content for that id if present, else
+/// falls back to the issue's own [`description`](crate::domain::Issue). An EMPTY
+/// map therefore reproduces the description-only behavior exactly, so callers with
+/// no bracket config pass `&HashMap::new()`.
 pub fn evaluate_graph(
     rules: &[&Rule],
     issues: &[Issue],
     hierarchy: &HierarchyConfig,
     repo_default_format: ContentFormat,
     now: DateTime<Utc>,
+    plan_content: &HashMap<String, String>,
 ) -> Vec<GraphFinding> {
     rules
         .iter()
         .filter(|rule| rule.scope == Scope::Graph && rule.severity != Severity::Off)
-        .flat_map(|rule| evaluate_one(rule, issues, hierarchy, repo_default_format, now))
+        .flat_map(|rule| {
+            evaluate_one(
+                rule,
+                issues,
+                hierarchy,
+                repo_default_format,
+                now,
+                plan_content,
+            )
+        })
         .collect()
 }
 
@@ -324,10 +347,11 @@ fn evaluate_one(
     hierarchy: &HierarchyConfig,
     repo_default_format: ContentFormat,
     now: DateTime<Utc>,
+    plan_content: &HashMap<String, String>,
 ) -> Vec<GraphFinding> {
     match &rule.assert {
         Assertion::LabelCoverage { config } => {
-            evaluate_label_coverage(rule, config, issues, repo_default_format)
+            evaluate_label_coverage(rule, config, issues, repo_default_format, plan_content)
         }
         Assertion::LabelReference { config } => evaluate_label_reference(rule, config, issues),
         Assertion::DependencyShape { config } => evaluate_dependency_shape(rule, config, issues),
@@ -351,6 +375,7 @@ fn evaluate_one(
             id_pattern,
             issues,
             repo_default_format,
+            plan_content,
         ),
         Assertion::CriteriaToCheck {
             criteria_section,
@@ -367,6 +392,7 @@ fn evaluate_one(
             check_namespace.as_deref(),
             issues,
             repo_default_format,
+            plan_content,
         ),
         Assertion::LabelUniqueness { namespace } => {
             evaluate_label_uniqueness(rule, namespace, issues)
@@ -543,6 +569,7 @@ fn evaluate_label_coverage(
     config: &toml::value::Table,
     issues: &[Issue],
     repo_default_format: ContentFormat,
+    plan_content: &HashMap<String, String>,
 ) -> Vec<GraphFinding> {
     // --- Interpret config (any error short-circuits to one config-error). ---
     let section_slug =
@@ -707,6 +734,7 @@ fn evaluate_label_coverage(
                 marker,
                 &id_pattern,
                 repo_default_format,
+                plan_content,
             ) {
                 Ok(ids) => ids,
                 Err(err) => return vec![config_error(rule, err.to_string())],
@@ -751,6 +779,13 @@ fn describe_link(link: ChildLink) -> &'static str {
 /// match of `id_pattern` in the item text is the criterion id. Ids are returned
 /// de-duplicated in first-seen order.
 ///
+/// The criteria source is the issue's own [`description`](crate::domain::Issue)
+/// UNLESS `plan_content` carries an entry for `source.id` — then that injected
+/// string (a plan document the boundary resolved from an external location) is
+/// parsed instead. This is how a container whose criteria live in an external
+/// plan file is validated WITHOUT the engine doing any I/O: the content arrives
+/// pre-resolved in the map. An empty map reproduces the description-only behavior.
+///
 /// The body is parsed with the [`ContentParser`](crate::document::ContentParser)
 /// selected by [`content_parser_for`]: the source's own `content_format` → else
 /// `repo_default_format` → else Markdown. A selected format whose parser feature
@@ -763,9 +798,15 @@ fn criterion_ids(
     marker: Option<&str>,
     id_pattern: &regex::Regex,
     repo_default_format: ContentFormat,
+    plan_content: &HashMap<String, String>,
 ) -> Result<Vec<String>, crate::document::ContentParserError> {
     let parser = content_parser_for(source.content_format, repo_default_format)?;
-    let projection = project(source).with_sections(&source.description, parser.as_ref());
+    // The resolved plan content for this source (external location), else its
+    // own body. The boundary injects external content; the engine stays pure.
+    let content = plan_content
+        .get(&source.id)
+        .map_or(source.description.as_str(), String::as_str);
+    let projection = project(source).with_sections(content, parser.as_ref());
     let Some(sections) = projection.sections else {
         return Ok(Vec::new());
     };
@@ -1255,6 +1296,7 @@ fn evaluate_criteria_to_check(
     check_namespace: Option<&str>,
     issues: &[Issue],
     repo_default_format: ContentFormat,
+    plan_content: &HashMap<String, String>,
 ) -> Vec<GraphFinding> {
     // Compile the id pattern (already validated at load for user-authored rules;
     // this compile step is a pure guard for programmatic callers).
@@ -1273,6 +1315,7 @@ fn evaluate_criteria_to_check(
                 marker,
                 &id_pattern,
                 repo_default_format,
+                plan_content,
             ) {
                 Ok(ids) => ids,
                 Err(err) => return vec![config_error(rule, err.to_string())],
@@ -1402,6 +1445,7 @@ fn evaluate_type_hierarchy(
 ///
 /// For a stray label `req:REQ-77` on issue `abc123` with section `Success Criteria`:
 /// `"label 'req:REQ-77' on issue abc123 names no criterion in section 'Success Criteria' (stray or invented)"`
+#[allow(clippy::too_many_arguments)]
 fn evaluate_criteria_label_match(
     rule: &Rule,
     namespace: &str,
@@ -1410,6 +1454,7 @@ fn evaluate_criteria_label_match(
     id_pattern_src: &str,
     issues: &[Issue],
     repo_default_format: ContentFormat,
+    plan_content: &HashMap<String, String>,
 ) -> Vec<GraphFinding> {
     let id_pattern = match regex::Regex::new(id_pattern_src) {
         Ok(re) => re,
@@ -1435,6 +1480,7 @@ fn evaluate_criteria_label_match(
                 marker,
                 &id_pattern,
                 repo_default_format,
+                plan_content,
             ) {
                 Ok(ids) => ids.into_iter().collect(),
                 Err(err) => return vec![config_error(rule, err.to_string())],
@@ -1558,6 +1604,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert!(findings.is_empty(), "covered criterion: {findings:?}");
     }
@@ -1577,6 +1624,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         // REQ-02 is uncovered.
         assert_eq!(findings.len(), 1);
@@ -1600,6 +1648,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert_eq!(findings.len(), 1, "wrong-state child does not cover");
     }
@@ -1621,6 +1670,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert!(
             findings.is_empty(),
@@ -1642,6 +1692,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert!(findings.is_empty(), "any link covers regardless of edges");
     }
@@ -1657,6 +1708,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert_eq!(findings.len(), 1);
         assert!(findings[0].finding.message.contains("config error"));
@@ -1692,6 +1744,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert!(
             findings.is_empty(),
@@ -1716,6 +1769,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert_eq!(
             findings.len(),
@@ -1743,6 +1797,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert!(
             findings.is_empty(),
@@ -1774,6 +1829,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert_eq!(
             findings.len(),
@@ -1802,6 +1858,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert!(
             findings.is_empty(),
@@ -1820,6 +1877,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert_eq!(findings.len(), 1);
         assert!(findings[0].finding.message.contains("config error"));
@@ -1854,6 +1912,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert!(
             findings.is_empty(),
@@ -1883,6 +1942,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert_eq!(
             findings.len(),
@@ -1915,6 +1975,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert!(
             findings.is_empty(),
@@ -1939,6 +2000,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert_eq!(findings.len(), 1);
         assert!(findings[0].finding.message.contains("config error"));
@@ -1972,6 +2034,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         // Container criteria ARE evaluated (REQ-01 uncovered), not a config error.
         assert_eq!(
@@ -2007,6 +2070,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert_eq!(
             findings.len(),
@@ -2041,6 +2105,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert_eq!(findings.len(), 1, "ambiguous prefix: {findings:?}");
         assert!(findings[0].finding.message.contains("config error"));
@@ -2071,6 +2136,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert!(findings.is_empty(), "resolved reference: {findings:?}");
     }
@@ -2087,6 +2153,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert_eq!(findings.len(), 1);
         assert!(findings[0].finding.message.contains("REQ-99"));
@@ -2106,6 +2173,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert_eq!(findings.len(), 1, "linked scope: unlinked source dangles");
 
@@ -2119,6 +2187,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert!(findings.is_empty(), "linked edge resolves: {findings:?}");
     }
@@ -2133,6 +2202,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert_eq!(findings.len(), 1);
         assert!(findings[0].finding.message.contains("config error"));
@@ -2161,6 +2231,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert!(findings.is_empty(), "task depends on design: {findings:?}");
     }
@@ -2177,6 +2248,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert_eq!(findings.len(), 1);
         assert!(findings[0].finding.message.contains("depend"));
@@ -2200,6 +2272,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert_eq!(findings.len(), 1, "direct-only must not see transitive dep");
 
@@ -2211,6 +2284,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert!(
             findings.is_empty(),
@@ -2228,6 +2302,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert_eq!(findings.len(), 1);
         assert!(findings[0].finding.message.contains("config error"));
@@ -2273,6 +2348,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert!(findings.is_empty(), "fresh gate must pass: {findings:?}");
     }
@@ -2290,6 +2366,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert_eq!(findings.len(), 1);
         assert_eq!(findings[0].issue_id.as_deref(), Some(id.as_str()));
@@ -2314,6 +2391,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert_eq!(findings.len(), 1);
         assert_eq!(
@@ -2336,6 +2414,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         findings.sort_by(|a, b| a.finding.message.cmp(&b.finding.message));
         assert_eq!(
@@ -2361,6 +2440,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert_eq!(findings.len(), 1);
         assert_eq!(
@@ -2381,6 +2461,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert_eq!(findings.len(), 1);
         assert_eq!(
@@ -2401,6 +2482,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         let b = evaluate_graph(
             &rules,
@@ -2408,6 +2490,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert_eq!(a, b);
     }
@@ -2427,6 +2510,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert_eq!(findings.len(), 1);
         assert_eq!(
@@ -2448,6 +2532,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert!(
             findings.is_empty(),
@@ -2468,6 +2553,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert_eq!(findings.len(), 1);
         assert_eq!(
@@ -2488,6 +2574,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert!(
             findings.is_empty(),
@@ -2510,6 +2597,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert!(
             findings.is_empty(),
@@ -2537,6 +2625,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert!(findings.is_empty(), "local + off rules produce nothing");
     }
@@ -2580,6 +2669,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert!(
             findings.is_empty(),
@@ -2600,6 +2690,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert!(
             findings.is_empty(),
@@ -2620,6 +2711,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert_eq!(findings.len(), 1, "one unmapped criterion: {findings:?}");
         assert_eq!(findings[0].issue_id.as_deref(), Some(id.as_str()));
@@ -2654,6 +2746,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert_eq!(
             findings.len(),
@@ -2684,6 +2777,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert_eq!(findings.len(), 1);
         let msg = &findings[0].finding.message;
@@ -2709,6 +2803,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert_eq!(findings.len(), 1);
         let msg = &findings[0].finding.message;
@@ -2762,6 +2857,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert_eq!(
             findings.len(),
@@ -2789,6 +2885,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert_eq!(findings.len(), 1, "orphan leaf must fire: {findings:?}");
         assert_eq!(findings[0].finding.rule, "default:orphan-leaf");
@@ -2835,6 +2932,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         // REQ-77 is stray; REQ-01 matches.
         assert_eq!(
@@ -2881,6 +2979,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert!(
             findings.is_empty(),
@@ -2903,6 +3002,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert_eq!(
             findings.len(),
@@ -2935,6 +3035,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert_eq!(
             findings.len(),
@@ -2959,6 +3060,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert_eq!(findings.len(), 1, "stray id must be reported: {findings:?}");
         let msg = &findings[0].finding.message;
@@ -2982,6 +3084,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert!(
             findings.is_empty(),
@@ -3012,6 +3115,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert_eq!(
             findings.len(),
@@ -3049,6 +3153,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert_eq!(findings.len(), 1, "one collision: {findings:?}");
         let msg = &findings[0].finding.message;
@@ -3076,6 +3181,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert!(
             findings.is_empty(),
@@ -3103,6 +3209,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert!(
             findings.is_empty(),
@@ -3128,6 +3235,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         assert_eq!(findings.len(), 1);
         let msg = &findings[0].finding.message;
@@ -3193,6 +3301,7 @@ mod tests {
             &HierarchyConfig::default(),
             ContentFormat::Markdown,
             fixed_now(),
+            &HashMap::new(),
         );
         let elapsed = started.elapsed();
         eprintln!(

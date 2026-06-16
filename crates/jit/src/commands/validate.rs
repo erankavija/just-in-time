@@ -400,6 +400,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         let hierarchy = crate::validation::defaults::hierarchy_config(namespaces);
         let repo_format = self.repo_content_format()?;
 
+        // Resolve any external plan documents at the boundary so a container
+        // whose criteria live in an external file is validated against the FILE
+        // content; the engine itself reads only the injected map (stays pure).
+        let plan_content = self.resolve_plan_content(issues)?;
+
         // Inject the wall-clock instant at the boundary so `gate-recency` rules
         // are deterministic and the graph engine stays pure (CC-5b).
         Ok(crate::validation::graph::evaluate_graph(
@@ -408,7 +413,78 @@ impl<S: IssueStore> CommandExecutor<S> {
             &hierarchy,
             repo_format,
             chrono::Utc::now(),
+            &plan_content,
         ))
+    }
+
+    /// Build the plan-document content map the graph engine consumes (boundary).
+    ///
+    /// For every issue in `issues` whose effective `[planning].plan_doc_location`
+    /// is EXTERNAL (i.e. not the [`INLINE_LOCATION`](crate::commands::plan_doc::INLINE_LOCATION)
+    /// sentinel) and whose type is one of the configured `breakable_types`, this
+    /// resolves the criteria-source content from disk via the
+    /// [`plan_doc`](crate::commands::plan_doc) resolver, keyed by issue id. Issues
+    /// with the inline sentinel — or any issue when no `[planning]` block is
+    /// configured — are OMITTED, so the engine falls back to the issue's own
+    /// description for them (an empty map reproduces the legacy behavior exactly).
+    ///
+    /// This is the ONLY place external plan files are read for validation; the
+    /// pure engine never touches the filesystem. A missing or unreadable external
+    /// file surfaces as a [`PlanDocError`](crate::commands::plan_doc::PlanDocError)
+    /// (an error, never a silent pass).
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use jit::commands::CommandExecutor;
+    /// use jit::storage::{IssueStore, JsonFileStorage};
+    ///
+    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
+    /// let issues = executor.storage().list_issues().unwrap();
+    /// // Inline brackets (or no `[planning]` config) yield an empty map.
+    /// let plan_content = executor.resolve_plan_content(&issues).unwrap();
+    /// println!("{} external plan(s) resolved", plan_content.len());
+    /// ```
+    pub fn resolve_plan_content(
+        &self,
+        issues: &[Issue],
+    ) -> Result<std::collections::HashMap<String, String>> {
+        use crate::commands::plan_doc::{load_plan_content, INLINE_LOCATION};
+
+        // No `[planning]` block, or an inline location: nothing to resolve. The
+        // empty map makes the engine read each issue's own description.
+        let Some(planning) = self.cached_config()?.planning.as_ref() else {
+            return Ok(std::collections::HashMap::new());
+        };
+        if planning.plan_doc_location == INLINE_LOCATION {
+            return Ok(std::collections::HashMap::new());
+        }
+
+        // Breakable container types carry the plan doc at `plan_doc_location`;
+        // their `{type:<name>}` label marks an issue as a plan-doc holder.
+        let breakable: std::collections::HashSet<&str> = planning
+            .breakable_types
+            .iter()
+            .map(String::as_str)
+            .collect();
+        let base_dir = self.storage.root();
+
+        issues
+            .iter()
+            .filter(|issue| {
+                issue
+                    .labels
+                    .iter()
+                    .filter_map(|l| l.strip_prefix("type:"))
+                    .any(|t| breakable.contains(t))
+            })
+            .map(|issue| {
+                let content =
+                    load_plan_content(issue, &planning.plan_doc_location, &issue.id, base_dir)
+                        .map_err(|e| anyhow!("{e}"))?;
+                Ok((issue.id.clone(), content))
+            })
+            .collect()
     }
 
     /// Run the declarative rule set (`.jit/rules.toml`) as a per-issue or
@@ -628,12 +704,16 @@ impl<S: IssueStore> CommandExecutor<S> {
         if !graph_rules.is_empty() {
             let namespaces = self.cached_namespaces().map_err(|e| anyhow!("{e}"))?;
             let hierarchy = crate::validation::defaults::hierarchy_config(namespaces);
+            // Resolve external plan docs for the in-scope issues so a container
+            // whose criteria live in an external file validates against the FILE.
+            let plan_content = self.resolve_plan_content(&slice)?;
             let graph_findings = crate::validation::graph::evaluate_graph(
                 &graph_rules,
                 &slice,
                 &hierarchy,
                 repo_format,
                 chrono::Utc::now(),
+                &plan_content,
             );
             findings.extend(
                 graph_findings
