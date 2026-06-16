@@ -125,14 +125,12 @@ pub fn default_ruleset(namespaces: &LabelNamespaces) -> RuleSet {
     // The hierarchy is always present (a repo with no `[type_hierarchy]` falls
     // back to the default 4-level set via `get_type_hierarchy`), so this rule is
     // always emitted.
-    let mut hierarchy_types: Vec<String> = namespaces.get_type_hierarchy().into_keys().collect();
-    hierarchy_types.sort(); // deterministic schema enum order
     rules.push(json_schema_rule(
         "default:type-hierarchy-known",
         Selector::default(),
         Severity::Error,
         false,
-        namespace_values_schema("type", &hierarchy_types),
+        type_hierarchy_known_schema(namespaces),
     ));
 
     // (4) Per-namespace UNIQUENESS: at most one label per unique namespace.
@@ -180,6 +178,28 @@ pub fn default_ruleset(namespaces: &LabelNamespaces) -> RuleSet {
     ));
 
     RuleSet { rules }
+}
+
+/// The stable schema file name the `default:type-hierarchy-known` rule references
+/// once serialized to `.jit/rules.toml` (the sanitized rule name + `.json`). This
+/// is the ONE file the write-path rule reads, so regenerating it from config is
+/// what keeps the write path in sync with `[type_hierarchy]` (R5).
+pub const TYPE_HIERARCHY_SCHEMA_FILE: &str = "default-type-hierarchy-known.json";
+
+/// Build the JSON Schema backing the `default:type-hierarchy-known` rule from a
+/// repo's namespace registry: an allowed-VALUES enum over the `type` namespace
+/// whose members are the configured hierarchy `types` keys (sorted for
+/// deterministic output).
+///
+/// This is the SINGLE source for that schema's shape, shared by
+/// [`default_ruleset`] (in-memory / `jit init` scaffold) and the on-disk
+/// regenerator (`regenerate_type_hierarchy_schema`), so the baked
+/// `.jit/schemas/default-type-hierarchy-known.json` can never drift from the
+/// in-memory default (R5: one source, not two). Pure: no I/O, deterministic.
+pub fn type_hierarchy_known_schema(namespaces: &LabelNamespaces) -> serde_json::Value {
+    let mut hierarchy_types: Vec<String> = namespaces.get_type_hierarchy().into_keys().collect();
+    hierarchy_types.sort(); // deterministic schema enum order
+    namespace_values_schema("type", &hierarchy_types)
 }
 
 /// Build the repo's [`HierarchyConfig`] from its label-namespace registry.

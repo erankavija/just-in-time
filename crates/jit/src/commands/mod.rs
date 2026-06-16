@@ -832,13 +832,39 @@ impl<S: IssueStore> CommandExecutor<S> {
             None => None,
         };
 
-        if jit_root.join("rules.toml").exists() {
-            return Ok(false);
-        }
         let config = self.config_manager.load()?;
         let namespaces = self.config_manager.namespaces_from_config(&config);
+
+        if jit_root.join("rules.toml").exists() {
+            // `rules.toml` is the sole source when present, so we never clobber it.
+            // But its `default:type-hierarchy-known` rule reads a BAKED schema file
+            // that does NOT track `[type_hierarchy]` edits — re-init / apply must
+            // refresh that one file from config so a newly-declared type stops
+            // warning on the write path (R5). This is a no-op when the file is
+            // already current (idempotent, atomic).
+            crate::validation::serialize::regenerate_type_hierarchy_schema(jit_root, &namespaces)?;
+            return Ok(false);
+        }
         crate::validation::serialize::scaffold_default_rules(jit_root, &namespaces)?;
         Ok(true)
+    }
+
+    /// Regenerate the baked write-path type-hierarchy schema
+    /// (`.jit/schemas/default-type-hierarchy-known.json`) from the current
+    /// `[type_hierarchy]` config, eliminating the dual source that lets a
+    /// config-declared type warn on the write path (R5).
+    ///
+    /// `.jit/rules.toml` is the sole validation source when present, and its
+    /// `default:type-hierarchy-known` rule reads this frozen enum file rather than
+    /// the config hierarchy. After adding a type to `[type_hierarchy].types`, run
+    /// this so the write-path rule recognizes it. Idempotent and atomic; a no-op
+    /// for a repo with no baked schemas (the read path builds them in memory).
+    /// Returns `true` when a file was (re)written.
+    pub fn regenerate_type_hierarchy_schema(&self) -> Result<bool> {
+        let jit_root = self.storage.root();
+        let config = self.config_manager.load()?;
+        let namespaces = self.config_manager.namespaces_from_config(&config);
+        crate::validation::serialize::regenerate_type_hierarchy_schema(jit_root, &namespaces)
     }
 
     /// Resolve the git control-plane dir (`<git-common-dir>/jit`) for the
