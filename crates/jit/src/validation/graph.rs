@@ -1462,6 +1462,288 @@ mod tests {
         assert!(findings[0].finding.message.contains("child-link"));
     }
 
+    // --- label-coverage: transitive closure (T3) ---------------------------
+
+    /// Build a `type:epic` issue with `[hard]` criteria but no other labels, so
+    /// callers can chain a `dependencies` spine of arbitrary depth beneath it.
+    fn epic_chain_head(ids: &[&str]) -> Issue {
+        epic_with_criteria(ids)
+    }
+
+    #[test]
+    fn test_label_coverage_credits_non_sink_via_transitive_walk() {
+        // Spine: epic ──dep→ sink ──dep→ deep. Under transitive reduction the
+        // epic links only to `sink`; the criterion is satisfied by `deep` (a
+        // non-sink, deeper in the subtree). Direct-adjacency coverage would miss
+        // it; the transitive walk must credit it.
+        let rule = coverage_rule("child-link = \"dependencies\"");
+        let mut epic = epic_chain_head(&["REQ-01"]);
+        let mut sink = issue("sink", &["type:task"]);
+        let deep = issue("deep", &["type:task", "satisfies:REQ-01"]);
+        // epic depends on sink; sink depends on deep.
+        epic.dependencies = vec![sink.id.clone()];
+        sink.dependencies = vec![deep.id.clone()];
+
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[epic, sink, deep],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        assert!(
+            findings.is_empty(),
+            "deep non-sink child must cover via transitive walk: {findings:?}"
+        );
+    }
+
+    #[test]
+    fn test_label_coverage_transitive_uncovered_still_reports() {
+        // Same chain shape, but nobody satisfies REQ-01 — must still report.
+        let rule = coverage_rule("child-link = \"dependencies\"");
+        let mut epic = epic_chain_head(&["REQ-01"]);
+        let mut sink = issue("sink", &["type:task"]);
+        let deep = issue("deep", &["type:task"]); // no satisfies label
+        epic.dependencies = vec![sink.id.clone()];
+        sink.dependencies = vec![deep.id.clone()];
+
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[epic, sink, deep],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        assert_eq!(findings.len(), 1, "uncovered criterion reports: {findings:?}");
+        assert!(findings[0].finding.message.contains("REQ-01"));
+    }
+
+    #[test]
+    fn test_label_coverage_dependents_walk_is_transitive() {
+        // The default `dependents` link also becomes transitive: epic <-dep- a
+        // <-dep- b, with b (a transitive dependent) satisfying the criterion.
+        let rule = coverage_rule(""); // default child-link = dependents
+        let epic = epic_chain_head(&["REQ-01"]);
+        let mut a = issue("a", &["type:task"]);
+        let mut b = issue("b", &["type:task", "satisfies:REQ-01"]);
+        a.dependencies = vec![epic.id.clone()]; // a depends on epic
+        b.dependencies = vec![a.id.clone()]; // b depends on a (so transitively on epic)
+
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[epic, a, b],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        assert!(
+            findings.is_empty(),
+            "transitive dependent must cover: {findings:?}"
+        );
+    }
+
+    // --- label-coverage: child-type-exclude (T3) ---------------------------
+
+    #[test]
+    fn test_child_type_exclude_drops_candidate_and_halts_walk() {
+        // Bracket spine: epic ──dep→ impl ──dep→ B(type:breakdown) ──dep→ P.
+        // P (beyond the boundary) satisfies REQ-01, but B is excluded, so the
+        // walk must halt at B and never reach P -> uncovered.
+        let rule = coverage_rule(
+            "child-link = \"dependencies\", child-type-exclude = [\"breakdown\"]",
+        );
+        let mut epic = epic_chain_head(&["REQ-01"]);
+        let mut impl_node = issue("impl", &["type:task"]);
+        let mut breakdown = issue("B", &["type:breakdown"]);
+        let plan = issue("P", &["type:planning", "satisfies:REQ-01"]);
+        epic.dependencies = vec![impl_node.id.clone()];
+        impl_node.dependencies = vec![breakdown.id.clone()];
+        breakdown.dependencies = vec![plan.id.clone()];
+
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[epic, impl_node, breakdown, plan],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        assert_eq!(
+            findings.len(),
+            1,
+            "walk must halt at excluded breakdown, leaving REQ-01 uncovered: {findings:?}"
+        );
+        assert!(findings[0].finding.message.contains("REQ-01"));
+    }
+
+    #[test]
+    fn test_child_type_exclude_credits_interior_before_boundary() {
+        // Same spine, but the impl interior node (before B) satisfies REQ-01.
+        // Excluding `breakdown` must NOT drop the impl node -> covered.
+        let rule = coverage_rule(
+            "child-link = \"dependencies\", child-type-exclude = [\"breakdown\"]",
+        );
+        let mut epic = epic_chain_head(&["REQ-01"]);
+        let mut impl_node = issue("impl", &["type:task", "satisfies:REQ-01"]);
+        let breakdown = issue("B", &["type:breakdown"]);
+        epic.dependencies = vec![impl_node.id.clone()];
+        impl_node.dependencies = vec![breakdown.id.clone()];
+
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[epic, impl_node, breakdown],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        assert!(
+            findings.is_empty(),
+            "impl interior covers; only the breakdown boundary is excluded: {findings:?}"
+        );
+    }
+
+    #[test]
+    fn test_child_type_exclude_must_be_array_of_strings() {
+        let rule = coverage_rule("child-type-exclude = \"breakdown\"");
+        let epic = epic_chain_head(&["REQ-01"]);
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[epic],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        assert_eq!(findings.len(), 1);
+        assert!(findings[0].finding.message.contains("config error"));
+        assert!(findings[0].finding.message.contains("child-type-exclude"));
+    }
+
+    // --- label-coverage: container indirection via brackets: (T3/D13) ------
+
+    #[test]
+    fn test_container_indirection_evaluates_container_criteria() {
+        // Preview instance: rule keyed on type:breakdown resolves its container
+        // from `brackets:<C-id>` and evaluates C's criteria coverage. C carries
+        // the criteria; B carries no criteria of its own.
+        let rule = rule_from(
+            "[[rules]]\nname = \"preview\"\nwhen = { type = \"breakdown\" }\n\
+             severity = \"error\"\nassert = { label-coverage = { \
+             child-link = \"dependencies\", container-from-label = \"brackets\" } }\n",
+        );
+        let mut container = epic_with_criteria(&["REQ-01"]);
+        let mut impl_node = issue("impl", &["type:task", "satisfies:REQ-01"]);
+        let mut breakdown = issue("B", &["type:breakdown"]);
+        // Container depends on impl (its subtree); B brackets the container.
+        container.dependencies = vec![impl_node.id.clone()];
+        breakdown
+            .labels
+            .push(format!("brackets:{}", container.id));
+        // B sits on the spine after impl, but the walk runs from the container.
+        impl_node.dependencies = vec![breakdown.id.clone()];
+
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[container, impl_node, breakdown],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        assert!(
+            findings.is_empty(),
+            "container criterion satisfied by impl child via indirection: {findings:?}"
+        );
+    }
+
+    #[test]
+    fn test_container_indirection_reports_container_uncovered() {
+        // Same indirection, but C's criterion is unsatisfied -> finding fires on
+        // the breakdown node's evaluation.
+        let rule = rule_from(
+            "[[rules]]\nname = \"preview\"\nwhen = { type = \"breakdown\" }\n\
+             severity = \"error\"\nassert = { label-coverage = { \
+             child-link = \"dependencies\", container-from-label = \"brackets\" } }\n",
+        );
+        let mut container = epic_with_criteria(&["REQ-01"]);
+        let impl_node = issue("impl", &["type:task"]); // does NOT satisfy
+        let mut breakdown = issue("B", &["type:breakdown"]);
+        container.dependencies = vec![impl_node.id.clone()];
+        breakdown
+            .labels
+            .push(format!("brackets:{}", container.id));
+
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[container, impl_node, breakdown],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        assert_eq!(findings.len(), 1, "uncovered container criterion: {findings:?}");
+        assert!(findings[0].finding.message.contains("REQ-01"));
+    }
+
+    #[test]
+    fn test_container_indirection_omitted_child_state_means_any_state() {
+        // The preview instance omits child-state, so a Backlog (drafted) child
+        // counts. Proves the absent-state = any-state semantics under indirection.
+        let rule = rule_from(
+            "[[rules]]\nname = \"preview\"\nwhen = { type = \"breakdown\" }\n\
+             severity = \"error\"\nassert = { label-coverage = { \
+             child-link = \"dependencies\", container-from-label = \"brackets\" } }\n",
+        );
+        let mut container = epic_with_criteria(&["REQ-01"]);
+        let mut impl_node = issue("impl", &["type:task", "satisfies:REQ-01"]);
+        impl_node.state = State::Backlog; // drafted, not done
+        let mut breakdown = issue("B", &["type:breakdown"]);
+        container.dependencies = vec![impl_node.id.clone()];
+        breakdown
+            .labels
+            .push(format!("brackets:{}", container.id));
+
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[container, impl_node, breakdown],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        assert!(
+            findings.is_empty(),
+            "backlog child counts when child-state is omitted: {findings:?}"
+        );
+    }
+
+    #[test]
+    fn test_container_indirection_unresolvable_label_is_config_error() {
+        // The breakdown node carries no brackets: label, so the container cannot
+        // be resolved -> a config-error finding (never a silent pass).
+        let rule = rule_from(
+            "[[rules]]\nname = \"preview\"\nwhen = { type = \"breakdown\" }\n\
+             severity = \"error\"\nassert = { label-coverage = { \
+             container-from-label = \"brackets\" } }\n",
+        );
+        let breakdown = issue("B", &["type:breakdown"]); // no brackets: label
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[breakdown],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        assert_eq!(findings.len(), 1);
+        assert!(findings[0].finding.message.contains("config error"));
+        assert!(findings[0].finding.message.contains("brackets"));
+    }
+
     // --- label-reference ---------------------------------------------------
 
     fn reference_rule(extra: &str) -> Rule {
@@ -2154,6 +2436,37 @@ mod tests {
     }
 
     #[test]
+    fn test_criteria_to_check_stays_per_issue_ignores_children() {
+        // criteria-to-check maps a criterion to the SAME issue's gate/label and
+        // must NOT traverse children. A child carrying the mapping does not
+        // satisfy the parent's criterion -> the parent still reports.
+        let rule = ctc_rule("gate-prefix = \"verify:\", check-namespace = \"checks\"");
+        let epic = epic_with_sc(&["REQ-01: do the thing"]);
+        // A dependent child carries the would-be mapping; per-issue semantics
+        // mean this is irrelevant to the epic.
+        let mut child = issue("child", &["type:task", "checks:REQ-01"]);
+        child.dependencies = vec![epic.id.clone()];
+        child.gates_required = vec!["verify:REQ-01".to_string()];
+        let epic_id = epic.id.clone();
+
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[epic, child],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        assert_eq!(
+            findings.len(),
+            1,
+            "criteria-to-check is per-issue; a child mapping must not cover: {findings:?}"
+        );
+        assert_eq!(findings[0].issue_id.as_deref(), Some(epic_id.as_str()));
+        assert!(findings[0].finding.message.contains("REQ-01"));
+    }
+
+    #[test]
     fn test_type_hierarchy_orphan_leaf_fires_with_injected_config() {
         // A `type-hierarchy` rule authored in TOML carries only its kind; the
         // HierarchyConfig is injected by `evaluate_graph`. A leaf task with no
@@ -2368,6 +2681,39 @@ mod tests {
             findings.is_empty(),
             "no namespace labels -> no findings: {findings:?}"
         );
+    }
+
+    #[test]
+    fn test_criteria_label_match_stays_per_issue_ignores_children() {
+        // criteria-label-match does same-issue stray-label detection. A child's
+        // labels must not influence the parent's evaluation: a stray label on the
+        // epic still fires, and a child carrying the criterion id does not make
+        // the parent's matching label "non-stray" via traversal (there is no
+        // traversal). Here the stray is on the epic itself.
+        let rule = clm_rule(r#"namespace = "req", marker = "[hard]""#);
+        let mut epic = epic_with_clm_criteria(&["REQ-01"]);
+        epic.labels.push("req:REQ-77".to_string()); // stray on the epic
+        let epic_id = epic.id.clone();
+        // A child that happens to carry req:REQ-77 must NOT silence the epic's
+        // stray finding (per-issue: the child is never consulted).
+        let mut child = issue("child", &["type:task", "req:REQ-77"]);
+        child.dependencies = vec![epic.id.clone()];
+
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[epic, child],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+        );
+        assert_eq!(
+            findings.len(),
+            1,
+            "criteria-label-match is per-issue; a child must not affect it: {findings:?}"
+        );
+        assert_eq!(findings[0].issue_id.as_deref(), Some(epic_id.as_str()));
+        assert!(findings[0].finding.message.contains("req:REQ-77"));
     }
 
     fn uniqueness_rule(namespace: &str) -> Rule {
