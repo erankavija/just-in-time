@@ -171,6 +171,16 @@ pub enum Commands {
         #[arg(long)]
         explain: bool,
 
+        /// Validate a container's bracket subtree as a deterministic gate
+        /// checker: evaluate the rules whose selector matches each issue in the
+        /// container's transitive dependency closure (including the
+        /// `type:breakdown` node, bounded there), excluding whole-repo rules.
+        /// Exits 4 with findings shown when an enforcing rule fails, 0 when
+        /// clean. Mutually exclusive with a positional id and with
+        /// `--fix`/`--divergence`/`--leases`/`--explain`.
+        #[arg(long, value_name = "ID")]
+        scope: Option<String>,
+
         /// Attempt to automatically fix validation issues
         #[arg(long)]
         fix: bool,

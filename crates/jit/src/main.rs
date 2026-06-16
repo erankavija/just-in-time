@@ -3603,10 +3603,23 @@ fn run() -> Result<()> {
             dry_run,
             divergence,
             leases,
+            scope,
         } => {
             // Validate dry_run requires fix
             if dry_run && !fix {
                 return Err(anyhow!("--dry-run requires --fix to be specified"));
+            }
+
+            // `--scope <C>` is a self-contained gate checker over a container's
+            // bracket subtree. It owns its own exit code (4 on any
+            // error-severity finding) and is mutually exclusive with the other
+            // validate modes, so it is dispatched FIRST after the combo checks
+            // below reject conflicting flags.
+            if scope.is_some() && (id.is_some() || fix || divergence || leases || explain) {
+                return Err(anyhow!(
+                    "`--scope` cannot be combined with a positional id or with \
+                     `--fix`/`--divergence`/`--leases`/`--explain`"
+                ));
             }
 
             // `--fix`, `--divergence`, and `--leases` are repo-wide operations and
@@ -3620,6 +3633,51 @@ fn run() -> Result<()> {
                     "`--fix`/`--divergence`/`--leases` cannot be combined with a \
                      positional issue id (they are repo-wide)"
                 ));
+            }
+
+            // --scope path: evaluate the container's bracket subtree as a
+            // deterministic gate checker. Exit 4 (ValidationFailed) on any
+            // error-severity finding, 0 when clean.
+            if let Some(container) = scope.as_deref() {
+                let report = executor.validate_scope(container)?;
+                let exit_nonzero = report.has_errors();
+                if json {
+                    use jit::output::JsonOutput;
+                    let value = serde_json::to_value(&report)?;
+                    let output =
+                        JsonOutput::success(value, "validate").with_message(if exit_nonzero {
+                            format!(
+                                "Scope validation failed with {} error(s)",
+                                report.error_count()
+                            )
+                        } else {
+                            "Scope validation passed".to_string()
+                        });
+                    println!("{}", output.to_json_string()?);
+                } else if report.findings.is_empty() {
+                    println!("✓ Scope validation passed");
+                } else {
+                    for finding in &report.findings {
+                        println!(
+                            "{} [{}] {}",
+                            if finding.is_error() { "❌" } else { "⚠" },
+                            finding.rule,
+                            finding.message
+                        );
+                    }
+                    if exit_nonzero {
+                        eprintln!(
+                            "Scope validation failed with {} error(s)",
+                            report.error_count()
+                        );
+                    } else {
+                        println!("✓ Scope validation passed");
+                    }
+                }
+                if exit_nonzero {
+                    std::process::exit(jit::ExitCode::ValidationFailed.code());
+                }
+                return Ok(());
             }
 
             // --explain requires an issue id (it is a per-issue debugging view).
