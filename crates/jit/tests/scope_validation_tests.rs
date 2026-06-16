@@ -419,8 +419,17 @@ fn container_with_external_plan(
     );
 
     // Write the external plan doc carrying the criteria, at the {id}-substituted
-    // path under the repo root.
-    let plan_dir = executor.storage().root().join("dev/active");
+    // path under the REPO ROOT (the parent of `.jit`, i.e. `storage.root()`'s
+    // parent), since `plan_doc_location` templates are repo-root-relative. For
+    // `InMemoryStorage` this parent is `/tmp`; the file-backed module below
+    // exercises a real `.jit`-rooted layout.
+    let repo_root = executor
+        .storage()
+        .root()
+        .parent()
+        .expect("storage root has a parent")
+        .to_path_buf();
+    let plan_dir = repo_root.join("dev/active");
     std::fs::create_dir_all(&plan_dir).unwrap();
     std::fs::write(
         plan_dir.join(format!("{c}-plan.md")),
@@ -505,6 +514,132 @@ fn test_inline_config_still_validates_from_body() {
         "inline criteria in the body must still validate: {:?}",
         report.findings
     );
+}
+
+// ---------------------------------------------------------------------------
+// File-backed regression (jit:1536006d): the external plan base dir is the REPO
+// ROOT (parent of `.jit`), NOT `storage.root()` (the `.jit` dir). The
+// InMemoryStorage tests above write the plan under `storage.root()/dev/active`
+// (= `.jit/dev/active`), which MASKS the `.jit`-vs-repo-root distinction. These
+// tests use a real `JsonFileStorage` rooted at `<tmp>/.jit` with the plan file
+// at the REPO-ROOT-relative `<tmp>/dev/active/{id}-plan.md` (NOT under `.jit/`),
+// so they FAIL while the resolver passes `storage.root()` and PASS after the
+// base dir is corrected to the repo root.
+// ---------------------------------------------------------------------------
+
+mod file_backed_external_plan {
+    use super::{COVERAGE_ON_EPIC, PLANNING_CONFIG_EXTERNAL};
+    use jit::commands::CommandExecutor;
+    use jit::domain::{Issue, State};
+    use jit::storage::{IssueStore, JsonFileStorage};
+    use tempfile::TempDir;
+
+    /// Build a `JsonFileStorage`-backed executor rooted at `<tmp>/.jit`, with the
+    /// rule set and `[planning]` (external location) config written into `.jit/`.
+    /// Returns the temp dir (kept alive = the repo root) and the executor.
+    fn executor() -> (TempDir, CommandExecutor<JsonFileStorage>) {
+        std::env::set_var("JIT_TEST_MODE", "1");
+        let repo_root = TempDir::new().unwrap();
+        let jit_dir = repo_root.path().join(".jit");
+        let storage = JsonFileStorage::new(&jit_dir);
+        storage.init().unwrap();
+        std::fs::write(jit_dir.join("config.toml"), PLANNING_CONFIG_EXTERNAL).unwrap();
+        std::fs::write(jit_dir.join("rules.toml"), COVERAGE_ON_EPIC).unwrap();
+        (repo_root, CommandExecutor::new(storage))
+    }
+
+    fn seed(
+        executor: &CommandExecutor<JsonFileStorage>,
+        title: &str,
+        labels: &[&str],
+        description: &str,
+        deps: &[String],
+    ) -> String {
+        let mut issue = Issue::new(title.to_string(), description.to_string());
+        issue.labels = labels.iter().map(|s| s.to_string()).collect();
+        issue.dependencies = deps.to_vec();
+        issue.state = State::Backlog;
+        let id = issue.id.clone();
+        executor.storage().save_issue(issue).unwrap();
+        id
+    }
+
+    /// Wire `C -> impl`, with C a breakable container whose criteria live ONLY in
+    /// the external plan file written at the REPO-ROOT-relative path
+    /// `<repo_root>/dev/active/{C.id}-plan.md` (NOT under `.jit/`). The old buggy
+    /// base dir (`storage.root()` = `.jit`) would look under `.jit/dev/active/`
+    /// and never find this file.
+    fn container_with_repo_root_plan(
+        repo_root: &TempDir,
+        executor: &CommandExecutor<JsonFileStorage>,
+        impl_satisfies: bool,
+    ) -> String {
+        let impl_labels: Vec<&str> = if impl_satisfies {
+            vec!["type:task", "satisfies:REQ-77"]
+        } else {
+            vec!["type:task"]
+        };
+        let impl_id = seed(executor, "impl", &impl_labels, "", &[]);
+        let c = seed(
+            executor,
+            "container",
+            &["type:epic"],
+            "no criteria in the body — the plan lives in the external file",
+            std::slice::from_ref(&impl_id),
+        );
+
+        // Write the plan under the REPO ROOT, NOT under `.jit/`.
+        let plan_dir = repo_root.path().join("dev/active");
+        std::fs::create_dir_all(&plan_dir).unwrap();
+        std::fs::write(
+            plan_dir.join(format!("{c}-plan.md")),
+            "## Success Criteria\n\n- [hard] REQ-77: declared only in the external plan\n",
+        )
+        .unwrap();
+        c
+    }
+
+    #[test]
+    fn test_file_backed_external_plan_at_repo_root_uncovered_fails() {
+        // The criterion lives only in `<repo_root>/dev/active/{id}-plan.md`; the
+        // child does NOT satisfy it. With the corrected repo-root base dir the
+        // engine reads the file and reports it uncovered. With the old
+        // `storage.root()` base dir the file under `.jit/dev/active` is absent, so
+        // resolution errored (or the criterion was never seen) — this test FAILS
+        // before the fix.
+        let (repo_root, executor) = executor();
+        let c = container_with_repo_root_plan(&repo_root, &executor, false);
+
+        let report = executor.validate_scope(&c).expect("scope validation runs");
+
+        assert!(
+            report.has_errors(),
+            "an uncovered criterion in the repo-root plan file must fail: {:?}",
+            report.findings
+        );
+        assert!(
+            report.findings.iter().any(|f| f.message.contains("REQ-77")),
+            "the finding names the criterion read from the repo-root file: {:?}",
+            report.findings
+        );
+    }
+
+    #[test]
+    fn test_file_backed_external_plan_at_repo_root_covered_clean() {
+        // Same repo-root plan criterion, now satisfied by the child -> clean,
+        // proving the file content (not the empty body) drove coverage AND that
+        // the file was found at the repo root rather than under `.jit/`.
+        let (repo_root, executor) = executor();
+        let c = container_with_repo_root_plan(&repo_root, &executor, true);
+
+        let report = executor.validate_scope(&c).expect("scope validation runs");
+
+        assert!(
+            !report.has_errors(),
+            "a covered repo-root-plan criterion must leave the scope clean: {:?}",
+            report.findings
+        );
+    }
 }
 
 // ---------------------------------------------------------------------------

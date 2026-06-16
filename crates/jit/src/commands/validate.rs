@@ -428,10 +428,14 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// configured — are OMITTED, so the engine falls back to the issue's own
     /// description for them (an empty map reproduces the legacy behavior exactly).
     ///
-    /// This is the ONLY place external plan files are read for validation; the
-    /// pure engine never touches the filesystem. A missing or unreadable external
-    /// file surfaces as a [`PlanDocError`](crate::commands::plan_doc::PlanDocError)
-    /// (an error, never a silent pass).
+    /// External `plan_doc_location` templates are REPO-ROOT-relative, so the
+    /// base dir passed to [`load_plan_content`](crate::commands::plan_doc::load_plan_content)
+    /// is the repo root (the PARENT of `.jit`), NOT `storage.root()` (which is
+    /// the `.jit` directory). This is the ONLY place external plan files are read
+    /// for validation; the pure engine never touches the filesystem. A missing or
+    /// unreadable external file surfaces as a
+    /// [`PlanDocError`](crate::commands::plan_doc::PlanDocError) (an error, never
+    /// a silent pass).
     ///
     /// # Examples
     ///
@@ -467,7 +471,15 @@ impl<S: IssueStore> CommandExecutor<S> {
             .iter()
             .map(String::as_str)
             .collect();
-        let base_dir = self.storage.root();
+
+        // External plan templates are REPO-ROOT-relative (e.g.
+        // `dev/active/{id}-plan.md`), so the base dir is the repo root — the
+        // PARENT of `.jit` — NOT `storage.root()` (which is the `.jit` dir
+        // itself). Mirror `add_document_reference`'s repo-root derivation; fall
+        // back to `storage.root()` only if it has no parent (a defensive case
+        // that does not arise for a real `.jit` directory).
+        let storage_root = self.storage.root();
+        let base_dir = storage_root.parent().unwrap_or(storage_root);
 
         issues
             .iter()
