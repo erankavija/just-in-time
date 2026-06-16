@@ -9,8 +9,22 @@
     "4aa44224-b7b6-4e7d-8a1c-a63f6f726106",
     "64c7df93-3fb6-4ee7-97e1-51d8254ed33a"
   ],
-  "gates_required": [],
-  "gates_status": {},
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-06-16T20:41:43.875002434Z"
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-06-16T20:41:43.882148586Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -19,5 +33,5 @@
     "epic:planning-bracket"
   ],
   "created_at": "2026-06-15T18:34:31.105103511+00:00",
-  "updated_at": "2026-06-16T18:30:17.923588776+00:00"
+  "updated_at": "2026-06-16T20:41:43.882176976+00:00"
 }
