@@ -2834,3 +2834,11 @@
 {"type":"issue_claimed","id":"0d96da68-ec01-4cf4-8208-3f107cd6eff6","issue_id":"4aa44224-b7b6-4e7d-8a1c-a63f6f726106","timestamp":"2026-06-16T20:43:14.262685225Z","assignee":"agent:claude"}
 {"type":"issue_state_changed","id":"f1bbd4c5-aa4a-4e90-b625-ef41a02fa80f","issue_id":"64c7df93-3fb6-4ee7-97e1-51d8254ed33a","timestamp":"2026-06-16T20:43:14.278329329Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"87f4a13e-3a1f-46ba-a32c-c3dccc0da3aa","issue_id":"64c7df93-3fb6-4ee7-97e1-51d8254ed33a","timestamp":"2026-06-16T20:43:14.278498679Z","assignee":"agent:claude"}
+{"type":"gate_failed","id":"f2ae300e-783b-4645-9f9e-062933eaf068","issue_id":"c78168d8-152a-4809-bb54-8de877197331","timestamp":"2026-06-16T21:25:46.987977665Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"c7c8c49b-4fc3-4700-ac47-74805152aaea","issue_id":"c78168d8-152a-4809-bb54-8de877197331","timestamp":"2026-06-16T21:30:35.901802514Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"e3722a5c-0d09-4413-a625-9e33eb6a3f9e","issue_id":"c78168d8-152a-4809-bb54-8de877197331","timestamp":"2026-06-16T21:39:33.879497460Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"b2c982c3-0d76-4bac-ab41-93f43f5554b6","issue_id":"64c7df93-3fb6-4ee7-97e1-51d8254ed33a","timestamp":"2026-06-16T21:45:23.501054928Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"94e6928d-6db5-4266-b0a0-2f8830af8561","issue_id":"4aa44224-b7b6-4e7d-8a1c-a63f6f726106","timestamp":"2026-06-16T21:51:00.252071163Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"7d286016-e4d9-4486-b028-4afc823dbd4c","issue_id":"c78168d8-152a-4809-bb54-8de877197331","timestamp":"2026-06-16T21:52:37.703586874Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"d4570f2c-e244-46b1-93d3-e4b0e167f12d","issue_id":"64c7df93-3fb6-4ee7-97e1-51d8254ed33a","timestamp":"2026-06-16T21:54:17.028399391Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"4c6c887e-153a-4268-bc94-65b223eb9cc9","issue_id":"4aa44224-b7b6-4e7d-8a1c-a63f6f726106","timestamp":"2026-06-16T21:55:21.026086491Z","gate_key":"code-review","updated_by":"auto:executor"}
