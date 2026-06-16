@@ -36,6 +36,20 @@ epic = "epic"
 milestone = "milestone"
 story = "story"
 
+[planning]
+# Plan-before-fan-out bracket (epic 2fbd2a82). DECLARES the bracket vocabulary;
+# the engine reads these names from config and hardcodes none of them (D1/D5/D9).
+# breakable_types: container types that require a planning bracket.
+# planning_type / breakdown_type: the two bracket node types (P / B).
+# plan_doc_location: where P's plan doc lives ({id} -> container id; "inline" = body).
+# *_gate_preset: the gate presets applied to P and B (defined by T6).
+breakable_types = ["epic"]
+planning_type = "planning"
+breakdown_type = "breakdown"
+plan_doc_location = "dev/active/{id}-plan.md"
+plan_gate_preset = "plan-review"
+coverage_gate_preset = "coverage-preview"
+
 [validation]
 # Strictness level: "strict", "loose", or "permissive"
 strictness = "loose"

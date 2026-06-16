@@ -31,6 +31,118 @@ pub struct JitConfig {
     pub locks: Option<LocksConfig>,
     /// Event logging configuration (optional).
     pub events: Option<EventsConfig>,
+    /// Plan-before-fan-out bracket configuration (optional).
+    pub planning: Option<PlanningConfig>,
+}
+
+/// Plan-before-fan-out bracket configuration (`[planning]`).
+///
+/// DECLARES the bracket vocabulary for an adopting ruleset (design doc D1/D5/D9):
+/// which container types are *breakable*, the two bracket type names (planning /
+/// breakdown), where a plan doc lives, and the names of the two gate presets. The
+/// engine stays domain-agnostic: NOTHING here is hardcoded to `epic` / `planning`
+/// / `breakdown` in engine logic — the strings come from THIS config, so the SDD
+/// and research example rulesets can declare entirely different vocabularies.
+///
+/// All fields are required when the `[planning]` section is present; an empty or
+/// blank value is rejected at load via [`PlanningConfig::validate`] so a
+/// misconfigured bracket fails fast rather than silently producing an unusable
+/// vocabulary.
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct PlanningConfig {
+    /// Container types that REQUIRE a planning bracket (e.g. `["epic"]` for SDD,
+    /// `["goal"]` for research). Each must also appear in
+    /// `[type_hierarchy].types`; cross-section consistency is validated by
+    /// [`PlanningConfig::validate_against_hierarchy`].
+    pub breakable_types: Vec<String>,
+    /// Type name carried by the planning node `P` (e.g. `"planning"`).
+    pub planning_type: String,
+    /// Type name carried by the breakdown node `B` (e.g. `"breakdown"`).
+    pub breakdown_type: String,
+    /// Plan-doc location template for `P`. A `{id}` placeholder (if present) is
+    /// substituted with the container id by the doc-location resolver (T4); an
+    /// inline-body convention is expressed by the literal `"inline"`.
+    pub plan_doc_location: String,
+    /// Gate-preset name applied to the planning node `P` (the agent plan-quality
+    /// gate, T6).
+    pub plan_gate_preset: String,
+    /// Gate-preset name applied to the breakdown node `B` (the deterministic
+    /// coverage-preview gate, T6).
+    pub coverage_gate_preset: String,
+}
+
+impl PlanningConfig {
+    /// Validate the `[planning]` block in isolation: every declared name must be
+    /// non-empty (after trimming) and the breakable-type list non-empty.
+    ///
+    /// Returns a descriptive error naming the offending field so a malformed
+    /// `config.toml` is rejected at load (success criterion: "malformed config is
+    /// rejected at load"). Pure: no I/O, deterministic.
+    pub fn validate(&self) -> Result<()> {
+        if self.breakable_types.is_empty() {
+            anyhow::bail!("[planning].breakable_types must list at least one container type");
+        }
+        for (field, value) in [
+            ("breakable_types entry", None),
+            ("planning_type", Some(&self.planning_type)),
+            ("breakdown_type", Some(&self.breakdown_type)),
+            ("plan_doc_location", Some(&self.plan_doc_location)),
+            ("plan_gate_preset", Some(&self.plan_gate_preset)),
+            ("coverage_gate_preset", Some(&self.coverage_gate_preset)),
+        ] {
+            if let Some(value) = value {
+                if value.trim().is_empty() {
+                    anyhow::bail!("[planning].{field} must not be empty");
+                }
+            }
+        }
+        if self.breakable_types.iter().any(|t| t.trim().is_empty()) {
+            anyhow::bail!("[planning].breakable_types must not contain an empty type name");
+        }
+        // The two bracket type names must differ, or `P` and `B` would be
+        // indistinguishable by type — the whole point of the type-axis split (D5).
+        if self.planning_type.trim() == self.breakdown_type.trim() {
+            anyhow::bail!(
+                "[planning].planning_type and breakdown_type must differ (got '{}')",
+                self.planning_type
+            );
+        }
+        Ok(())
+    }
+
+    /// Validate that every name the bracket DECLARES is also present in the type
+    /// hierarchy, so the declared vocabulary is actually a valid set of types.
+    ///
+    /// `hierarchy_types` is the configured `[type_hierarchy].types` key set. A
+    /// breakable container type, the planning type, or the breakdown type that is
+    /// absent from the hierarchy is rejected — otherwise the bracket would declare
+    /// types the write-path `type-hierarchy-known` rule would warn on (R5). Pure.
+    pub fn validate_against_hierarchy<S: std::borrow::Borrow<str>>(
+        &self,
+        hierarchy_types: &[S],
+    ) -> Result<()> {
+        let known = |name: &str| hierarchy_types.iter().any(|t| t.borrow() == name);
+        for ty in &self.breakable_types {
+            if !known(ty) {
+                anyhow::bail!(
+                    "[planning].breakable_types contains '{ty}', which is not declared in [type_hierarchy].types"
+                );
+            }
+        }
+        if !known(&self.planning_type) {
+            anyhow::bail!(
+                "[planning].planning_type '{}' is not declared in [type_hierarchy].types",
+                self.planning_type
+            );
+        }
+        if !known(&self.breakdown_type) {
+            anyhow::bail!(
+                "[planning].breakdown_type '{}' is not declared in [type_hierarchy].types",
+                self.breakdown_type
+            );
+        }
+        Ok(())
+    }
 }
 
 /// Schema version configuration.
@@ -435,6 +547,7 @@ impl JitConfig {
                 global_operations: None,
                 locks: None,
                 events: None,
+                planning: None,
             });
         }
 
@@ -446,6 +559,23 @@ impl JitConfig {
         // serde ignores them (no `deny_unknown_fields`), so the file still parses;
         // the keys simply have no effect — `.jit/rules.toml` is the sole source.
         let config: JitConfig = toml::from_str(&content).context("Failed to parse config.toml")?;
+
+        // Reject a malformed `[planning]` block at LOAD time (T1 success
+        // criterion): both the in-isolation field checks and, when a hierarchy is
+        // also configured, the cross-section consistency check. A bracket that
+        // declares types absent from `[type_hierarchy]` would otherwise warn on
+        // every write (R5), so it is rejected up front.
+        if let Some(ref planning) = config.planning {
+            planning
+                .validate()
+                .context("invalid [planning] section in .jit/config.toml")?;
+            if let Some(ref hierarchy) = config.type_hierarchy {
+                let types: Vec<&str> = hierarchy.types.keys().map(|s| s.as_str()).collect();
+                planning
+                    .validate_against_hierarchy(&types)
+                    .context("invalid [planning] section in .jit/config.toml")?;
+            }
+        }
 
         Ok(config)
     }
@@ -1694,5 +1824,158 @@ enforce_leases = "strict"
         let config = ConfigLoader::new().build();
         assert!(config.worktree_mode().is_err());
         std::env::remove_var("JIT_WORKTREE_MODE");
+    }
+
+    // ============================================================
+    // [planning] bracket config (TDD - written before implementation)
+    // ============================================================
+
+    const FULL_PLANNING_TOML: &str = r#"
+[type_hierarchy]
+types = { epic = 2, planning = 3, breakdown = 3, task = 4 }
+
+[planning]
+breakable_types = ["epic"]
+planning_type = "planning"
+breakdown_type = "breakdown"
+plan_doc_location = "dev/active/{id}-plan.md"
+plan_gate_preset = "plan-review"
+coverage_gate_preset = "coverage-preview"
+"#;
+
+    #[test]
+    fn test_parse_planning_block_full() {
+        let config: JitConfig = toml::from_str(FULL_PLANNING_TOML).unwrap();
+        let planning = config.planning.expect("planning section parsed");
+        assert_eq!(planning.breakable_types, vec!["epic".to_string()]);
+        assert_eq!(planning.planning_type, "planning");
+        assert_eq!(planning.breakdown_type, "breakdown");
+        assert_eq!(planning.plan_doc_location, "dev/active/{id}-plan.md");
+        assert_eq!(planning.plan_gate_preset, "plan-review");
+        assert_eq!(planning.coverage_gate_preset, "coverage-preview");
+        planning.validate().expect("full planning block is valid");
+    }
+
+    #[test]
+    fn test_planning_block_absent_is_none() {
+        let config: JitConfig = toml::from_str("[type_hierarchy]\ntypes = { task = 1 }\n").unwrap();
+        assert!(config.planning.is_none());
+    }
+
+    #[test]
+    fn test_planning_validate_rejects_empty_breakable_types() {
+        let toml = r#"
+[planning]
+breakable_types = []
+planning_type = "planning"
+breakdown_type = "breakdown"
+plan_doc_location = "inline"
+plan_gate_preset = "plan-review"
+coverage_gate_preset = "coverage-preview"
+"#;
+        let config: JitConfig = toml::from_str(toml).unwrap();
+        let err = config.planning.unwrap().validate().unwrap_err().to_string();
+        assert!(err.contains("breakable_types"), "{err}");
+    }
+
+    #[test]
+    fn test_planning_validate_rejects_blank_field() {
+        let toml = r#"
+[planning]
+breakable_types = ["epic"]
+planning_type = ""
+breakdown_type = "breakdown"
+plan_doc_location = "inline"
+plan_gate_preset = "plan-review"
+coverage_gate_preset = "coverage-preview"
+"#;
+        let config: JitConfig = toml::from_str(toml).unwrap();
+        let err = config.planning.unwrap().validate().unwrap_err().to_string();
+        assert!(err.contains("planning_type"), "{err}");
+    }
+
+    #[test]
+    fn test_planning_validate_rejects_identical_bracket_types() {
+        let toml = r#"
+[planning]
+breakable_types = ["epic"]
+planning_type = "bracket"
+breakdown_type = "bracket"
+plan_doc_location = "inline"
+plan_gate_preset = "plan-review"
+coverage_gate_preset = "coverage-preview"
+"#;
+        let config: JitConfig = toml::from_str(toml).unwrap();
+        let err = config.planning.unwrap().validate().unwrap_err().to_string();
+        assert!(err.contains("must differ"), "{err}");
+    }
+
+    #[test]
+    fn test_planning_validate_against_hierarchy_ok() {
+        let config: JitConfig = toml::from_str(FULL_PLANNING_TOML).unwrap();
+        let hierarchy = config.type_hierarchy.unwrap();
+        let types: Vec<&str> = hierarchy.types.keys().map(|s| s.as_str()).collect();
+        config
+            .planning
+            .unwrap()
+            .validate_against_hierarchy(&types)
+            .expect("declared types are all in the hierarchy");
+    }
+
+    #[test]
+    fn test_planning_validate_against_hierarchy_rejects_undeclared_type() {
+        // `breakdown` is declared by [planning] but absent from [type_hierarchy].
+        let toml = r#"
+[type_hierarchy]
+types = { epic = 2, planning = 3, task = 4 }
+
+[planning]
+breakable_types = ["epic"]
+planning_type = "planning"
+breakdown_type = "breakdown"
+plan_doc_location = "inline"
+plan_gate_preset = "plan-review"
+coverage_gate_preset = "coverage-preview"
+"#;
+        let config: JitConfig = toml::from_str(toml).unwrap();
+        let hierarchy = config.type_hierarchy.clone().unwrap();
+        let types: Vec<&str> = hierarchy.types.keys().map(|s| s.as_str()).collect();
+        let err = config
+            .planning
+            .unwrap()
+            .validate_against_hierarchy(&types)
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("breakdown"), "{err}");
+    }
+
+    #[test]
+    fn test_load_rejects_malformed_planning_block() {
+        // The end-to-end LOAD path rejects a [planning] block whose declared types
+        // are not in [type_hierarchy] (R5 prevention).
+        let temp_dir = TempDir::new().unwrap();
+        let toml = r#"
+[type_hierarchy]
+types = { epic = 2, task = 4 }
+
+[planning]
+breakable_types = ["epic"]
+planning_type = "planning"
+breakdown_type = "breakdown"
+plan_doc_location = "inline"
+plan_gate_preset = "plan-review"
+coverage_gate_preset = "coverage-preview"
+"#;
+        std::fs::write(temp_dir.path().join("config.toml"), toml).unwrap();
+        let err = JitConfig::load(temp_dir.path()).unwrap_err().to_string();
+        assert!(err.contains("[planning]"), "{err}");
+    }
+
+    #[test]
+    fn test_load_accepts_well_formed_planning_block() {
+        let temp_dir = TempDir::new().unwrap();
+        std::fs::write(temp_dir.path().join("config.toml"), FULL_PLANNING_TOML).unwrap();
+        let config = JitConfig::load(temp_dir.path()).expect("well-formed planning block loads");
+        assert!(config.planning.is_some());
     }
 }
