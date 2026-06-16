@@ -498,10 +498,18 @@ fn optional_str<'a>(
 
 /// Evaluate a `label-coverage` rule.
 ///
-/// Every canonical criterion id declared in a source issue's success-criteria
-/// section must be satisfied by at least one related child carrying the derived
-/// `satisfies:<id>` label, optionally in a required state. Source issues are
-/// those matching the rule's [`Rule::when`] selector.
+/// Every canonical criterion id declared in the **container** issue's
+/// success-criteria section must be satisfied by at least one related child
+/// carrying the derived `satisfies:<id>` label, optionally in a required state.
+/// The issues whose criteria are checked are those matching the rule's
+/// [`Rule::when`] selector (the *firing* issues); by default the firing issue is
+/// its own container, but `container-from-label` can redirect the criteria source
+/// to another issue.
+///
+/// Unlike the per-issue `criteria-to-check` / `criteria-label-match` rules, this
+/// rule's child search is **transitive**: it walks the dependency subtree (via
+/// [`children_of`]) so a criterion satisfied by a non-sink issue deep in a
+/// transitively-reduced DAG is still credited.
 ///
 /// # Config keys
 ///
@@ -514,12 +522,22 @@ fn optional_str<'a>(
 /// - `satisfies-namespace` (string, optional, default `"satisfies"`): label
 ///   namespace on children whose value is the satisfied criterion id.
 /// - `child-state` (string, optional): when set, a satisfying child must be in
-///   this lifecycle state (snake_case, e.g. `"done"`).
+///   this lifecycle state (snake_case, e.g. `"done"`). **Absent means any
+///   state** — there is no `"any"` token.
 /// - `child-link` (string, optional, default `"dependents"`): how a child
-///   relates to the source — `"dependents"`, `"dependencies"`, or `"any"`.
+///   relates to the container — `"dependents"`, `"dependencies"`, or `"any"`.
+///   For `"dependents"` / `"dependencies"` the walk is a transitive closure in
+///   that direction.
+/// - `child-type-exclude` (array of strings, optional): bare `type:` names that
+///   are dropped from coverage candidates AND act as a traversal boundary (the
+///   walk does not descend through them).
+/// - `container-from-label` (string, optional): label namespace whose value on a
+///   firing issue names the criteria-bearing container, so a rule keyed on one
+///   issue type can evaluate another issue's criteria (container indirection).
 ///
-/// One finding is produced per uncovered criterion id per source issue. A
-/// malformed config yields a single `config-error` finding.
+/// One finding is produced per uncovered criterion id per container. A malformed
+/// config — including a firing issue whose `container-from-label` pointer cannot
+/// be resolved — yields a single `config-error` finding.
 fn evaluate_label_coverage(
     rule: &Rule,
     config: &toml::value::Table,
@@ -575,6 +593,48 @@ fn evaluate_label_coverage(
             )]
         }
     };
+    // `child-type-exclude` (optional, default empty): bare type names dropped
+    // from coverage candidates AND used as the transitive-walk boundary.
+    let exclude_types = match config.get("child-type-exclude") {
+        None => BTreeSet::new(),
+        Some(toml::Value::Array(arr)) => {
+            let mut set = BTreeSet::new();
+            for v in arr {
+                match v {
+                    toml::Value::String(s) => {
+                        set.insert(s.clone());
+                    }
+                    _ => {
+                        return vec![config_error(
+                            rule,
+                            "key 'child-type-exclude' must be an array of strings",
+                        )]
+                    }
+                }
+            }
+            set
+        }
+        Some(_) => {
+            return vec![config_error(
+                rule,
+                "key 'child-type-exclude' must be an array of strings",
+            )]
+        }
+    };
+    // `container-from-label` (optional): when set, the criteria-bearing container
+    // is not the matched (firing) issue itself but the issue named by the firing
+    // issue's `<namespace>:<id>` label. This lets a rule keyed on the breakdown
+    // node evaluate its container's criteria (D13 container indirection).
+    let container_ns = match config.get("container-from-label") {
+        None => None,
+        Some(toml::Value::String(s)) => Some(s.as_str()),
+        Some(_) => {
+            return vec![config_error(
+                rule,
+                "key 'container-from-label' must be a string",
+            )]
+        }
+    };
 
     // A child satisfies criterion `id` if it carries `satisfies-ns:id` and (when
     // configured) is in `child-state`.
@@ -591,15 +651,41 @@ fn evaluate_label_coverage(
         claims && state_ok
     };
 
+    let by_id: HashMap<&str, &Issue> = issues.iter().map(|i| (i.id.as_str(), i)).collect();
+
     issues
         .iter()
         .filter(|source| rule.when.matches(source))
         .flat_map(|source| {
-            // Select the parser per source issue (content_format -> repo default
-            // -> Markdown). A feature-not-compiled selection surfaces as a single
-            // config-error finding on the source rather than parsing wrongly.
+            // The criteria-bearing container is the firing issue itself, unless
+            // container indirection redirects to the issue named by the firing
+            // issue's `<container_ns>:<id>` label (D13). An unresolvable pointer
+            // is a config error (never a silent pass).
+            let container: &Issue = match container_ns {
+                None => source,
+                Some(ns) => {
+                    let mut targets = values_in_namespace(source, ns);
+                    match targets.next().and_then(|id| by_id.get(id).copied()) {
+                        Some(c) => c,
+                        None => {
+                            return vec![config_error(
+                                rule,
+                                format!(
+                                    "issue {} matched the rule but its '{ns}:<id>' container \
+                                     pointer is missing or names no known issue",
+                                    source.short_id()
+                                ),
+                            )]
+                        }
+                    }
+                }
+            };
+
+            // Select the parser per container issue (content_format -> repo
+            // default -> Markdown). A feature-not-compiled selection surfaces as a
+            // single config-error finding rather than parsing wrongly.
             let criteria = match criterion_ids(
-                source,
+                container,
                 section_slug,
                 marker,
                 &id_pattern,
@@ -608,17 +694,18 @@ fn evaluate_label_coverage(
                 Ok(ids) => ids,
                 Err(err) => return vec![config_error(rule, err.to_string())],
             };
-            let candidates: Vec<&Issue> = children_of(source, issues, child_link);
+            let candidates: Vec<&Issue> =
+                children_of(container, issues, child_link, &exclude_types);
             criteria
                 .into_iter()
                 .filter(move |id| !candidates.iter().any(|child| satisfied_id(child, id)))
                 .map(move |id| {
                     issue_finding(
                         rule,
-                        &source.id,
+                        &container.id,
                         format!(
                             "criterion '{id}' of issue {} is not satisfied by any {} child{}",
-                            source.short_id(),
+                            container.short_id(),
                             describe_link(child_link),
                             child_state
                                 .map(|s| format!(" in state '{s}'"))
@@ -679,19 +766,84 @@ fn criterion_ids(
         .collect())
 }
 
-/// The candidate child issues for a source under the given link semantics.
-fn children_of<'a>(source: &Issue, issues: &'a [Issue], link: ChildLink) -> Vec<&'a Issue> {
-    match link {
-        ChildLink::Any => issues.iter().filter(|i| i.id != source.id).collect(),
-        ChildLink::Dependents => issues
+/// Whether `issue`'s `type:` label is one of the excluded type names.
+///
+/// `excluded` holds bare type names (e.g. `"breakdown"`); an issue is excluded
+/// when it carries `type:<name>` for any of them.
+fn type_is_excluded(issue: &Issue, excluded: &BTreeSet<String>) -> bool {
+    !excluded.is_empty() && values_in_namespace(issue, "type").any(|t| excluded.contains(t))
+}
+
+/// The candidate child issues for a source under the given link semantics,
+/// walked **transitively** through the dependency DAG.
+///
+/// For the directional links the walk is a breadth-first closure: from `source`
+/// it follows dependency edges in the link's direction (`Dependents` = issues
+/// that depend on the frontier; `Dependencies` = issues the frontier depends on)
+/// and keeps descending. This lets a `label-coverage` rule credit a satisfying
+/// issue anywhere in the transitive subtree — necessary because the DAG is kept
+/// transitively reduced, so a container links only to its immediate (sink)
+/// children and a criterion satisfied deeper would otherwise read as uncovered.
+///
+/// `exclude_types` bounds the walk: a reached issue whose `type:` label is in the
+/// set is **dropped from the candidates** *and* the walk **does not descend
+/// through it** (it is a traversal boundary). In a bracket the boundary is the
+/// `type:breakdown` node, so coverage collects exactly the impl interior between
+/// the container and the breakdown node.
+///
+/// `ChildLink::Any` has no traversal notion — it returns every other issue as a
+/// candidate — but excluded types are still dropped from the candidate set.
+fn children_of<'a>(
+    source: &Issue,
+    issues: &'a [Issue],
+    link: ChildLink,
+    exclude_types: &BTreeSet<String>,
+) -> Vec<&'a Issue> {
+    if link == ChildLink::Any {
+        return issues
             .iter()
-            .filter(|i| i.dependencies.contains(&source.id))
-            .collect(),
-        ChildLink::Dependencies => issues
-            .iter()
-            .filter(|i| source.dependencies.contains(&i.id))
-            .collect(),
+            .filter(|i| i.id != source.id && !type_is_excluded(i, exclude_types))
+            .collect();
     }
+
+    // Index issues by id for O(1) neighbour resolution during the walk.
+    let by_id: HashMap<&str, &Issue> = issues.iter().map(|i| (i.id.as_str(), i)).collect();
+
+    // Neighbours of `node` in the link's direction.
+    let neighbours = |node: &Issue| -> Vec<&'a Issue> {
+        match link {
+            ChildLink::Dependents => issues
+                .iter()
+                .filter(|i| i.dependencies.contains(&node.id))
+                .collect(),
+            ChildLink::Dependencies => node
+                .dependencies
+                .iter()
+                .filter_map(|dep| by_id.get(dep.as_str()).copied())
+                .collect(),
+            ChildLink::Any => Vec::new(), // handled above
+        }
+    };
+
+    let mut visited: BTreeSet<&str> = BTreeSet::new();
+    visited.insert(source.id.as_str());
+    let mut frontier: Vec<&Issue> = neighbours(source);
+    let mut candidates: Vec<&Issue> = Vec::new();
+
+    while let Some(node) = frontier.pop() {
+        if !visited.insert(node.id.as_str()) {
+            continue;
+        }
+        // An excluded-type node is neither a candidate nor a path to descend
+        // through: it is the traversal boundary.
+        if type_is_excluded(node, exclude_types) {
+            continue;
+        }
+        candidates.push(node);
+        frontier.extend(neighbours(node));
+    }
+
+    candidates
 }
 
 // ---------------------------------------------------------------------------
@@ -1516,7 +1668,11 @@ mod tests {
             ContentFormat::Markdown,
             fixed_now(),
         );
-        assert_eq!(findings.len(), 1, "uncovered criterion reports: {findings:?}");
+        assert_eq!(
+            findings.len(),
+            1,
+            "uncovered criterion reports: {findings:?}"
+        );
         assert!(findings[0].finding.message.contains("REQ-01"));
     }
 
@@ -1552,9 +1708,8 @@ mod tests {
         // Bracket spine: epic ──dep→ impl ──dep→ B(type:breakdown) ──dep→ P.
         // P (beyond the boundary) satisfies REQ-01, but B is excluded, so the
         // walk must halt at B and never reach P -> uncovered.
-        let rule = coverage_rule(
-            "child-link = \"dependencies\", child-type-exclude = [\"breakdown\"]",
-        );
+        let rule =
+            coverage_rule("child-link = \"dependencies\", child-type-exclude = [\"breakdown\"]");
         let mut epic = epic_chain_head(&["REQ-01"]);
         let mut impl_node = issue("impl", &["type:task"]);
         let mut breakdown = issue("B", &["type:breakdown"]);
@@ -1583,9 +1738,8 @@ mod tests {
     fn test_child_type_exclude_credits_interior_before_boundary() {
         // Same spine, but the impl interior node (before B) satisfies REQ-01.
         // Excluding `breakdown` must NOT drop the impl node -> covered.
-        let rule = coverage_rule(
-            "child-link = \"dependencies\", child-type-exclude = [\"breakdown\"]",
-        );
+        let rule =
+            coverage_rule("child-link = \"dependencies\", child-type-exclude = [\"breakdown\"]");
         let mut epic = epic_chain_head(&["REQ-01"]);
         let mut impl_node = issue("impl", &["type:task", "satisfies:REQ-01"]);
         let breakdown = issue("B", &["type:breakdown"]);
@@ -1640,9 +1794,7 @@ mod tests {
         let mut breakdown = issue("B", &["type:breakdown"]);
         // Container depends on impl (its subtree); B brackets the container.
         container.dependencies = vec![impl_node.id.clone()];
-        breakdown
-            .labels
-            .push(format!("brackets:{}", container.id));
+        breakdown.labels.push(format!("brackets:{}", container.id));
         // B sits on the spine after impl, but the walk runs from the container.
         impl_node.dependencies = vec![breakdown.id.clone()];
 
@@ -1673,9 +1825,7 @@ mod tests {
         let impl_node = issue("impl", &["type:task"]); // does NOT satisfy
         let mut breakdown = issue("B", &["type:breakdown"]);
         container.dependencies = vec![impl_node.id.clone()];
-        breakdown
-            .labels
-            .push(format!("brackets:{}", container.id));
+        breakdown.labels.push(format!("brackets:{}", container.id));
 
         let rules = vec![&rule];
         let findings = evaluate_graph(
@@ -1685,7 +1835,11 @@ mod tests {
             ContentFormat::Markdown,
             fixed_now(),
         );
-        assert_eq!(findings.len(), 1, "uncovered container criterion: {findings:?}");
+        assert_eq!(
+            findings.len(),
+            1,
+            "uncovered container criterion: {findings:?}"
+        );
         assert!(findings[0].finding.message.contains("REQ-01"));
     }
 
@@ -1703,9 +1857,7 @@ mod tests {
         impl_node.state = State::Backlog; // drafted, not done
         let mut breakdown = issue("B", &["type:breakdown"]);
         container.dependencies = vec![impl_node.id.clone()];
-        breakdown
-            .labels
-            .push(format!("brackets:{}", container.id));
+        breakdown.labels.push(format!("brackets:{}", container.id));
 
         let rules = vec![&rule];
         let findings = evaluate_graph(
