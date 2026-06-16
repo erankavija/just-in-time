@@ -2,64 +2,189 @@
   "epic_id": "2fbd2a82-14ba-4e6e-90f6-e0c34f0f912c",
   "epic_short_id": "2fbd2a82",
   "epic_title": "Plan-before-fan-out bracket: gated planning node before breakdown",
-  "current_wave": 1,
+  "current_wave": 2,
   "design_doc": "dev/active/planning-bracket-design.md",
-  "gates_attached": ["cargo-ci", "code-review"],
+  "gates_attached": [
+    "cargo-ci",
+    "code-review"
+  ],
   "stories": {
-    "81fbf45a-2991-4f7e-bf03-7aed8bcedb02": {"short_id": "81fbf45a", "title": "Validation engine primitives", "member_tasks": ["c78168d8", "4aa44224", "64c7df93"]},
-    "c6d2f4ca-950c-4c2a-9d31-d01eaf7fbff7": {"short_id": "c6d2f4ca", "title": "Scaffolding command, doc resolver, gate presets", "member_tasks": ["1536006d", "6a82ca5d", "17eb97ba"]},
-    "bd5c1feb-33c6-4f0d-8524-6031d8ee9060": {"short_id": "bd5c1feb", "title": "Example rulesets and documentation", "member_tasks": ["539cbdb1", "5c21327f", "04656f7b"]},
-    "cb8cdf1b-2375-4a0a-b864-683dfab97367": {"short_id": "cb8cdf1b", "title": "Skill re-sequencing and steering eval", "member_tasks": ["590add26", "4d321a11", "af0a499f"]}
+    "81fbf45a-2991-4f7e-bf03-7aed8bcedb02": {
+      "short_id": "81fbf45a",
+      "title": "Validation engine primitives",
+      "member_tasks": [
+        "c78168d8",
+        "4aa44224",
+        "64c7df93"
+      ]
+    },
+    "c6d2f4ca-950c-4c2a-9d31-d01eaf7fbff7": {
+      "short_id": "c6d2f4ca",
+      "title": "Scaffolding command, doc resolver, gate presets",
+      "member_tasks": [
+        "1536006d",
+        "6a82ca5d",
+        "17eb97ba"
+      ]
+    },
+    "bd5c1feb-33c6-4f0d-8524-6031d8ee9060": {
+      "short_id": "bd5c1feb",
+      "title": "Example rulesets and documentation",
+      "member_tasks": [
+        "539cbdb1",
+        "5c21327f",
+        "04656f7b"
+      ]
+    },
+    "cb8cdf1b-2375-4a0a-b864-683dfab97367": {
+      "short_id": "cb8cdf1b",
+      "title": "Skill re-sequencing and steering eval",
+      "member_tasks": [
+        "590add26",
+        "4d321a11",
+        "af0a499f"
+      ]
+    }
   },
   "waves": [
     {
       "wave_number": 1,
       "issues": [
-        {"id": "c78168d8-152a-4809-bb54-8de877197331", "short_id": "c78168d8", "title": "Planning config block and type-schema regeneration", "classification": "implementation", "status": "dispatched", "task_ref": "T1", "worktree": ".claude/worktrees/agent-c78168d8"},
-        {"id": "4aa44224-b7b6-4e7d-8a1c-a63f6f726106", "short_id": "4aa44224", "title": "Scoped validation: jit validate --scope", "classification": "implementation", "status": "dispatched", "task_ref": "T2", "worktree": ".claude/worktrees/agent-4aa44224"},
-        {"id": "64c7df93-3fb6-4ee7-97e1-51d8254ed33a", "short_id": "64c7df93", "title": "Transitive coverage with type-exclude and container indirection", "classification": "implementation", "status": "dispatched", "task_ref": "T3", "worktree": ".claude/worktrees/agent-64c7df93"}
+        {
+          "id": "c78168d8-152a-4809-bb54-8de877197331",
+          "short_id": "c78168d8",
+          "title": "Planning config block and type-schema regeneration",
+          "classification": "implementation",
+          "status": "done",
+          "task_ref": "T1",
+          "worktree": ".claude/worktrees/agent-c78168d8"
+        },
+        {
+          "id": "4aa44224-b7b6-4e7d-8a1c-a63f6f726106",
+          "short_id": "4aa44224",
+          "title": "Scoped validation: jit validate --scope",
+          "classification": "implementation",
+          "status": "done",
+          "task_ref": "T2",
+          "worktree": ".claude/worktrees/agent-4aa44224"
+        },
+        {
+          "id": "64c7df93-3fb6-4ee7-97e1-51d8254ed33a",
+          "short_id": "64c7df93",
+          "title": "Transitive coverage with type-exclude and container indirection",
+          "classification": "implementation",
+          "status": "done",
+          "task_ref": "T3",
+          "worktree": ".claude/worktrees/agent-64c7df93"
+        }
       ]
     },
     {
       "wave_number": 2,
       "issues": [
-        {"id": "1536006d-d0f2-4783-8027-cb1f7e8beaef", "short_id": "1536006d", "title": "Plan-document location resolver", "classification": "implementation", "status": "pending", "task_ref": "T4"},
-        {"id": "6a82ca5d-234a-405e-9ba3-ee8c95ac5cd4", "short_id": "6a82ca5d", "title": "Plan-review and coverage-preview gate presets", "classification": "implementation", "status": "pending", "task_ref": "T6"}
+        {
+          "id": "1536006d-d0f2-4783-8027-cb1f7e8beaef",
+          "short_id": "1536006d",
+          "title": "Plan-document location resolver",
+          "classification": "implementation",
+          "status": "pending",
+          "task_ref": "T4"
+        },
+        {
+          "id": "6a82ca5d-234a-405e-9ba3-ee8c95ac5cd4",
+          "short_id": "6a82ca5d",
+          "title": "Plan-review and coverage-preview gate presets",
+          "classification": "implementation",
+          "status": "pending",
+          "task_ref": "T6"
+        }
       ]
     },
     {
       "wave_number": 3,
       "issues": [
-        {"id": "17eb97ba-0564-495d-bbf5-6ee5cb890b20", "short_id": "17eb97ba", "title": "Bracket scaffolding command", "classification": "implementation", "status": "pending", "task_ref": "T5"},
-        {"id": "539cbdb1-c9c8-422a-af94-3db34b585f75", "short_id": "539cbdb1", "title": "SDD example ruleset with the bracket", "classification": "implementation", "status": "pending", "task_ref": "T7"},
-        {"id": "5c21327f-4254-4cde-a101-369a592b59dd", "short_id": "5c21327f", "title": "Research example ruleset on a non-epic hierarchy", "classification": "implementation", "status": "pending", "task_ref": "T8"}
+        {
+          "id": "17eb97ba-0564-495d-bbf5-6ee5cb890b20",
+          "short_id": "17eb97ba",
+          "title": "Bracket scaffolding command",
+          "classification": "implementation",
+          "status": "pending",
+          "task_ref": "T5"
+        },
+        {
+          "id": "539cbdb1-c9c8-422a-af94-3db34b585f75",
+          "short_id": "539cbdb1",
+          "title": "SDD example ruleset with the bracket",
+          "classification": "implementation",
+          "status": "pending",
+          "task_ref": "T7"
+        },
+        {
+          "id": "5c21327f-4254-4cde-a101-369a592b59dd",
+          "short_id": "5c21327f",
+          "title": "Research example ruleset on a non-epic hierarchy",
+          "classification": "implementation",
+          "status": "pending",
+          "task_ref": "T8"
+        }
       ]
     },
     {
       "wave_number": 4,
       "issues": [
-        {"id": "590add26-10af-4aea-b7da-189bf257e39d", "short_id": "590add26", "title": "Re-sequence jit-breakdown for the bracket", "classification": "implementation", "status": "pending", "task_ref": "T10"},
-        {"id": "04656f7b-2af9-4f5a-ace1-ceef8a576d86", "short_id": "04656f7b", "title": "Bracket concept and how-to documentation", "classification": "documentation", "status": "pending", "task_ref": "T9"}
+        {
+          "id": "590add26-10af-4aea-b7da-189bf257e39d",
+          "short_id": "590add26",
+          "title": "Re-sequence jit-breakdown for the bracket",
+          "classification": "implementation",
+          "status": "pending",
+          "task_ref": "T10"
+        },
+        {
+          "id": "04656f7b-2af9-4f5a-ace1-ceef8a576d86",
+          "short_id": "04656f7b",
+          "title": "Bracket concept and how-to documentation",
+          "classification": "documentation",
+          "status": "pending",
+          "task_ref": "T9"
+        }
       ]
     },
     {
       "wave_number": 5,
       "issues": [
-        {"id": "4d321a11-e6eb-4331-97af-7b9557bee6ac", "short_id": "4d321a11", "title": "Re-sequence project-lead for the bracket", "classification": "implementation", "status": "pending", "task_ref": "T11"}
+        {
+          "id": "4d321a11-e6eb-4331-97af-7b9557bee6ac",
+          "short_id": "4d321a11",
+          "title": "Re-sequence project-lead for the bracket",
+          "classification": "implementation",
+          "status": "pending",
+          "task_ref": "T11"
+        }
       ]
     },
     {
       "wave_number": 6,
       "issues": [
-        {"id": "af0a499f-ecec-4b08-a662-531afa0e3c01", "short_id": "af0a499f", "title": "Steering scenarios for the bracket", "classification": "implementation", "status": "pending", "task_ref": "T12"}
+        {
+          "id": "af0a499f-ecec-4b08-a662-531afa0e3c01",
+          "short_id": "af0a499f",
+          "title": "Steering scenarios for the bracket",
+          "classification": "implementation",
+          "status": "pending",
+          "task_ref": "T12"
+        }
       ]
     }
   ],
   "created_during_execution": [],
   "escalations": [],
-  "rework_counts": {"4aa44224": 1, "64c7df93": 1},
+  "rework_counts": {
+    "4aa44224": 1,
+    "64c7df93": 1
+  },
   "wave1_gate_status": {
-    "c78168d8": "cargo-ci PASSED, code-review PASSED — DONE-ready",
+    "c78168d8": "cargo-ci PASSED, code-review PASSED \u2014 DONE-ready",
     "64c7df93": "cargo-ci PASSED; code-review FAIL: container-from-label resolves only full IDs, brackets:<short-id> convention breaks. Rework #1 in progress.",
     "4aa44224": "cargo-ci PASSED; code-review FAIL: (1) bracket_scope_ids graph traversal in commands/ violates domain boundary; (2) validate_scope missing # Examples doc. Rework #1 pending after T3.",
     "gate_env_note": "cargo-ci must run with RUST_TEST_THREADS=1 and TMPDIR=/home/vkaskivuo/.cache/jit-test-tmp to avoid pre-existing load-induced flake in prop_concurrent_different_issues_succeed (global claims.lock 5s timeout) and tmpfs quota in version_cli_tests. Honest run, all tests pass."
@@ -69,5 +194,7 @@
     "4aa44224": "T2 content FAIL: hardcodes const BREAKDOWN_TYPE_LABEL=\"type:breakdown\" in validate.rs:1225 (production), violating the epic [hard] criterion 'no epic/planning/breakdown strings in Rust'. Must consume bracket type from T1 [planning] config. Rework AFTER T1 lands (needs T1 config API). Otherwise scope BFS logic is correct.",
     "env_note": "Both T2 & T3 workers report version_cli_tests (test_version_build_*) failing in their restricted sandboxes (fresh full cargo rebuild needs network+disk). Must confirm cargo-ci passes these in the real gate environment before relying on the gate."
   },
-  "started_at": "2026-06-16"
+  "started_at": "2026-06-16",
+  "wave1_complete": true,
+  "story_81fbf45a": "done"
 }

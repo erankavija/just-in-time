@@ -2,7 +2,7 @@
   "id": "1536006d-d0f2-4783-8027-cb1f7e8beaef",
   "title": "Plan-document location resolver",
   "description": "A boundary resolver that loads a plan document from either the issue body or a configured external path and feeds its content to the pure validation engine.\n\n## Success Criteria\n\n- [ ] An inline plan body and an external-file plan both resolve to the same projected content for validation.\n- [ ] File reading happens at the boundary; the validation engine performs no filesystem I/O.\n- [ ] A missing or unreadable external plan path produces a clear error.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -13,15 +13,15 @@
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-06-16T20:41:43.867675032Z"
-    },
     "cargo-ci": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-06-16T20:41:43.860302410Z"
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-06-16T20:41:43.867675032Z"
     }
   },
   "context": {},
@@ -32,5 +32,5 @@
     "epic:planning-bracket"
   ],
   "created_at": "2026-06-15T18:34:31.094250428+00:00",
-  "updated_at": "2026-06-16T20:41:43.867725082+00:00"
+  "updated_at": "2026-06-16T22:24:38.534749888+00:00"
 }

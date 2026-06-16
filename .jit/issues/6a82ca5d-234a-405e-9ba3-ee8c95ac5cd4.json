@@ -2,7 +2,7 @@
   "id": "6a82ca5d-234a-405e-9ba3-ee8c95ac5cd4",
   "title": "Plan-review and coverage-preview gate presets",
   "description": "Define a `plan-review` preset (agent gate on the planning node) and a `coverage-preview` preset (deterministic gate on the breakdown node running scoped validation), plus the preview coverage rule that omits child-state.\n\n## Success Criteria\n\n- [ ] Applying `plan-review` attaches an agent review gate to a planning node.\n- [ ] Applying `coverage-preview` attaches a gate whose checker runs scoped validation for the container resolved from the breakdown node.\n- [ ] The preview coverage rule omits `child-state` (any state) while the closure rule requires done.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -14,15 +14,15 @@
     "code-review"
   ],
   "gates_status": {
-    "cargo-ci": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-06-16T20:41:43.875002434Z"
-    },
     "code-review": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-06-16T20:41:43.882148586Z"
+    },
+    "cargo-ci": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-06-16T20:41:43.875002434Z"
     }
   },
   "context": {},
@@ -33,5 +33,5 @@
     "epic:planning-bracket"
   ],
   "created_at": "2026-06-15T18:34:31.105103511+00:00",
-  "updated_at": "2026-06-16T20:41:43.882176976+00:00"
+  "updated_at": "2026-06-16T22:24:38.896699722+00:00"
 }
