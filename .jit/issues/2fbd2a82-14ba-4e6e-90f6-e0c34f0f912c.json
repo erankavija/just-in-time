@@ -6,8 +6,10 @@
   "priority": "high",
   "assignee": null,
   "dependencies": [
+    "81fbf45a-2991-4f7e-bf03-7aed8bcedb02",
     "bd5c1feb-33c6-4f0d-8524-6031d8ee9060",
-    "cb8cdf1b-2375-4a0a-b864-683dfab97367"
+    "cb8cdf1b-2375-4a0a-b864-683dfab97367",
+    "c6d2f4ca-950c-4c2a-9d31-d01eaf7fbff7"
   ],
   "gates_required": [],
   "gates_status": {},
@@ -18,5 +20,5 @@
     "epic:planning-bracket"
   ],
   "created_at": "2026-06-14T15:13:23.772344129+00:00",
-  "updated_at": "2026-06-16T18:31:37.237830698+00:00"
+  "updated_at": "2026-06-16T20:24:12.848382043+00:00"
 }
