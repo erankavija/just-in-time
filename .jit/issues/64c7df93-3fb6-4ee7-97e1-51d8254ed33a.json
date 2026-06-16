@@ -2,9 +2,9 @@
   "id": "64c7df93-3fb6-4ee7-97e1-51d8254ed33a",
   "title": "Transitive coverage with type-exclude and container indirection",
   "description": "Make `label-coverage` traverse the container transitive subtree by default, add a `child-type-exclude` option, and let a coverage rule resolve its criteria-bearing container from a `brackets:` label.\n\n## Background\n\nCoverage walks direct dependencies only; under transitive reduction a container links only to sink children, so a criterion satisfied deeper reads as uncovered. The per-issue rules must keep their same-issue semantics.\n\n## Success Criteria\n\n- [ ] `label-coverage` credits a satisfying issue anywhere in the transitive subtree; `criteria-to-check` and `criteria-label-match` are unchanged.\n- [ ] `child-type-exclude` drops listed types from coverage candidates and halts the walk through them.\n- [ ] A `label-coverage` rule matching the breakdown node resolves the container via its `brackets:` label and evaluates that container criteria.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [
     "4b090868-1018-4cb2-acd7-de449a034e51"
   ],
@@ -13,15 +13,15 @@
     "code-review"
   ],
   "gates_status": {
-    "cargo-ci": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-06-16T20:41:43.846606526Z"
-    },
     "code-review": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-06-16T20:41:43.853288048Z"
+    },
+    "cargo-ci": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-06-16T20:41:43.846606526Z"
     }
   },
   "context": {},
@@ -32,5 +32,5 @@
     "epic:planning-bracket"
   ],
   "created_at": "2026-06-15T18:34:31.088609666+00:00",
-  "updated_at": "2026-06-16T20:41:43.853337688+00:00"
+  "updated_at": "2026-06-16T20:43:14.278376519+00:00"
 }

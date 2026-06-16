@@ -2,9 +2,9 @@
   "id": "4aa44224-b7b6-4e7d-8a1c-a63f6f726106",
   "title": "Scoped validation: jit validate --scope",
   "description": "Add `jit validate --scope <id>` that evaluates rules over a container bracket subtree with a deterministic exit code, for use as a gate checker.\n\n## Success Criteria\n\n- [ ] The scope slice is the container transitive dependency closure including the breakdown node, and excludes whole-repo rules.\n- [ ] Each in-slice issue is evaluated against the rules whose selector matches it; a rule selecting the breakdown node fires.\n- [ ] Exits 4 (ValidationFailed) with findings shown when an enforcing rule fails; zero when clean.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [
     "4b090868-1018-4cb2-acd7-de449a034e51"
   ],
@@ -32,5 +32,5 @@
     "epic:planning-bracket"
   ],
   "created_at": "2026-06-15T18:34:31.082657884+00:00",
-  "updated_at": "2026-06-16T20:41:43.839489394+00:00"
+  "updated_at": "2026-06-16T20:43:14.262561445+00:00"
 }
