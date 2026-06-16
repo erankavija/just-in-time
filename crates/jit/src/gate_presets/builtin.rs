@@ -1,6 +1,9 @@
 //! Built-in gate presets
 
-use super::{GatePresetDefinition, GateTemplate};
+use super::{
+    coverage_preview_preset, plan_review_preset, GatePresetDefinition, GateTemplate,
+    COVERAGE_PREVIEW_PRESET, PLAN_REVIEW_PRESET,
+};
 use crate::domain::{GateChecker, GateMode, GateStage};
 use anyhow::Result;
 use std::collections::HashMap;
@@ -18,6 +21,8 @@ use std::collections::HashMap;
 /// assert!(presets.contains_key("python-tdd"));
 /// assert!(presets.contains_key("js-tdd"));
 /// assert!(presets.contains_key("security-audit"));
+/// assert!(presets.contains_key("plan-review"));
+/// assert!(presets.contains_key("coverage-preview"));
 /// ```
 pub struct BuiltinPresets;
 
@@ -30,7 +35,7 @@ impl BuiltinPresets {
     /// use jit::gate_presets::BuiltinPresets;
     ///
     /// let presets = BuiltinPresets::load().unwrap();
-    /// assert_eq!(presets.len(), 5);
+    /// assert_eq!(presets.len(), 7);
     /// let security = presets.get("security-audit").unwrap();
     /// assert_eq!(security.gates.len(), 3);
     /// ```
@@ -304,8 +309,23 @@ impl BuiltinPresets {
             ],
         };
 
+        // Planning-bracket presets (T6): the agent plan-quality gate on the
+        // planning node and the deterministic coverage-preview gate on the
+        // breakdown node. Defined in `planning.rs` so the gate shapes live next
+        // to the preview-rule constructor.
+        let plan_review = plan_review_preset();
+        let coverage_preview = coverage_preview_preset();
+
         // Validate all presets
-        let all_presets = [&rust_tdd, &minimal, &python_tdd, &js_tdd, &security_audit];
+        let all_presets = [
+            &rust_tdd,
+            &minimal,
+            &python_tdd,
+            &js_tdd,
+            &security_audit,
+            &plan_review,
+            &coverage_preview,
+        ];
         for preset in &all_presets {
             preset.validate()?;
         }
@@ -315,6 +335,8 @@ impl BuiltinPresets {
         presets.insert(python_tdd.name.clone(), python_tdd);
         presets.insert(js_tdd.name.clone(), js_tdd);
         presets.insert(security_audit.name.clone(), security_audit);
+        presets.insert(plan_review.name.clone(), plan_review);
+        presets.insert(coverage_preview.name.clone(), coverage_preview);
 
         Ok(presets)
     }
@@ -336,6 +358,8 @@ impl BuiltinPresets {
             "python-tdd".to_string(),
             "js-tdd".to_string(),
             "security-audit".to_string(),
+            PLAN_REVIEW_PRESET.to_string(),
+            COVERAGE_PREVIEW_PRESET.to_string(),
         ]
     }
 }
@@ -347,12 +371,32 @@ mod tests {
     #[test]
     fn test_load_builtin_presets() {
         let presets = BuiltinPresets::load().unwrap();
-        assert_eq!(presets.len(), 5);
+        assert_eq!(presets.len(), 7);
         assert!(presets.contains_key("rust-tdd"));
         assert!(presets.contains_key("minimal"));
         assert!(presets.contains_key("python-tdd"));
         assert!(presets.contains_key("js-tdd"));
         assert!(presets.contains_key("security-audit"));
+        assert!(presets.contains_key("plan-review"));
+        assert!(presets.contains_key("coverage-preview"));
+    }
+
+    #[test]
+    fn test_planning_bracket_presets_registered() {
+        let presets = BuiltinPresets::load().unwrap();
+
+        let plan_review = presets.get("plan-review").unwrap();
+        assert_eq!(plan_review.gates.len(), 1);
+        assert_eq!(plan_review.gates[0].key, "plan-review");
+        assert_eq!(plan_review.gates[0].mode, GateMode::Auto);
+
+        let coverage = presets.get("coverage-preview").unwrap();
+        assert_eq!(coverage.gates.len(), 1);
+        assert_eq!(coverage.gates[0].key, "coverage-preview");
+        assert_eq!(coverage.gates[0].mode, GateMode::Auto);
+
+        assert!(BuiltinPresets::names().contains(&"plan-review".to_string()));
+        assert!(BuiltinPresets::names().contains(&"coverage-preview".to_string()));
     }
 
     #[test]
