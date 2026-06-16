@@ -517,7 +517,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// The scope slice is the container's transitive dependency closure
     /// **including** the `type:breakdown` node `B` but **bounded** so the walk
     /// stops at `B` (it never pulls in `P` / upstream beyond the breakdown gate).
-    /// See [`bracket_scope_ids`] for the precise membership rule. For each
+    /// See [`bracket_scope_ids`](crate::domain::queries::bracket_scope_ids) for
+    /// the precise membership rule. For each
     /// in-slice issue, the rules whose `when` selector matches it are evaluated —
     /// so a rule keyed on `type:breakdown` (the coverage-preview instance, D13)
     /// fires because `B` is in scope. This decides *whose* rules run; it is
@@ -542,6 +543,27 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// Returns an error if `.jit/rules.toml` is malformed, the container id cannot
     /// be resolved, or a matching local rule's schema fails to compile.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use jit::commands::CommandExecutor;
+    /// use jit::storage::InMemoryStorage;
+    ///
+    /// # fn main() -> anyhow::Result<()> {
+    /// let executor = CommandExecutor::new(InMemoryStorage::new());
+    ///
+    /// // Run the deterministic scope gate for one container (e.g. an epic);
+    /// // partial ids are accepted and resolved internally.
+    /// let report = executor.validate_scope("2fbd2a82")?;
+    ///
+    /// // The caller decides the exit code: fail on any error-severity finding.
+    /// if report.findings.iter().any(|f| f.is_error()) {
+    ///     eprintln!("scope validation failed");
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn validate_scope(
         &self,
         container_id: &str,
@@ -564,7 +586,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Resolve the container (partial ids accepted) and build the slice.
         let container_full_id = self.storage.resolve_issue_id(container_id)?;
         let all = self.storage.list_issues()?;
-        let scope_ids = bracket_scope_ids(&container_full_id, &all, breakdown_type.as_deref());
+        let scope_ids = crate::domain::queries::bracket_scope_ids(
+            &container_full_id,
+            &all,
+            breakdown_type.as_deref(),
+        );
         let slice: Vec<Issue> = all
             .into_iter()
             .filter(|i| scope_ids.contains(&i.id))
@@ -1228,83 +1254,6 @@ fn graph_findings_error_message(
     ))
 }
 
-/// Compute the bracket-scope membership for `jit validate --scope <container>`:
-/// the container's transitive dependency closure, **including** any breakdown
-/// boundary node `B` reached, but **bounded** so the walk does not descend
-/// through `B` into its dependencies (`P` / upstream). The container id itself is
-/// always a member.
-///
-/// The breakdown boundary type is **config-driven**, not baked in: `B` is the
-/// node carrying `type:<breakdown_type>`, where `breakdown_type` is the
-/// `[planning].breakdown_type` name passed by the caller (e.g. `"breakdown"` for
-/// SDD, or any custom name a different ruleset chooses). The label string is
-/// built at runtime from that name, so the engine stays domain-agnostic.
-///
-/// When `breakdown_type` is `None` — i.e. no `[planning]` block is configured, so
-/// the ruleset has no bracket — there is no breakdown boundary: the walk is the
-/// full transitive dependency closure of the container, with no halt.
-///
-/// This is a pure graph walk over dependency edges (no I/O): a BFS from the
-/// container that adds each dependency it reaches and continues descending,
-/// except that (when a boundary type is configured) it never enqueues the
-/// dependencies OF a boundary node — so `B` is collected as the boundary but
-/// everything strictly upstream of it is excluded. The container is matched by
-/// its full id (the caller resolves partial ids before calling). A missing
-/// container yields just that id.
-///
-/// Membership here decides whose `when` rules are evaluated (D14); it is
-/// independent of `child-type-exclude`, which governs only the coverage rule's
-/// candidate traversal.
-fn bracket_scope_ids(
-    container_id: &str,
-    issues: &[Issue],
-    breakdown_type: Option<&str>,
-) -> std::collections::HashSet<String> {
-    use std::collections::{HashSet, VecDeque};
-
-    // The boundary label, derived from config (e.g. `type:breakdown`). Absent
-    // when no `[planning]` bracket is configured, in which case nothing halts the
-    // walk and the result is the full dependency closure.
-    let breakdown_label = breakdown_type.map(|t| format!("type:{t}"));
-
-    let is_breakdown = |id: &str| match &breakdown_label {
-        Some(label) => issues
-            .iter()
-            .find(|i| i.id == id)
-            .is_some_and(|i| i.labels.iter().any(|l| l == label)),
-        None => false,
-    };
-
-    let mut included: HashSet<String> = HashSet::new();
-    included.insert(container_id.to_string());
-
-    let mut queue: VecDeque<String> = VecDeque::new();
-    queue.push_back(container_id.to_string());
-
-    while let Some(current) = queue.pop_front() {
-        // Halt the walk AT a breakdown node: it is in scope, but its own
-        // dependencies (the plan `P` / upstream) are out of scope.
-        if current != container_id && is_breakdown(&current) {
-            continue;
-        }
-        let Some(node) = issues.iter().find(|i| i.id == current) else {
-            continue;
-        };
-        for dep in &node.dependencies {
-            // Skip dangling edges to ids absent from the store (defensive: the
-            // integrity check owns broken-dependency reporting).
-            if !issues.iter().any(|i| &i.id == dep) {
-                continue;
-            }
-            if included.insert(dep.clone()) {
-                queue.push_back(dep.clone());
-            }
-        }
-    }
-
-    included
-}
-
 /// Group `(rule_name, message)` pairs into a map of rule name to its messages,
 /// preserving first-seen order within each rule.
 fn group_messages(
@@ -1491,121 +1440,6 @@ pub fn validate_claims_index() -> Result<Vec<String>> {
 mod tests {
     use super::*;
     use chrono::Duration;
-
-    /// Build an issue with the given id, type label, and dependency ids.
-    fn scope_issue(id: &str, type_: &str, deps: &[&str]) -> Issue {
-        let mut issue = Issue::new(format!("issue {id}"), String::new());
-        issue.id = id.to_string();
-        issue.labels = vec![format!("type:{type_}")];
-        issue.dependencies = deps.iter().map(|s| s.to_string()).collect();
-        issue
-    }
-
-    /// A bracket spine `C -> impl1 -> impl2 -> B -> P` plus an upstream `U`
-    /// that `P` depends on. Edges point from dependent to dependency (an issue
-    /// depends on the ones before it close).
-    fn bracket_spine() -> Vec<Issue> {
-        vec![
-            scope_issue("C0000000", "epic", &["I1000000"]),
-            scope_issue("I1000000", "task", &["I2000000"]),
-            scope_issue("I2000000", "task", &["B0000000"]),
-            scope_issue("B0000000", "breakdown", &["P0000000"]),
-            scope_issue("P0000000", "planning", &["U0000000"]),
-            scope_issue("U0000000", "epic", &[]),
-        ]
-    }
-
-    #[test]
-    fn test_bracket_scope_includes_container_impl_and_breakdown() {
-        let issues = bracket_spine();
-        let ids = bracket_scope_ids("C0000000", &issues, Some("breakdown"));
-        assert!(ids.contains("C0000000"), "container is in scope");
-        assert!(ids.contains("I1000000"), "impl source is in scope");
-        assert!(ids.contains("I2000000"), "impl sink is in scope");
-        assert!(
-            ids.contains("B0000000"),
-            "breakdown node B is in scope (its rule fires)"
-        );
-    }
-
-    #[test]
-    fn test_bracket_scope_stops_at_breakdown_excludes_plan_and_upstream() {
-        let issues = bracket_spine();
-        let ids = bracket_scope_ids("C0000000", &issues, Some("breakdown"));
-        assert!(
-            !ids.contains("P0000000"),
-            "walk halts at B; plan P is out of scope"
-        );
-        assert!(
-            !ids.contains("U0000000"),
-            "upstream beyond B is out of scope"
-        );
-        assert_eq!(ids.len(), 4, "exactly C + 2 impl + B");
-    }
-
-    #[test]
-    fn test_bracket_scope_boundary_type_is_config_driven() {
-        // The boundary is whatever `[planning].breakdown_type` names — here a
-        // CUSTOM type `synthesis`, not the literal "breakdown". The walk must
-        // halt at the `type:synthesis` node and exclude its upstream.
-        let issues = vec![
-            scope_issue("C0000000", "goal", &["I1000000"]),
-            scope_issue("I1000000", "task", &["S0000000"]),
-            scope_issue("S0000000", "synthesis", &["P0000000"]),
-            scope_issue("P0000000", "planning", &["U0000000"]),
-            scope_issue("U0000000", "goal", &[]),
-        ];
-        let ids = bracket_scope_ids("C0000000", &issues, Some("synthesis"));
-        assert!(ids.contains("C0000000"), "container is in scope");
-        assert!(ids.contains("I1000000"), "impl is in scope");
-        assert!(
-            ids.contains("S0000000"),
-            "the custom-named boundary node is in scope"
-        );
-        assert!(
-            !ids.contains("P0000000"),
-            "walk halts at the synthesis boundary; plan is out of scope"
-        );
-        assert!(
-            !ids.contains("U0000000"),
-            "upstream beyond the synthesis boundary is out of scope"
-        );
-        assert_eq!(ids.len(), 3, "exactly C + impl + synthesis boundary");
-    }
-
-    #[test]
-    fn test_bracket_scope_no_planning_walks_full_closure() {
-        // With no `[planning]` configured (breakdown_type = None) there is no
-        // bracket boundary, so the walk is the full transitive closure: even a
-        // node that WOULD be a boundary under a config does not halt it.
-        let issues = bracket_spine();
-        let ids = bracket_scope_ids("C0000000", &issues, None);
-        assert!(
-            ids.contains("B0000000") && ids.contains("P0000000") && ids.contains("U0000000"),
-            "without a configured boundary the walk descends the whole closure: {ids:?}"
-        );
-        assert_eq!(ids.len(), 6, "all six spine nodes are reachable");
-    }
-
-    #[test]
-    fn test_bracket_scope_lone_container_is_just_itself() {
-        let issues = vec![scope_issue("C0000000", "epic", &[])];
-        let ids = bracket_scope_ids("C0000000", &issues, Some("breakdown"));
-        assert_eq!(ids.len(), 1);
-        assert!(ids.contains("C0000000"));
-    }
-
-    #[test]
-    fn test_bracket_scope_ignores_dangling_dependency() {
-        // Container depends on an id absent from the store; the walk must not
-        // panic and must not include the missing id.
-        let issues = vec![scope_issue("C0000000", "epic", &["MISSING0"])];
-        let ids = bracket_scope_ids("C0000000", &issues, Some("breakdown"));
-        assert_eq!(
-            ids,
-            std::collections::HashSet::from(["C0000000".to_string()])
-        );
-    }
 
     // Note: validate_leases() and validate_divergence() require git repository setup
     // and are integration-tested through manual testing and real usage.
