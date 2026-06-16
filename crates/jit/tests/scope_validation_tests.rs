@@ -16,13 +16,38 @@ use jit::commands::CommandExecutor;
 use jit::domain::{Issue, State};
 use jit::storage::{InMemoryStorage, IssueStore};
 
-/// Build an executor whose `.jit/rules.toml` holds exactly `rules_toml`.
+/// A minimal `[planning]` block whose `breakdown_type` is the bare `"breakdown"`
+/// name. The scope walk's boundary type is config-driven (it is NOT baked into
+/// the engine), so any test that exercises the breakdown boundary must declare it
+/// here. The block omits `[type_hierarchy]`, so the cross-section hierarchy check
+/// at config load is skipped and only the in-isolation field checks run.
+const PLANNING_CONFIG: &str = r#"
+[planning]
+breakable_types = ["epic"]
+planning_type = "planning"
+breakdown_type = "breakdown"
+plan_doc_location = "inline"
+plan_gate_preset = "plan-quality"
+coverage_gate_preset = "coverage-preview"
+"#;
+
+/// Build an executor whose `.jit/rules.toml` holds exactly `rules_toml` and whose
+/// `config.toml` declares a `[planning]` bracket with `breakdown_type =
+/// "breakdown"`, so the `--scope` walk halts at `type:breakdown` nodes.
 fn executor_with_rules(rules_toml: &str) -> CommandExecutor<InMemoryStorage> {
+    executor_with_rules_and_config(rules_toml, PLANNING_CONFIG)
+}
+
+/// Build an executor with explicit `rules.toml` and `config.toml` contents.
+fn executor_with_rules_and_config(
+    rules_toml: &str,
+    config_toml: &str,
+) -> CommandExecutor<InMemoryStorage> {
     std::env::set_var("JIT_TEST_MODE", "1");
     let storage = InMemoryStorage::new();
     storage.init().unwrap();
     std::fs::create_dir_all(storage.root()).unwrap();
-    std::fs::write(storage.root().join("config.toml"), "").unwrap();
+    std::fs::write(storage.root().join("config.toml"), config_toml).unwrap();
     std::fs::write(storage.root().join("rules.toml"), rules_toml).unwrap();
     CommandExecutor::new(storage)
 }
@@ -233,6 +258,94 @@ assert = { label-coverage = { } }
             .iter()
             .any(|f| f.rule == "planning-coverage"),
         "the planning-keyed rule must not have been evaluated: {:?}",
+        report.findings
+    );
+}
+
+#[test]
+fn test_scope_boundary_is_config_driven_custom_breakdown_type() {
+    // The breakdown boundary TYPE is read from `[planning].breakdown_type`, not
+    // baked into the engine. Configure a CUSTOM boundary name `synthesis` and
+    // build C -> impl -> S(synthesis) -> P(planning, violating). The walk must
+    // halt at the `type:synthesis` node: a rule keyed on `type:synthesis` fires
+    // (S is in scope) while the planning-keyed rule on P never fires (P, upstream
+    // of the boundary, is out of scope). This fails against any engine that
+    // hardcodes `type:breakdown` as the boundary.
+    let config = r#"
+[planning]
+breakable_types = ["goal"]
+planning_type = "planning"
+breakdown_type = "synthesis"
+plan_doc_location = "inline"
+plan_gate_preset = "plan-quality"
+coverage_gate_preset = "coverage-preview"
+"#;
+    let rules = r#"
+[[rules]]
+name = "synthesis-coverage"
+when = { type = "synthesis" }
+severity = "error"
+enforce = true
+assert = { label-coverage = { } }
+
+[[rules]]
+name = "planning-coverage"
+when = { type = "planning" }
+severity = "error"
+enforce = true
+assert = { label-coverage = { } }
+"#;
+    let executor = executor_with_rules_and_config(rules, config);
+
+    // P (planning) declares an uncovered criterion: it is BEYOND the boundary, so
+    // its rule must not fire.
+    let p = seed(
+        &executor,
+        "plan",
+        &["type:planning"],
+        "## Success Criteria\n\n- [hard] PLAN-01: uncovered\n",
+        &[],
+    );
+    // S (synthesis) is the boundary; it declares an uncovered criterion that MUST
+    // surface, proving S is in scope.
+    let s = seed(
+        &executor,
+        "synthesis",
+        &["type:synthesis"],
+        "## Success Criteria\n\n- [hard] SYN-01: uncovered\n",
+        std::slice::from_ref(&p),
+    );
+    let impl_id = seed(
+        &executor,
+        "impl",
+        &["type:task"],
+        "",
+        std::slice::from_ref(&s),
+    );
+    let c = seed(
+        &executor,
+        "container",
+        &["type:goal"],
+        "",
+        std::slice::from_ref(&impl_id),
+    );
+
+    let report = executor.validate_scope(&c).expect("scope validation runs");
+
+    assert!(
+        report
+            .findings
+            .iter()
+            .any(|f| f.rule == "synthesis-coverage" && f.message.contains("SYN-01")),
+        "the custom-named boundary node is in scope, so its rule fires: {:?}",
+        report.findings
+    );
+    assert!(
+        !report
+            .findings
+            .iter()
+            .any(|f| f.rule == "planning-coverage"),
+        "P is beyond the synthesis boundary; its rule must not fire: {:?}",
         report.findings
     );
 }
