@@ -37,6 +37,17 @@ child issues with a correct dependency DAG, and populate JIT.
 5. Run `jit validate` on the current repository state. Surface any errors to the
    user before adding anything new.
 
+6. **Determine the project's gate tiers.** Every implementation issue needs quality
+   gates — a breakdown that ships gateless work is incomplete. Run `jit gate list` and
+   `jit gate preset list`, and sample a few existing issues
+   (`jit issue show <id> --json | jq .gates_required`) to learn the convention. From
+   these, define a small set of named tiers for this project — at minimum a
+   **primary/full** tier (the standard gates a core deliverable must pass) and a lighter
+   tier for clearly supporting work (e.g. documentation). The gates are whatever the
+   project configured, so this works for any domain. Present the proposed tiers and
+   their gate sets and confirm with the user once. These become `[GATE_TIERS]` for the
+   analysis prompt and the tier → gate mapping applied at creation (Step 6).
+
 ---
 
 ## Step 2: Read the configured type hierarchy
@@ -109,6 +120,7 @@ Fill in the template fields:
 | `[MEMBERSHIP_LABEL]` | The membership label determined in Step 3 |
 | `[SPEC_DOC_PATH]` | Absolute path to the spec document |
 | `[TYPE_HIERARCHY_TABLE]` | Full hierarchy table from Step 2 |
+| `[GATE_TIERS]` | The gate tiers and their gate sets from Step 1.6 (one per line) |
 
 The agent must return **only** a JSON object — see
 [references/plan-schema.md](references/plan-schema.md) for the schema.
@@ -167,8 +179,14 @@ jit issue create \
   --description "<description>" \
   --label "type:<child-type>" \
   --label "<membership-label>" \
-  --priority "<priority>"
+  --priority "<priority>" \
+  --gate "<g1>" --gate "<g2>"          # the gates this issue's gate_tier maps to (Step 1.6)
 ```
+
+Apply the quality gates from the issue's `gate_tier`. Every implementation issue gets
+its tier's gates — skipping them leaves work that can be closed with no quality check.
+Use `--gate` at creation (above), or `jit gate add <uuid> <gates>` / `jit gate preset
+apply <preset> <uuid>` afterward.
 
 Capture the returned UUID and store in an in-memory map: `ref → UUID`.
 
@@ -234,8 +252,12 @@ leaves. Keep depth proportional to size — do not force a story level onto smal
    - **Correct type + membership** — `type:*` matches the level created; the membership
      label (`epic:<slug>`, `story:<slug>`, …) is present and is a kebab slug, never a
      JIT short ID; every `type:story`/`type:epic` carries its own identifying label.
+   - **Quality gates present** — `gates_required` is non-empty and matches the issue's
+     `gate_tier` set (Step 1.6). A leaf issue with no gates can be closed with no quality
+     check — that is a defect; add the tier's gates before finishing.
    Report violations and offer to fix them (`jit issue update --label … --remove-label …`
-   for labels, `jit issue update -d` for descriptions) before declaring done.
+   for labels, `jit issue update -d` for descriptions, `jit gate add` for gates) before
+   declaring done.
 
 3. Show a summary:
    ```

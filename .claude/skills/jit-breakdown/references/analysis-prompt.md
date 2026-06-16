@@ -36,6 +36,13 @@ Every child issue you produce must carry the membership label: `[MEMBERSHIP_LABE
 Do NOT include this label in the JSON output — it is added automatically. Just use
 it to understand the grouping context.
 
+## Gate tiers
+
+This project defines the following quality-gate tiers. Assign each issue's `gate_tier`
+to exactly one of these labels (per Decomposition rule 2a):
+
+[GATE_TIERS]
+
 ## Specification document
 
 Read the following file in full, then decompose it into work items:
@@ -63,6 +70,12 @@ Output **only** the JSON object — no preamble, no explanation, no markdown fen
 
 2. **Use the narrowest child type that fits.** If there are multiple child types
    available, assign the type whose scope best matches the work item.
+
+2a. **Assign each issue a `gate_tier`** from the `[GATE_TIERS]` the skill supplies
+   below. These tiers come from this project's own gate registry, so they fit any
+   domain. Give core deliverables the primary/full tier and clearly supporting work
+   (such as pure documentation) a lighter tier; when in doubt, choose the primary tier.
+   Pick a supplied tier label and leave the tier → gate mapping to the skill.
 
 3. **Descriptions must stand alone.** The person reading the issue in JIT will not
    have access to the spec document. Include enough context — motivation, acceptance

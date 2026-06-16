@@ -14,7 +14,8 @@ No prose before or after — the main agent parses the output directly.
       "priority":    "string  — 'low' | 'normal' | 'high' | 'critical'",
       "depends_on":  ["ref-of-sibling"],
       "source":      "string  — section heading or excerpt from the spec that motivated this issue",
-      "decompose_further": "boolean — true if this child is itself several distinct deliverables and should become a parent at the next level down (only when a finer child type exists below it)"
+      "decompose_further": "boolean — true if this child is itself several distinct deliverables and should become a parent at the next level down (only when a finer child type exists below it)",
+      "gate_tier":   "string  — which project gate tier this task needs, chosen from the tiers the skill supplies in [GATE_TIERS] (never invent gate names)"
     }
   ],
   "notes": "string — ambiguities, assumptions, items that could not be classified, or open questions"
@@ -39,6 +40,15 @@ leaf. Set it **only** when a finer child type exists below this one in the hiera
 Heuristic: if the child's own Success Criteria would split into three or more groups
 addressing separate concerns, it is a story, not a task — set `true`. Default `false`.
 The skill recurses on every child flagged `true`.
+
+**`gate_tier`**
+Which of the project's gate tiers applies, chosen from the `[GATE_TIERS]` list the skill
+supplies in the analysis prompt. The skill derives these tiers from the project's own gate
+registry, so the same mechanism fits any domain: software (a full CI+review tier alongside
+a review-only tier), research (a peer-review+reproducibility tier alongside a notes tier),
+and others. Give core deliverables the **primary/full** tier and clearly supporting work
+(documentation, notes) a lighter tier. When unsure, choose the primary tier; pick from the
+supplied tier labels.
 
 **`depends_on`**
 `["ref-X"]` means this issue **is blocked by** `ref-X` — it cannot start until
