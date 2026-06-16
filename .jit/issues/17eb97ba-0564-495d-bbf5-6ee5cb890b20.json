@@ -15,8 +15,9 @@
   "documents": [],
   "labels": [
     "type:task",
-    "story:scaffolding-and-gates"
+    "story:scaffolding-and-gates",
+    "epic:planning-bracket"
   ],
   "created_at": "2026-06-15T18:34:31.099974789+00:00",
-  "updated_at": "2026-06-15T18:35:40.904706021+00:00"
+  "updated_at": "2026-06-16T18:28:24.131790070+00:00"
 }

@@ -2,14 +2,28 @@
   "id": "4b090868-1018-4cb2-acd7-de449a034e51",
   "title": "Breakdown: planning-bracket fan-out",
   "description": "Fan-out node for the plan-before-fan-out bracket. Holds the coverage-preview gate (once that machinery exists). Created at breakdown of the approved plan; depends on the planning node.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:claude-opus",
   "dependencies": [
     "8646a474-4324-47f3-bc75-89ea4cd0e516"
   ],
-  "gates_required": [],
-  "gates_status": {},
+  "gates_required": [
+    "breakdown-review",
+    "jit-validate"
+  ],
+  "gates_status": {
+    "jit-validate": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-16T20:19:02.123082704Z"
+    },
+    "breakdown-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-06-16T20:13:26.869187057Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -18,5 +32,5 @@
     "brackets:2fbd2a82"
   ],
   "created_at": "2026-06-15T18:22:14.687706630+00:00",
-  "updated_at": "2026-06-15T18:22:14.706147066+00:00"
+  "updated_at": "2026-06-16T20:19:02.225630284+00:00"
 }

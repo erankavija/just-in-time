@@ -6,7 +6,8 @@
   "priority": "normal",
   "assignee": null,
   "dependencies": [
-    "c6d2f4ca-950c-4c2a-9d31-d01eaf7fbff7"
+    "6a82ca5d-234a-405e-9ba3-ee8c95ac5cd4",
+    "c78168d8-152a-4809-bb54-8de877197331"
   ],
   "gates_required": [],
   "gates_status": {},
@@ -14,8 +15,9 @@
   "documents": [],
   "labels": [
     "type:task",
-    "story:examples-and-docs"
+    "story:examples-and-docs",
+    "epic:planning-bracket"
   ],
   "created_at": "2026-06-15T18:34:31.116031444+00:00",
-  "updated_at": "2026-06-15T18:35:40.936765390+00:00"
+  "updated_at": "2026-06-16T18:30:18.099426547+00:00"
 }

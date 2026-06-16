@@ -14,8 +14,9 @@
   "documents": [],
   "labels": [
     "type:task",
-    "story:skills-and-eval"
+    "story:skills-and-eval",
+    "epic:planning-bracket"
   ],
   "created_at": "2026-06-15T18:34:31.132971859+00:00",
-  "updated_at": "2026-06-15T18:35:40.976342521+00:00"
+  "updated_at": "2026-06-16T18:28:24.183040355+00:00"
 }
