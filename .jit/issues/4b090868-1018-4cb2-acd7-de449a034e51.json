@@ -2,7 +2,7 @@
   "id": "4b090868-1018-4cb2-acd7-de449a034e51",
   "title": "Breakdown: planning-bracket fan-out",
   "description": "Fan-out node for the plan-before-fan-out bracket. Created at breakdown of the approved plan; depends on the planning node; carries the coverage-preview and breakdown-review gates.\n\n## Success Criteria\n\n- [ ] All planned child issues exist and are wired into the container spine (sources depend on this node; sinks gate the container).\n- [ ] The breakdown gates on this node (coverage-preview, breakdown-review) pass before it is marked done.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "normal",
   "assignee": "agent:claude-opus",
   "dependencies": [
@@ -32,5 +32,5 @@
     "brackets:2fbd2a82"
   ],
   "created_at": "2026-06-15T18:22:14.687706630+00:00",
-  "updated_at": "2026-06-16T20:28:26.926355346+00:00"
+  "updated_at": "2026-06-16T20:31:13.714485914+00:00"
 }
