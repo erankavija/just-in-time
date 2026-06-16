@@ -15,9 +15,9 @@
     {
       "wave_number": 1,
       "issues": [
-        {"id": "c78168d8-152a-4809-bb54-8de877197331", "short_id": "c78168d8", "title": "Planning config block and type-schema regeneration", "classification": "implementation", "status": "pending", "task_ref": "T1"},
-        {"id": "4aa44224-b7b6-4e7d-8a1c-a63f6f726106", "short_id": "4aa44224", "title": "Scoped validation: jit validate --scope", "classification": "implementation", "status": "pending", "task_ref": "T2"},
-        {"id": "64c7df93-3fb6-4ee7-97e1-51d8254ed33a", "short_id": "64c7df93", "title": "Transitive coverage with type-exclude and container indirection", "classification": "implementation", "status": "pending", "task_ref": "T3"}
+        {"id": "c78168d8-152a-4809-bb54-8de877197331", "short_id": "c78168d8", "title": "Planning config block and type-schema regeneration", "classification": "implementation", "status": "dispatched", "task_ref": "T1", "worktree": ".claude/worktrees/agent-c78168d8"},
+        {"id": "4aa44224-b7b6-4e7d-8a1c-a63f6f726106", "short_id": "4aa44224", "title": "Scoped validation: jit validate --scope", "classification": "implementation", "status": "dispatched", "task_ref": "T2", "worktree": ".claude/worktrees/agent-4aa44224"},
+        {"id": "64c7df93-3fb6-4ee7-97e1-51d8254ed33a", "short_id": "64c7df93", "title": "Transitive coverage with type-exclude and container indirection", "classification": "implementation", "status": "dispatched", "task_ref": "T3", "worktree": ".claude/worktrees/agent-64c7df93"}
       ]
     },
     {
@@ -58,5 +58,10 @@
   "created_during_execution": [],
   "escalations": [],
   "rework_counts": {},
+  "wave1_findings": {
+    "64c7df93": "T3 content PASS (graph.rs only, in-scope; transitive walk + boundary-halt + container indirection correct; per-issue rules untouched w/ regression tests). Pending gate verification.",
+    "4aa44224": "T2 content FAIL: hardcodes const BREAKDOWN_TYPE_LABEL=\"type:breakdown\" in validate.rs:1225 (production), violating the epic [hard] criterion 'no epic/planning/breakdown strings in Rust'. Must consume bracket type from T1 [planning] config. Rework AFTER T1 lands (needs T1 config API). Otherwise scope BFS logic is correct.",
+    "env_note": "Both T2 & T3 workers report version_cli_tests (test_version_build_*) failing in their restricted sandboxes (fresh full cargo rebuild needs network+disk). Must confirm cargo-ci passes these in the real gate environment before relying on the gate."
+  },
   "started_at": "2026-06-16"
 }
