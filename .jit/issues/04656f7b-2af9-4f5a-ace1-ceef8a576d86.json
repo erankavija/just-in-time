@@ -2,7 +2,7 @@
   "id": "04656f7b-2af9-4f5a-ace1-ceef8a576d86",
   "title": "Bracket concept and how-to documentation",
   "description": "Concept and how-to documentation for the bracket: the spine, the two gates, the preview versus closure split, and how to adopt it in a ruleset.\n\n## Success Criteria\n\n- [ ] A concept page explains the bracket spine and the two gates.\n- [ ] A how-to walks through adopting the bracket in a ruleset and scaffolding a container.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -33,5 +33,5 @@
     "epic:planning-bracket"
   ],
   "created_at": "2026-06-15T18:34:31.121738036+00:00",
-  "updated_at": "2026-06-16T20:41:43.939756403+00:00"
+  "updated_at": "2026-06-17T01:12:49.530737505+00:00"
 }

@@ -2,7 +2,7 @@
   "id": "c6d2f4ca-950c-4c2a-9d31-d01eaf7fbff7",
   "title": "Scaffolding command, doc resolver, and gate presets",
   "description": "The user-facing commands and gate presets that stand up a bracket: a plan-document resolver, the scaffolding command, and the two gate presets.\n\n## Success Criteria\n\n- [ ] A plan document can live inline or at a configured external path and is validated through the pure engine.\n- [ ] A single command brackets a container, creating and wiring the planning node and applying the plan-review gate.\n- [ ] `plan-review` and `coverage-preview` gate presets exist and attach to the correct nodes.",
-  "state": "backlog",
+  "state": "done",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -18,5 +18,5 @@
     "story:scaffolding-and-gates"
   ],
   "created_at": "2026-06-15T18:33:57.161272549+00:00",
-  "updated_at": "2026-06-15T18:35:41.089318934+00:00"
+  "updated_at": "2026-06-17T01:13:02.627881862+00:00"
 }

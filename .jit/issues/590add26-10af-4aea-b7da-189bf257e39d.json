@@ -2,7 +2,7 @@
   "id": "590add26-10af-4aea-b7da-189bf257e39d",
   "title": "Re-sequence jit-breakdown for the bracket",
   "description": "Re-sequence the jit-breakdown skill to consume an approved plan, create the breakdown node, draft children in backlog, wire the source and sink spine, and run the coverage-preview gate. Replaces the parent-centric wiring of the current breakdown helper.\n\n## Success Criteria\n\n- [ ] Breaking down a breakable container creates the breakdown node (brackets label, coverage gate) depending on the planning node, and drafts children in backlog.\n- [ ] Source children depend on the breakdown node and sink children gate the container, in reduced form.\n- [ ] The skill does not reuse the parent-centric breakdown wiring.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -32,5 +32,5 @@
     "epic:planning-bracket"
   ],
   "created_at": "2026-06-15T18:34:31.127458397+00:00",
-  "updated_at": "2026-06-16T20:41:43.954400137+00:00"
+  "updated_at": "2026-06-17T01:12:49.442996109+00:00"
 }

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "5e4fec34-a293-4122-9041-d8475079bbf8",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "5c21327f-4254-4cde-a101-369a592b59dd",
+  "commit": "609a3dbb80a29c3b31d58fe44a4bb4c98e67bd31",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-06-17T01:11:19.073177354Z",
+  "completed_at": "2026-06-17T01:12:35.710658651Z",
+  "duration_ms": 76637,
+  "exit_code": 0,
+  "stdout": "## Acceptance Criteria\n\nPass. `docs/examples/research/config.toml:56` declares `goal` as the breakable container, and `docs/examples/research/config.toml:57` / `:58` declare `planning` and `breakdown`. The authored research example config/rules do not define epic or milestone hierarchy types; the test asserts that at `crates/jit/tests/research_bracket_tests.rs:204`.\n\nPass. The breakdown gate preview behavior is covered: `docs/examples/research/rules.toml:263` defines `research-hypotheses-covered-preview` on `type:breakdown`, and `crates/jit/tests/research_bracket_tests.rs:216` verifies an uncovered hard hypothesis is reported at breakdown.\n\n## Prior Review Feedback\n\nResolved. The prior failure was the contradictory dependency-direction text. `docs/examples/research/rules.toml:26` now says the goal lists experiments as dependencies, and `docs/examples/research/rules.toml:29` gives the matching command direction: `jit dep add <goal> <experiment>`.\n\n## Jit Issue Management\n\nPass. Dependencies `6a82ca5d` and `c78168d8` are both `done`.\n\n`./scripts/jit-validate.sh` passed locally with 26 label/orphan warnings, which are allowed by the review instructions.\n\n## Architecture And Separation Of Concerns\n\nPass. The issue scope adds example docs/config and integration-style tests only. No production domain, storage, command, CLI, or output boundary changes are introduced by the research example.\n\n## Functional Paradigm\n\nPass. The new Rust is test helper code. Iterator usage in `crates/jit/tests/research_bracket_tests.rs:60` and `:242` is idiomatic; no concerning imperative production logic was introduced.\n\n## Correctness And Invariants\n\nPass. The example consistently uses `child-link = \"dependencies\"` at `docs/examples/research/rules.toml:229` and `:268`, matching the documented parent-depends-on-children containment at `docs/examples/research/rules.toml:207`.\n\nNo new file writes, event-log paths, state transitions, PID handling, assignee parsing, or label validation implementation paths were introduced.\n\n## Safety\n\nPass. No unsafe code was introduced in the reviewed scope.\n\n## Testing\n\nPass. Provided gate evidence shows `cargo-ci` passed for issue `5c21327f` in `.jit/gate-runs/6ff51ecb-3464-45f7-88b3-8fb8f9dfa0ae/result.json`.\n\nI also ran `cargo test -p jit --test research_bracket_tests --quiet`: 7 passed, 0 failed.\n\n## Error Handling\n\nPass. No library error-handling changes were introduced. Test-only `expect`/panic usage is acceptable.\n\n## CLI Contract\n\nPass. No CLI surface changes were introduced by this issue.\n\n## Documentation\n\nPass. The user-facing example documentation is internally consistent after the fix. The bracket explanation at `docs/examples/research/rules.toml:68` and coverage-preview explanation at `docs/examples/research/rules.toml:231` match the implemented example rules and tests.\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
