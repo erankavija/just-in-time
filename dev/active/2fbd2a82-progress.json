@@ -178,14 +178,22 @@
     }
   ],
   "created_during_execution": [],
-  "escalations": [],
+  "escalations": [
+    {
+      "issue": "590add26",
+      "wave": 4,
+      "reason": "MAX_REWORK_ATTEMPTS + MAX_SAME_FINDING_REPEATS(3) on 'run the coverage-preview gate'",
+      "finding": "reviewer wants a persisted GateRunResult via gate_check model; helper currently stamps gates_status+event only; coverage-preview auto-checker shells out (subprocess) so can't run vs in-memory test stores",
+      "status": "awaiting user decision"
+    }
+  ],
   "rework_counts": {
     "4aa44224": 1,
     "64c7df93": 1,
     "1536006d": 2,
     "17eb97ba": 1,
     "5c21327f": 1,
-    "590add26": 1,
+    "590add26": 2,
     "04656f7b": 1
   },
   "wave1_gate_status": {

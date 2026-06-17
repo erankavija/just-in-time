@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "b2a88870-07d7-4c88-8a92-a1a90a027bf7",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "04656f7b-2af9-4f5a-ace1-ceef8a576d86",
+  "commit": "e973f77e6c447d864af9687228ac4fb4f04da9d7",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-06-17T02:13:26.004251538Z",
+  "completed_at": "2026-06-17T02:14:13.389155995Z",
+  "duration_ms": 47384,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nPass. The concept page explains the bracket spine and the two gates in [docs/concepts/planning-bracket.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/planning-bracket.md:38), including the `P > B > impl > C` ordering and the `plan-review` / `coverage-preview` split.\n\nPass. The how-to walks through adopting the bracket in a ruleset and scaffolding a container in [docs/how-to/adopt-planning-bracket.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/adopt-planning-bracket.md:35), [docs/how-to/adopt-planning-bracket.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/adopt-planning-bracket.md:157), and [docs/how-to/adopt-planning-bracket.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/adopt-planning-bracket.md:198).\n\n**Architecture And Separation Of Concerns**\n\nNo Rust code changes are in scope for this issue’s documentation fix. I found no domain/storage/commands/CLI boundary violations.\n\n**Functional Paradigm**\n\nNo applicable Rust implementation changes.\n\n**Correctness And Invariants**\n\nNo code paths touching atomic writes, event logging, gate transitions, assignee/label validation, or PID handling are changed. The previously broken checker-copy command has been fixed: [docs/how-to/adopt-planning-bracket.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/adopt-planning-bracket.md:163) now tells users to set `JIT_SRC` to a JIT checkout and copies from `\"$JIT_SRC\"/scripts/...`.\n\n**Safety**\n\nNo unsafe code is introduced by this documentation-only change.\n\n**Testing**\n\nIssue gate evidence shows `cargo-ci` passed at `2026-06-17T02:05:44.684031013Z`. I also ran `./scripts/jit-validate.sh`; it passed with 26 label warnings, which are allowed by the review prompt.\n\n**Error Handling**\n\nNo fallible Rust code changes.\n\n**CLI Contract**\n\nNo CLI implementation changes. The how-to mentions `--json` for the scaffold retrofit command at [docs/how-to/adopt-planning-bracket.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/adopt-planning-bracket.md:225).\n\n**Documentation**\n\nThe prior documentation blocker is resolved. The gate checker setup no longer self-copies `scripts/*` onto itself and now distinguishes adopting projects from the in-repository case at [docs/how-to/adopt-planning-bracket.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/adopt-planning-bracket.md:175).\n\n**Prior Review Feedback**\n\nThe most recent failed run objected to Step 4’s non-working `cp scripts/... scripts/` commands. That issue has been addressed in commit `e973f77` and in the current file contents.\n\n**Jit Issue Management**\n\nThe issue dependencies `539cbdb1` and `17eb97ba` are both `done`. `./scripts/jit-validate.sh` passes with allowed warnings.\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
