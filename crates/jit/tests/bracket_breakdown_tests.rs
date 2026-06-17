@@ -700,6 +700,24 @@ fn test_bracket_breakdown_coverage_passes_when_hard_criterion_covered() {
         "covered plan must have no error-severity coverage findings, got {:?}",
         result.coverage_report
     );
+
+    // The verdict is RECORDED on B's coverage gate (not just returned): B's
+    // coverage-preview gate status is Passed.
+    let b = h.get_issue(&result.breakdown_id);
+    assert_eq!(
+        b.gates_status.get("coverage-preview").map(|g| g.status),
+        Some(jit::domain::GateStatus::Passed),
+        "covered plan must record B's coverage-preview gate as Passed, got {:?}",
+        b.gates_status
+    );
+    // ...and a gate_passed event exists for B against that gate.
+    let events = h.storage.read_events().unwrap();
+    assert!(
+        events
+            .iter()
+            .any(|e| e.get_type() == "gate_passed" && e.get_issue_id() == result.breakdown_id),
+        "a covered plan must log a gate_passed event for B"
+    );
 }
 
 #[test]
@@ -741,4 +759,21 @@ fn test_bracket_breakdown_coverage_fails_when_hard_criterion_uncovered() {
         "B must still be created (the preview reports, not blocks)"
     );
     assert_eq!(result.child_ids.len(), 1);
+
+    // The failing verdict is RECORDED on B's coverage gate: status is Failed.
+    let b = h.get_issue(&result.breakdown_id);
+    assert_eq!(
+        b.gates_status.get("coverage-preview").map(|g| g.status),
+        Some(jit::domain::GateStatus::Failed),
+        "uncovered plan must record B's coverage-preview gate as Failed, got {:?}",
+        b.gates_status
+    );
+    // ...and a gate_failed event exists for B against that gate.
+    let events = h.storage.read_events().unwrap();
+    assert!(
+        events
+            .iter()
+            .any(|e| e.get_type() == "gate_failed" && e.get_issue_id() == result.breakdown_id),
+        "an uncovered plan must log a gate_failed event for B"
+    );
 }

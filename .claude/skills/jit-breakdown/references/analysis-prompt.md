@@ -43,6 +43,18 @@ to exactly one of these labels (per Decomposition rule 2a):
 
 [GATE_TIERS]
 
+## Container [hard] criteria to cover
+
+The parent is a breakable container, and the breakdown is checked by a
+**coverage-preview** gate: every `[hard]` success criterion below must be delivered
+by at least one child you produce. For each child, list (in its `satisfies` array)
+the id(s) of the criteria it completes — coverage must be **total**.
+
+[CONTAINER_HARD_CRITERIA]
+
+(If this section reads "(none — plain breakdown)", leave every child's `satisfies`
+as `[]`.)
+
 ## Specification document
 
 Read the following file in full, then decompose it into work items:
@@ -113,6 +125,14 @@ Output **only** the JSON object — no preamble, no explanation, no markdown fen
    (amendable in-loop if empirical evidence contradicts). Default to `[hard]`
    when in doubt.
 
+3a. **Credit container `[hard]` criteria with `satisfies`.** When
+   `[CONTAINER_HARD_CRITERIA]` lists criteria, set each child's `satisfies` array to
+   the criterion id(s) that child delivers (use the exact id token, e.g. `REQ-01`).
+   A criterion may be split across several children (list its id on each); a child
+   may satisfy several. **Every** listed criterion must appear in at least one
+   child's `satisfies` — the coverage-preview gate reports any uncovered `[hard]`
+   criterion as a failure. Leave `satisfies: []` only when no criteria were supplied.
+
 4. **Do NOT include the parent issue itself.** Only return the children to create.
    The parent's dependency on its children is handled separately.
 
@@ -144,6 +164,10 @@ Output **only** the JSON object — no preamble, no explanation, no markdown fen
      an agent begin this task on a blank workspace, with none of the other tasks in
      this breakdown having run?"* If no — because it writes into a directory, crate,
      or project structure that another task creates — add the missing edge.
+   - **Verify coverage is total:** when `[CONTAINER_HARD_CRITERIA]` is non-empty,
+     every listed criterion id appears in at least one child's `satisfies`. An
+     uncovered `[hard]` criterion fails the coverage-preview gate — add or adjust a
+     child to cover it before returning.
    - Note: JIT will apply transitive reduction when the edges are committed, so it is
      safe to add all genuine dependencies without manually pruning redundant paths.
 
@@ -170,7 +194,8 @@ Output **only** the JSON object — no preamble, no explanation, no markdown fen
       "type":        "one of the configured child type names",
       "priority":    "low | normal | high | critical",
       "depends_on":  ["ref-of-sibling-prerequisite"],
-      "source":      "section heading or excerpt from the spec that motivated this issue"
+      "source":      "section heading or excerpt from the spec that motivated this issue",
+      "satisfies":   ["container [hard] criterion id(s) this child covers, e.g. 'REQ-01'; [] if none"]
     }
   ],
   "notes": "ambiguities, assumptions, items that could not be classified, or questions for the author"

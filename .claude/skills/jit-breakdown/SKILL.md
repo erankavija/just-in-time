@@ -127,6 +127,21 @@ approved before drafting any children.
    > plan before fanning out (the breakdown must consume an approved plan)."
    Do not proceed to draft children until the plan is approved.
 
+5. **Extract the container's `[hard]` criteria (for coverage).** The
+   coverage-preview gate on `B` checks that every `[hard]` success criterion of the
+   container `C` is credited by some child via a `satisfies:<id>` label. Pull the
+   container's `## Success Criteria` and collect each line tagged `[hard]`, with its
+   id token (the ruleset's `id-pattern`, e.g. `REQ-01`):
+   ```bash
+   jit issue show <C> --json | jq -r '.description'   # read the Success Criteria section
+   ```
+   Record these as `[CONTAINER_HARD_CRITERIA]` (id + text, one per line) for the
+   analysis prompt (Step 4). If the container has no `[hard]` criteria, note
+   "(none — plain breakdown)" so the analysis agent leaves `satisfies` empty.
+   The `satisfies-namespace` (default `satisfies`) and `id-pattern` come from the
+   coverage rule in `.jit/rules.toml` — read them there; never hardcode `satisfies`
+   or `REQ-` if the rule declares otherwise.
+
 ---
 
 ## Step 2: Read the configured type hierarchy
@@ -200,6 +215,7 @@ Fill in the template fields:
 | `[SPEC_DOC_PATH]` | Absolute path to the spec document |
 | `[TYPE_HIERARCHY_TABLE]` | Full hierarchy table from Step 2 |
 | `[GATE_TIERS]` | The gate tiers and their gate sets from Step 1.6 (one per line) |
+| `[CONTAINER_HARD_CRITERIA]` | Bracket only: the container's `[hard]` criteria (id + text) from Step 1.5 step 5, one per line; "(none — plain breakdown)" otherwise |
 
 The agent must return **only** a JSON object — see
 [references/plan-schema.md](references/plan-schema.md) for the schema.
@@ -263,6 +279,7 @@ jit issue create \
   --description "<description>" \
   --label "type:<child-type>" \
   --label "<membership-label>" \
+  --label "satisfies:<id>" ...        # one per id in this child's `satisfies` (bracket only; Step 1.5 step 5)
   --priority "<priority>" \
   --gate "<g1>" --gate "<g2>"          # the gates this issue's gate_tier maps to (Step 1.6)
 ```
@@ -273,6 +290,15 @@ Use `--gate` at creation (above), or `jit gate add <uuid> <gates>` / `jit gate p
 apply <preset> <uuid>` afterward. **This per-task gate assignment applies to BOTH
 breakdown shapes** — bracket children still carry their tier's quality gates; the
 coverage-preview gate added in 6d-bracket lives on `B`, not on the children.
+
+**Bracket only — attach the coverage credits.** For each id in this child's
+`satisfies` array (the plan JSON field), add a `<satisfies-namespace>:<id>` label
+(default namespace `satisfies`, e.g. `satisfies:REQ-01`) — via `--label` above or
+`jit issue update <uuid> --label satisfies:<id>` afterward. These labels are what the
+coverage-preview gate on `B` reads to credit each container `[hard]` criterion; a
+criterion no child carries is reported uncovered (6d-bracket step 5). When the in-process
+engine path is used, pass them as the child's `labels` so they are attached at creation.
+Plain breakdown produces no `satisfies` labels.
 
 Capture the returned UUID and store in an in-memory map: `ref → UUID`.
 
@@ -432,6 +458,12 @@ leaves. Keep depth proportional to size — do not force a story level onto smal
    - **Quality gates present** — `gates_required` is non-empty and matches the issue's
      `gate_tier` set (Step 1.6). A leaf issue with no gates can be closed with no quality
      check — that is a defect; add the tier's gates before finishing.
+   - **Coverage credits present (bracket only)** — every container `[hard]` criterion
+     (Step 1.5 step 5) is carried by at least one child as a `satisfies:<id>` label, so
+     the coverage-preview gate on `B` can credit it. The breakdown helper records that
+     gate's verdict on `B` (6d-bracket step 5); a `[hard]` criterion no child satisfies
+     is reported uncovered and the gate fails — add the missing `satisfies:<id>` label
+     (`jit issue update <child> --label satisfies:<id>`) and re-run the check.
    Report violations and offer to fix them (`jit issue update --label … --remove-label …`
    for labels, `jit issue update -d` for descriptions, `jit gate add` for gates) before
    declaring done.

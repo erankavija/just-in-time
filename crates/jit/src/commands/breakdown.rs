@@ -82,6 +82,9 @@ pub struct BracketChild {
 /// The coverage-preview check is run in-process after the spine is wired:
 /// [`coverage_passed`](Self::coverage_passed) is the verdict and
 /// [`coverage_report`](Self::coverage_report) carries the deterministic findings.
+/// The same verdict is RECORDED on the breakdown node `B`'s coverage gate(s)
+/// (`gates_status` set to passed/failed plus a matching gate event), so the gate
+/// is genuinely run rather than left attached-but-unevaluated.
 /// A result with `coverage_passed == false` is NOT an unqualified success — the
 /// drafted children leave a `[hard]` criterion uncovered and the plan should be
 /// revised (the `B`/children are still created; the preview only REPORTS the gap).
@@ -205,10 +208,20 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// breakdown leaves NO partial state.
     ///
     /// After wiring the spine it RUNS the deterministic coverage-preview check
-    /// in-process (via [`validate_scope`](Self::validate_scope)) and records the
-    /// verdict in the result's `coverage_passed`/`coverage_report` fields — a
-    /// `false` verdict reports an uncovered `[hard]` criterion (the children are
-    /// still created; the preview only surfaces the gap).
+    /// in-process (via [`validate_scope`](Self::validate_scope)) and:
+    /// - records the verdict in the result's `coverage_passed`/`coverage_report`
+    ///   fields, AND
+    /// - RECORDS that verdict on `B`'s coverage gate(s): each gate `B` gained
+    ///   from `config.coverage_gate_preset` has its `gates_status` set to
+    ///   [`GateStatus::Passed`]/[`GateStatus::Failed`] (`updated_by`
+    ///   `"auto:breakdown"`) and a matching `gate_passed`/`gate_failed` event is
+    ///   appended. This is the in-process equivalent of the preset's auto checker
+    ///   (which just runs `jit validate --scope <C>`), recorded honestly without
+    ///   shelling out to a subprocess that cannot see an in-memory store.
+    ///
+    /// A `false` verdict reports an uncovered `[hard]` criterion (the children
+    /// and `B` are still created; the preview only surfaces the gap — it records
+    /// the gate as failed but never aborts breakdown).
     ///
     /// # Errors
     ///
@@ -431,12 +444,57 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // 5. RUN the coverage-preview check in-process. This is the same
         //    deterministic scope validation the coverage-preview gate's checker
-        //    performs; running it here means the result carries the verdict (an
+        //    performs (the checker just shells out to `jit validate --scope <C>`);
+        //    running it here means the result carries the verdict (an
         //    attached-but-unrun gate would let the helper report unverified
         //    success). A failure REPORTS an uncovered [hard] criterion — B and
         //    the children remain created (the plan-time preview surfaces the gap).
         let coverage_report = self.validate_scope(&full_container_id)?;
         let coverage_passed = !coverage_report.has_errors();
+
+        // 5b. RECORD that verdict on B's coverage gate(s). The preset's auto
+        //     checker cannot run against an in-memory store (it spawns a `jit`
+        //     subprocess), but its check IS the scope validation we just ran, so
+        //     recording the in-process verdict on B's gate status is the honest,
+        //     equivalent result. Record on EVERY gate B gained from the coverage
+        //     preset (its gates_required), so a multi-gate preset is fully
+        //     covered. This RECORDS pass OR fail either way; it never aborts
+        //     breakdown (the preview reports the gap, it does not block).
+        let now = Utc::now();
+        let mut breakdown_node = self.storage.load_issue(&breakdown_id)?;
+        let coverage_gate_keys: Vec<String> = breakdown_node.gates_required.clone();
+        let recorded_status = if coverage_passed {
+            GateStatus::Passed
+        } else {
+            GateStatus::Failed
+        };
+        for key in &coverage_gate_keys {
+            breakdown_node.gates_status.insert(
+                key.clone(),
+                GateState {
+                    status: recorded_status,
+                    updated_by: Some("auto:breakdown".to_string()),
+                    updated_at: now,
+                },
+            );
+        }
+        self.storage.save_issue(breakdown_node)?;
+        for key in &coverage_gate_keys {
+            let event = if coverage_passed {
+                Event::new_gate_passed(
+                    breakdown_id.clone(),
+                    key.clone(),
+                    Some("auto:breakdown".to_string()),
+                )
+            } else {
+                Event::new_gate_failed(
+                    breakdown_id.clone(),
+                    key.clone(),
+                    Some("auto:breakdown".to_string()),
+                )
+            };
+            self.storage.append_event(&event)?;
+        }
 
         Ok(BracketBreakdownResult {
             container_id: full_container_id,

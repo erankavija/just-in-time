@@ -14,6 +14,7 @@ No prose before or after — the main agent parses the output directly.
       "priority":    "string  — 'low' | 'normal' | 'high' | 'critical'",
       "depends_on":  ["ref-of-sibling"],
       "source":      "string  — section heading or excerpt from the spec that motivated this issue",
+      "satisfies":   ["string  — container [hard] criterion id(s) this child covers, e.g. 'REQ-01'; [] if none"],
       "decompose_further": "boolean — true if this child is itself several distinct deliverables and should become a parent at the next level down (only when a finer child type exists below it)",
       "gate_tier":   "string  — which project gate tier this task needs, chosen from the tiers the skill supplies in [GATE_TIERS] (never invent gate names)"
     }
@@ -57,6 +58,22 @@ Do NOT reference the parent issue (that relationship is handled by the skill).
 Use an empty array `[]` when there are no sibling prerequisites.
 
 This is the most important field. Take time to reason carefully about sequencing.
+
+**`satisfies`** (bracket breakdown only)
+The container's `[hard]` criterion ids that THIS child delivers. The skill supplies
+the container's `[hard]` criteria (id + text) in `[CONTAINER_HARD_CRITERIA]`; for
+each criterion, name the child(ren) that complete it and list that criterion's id
+in their `satisfies` array. The skill turns each entry into a `satisfies:<id>` label
+on the created child, which is how the **coverage-preview** gate credits coverage —
+a `[hard]` criterion no child lists here is reported as *uncovered* by the gate.
+
+- Use the exact id token from `[CONTAINER_HARD_CRITERIA]` (e.g. `REQ-01`), not the
+  prose.
+- A criterion may be split across several children (list its id on each); a child
+  may satisfy several criteria (list all their ids).
+- **Every** container `[hard]` criterion must appear in at least one child's
+  `satisfies` — coverage must be total, or the gate fails.
+- Plain breakdown (no `[CONTAINER_HARD_CRITERIA]` supplied): leave `satisfies: []`.
 
 **`description`**
 Must be self-contained. The reader will not have access to the spec document.
@@ -117,7 +134,8 @@ Given a spec for "GPU Acceleration Pipeline" epic, the output might be:
       "type": "task",
       "priority": "high",
       "depends_on": [],
-      "source": "Section 2: Shader Interface"
+      "source": "Section 2: Shader Interface",
+      "satisfies": ["REQ-01"]
     },
     {
       "ref": "C2",
@@ -144,7 +162,8 @@ Given a spec for "GPU Acceleration Pipeline" epic, the output might be:
       "type": "task",
       "priority": "normal",
       "depends_on": ["C2", "C3"],
-      "source": "Section 5: Performance Validation"
+      "source": "Section 5: Performance Validation",
+      "satisfies": ["REQ-04"]
     }
   ],
   "notes": "Section 6 (fallback CPU path) was too vague to decompose into a single task; included as C5 with a note in its description."
@@ -153,4 +172,9 @@ Given a spec for "GPU Acceleration Pipeline" epic, the output might be:
 
 In this example: C1 has no deps (can start immediately). C2 and C3 both depend on
 C1 but not on each other (can be worked in parallel). C4 depends on both C2 and
-C3 (needs both implementations to benchmark).
+C3 (needs both implementations to benchmark). The container's `[hard]` criteria
+REQ-01..REQ-04 are each credited to the child that delivers them via `satisfies`
+(the interface task covers REQ-01, the two implementation tasks REQ-02/REQ-03, the
+benchmark REQ-04), so the coverage-preview gate sees every `[hard]` criterion
+covered. `C2` and `C3` (omitted above for brevity) carry `"satisfies": ["REQ-02"]`
+and `["REQ-03"]` respectively.
