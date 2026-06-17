@@ -2,7 +2,7 @@
   "epic_id": "2fbd2a82-14ba-4e6e-90f6-e0c34f0f912c",
   "epic_short_id": "2fbd2a82",
   "epic_title": "Plan-before-fan-out bracket: gated planning node before breakdown",
-  "current_wave": 2,
+  "current_wave": 3,
   "design_doc": "dev/active/planning-bracket-design.md",
   "gates_attached": [
     "cargo-ci",
@@ -87,7 +87,7 @@
           "short_id": "1536006d",
           "title": "Plan-document location resolver",
           "classification": "implementation",
-          "status": "pending",
+          "status": "done",
           "task_ref": "T4"
         },
         {
@@ -95,7 +95,7 @@
           "short_id": "6a82ca5d",
           "title": "Plan-review and coverage-preview gate presets",
           "classification": "implementation",
-          "status": "pending",
+          "status": "done",
           "task_ref": "T6"
         }
       ]
@@ -197,5 +197,6 @@
   },
   "started_at": "2026-06-16",
   "wave1_complete": true,
-  "story_81fbf45a": "done"
+  "story_81fbf45a": "done",
+  "wave2_complete": true
 }

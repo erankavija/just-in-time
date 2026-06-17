@@ -2,7 +2,7 @@
   "id": "5c21327f-4254-4cde-a101-369a592b59dd",
   "title": "Research example ruleset on a non-epic hierarchy",
   "description": "A research example ruleset (goal to experiment, no epic) demonstrating the bracket on a non-software hierarchy.\n\n## Success Criteria\n\n- [ ] A goal is the breakable container, the bracket types are declared, and there are no epic or milestone references.\n- [ ] The example tests show the bracket blocking an uncovered goal criterion at the breakdown gate.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -33,5 +33,5 @@
     "epic:planning-bracket"
   ],
   "created_at": "2026-06-15T18:34:31.116031444+00:00",
-  "updated_at": "2026-06-16T20:41:43.925423729+00:00"
+  "updated_at": "2026-06-17T00:02:07.601023989+00:00"
 }

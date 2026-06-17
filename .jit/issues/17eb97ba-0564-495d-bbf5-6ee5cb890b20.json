@@ -2,7 +2,7 @@
   "id": "17eb97ba-0564-495d-bbf5-6ee5cb890b20",
   "title": "Bracket scaffolding command",
   "description": "Provide `jit plan <id>` and `jit issue create --with-planning` that create the planning node, wire the container to depend on it, move the container upstream dependencies onto the planning node, and apply the plan-review gate. Does not create the breakdown node.\n\n## Success Criteria\n\n- [ ] Both jit plan <id> and jit issue create --with-planning bracket a container, yielding a planning-typed node wired so the container depends on it and carrying the plan-review gate.\n- [ ] Pre-existing upstream dependencies of the container are moved onto the planning node.\n- [ ] No breakdown node is created by this command.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -14,15 +14,15 @@
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-06-16T20:41:43.896314061Z"
-    },
     "cargo-ci": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-06-16T20:41:43.889294609Z"
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-06-16T20:41:43.896314061Z"
     }
   },
   "context": {},
@@ -33,5 +33,5 @@
     "epic:planning-bracket"
   ],
   "created_at": "2026-06-15T18:34:31.099974789+00:00",
-  "updated_at": "2026-06-16T20:41:43.896382041+00:00"
+  "updated_at": "2026-06-17T00:02:07.567680640+00:00"
 }

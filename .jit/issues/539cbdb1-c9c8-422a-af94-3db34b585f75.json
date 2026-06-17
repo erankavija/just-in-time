@@ -2,7 +2,7 @@
   "id": "539cbdb1-c9c8-422a-af94-3db34b585f75",
   "title": "SDD example ruleset with the bracket",
   "description": "Extend the SDD example ruleset to declare the epic breakable, add the bracket types, wire both gates, and use lifecycle-scoped coverage.\n\n## Success Criteria\n\n- [ ] The SDD example declares its breakable container and bracket types and wires plan-review and coverage-preview.\n- [ ] An uncovered hard criterion is blocked at the breakdown gate in the example tests.\n- [ ] The example uses child-type-exclude to drop the bracket types from coverage, and uses lifecycle-scoped coverage wording.\n- [ ] No methodology-specific strings are added to engine Rust.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -33,5 +33,5 @@
     "epic:planning-bracket"
   ],
   "created_at": "2026-06-15T18:34:31.110467232+00:00",
-  "updated_at": "2026-06-16T20:41:43.911294935+00:00"
+  "updated_at": "2026-06-17T00:02:07.584642444+00:00"
 }
