@@ -44,6 +44,7 @@ pub mod worktree;
 #[cfg(test)]
 pub mod test_helpers;
 
+pub use breakdown::{BracketBreakdownResult, BracketChild};
 pub use bulk_update::{BulkUpdatePreview, BulkUpdateResult, UpdateOperations};
 pub use gate::GatePassFailed;
 pub use plan::PlanResult;

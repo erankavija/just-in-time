@@ -9,6 +9,46 @@ compatibility: Requires JIT CLI on PATH. JIT MCP tools used where available.
 Read the specification document attached to a parent issue, decompose it into
 child issues with a correct dependency DAG, and populate JIT.
 
+**Two breakdown shapes, selected by the ruleset (Step 1.5):**
+
+- **Bracket breakdown** — when the parent is a *breakable container* declared in
+  the repo's `[planning]` config. The plan is a first-class, gated node `P`
+  sequenced *before* the fan-out, and breakdown splices a **source/sink spine**
+  `C → impl → B → P` (not parent-centric containment). This is the
+  plan-before-fan-out flow. See [The bracket](#the-bracket) below.
+- **Plain breakdown** — when the parent is NOT a breakable container (or the repo
+  declares no `[planning]` config). The classic parent-centric flow: create
+  children, then make the parent depend on all of them (Step 6d-plain).
+
+Everything in Steps 2-5 (read hierarchy, membership label, analysis, plan review)
+is shared. The two shapes differ only in **Step 6 execution wiring**.
+
+---
+
+## The bracket
+
+For a breakable container `C` whose plan has been approved, breakdown produces:
+
+```
+C ──dep→ {impl subgraph} ──dep→ B ──dep→ P
+```
+
+precedence `P > B > impl > C` (plan first, then breakdown, then work, then the
+container closes). Concretely:
+
+- **`B`** (`type:<breakdown_type>` from config) carries a `brackets:<C-id>` label
+  and the **coverage-preview** gate (`coverage_gate_preset`), and depends on `P`.
+- **Impl children** are drafted in **Backlog** (they depend on `B`, which is not
+  done, so `jit ready` never surfaces them before the breakdown is approved).
+- **Sources** (impl issues with no intra-subgraph predecessor) depend on `B`;
+  internal chains carry the rest. This transitively gates ALL impl behind `B`.
+- **Sinks** (impl issues with no intra-subgraph successor) are depended-on by `C`
+  (`C depends on each sink`). Transitive reduction drops the scaffold's direct
+  `C → P` edge and any redundant `C → non-sink` edge automatically.
+
+The type names (`breakdown_type`, `planning_type`) and the gate preset name come
+from `[planning]` config — never hardcode `breakdown`/`planning`/`epic` literals.
+
 ---
 
 ## Step 1: Pre-flight
@@ -47,6 +87,45 @@ child issues with a correct dependency DAG, and populate JIT.
    project configured, so this works for any domain. Present the proposed tiers and
    their gate sets and confirm with the user once. These become `[GATE_TIERS]` for the
    analysis prompt and the tier → gate mapping applied at creation (Step 6).
+
+---
+
+## Step 1.5: Bracket detection and plan-approval gate
+
+Decide which breakdown shape applies, and — if bracket — confirm the plan is
+approved before drafting any children.
+
+1. **Read the `[planning]` config.** Inspect `.jit/config.toml` for a `[planning]`
+   section. If absent, the repo does not use brackets → this is a **plain
+   breakdown**; skip the rest of this step and use the plain wiring (Step 6d-plain).
+
+2. **Is the parent breakable?** From `[planning].breakable_types`, check whether the
+   parent's `type:*` value is listed. If NOT listed → **plain breakdown** (skip the
+   rest of this step). If listed → **bracket breakdown**; continue. Read and record
+   `planning_type`, `breakdown_type`, and `coverage_gate_preset` from `[planning]` —
+   never hardcode these names.
+
+3. **Require a scaffolded planning node `P`.** The container must already be
+   bracketed (`C → P`) by the scaffold step (`jit plan <id>` or
+   `jit issue create --with-planning`). Find `P` among the container's dependencies:
+   ```bash
+   jit issue show <C> --json | jq -r '.depends_on[]'
+   # inspect each: the one whose type: label == <planning_type> is P
+   ```
+   If no planning node exists, STOP and tell the user:
+   > "This breakable container has no planning node. Scaffold it first with
+   > `jit plan <id>`, produce and review the plan, then re-run breakdown."
+
+4. **Require an APPROVED plan.** Bracket breakdown consumes an *approved* plan, so
+   the plan-quality gate on `P` must have passed. Check:
+   ```bash
+   jit issue show <P> --json | jq '{state, gates_required, gate_status}'
+   ```
+   The plan is approved when `P`'s plan-quality gate status is `passed` (and `P` is
+   Done or Gated-passing). If the plan gate is pending or failed, STOP:
+   > "The plan node <P> has not passed its plan-quality gate. Review and pass the
+   > plan before fanning out (the breakdown must consume an approved plan)."
+   Do not proceed to draft children until the plan is approved.
 
 ---
 
@@ -143,7 +222,12 @@ Breakdown plan for: "<Parent Issue Title>"  (N child issues, M sequencing edges)
   [child-type] Title of second work item (ref: B, priority: normal) ← depends on A
   [child-type] Title of third work item (ref: C, priority: normal)  ← depends on A, B
 
-  After creation, the parent issue will be updated to depend on all N children.
+  Wiring after creation:
+    - Plain breakdown:   the parent will depend on all N children (containment).
+    - Bracket breakdown: a breakdown node B (coverage-preview gate) is created
+      depending on the approved plan P; children are drafted in Backlog; source
+      children depend on B; the container depends on the sink children. The
+      direct C → P edge is dropped by reduction. (See "The bracket".)
 
 Notes from analysis agent:
   <notes field from JSON>
@@ -186,27 +270,99 @@ jit issue create \
 Apply the quality gates from the issue's `gate_tier`. Every implementation issue gets
 its tier's gates — skipping them leaves work that can be closed with no quality check.
 Use `--gate` at creation (above), or `jit gate add <uuid> <gates>` / `jit gate preset
-apply <preset> <uuid>` afterward.
+apply <preset> <uuid>` afterward. **This per-task gate assignment applies to BOTH
+breakdown shapes** — bracket children still carry their tier's quality gates; the
+coverage-preview gate added in 6d-bracket lives on `B`, not on the children.
 
 Capture the returned UUID and store in an in-memory map: `ref → UUID`.
 
+> Bracket note: in a bracket breakdown the children are **drafts** — they will be
+> pulled into Backlog automatically once they gain a dependency on `B` or on a
+> predecessor sibling (6d-bracket). No special create flag is needed; `jit` demotes
+> a dependency-less Ready issue to Backlog the moment a not-done dependency is added.
+
 ### 6c. Add sequencing dependencies between children
 
-After **all** children are created, add peer-to-peer sequencing edges:
+After **all** children are created, add peer-to-peer sequencing edges (shared by
+both shapes):
 
 ```bash
 # For each child that has depends_on entries:
 jit dep add <child-UUID> <dep-UUID-1> [<dep-UUID-2> ...]
 ```
 
-### 6d. Wire containment: parent depends on all children
+### 6d-plain. Wire containment: parent depends on all children (PLAIN only)
+
+For a **non-breakable** parent (Step 1.5 selected plain breakdown):
 
 ```bash
 jit dep add <parent-UUID> <child-UUID-1> <child-UUID-2> ... <child-UUID-N>
 ```
 
 This expresses the containment invariant: the parent cannot be marked done until
-every child is complete.
+every child is complete. **Do NOT use this wiring for a bracket breakdown** — use
+6d-bracket instead.
+
+### 6d-bracket. Wire the bracket spine (BRACKET only)
+
+For a **breakable** parent with an approved plan (Step 1.5 selected bracket
+breakdown), create `B` and splice the source/sink spine `C → impl → B → P`. Use
+the in-process engine path when available, or the CLI primitives below.
+
+**1. Create the breakdown node `B`.** It carries the configured breakdown type, a
+`brackets:<C-id>` label, and the container's membership label (NOT its type):
+
+```bash
+jit issue create \
+  --title "Breakdown: <container title>" \
+  --label "type:<breakdown_type>" \
+  --label "brackets:<C-UUID>" \
+  --label "<membership-label>"
+# capture B-UUID
+```
+
+**2. Attach the coverage-preview gate to `B` and wire `B → P`:**
+
+```bash
+jit gate preset apply <coverage_gate_preset> <B-UUID>   # coverage-preview gate
+jit dep add <B-UUID> <P-UUID>                            # B depends on approved plan
+```
+
+**3. Wire sources → `B`.** A *source* child has an empty `depends_on` (no
+intra-subgraph predecessor). Every source depends on `B`, gating all impl behind
+the approved breakdown:
+
+```bash
+# For each source child:
+jit dep add <source-child-UUID> <B-UUID>
+```
+
+**4. Wire `C` → sinks.** A *sink* child has no sibling listing it in `depends_on`
+(no intra-subgraph successor). The container depends on each sink:
+
+```bash
+# For each sink child:
+jit dep add <C-UUID> <sink-child-UUID>
+```
+
+`jit` keeps the DAG transitively reduced, so the scaffold's direct `C → P` edge
+and any redundant `C → non-sink` edge are dropped automatically. Verify with
+`jit issue show <C> --json | jq .depends_on` (should list sinks only, not `P`).
+
+**5. Run the coverage-preview gate on `B`** (the plan-time coverage check):
+
+```bash
+jit gate run <coverage_gate_preset-gate-key> <B-UUID>   # or `jit gate pass` per project flow
+```
+
+If it FAILS (a `[hard]` criterion is left uncovered by the drafted children),
+surface the findings and revise the plan/children before declaring the breakdown
+done — do not force the gate. (Checking the recorded gate *status*, not just the
+exit code, is the project convention.)
+
+> Do NOT also run 6d-plain. The bracket spine REPLACES parent-centric containment:
+> `C` depends on sinks only, children never copy `C`'s deps, and the container does
+> not depend on `B` or every child.
 
 ### 6e. Error handling
 
@@ -234,6 +390,13 @@ re-running this skill with the child as the new parent:
 This is what turns a large epic into epic → story → task rather than a flat layer of
 leaves. Keep depth proportional to size — do not force a story level onto small work.
 
+> Bracket note: recursion shape is decided per-child in Step 1.5 by the *child's*
+> type, not the root's. A `decompose_further` child is itself a bracket breakdown
+> only if its own type is in `breakable_types` AND it has been scaffolded with its
+> own plan node; otherwise it recurses as a plain breakdown. In practice the impl
+> children of a bracket are leaves or plain sub-containers — the bracket lives at
+> the breakable-container level.
+
 ---
 
 ## Step 7: Validation and summary
@@ -259,7 +422,9 @@ leaves. Keep depth proportional to size — do not force a story level onto smal
    for labels, `jit issue update -d` for descriptions, `jit gate add` for gates) before
    declaring done.
 
-3. Show a summary:
+3. Show a summary (shape-aware):
+
+   Plain breakdown:
    ```
    Breakdown complete
      Parent issue      : <title> (<short-id>)
@@ -267,6 +432,18 @@ leaves. Keep depth proportional to size — do not force a story level onto smal
      Sequencing edges  : M (between siblings)
      Containment edges : N (parent → each child)
      Longest chain     : K issues
+     Warnings          : <any from jit validate>
+   ```
+
+   Bracket breakdown:
+   ```
+   Bracket breakdown complete
+     Container (C)     : <title> (<short-id>)
+     Plan node (P)     : <short-id>  (plan-quality gate: passed)
+     Breakdown node (B): <short-id>  (coverage-preview gate: <pass/fail>)
+     Children drafted  : N (in Backlog)
+     Spine             : C → {S sinks} … {sources} → B → P
+     Sequencing edges  : M (between siblings)
      Warnings          : <any from jit validate>
    ```
 
