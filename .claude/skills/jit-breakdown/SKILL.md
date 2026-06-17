@@ -375,30 +375,45 @@ jit dep add <C-UUID> <sink-child-UUID>
 and any redundant `C → non-sink` edge are dropped automatically. Verify with
 `jit issue show <C> --json | jq .depends_on` (should list sinks only, not `P`).
 
-**5. Coverage-preview check (the plan-time coverage check).**
+**5. Run the coverage-preview gate via the standard runner, then block on it.**
 
-When you use the **in-process engine path**, the breakdown helper RUNS this check
-for you after wiring the spine: it executes the deterministic scoped coverage
-validation and the returned `BracketBreakdownResult` carries the verdict
-(`coverage_passed`) and the findings (`coverage_report`). A `coverage_passed ==
-false` result is NOT success — it means a `[hard]` criterion is left uncovered by
-the drafted children (the criterion id appears in `coverage_report`). The helper
-still creates `B` and the children (the preview REPORTS the gap, it does not block
-creation), so surface the findings and revise the plan/children before declaring
-the breakdown done.
+The bracket-builder (step 1–4) only ATTACHES the coverage-preview gate to `B` —
+it leaves the gate PENDING and never runs, stamps, or fabricates a verdict
+(`BracketBreakdownResult` is purely structural: `container_id`, `breakdown_id`,
+`planning_id`, `child_ids`, `coverage_gate_preset`). Running the gate is a
+breakdown-workflow step, executed by the standard gate runner exactly like every
+gate in this project — never by command code. After the bracket is created, RUN
+the coverage-preview gate on `B` through the real runner:
 
+```bash
+jit gate pass <B-UUID> <coverage_gate_preset>   # e.g. coverage-preview
+```
+
+This is the standard auto-gate execution path: it runs the checker
+(`jit validate --scope <C>`, resolved from `B`'s `brackets:<C-id>` label),
+persists a `GateRunResult`, updates `B`'s gate status, and logs the gate event.
 For coverage to register, each child must carry the `satisfies:<id>` label(s) for
 the `[hard]` criteria it covers (pass them via the child's `labels`, or
 `jit issue update <child> --label satisfies:<id>` when wiring by hand).
 
-When wiring by hand via the CLI primitives, run the gate explicitly instead:
+**GATE the fan-out on the recorded result** (check the recorded gate *status*,
+not just the exit code — the project convention):
 
 ```bash
-jit gate run <coverage_gate_preset-gate-key> <B-UUID>   # or `jit gate pass` per project flow
+jit gate check <B-UUID> <coverage_gate_preset> --json | jq -r .status
 ```
 
-(Checking the recorded gate *status*, not just the exit code, is the project
-convention.)
+- **Coverage-preview FAILS** (a `[hard]` criterion uncovered → exit 4, status
+  `failed`): a `[hard]` criterion is left uncovered by the drafted children (the
+  criterion id appears in the gate-run output). Do NOT release the impl children.
+  Surface the findings, add the missing `satisfies:<id>` label(s) (or revise the
+  plan/draft), and re-run `jit gate pass <B> <coverage_gate_preset>` until it
+  passes.
+- **Coverage-preview PASSES** (status `passed`): the breakdown is approved; the
+  impl children may proceed (they are released once `B` is done).
+
+So the explicit sequence is: **create bracket → run coverage-preview gate via the
+runner → block on fail / proceed on pass.**
 
 > Do NOT also run 6d-plain. The bracket spine REPLACES parent-centric containment:
 > `C` depends on sinks only, children never copy `C`'s deps, and the container does
@@ -460,10 +475,11 @@ leaves. Keep depth proportional to size — do not force a story level onto smal
      check — that is a defect; add the tier's gates before finishing.
    - **Coverage credits present (bracket only)** — every container `[hard]` criterion
      (Step 1.5 step 5) is carried by at least one child as a `satisfies:<id>` label, so
-     the coverage-preview gate on `B` can credit it. The breakdown helper records that
-     gate's verdict on `B` (6d-bracket step 5); a `[hard]` criterion no child satisfies
-     is reported uncovered and the gate fails — add the missing `satisfies:<id>` label
-     (`jit issue update <child> --label satisfies:<id>`) and re-run the check.
+     the coverage-preview gate on `B` can credit it. The standard gate runner records
+     that gate's verdict on `B` when you run `jit gate pass <B> <coverage_gate_preset>`
+     (6d-bracket step 5); a `[hard]` criterion no child satisfies is reported uncovered
+     and the gate fails — add the missing `satisfies:<id>` label
+     (`jit issue update <child> --label satisfies:<id>`) and re-run the gate.
    Report violations and offer to fix them (`jit issue update --label … --remove-label …`
    for labels, `jit issue update -d` for descriptions, `jit gate add` for gates) before
    declaring done.

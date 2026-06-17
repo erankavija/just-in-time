@@ -642,29 +642,13 @@ fn test_bracket_breakdown_rejects_cyclic_child_plan() {
     );
 }
 
-// ===================== Finding 2: coverage-preview run =======================
-
-/// The SDD-style preview coverage rule keyed on `type:breakdown`, resolving its
-/// container via `brackets:` and checking `[hard]` REQ coverage via `satisfies:`.
-const COVERAGE_RULES_TOML: &str = r#"
-[[rules]]
-name = "coverage-preview"
-when = { type = "breakdown" }
-severity = "error"
-enforce = true
-assert = { label-coverage = { criteria-section = "success_criteria", marker = "[hard]", id-pattern = "REQ-[0-9]+", satisfies-namespace = "satisfies", child-link = "dependencies", child-type-exclude = ["planning", "breakdown"], container-from-label = "brackets" } }
-"#;
-
-/// A harness whose storage root carries the `[planning]` config and the preview
-/// coverage rule, so `validate_scope` (run in-process by the breakdown helper)
-/// evaluates `[hard]` criteria coverage.
-fn coverage_harness() -> TestHarness {
-    let h = TestHarness::new();
-    std::fs::create_dir_all(h.storage.root()).unwrap();
-    std::fs::write(h.storage.root().join("config.toml"), PLANNING_CONFIG_TOML).unwrap();
-    std::fs::write(h.storage.root().join("rules.toml"), COVERAGE_RULES_TOML).unwrap();
-    h
-}
+// ============ coverage-preview gate is ATTACHED, not run, by the helper =======
+//
+// The helper is a pure bracket-builder: it ATTACHES the coverage-preview gate to
+// B (left PENDING) and never runs/stamps/fabricates a verdict. The gate is run
+// later by the standard gate runner (`jit gate pass <B> coverage-preview`) as a
+// breakdown-workflow step (see the jit-breakdown skill and the integration test
+// in `bracket_coverage_gate_run_test.rs`). These tests assert attachment-only.
 
 /// A child that credits the given `[hard]` criterion id via `satisfies:<id>`.
 fn child_satisfying(title: &str, req_id: &str) -> BracketChild {
@@ -679,10 +663,11 @@ fn child_satisfying(title: &str, req_id: &str) -> BracketChild {
 }
 
 #[test]
-fn test_bracket_breakdown_coverage_passes_when_hard_criterion_covered() {
-    let h = coverage_harness();
+fn test_bracket_breakdown_attaches_coverage_gate_pending_not_run() {
+    let h = TestHarness::new();
     let cfg = sdd_planning_config();
-    // Container declares [hard] REQ-01 (scaffold_container's body).
+    // Container declares [hard] REQ-01 (scaffold_container's body), covered by
+    // the child's satisfies:REQ-01 label.
     let (c, _p) = scaffold_container(&h, &cfg, "Auth epic");
 
     let result = h
@@ -690,41 +675,61 @@ fn test_bracket_breakdown_coverage_passes_when_hard_criterion_covered() {
         .bracket_breakdown_with_config(&cfg, &c, vec![child_satisfying("Build login", "REQ-01")])
         .unwrap();
 
-    assert!(
-        result.coverage_passed,
-        "a covered [hard] criterion must yield coverage_passed=true; report: {:?}",
-        result.coverage_report
-    );
-    assert!(
-        !result.coverage_report.has_errors(),
-        "covered plan must have no error-severity coverage findings, got {:?}",
-        result.coverage_report
+    assert_eq!(
+        result.coverage_gate_preset, "coverage-preview",
+        "the result names the coverage gate preset attached to B"
     );
 
-    // The verdict is RECORDED on B's coverage gate (not just returned): B's
-    // coverage-preview gate status is Passed.
-    let b = h.get_issue(&result.breakdown_id);
-    assert_eq!(
-        b.gates_status.get("coverage-preview").map(|g| g.status),
-        Some(jit::domain::GateStatus::Passed),
-        "covered plan must record B's coverage-preview gate as Passed, got {:?}",
-        b.gates_status
+    // The child carries its satisfies:<id> coverage credit (forwarded by the
+    // helper to create_issue's labels) — this is what the coverage-preview gate
+    // reads when the runner later evaluates it.
+    let kid = h.get_issue(&result.child_ids[0]);
+    assert!(
+        kid.labels.contains(&"satisfies:REQ-01".to_string()),
+        "child must carry its satisfies:REQ-01 coverage credit, got {:?}",
+        kid.labels
     );
-    // ...and a gate_passed event exists for B against that gate.
+
+    // The coverage-preview gate is ATTACHED to B (in gates_required)...
+    let b = h.get_issue(&result.breakdown_id);
+    assert!(
+        b.gates_required.contains(&"coverage-preview".to_string()),
+        "B must carry the coverage-preview gate, got {:?}",
+        b.gates_required
+    );
+
+    // ...but the helper does NOT run it: the gate is PENDING/unset (never stamped
+    // Passed or Failed by breakdown). The preset-apply path may initialize the
+    // status to Pending; the helper must never advance it past that.
+    let coverage_status = b.gates_status.get("coverage-preview").map(|g| g.status);
+    assert!(
+        matches!(
+            coverage_status,
+            None | Some(jit::domain::GateStatus::Pending)
+        ),
+        "the helper must leave the coverage gate PENDING/unset (it does not run \
+         it), got {coverage_status:?}"
+    );
+
+    // The helper emits NO gate_passed/gate_failed event for B (it is a clean
+    // bracket-builder — only genuine create/dep state changes are logged).
     let events = h.storage.read_events().unwrap();
     assert!(
-        events
-            .iter()
-            .any(|e| e.get_type() == "gate_passed" && e.get_issue_id() == result.breakdown_id),
-        "a covered plan must log a gate_passed event for B"
+        !events.iter().any(|e| {
+            (e.get_type() == "gate_passed" || e.get_type() == "gate_failed")
+                && e.get_issue_id() == result.breakdown_id
+        }),
+        "the helper must NOT emit a gate verdict event for B (no faked gate run)"
     );
 }
 
 #[test]
-fn test_bracket_breakdown_coverage_fails_when_hard_criterion_uncovered() {
-    let h = coverage_harness();
+fn test_bracket_breakdown_does_not_stamp_coverage_gate_when_uncovered() {
+    let h = TestHarness::new();
     let cfg = sdd_planning_config();
-    // Container declares [hard] REQ-01, but the child satisfies nothing.
+    // Container declares [hard] REQ-01, but the child satisfies nothing. The
+    // helper still must NOT run the coverage gate or fabricate a Failed verdict —
+    // surfacing the gap is the runner's job (run as a workflow step).
     let (c, _p) = scaffold_container(&h, &cfg, "Auth epic");
 
     let result = h
@@ -732,48 +737,33 @@ fn test_bracket_breakdown_coverage_fails_when_hard_criterion_uncovered() {
         .bracket_breakdown_with_config(&cfg, &c, vec![child("Build something unrelated")])
         .unwrap();
 
-    assert!(
-        !result.coverage_passed,
-        "an uncovered [hard] criterion must yield coverage_passed=false"
-    );
-    assert!(
-        result.coverage_report.has_errors(),
-        "uncovered plan must carry an error-severity finding, got {:?}",
-        result.coverage_report
-    );
-    // The uncovered criterion is named in the findings.
-    assert!(
-        result
-            .coverage_report
-            .findings
-            .iter()
-            .any(|f| f.message.contains("REQ-01")),
-        "the uncovered criterion REQ-01 must appear in the coverage findings, got {:?}",
-        result.coverage_report.findings
-    );
-
-    // B and the child ARE still created — the preview REPORTS the gap, it does
-    // not block creation.
+    // B and the child ARE created (the bracket is built regardless of coverage).
     assert!(
         h.storage.load_issue(&result.breakdown_id).is_ok(),
-        "B must still be created (the preview reports, not blocks)"
+        "B must be created by the bracket-builder"
     );
     assert_eq!(result.child_ids.len(), 1);
 
-    // The failing verdict is RECORDED on B's coverage gate: status is Failed.
+    // The coverage gate is attached but NOT stamped Failed by the helper.
     let b = h.get_issue(&result.breakdown_id);
-    assert_eq!(
-        b.gates_status.get("coverage-preview").map(|g| g.status),
-        Some(jit::domain::GateStatus::Failed),
-        "uncovered plan must record B's coverage-preview gate as Failed, got {:?}",
-        b.gates_status
+    assert!(b.gates_required.contains(&"coverage-preview".to_string()));
+    let coverage_status = b.gates_status.get("coverage-preview").map(|g| g.status);
+    assert!(
+        matches!(
+            coverage_status,
+            None | Some(jit::domain::GateStatus::Pending)
+        ),
+        "the helper must NOT stamp the coverage gate Failed (the runner evaluates \
+         it), got {coverage_status:?}"
     );
-    // ...and a gate_failed event exists for B against that gate.
+
+    // No gate verdict event for B.
     let events = h.storage.read_events().unwrap();
     assert!(
-        events
-            .iter()
-            .any(|e| e.get_type() == "gate_failed" && e.get_issue_id() == result.breakdown_id),
-        "an uncovered plan must log a gate_failed event for B"
+        !events.iter().any(|e| {
+            (e.get_type() == "gate_passed" || e.get_type() == "gate_failed")
+                && e.get_issue_id() == result.breakdown_id
+        }),
+        "the helper must NOT emit a gate_failed event for B (no faked gate run)"
     );
 }

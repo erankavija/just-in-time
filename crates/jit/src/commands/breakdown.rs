@@ -79,21 +79,18 @@ pub struct BracketChild {
 /// (in declaration order, so indices match the input). Used for `--json` output
 /// and as the in-process return value.
 ///
-/// The coverage-preview check is run in-process after the spine is wired:
-/// [`coverage_passed`](Self::coverage_passed) is the verdict and
-/// [`coverage_report`](Self::coverage_report) carries the deterministic findings.
-/// The same verdict is RECORDED on the breakdown node `B`'s coverage gate(s)
-/// (`gates_status` set to passed/failed plus a matching gate event), so the gate
-/// is genuinely run rather than left attached-but-unevaluated.
-/// A result with `coverage_passed == false` is NOT an unqualified success — the
-/// drafted children leave a `[hard]` criterion uncovered and the plan should be
-/// revised (the `B`/children are still created; the preview only REPORTS the gap).
+/// This is a purely structural result. The helper is a **bracket-builder**: it
+/// ATTACHES the coverage-preview gate to `B` (left PENDING) and reports its
+/// preset name in [`coverage_gate_preset`](Self::coverage_gate_preset). It does
+/// **not** run, stamp, or fabricate a coverage verdict — the coverage-preview
+/// gate is run separately by the standard gate runner (`jit gate pass`) as a
+/// breakdown-workflow step, exactly as every gate in the project is run by the
+/// orchestrator. So there is no `coverage_passed`/`coverage_report` field here.
 ///
 /// # Examples
 ///
 /// ```
 /// use jit::commands::BracketBreakdownResult;
-/// use jit::validation::report::RuleReport;
 ///
 /// let result = BracketBreakdownResult {
 ///     container_id: "c1".to_string(),
@@ -101,11 +98,9 @@ pub struct BracketChild {
 ///     planning_id: "p1".to_string(),
 ///     child_ids: vec!["k1".to_string(), "k2".to_string()],
 ///     coverage_gate_preset: "coverage-preview".to_string(),
-///     coverage_passed: true,
-///     coverage_report: RuleReport::default(),
 /// };
 /// assert_eq!(result.child_ids.len(), 2);
-/// assert!(result.coverage_passed);
+/// assert_eq!(result.coverage_gate_preset, "coverage-preview");
 /// ```
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct BracketBreakdownResult {
@@ -117,16 +112,9 @@ pub struct BracketBreakdownResult {
     pub planning_id: String,
     /// The drafted impl children, in declaration order.
     pub child_ids: Vec<String>,
-    /// The gate preset applied to `B` (from `[planning].coverage_gate_preset`).
+    /// The gate preset ATTACHED to `B` (from `[planning].coverage_gate_preset`),
+    /// left PENDING for the standard gate runner to evaluate as a workflow step.
     pub coverage_gate_preset: String,
-    /// Whether the in-process coverage-preview check passed: `true` when the
-    /// drafted children cover every `[hard]` criterion of the container's scope,
-    /// `false` when a criterion is left uncovered (see `coverage_report`).
-    pub coverage_passed: bool,
-    /// The deterministic coverage-preview findings, run via
-    /// [`validate_scope`](CommandExecutor::validate_scope) over the bracket scope.
-    /// Empty of error-severity findings exactly when `coverage_passed` is `true`.
-    pub coverage_report: crate::validation::report::RuleReport,
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
@@ -186,8 +174,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// 1. Validates `C`'s `type:` label is breakable and locates its planning
     ///    node `P` (a `type:<planning_type>` dependency of `C`).
     /// 2. Creates the breakdown node `B` (`type:<breakdown_type>`, a
-    ///    `brackets:<C-id>` label, inheriting `C`'s membership labels), applies
-    ///    the coverage-preview preset, and wires `B → P`.
+    ///    `brackets:<C-id>` label, inheriting `C`'s membership labels), ATTACHES
+    ///    the coverage-preview preset (gate left PENDING — the helper does not
+    ///    run it), and wires `B → P`.
     /// 3. Creates the impl children in **Backlog** (they each gain a dependency,
     ///    so [`create_issue`](Self::create_issue)'s auto-Ready promotion is
     ///    immediately demoted).
@@ -207,21 +196,16 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// plan) run BEFORE any `create_issue`/`add_dependency`, so a rejected
     /// breakdown leaves NO partial state.
     ///
-    /// After wiring the spine it RUNS the deterministic coverage-preview check
-    /// in-process (via [`validate_scope`](Self::validate_scope)) and:
-    /// - records the verdict in the result's `coverage_passed`/`coverage_report`
-    ///   fields, AND
-    /// - RECORDS that verdict on `B`'s coverage gate(s): each gate `B` gained
-    ///   from `config.coverage_gate_preset` has its `gates_status` set to
-    ///   [`GateStatus::Passed`]/[`GateStatus::Failed`] (`updated_by`
-    ///   `"auto:breakdown"`) and a matching `gate_passed`/`gate_failed` event is
-    ///   appended. This is the in-process equivalent of the preset's auto checker
-    ///   (which just runs `jit validate --scope <C>`), recorded honestly without
-    ///   shelling out to a subprocess that cannot see an in-memory store.
-    ///
-    /// A `false` verdict reports an uncovered `[hard]` criterion (the children
-    /// and `B` are still created; the preview only surfaces the gap — it records
-    /// the gate as failed but never aborts breakdown).
+    /// This helper is a pure **bracket-builder**: it ATTACHES the
+    /// coverage-preview gate to `B` (via `config.coverage_gate_preset`), leaving
+    /// it PENDING. It does **not** run, stamp, or fabricate a coverage verdict.
+    /// The coverage-preview gate is run separately by the standard gate runner
+    /// (`jit gate pass <B> <coverage-gate>`) as a breakdown-workflow step — the
+    /// orchestrator runs every gate in this project, never command code. That
+    /// runner executes the deterministic `jit validate --scope <C>` check,
+    /// persists a `GateRunResult`, updates `B`'s gate status, and logs the gate
+    /// event. The breakdown workflow then blocks the impl fan-out on that
+    /// recorded result.
     ///
     /// # Errors
     ///
@@ -442,68 +426,18 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
-        // 5. RUN the coverage-preview check in-process. This is the same
-        //    deterministic scope validation the coverage-preview gate's checker
-        //    performs (the checker just shells out to `jit validate --scope <C>`);
-        //    running it here means the result carries the verdict (an
-        //    attached-but-unrun gate would let the helper report unverified
-        //    success). A failure REPORTS an uncovered [hard] criterion — B and
-        //    the children remain created (the plan-time preview surfaces the gap).
-        let coverage_report = self.validate_scope(&full_container_id)?;
-        let coverage_passed = !coverage_report.has_errors();
-
-        // 5b. RECORD that verdict on B's coverage gate(s). The preset's auto
-        //     checker cannot run against an in-memory store (it spawns a `jit`
-        //     subprocess), but its check IS the scope validation we just ran, so
-        //     recording the in-process verdict on B's gate status is the honest,
-        //     equivalent result. Record on EVERY gate B gained from the coverage
-        //     preset (its gates_required), so a multi-gate preset is fully
-        //     covered. This RECORDS pass OR fail either way; it never aborts
-        //     breakdown (the preview reports the gap, it does not block).
-        let now = Utc::now();
-        let mut breakdown_node = self.storage.load_issue(&breakdown_id)?;
-        let coverage_gate_keys: Vec<String> = breakdown_node.gates_required.clone();
-        let recorded_status = if coverage_passed {
-            GateStatus::Passed
-        } else {
-            GateStatus::Failed
-        };
-        for key in &coverage_gate_keys {
-            breakdown_node.gates_status.insert(
-                key.clone(),
-                GateState {
-                    status: recorded_status,
-                    updated_by: Some("auto:breakdown".to_string()),
-                    updated_at: now,
-                },
-            );
-        }
-        self.storage.save_issue(breakdown_node)?;
-        for key in &coverage_gate_keys {
-            let event = if coverage_passed {
-                Event::new_gate_passed(
-                    breakdown_id.clone(),
-                    key.clone(),
-                    Some("auto:breakdown".to_string()),
-                )
-            } else {
-                Event::new_gate_failed(
-                    breakdown_id.clone(),
-                    key.clone(),
-                    Some("auto:breakdown".to_string()),
-                )
-            };
-            self.storage.append_event(&event)?;
-        }
-
+        // The coverage-preview gate is ATTACHED to B (step 2, left PENDING) but
+        // NOT run here. The standard gate runner (`jit gate pass <B>
+        // <coverage-gate>`) evaluates it as a breakdown-workflow step — the
+        // orchestrator runs every gate, never this command code. The helper is a
+        // clean bracket-builder: no faked verdict, no gate stamping, no gate
+        // events emitted by breakdown.
         Ok(BracketBreakdownResult {
             container_id: full_container_id,
             breakdown_id,
             planning_id,
             child_ids,
             coverage_gate_preset: config.coverage_gate_preset.clone(),
-            coverage_passed,
-            coverage_report,
         })
     }
 
