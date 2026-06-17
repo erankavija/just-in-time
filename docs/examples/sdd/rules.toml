@@ -18,6 +18,22 @@
 #   * a child issue that implements REQ-01 carries `satisfies:REQ-01`;
 #   * the graph rules below CHECK the labels against the canonical criteria.
 #
+# THE PLAN-BEFORE-FAN-OUT BRACKET (config.toml declares it; engine stays agnostic):
+#
+#   The companion `config.toml` declares `epic` a BREAKABLE container and adds two
+#   function-typed bracket node types — `planning` (`P`) and `breakdown` (`B`) —
+#   plus the two gate presets. A breakable epic is bracketed as the reduced spine
+#
+#     C(epic) ──dep→ {impl subgraph} ──dep→ B(type:breakdown) ──dep→ P(type:planning)
+#
+#   read as precedence `P > B > impl > C`: plan first, then breakdown, then the
+#   work, then the container closes. `P` carries the agent `plan-review` gate; `B`
+#   carries the deterministic `coverage-preview` gate (checker: `jit validate
+#   --scope <C>`). `B` carries a `brackets:<C-id>` label naming its container.
+#
+#   Coverage is checked at BOTH ends of the bracket, by ONE rule kind
+#   (`label-coverage`) instanced twice — see (3) closure and (3b) preview below.
+#
 # LIFECYCLE ENFORCEMENT (when each rule bites):
 #
 #   PLANNING (backlog / in_progress / gated / ready)
@@ -26,6 +42,14 @@
 #       `sdd-req-matches-a-criterion` is always-on. Coverage (3) and derivation
 #       (4) do NOT fire during planning; an in-flight epic with uncovered or
 #       unsatisfied requirements produces ZERO error-severity graph findings.
+#
+#   BREAKDOWN GATE (the bracket's plan-time check)
+#     — `sdd-coverage-preview` (3b) fires on the transient `B` node (keyed on
+#       `type:breakdown`), resolves its container `C` via the `brackets:<C-id>`
+#       label, and checks that every `[hard]` criterion has a `satisfies:` child
+#       in ANY state (drafts sit in Backlog at breakdown time). An uncovered
+#       criterion BLOCKS the breakdown gate (exit 4 from `jit validate --scope`).
+#       This rule never fires on the epic, so an in-progress epic is unaffected.
 #
 #   DONE TRANSITION
 #     — `sdd-hard-criteria-covered` (3) and `sdd-req-is-satisfied` (4) run with
@@ -48,6 +72,11 @@
 #   (3) coverage      — at done: every `[hard]` criterion id in `## Success
 #                       Criteria` is satisfied by a `done` child carrying
 #                       `satisfies:<id>` (label-coverage; enforce=true blocks).
+#   (3b) preview      — at the BREAKDOWN gate: the same coverage check, but
+#                       *mapping exists* (child in ANY state) over the impl
+#                       interior, keyed on the `type:breakdown` node and resolving
+#                       its container via `brackets:` (label-coverage; the preview
+#                       instance OMITS `child-state`; enforce=true blocks).
 #   (4) req->satisfies — at done: every declared `req:<id>` is actually USED by
 #                       some `satisfies:<id>` child; a `req:` label that nothing
 #                       satisfies is a STRAY/invented label (label-reference;
@@ -83,7 +112,11 @@
 #   json-schema            (local)  content: schemas/spec-body.json over `sections`
 #   label-value-pattern    (local)  req ids look like REQ-01
 #   criteria-label-match   (graph)  req label value -> real criterion id (stray check)
-#   label-coverage         (graph)  criteria -> satisfies coverage of [hard] items at done
+#   label-coverage         (graph)  criteria -> satisfies coverage of [hard] items.
+#                                    Closure instance: child-state="done" (at done).
+#                                    Preview instance: child-state OMITTED (any state),
+#                                    keyed on type:breakdown, container-from-label="brackets",
+#                                    child-type-exclude=["planning","breakdown"] (bracket gate).
 #   label-reference        (graph)  req->satisfies derivation at done; satisfies->req warn
 
 # --- Local: the spec must have a Success Criteria section -------------------
@@ -162,7 +195,46 @@ name = "sdd-hard-criteria-covered"
 when = { type = "epic", state = "done" }
 severity = "error"
 enforce = true
-assert = { label-coverage = { criteria-section = "success_criteria", marker = "[hard]", id-pattern = "REQ-[0-9]+", satisfies-namespace = "satisfies", child-state = "done", child-link = "dependencies" } }
+assert = { label-coverage = { criteria-section = "success_criteria", marker = "[hard]", id-pattern = "REQ-[0-9]+", satisfies-namespace = "satisfies", child-state = "done", child-link = "dependencies", child-type-exclude = ["planning", "breakdown"] } }
+
+# --- Graph: the BRACKET's plan-time coverage preview -------------------------
+# The PREVIEW instance of coverage (design `dev/active/planning-bracket-design.md`,
+# D13). Where the closure rule above bites at the container's `→ done` transition,
+# this rule bites at the BREAKDOWN gate — the moment the decomposition is reviewed,
+# before any work fans out. The two are the SAME rule kind (`label-coverage`)
+# differing only in TWO knobs:
+#
+#   * WHEN it fires. This rule is keyed on `type:breakdown` (the transient `B`
+#     node), not on the epic. So it never fires on an in-progress epic; it fires
+#     only while the bracket's breakdown node exists. `B` carries a
+#     `brackets:<C-id>` label, and `container-from-label = "brackets"` redirects
+#     the criteria source from `B` to its container `C` — so a rule keyed on the
+#     breakdown node evaluates `C`'s `## Success Criteria` coverage.
+#
+#   * WHAT "covered" means. The closure rule sets `child-state = "done"` (mapping
+#     DONE). This preview rule OMITS `child-state` entirely — an absent
+#     `child-state` means "any state". At breakdown time the drafted children sit
+#     in Backlog, so the check is *mapping EXISTS* (a child carrying
+#     `satisfies:<id>` in ANY state), not *mapping done*. Note: `"any"` is NOT a
+#     valid token; the absence of the key is how "any state" is expressed.
+#
+# `child-link = "dependencies"` walks `C`'s dependency closure (the impl interior)
+# transitively, so a criterion satisfied by a NON-SINK impl issue is still
+# credited. `child-type-exclude = ["planning", "breakdown"]` drops the bracket
+# nodes `P`/`B` from coverage candidates AND halts the walk at `B`, so coverage
+# tallies exactly the impl interior between `C` and `B` — a `satisfies:` label on
+# `P` (beyond the boundary) does not count.
+#
+# The deterministic `coverage-preview` gate on `B` (wired in config.toml) runs
+# `jit validate --scope <C>`, which evaluates this rule; an uncovered `[hard]`
+# criterion BLOCKS the breakdown gate (exit 4). `enforce = true` makes the
+# severity blocking at scoped-validate time.
+[[rules]]
+name = "sdd-coverage-preview"
+when = { type = "breakdown" }
+severity = "error"
+enforce = true
+assert = { label-coverage = { criteria-section = "success_criteria", marker = "[hard]", id-pattern = "REQ-[0-9]+", satisfies-namespace = "satisfies", child-link = "dependencies", child-type-exclude = ["planning", "breakdown"], container-from-label = "brackets" } }
 
 # --- Graph: every satisfies: reference resolves to a declared req: ----------
 # Reference integrity within the epic's own dependency graph. A child claiming

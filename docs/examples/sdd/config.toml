@@ -1,0 +1,76 @@
+# Example config: Spec-Driven Development (SDD) with the plan-before-fan-out bracket.
+#
+# This is an EXAMPLE configuration, not the config active on this repository. To
+# use it, copy this file to `.jit/config.toml`, `rules.toml` to `.jit/rules.toml`,
+# and the `schemas/` directory to `.jit/schemas/` in your own project.
+#
+# This config DECLARES the bracket vocabulary that the engine stays agnostic to.
+# The engine hardcodes NONE of these names: the container type (`epic`), the two
+# bracket node types (`planning` / `breakdown`), and the gate presets are read
+# from this config (design `dev/active/planning-bracket-design.md`, D1/D5/D9).
+# Swap the names here and the same engine drives a different methodology — see
+# the research example (`goal` breakable, no `epic`).
+
+[version]
+schema = 2
+
+[type_hierarchy]
+# Type name -> hierarchy level (lower = more strategic). SDD's canonical
+# container is `epic`. `planning` and `breakdown` are the two bracket node
+# types: function-typed children of a breakable container (design D5 — function
+# lives in the type axis, no separate `role:` namespace). They are declared here
+# so they are valid children of the breakable `epic`.
+types = { epic = 2, story = 3, planning = 3, breakdown = 3, task = 4, bug = 4 }
+
+# Strategic types - used by 'query strategic' command.
+strategic_types = ["epic"]
+
+[type_hierarchy.label_associations]
+epic = "epic"
+story = "story"
+
+[planning]
+# Plan-before-fan-out bracket. A breakable container `C` is bracketed by two
+# function-typed children: `P` (type:planning, carries the plan-quality gate)
+# sequenced first, then `B` (type:breakdown, carries the deterministic
+# coverage-preview gate, born at the breakdown step) — read as the spine
+# `C ──dep→ {impl} ──dep→ B ──dep→ P`.
+#
+# - breakable_types: container types that require a planning bracket. SDD's is `epic`.
+# - planning_type / breakdown_type: the two bracket node types (P / B).
+# - plan_doc_location: where P's plan doc lives ({id} -> container id).
+# - plan_gate_preset / coverage_gate_preset: the gate presets applied to P and B.
+#     * plan-review     (agent)         -> attached to the planning node P.
+#     * coverage-preview (deterministic) -> attached to the breakdown node B;
+#       its checker runs `jit validate --scope <C>`, resolving C from B's
+#       `brackets:<C-id>` label, so the preview coverage rule below fires.
+breakable_types = ["epic"]
+planning_type = "planning"
+breakdown_type = "breakdown"
+plan_doc_location = "dev/active/{id}-plan.md"
+plan_gate_preset = "plan-review"
+coverage_gate_preset = "coverage-preview"
+
+[validation]
+strictness = "loose"
+default_type = "task"
+
+[namespaces.type]
+description = "Issue type (hierarchical). Exactly one per issue."
+unique = true
+examples = ["type:task", "type:story", "type:epic", "type:planning", "type:breakdown"]
+
+[namespaces.req]
+description = "A requirement id this epic owns, DERIVED from a [hard] Success Criterion."
+unique = false
+examples = ["req:REQ-01"]
+
+[namespaces.satisfies]
+description = "On a child: the requirement id it implements."
+unique = false
+examples = ["satisfies:REQ-01"]
+
+[namespaces.brackets]
+description = "On a breakdown node B: names the container C it brackets (the sole scope pointer for `validate --scope`)."
+unique = true
+examples = ["brackets:2fbd2a82"]
