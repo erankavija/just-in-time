@@ -349,16 +349,30 @@ jit dep add <C-UUID> <sink-child-UUID>
 and any redundant `C → non-sink` edge are dropped automatically. Verify with
 `jit issue show <C> --json | jq .depends_on` (should list sinks only, not `P`).
 
-**5. Run the coverage-preview gate on `B`** (the plan-time coverage check):
+**5. Coverage-preview check (the plan-time coverage check).**
+
+When you use the **in-process engine path**, the breakdown helper RUNS this check
+for you after wiring the spine: it executes the deterministic scoped coverage
+validation and the returned `BracketBreakdownResult` carries the verdict
+(`coverage_passed`) and the findings (`coverage_report`). A `coverage_passed ==
+false` result is NOT success — it means a `[hard]` criterion is left uncovered by
+the drafted children (the criterion id appears in `coverage_report`). The helper
+still creates `B` and the children (the preview REPORTS the gap, it does not block
+creation), so surface the findings and revise the plan/children before declaring
+the breakdown done.
+
+For coverage to register, each child must carry the `satisfies:<id>` label(s) for
+the `[hard]` criteria it covers (pass them via the child's `labels`, or
+`jit issue update <child> --label satisfies:<id>` when wiring by hand).
+
+When wiring by hand via the CLI primitives, run the gate explicitly instead:
 
 ```bash
 jit gate run <coverage_gate_preset-gate-key> <B-UUID>   # or `jit gate pass` per project flow
 ```
 
-If it FAILS (a `[hard]` criterion is left uncovered by the drafted children),
-surface the findings and revise the plan/children before declaring the breakdown
-done — do not force the gate. (Checking the recorded gate *status*, not just the
-exit code, is the project convention.)
+(Checking the recorded gate *status*, not just the exit code, is the project
+convention.)
 
 > Do NOT also run 6d-plain. The bracket spine REPLACES parent-centric containment:
 > `C` depends on sinks only, children never copy `C`'s deps, and the container does

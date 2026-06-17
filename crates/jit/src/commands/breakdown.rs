@@ -37,6 +37,7 @@ use serde::Serialize;
 ///     description: String::new(),
 ///     priority: Priority::Normal,
 ///     gates: vec![],
+///     labels: vec!["satisfies:REQ-01".to_string()],
 ///     deps: vec![],
 /// };
 /// let sink = BracketChild {
@@ -44,6 +45,7 @@ use serde::Serialize;
 ///     description: String::new(),
 ///     priority: Priority::Normal,
 ///     gates: vec!["code-review".to_string()],
+///     labels: vec![],
 ///     deps: vec![0],
 /// };
 /// assert!(source.deps.is_empty());
@@ -60,6 +62,11 @@ pub struct BracketChild {
     /// Per-issue quality gates (gate keys) to attach at creation. The skill
     /// assigns these per task; the engine simply forwards them.
     pub gates: Vec<String>,
+    /// Per-child labels to attach in addition to the container's inherited
+    /// membership labels — notably the `satisfies:<id>` labels that credit this
+    /// child against the container's `[hard]` criteria for the coverage-preview
+    /// check. The engine forwards them; the skill assigns coverage per task.
+    pub labels: Vec<String>,
     /// 0-based indices of sibling children this child depends on (the
     /// intra-subgraph edges).
     pub deps: Vec<usize>,
@@ -72,10 +79,18 @@ pub struct BracketChild {
 /// (in declaration order, so indices match the input). Used for `--json` output
 /// and as the in-process return value.
 ///
+/// The coverage-preview check is run in-process after the spine is wired:
+/// [`coverage_passed`](Self::coverage_passed) is the verdict and
+/// [`coverage_report`](Self::coverage_report) carries the deterministic findings.
+/// A result with `coverage_passed == false` is NOT an unqualified success — the
+/// drafted children leave a `[hard]` criterion uncovered and the plan should be
+/// revised (the `B`/children are still created; the preview only REPORTS the gap).
+///
 /// # Examples
 ///
 /// ```
 /// use jit::commands::BracketBreakdownResult;
+/// use jit::validation::report::RuleReport;
 ///
 /// let result = BracketBreakdownResult {
 ///     container_id: "c1".to_string(),
@@ -83,8 +98,11 @@ pub struct BracketChild {
 ///     planning_id: "p1".to_string(),
 ///     child_ids: vec!["k1".to_string(), "k2".to_string()],
 ///     coverage_gate_preset: "coverage-preview".to_string(),
+///     coverage_passed: true,
+///     coverage_report: RuleReport::default(),
 /// };
 /// assert_eq!(result.child_ids.len(), 2);
+/// assert!(result.coverage_passed);
 /// ```
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct BracketBreakdownResult {
@@ -98,6 +116,14 @@ pub struct BracketBreakdownResult {
     pub child_ids: Vec<String>,
     /// The gate preset applied to `B` (from `[planning].coverage_gate_preset`).
     pub coverage_gate_preset: String,
+    /// Whether the in-process coverage-preview check passed: `true` when the
+    /// drafted children cover every `[hard]` criterion of the container's scope,
+    /// `false` when a criterion is left uncovered (see `coverage_report`).
+    pub coverage_passed: bool,
+    /// The deterministic coverage-preview findings, run via
+    /// [`validate_scope`](CommandExecutor::validate_scope) over the bracket scope.
+    /// Empty of error-severity findings exactly when `coverage_passed` is `true`.
+    pub coverage_report: crate::validation::report::RuleReport,
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
@@ -120,6 +146,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///     description: String::new(),
     ///     priority: Priority::Normal,
     ///     gates: vec![],
+    ///     labels: vec![],
     ///     deps: vec![],
     /// }];
     /// let result = executor.bracket_breakdown("epic-123", children).unwrap();
@@ -172,11 +199,23 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// [`breakdown_issue`](Self::breakdown_issue): children never copy `C`'s
     /// dependencies, and `C` depends on sinks only — not on every child.
     ///
+    /// All pre-mutation checks (empty child set, out-of-range/self `deps`,
+    /// cycles in the child subgraph, breakable container type, and an APPROVED
+    /// plan) run BEFORE any `create_issue`/`add_dependency`, so a rejected
+    /// breakdown leaves NO partial state.
+    ///
+    /// After wiring the spine it RUNS the deterministic coverage-preview check
+    /// in-process (via [`validate_scope`](Self::validate_scope)) and records the
+    /// verdict in the result's `coverage_passed`/`coverage_report` fields — a
+    /// `false` verdict reports an uncovered `[hard]` criterion (the children are
+    /// still created; the preview only surfaces the gap).
+    ///
     /// # Errors
     ///
     /// Returns an error if the container is not breakable, has no scaffolded
-    /// planning node, the child set is empty, or a child's `deps` index is out
-    /// of range.
+    /// planning node, that planning node's plan-review gate has not passed, the
+    /// child set is empty, a child's `deps` index is out of range or self-referent,
+    /// or the children's `deps` form a cycle.
     ///
     /// # Examples
     ///
@@ -200,6 +239,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///     description: String::new(),
     ///     priority: Priority::Normal,
     ///     gates: vec![],
+    ///     labels: vec![],
     ///     deps: vec![],
     /// }];
     /// let result = executor
@@ -239,6 +279,21 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
+        // Reject a cyclic child plan BEFORE any mutation: a cycle in the `deps`
+        // index adjacency would otherwise create B and some children before
+        // `add_dependency` rejects the closing edge, leaving partial state.
+        if let Some(cycle) = first_child_cycle(&children) {
+            let names: Vec<String> = cycle
+                .iter()
+                .map(|&i| format!("{i} ('{}')", children[i].title))
+                .collect();
+            return Err(anyhow!(
+                "child dependency cycle detected among siblings: {}; \
+                 the child subgraph must be acyclic",
+                names.join(" -> ")
+            ));
+        }
+
         let full_container_id = self.storage.resolve_issue_id(container_id)?;
         let container = self.storage.load_issue(&full_container_id)?;
 
@@ -264,6 +319,24 @@ impl<S: IssueStore> CommandExecutor<S> {
         // 1b. Locate the planning node P: a dependency of C typed as the
         //     planning type. The scaffold (`jit plan`) created the `C → P` edge.
         let planning_id = self.find_planning_node(&container, config)?;
+
+        // 1c. Enforce an APPROVED plan BEFORE any mutation: P's plan-review gate
+        //     (config.plan_gate_preset) must have PASSED. Breakdown consumes an
+        //     approved plan; a pending/unset plan gate rejects with no partial
+        //     state created.
+        let planning_node = self.storage.load_issue(&planning_id)?;
+        let plan_gate_passed = matches!(
+            planning_node.gates_status.get(&config.plan_gate_preset),
+            Some(gate_state) if gate_state.status == GateStatus::Passed
+        );
+        if !plan_gate_passed {
+            return Err(anyhow!(
+                "planning node P ({}) {} gate has not passed; breakdown requires an \
+                 approved plan",
+                planning_node.short_id(),
+                config.plan_gate_preset
+            ));
+        }
 
         // 2. Create the breakdown node B. It inherits C's non-type labels
         //    (epic/milestone membership), carries the breakdown type and a
@@ -298,15 +371,23 @@ impl<S: IssueStore> CommandExecutor<S> {
         //    its type). Children are created dependency-less (so auto-Ready),
         //    then immediately gain spine/internal edges below, which demote them
         //    to Backlog — drafted, never surfaced by query_ready pre-approval.
-        let child_labels = membership_labels(&container.labels);
+        let membership = membership_labels(&container.labels);
         let mut child_ids = Vec::with_capacity(n);
         for child in &children {
+            // Inherited membership labels plus the child's own labels (e.g.
+            // satisfies:<id> coverage credits), de-duplicated.
+            let mut child_labels = membership.clone();
+            for label in &child.labels {
+                if !child_labels.contains(label) {
+                    child_labels.push(label.clone());
+                }
+            }
             let (id, _warnings) = self.create_issue(
                 child.title.clone(),
                 child.description.clone(),
                 child.priority,
                 child.gates.clone(),
-                child_labels.clone(),
+                child_labels,
                 None,
                 false,
             )?;
@@ -348,12 +429,23 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
+        // 5. RUN the coverage-preview check in-process. This is the same
+        //    deterministic scope validation the coverage-preview gate's checker
+        //    performs; running it here means the result carries the verdict (an
+        //    attached-but-unrun gate would let the helper report unverified
+        //    success). A failure REPORTS an uncovered [hard] criterion — B and
+        //    the children remain created (the plan-time preview surfaces the gap).
+        let coverage_report = self.validate_scope(&full_container_id)?;
+        let coverage_passed = !coverage_report.has_errors();
+
         Ok(BracketBreakdownResult {
             container_id: full_container_id,
             breakdown_id,
             planning_id,
             child_ids,
             coverage_gate_preset: config.coverage_gate_preset.clone(),
+            coverage_passed,
+            coverage_report,
         })
     }
 
@@ -375,6 +467,59 @@ impl<S: IssueStore> CommandExecutor<S> {
             config.planning_type
         ))
     }
+}
+
+/// Detect a cycle in the children's intra-subgraph `deps` index adjacency,
+/// returning one offending cycle as a list of child indices if present (pure
+/// helper). Assumes indices are already range/self checked.
+///
+/// Iterative DFS with a recursion stack over the index graph; on the first
+/// back-edge it reconstructs the cycle from the stack.
+fn first_child_cycle(children: &[BracketChild]) -> Option<Vec<usize>> {
+    #[derive(Clone, Copy, PartialEq)]
+    enum Mark {
+        Unvisited,
+        InStack,
+        Done,
+    }
+    let n = children.len();
+    let mut mark = vec![Mark::Unvisited; n];
+
+    // Each stack frame tracks a node and the next dep index to explore, so the
+    // live stack always spells the current DFS path (for cycle reconstruction).
+    for start in 0..n {
+        if mark[start] != Mark::Unvisited {
+            continue;
+        }
+        let mut stack: Vec<(usize, usize)> = vec![(start, 0)];
+        mark[start] = Mark::InStack;
+        while let Some(&(node, next)) = stack.last() {
+            if next < children[node].deps.len() {
+                stack.last_mut().expect("stack non-empty").1 += 1;
+                let dep = children[node].deps[next];
+                match mark[dep] {
+                    Mark::Unvisited => {
+                        mark[dep] = Mark::InStack;
+                        stack.push((dep, 0));
+                    }
+                    Mark::InStack => {
+                        // Back-edge to `dep`: the cycle is the path suffix from
+                        // `dep` to the current node, closed by `node -> dep`.
+                        let from = stack
+                            .iter()
+                            .position(|&(id, _)| id == dep)
+                            .expect("on stack");
+                        return Some(stack[from..].iter().map(|&(id, _)| id).collect());
+                    }
+                    Mark::Done => {}
+                }
+            } else {
+                mark[node] = Mark::Done;
+                stack.pop();
+            }
+        }
+    }
+    None
 }
 
 /// Extract the `type:*` value from a label list, if present (pure helper).
