@@ -48,6 +48,33 @@ pub enum Commands {
     #[command(subcommand)]
     Issue(IssueCommands),
 
+    /// Bracket an existing container with a planning node (plan-before-fan-out)
+    ///
+    /// Creates a planning node `P` (`type:<planning_type>` from the `[planning]`
+    /// config), wires the container to depend on it, MOVES the container's
+    /// pre-existing upstream dependencies onto `P`, applies the plan-review gate
+    /// preset to `P`, and sets `P`'s plan-doc location. Does NOT create the
+    /// breakdown node (that is the breakdown step's job).
+    ///
+    /// The container's `type:` label must be one of the configured
+    /// `[planning].breakable_types`.
+    ///
+    /// Examples:
+    ///   jit plan epic-123          # Retrofit a planning bracket onto an epic
+    ///   jit plan epic-123 --json   # Machine-readable result
+    Plan {
+        /// Container issue ID to bracket
+        id: String,
+
+        /// Bypass validation warnings
+        #[arg(long)]
+        force: bool,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Dependency management commands
     #[command(subcommand)]
     Dep(DepCommands),
@@ -297,6 +324,14 @@ pub enum IssueCommands {
         /// Explicitly allow orphaned leaf issues (tasks without parent labels)
         #[arg(long)]
         orphan: bool,
+
+        /// Bracket the new container with a planning node in one shot. The
+        /// issue's `type:` label must be one of `[planning].breakable_types`.
+        /// Creates `P` (`type:<planning_type>`), wires the container to depend
+        /// on it, and applies the plan-review gate preset to `P`. Does NOT create
+        /// the breakdown node.
+        #[arg(long)]
+        with_planning: bool,
 
         #[arg(long)]
         json: bool,
