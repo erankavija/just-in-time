@@ -119,7 +119,7 @@ approved before drafting any children.
 4. **Require an APPROVED plan.** Bracket breakdown consumes an *approved* plan, so
    the plan-quality gate on `P` must have passed. Check:
    ```bash
-   jit issue show <P> --json | jq '{state, gates_required, gate_status}'
+   jit issue show <P> --json | jq '{state, gates_required, gates_status}'
    ```
    The plan is approved when `P`'s plan-quality gate status is `passed` (and `P` is
    Done or Gated-passing). If the plan gate is pending or failed, STOP:
