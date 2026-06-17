@@ -48,6 +48,12 @@
 #   4. tests: reference integrity — every `tests:<id>` on an experiment resolves
 #      to a declared `hyp:<id>` on the linked goal (label-reference, warn). A
 #      typo'd hypothesis id surfaces without blocking.
+#   5. Hypothesis coverage PREVIEW at breakdown — the bracket's plan-time check.
+#      The same coverage check as (3), but fired on the transient `breakdown` node
+#      `B` (keyed on `type:breakdown`, container resolved via `brackets:`), with
+#      `child-state` OMITTED so a `tests:<id>` child in ANY state counts (drafted
+#      experiments sit in backlog at breakdown time). An uncovered `[hard]`
+#      hypothesis BLOCKS the breakdown gate. See the bracket note below.
 #
 # LIFECYCLE NOTE:
 #   Rules (2) and (4) are always-on (no state predicate) because a stray or
@@ -55,6 +61,36 @@
 #   `state = "done"` with `enforce = true`: an in-flight goal is quiet, but the
 #   goal cannot complete until every [hard] hypothesis is covered. This mirrors
 #   the lifecycle-aware pattern from CC-8 / the SDD example.
+#
+# THE PLAN-BEFORE-FAN-OUT BRACKET (config.toml declares it; engine stays agnostic):
+#
+#   The companion `config.toml` declares the research `goal` a BREAKABLE container
+#   — NOT a software container; the breakable type is research vocabulary, which is
+#   the whole point of this example (design D11: prove the bracket carries no
+#   software assumptions). It adds two function-typed bracket node types —
+#   `planning` (`P`) and `breakdown` (`B`) — plus the two gate presets. A breakable
+#   goal is bracketed as the reduced spine
+#
+#     C(goal) ──dep→ {experiment subgraph} ──dep→ B(type:breakdown) ──dep→ P(type:planning)
+#
+#   read as precedence `P > B > experiments > C`: plan first, then breakdown, then
+#   the experiments, then the goal closes. `P` carries the agent `plan-review`
+#   gate; `B` carries the deterministic `coverage-preview` gate (checker: `jit
+#   validate --scope <C>`). `B` carries a `brackets:<C-id>` label naming its
+#   container goal.
+#
+#   Hypothesis coverage is checked at BOTH ends of the bracket, by ONE rule kind
+#   (`label-coverage`) instanced twice — see rule (3) closure and rule (5) preview
+#   below.
+#
+# BREAKDOWN GATE (the bracket's plan-time check):
+#   The preview rule `research-hypotheses-covered-preview` (5) fires on the
+#   transient `B` node (keyed on `type:breakdown`), resolves its container goal `C`
+#   via the `brackets:<C-id>` label, and checks that every `[hard]` hypothesis has
+#   a `tests:` child in ANY state (drafted experiments sit in backlog at breakdown
+#   time). An uncovered hypothesis BLOCKS the breakdown gate (exit 4 from `jit
+#   validate --scope`). This rule never fires on the goal, so an in-progress goal
+#   is unaffected.
 #
 # ADAPTATION KNOBS:
 #   - Change the hypothesis id format by adjusting `id-pattern` on the
@@ -176,12 +212,57 @@ assert = { criteria-label-match = { namespace = "hyp", criteria-section = "hypot
 # Adapt `marker` to `"[aspirational]"` or remove it to require coverage of
 # ALL hypotheses (the default criteria-section is `success_criteria`; here it is
 # `hypotheses`).
+#
+# `child-type-exclude = ["planning", "breakdown"]` is ADDITIVE: in a bracketed
+# goal it drops the bracket nodes `P`/`B` from coverage candidates and halts the
+# transitive walk at `B`, so closure tallies exactly the experiment interior
+# between `C` and `B`. In a plain (unbracketed) goal there are no such nodes, so
+# the exclusion is a no-op and the rule behaves exactly as before.
 [[rules]]
 name = "research-hard-hypotheses-covered-at-done"
 when = { type = "goal", state = "done" }
 severity = "error"
 enforce = true
-assert = { label-coverage = { criteria-section = "hypotheses", marker = "[hard]", id-pattern = "H-[0-9]+", satisfies-namespace = "tests", child-state = "done", child-link = "dependencies" } }
+assert = { label-coverage = { criteria-section = "hypotheses", marker = "[hard]", id-pattern = "H-[0-9]+", satisfies-namespace = "tests", child-state = "done", child-link = "dependencies", child-type-exclude = ["planning", "breakdown"] } }
+
+# --- Graph: the BRACKET's plan-time hypothesis-coverage preview -------------
+# The PREVIEW instance of coverage (design `dev/active/planning-bracket-design.md`,
+# D13). Where the closure rule above bites at the goal's `→ done` transition, this
+# rule bites at the BREAKDOWN gate — the moment the decomposition is reviewed,
+# before any experiments fan out. The two are the SAME rule kind (`label-coverage`)
+# differing only in TWO knobs:
+#
+#   * WHEN it fires. This rule is keyed on `type:breakdown` (the transient `B`
+#     node), not on the goal. So it never fires on an in-progress goal; it fires
+#     only while the bracket's breakdown node exists. `B` carries a
+#     `brackets:<C-id>` label, and `container-from-label = "brackets"` redirects
+#     the criteria source from `B` to its container goal `C` — so a rule keyed on
+#     the breakdown node evaluates `C`'s `## Hypotheses` coverage.
+#
+#   * WHAT "covered" means. The closure rule sets `child-state = "done"` (mapping
+#     DONE). This preview rule OMITS `child-state` entirely — an absent
+#     `child-state` means "any state". At breakdown time the drafted experiments
+#     sit in backlog, so the check is *mapping EXISTS* (a child carrying
+#     `tests:<id>` in ANY state), not *mapping done*. Note: `"any"` is NOT a valid
+#     token; the absence of the key is how "any state" is expressed.
+#
+# `child-link = "dependencies"` walks `C`'s dependency closure (the experiment
+# interior) transitively, so a hypothesis tested by a NON-SINK experiment is still
+# credited. `child-type-exclude = ["planning", "breakdown"]` drops the bracket
+# nodes `P`/`B` from coverage candidates AND halts the walk at `B`, so coverage
+# tallies exactly the experiment interior between `C` and `B` — a `tests:` label on
+# `P` (beyond the boundary) does not count.
+#
+# The deterministic `coverage-preview` gate on `B` (wired in config.toml) runs
+# `jit validate --scope <C>`, which evaluates this rule; an uncovered `[hard]`
+# hypothesis BLOCKS the breakdown gate (exit 4). `enforce = true` makes the
+# severity blocking at scoped-validate time.
+[[rules]]
+name = "research-hypotheses-covered-preview"
+when = { type = "breakdown" }
+severity = "error"
+enforce = true
+assert = { label-coverage = { criteria-section = "hypotheses", marker = "[hard]", id-pattern = "H-[0-9]+", satisfies-namespace = "tests", child-link = "dependencies", child-type-exclude = ["planning", "breakdown"], container-from-label = "brackets" } }
 
 # --- Graph: tests: resolves to a declared hyp: ----------------------------
 # Reference integrity in the OTHER direction: an experiment's `tests:<id>` label
