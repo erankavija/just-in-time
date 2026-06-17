@@ -15,6 +15,7 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 - [System Guarantees](concepts/guarantees.md) - Invariants and consistency
 - [Design Philosophy](concepts/design-philosophy.md) - Domain-agnostic principles
 - [Methodology-Agnostic Validation](concepts/validation-engine.md) - Why validation is configuration, not code
+- [The Plan-Before-Fan-Out Bracket](concepts/planning-bracket.md) - Gated planning sequenced before the implementation fan-out
 
 ### 🎓 [Tutorials](tutorials/) - Learning-Oriented
 *Step-by-step lessons to get started*
@@ -30,6 +31,7 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 - [Research Projects](how-to/research-projects.md) - Research questions, experiments
 - [Knowledge Work](how-to/knowledge-work.md) - Personal projects, learning goals
 - [Validation Rules](how-to/validation-rules.md) - Author `.jit/rules.toml` rules and schemas
+- [Adopt the Planning Bracket](how-to/adopt-planning-bracket.md) - Wire gated planning before the fan-out
 - [Custom Gates](how-to/custom-gates.md) - Define and use quality gates
 - [Dependency Management](how-to/dependency-management.md) - Graph strategies
 - [Multi-Agent Coordination](how-to/multi-agent-coordination.md) - Team and parallel work

@@ -14,24 +14,147 @@
     "code-review"
   ],
   "gates_status": {
-    "cargo-ci": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-06-16T20:41:43.932564511Z"
-    },
     "code-review": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-06-16T20:41:43.939711083Z"
+    },
+    "cargo-ci": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-06-16T20:41:43.932564511Z"
     }
   },
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "docs/concepts/planning-bracket.md",
+      "commit": null,
+      "label": "Documentation",
+      "doc_type": "documentation",
+      "format": "markdown",
+      "assets": [
+        {
+          "original_path": "../how-to/custom-gates.md",
+          "resolved_path": "docs/how-to/custom-gates.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "eeda19cc5d73d4765d4f4a150e69cd73a37b8dc66c6aa902a7ac802b3782868d",
+          "is_shared": false
+        },
+        {
+          "original_path": "../how-to/validation-rules.md",
+          "resolved_path": "docs/how-to/validation-rules.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "47f3557c629a8e35a2a24f09a8cbd0b6765845e89886dc573d84262eca9efb59",
+          "is_shared": false
+        },
+        {
+          "original_path": "../examples/sdd/config.toml",
+          "resolved_path": "docs/examples/sdd/config.toml",
+          "asset_type": "local",
+          "mime_type": null,
+          "content_hash": "eed69ebdec0093a8fd0d76d7f77905fd8eee66fa4231025c47bdd33e42f83798",
+          "is_shared": false
+        },
+        {
+          "original_path": "../how-to/adopt-planning-bracket.md",
+          "resolved_path": "docs/how-to/adopt-planning-bracket.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "db9367c0056eabac099fbd97e08fef65ca6c3583a9f0837833d56f61b3b52093",
+          "is_shared": false
+        },
+        {
+          "original_path": "validation-engine.md",
+          "resolved_path": "docs/concepts/validation-engine.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "53fb59fee3ae0565a625d1ff4d08e5055309473b4a6ddf43162e339fc068b806",
+          "is_shared": false
+        },
+        {
+          "original_path": "../examples/research/config.toml",
+          "resolved_path": "docs/examples/research/config.toml",
+          "asset_type": "local",
+          "mime_type": null,
+          "content_hash": "e582953c5d874afbfbe8333fa45fa61bf280ce1218a422275aa4151ca69d56d2",
+          "is_shared": false
+        }
+      ]
+    },
+    {
+      "path": "docs/how-to/adopt-planning-bracket.md",
+      "commit": null,
+      "label": "Documentation",
+      "doc_type": "documentation",
+      "format": "markdown",
+      "assets": [
+        {
+          "original_path": "../examples/sdd/config.toml",
+          "resolved_path": "docs/examples/sdd/config.toml",
+          "asset_type": "local",
+          "mime_type": null,
+          "content_hash": "eed69ebdec0093a8fd0d76d7f77905fd8eee66fa4231025c47bdd33e42f83798",
+          "is_shared": false
+        },
+        {
+          "original_path": "../examples/sdd/rules.toml",
+          "resolved_path": "docs/examples/sdd/rules.toml",
+          "asset_type": "local",
+          "mime_type": null,
+          "content_hash": "355d22ea7f380bfb44e9d78fb36399f4047b743b6245a12822db6154b6903b92",
+          "is_shared": false
+        },
+        {
+          "original_path": "validation-rules.md",
+          "resolved_path": "docs/how-to/validation-rules.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "47f3557c629a8e35a2a24f09a8cbd0b6765845e89886dc573d84262eca9efb59",
+          "is_shared": false
+        },
+        {
+          "original_path": "../concepts/validation-engine.md",
+          "resolved_path": "docs/concepts/validation-engine.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "53fb59fee3ae0565a625d1ff4d08e5055309473b4a6ddf43162e339fc068b806",
+          "is_shared": false
+        },
+        {
+          "original_path": "../concepts/planning-bracket.md",
+          "resolved_path": "docs/concepts/planning-bracket.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "ddb614e053a032a550fd85019eab60f22d08f0bd53f2233d09bb47844b51a661",
+          "is_shared": false
+        },
+        {
+          "original_path": "../examples/research/config.toml",
+          "resolved_path": "docs/examples/research/config.toml",
+          "asset_type": "local",
+          "mime_type": null,
+          "content_hash": "e582953c5d874afbfbe8333fa45fa61bf280ce1218a422275aa4151ca69d56d2",
+          "is_shared": false
+        },
+        {
+          "original_path": "custom-gates.md",
+          "resolved_path": "docs/how-to/custom-gates.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "eeda19cc5d73d4765d4f4a150e69cd73a37b8dc66c6aa902a7ac802b3782868d",
+          "is_shared": false
+        }
+      ]
+    }
+  ],
   "labels": [
     "type:task",
     "story:examples-and-docs",
     "epic:planning-bracket"
   ],
   "created_at": "2026-06-15T18:34:31.121738036+00:00",
-  "updated_at": "2026-06-17T01:14:05.569175499+00:00"
+  "updated_at": "2026-06-17T01:19:32.131235259+00:00"
 }

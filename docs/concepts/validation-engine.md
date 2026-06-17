@@ -144,5 +144,6 @@ the id format, add or remove the lifecycle scoping) or replace it wholesale.
 ## See Also
 
 - [How-To: Author Validation Rules](../how-to/validation-rules.md) — write your own rules, with the examples walked through
+- [The Plan-Before-Fan-Out Bracket](planning-bracket.md) — front-ends the `→ done` coverage enforcement with a plan-time coverage preview
 - [Design Philosophy](design-philosophy.md) — JIT's domain-agnostic core
 - [Custom Gates](../how-to/custom-gates.md) — run validation as a quality gate
