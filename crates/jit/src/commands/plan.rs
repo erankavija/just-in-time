@@ -422,6 +422,16 @@ impl<S: IssueStore> CommandExecutor<S> {
                     .documents
                     .push(DocumentReference::new(path_str.clone()).with_label("plan".to_string()));
                 self.storage.save_issue(planning)?;
+                // Audit the state change: attaching the external plan-doc
+                // reference mutates the planning node, so log an issue-updated
+                // event (CLAUDE.md: all state changes must be logged). Appended
+                // after the save commits so a failed write leaves no ghost event.
+                self.storage
+                    .append_event(&crate::domain::Event::new_issue_updated(
+                        planning_id.to_string(),
+                        "agent:scaffold".to_string(),
+                        vec!["documents".to_string()],
+                    ))?;
                 Ok(path_str)
             }
         }

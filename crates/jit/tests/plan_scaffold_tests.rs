@@ -216,6 +216,42 @@ fn test_plan_existing_sets_external_plan_doc_location_reference() {
 }
 
 #[test]
+fn test_plan_existing_external_plan_doc_location_logs_issue_updated_event() {
+    let h = TestHarness::new();
+    let mut cfg = sdd_planning_config();
+    // External template: attaching the plan-doc reference mutates P, so the
+    // mutation must be audited with an issue-updated event (CLAUDE.md invariant).
+    cfg.plan_doc_location = "dev/plans/{id}.md".to_string();
+    let container = create_epic(&h, "Auth epic");
+
+    let (result, _warnings) = h
+        .executor
+        .plan_existing_with_config(&cfg, &container, false)
+        .unwrap();
+
+    let events = h.storage.read_events().unwrap();
+    let doc_event = events
+        .iter()
+        .find(|e| e.get_type() == "issue_updated" && e.get_issue_id() == result.planning_id);
+    assert!(
+        doc_event.is_some(),
+        "attaching the external plan-doc reference to P must log an issue-updated \
+         event for the planning node, got events: {:?}",
+        events
+            .iter()
+            .map(|e| (e.get_type(), e.get_issue_id()))
+            .collect::<Vec<_>>()
+    );
+
+    if let Some(jit::domain::Event::IssueUpdated { fields, .. }) = doc_event {
+        assert!(
+            fields.iter().any(|f| f == "documents"),
+            "the plan-doc issue-updated event must record the 'documents' field, got {fields:?}"
+        );
+    }
+}
+
+#[test]
 fn test_plan_existing_inline_location_adds_no_document_reference() {
     let h = TestHarness::new();
     let cfg = sdd_planning_config(); // inline
