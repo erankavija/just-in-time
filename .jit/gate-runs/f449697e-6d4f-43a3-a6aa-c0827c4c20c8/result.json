@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "f449697e-6d4f-43a3-a6aa-c0827c4c20c8",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "5c21327f-4254-4cde-a101-369a592b59dd",
+  "commit": "1cd4d910f60c0d11bf0e20a20acd22a86f6076dd",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-06-17T00:45:51.649092515Z",
+  "completed_at": "2026-06-17T00:47:56.343469980Z",
+  "duration_ms": 124694,
+  "exit_code": 1,
+  "stdout": "**Findings**\n\n- Blocking: [docs/examples/research/rules.toml](/home/vkaskivuo/Projects/just-in-time/docs/examples/research/rules.toml:26) says “Experiments depend on the goal they advance.” In JIT dependency language, the rest of this ruleset and tests use the opposite edge: the goal depends on experiments, e.g. [rules.toml](/home/vkaskivuo/Projects/just-in-time/docs/examples/research/rules.toml:205) and [research_bracket_tests.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/research_bracket_tests.rs:237). Because this is a copyable example ruleset, the contradiction is user-facing technical debt and can lead users to wire the graph in a way that makes `child-link = \"dependencies\"` coverage fail incorrectly.\n\n**Acceptance Criteria**\n\n- Mostly met: `docs/examples/research/config.toml` declares `goal` as `breakable_types`, declares `planning` and `breakdown`, and the authored example config/rules avoid actual `epic`/`milestone` types.\n- Failed due to the dependency-direction contradiction above in the ruleset documentation.\n\n**Prior Review Feedback**\n\n- `run_history` is empty, so there was no prior feedback to verify.\n\n**Jit Issue Management**\n\n- Dependencies `6a82ca5d` and `c78168d8` are done.\n- `./scripts/jit-validate.sh` passed; warnings were label/orphan warnings, allowed by the review instructions.\n\n**Architecture**\n\n- No production Rust architecture boundary changes in this issue. Added files are example docs/config and tests only.\n\n**Functional Paradigm**\n\n- No concern in the changed Rust tests; helper code is small and conventional.\n\n**Correctness And Invariants**\n\n- No new file-write, event-log, gate-transition, PID, assignee, or label-format implementation paths were introduced.\n- The ruleset documentation issue above affects correctness of the example workflow.\n\n**Safety**\n\n- No unsafe code introduced.\n\n**Testing**\n\n- Cargo CI evidence for issue `5c21327f` passed in `.jit/gate-runs/6ff51ecb-3464-45f7-88b3-8fb8f9dfa0ae/result.json`: `cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace`, exit code 0.\n- New tests in `crates/jit/tests/research_bracket_tests.rs` cover declaration and preview coverage behavior.\n\n**Error Handling**\n\n- No library error-handling changes introduced.\n\n**CLI Contract**\n\n- No CLI surface changes introduced.\n\n**Documentation**\n\n- Failed: the example ruleset has contradictory dependency-direction documentation at [rules.toml](/home/vkaskivuo/Projects/just-in-time/docs/examples/research/rules.toml:26).\n\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 5392 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.137.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019ed30a-a959-7540-a94f-d27755ef894c\n--------\nuser\n--- 5379 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

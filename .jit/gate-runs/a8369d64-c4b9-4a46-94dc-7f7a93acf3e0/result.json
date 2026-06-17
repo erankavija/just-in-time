@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "a8369d64-c4b9-4a46-94dc-7f7a93acf3e0",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "539cbdb1-c9c8-422a-af94-3db34b585f75",
+  "commit": "1cd4d910f60c0d11bf0e20a20acd22a86f6076dd",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-06-17T00:44:58.587759194Z",
+  "completed_at": "2026-06-17T00:45:51.571466593Z",
+  "duration_ms": 52983,
+  "exit_code": 0,
+  "stdout": "**Findings**\nNo blocking findings.\n\n**Acceptance Criteria**\nAll criteria are met. The SDD config declares `epic` as breakable, adds `planning`/`breakdown`, and wires `plan-review` plus `coverage-preview` in [config.toml](/home/vkaskivuo/Projects/just-in-time/docs/examples/sdd/config.toml:47). The preview and closure coverage rules use lifecycle-scoped wording and behavior in [rules.toml](/home/vkaskivuo/Projects/just-in-time/docs/examples/sdd/rules.toml:186) and [rules.toml](/home/vkaskivuo/Projects/just-in-time/docs/examples/sdd/rules.toml:214). The preview rule uses `child-type-exclude = [\"planning\", \"breakdown\"]` and `container-from-label = \"brackets\"` in [rules.toml](/home/vkaskivuo/Projects/just-in-time/docs/examples/sdd/rules.toml:237). The uncovered hard criterion case is covered by [sdd_bracket_tests.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/sdd_bracket_tests.rs:200).\n\n**Architecture And Separation Of Concerns**\nNo boundary violations found. The issue changes are example TOML plus tests. No production Rust engine code was changed for SDD-specific behavior.\n\n**Functional Paradigm**\nNo blocking concerns. The added Rust is test-only and uses simple setup code with iterator checks where appropriate.\n\n**Correctness And Invariants**\nNo file-write, event-log, state-transition, PID, assignee, or label invariant regressions found in the scoped change. Gate wiring is declarative in the example config, and coverage enforcement is expressed through existing validation rules.\n\n**Safety**\nNo unsafe code introduced. The scoped commit does not add production Rust.\n\n**Testing**\nIssue gate evidence shows `cargo-ci` passed at `2026-06-17T00:31:26Z`. I also ran `cargo test --test sdd_bracket_tests --quiet`: 7 passed, 0 failed. The focused tests cover preview failure, preview success with Backlog mapping, bracket type exclusion, transitive interior crediting, and closure requiring `done`.\n\n**Error Handling**\nNo new library error-handling paths were added. Test `expect`/panic usage is confined to tests.\n\n**CLI Contract**\nNo CLI commands were added or changed, so no `--json` contract impact.\n\n**Documentation**\nThe example documentation is updated inline in the SDD rules/config and accurately describes lifecycle-scoped coverage, breakdown preview semantics, and bracket vocabulary.\n\n**JIT Issue Management**\nBoth listed dependencies are `done`. `./scripts/jit-validate.sh` passes; only allowed label warnings were emitted.\n\n**Prior Review Feedback**\n`run_history` is empty, so there was no prior feedback for this issue to re-check.\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

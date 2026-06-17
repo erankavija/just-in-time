@@ -23,8 +23,11 @@
 #                     hypotheses. Its body has a `## Method` section (the
 #                     experimental protocol) and an `## Evidence` section
 #                     (observations and results). Experiments carry `tests:<id>`
-#                     labels naming the hypotheses they test. Experiments depend
-#                     on the goal they advance.
+#                     labels naming the hypotheses they test. The goal lists its
+#                     experiments as dependencies (the parent-depends-on-children
+#                     containment used throughout this ruleset, wired by
+#                     `jit dep add <goal> <experiment>`), so each experiment
+#                     advances the goal that depends on it.
 #
 # LABEL NAMESPACES:
 #   hyp:     on goals      — declared hypotheses (e.g. hyp:H-1)
