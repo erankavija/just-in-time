@@ -158,15 +158,22 @@ jit validate --explain
 
 The two gate presets (`plan-review`, `coverage-preview`) are **built in** to JIT,
 so you do not define the gates by hand — but their checkers shell out to scripts
-that must exist at the repo root. Copy them from this repository's `scripts/`:
+that must exist at the root of **your** repository. The scripts ship in the JIT
+source tree, so copy them from a checkout of the JIT repository into your project.
+Point `JIT_SRC` at that checkout (clone it first if you do not already have one):
 
 ```bash
+# In your adopting project's root. JIT_SRC = a local checkout of the jit repo.
+JIT_SRC=${JIT_SRC:-/path/to/jit}            # e.g. git clone https://…/jit /tmp/jit && JIT_SRC=/tmp/jit
 mkdir -p scripts
-cp scripts/coverage-preview.sh scripts/      # deterministic coverage gate (on B)
-cp scripts/ai-review.sh scripts/             # agent review runner (used by plan-review)
-cp scripts/plan-review-prompt.md scripts/    # the plan-review prompt
+cp "$JIT_SRC"/scripts/coverage-preview.sh scripts/   # deterministic coverage gate (on B)
+cp "$JIT_SRC"/scripts/ai-review.sh scripts/          # agent review runner (used by plan-review)
+cp "$JIT_SRC"/scripts/plan-review-prompt.md scripts/ # the plan-review prompt
 chmod +x scripts/coverage-preview.sh scripts/ai-review.sh
 ```
+
+(If you are adopting the bracket *inside* the JIT repository itself, these scripts
+are already present at `scripts/` — skip this step.)
 
 What each does:
 

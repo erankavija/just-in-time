@@ -14,14 +14,14 @@
   ],
   "gates_status": {
     "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-06-16T20:41:43.954358137Z"
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-17T01:42:14.814063176Z"
     },
     "cargo-ci": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-06-16T20:41:43.946929665Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-17T01:28:48.797980963Z"
     }
   },
   "context": {},
@@ -32,5 +32,5 @@
     "epic:planning-bracket"
   ],
   "created_at": "2026-06-15T18:34:31.127458397+00:00",
-  "updated_at": "2026-06-17T01:14:05.552550385+00:00"
+  "updated_at": "2026-06-17T01:43:37.165804327+00:00"
 }
