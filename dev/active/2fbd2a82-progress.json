@@ -2,7 +2,7 @@
   "epic_id": "2fbd2a82-14ba-4e6e-90f6-e0c34f0f912c",
   "epic_short_id": "2fbd2a82",
   "epic_title": "Plan-before-fan-out bracket: gated planning node before breakdown",
-  "current_wave": 4,
+  "current_wave": 5,
   "design_doc": "dev/active/planning-bracket-design.md",
   "gates_attached": [
     "cargo-ci",
@@ -137,7 +137,7 @@
           "short_id": "590add26",
           "title": "Re-sequence jit-breakdown for the bracket",
           "classification": "implementation",
-          "status": "pending",
+          "status": "done",
           "task_ref": "T10"
         },
         {
@@ -145,7 +145,7 @@
           "short_id": "04656f7b",
           "title": "Bracket concept and how-to documentation",
           "classification": "documentation",
-          "status": "pending",
+          "status": "done",
           "task_ref": "T9"
         }
       ]
@@ -184,13 +184,13 @@
       "wave": 4,
       "reason": "MAX_REWORK_ATTEMPTS + MAX_SAME_FINDING_REPEATS(3) on 'run the coverage-preview gate'",
       "finding": "reviewer wants a persisted GateRunResult via gate_check model; helper currently stamps gates_status+event only; coverage-preview auto-checker shells out (subprocess) so can't run vs in-memory test stores",
-      "status": "awaiting user decision"
+      "status": "resolved: user passed code-review after cargo-ci concise-output fix; env-test fragility deferred to user"
     },
     {
       "issue": "590add26",
       "wave": 4,
       "reason": "code-review reviewer (no-network sandbox) deterministically blocks on 5 PRE-EXISTING env-sensitive tests (serve.rs port-binding, issue.rs claim-prechecks). T10's own work fully accepted by reviewer. Tests pass locally + cargo-ci evidence clean. Fixing = shared-infra/test change (out of epic scope). Will recur for T11/T12.",
-      "status": "awaiting user decision"
+      "status": "resolved: user passed code-review after cargo-ci concise-output fix; env-test fragility deferred to user"
     }
   ],
   "rework_counts": {
@@ -218,5 +218,10 @@
   "story_81fbf45a": "done",
   "wave2_complete": true,
   "wave3_complete": true,
-  "story_c6d2f4ca": "done"
+  "story_c6d2f4ca": "done",
+  "wave4_complete": true,
+  "story_bd5c1feb": "done",
+  "infra_changes": [
+    "scripts/cargo-ci.sh concise wrapper + cargo-ci gate re-pointed (log-flooding fix)"
+  ]
 }
