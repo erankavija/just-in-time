@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "9e7c67b5-48cf-4346-b648-e88308887e8f",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "4d321a11-e6eb-4331-97af-7b9557bee6ac",
+  "commit": "6787bf414bb1e8baedbb851f3809fdf7249876ec",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-06-18T19:30:25.098274529Z",
+  "completed_at": "2026-06-18T19:31:24.605705575Z",
+  "duration_ms": 59507,
+  "exit_code": 1,
+  "stdout": "**Acceptance Criteria**\n\nBlocking finding:\n\n- `.claude/skills/project-lead/SKILL.md:65-71` correctly discovers `[planning].plan_gate_preset` and `[planning].coverage_gate_preset`, but the actual bracket flow hardcodes gate names at `.claude/skills/project-lead/SKILL.md:123` and `.claude/skills/project-lead/SKILL.md:127`:\n  - `Run the plan-review gate on P`\n  - `Run the coverage-preview gate on B`\n  - check `P`'s `plan-review` status and `B`'s `coverage-preview` status\n\n  This violates the success criterion that behavior is configurable from the ruleset. A ruleset with `plan_gate_preset = \"architecture-review\"` or `coverage_gate_preset = \"hypothesis-preview\"` would be discovered but then ignored during execution. The steps should use `<plan_gate_preset>` and `<coverage_gate_preset>` consistently, with `plan-review` / `coverage-preview` only as examples.\n\nThe other two criteria are addressed in intent: bracketed containers scaffold `P` before breakdown, and implementation fan-out is blocked until the coverage gate passes.\n\n**Architecture and Separation of Concerns**\n\nNo Rust code changed. The change is isolated to `.claude/skills/project-lead/SKILL.md`, so domain/storage/commands/CLI boundaries are not affected.\n\n**Functional Paradigm**\n\nNo executable Rust code changed.\n\n**Correctness and Invariants**\n\nNo direct impact on atomic writes, event logging, state transitions, assignee format, label format, PID safety, or unsafe code.\n\nThe configurable-gate inconsistency above is a correctness issue for bracket orchestration.\n\n**Safety**\n\nNo unsafe code introduced.\n\n**Testing**\n\n`cargo-ci` gate is recorded as passed for this issue at `2026-06-18T19:23:38.510314574Z`. Per instruction, I did not rerun tests.\n\nNo new test failure evidence was present.\n\n**Error Handling**\n\nNo fallible Rust operations changed.\n\n**CLI Contract**\n\nNo CLI code changed.\n\n**Documentation**\n\nThe changed artifact is documentation/instructions. It introduces contradictory guidance: discover configured gate presets, then execute hardcoded gate names. That must be corrected before passing review.\n\n**Jit Issue Management**\n\nDependency `590add26` is `done` with `cargo-ci` and `code-review` passed.\n\n`./scripts/jit-validate.sh` passed. It reported label warnings only, which are allowed by the review instructions.\n\n**Prior Review Feedback**\n\n`run_history` is empty, so there are no prior findings to verify.\n\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 4530 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.137.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019edc36-966f-7f83-810d-ed1df5c09024\n--------\nuser\n--- 4517 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
