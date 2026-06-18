@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "39e2696e-77a3-4bd8-aa39-ed89f2e4cded",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "4d321a11-e6eb-4331-97af-7b9557bee6ac",
+  "commit": "ff1583cce7ed6ead8de9e661cfd9aa44362800a3",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-06-18T19:39:48.792526144Z",
+  "completed_at": "2026-06-18T19:40:47.308237675Z",
+  "duration_ms": 58515,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nNo blocking findings.\n\n- [.claude/skills/project-lead/SKILL.md:117](/home/vkaskivuo/Projects/just-in-time/.claude/skills/project-lead/SKILL.md:117) scaffolds the planning node with `jit plan <epic-id>` before breakdown.\n- [.claude/skills/project-lead/SKILL.md:123](/home/vkaskivuo/Projects/just-in-time/.claude/skills/project-lead/SKILL.md:123) now blocks breakdown on the discovered `plan_gate_preset`, not a hardcoded gate name.\n- [.claude/skills/project-lead/SKILL.md:65](/home/vkaskivuo/Projects/just-in-time/.claude/skills/project-lead/SKILL.md:65) and [.claude/skills/project-lead/SKILL.md:110](/home/vkaskivuo/Projects/just-in-time/.claude/skills/project-lead/SKILL.md:110) read breakable types from `[planning].breakable_types`.\n- [.claude/skills/project-lead/SKILL.md:127](/home/vkaskivuo/Projects/just-in-time/.claude/skills/project-lead/SKILL.md:127) blocks implementation fan-out until the discovered `coverage_gate_preset` has recorded `passed`.\n\n**Architecture and Separation of Concerns**\n\nNo Rust code changed. The change is limited to `.claude/skills/project-lead/SKILL.md` plus JIT gate metadata, so domain/storage/commands/CLI boundaries are unaffected.\n\n**Functional Paradigm**\n\nNo executable Rust code changed.\n\n**Correctness and Invariants**\n\nNo impact on atomic writes, event logging behavior, gate transition semantics in Rust, assignee format, label format, PID safety, or unsafe code. The prior configurable-gate correctness issue is addressed by using discovered preset names at [.claude/skills/project-lead/SKILL.md:123](/home/vkaskivuo/Projects/just-in-time/.claude/skills/project-lead/SKILL.md:123) and [.claude/skills/project-lead/SKILL.md:127](/home/vkaskivuo/Projects/just-in-time/.claude/skills/project-lead/SKILL.md:127).\n\n**Safety**\n\nNo unsafe code introduced.\n\n**Testing**\n\n`cargo-ci` gate evidence for commit `ff1583cce7ed6ead8de9e661cfd9aa44362800a3` passed: fmt ok, clippy ok, tests `2072 passed, 0 failed, 9 ignored`. Per instruction, I did not rerun tests.\n\n**Error Handling**\n\nNo fallible Rust operations changed.\n\n**CLI Contract**\n\nNo CLI code changed.\n\n**Documentation**\n\nThe changed artifact is documentation/instructions. The contradictory hardcoded execution guidance from the previous review has been corrected; default names remain only as examples.\n\n**Jit Issue Management**\n\nDependency `590add26` is `done` with `cargo-ci` and `code-review` passed. `./scripts/jit-validate.sh` passes; it reports label warnings only, which are allowed by the review instructions.\n\n**Prior Review Feedback**\n\nThe most recent failed review flagged hardcoded `plan-review` and `coverage-preview` execution in project-lead. That is resolved in [.claude/skills/project-lead/SKILL.md:123](/home/vkaskivuo/Projects/just-in-time/.claude/skills/project-lead/SKILL.md:123) and [.claude/skills/project-lead/SKILL.md:127](/home/vkaskivuo/Projects/just-in-time/.claude/skills/project-lead/SKILL.md:127).\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

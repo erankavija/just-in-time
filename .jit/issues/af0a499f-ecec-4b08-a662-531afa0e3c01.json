@@ -2,9 +2,9 @@
   "id": "af0a499f-ecec-4b08-a662-531afa0e3c01",
   "title": "Steering scenarios for the bracket",
   "description": "Steering scenarios over the bracket reusing the existing eval harness: a plan rejected at the quality gate, a coverage gap caught at the breakdown gate, and a clean green path.\n\n## Success Criteria\n\n- [ ] A scenario asserts the plan-review gate blocks a deficient plan.\n- [ ] A scenario asserts the breakdown gate blocks an uncovered hard criterion.\n- [ ] A scenario asserts a well-formed bracket passes end-to-end.",
-  "state": "backlog",
+  "state": "in_progress",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [
     "4d321a11-e6eb-4331-97af-7b9557bee6ac"
   ],
@@ -32,5 +32,5 @@
     "epic:planning-bracket"
   ],
   "created_at": "2026-06-15T18:34:31.138877221+00:00",
-  "updated_at": "2026-06-16T20:41:43.982400225+00:00"
+  "updated_at": "2026-06-18T19:44:00.817752109+00:00"
 }
