@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "6f497982-73f3-423f-bca9-52a9d6c1f9e2",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "af0a499f-ecec-4b08-a662-531afa0e3c01",
+  "commit": "a8fbaa941eb5f89ca24c97a35b18177785fac210",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-06-18T20:07:34.792770710Z",
+  "completed_at": "2026-06-18T20:08:42.420629628Z",
+  "duration_ms": 67627,
+  "exit_code": 0,
+  "stdout": "**Findings**\n\nNo blocking findings.\n\n**Acceptance Criteria**\n\n- Plan-review rejection is covered in `crates/jit/tests/fixtures/steering/bracket-plan-rejected/scenario.toml:45`: `gate pass` expects exit `4`, then `gate check --json` asserts persisted `\"failed\"` at line 55, and `issue update ... --state done` is blocked with `\"plan-review\"` at line 61.\n- Breakdown coverage gap is covered in `crates/jit/tests/fixtures/steering/bracket-coverage-gap/scenario.toml:79`: `validate --scope $container` expects exit `4` and output containing `REQ-01`.\n- Clean green path is covered in `crates/jit/tests/fixtures/steering/bracket-happy-path/scenario.toml:74` and `:107`: scoped validation exits `0`, then the bracket spine transitions to done and the container JSON contains `\"done\"` at line 114.\n- The fixtures are wired into the existing harness: `crates/jit/tests/steering_scenarios.rs:421-455` enumerates every fixture directory with a `scenario.toml`.\n\n**Prior Review Feedback**\n\nNo prior `run_history` entries were provided, so there are no previous review findings to re-check.\n\n**Issue Dependencies**\n\nDependency `4d321a11` is done with both `cargo-ci` and `code-review` passed. This change builds on that bracket sequencing work.\n\n**Architecture And Separation Of Concerns**\n\nNo production code changed. The change is limited to steering fixture data and fixture README documentation, so it does not introduce domain/storage/command/CLI boundary violations.\n\n**Functional Paradigm**\n\nNo Rust implementation changes were made. The existing harness remains data-driven; unannotated fixture steps still default to exit `0` per `crates/jit/tests/steering_scenarios.rs:336-350`.\n\n**Correctness And Invariants**\n\nThe scenarios exercise gate semantics directly:\n- Failed plan-review gate blocks done transition: `bracket-plan-rejected/scenario.toml:57-61`.\n- Breakdown validation blocks uncovered hard criterion: `bracket-coverage-gap/scenario.toml:77-82`.\n- Successful coverage allows done transition: `bracket-happy-path/scenario.toml:104-109`.\n\nNo new file-writing, event logging, assignee parsing, label parsing, PID, or state-machine implementation code was introduced.\n\n**Safety**\n\nNo unsafe code was added. The change is TOML and Markdown only.\n\n**Testing And Lint Evidence**\n\nI did not rerun cargo tests because the issue has a succeeded `cargo-ci` gate. Gate evidence for commit `a8fbaa941eb5f89ca24c97a35b18177785fac210` shows:\n\n- `fmt: ok`\n- `clippy: ok`\n- `test: 2072 passed, 0 failed, 9 ignored`\n\nI did run `./scripts/jit-validate.sh`; it passed with label warnings only, which are allowed by the review instructions.\n\n**Error Handling**\n\nNo library error-handling code changed. Fixture expectations assert contextual output where relevant, including `REQ-01` and `plan-review`.\n\n**CLI Contract**\n\nNo CLI commands were added or modified. Existing fixture commands use JSON where inspection needs machine-readable output, e.g. `gate check ... --json` at `bracket-plan-rejected/scenario.toml:53` and `issue show ... --json` at `bracket-happy-path/scenario.toml:112`.\n\n**Documentation**\n\nThe steering fixture README was updated to list all three new scenarios at `crates/jit/tests/fixtures/steering/README.md:91-93`. No public APIs were added, so public API doc-comment requirements do not apply.\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
