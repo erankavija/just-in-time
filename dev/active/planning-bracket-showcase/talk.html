@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<title>Plan-before-fan-out bracket</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;0,700;1,400&family=Source+Code+Pro:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+
+<link rel="stylesheet" id="theme" href="themes/rust.css">
+<link rel="stylesheet" href="base.css">
+
+<!-- Deck-local diagram styles: a deterministic CSS spine (no Mermaid, so the
+     fit-checker measures a fixed height). Colours come from theme tokens. -->
+<style>
+  .spine { display:flex; align-items:stretch; justify-content:center;
+           gap:.5rem; margin:1.4rem 0 1rem; flex-wrap:nowrap; }
+  .spine .node { display:flex; flex-direction:column; align-items:center;
+           justify-content:center; min-width:120px; padding:.55rem .7rem;
+           border:2px solid var(--rule, #888); border-radius:10px;
+           background:var(--panel, rgba(127,127,127,.08)); }
+  .spine .node b { font-family:"JetBrains Mono",monospace; font-size:1.5rem;
+           line-height:1.1; }
+  .spine .node small { font-size:.72rem; opacity:.8; margin-top:.15rem; }
+  .spine .node.gate { border-style:dashed; }
+  .spine .arrow { display:flex; flex-direction:column; align-items:center;
+           justify-content:center; font-size:1.4rem; opacity:.65;
+           min-width:64px; }
+  .spine .arrow small { font-size:.62rem; opacity:.85; }
+  .spine .impl { min-width:150px; }
+  .legend { display:flex; gap:1.4rem; justify-content:center; font-size:.8rem;
+           opacity:.85; margin-top:.2rem; }
+  .legend span b { font-family:"JetBrains Mono",monospace; }
+</style>
+</head>
+<body>
+<div class="reveal"><div class="slides">
+
+<!-- ── TITLE ───────────────────────────────────────────────────────────── -->
+<section class="title">
+  <h1>The Plan-before-fan-out Bracket</h1>
+  <p class="tagline">Making planning a first-class, gated node in the dependency DAG</p>
+  <p>just-in-time &nbsp;·&nbsp; epic <code>2fbd2a82</code> &nbsp;·&nbsp; 2026-06</p>
+  <p class="caption">Front-end counterpart to epic 94d26c42's done-transition coverage enforcement</p>
+</section>
+
+<!-- ── AGENDA ──────────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Outline <span class="num">· 2 / 14</span></span>
+  <h2>Agenda</h2>
+  <ol>
+    <li>The problem: one node, three jobs</li>
+    <li>The bracket: the <code>C → impl → B → P</code> spine</li>
+    <li>The two gates and the coverage split</li>
+    <li>The engine change that makes it work</li>
+    <li>What shipped: 6 waves, 12 tasks</li>
+    <li>Domain-agnosticism and the steering eval</li>
+  </ol>
+</section>
+
+<!-- ── PROBLEM ─────────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Problem <span class="num">· 3 / 14</span></span>
+  <h2>One container, three conflated jobs</h2>
+  <p>Before this work, a container (an <code>epic</code>, or whatever a ruleset's top type is) silently played three roles at once:</p>
+  <ol>
+    <li>the <b>planning artifact</b> — a design doc produced out-of-band;</li>
+    <li>the <b>fan-out trigger</b> — breakdown, run speculatively;</li>
+    <li>the <b>fan-in acceptance</b> node — coverage checked at <code>→ done</code>.</li>
+  </ol>
+  <div class="warning">Breakdown happens <em>before</em> anyone reviews whether the decomposition is right, and coverage is only checked at the very end — after all the work is done.</div>
+</section>
+
+<!-- ── THE BRACKET + SPINE DIAGRAM ─────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Solution <span class="num">· 4 / 14</span></span>
+  <h2>The bracket: a reviewed, gated spine</h2>
+  <p>A breakable container <code>C</code> is bracketed by two function-typed nodes — <b>P</b> (<code>type:planning</code>) and <b>B</b> (<code>type:breakdown</code>) — with the implementation subgraph spliced between them:</p>
+  <div class="spine">
+    <span class="node"><b>C</b><small>container</small></span>
+    <span class="arrow">→<small>depends on</small></span>
+    <span class="node impl"><b>impl…</b><small>the work</small></span>
+    <span class="arrow">→<small>depends on</small></span>
+    <span class="node gate"><b>B</b><small>breakdown · coverage gate</small></span>
+    <span class="arrow">→<small>depends on</small></span>
+    <span class="node gate"><b>P</b><small>planning · plan-review gate</small></span>
+  </div>
+  <div class="legend">
+    <span>Read as precedence <b>P &gt; B &gt; impl &gt; C</b>:</span>
+    <span>plan first → breakdown → the work → the container closes.</span>
+  </div>
+</section>
+
+<!-- ── EDGE GEOMETRY ───────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Solution <span class="num">· 5 / 14</span></span>
+  <h2>Edge geometry (kept transitively reduced)</h2>
+  <ul>
+    <li><b>C → impl: sinks only.</b> Only the issues immediately before container completion carry an edge to <code>C</code>.</li>
+    <li><b>impl → B: sources only.</b> Only entry impl issues depend on <code>B</code>; this transitively gates <em>all</em> impl behind the approved breakdown.</li>
+    <li><b>B → P.</b> Breakdown depends on the plan; <code>B</code> is born <em>at</em> breakdown, not at scaffold.</li>
+    <li><b>Reduction drops <code>C → P</code></b> automatically once the spine connects <code>C → impl → B → P</code>.</li>
+  </ul>
+  <div class="note">Retrofit: <code>jit plan &lt;existing-C&gt;</code> moves <code>C</code>'s pre-existing upstream deps onto <code>P</code>, so planning waits on upstream work and <code>C</code> becomes the pure closure node.</div>
+</section>
+
+<!-- ── THE TWO GATES ───────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Gates <span class="num">· 6 / 14</span></span>
+  <h2>Two gates, two questions</h2>
+  <div class="two-col">
+    <div>
+      <h3>plan-review · on P</h3>
+      <p>An <b>agent</b> quality gate. Is the plan good enough to fan out from? Blocks breakdown until the plan is <em>approved</em>.</p>
+    </div>
+    <div>
+      <h3>coverage-preview · on B</h3>
+      <p>A <b>deterministic</b> gate: runs <code>jit validate --scope &lt;C&gt;</code>. Do the drafted children actually cover <code>C</code>'s <code>[hard]</code> criteria? Exit 4 if not.</p>
+    </div>
+  </div>
+  <div class="note">Quality vs coverage are split across the two nodes. The gate runs through the standard runner — the breakdown step <em>attaches</em> the gate; it never fakes a result.</div>
+</section>
+
+<!-- ── PREVIEW vs CLOSURE SPLIT ────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Gates <span class="num">· 7 / 14</span></span>
+  <h2>Preview vs closure: one rule, one knob</h2>
+  <p>Both checks are instances of the same <code>label-coverage</code> rule. They differ only by the <code>child-state</code> knob:</p>
+  <table>
+    <thead><tr><th>aspect</th><th>preview (on B)</th><th>closure (on C → done)</th></tr></thead>
+    <tbody>
+      <tr><td>fires</td><td>at breakdown, plan-time</td><td>at the container's <code>→ done</code></td></tr>
+      <tr><td><code>child-state</code></td><td><b>omitted</b> = any state</td><td><code>"done"</code></td></tr>
+      <tr><td>question</td><td>does a mapping <em>exist</em>?</td><td>is the mapping <em>done</em>?</td></tr>
+      <tr><td>children</td><td>drafts sit in Backlog</td><td>children must be complete</td></tr>
+    </tbody>
+  </table>
+  <div class="note">The literal <code>"any"</code> is <em>not</em> a token — an absent <code>child-state</code> already means "any state" in the evaluator. No parser change was needed.</div>
+</section>
+
+<!-- ── ENGINE CHANGE ───────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Engine <span class="num">· 8 / 14</span></span>
+  <h2>Why coverage had to go transitive</h2>
+  <p>Because the DAG is reduced, <code>C</code> links only to its <em>sink</em> children — so a criterion satisfied by a <em>non-sink</em> impl issue read as uncovered. Three engine changes fixed it:</p>
+  <ul>
+    <li><b>Transitive traversal by default</b> — <code>label-coverage</code> walks the dependency closure, not just direct adjacency.</li>
+    <li><b>child-type-exclude</b> — drops bracket types from candidates <em>and</em> halts the walk at them, bounding coverage to the impl interior between <code>C</code> and <code>B</code>.</li>
+    <li><b>container-from-label</b> — a rule firing on <code>B</code> resolves its container from the <code>brackets:&lt;C-id&gt;</code> label (full id, short id, or prefix).</li>
+  </ul>
+  <div class="note">The per-issue rules were left untouched — only <code>label-coverage</code> became transitive.</div>
+</section>
+
+<!-- ── WHAT SHIPPED: WAVES ─────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Delivery <span class="num">· 9 / 14</span></span>
+  <h2>What shipped — 6 waves, 12 tasks</h2>
+  <table>
+    <thead><tr><th>wave</th><th>delivered</th></tr></thead>
+    <tbody>
+      <tr><td>1 · engine</td><td><code>[planning]</code> config + schema regen, <code>validate --scope</code>, transitive coverage</td></tr>
+      <tr><td>2 · plumbing</td><td>plan-doc resolver, plan-review + coverage-preview presets</td></tr>
+      <tr><td>3 · surface</td><td><code>jit plan</code> / <code>--with-planning</code>, SDD + research examples</td></tr>
+      <tr><td>4 · orchestrate</td><td>jit-breakdown builds the spine; concept + how-to docs</td></tr>
+      <tr><td>5 · lead</td><td>project-lead re-sequenced for the bracket</td></tr>
+      <tr><td>6 · eval</td><td>steering scenarios regression-test the flow</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ── DOMAIN AGNOSTICISM ──────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Delivery <span class="num">· 10 / 14</span></span>
+  <h2>Domain-agnostic by construction</h2>
+  <p>The engine bakes in <em>no</em> domain vocabulary. Two example rulesets prove it, declaring their own breakable + bracket types in config:</p>
+  <div class="two-col">
+    <div>
+      <h3>SDD</h3>
+      <p><code>epic</code> is breakable; criteria are <code>REQ-*</code> requirements satisfied by impl children.</p>
+    </div>
+    <div>
+      <h3>Research</h3>
+      <p><code>goal</code> is breakable (<b>no epic</b>); <code>[hard]</code> hypotheses tested by experiments.</p>
+    </div>
+  </div>
+  <div class="note">Verified repeatedly: no <code>epic</code> / <code>planning</code> / <code>breakdown</code> string literals in production Rust — every type name flows from <code>[planning]</code> config.</div>
+</section>
+
+<!-- ── STEERING EVAL ───────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Delivery <span class="num">· 11 / 14</span></span>
+  <h2>Steering eval: three scenarios</h2>
+  <div class="three-col">
+    <div><h3>Plan rejected</h3><p>The plan-review gate blocks a deficient plan before any fan-out.</p></div>
+    <div><h3>Coverage gap</h3><p>An uncovered <code>[hard]</code> criterion is caught at the breakdown gate — exit 4.</p></div>
+    <div><h3>Green path</h3><p>A well-formed bracket validates clean and passes end-to-end.</p></div>
+  </div>
+  <div class="note">Added as data-only fixtures (<code>scenario.toml</code>) to the existing deterministic steering harness — no Rust changes; the runner auto-discovers them.</div>
+</section>
+
+<!-- ── ORCHESTRATION RE-SEQUENCED ──────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Delivery <span class="num">· 12 / 14</span></span>
+  <h2>The skills now drive the order</h2>
+  <div class="item-decl">plan → review → breakdown → coverage → implement</div>
+  <ul>
+    <li><b>jit-breakdown</b> — for a breakable container, builds the spine: creates <code>B</code>, drafts children in Backlog with <code>satisfies:</code> labels, wires sources→B / C→sinks, then runs the coverage gate via the standard runner.</li>
+    <li><b>project-lead</b> — scaffolds <code>P</code>, blocks breakdown until plan-review passes, blocks the implementation fan-out until coverage passes. Breakable types read from the ruleset, never hardcoded.</li>
+  </ul>
+</section>
+
+<!-- ── SUMMARY ─────────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Wrap-up <span class="num">· 13 / 14</span></span>
+  <h2>Summary</h2>
+  <ul>
+    <li>Planning is now a reviewed, gated node <em>in</em> the DAG — not an out-of-band step.</li>
+    <li>Coverage is checked <b>before</b> fan-out (preview on B) and again <b>at closure</b> (on C) — one rule, one knob.</li>
+    <li>The engine stays domain-agnostic; SDD and research rulesets prove it.</li>
+    <li>The whole flow is regression-tested by the steering suite.</li>
+  </ul>
+</section>
+
+<!-- ── CLOSING ─────────────────────────────────────────────────────────── -->
+<section class="title">
+  <h1>Plan first, then fan out.</h1>
+  <p class="tagline">epic 2fbd2a82 · 12 / 12 tasks · 4 / 4 stories · done</p>
+  <p><code>docs/concepts/planning-bracket.md</code> &nbsp;·&nbsp; <code>docs/how-to/adopt-planning-bracket.md</code></p>
+</section>
+
+</div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script>
+  window.__deckReady = false;
+  window.__mathReady = false;
+
+  function initDeck() {
+    if (window.renderMathInElement) {
+      renderMathInElement(document.body, {
+        delimiters: [
+          { left: "\\[", right: "\\]", display: true },
+          { left: "\\(", right: "\\)", display: false },
+        ],
+        throwOnError: false,
+      });
+    }
+    window.__mathReady = true;
+
+    Reveal.initialize({
+      width: 1280,
+      height: 720,
+      margin: 0.04,
+      minScale: 0.4,
+      maxScale: 1.2,
+      hash: true,
+      center: false,
+      slideNumber: 'c/t',
+      transition: 'none',
+      backgroundTransition: 'none',
+      plugins: [ RevealHighlight ],
+    }).then(function () {
+      Promise.resolve(document.fonts ? document.fonts.ready : null)
+        .finally(function () { window.__deckReady = true; });
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', function () {
+      setTimeout(initDeck, 0);
+    });
+  } else {
+    setTimeout(initDeck, 0);
+  }
+</script>
+</body>
+</html>
