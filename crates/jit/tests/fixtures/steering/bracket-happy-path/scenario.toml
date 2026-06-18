@@ -1,0 +1,114 @@
+# Scenario: bracket-happy-path
+#
+# A well-formed plan-before-fan-out bracket passes the BREAKDOWN gate end-to-end.
+# Same spine `C -> child -> B` as bracket-coverage-gap, but the impl child DOES
+# carry satisfies:REQ-01, so every [hard] criterion is covered.
+#
+# `jit validate --scope $C` runs the preview coverage rule (child-state omitted =
+# any state) over C's impl interior. REQ-01 is satisfied by the child (in ANY
+# state, drafts sit in Backlog at breakdown time), so the breakdown gate passes:
+# exit 0. We then walk the child to done and show C transitions to done cleanly,
+# demonstrating the full green path (the done-scoped closure coverage rule also
+# passes because the done child satisfies REQ-01).
+ruleset = "sdd"
+
+[[steps]]
+argv = [
+  "issue", "create",
+  "--title", "Bracket Happy Path Epic",
+  "--label", "type:epic",
+  "--label", "req:REQ-01",
+  "--force",
+  "--description", """
+## Requirements
+
+- REQ-01: the system validates specs
+
+## Scenarios
+
+- Given a spec When parsed Then valid
+
+## Success Criteria
+
+- [hard] REQ-01: the system validates specs""",
+]
+capture = "id"
+id_slot = "container"
+
+# Impl child WITH satisfies:REQ-01 -> REQ-01 covered.
+[[steps]]
+argv = [
+  "issue", "create",
+  "--title", "Impl child (covered)",
+  "--label", "type:task",
+  "--label", "satisfies:REQ-01",
+  "--force",
+  "--description", "Implements REQ-01.",
+]
+capture = "id"
+id_slot = "child"
+
+# Breakdown node B carries brackets:$container so the preview rule resolves C.
+[[steps]]
+argv = [
+  "issue", "create",
+  "--title", "Breakdown node",
+  "--label", "type:breakdown",
+  "--label", "brackets:$container",
+  "--force",
+  "--description", "Breakdown of the container epic.",
+]
+capture = "id"
+id_slot = "breakdown"
+
+# Spine: child depends on B; C depends on child (B inside C's dep closure).
+[[steps]]
+argv = ["dep", "add", "$child", "$breakdown"]
+capture = "none"
+
+[[steps]]
+argv = ["dep", "add", "$container", "$child"]
+capture = "none"
+
+# The breakdown gate's deterministic checker passes: REQ-01 is covered, exit 0.
+[[steps]]
+argv = ["validate", "--scope", "$container"]
+capture = "none"
+expect = { exit = 0, enforcement_point = "validate" }
+
+# Green path: walk the bracket spine to done bottom-up. The container depends on
+# the child, which depends on the breakdown node B, so B and the child must reach
+# done before the container can close.
+[[steps]]
+argv = ["issue", "update", "$container", "--state", "in_progress"]
+capture = "none"
+
+# B has no blocking gate in this fixture; walk it to done first (it is the sink
+# of the impl spine here).
+[[steps]]
+argv = ["issue", "update", "$breakdown", "--state", "in_progress"]
+capture = "none"
+
+[[steps]]
+argv = ["issue", "update", "$breakdown", "--state", "done"]
+capture = "none"
+
+[[steps]]
+argv = ["issue", "update", "$child", "--state", "in_progress"]
+capture = "none"
+
+[[steps]]
+argv = ["issue", "update", "$child", "--state", "done"]
+capture = "none"
+
+# Container reaches done: the done-scoped closure coverage rule passes because the
+# done child satisfies REQ-01.
+[[steps]]
+argv = ["issue", "update", "$container", "--state", "done"]
+capture = "none"
+expect = { exit = 0, enforcement_point = "transition" }
+
+[[steps]]
+argv = ["issue", "show", "$container", "--json"]
+capture = "none"
+expect = { exit = 0, contains = ["done"] }

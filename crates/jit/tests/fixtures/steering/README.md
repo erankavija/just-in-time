@@ -88,6 +88,9 @@ failure-location oracle.
 | `pending-req-quiet/` | validate | In-flight epic with req:REQ-01 and no children produces zero error findings (exit 0) |
 | `premature-done/` | transition | Transitioning an epic to done without covered criteria is blocked (exit 4) |
 | `happy-path-done/` | transition | Epic with a done child satisfying REQ-01 reaches done successfully (exit 0) |
+| `bracket-coverage-gap/` | validate | The bracket's breakdown gate (`validate --scope <C>`) blocks an uncovered `[hard]` criterion (exit 4) |
+| `bracket-happy-path/` | validate / transition | A well-formed bracket passes the breakdown gate (exit 0) and the spine walks to done end-to-end |
+| `bracket-plan-rejected/` | transition | The bracket's plan-review gate (deterministic FAILING stand-in checker) blocks; the unpassed gate blocks P's done transition (exit 4) |
 
 ## Fresh-evidence scenario note
 

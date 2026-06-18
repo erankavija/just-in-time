@@ -1,0 +1,61 @@
+# Scenario: bracket-plan-rejected
+#
+# The plan-before-fan-out bracket's PLAN-REVIEW gate blocks a deficient plan.
+#
+# plan-review is an AI-agent gate: the real reviewer cannot run deterministically
+# in CI. The opt-in LLM-agent eval (dev/eval/steering/run_eval.py) exercises the
+# actual agent reviewer. THIS deterministic scenario asserts the bracket's
+# plan-review GATE machinery blocks when the plan-quality check fails, by standing
+# in a deterministic FAILING checker (`false`, which exits 1 => the gate's checker
+# FAILS, as a reviewer rejecting a deficient plan would).
+ruleset = "sdd"
+
+# Planning node P — carries the plan-review gate in the bracket.
+[[steps]]
+argv = [
+  "issue", "create",
+  "--title", "Planning node",
+  "--label", "type:planning",
+  "--force",
+  "--description", "Plan for the container epic (deficient).",
+]
+capture = "id"
+id_slot = "planning"
+
+# Stand-in plan-review gate: auto-mode, checker `false` (exit 1 => FAIL),
+# deterministically standing in for a reviewer rejecting a deficient plan.
+[[steps]]
+argv = [
+  "gate", "define", "plan-review",
+  "--title", "Plan Review",
+  "--description", "Adversarial plan-quality review (deterministic stand-in: false => FAIL).",
+  "--mode", "auto",
+  "--stage", "postcheck",
+  "--checker-command", "false",
+]
+capture = "none"
+
+# Attach the gate to the planning node P.
+[[steps]]
+argv = ["gate", "add", "$planning", "plan-review"]
+capture = "none"
+
+# Attempt to pass the gate. The checker `false` exits 1 => the gate FAILS.
+# `jit gate pass` exits 4 on a failing required gate; assert the block here.
+[[steps]]
+argv = ["gate", "pass", "$planning", "plan-review"]
+capture = "none"
+expect = { exit = 4 }
+
+# Assert the RECORDED gate status is failed (not the exit code, which can be
+# misleading). gate check is inspection-only and reflects the persisted run.
+[[steps]]
+argv = ["gate", "check", "$planning", "plan-review", "--json"]
+capture = "none"
+expect = { exit = 0, contains = ["failed"] }
+
+# And the unpassed required gate blocks the done transition on P.
+[[steps]]
+argv = ["issue", "update", "$planning", "--state", "done"]
+capture = "none"
+expect = { exit = 4, contains = ["plan-review"], enforcement_point = "transition" }

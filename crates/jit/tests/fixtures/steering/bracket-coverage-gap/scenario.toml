@@ -1,0 +1,82 @@
+# Scenario: bracket-coverage-gap
+#
+# The plan-before-fan-out bracket's BREAKDOWN gate blocks an uncovered hard
+# criterion. We build the reduced spine `C -> child -> B` by hand (the shape the
+# bracket-breakdown helper produces):
+#
+#   * C (type:epic) owns a [hard] criterion REQ-01 (req:REQ-01 label + criterion
+#     in ## Success Criteria).
+#   * B (type:breakdown) carries brackets:$C, putting it inside C's dependency
+#     closure so the preview rule `sdd-coverage-preview` evaluates B and resolves
+#     its container C via the brackets: label.
+#   * The impl child does NOT carry satisfies:REQ-01, so REQ-01 is uncovered.
+#
+# `jit validate --scope $C` runs the preview coverage rule (child-state omitted =
+# any state) over C's impl interior. REQ-01 has no satisfying child in ANY state,
+# so the breakdown gate's deterministic checker blocks: exit 4, naming REQ-01.
+ruleset = "sdd"
+
+[[steps]]
+argv = [
+  "issue", "create",
+  "--title", "Bracket Coverage Gap Epic",
+  "--label", "type:epic",
+  "--label", "req:REQ-01",
+  "--force",
+  "--description", """
+## Requirements
+
+- REQ-01: the system validates specs
+
+## Scenarios
+
+- Given a spec When parsed Then valid
+
+## Success Criteria
+
+- [hard] REQ-01: the system validates specs""",
+]
+capture = "id"
+id_slot = "container"
+
+# Impl child WITHOUT satisfies:REQ-01 -> REQ-01 left uncovered.
+[[steps]]
+argv = [
+  "issue", "create",
+  "--title", "Impl child (uncovered)",
+  "--label", "type:task",
+  "--force",
+  "--description", "Does not implement REQ-01.",
+]
+capture = "id"
+id_slot = "child"
+
+# Breakdown node B carries brackets:$container so the preview rule resolves C.
+[[steps]]
+argv = [
+  "issue", "create",
+  "--title", "Breakdown node",
+  "--label", "type:breakdown",
+  "--label", "brackets:$container",
+  "--force",
+  "--description", "Breakdown of the container epic.",
+]
+capture = "id"
+id_slot = "breakdown"
+
+# Spine: child depends on B; C depends on child. This puts B inside C's
+# dependency closure, where the scoped preview coverage rule evaluates it.
+[[steps]]
+argv = ["dep", "add", "$child", "$breakdown"]
+capture = "none"
+
+[[steps]]
+argv = ["dep", "add", "$container", "$child"]
+capture = "none"
+
+# The breakdown gate's deterministic checker (`jit validate --scope <C>`).
+# REQ-01 is uncovered -> blocked, exit 4, naming the uncovered criterion.
+[[steps]]
+argv = ["validate", "--scope", "$container"]
+capture = "none"
+expect = { exit = 4, contains = ["REQ-01"], enforcement_point = "validate" }
