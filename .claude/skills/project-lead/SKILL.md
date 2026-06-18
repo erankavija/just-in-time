@@ -62,6 +62,14 @@ Before any orchestration, discover the project's expectations. This context info
    - Identify strategic types
    - Map types to membership label namespaces via `[type_hierarchy.label_associations]`
 
+6. **Planning bracket (if the ruleset uses it).** From `.jit/config.toml` `[planning]`:
+   - `breakable_types` — container types that require a gated planning bracket before fan-out (e.g. `epic` for an SDD ruleset, `goal` for a research ruleset).
+   - `planning_type` / `breakdown_type` — the bracket node types (`P` and `B`).
+   - `plan_doc_location` — where `P`'s plan lives (inline body or an external `{id}`-templated path).
+   - `plan_gate_preset` / `coverage_gate_preset` — the gate presets applied to `P` (plan-review) and `B` (coverage-preview).
+
+   Breakable types are **always read from this config, never hardcoded**. If no `[planning]` block exists, the project does not use the bracket — drive the plain (non-bracketed) breakdown flow throughout (Section 3B). This makes the bracket behavior configurable and opt-in per ruleset.
+
 Hold all discovered context in working memory for the duration of the session.
 
 ## Section 2: Epic Intake
@@ -97,7 +105,32 @@ Hold all discovered context in working memory for the duration of the session.
 
 If the epic already has children that fully cover its success criteria, skip to Section 4.
 
-Otherwise, delegate to jit-breakdown (read `.claude/skills/jit-breakdown/SKILL.md`, follow Steps 1–7) with these modifications:
+**Choose the breakdown path by the epic's type** (discovered in Section 1):
+
+- If the epic's type is in the ruleset's `[planning].breakable_types`, follow **Section 3A — Bracketed breakdown**.
+- Otherwise (no `[planning]` block, or the epic type is not breakable), follow **Section 3B — Plain breakdown** (the legacy flow).
+
+### Section 3A: Bracketed breakdown (plan → review → breakdown → coverage → implement)
+
+A breakable container `C` (the epic) is bracketed by a planning node `P` and a breakdown node `B`, with the implementation subgraph spliced as a spine `C → impl → B → P` (precedence **P > B > impl > C**: plan first, then breakdown, then the work, then the container closes). Drive the bracket strictly in order — each gate blocks the next step:
+
+1. **Scaffold the bracket.** Create the planning node `P` and wire `C → P`:
+   - Retrofit an existing epic with `jit plan <epic-id>` (also moves `C`'s pre-existing upstream deps onto `P`). (`jit issue create --with-planning` does the same at creation time; for an epic already in the tracker, use `jit plan`.)
+   This creates `P` (`type:<planning_type>`), applies the `plan_gate_preset` (plan-review) to `P`, and sets `P`'s plan-doc location from config. Commit JIT state.
+
+2. **Produce the plan on `P`.** `P`'s plan is the spec for the decomposition. If a design doc exists (Section 2), it is `P`'s plan-doc; otherwise dispatch an architect agent (Section 6, `design` classification) to author it at `P`'s configured plan-doc location. The plan must be concrete enough to decompose and to judge coverage of `C`'s `[hard]` success criteria.
+
+3. **Enforce the plan-review gate on `P` — this BLOCKS breakdown.** Run the `plan-review` gate on `P`. Breakdown does **not** begin until `P`'s plan-review gate shows `passed` (check the recorded status, not the exit code). If it fails, revise the plan (rework) and re-run. Breakdown consumes an **approved** plan only. The gate is inviolable — never bypass it.
+
+4. **Break down behind the approved plan.** Delegate to jit-breakdown (`.claude/skills/jit-breakdown/SKILL.md`), which for a breakable container takes the bracket path: it creates `B` (`type:<breakdown_type>`, `brackets:<C-id>` label, `coverage_gate_preset`) depending on `P`, drafts the impl children in Backlog carrying their `satisfies:<criterion-id>` coverage labels, and wires the spine (sources → `B`, `C` → sinks; transitive reduction drops the scaffold's `C → P` edge). Apply gate inheritance + per-task quality gates to the drafted children (Section 3B bullets apply to the children). Self-approve the decomposition (escalate only if it introduces stories or higher-level types, per `references/escalation-policy.md`).
+
+5. **Enforce the coverage-preview gate on `B` — this BLOCKS the implementation fan-out.** Run the `coverage-preview` gate on `B` via the standard runner (deterministic; it runs `jit validate --scope <C>`). It blocks (exit 4) when the drafted children leave a `[hard]` criterion uncovered. Implementation waves are **not** dispatched until `B`'s coverage-preview gate shows `passed`. If it fails, revise the decomposition (add or relabel children to cover the gap) and re-run — the coverage gap is closed at plan time, before any code is written.
+
+6. Commit JIT state in batch, then proceed to Section 4 (Wave Planning) over the **impl interior only**: `P` and `B` are bracket-infrastructure nodes, not implementation waves — exclude them from the wave plan (they are already `done`/gated by the time the impl waves run).
+
+### Section 3B: Plain breakdown (non-breakable epics)
+
+Delegate to jit-breakdown (read `.claude/skills/jit-breakdown/SKILL.md`, follow Steps 1–7) with these modifications:
 
 - **Self-approve the breakdown.** Do not present the plan for user confirmation. The lead reviews it autonomously. Only escalate if the proposed children include stories or higher-level types — that implies scope the user should approve (per `references/escalation-policy.md`).
 
@@ -113,7 +146,7 @@ After breakdown, commit JIT state in batch.
 
 Convert the epic's children into ordered execution waves.
 
-1. **Build the dependency subgraph.** From `jit graph deps <epic-id>`, extract only the direct children and their inter-sibling dependencies.
+1. **Build the dependency subgraph.** From `jit graph deps <epic-id>`, extract only the direct children and their inter-sibling dependencies. **For a bracketed epic (Section 3A):** plan over the **impl interior** — the issues between `C` and the breakdown node `B` — and exclude the bracket-infrastructure nodes `P` (`type:<planning_type>`) and `B` (`type:<breakdown_type>`); they are already scaffolded and gated, not implementation waves.
 
 2. **Compute topological layers.** Group children by dependency depth:
    - **Wave 1:** Children with no sibling dependencies (can start immediately).
