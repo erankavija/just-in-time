@@ -185,6 +185,12 @@
       "reason": "MAX_REWORK_ATTEMPTS + MAX_SAME_FINDING_REPEATS(3) on 'run the coverage-preview gate'",
       "finding": "reviewer wants a persisted GateRunResult via gate_check model; helper currently stamps gates_status+event only; coverage-preview auto-checker shells out (subprocess) so can't run vs in-memory test stores",
       "status": "awaiting user decision"
+    },
+    {
+      "issue": "590add26",
+      "wave": 4,
+      "reason": "code-review reviewer (no-network sandbox) deterministically blocks on 5 PRE-EXISTING env-sensitive tests (serve.rs port-binding, issue.rs claim-prechecks). T10's own work fully accepted by reviewer. Tests pass locally + cargo-ci evidence clean. Fixing = shared-infra/test change (out of epic scope). Will recur for T11/T12.",
+      "status": "awaiting user decision"
     }
   ],
   "rework_counts": {

@@ -52,7 +52,7 @@
       "mode": "auto",
       "checker": {
         "type": "exec",
-        "command": "cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace",
+        "command": "./scripts/cargo-ci.sh",
         "timeout_seconds": 900,
         "working_dir": null,
         "env": {},

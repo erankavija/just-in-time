@@ -16,12 +16,12 @@
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-06-17T23:05:36.841029026Z"
+      "updated_at": "2026-06-18T18:35:46.381992681Z"
     },
     "code-review": {
       "status": "failed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-06-17T23:12:57.659371195Z"
+      "updated_at": "2026-06-18T18:41:31.073131668Z"
     }
   },
   "context": {},
@@ -32,5 +32,5 @@
     "epic:planning-bracket"
   ],
   "created_at": "2026-06-15T18:34:31.127458397+00:00",
-  "updated_at": "2026-06-17T23:16:01.653411007+00:00"
+  "updated_at": "2026-06-18T18:42:45.315884009+00:00"
 }
