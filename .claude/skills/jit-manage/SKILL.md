@@ -53,8 +53,16 @@ These rules apply across **all** workflows. Never violate them.
    separately from code changes, batched per workflow step. See
    [references/state-commit-patterns.md](references/state-commit-patterns.md).
 
-8. **Design docs in `dev/active/`.** Plans and design documents are saved to
-   `dev/active/` and linked to the corresponding issue via `jit doc add`.
+8. **Link artifacts for discoverability.** Every durable artifact produced for
+   an issue — plans and design docs, research findings, completion reports,
+   figures, slide decks, generated datasets, benchmark outputs — is saved under
+   the project's doc paths (plans/designs in `dev/active/`) and linked to its
+   issue via `jit doc add <id> <path> --doc-type <type> --label "..."`. Link the
+   artifact at its **final** path (re-link if you later move/archive it).
+   `jit doc list <id>` is how downstream readers and future sessions discover an
+   issue's plan, outputs, and outcome — an unlinked artifact is effectively
+   invisible. The DAG carries work order; document references carry the
+   artifacts. Never leave a deliverable artifact unlinked.
 
 9. **Markdown everywhere.** Issue descriptions and plan documents use
    markdown format.

@@ -242,6 +242,7 @@ Fill each template with:
 - Full issue context from `jit issue show` (title, description, success criteria, linked docs)
 - The gates defined on the issue and the explicit requirement that the implementation be sufficient to pass them
 - This instruction: **"Do NOT mark the issue as done. Do NOT modify `.jit/` state or pass the gates. The project lead handles all state transitions."**
+- This instruction: **"Link every durable artifact you produce — design/plan docs, research findings, figures, slide decks, generated datasets, benchmark outputs — to the issue via `jit doc add <id> <path> --doc-type <type> --label "..."` (jit-manage invariant 8). The `jit doc add` reference is a doc link, not a lifecycle state change, so it is yours to make."** Verify in review (Section 7) that promised artifacts are linked; link any the worker missed.
 
 ### Agent type
 All dispatched agents are `general-purpose` (they need write access to produce artifacts).
@@ -359,7 +360,7 @@ After all waves are complete:
 
 5. **Transition.** `jit issue update <epic-id> --state done`. Commit JIT state.
 
-6. **Archive.** Move or archive the progress file per the project's documentation config.
+6. **Archive, then link.** Move or archive the progress file and completion report per the project's documentation config. Then link the completion report (and the epic's design doc, if not already linked) to the epic via `jit doc add` at its final/archived path — per jit-manage invariant 8 (link artifacts for discoverability). `jit doc list <epic-id>` should surface the epic's plan and its outcome.
 
 7. **Report.** Present the completion report to the user.
 
