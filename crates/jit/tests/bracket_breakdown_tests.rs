@@ -28,7 +28,7 @@ use jit::labels::parse_label;
 use jit::storage::{InMemoryStorage, IssueStore};
 
 /// SDD-mirroring `[planning]` vocabulary (epic containers, planning/breakdown
-/// bracket types, inline plan doc, the two gate presets).
+/// bracket types, inline plan doc, the three gate presets).
 fn sdd_planning_config() -> PlanningConfig {
     PlanningConfig {
         breakable_types: vec!["epic".to_string()],
@@ -37,6 +37,7 @@ fn sdd_planning_config() -> PlanningConfig {
         plan_doc_location: "inline".to_string(),
         plan_gate_preset: "plan-review".to_string(),
         coverage_gate_preset: "coverage-preview".to_string(),
+        breakdown_review_gate_preset: "breakdown-review".to_string(),
     }
 }
 
@@ -158,6 +159,45 @@ fn test_bracket_breakdown_applies_coverage_preview_gate_to_breakdown_node() {
     // The gate is registered by the preset-apply path.
     let registry = h.storage.load_gate_registry().unwrap();
     assert!(registry.gates.contains_key("coverage-preview"));
+}
+
+#[test]
+fn test_bracket_breakdown_applies_breakdown_review_gate_to_breakdown_node() {
+    let h = TestHarness::new();
+    let cfg = sdd_planning_config();
+    let (c, _p) = scaffold_container(&h, &cfg, "Auth epic");
+
+    let result = h
+        .executor
+        .bracket_breakdown_with_config(&cfg, &c, vec![child("Build login")])
+        .unwrap();
+
+    let b = h.get_issue(&result.breakdown_id);
+    // B carries BOTH bracket gates: the deterministic coverage-preview gate and
+    // the agent breakdown-review gate (the quality-vs-coverage split on B).
+    assert!(
+        b.gates_required.contains(&"breakdown-review".to_string()),
+        "B must carry the breakdown-review gate, got {:?}",
+        b.gates_required
+    );
+    assert!(
+        b.gates_required.contains(&"coverage-preview".to_string()),
+        "B must still carry the coverage-preview gate, got {:?}",
+        b.gates_required
+    );
+    assert_eq!(
+        result.breakdown_review_gate_preset, "breakdown-review",
+        "result reports the attached breakdown-review preset name"
+    );
+    // The agent gate is registered by the preset-apply path and left PENDING
+    // (the builder attaches but never runs it).
+    let registry = h.storage.load_gate_registry().unwrap();
+    assert!(registry.gates.contains_key("breakdown-review"));
+    assert_eq!(
+        b.gates_status.get("breakdown-review").map(|s| s.status),
+        Some(jit::domain::GateStatus::Pending),
+        "the breakdown-review gate is attached PENDING, not run by the builder"
+    );
 }
 
 #[test]

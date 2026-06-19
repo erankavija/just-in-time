@@ -448,7 +448,8 @@ Gate presets are pre-configured bundles of quality gates that dramatically reduc
 
 ### Using Builtin Presets
 
-JIT includes two builtin presets for common workflows:
+JIT includes eight builtin presets — five general workflows plus the three
+[planning-bracket](../concepts/planning-bracket.md) gates:
 
 **List available presets:**
 ```bash
@@ -458,7 +459,13 @@ jit gate preset list
 **Output:**
 ```
 [builtin] rust-tdd - Test-driven development workflow for Rust projects (5 gates)
+[builtin] python-tdd - Test-driven development workflow for Python (5 gates)
+[builtin] js-tdd - Test-driven development workflow for JavaScript/TypeScript (4 gates)
+[builtin] security-audit - Security review workflow (3 gates)
 [builtin] minimal - Minimal workflow with just code review (1 gate)
+[builtin] plan-review - Agent plan-quality review on the planning node (1 gate)
+[builtin] coverage-preview - Deterministic coverage check on the breakdown node (1 gate)
+[builtin] breakdown-review - Agent decomposition-quality review on the breakdown node (1 gate)
 ```
 
 **View preset details:**

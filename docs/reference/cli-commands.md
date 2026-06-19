@@ -1473,7 +1473,7 @@ Custom presets are stored in `.jit/config/gate-presets/<name>.json` and are auto
 
 ### Builtin Presets
 
-JIT includes five builtin presets embedded in the binary:
+JIT includes eight builtin presets embedded in the binary:
 
 **`rust-tdd`** - Test-driven development workflow for Rust (5 gates)
 - `tdd-reminder` - Manual reminder to write tests first (precheck)
@@ -1502,6 +1502,17 @@ JIT includes five builtin presets embedded in the binary:
 
 **`minimal`** - Minimal workflow with just code review (1 gate)
 - `code-review` - Manual code review requirement (postcheck)
+
+The remaining three are the [planning-bracket](../concepts/planning-bracket.md) gates, attached automatically when a breakable container is bracketed:
+
+**`plan-review`** - Agent plan-quality review on the planning node `P` (1 gate)
+- `plan-review` - AI review of the plan/design before fan-out (postcheck, auto)
+
+**`coverage-preview`** - Deterministic coverage check on the breakdown node `B` (1 gate)
+- `coverage-preview` - Scoped `jit validate` over the drafted decomposition; blocks when a `[hard]` criterion is uncovered (postcheck, auto)
+
+**`breakdown-review`** - Agent decomposition-quality review on the breakdown node `B` (1 gate)
+- `breakdown-review` - AI review of the breakdown against the design and content standards: per-child content standards, dependency-DAG coherence, right-sized depth (postcheck, auto)
 
 **Note:** Builtin presets can be overridden by creating a custom preset with the same name in `.jit/config/gate-presets/`.
 

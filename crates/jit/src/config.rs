@@ -39,7 +39,7 @@ pub struct JitConfig {
 ///
 /// DECLARES the bracket vocabulary for an adopting ruleset (design doc D1/D5/D9):
 /// which container types are *breakable*, the two bracket type names (planning /
-/// breakdown), where a plan doc lives, and the names of the two gate presets. The
+/// breakdown), where a plan doc lives, and the names of the three gate presets. The
 /// engine stays domain-agnostic: NOTHING here is hardcoded to `epic` / `planning`
 /// / `breakdown` in engine logic — the strings come from THIS config, so the SDD
 /// and research example rulesets can declare entirely different vocabularies.
@@ -69,6 +69,25 @@ pub struct PlanningConfig {
     /// Gate-preset name applied to the breakdown node `B` (the deterministic
     /// coverage-preview gate, T6).
     pub coverage_gate_preset: String,
+    /// Gate-preset name applied to the breakdown node `B` (the **agent**
+    /// breakdown-quality review). Sits alongside `coverage_gate_preset` on `B` as
+    /// the quality-vs-coverage split: coverage-preview is deterministic, this one
+    /// is the AI review of the decomposition (content standards + dependency-DAG
+    /// coherence + right-sized depth) before fan-out.
+    ///
+    /// Added after the original bracket vocabulary, so it carries a serde default
+    /// (`"breakdown-review"`, the builtin preset name): a `[planning]` block
+    /// written before this gate existed still attaches the review automatically,
+    /// keeping the gate self-guiding without a config migration. Set it explicitly
+    /// to override or disable-by-substitution.
+    #[serde(default = "default_breakdown_review_gate_preset")]
+    pub breakdown_review_gate_preset: String,
+}
+
+/// Default `[planning].breakdown_review_gate_preset`: the builtin `breakdown-review`
+/// agent preset, so existing bracket configs gain the review gate without an edit.
+fn default_breakdown_review_gate_preset() -> String {
+    "breakdown-review".to_string()
 }
 
 impl PlanningConfig {
@@ -89,6 +108,10 @@ impl PlanningConfig {
             ("plan_doc_location", Some(&self.plan_doc_location)),
             ("plan_gate_preset", Some(&self.plan_gate_preset)),
             ("coverage_gate_preset", Some(&self.coverage_gate_preset)),
+            (
+                "breakdown_review_gate_preset",
+                Some(&self.breakdown_review_gate_preset),
+            ),
         ] {
             if let Some(value) = value {
                 if value.trim().is_empty() {
@@ -1853,7 +1876,30 @@ coverage_gate_preset = "coverage-preview"
         assert_eq!(planning.plan_doc_location, "dev/active/{id}-plan.md");
         assert_eq!(planning.plan_gate_preset, "plan-review");
         assert_eq!(planning.coverage_gate_preset, "coverage-preview");
+        // Omitted from FULL_PLANNING_TOML: defaults to the builtin preset name.
+        assert_eq!(planning.breakdown_review_gate_preset, "breakdown-review");
         planning.validate().expect("full planning block is valid");
+    }
+
+    #[test]
+    fn test_planning_breakdown_review_preset_explicit_override() {
+        let toml = r#"
+[planning]
+breakable_types = ["epic"]
+planning_type = "planning"
+breakdown_type = "breakdown"
+plan_doc_location = "inline"
+plan_gate_preset = "plan-review"
+coverage_gate_preset = "coverage-preview"
+breakdown_review_gate_preset = "custom-breakdown-review"
+"#;
+        let config: JitConfig = toml::from_str(toml).unwrap();
+        let planning = config.planning.expect("planning section parsed");
+        assert_eq!(
+            planning.breakdown_review_gate_preset,
+            "custom-breakdown-review"
+        );
+        planning.validate().expect("explicit override is valid");
     }
 
     #[test]

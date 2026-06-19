@@ -28,6 +28,7 @@ Each area is verdict-affecting; a serious defect in any one is a blocking failur
 ### Dependency DAG correctness
 
 - Compare the implemented edges (transitive reachability) against the design's intended ordering. **Both** failure modes are blocking: a **missing** prerequisite (a task can start before work it genuinely needs) and an **over-constraint** (false serialization that kills parallelism the design intends). Name the specific wrong/missing edge.
+- **Blank-workspace reachability:** for every issue with no prerequisites (a root of the subgraph), ask *"could an agent begin this on a fresh workspace, with none of the sibling tasks having run?"* If no — because it writes into a crate, directory, or project skeleton another task creates — that missing structural edge is a blocking defect. A wrong root stalls the fan-out exactly the way a wrong chain does.
 - Do **not** count `[hard]`-criterion coverage — that is the separate coverage gate's job.
 
 ### Structural integrity
@@ -41,6 +42,14 @@ If `run_history` is non-empty, check whether the most recent run's findings were
 ## Output
 
 Provide a structured markdown review with a section per area above, plus a per-item coverage table (design item → issue → matches?). Be specific; quote the offending text. Distinguish blocking failures from minor/advisory notes; minor issues are noted but do not by themselves fail the review.
+
+For **every blocking finding, propose a concrete, actionable fix** — the exact remediation, not vague advice. This review is read-only, so you do not apply the change; you hand the breakdown owner a diff they can apply directly. Examples:
+
+- Dependency: `jit dep add <issue> <prereq>` (missing edge) or `jit dep rm <issue> <wrong-prereq>` (over-constraint), naming the specific short-ids.
+- Content standards: the precise text to add/rewrite (e.g. the missing `## Success Criteria` lines, the criterion made machine-verifiable, the retitled issue without its ordinal prefix).
+- Coverage-vs-design: the missing issue to create (title + type + which design item) or the merge/split to perform.
+
+A blocking finding without a concrete proposed fix is incomplete.
 
 End your response with exactly one of these lines:
 VERDICT: PASS

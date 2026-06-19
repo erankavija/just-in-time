@@ -28,6 +28,7 @@ fn sdd_planning_config() -> PlanningConfig {
         plan_doc_location: "inline".to_string(),
         plan_gate_preset: "plan-review".to_string(),
         coverage_gate_preset: "coverage-preview".to_string(),
+        breakdown_review_gate_preset: "breakdown-review".to_string(),
     }
 }
 

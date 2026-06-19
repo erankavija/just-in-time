@@ -1,6 +1,6 @@
 //! Planning-bracket gate presets (design doc D8/D13, task T6).
 //!
-//! Two presets bundle the gates that bracket a breakable container:
+//! Three presets bundle the gates that bracket a breakable container:
 //!
 //! - [`plan_review_preset`] attaches the **agent** plan-quality gate to the
 //!   planning node `P` (`type:planning`). It mirrors the `plan-review` gate
@@ -11,6 +11,10 @@
 //!   container `C` from `B`'s `brackets:<C-id>` label and runs
 //!   `jit validate --scope <C>` (T2), which exits 4 when a `[hard]` criterion is
 //!   left uncovered.
+//! - [`breakdown_review_preset`] attaches the **agent** breakdown-quality gate to
+//!   the same breakdown node `B` — the quality half of `B`'s quality-vs-coverage
+//!   split. It reviews the decomposition itself (content standards, dependency-DAG
+//!   coherence, right-sized depth) and does not re-check `[hard]` coverage.
 //!
 //! Plus [`preview_coverage_rule`], the pure constructor for the preview
 //! `label-coverage` rule (D13): it is the closure rule with `child-state`
@@ -36,6 +40,9 @@ pub const COVERAGE_PREVIEW_PRESET: &str = "coverage-preview";
 
 /// Gate key bundled by [`coverage_preview_preset`].
 pub const COVERAGE_PREVIEW_GATE: &str = "coverage-preview";
+
+/// Preset name for the agent breakdown-review gate (breakdown node `B`).
+pub const BREAKDOWN_REVIEW_PRESET: &str = "breakdown-review";
 
 /// Build the `plan-review` preset: an agent review gate for the planning node.
 ///
@@ -143,6 +150,72 @@ pub fn coverage_preview_preset() -> GatePresetDefinition {
                 pass_context: true,
                 prompt: None,
                 prompt_file: None,
+            }),
+        }],
+    }
+}
+
+/// Build the `breakdown-review` preset: an **agent** quality review of the
+/// drafted decomposition, attached to the breakdown node `B`.
+///
+/// It is the front-end counterpart to `coverage-preview`'s **quality-vs-coverage
+/// split** on `B`: where `coverage-preview` (deterministic) answers *"is every
+/// `[hard]` criterion mapped to a child?"*, `breakdown-review` (agent) answers
+/// *"is the decomposition itself any good?"* — content standards per child,
+/// dependency-DAG coherence (both missing prerequisites and over-constraining
+/// false serialization), right-sized depth, and blank-workspace reachability. It
+/// deliberately does **not** re-check `[hard]`-criterion coverage; that is the
+/// deterministic gate's job.
+///
+/// The single bundled gate mirrors [`plan_review_preset`]'s command-backed agent
+/// mechanism (checker `./scripts/ai-review.sh`, reviewer agent via env, structured
+/// context passed) but points at `./scripts/breakdown-review-prompt.md`. Because
+/// it is an ordinary postcheck gate on `B`, jit's gate enforcement is
+/// self-guiding: `B` cannot complete — and the impl fan-out it gates cannot be
+/// released — until the review passes.
+///
+/// # Examples
+///
+/// ```
+/// use jit::gate_presets::breakdown_review_preset;
+/// use jit::domain::GateMode;
+///
+/// let preset = breakdown_review_preset();
+/// assert_eq!(preset.name, "breakdown-review");
+/// assert_eq!(preset.gates.len(), 1);
+/// let gate = &preset.gates[0];
+/// assert_eq!(gate.key, "breakdown-review");
+/// assert_eq!(gate.mode, GateMode::Auto);
+/// assert!(gate.checker.is_some());
+/// assert!(preset.validate().is_ok());
+/// ```
+pub fn breakdown_review_preset() -> GatePresetDefinition {
+    let mut env = HashMap::new();
+    env.insert("REVIEWER_AGENT".to_string(), "codex exec".to_string());
+
+    GatePresetDefinition {
+        name: BREAKDOWN_REVIEW_PRESET.to_string(),
+        description: "Agent quality review of the decomposition on the breakdown node before \
+                      fan-out"
+            .to_string(),
+        gates: vec![GateTemplate {
+            key: "breakdown-review".to_string(),
+            title: "AI Breakdown Review".to_string(),
+            description:
+                "AI-powered adversarial review of a breakdown against the design doc and content \
+                 standards: per-child content standards, dependency-DAG coherence, and right-sized \
+                 decomposition (coverage of [hard] criteria is the separate coverage-preview gate)"
+                    .to_string(),
+            stage: GateStage::Postcheck,
+            mode: GateMode::Auto,
+            checker: Some(GateChecker::Exec {
+                command: "./scripts/ai-review.sh".to_string(),
+                timeout_seconds: 1800,
+                working_dir: None,
+                env,
+                pass_context: true,
+                prompt: None,
+                prompt_file: Some("./scripts/breakdown-review-prompt.md".to_string()),
             }),
         }],
     }
@@ -308,6 +381,40 @@ assert = { label-coverage = { criteria-section = "success_criteria", marker = "[
                 assert_eq!(
                     prompt_file.as_deref(),
                     Some("./scripts/plan-review-prompt.md")
+                );
+                assert_eq!(
+                    env.get("REVIEWER_AGENT").map(String::as_str),
+                    Some("codex exec")
+                );
+            }
+        }
+        assert!(preset.validate().is_ok());
+    }
+
+    #[test]
+    fn test_breakdown_review_preset_attaches_agent_gate() {
+        let preset = breakdown_review_preset();
+        assert_eq!(preset.name, "breakdown-review");
+        assert_eq!(preset.gates.len(), 1);
+
+        let gate = &preset.gates[0];
+        assert_eq!(gate.key, "breakdown-review");
+        assert_eq!(gate.stage, GateStage::Postcheck);
+        assert_eq!(gate.mode, GateMode::Auto);
+
+        match gate.checker.as_ref().expect("agent gate has a checker") {
+            GateChecker::Exec {
+                command,
+                pass_context,
+                prompt_file,
+                env,
+                ..
+            } => {
+                assert_eq!(command, "./scripts/ai-review.sh");
+                assert!(*pass_context, "agent gate passes structured context");
+                assert_eq!(
+                    prompt_file.as_deref(),
+                    Some("./scripts/breakdown-review-prompt.md")
                 );
                 assert_eq!(
                     env.get("REVIEWER_AGENT").map(String::as_str),

@@ -1,8 +1,8 @@
 //! Built-in gate presets
 
 use super::{
-    coverage_preview_preset, plan_review_preset, GatePresetDefinition, GateTemplate,
-    COVERAGE_PREVIEW_PRESET, PLAN_REVIEW_PRESET,
+    breakdown_review_preset, coverage_preview_preset, plan_review_preset, GatePresetDefinition,
+    GateTemplate, BREAKDOWN_REVIEW_PRESET, COVERAGE_PREVIEW_PRESET, PLAN_REVIEW_PRESET,
 };
 use crate::domain::{GateChecker, GateMode, GateStage};
 use anyhow::Result;
@@ -23,6 +23,7 @@ use std::collections::HashMap;
 /// assert!(presets.contains_key("security-audit"));
 /// assert!(presets.contains_key("plan-review"));
 /// assert!(presets.contains_key("coverage-preview"));
+/// assert!(presets.contains_key("breakdown-review"));
 /// ```
 pub struct BuiltinPresets;
 
@@ -35,7 +36,7 @@ impl BuiltinPresets {
     /// use jit::gate_presets::BuiltinPresets;
     ///
     /// let presets = BuiltinPresets::load().unwrap();
-    /// assert_eq!(presets.len(), 7);
+    /// assert_eq!(presets.len(), 8);
     /// let security = presets.get("security-audit").unwrap();
     /// assert_eq!(security.gates.len(), 3);
     /// ```
@@ -315,6 +316,10 @@ impl BuiltinPresets {
         // to the preview-rule constructor.
         let plan_review = plan_review_preset();
         let coverage_preview = coverage_preview_preset();
+        // The agent quality review on the breakdown node `B`, the front-end
+        // counterpart to the deterministic coverage-preview gate (quality vs
+        // coverage split on `B`).
+        let breakdown_review = breakdown_review_preset();
 
         // Validate all presets
         let all_presets = [
@@ -325,6 +330,7 @@ impl BuiltinPresets {
             &security_audit,
             &plan_review,
             &coverage_preview,
+            &breakdown_review,
         ];
         for preset in &all_presets {
             preset.validate()?;
@@ -337,6 +343,7 @@ impl BuiltinPresets {
         presets.insert(security_audit.name.clone(), security_audit);
         presets.insert(plan_review.name.clone(), plan_review);
         presets.insert(coverage_preview.name.clone(), coverage_preview);
+        presets.insert(breakdown_review.name.clone(), breakdown_review);
 
         Ok(presets)
     }
@@ -360,6 +367,7 @@ impl BuiltinPresets {
             "security-audit".to_string(),
             PLAN_REVIEW_PRESET.to_string(),
             COVERAGE_PREVIEW_PRESET.to_string(),
+            BREAKDOWN_REVIEW_PRESET.to_string(),
         ]
     }
 }
@@ -371,7 +379,7 @@ mod tests {
     #[test]
     fn test_load_builtin_presets() {
         let presets = BuiltinPresets::load().unwrap();
-        assert_eq!(presets.len(), 7);
+        assert_eq!(presets.len(), 8);
         assert!(presets.contains_key("rust-tdd"));
         assert!(presets.contains_key("minimal"));
         assert!(presets.contains_key("python-tdd"));
@@ -379,6 +387,7 @@ mod tests {
         assert!(presets.contains_key("security-audit"));
         assert!(presets.contains_key("plan-review"));
         assert!(presets.contains_key("coverage-preview"));
+        assert!(presets.contains_key("breakdown-review"));
     }
 
     #[test]
@@ -395,8 +404,14 @@ mod tests {
         assert_eq!(coverage.gates[0].key, "coverage-preview");
         assert_eq!(coverage.gates[0].mode, GateMode::Auto);
 
+        let breakdown_review = presets.get("breakdown-review").unwrap();
+        assert_eq!(breakdown_review.gates.len(), 1);
+        assert_eq!(breakdown_review.gates[0].key, "breakdown-review");
+        assert_eq!(breakdown_review.gates[0].mode, GateMode::Auto);
+
         assert!(BuiltinPresets::names().contains(&"plan-review".to_string()));
         assert!(BuiltinPresets::names().contains(&"coverage-preview".to_string()));
+        assert!(BuiltinPresets::names().contains(&"breakdown-review".to_string()));
     }
 
     #[test]

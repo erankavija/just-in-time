@@ -11,8 +11,8 @@ mod planning;
 pub use builtin::BuiltinPresets;
 pub use manager::PresetManager;
 pub use planning::{
-    coverage_preview_preset, plan_review_preset, preview_coverage_rule, COVERAGE_PREVIEW_GATE,
-    COVERAGE_PREVIEW_PRESET, PLAN_REVIEW_PRESET,
+    breakdown_review_preset, coverage_preview_preset, plan_review_preset, preview_coverage_rule,
+    BREAKDOWN_REVIEW_PRESET, COVERAGE_PREVIEW_GATE, COVERAGE_PREVIEW_PRESET, PLAN_REVIEW_PRESET,
 };
 
 use crate::domain::{Gate, GateChecker, GateMode, GateStage};

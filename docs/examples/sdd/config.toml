@@ -39,17 +39,23 @@ story = "story"
 # - breakable_types: container types that require a planning bracket. SDD's is `epic`.
 # - planning_type / breakdown_type: the two bracket node types (P / B).
 # - plan_doc_location: where P's plan doc lives ({id} -> container id).
-# - plan_gate_preset / coverage_gate_preset: the gate presets applied to P and B.
+# - plan_gate_preset: the gate preset applied to the planning node P.
 #     * plan-review     (agent)         -> attached to the planning node P.
-#     * coverage-preview (deterministic) -> attached to the breakdown node B;
-#       its checker runs `jit validate --scope <C>`, resolving C from B's
-#       `brackets:<C-id>` label, so the preview coverage rule below fires.
+# - coverage_gate_preset / breakdown_review_gate_preset: the TWO gates applied to
+#   the breakdown node B (a quality-vs-coverage split):
+#     * coverage-preview (deterministic) -> its checker runs `jit validate --scope
+#       <C>`, resolving C from B's `brackets:<C-id>` label, so the preview coverage
+#       rule below fires; blocks when a [hard] criterion is uncovered.
+#     * breakdown-review (agent)         -> AI review of the decomposition itself:
+#       per-child content standards, dependency-DAG coherence (missing AND
+#       over-constraining edges), and right-sized depth. Does NOT re-check coverage.
 breakable_types = ["epic"]
 planning_type = "planning"
 breakdown_type = "breakdown"
 plan_doc_location = "dev/active/{id}-plan.md"
 plan_gate_preset = "plan-review"
 coverage_gate_preset = "coverage-preview"
+breakdown_review_gate_preset = "breakdown-review"
 
 [validation]
 strictness = "loose"

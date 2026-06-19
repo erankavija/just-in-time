@@ -71,7 +71,7 @@
 #   — NOT a software container; the breakable type is research vocabulary, which is
 #   the whole point of this example (design D11: prove the bracket carries no
 #   software assumptions). It adds two function-typed bracket node types —
-#   `planning` (`P`) and `breakdown` (`B`) — plus the two gate presets. A breakable
+#   `planning` (`P`) and `breakdown` (`B`) — plus the three gate presets. A breakable
 #   goal is bracketed as the reduced spine
 #
 #     C(goal) ──dep→ {experiment subgraph} ──dep→ B(type:breakdown) ──dep→ P(type:planning)

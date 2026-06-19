@@ -143,6 +143,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///     plan_doc_location: "inline".into(),
     ///     plan_gate_preset: "plan-review".into(),
     ///     coverage_gate_preset: "coverage-preview".into(),
+    ///     breakdown_review_gate_preset: "breakdown-review".into(),
     /// };
     /// let (result, _warnings) =
     ///     executor.plan_existing_with_config(&config, "epic-123", false).unwrap();
@@ -240,6 +241,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///     plan_doc_location: "inline".into(),
     ///     plan_gate_preset: "plan-review".into(),
     ///     coverage_gate_preset: "coverage-preview".into(),
+    ///     breakdown_review_gate_preset: "breakdown-review".into(),
     /// };
     /// let (result, _warnings) = executor
     ///     .create_with_planning_with_config(

@@ -42,13 +42,18 @@ story = "story"
 # breakable_types: container types that require a planning bracket.
 # planning_type / breakdown_type: the two bracket node types (P / B).
 # plan_doc_location: where P's plan doc lives ({id} -> container id; "inline" = body).
-# *_gate_preset: the gate presets applied to P and B (defined by T6).
+# *_gate_preset: the gate presets applied to P and B. P carries plan-review; B
+#   carries TWO gates (quality-vs-coverage split): the deterministic
+#   coverage-preview gate AND the agent breakdown-review gate.
 breakable_types = ["epic"]
 planning_type = "planning"
 breakdown_type = "breakdown"
 plan_doc_location = "dev/active/{id}-plan.md"
 plan_gate_preset = "plan-review"
 coverage_gate_preset = "coverage-preview"
+# Agent quality review of the decomposition on B (content standards + dependency-DAG
+# coherence + right-sized depth), the front-end counterpart to coverage-preview.
+breakdown_review_gate_preset = "breakdown-review"
 
 [validation]
 # Strictness level: "strict", "loose", or "permissive"

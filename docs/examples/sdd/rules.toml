@@ -22,7 +22,7 @@
 #
 #   The companion `config.toml` declares `epic` a BREAKABLE container and adds two
 #   function-typed bracket node types — `planning` (`P`) and `breakdown` (`B`) —
-#   plus the two gate presets. A breakable epic is bracketed as the reduced spine
+#   plus the three gate presets. A breakable epic is bracketed as the reduced spine
 #
 #     C(epic) ──dep→ {impl subgraph} ──dep→ B(type:breakdown) ──dep→ P(type:planning)
 #

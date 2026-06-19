@@ -98,6 +98,7 @@ pub struct BracketChild {
 ///     planning_id: "p1".to_string(),
 ///     child_ids: vec!["k1".to_string(), "k2".to_string()],
 ///     coverage_gate_preset: "coverage-preview".to_string(),
+///     breakdown_review_gate_preset: "breakdown-review".to_string(),
 /// };
 /// assert_eq!(result.child_ids.len(), 2);
 /// assert_eq!(result.coverage_gate_preset, "coverage-preview");
@@ -115,6 +116,11 @@ pub struct BracketBreakdownResult {
     /// The gate preset ATTACHED to `B` (from `[planning].coverage_gate_preset`),
     /// left PENDING for the standard gate runner to evaluate as a workflow step.
     pub coverage_gate_preset: String,
+    /// The agent-review preset ATTACHED to `B` (from
+    /// `[planning].breakdown_review_gate_preset`), left PENDING for the standard
+    /// gate runner. Like the coverage gate, the helper only attaches it — it does
+    /// not run or stamp a verdict.
+    pub breakdown_review_gate_preset: String,
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
@@ -175,8 +181,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///    node `P` (a `type:<planning_type>` dependency of `C`).
     /// 2. Creates the breakdown node `B` (`type:<breakdown_type>`, a
     ///    `brackets:<C-id>` label, inheriting `C`'s membership labels), ATTACHES
-    ///    the coverage-preview preset (gate left PENDING — the helper does not
-    ///    run it), and wires `B → P`.
+    ///    both bracket gates to it — the deterministic coverage-preview preset
+    ///    and the agent breakdown-review preset (gates left PENDING — the helper
+    ///    does not run them), and wires `B → P`.
     /// 3. Creates the impl children in **Backlog** (they each gain a dependency,
     ///    so [`create_issue`](Self::create_issue)'s auto-Ready promotion is
     ///    immediately demoted).
@@ -196,16 +203,18 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// plan) run BEFORE any `create_issue`/`add_dependency`, so a rejected
     /// breakdown leaves NO partial state.
     ///
-    /// This helper is a pure **bracket-builder**: it ATTACHES the
-    /// coverage-preview gate to `B` (via `config.coverage_gate_preset`), leaving
-    /// it PENDING. It does **not** run, stamp, or fabricate a coverage verdict.
-    /// The coverage-preview gate is run separately by the standard gate runner
-    /// (`jit gate pass <B> <coverage-gate>`) as a breakdown-workflow step — the
-    /// orchestrator runs every gate in this project, never command code. That
-    /// runner executes the deterministic `jit validate --scope <C>` check,
-    /// persists a `GateRunResult`, updates `B`'s gate status, and logs the gate
-    /// event. The breakdown workflow then blocks the impl fan-out on that
-    /// recorded result.
+    /// This helper is a pure **bracket-builder**: it ATTACHES `B`'s two gates —
+    /// the deterministic coverage-preview gate (via `config.coverage_gate_preset`)
+    /// and the agent breakdown-review gate (via
+    /// `config.breakdown_review_gate_preset`) — leaving both PENDING. It does
+    /// **not** run, stamp, or fabricate any verdict. Both gates are run separately
+    /// by the standard gate runner (`jit gate pass <B> <gate>`) as breakdown-workflow
+    /// steps — the orchestrator runs every gate in this project, never command code.
+    /// The coverage gate executes the deterministic `jit validate --scope <C>`
+    /// check; the review gate runs the command-backed AI reviewer. Each persists a
+    /// `GateRunResult`, updates `B`'s gate status, and logs the event. Because the
+    /// impl subgraph transitively depends on `B`, jit's gate enforcement is
+    /// self-guiding: the fan-out cannot release until both gates on `B` pass.
     ///
     /// # Errors
     ///
@@ -230,6 +239,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///     plan_doc_location: "inline".into(),
     ///     plan_gate_preset: "plan-review".into(),
     ///     coverage_gate_preset: "coverage-preview".into(),
+    ///     breakdown_review_gate_preset: "breakdown-review".into(),
     /// };
     /// let children = vec![BracketChild {
     ///     title: "Build login".into(),
@@ -352,11 +362,21 @@ impl<S: IssueStore> CommandExecutor<S> {
             false,
         )?;
 
-        // Apply the coverage-preview preset (registers the gate, initializes
-        // status, logs events) and wire B → P.
+        // Apply the two gates that bracket `B` (the quality-vs-coverage split):
+        // the deterministic coverage-preview gate and the agent breakdown-review
+        // gate. Each registers its gate, initializes status, and logs events; both
+        // are left PENDING for the standard gate runner. Then wire B → P.
         self.apply_gate_preset(
             &breakdown_id,
             &config.coverage_gate_preset,
+            None,
+            false,
+            false,
+            &[],
+        )?;
+        self.apply_gate_preset(
+            &breakdown_id,
+            &config.breakdown_review_gate_preset,
             None,
             false,
             false,
@@ -438,6 +458,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             planning_id,
             child_ids,
             coverage_gate_preset: config.coverage_gate_preset.clone(),
+            breakdown_review_gate_preset: config.breakdown_review_gate_preset.clone(),
         })
     }
 

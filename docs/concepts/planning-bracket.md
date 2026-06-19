@@ -5,7 +5,7 @@
 
 JIT can make planning a **first-class, reviewable, gated node** in the dependency
 graph, sequenced *before* the implementation fan-out. This document explains the
-shape of that structure — the **bracket** — the two gates it carries, and the
+shape of that structure — the **bracket** — the three gates it carries, and the
 coverage split that lets the same rule kind check the decomposition twice: once
 at plan time, once at closure.
 
@@ -43,8 +43,9 @@ A **breakable container** `C` — a type a ruleset *declares* as requiring plann
 - **`P` — the planning node** (`type:planning`). It produces the plan and carries
   an **agent plan-quality gate** (`plan-review`).
 - **`B` — the breakdown node** (`type:breakdown`). It is created **by the
-  breakdown step, not at scaffold**, carries a **deterministic coverage-preview
-  gate** (`coverage-preview`), and wears a `brackets:<C-id>` label naming the
+  breakdown step, not at scaffold**, carries **two gates** — a **deterministic
+  coverage-preview gate** (`coverage-preview`) and an **agent breakdown-review
+  gate** (`breakdown-review`) — and wears a `brackets:<C-id>` label naming the
   container it brackets.
 
 "Function-typed" means the role lives in the **type axis**, not a separate `role:`
@@ -106,14 +107,17 @@ That shapes the spine edges:
   `P`** — planning waits on that upstream work, and `C` becomes the pure closure
   node at the back of its own bracket.
 
-## The two gates
+## The three gates
 
-The bracket carries two gates with a deliberate **quality-vs-coverage split**:
+The bracket carries three gates. One sits on `P`; the other two share `B` in a
+deliberate **quality-vs-coverage split** — the same axis runs across the whole
+bracket:
 
 | Gate | Node | Mode | Checks |
 |------|------|------|--------|
 | `plan-review` | `P` | agent (command-backed) | Is the *plan itself* good? Reviews the planning issue's success criteria and linked design document. |
 | `coverage-preview` | `B` | deterministic | Does the *decomposition* cover every `[hard]` criterion? Runs `jit validate --scope <C>`. |
+| `breakdown-review` | `B` | agent (command-backed) | Is the *decomposition itself* good? Per-child content standards, dependency-DAG coherence, and right-sized depth. |
 
 **`plan-review`** is an agent gate — the same command-backed AI-review mechanism
 described in [Custom Gates](../how-to/custom-gates.md). It judges plan *quality*:
@@ -127,11 +131,26 @@ scoped validation evaluates the **preview coverage rule** (below), which exits 4
 uncovered. No human judgment, no agent: pure structural coverage over the drafted
 decomposition.
 
-The two answer different questions. `plan-review` asks *"is this plan any good?"*;
-`coverage-preview` asks *"does this breakdown actually cover what the container
-promised?"* A plan can read beautifully and still leave a hard requirement with no
-implementing child — that is exactly the gap the coverage gate catches before any
-work fans out.
+**`breakdown-review`** is the agent counterpart of `coverage-preview` on the same
+node — the *quality* half of `B`'s split. It is the command-backed AI-review
+mechanism again, pointed at the drafted children: it audits each child against the
+project's content standards, checks the **dependency DAG** for coherence (flagging
+**both** a missing prerequisite that lets a task start too early **and** an
+over-constraint that needlessly serializes parallel work), verifies decomposition
+depth suits the work size, and confirms every root can start on a blank workspace.
+It deliberately does **not** re-check `[hard]`-criterion coverage — that is
+`coverage-preview`'s job. A FAIL reports concrete proposed fixes (the specific edge
+to add/remove, the criterion to make verifiable) for the breakdown owner to apply;
+the drafts stay in Backlog for revision.
+
+The three answer different questions. `plan-review` asks *"is this plan any
+good?"*; `coverage-preview` asks *"does this breakdown actually cover what the
+container promised?"*; `breakdown-review` asks *"is the decomposition itself sound
+— right pieces, right wiring?"* A plan can read beautifully and still leave a hard
+requirement with no implementing child (the coverage gap), or cover every
+requirement yet wire a dependency chain that stalls the fan-out (the structure
+gap). Each gate catches a failure the others cannot, all before any work fans
+out.
 
 ## Coverage at both ends: preview vs closure
 
