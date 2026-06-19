@@ -66,6 +66,17 @@ Read the following file in full, then decompose it into work items:
 Produce a single JSON object following the schema at the end of this prompt.
 Output **only** the JSON object — no preamble, no explanation, no markdown fences.
 
+> **This decomposition will be adversarially reviewed** by a `breakdown-review`
+> gate before any work fans out. That reviewer fails the breakdown for: a child
+> that misses content standards (no verifiable `## Success Criteria`, an unclean
+> title, a non-self-contained description); a **missing** dependency edge (a task
+> that can start before work it genuinely needs); an **over-constraining** edge
+> (false serialization that kills intended parallelism); a root that cannot start
+> on a blank workspace; or a decomposition whose depth does not suit the work size.
+> The rules below are written to clear that bar — follow them precisely so the
+> breakdown passes on the first run. (Coverage of `[hard]` criteria is checked by a
+> *separate* deterministic gate via `satisfies`; both must pass.)
+
 ### Decomposition rules
 
 1. **One issue per distinct deliverable.** Each issue should describe one coherent

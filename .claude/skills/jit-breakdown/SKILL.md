@@ -37,7 +37,15 @@ precedence `P > B > impl > C` (plan first, then breakdown, then work, then the
 container closes). Concretely:
 
 - **`B`** (`type:<breakdown_type>` from config) carries a `brackets:<C-id>` label
-  and the **coverage-preview** gate (`coverage_gate_preset`), and depends on `P`.
+  and **both** of the breakdown node's gates — the deterministic **coverage-preview**
+  gate (`coverage_gate_preset`) and the agent **breakdown-review** gate
+  (`breakdown_review_gate_preset`) — and depends on `P`. Both gate the fan-out: jit
+  will not release the impl children until each passes. The skill runs the cheap
+  deterministic coverage-preview inline for immediate feedback (Step 6d-bracket); the
+  agent **breakdown-review is left PENDING for the standard gate runner, exactly like
+  `plan-review` on `P`** — the skill does not run agent gates. jit's own gate
+  enforcement holds the fan-out until both pass, so there is no extra choreography to
+  do; the skill's job is to draft a decomposition that *passes* the review (Step 4).
 - **Impl children** are drafted in **Backlog** (they depend on `B`, which is not
   done, so `jit ready` never surfaces them before the breakdown is approved).
 - **Sources** (impl issues with no intra-subgraph predecessor) depend on `B`;
@@ -46,7 +54,7 @@ container closes). Concretely:
   (`C depends on each sink`). Transitive reduction drops the scaffold's direct
   `C → P` edge and any redundant `C → non-sink` edge automatically.
 
-The type names (`breakdown_type`, `planning_type`) and the gate preset name come
+The type names (`breakdown_type`, `planning_type`) and the gate preset names come
 from `[planning]` config — never hardcode `breakdown`/`planning`/`epic` literals.
 
 ---
@@ -102,8 +110,10 @@ approved before drafting any children.
 2. **Is the parent breakable?** From `[planning].breakable_types`, check whether the
    parent's `type:*` value is listed. If NOT listed → **plain breakdown** (skip the
    rest of this step). If listed → **bracket breakdown**; continue. Read and record
-   `planning_type`, `breakdown_type`, and `coverage_gate_preset` from `[planning]` —
-   never hardcode these names.
+   `planning_type`, `breakdown_type`, `coverage_gate_preset`, and
+   `breakdown_review_gate_preset` from `[planning]` — never hardcode these names.
+   (`breakdown_review_gate_preset` defaults to `breakdown-review` when the key is
+   absent.)
 
 3. **Require a scaffolded planning node `P`.** The container must already be
    bracketed (`C → P`) by the scaffold step (`jit plan <id>` or
@@ -347,12 +357,16 @@ jit issue create \
 # capture B-UUID
 ```
 
-**2. Attach the coverage-preview gate to `B` and wire `B → P`:**
+**2. Attach BOTH of `B`'s gates and wire `B → P`:**
 
 ```bash
-jit gate preset apply <coverage_gate_preset> <B-UUID>   # coverage-preview gate
-jit dep add <B-UUID> <P-UUID>                            # B depends on approved plan
+jit gate preset apply <coverage_gate_preset> <B-UUID>          # deterministic coverage-preview gate
+jit gate preset apply <breakdown_review_gate_preset> <B-UUID>  # agent breakdown-review gate
+jit dep add <B-UUID> <P-UUID>                                  # B depends on approved plan
 ```
+
+(The in-process engine path attaches both automatically; apply both here only when
+wiring `B` by hand with CLI primitives.)
 
 **3. Wire sources → `B`.** A *source* child has an empty `depends_on` (no
 intra-subgraph predecessor). Every source depends on `B`, gating all impl behind
@@ -377,13 +391,15 @@ and any redundant `C → non-sink` edge are dropped automatically. Verify with
 
 **5. Run the coverage-preview gate via the standard runner, then block on it.**
 
-The bracket-builder (step 1–4) only ATTACHES the coverage-preview gate to `B` —
-it leaves the gate PENDING and never runs, stamps, or fabricates a verdict
-(`BracketBreakdownResult` is purely structural: `container_id`, `breakdown_id`,
-`planning_id`, `child_ids`, `coverage_gate_preset`). Running the gate is a
+The bracket-builder (step 1–4) only ATTACHES `B`'s gates — it leaves both PENDING
+and never runs, stamps, or fabricates a verdict (`BracketBreakdownResult` is purely
+structural: `container_id`, `breakdown_id`, `planning_id`, `child_ids`,
+`coverage_gate_preset`, `breakdown_review_gate_preset`). Running a gate is a
 breakdown-workflow step, executed by the standard gate runner exactly like every
-gate in this project — never by command code. After the bracket is created, RUN
-the coverage-preview gate on `B` through the real runner:
+gate in this project — never by command code. The deterministic coverage-preview
+gate is cheap, so RUN it inline here for immediate feedback (the agent
+breakdown-review gate is left for the runner, like `plan-review` on `P` — see the
+note at the end of this step):
 
 ```bash
 jit gate pass <B-UUID> <coverage_gate_preset>   # e.g. coverage-preview
@@ -409,11 +425,25 @@ jit gate check <B-UUID> <coverage_gate_preset> --json | jq -r .status
   Surface the findings, add the missing `satisfies:<id>` label(s) (or revise the
   plan/draft), and re-run `jit gate pass <B> <coverage_gate_preset>` until it
   passes.
-- **Coverage-preview PASSES** (status `passed`): the breakdown is approved; the
-  impl children may proceed (they are released once `B` is done).
+- **Coverage-preview PASSES** (status `passed`): the deterministic *coverage* half
+  is satisfied. This does **not** by itself approve the breakdown or release the impl
+  children — `B` still carries the PENDING `breakdown-review` gate, so it stays
+  `Gated` (not `Done`) and the children stay blocked. `B` reaches `Done` and releases
+  the fan-out only once **both** gates pass.
 
-So the explicit sequence is: **create bracket → run coverage-preview gate via the
-runner → block on fail / proceed on pass.**
+> **The `breakdown-review` gate is run by the standard gate runner, not by this
+> skill** — exactly like the `plan-review` gate on `P`, which Step 1.5 only *checks*
+> rather than runs. You do not invoke it here: jit's gate enforcement holds the
+> fan-out (impl children depend on `B`, and `B` cannot go `Done` while any required
+> gate is unpassed) until the runner passes it. The skill's contribution is to draft
+> a decomposition that *passes* that review — which is why Step 4's analysis prompt
+> is aligned to the reviewer's rubric. If you ARE the orchestrator running `B`'s
+> gates, run `jit gate pass <B-UUID> <breakdown_review_gate_preset>` and block on its
+> recorded status the same way as coverage-preview above.
+
+So the explicit sequence is: **create bracket → run coverage-preview inline → block
+on its fail; the runner separately passes breakdown-review → impl releases only when
+`B` is `Done` (both gates passed).**
 
 > Do NOT also run 6d-plain. The bracket spine REPLACES parent-centric containment:
 > `C` depends on sinks only, children never copy `C`'s deps, and the container does
@@ -502,7 +532,7 @@ leaves. Keep depth proportional to size — do not force a story level onto smal
    Bracket breakdown complete
      Container (C)     : <title> (<short-id>)
      Plan node (P)     : <short-id>  (plan-quality gate: passed)
-     Breakdown node (B): <short-id>  (coverage-preview gate: <pass/fail>)
+     Breakdown node (B): <short-id>  (coverage-preview: <pass/fail>, breakdown-review: attached, pending gate runner)
      Children drafted  : N (in Backlog)
      Spine             : C → {S sinks} … {sources} → B → P
      Sequencing edges  : M (between siblings)
