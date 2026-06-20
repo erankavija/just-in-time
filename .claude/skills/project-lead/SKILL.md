@@ -68,7 +68,7 @@ Before any orchestration, discover the project's expectations. This context info
    - `plan_doc_location` — where `P`'s plan lives (inline body or an external `{id}`-templated path).
    - `plan_gate_preset` / `coverage_gate_preset` — the gate presets applied to `P` (plan-review) and `B` (coverage-preview).
 
-   Breakable types are **always read from this config, never hardcoded**. If no `[planning]` block exists, the project does not use the bracket — drive the plain (non-bracketed) breakdown flow throughout (Section 3B). This makes the bracket behavior configurable and opt-in per ruleset.
+   Breakable types are **always read from this config, never hardcoded**. If no `[planning]` block exists, the project does not use the bracket — drive the plain (non-bracketed) breakdown flow throughout (Section 3B).
 
 Hold all discovered context in working memory for the duration of the session.
 
@@ -261,29 +261,21 @@ Per jit-parallel's conflict heuristics, if two issues in the wave may touch the 
 
 ## Section 7: Lead Review
 
-For each completed sub-agent, follow `references/lead-review-protocol.md` — which defines six tiers (1, 1.5, 2, 2.5, 2.75, 3). In summary:
+For each completed sub-agent, review its output by following
+`references/lead-review-protocol.md` **in full** — read it before every review. It
+defines six tiers, applied in order; a failure at any tier is an automatic FAIL:
 
-**Tier 1 — Gate verification:** Check that all gates on the issue show `passed`. If any gate is unpassed, automatic FAIL.
+- **Tier 1 — Gate verification:** all gates on the issue show `passed`.
+- **Tier 1.5 — Prior-findings regression check** (re-reviews only): every prior `code-review` finding still closed at HEAD.
+- **Tier 2 — Success criteria:** each criterion genuinely satisfied, verified against the artifacts.
+- **Tier 2.5 — Stale-narrative sweep:** no forward-looking narrative about the work that just landed.
+- **Tier 2.75 — Deferred-items audit:** no in-scope deferral surviving in linked design docs.
+- **Tier 3 — Holistic coherence:** cross-issue naming, interfaces, doc narrative, and scope fit the rest of the epic.
 
-**Tier 1.5 — Prior-findings regression check** (re-reviews only): Extract every finding from every prior failed `code-review` run and verify each is still closed at HEAD. A regression outranks any new finding.
-
-**Tier 2 — Success criteria:** Read each criterion. Verify the work genuinely satisfies it by inspecting the artifacts (diffs, files, documents). Do not rely on the agent's self-assessment alone.
-
-**Tier 2.5 — Stale-narrative sweep:** grep for forward-looking narrative about the work that just landed.
-
-**Tier 2.75 — Deferred-items audit:** Open every design doc linked to the issue and grep for "deferred", "TODO", "open question", "future work", etc. Every match must be either closed in the current commit or explicitly cited as out-of-scope per the issue's Non-goals section.
-
-**Tier 3 — Holistic coherence:** Assess fit with the rest of the epic:
-- Cross-issue naming and style consistency
-- Interface compatibility between pieces
-- Documentation narrative coherence
-- No out-of-scope changes
-
-Record a structured verdict (PASS or FAIL with specific findings). If FAIL, the verdict is passed to the rework protocol.
-
-**Before dispatching any rework**, the lead must have completed Tiers 1.5 and 2.75 in addition to the other tiers. The 6-cycle loop pattern observed in practice (each round surfacing a different subset of findings) is preventable only if the lead audits holistically on every round — reviewers have no memory across rounds, so the lead must supply it.
-
-**No-argue discipline.** When a reviewer cites a contract document (acceptance protocol, design doc, project CLAUDE.md, any governance file) and says the artifact violates it, the lead has exactly two responses: (a) change the artifact to satisfy the contract literally, or (b) escalate. The lead may not soften the contract's reading by argument. Wording such as "non-blocking marker", "redundant witness", "two independent witnesses already satisfy criterion N", "the contract doesn't really require this for our case", or "the marker is diagnostic rather than blocking" indicates the lead is in argue mode and must stop — argue-mode rework rounds will fail the next review and the cycle is wasted. If the contract is genuinely wrong for the project's needs, amend the contract; if it's right, comply. There is no soft middle. This rule applies even when the reviewer's reading appears to overstate a literal-vs-spirit interpretation: the reviewer is a contract enforcer, not an obstacle to argue past.
+The protocol also defines the **No-argue discipline**, the rule to complete Tiers
+1.5 and 2.75 before any rework, and the structured verdict format. Record a
+PASS/FAIL verdict with specific findings; on FAIL, pass it to the rework protocol
+(Section 8).
 
 ## Section 8: Rework
 

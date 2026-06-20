@@ -61,8 +61,7 @@ These rules apply across **all** workflows. Never violate them.
    artifact at its **final** path (re-link if you later move/archive it).
    `jit doc list <id>` is how downstream readers and future sessions discover an
    issue's plan, outputs, and outcome — an unlinked artifact is effectively
-   invisible. The DAG carries work order; document references carry the
-   artifacts. Never leave a deliverable artifact unlinked.
+   invisible.
 
 9. **Markdown everywhere.** Issue descriptions and plan documents use
    markdown format.

@@ -18,7 +18,7 @@ child issues with a correct dependency DAG, and populate JIT.
   plan-before-fan-out flow. See [The bracket](#the-bracket) below.
 - **Plain breakdown** — when the parent is NOT a breakable container (or the repo
   declares no `[planning]` config). The classic parent-centric flow: create
-  children, then make the parent depend on all of them (Step 6d-plain).
+  children, then make the parent depend on all of them (Step 6c-plain).
 
 Everything in Steps 2-5 (read hierarchy, membership label, analysis, plan review)
 is shared. The two shapes differ only in **Step 6 execution wiring**.
@@ -37,17 +37,14 @@ precedence `P > B > impl > C` (plan first, then breakdown, then work, then the
 container closes). Concretely:
 
 - **`B`** (`type:<breakdown_type>` from config) carries a `brackets:<C-id>` label
-  and **both** of the breakdown node's gates — the deterministic **coverage-preview**
-  gate (`coverage_gate_preset`) and the agent **breakdown-review** gate
+  and **both** of the breakdown node's preset gates — the **coverage-preview**
+  gate (`coverage_gate_preset`) and the **breakdown-review** gate
   (`breakdown_review_gate_preset`) — and depends on `P`. Both gate the fan-out: jit
-  will not release the impl children until each passes. The skill runs the cheap
-  deterministic coverage-preview inline for immediate feedback (Step 6d-bracket); the
-  agent **breakdown-review is left PENDING for the standard gate runner, exactly like
-  `plan-review` on `P`** — the skill does not run agent gates. jit's own gate
-  enforcement holds the fan-out until both pass, so there is no extra choreography to
-  do; the skill's job is to draft a decomposition that *passes* the review (Step 4).
-- **Impl children** are drafted in **Backlog** (they depend on `B`, which is not
-  done, so `jit ready` never surfaces them before the breakdown is approved).
+  will not release the impl children until each passes. Run the 
+  coverage-preview inline for immediate feedback (Step 6c-bracket). 
+  **Breakdown-review is left PENDING** for the standard gate runner. Jit's own gate
+  enforcement holds the fan-out until both pass.
+- **Impl children** are created in backlog.
 - **Sources** (impl issues with no intra-subgraph predecessor) depend on `B`;
   internal chains carry the rest. This transitively gates ALL impl behind `B`.
 - **Sinks** (impl issues with no intra-subgraph successor) are depended-on by `C`
@@ -55,7 +52,7 @@ container closes). Concretely:
   `C → P` edge and any redundant `C → non-sink` edge automatically.
 
 The type names (`breakdown_type`, `planning_type`) and the gate preset names come
-from `[planning]` config — never hardcode `breakdown`/`planning`/`epic` literals.
+from `[planning]` config.
 
 ---
 
@@ -92,7 +89,7 @@ from `[planning]` config — never hardcode `breakdown`/`planning`/`epic` litera
    these, define a small set of named tiers for this project — at minimum a
    **primary/full** tier (the standard gates a core deliverable must pass) and a lighter
    tier for clearly supporting work (e.g. documentation). The gates are whatever the
-   project configured, so this works for any domain. Present the proposed tiers and
+   project configured. Present the proposed tiers and
    their gate sets and confirm with the user once. These become `[GATE_TIERS]` for the
    analysis prompt and the tier → gate mapping applied at creation (Step 6).
 
@@ -105,7 +102,7 @@ approved before drafting any children.
 
 1. **Read the `[planning]` config.** Inspect `.jit/config.toml` for a `[planning]`
    section. If absent, the repo does not use brackets → this is a **plain
-   breakdown**; skip the rest of this step and use the plain wiring (Step 6d-plain).
+   breakdown**; skip the rest of this step and use the plain wiring (Step 6c-plain).
 
 2. **Is the parent breakable?** From `[planning].breakable_types`, check whether the
    parent's `type:*` value is listed. If NOT listed → **plain breakdown** (skip the
@@ -157,7 +154,7 @@ approved before drafting any children.
 ## Step 2: Read the configured type hierarchy
 
 Read `.jit/config.toml` and extract the `[type_hierarchy]` section. Build a table
-of type names sorted by level (ascending):
+of type names sorted by level (ascending), for example:
 
 ```
 Level 1 (broadest): milestone
@@ -179,10 +176,10 @@ children of an epic carry an `epic:<name>` label.
 
 **Never hardcode type names — always use the configured hierarchy.**
 
-**Depth is size-driven, not fixed at one level.** This skill breaks one level at a
+**Depth is size-driven, not fixed at one level.** Break one level at a
 time (parent → level+1), but a large parent should end up multi-level (e.g.
 epic → story → task), not a flat layer of leaves. The analysis agent flags any child
-that is itself several deliverables with `decompose_further: true`; Step 6f recurses
+that is itself several deliverables with `decompose_further: true`; Step 6e recurses
 on those into the next level. A small parent simply produces leaf children directly.
 
 ---
@@ -192,7 +189,7 @@ on those into the next level. A small parent simply produces leaf children direc
 Children need a label that groups them with this parent.
 
 1. Inspect the parent issue's existing labels for one matching the membership
-   namespace (e.g., look for `epic:*` if parent is type `epic`).
+   namespace (e.g., look for `epic:*` if parent type is named `epic`).
 
 2. If such a label already exists on the parent (e.g., `epic:gpu-acceleration`),
    use that value for all children.
@@ -273,15 +270,9 @@ Ask: **"Create these N child issues and wire up dependencies? [yes / edit / abor
 
 ## Step 6: Execution
 
-### 6a. Topological sort
+### 6a. Create child issues
 
-Sort child issues so that every issue's dependencies appear before it in the
-creation order. Use Kahn's algorithm on the `depends_on` graph within the child
-issue set. This ensures all dep-target UUIDs exist before they are referenced.
-
-### 6b. Create child issues
-
-For each child issue in topological order:
+For each child issue:
 
 ```bash
 jit issue create \
@@ -298,26 +289,20 @@ Apply the quality gates from the issue's `gate_tier`. Every implementation issue
 its tier's gates — skipping them leaves work that can be closed with no quality check.
 Use `--gate` at creation (above), or `jit gate add <uuid> <gates>` / `jit gate preset
 apply <preset> <uuid>` afterward. **This per-task gate assignment applies to BOTH
-breakdown shapes** — bracket children still carry their tier's quality gates; the
-coverage-preview gate added in 6d-bracket lives on `B`, not on the children.
+breakdown shapes**.
 
 **Bracket only — attach the coverage credits.** For each id in this child's
 `satisfies` array (the plan JSON field), add a `<satisfies-namespace>:<id>` label
 (default namespace `satisfies`, e.g. `satisfies:REQ-01`) — via `--label` above or
 `jit issue update <uuid> --label satisfies:<id>` afterward. These labels are what the
 coverage-preview gate on `B` reads to credit each container `[hard]` criterion; a
-criterion no child carries is reported uncovered (6d-bracket step 5). When the in-process
+criterion no child carries is reported uncovered (references/bracket-spine.md step 5). When the in-process
 engine path is used, pass them as the child's `labels` so they are attached at creation.
 Plain breakdown produces no `satisfies` labels.
 
 Capture the returned UUID and store in an in-memory map: `ref → UUID`.
 
-> Bracket note: in a bracket breakdown the children are **drafts** — they will be
-> pulled into Backlog automatically once they gain a dependency on `B` or on a
-> predecessor sibling (6d-bracket). No special create flag is needed; `jit` demotes
-> a dependency-less Ready issue to Backlog the moment a not-done dependency is added.
-
-### 6c. Add sequencing dependencies between children
+### 6b. Add sequencing dependencies between children
 
 After **all** children are created, add peer-to-peer sequencing edges (shared by
 both shapes):
@@ -327,7 +312,7 @@ both shapes):
 jit dep add <child-UUID> <dep-UUID-1> [<dep-UUID-2> ...]
 ```
 
-### 6d-plain. Wire containment: parent depends on all children (PLAIN only)
+### 6c-plain. Wire containment: parent depends on all children (PLAIN only)
 
 For a **non-breakable** parent (Step 1.5 selected plain breakdown):
 
@@ -337,126 +322,32 @@ jit dep add <parent-UUID> <child-UUID-1> <child-UUID-2> ... <child-UUID-N>
 
 This expresses the containment invariant: the parent cannot be marked done until
 every child is complete. **Do NOT use this wiring for a bracket breakdown** — use
-6d-bracket instead.
+6c-bracket instead.
 
-### 6d-bracket. Wire the bracket spine (BRACKET only)
+### 6c-bracket. Wire the bracket spine (BRACKET only)
 
 For a **breakable** parent with an approved plan (Step 1.5 selected bracket
-breakdown), create `B` and splice the source/sink spine `C → impl → B → P`. Use
-the in-process engine path when available, or the CLI primitives below.
+breakdown), create `B` and splice the source/sink spine `C → impl → B → P`, then
+run the coverage-preview gate inline and block the fan-out on its result.
 
-**1. Create the breakdown node `B`.** It carries the configured breakdown type, a
-`brackets:<C-id>` label, and the container's membership label (NOT its type):
+**Follow [references/bracket-spine.md](references/bracket-spine.md)** for the full
+procedure: create `B`, attach both gates and wire `B → P`, wire sources → `B` and
+`C` → sinks (transitive reduction drops the scaffold's `C → P` edge), then run
+coverage-preview via the standard runner and gate the fan-out on its recorded
+status. The agent breakdown-review gate is left PENDING for the runner, like
+`plan-review` on `P`.
 
-```bash
-jit issue create \
-  --title "Breakdown: <container title>" \
-  --label "type:<breakdown_type>" \
-  --label "brackets:<C-UUID>" \
-  --label "<membership-label>"
-# capture B-UUID
-```
+Do **not** also run 6c-plain — the bracket spine REPLACES parent-centric
+containment.
 
-**2. Attach BOTH of `B`'s gates and wire `B → P`:**
-
-```bash
-jit gate preset apply <coverage_gate_preset> <B-UUID>          # deterministic coverage-preview gate
-jit gate preset apply <breakdown_review_gate_preset> <B-UUID>  # agent breakdown-review gate
-jit dep add <B-UUID> <P-UUID>                                  # B depends on approved plan
-```
-
-(The in-process engine path attaches both automatically; apply both here only when
-wiring `B` by hand with CLI primitives.)
-
-**3. Wire sources → `B`.** A *source* child has an empty `depends_on` (no
-intra-subgraph predecessor). Every source depends on `B`, gating all impl behind
-the approved breakdown:
-
-```bash
-# For each source child:
-jit dep add <source-child-UUID> <B-UUID>
-```
-
-**4. Wire `C` → sinks.** A *sink* child has no sibling listing it in `depends_on`
-(no intra-subgraph successor). The container depends on each sink:
-
-```bash
-# For each sink child:
-jit dep add <C-UUID> <sink-child-UUID>
-```
-
-`jit` keeps the DAG transitively reduced, so the scaffold's direct `C → P` edge
-and any redundant `C → non-sink` edge are dropped automatically. Verify with
-`jit issue show <C> --json | jq .depends_on` (should list sinks only, not `P`).
-
-**5. Run the coverage-preview gate via the standard runner, then block on it.**
-
-The bracket-builder (step 1–4) only ATTACHES `B`'s gates — it leaves both PENDING
-and never runs, stamps, or fabricates a verdict (`BracketBreakdownResult` is purely
-structural: `container_id`, `breakdown_id`, `planning_id`, `child_ids`,
-`coverage_gate_preset`, `breakdown_review_gate_preset`). Running a gate is a
-breakdown-workflow step, executed by the standard gate runner exactly like every
-gate in this project — never by command code. The deterministic coverage-preview
-gate is cheap, so RUN it inline here for immediate feedback (the agent
-breakdown-review gate is left for the runner, like `plan-review` on `P` — see the
-note at the end of this step):
-
-```bash
-jit gate pass <B-UUID> <coverage_gate_preset>   # e.g. coverage-preview
-```
-
-This is the standard auto-gate execution path: it runs the checker
-(`jit validate --scope <C>`, resolved from `B`'s `brackets:<C-id>` label),
-persists a `GateRunResult`, updates `B`'s gate status, and logs the gate event.
-For coverage to register, each child must carry the `satisfies:<id>` label(s) for
-the `[hard]` criteria it covers (pass them via the child's `labels`, or
-`jit issue update <child> --label satisfies:<id>` when wiring by hand).
-
-**GATE the fan-out on the recorded result** (check the recorded gate *status*,
-not just the exit code — the project convention):
-
-```bash
-jit gate check <B-UUID> <coverage_gate_preset> --json | jq -r .status
-```
-
-- **Coverage-preview FAILS** (a `[hard]` criterion uncovered → exit 4, status
-  `failed`): a `[hard]` criterion is left uncovered by the drafted children (the
-  criterion id appears in the gate-run output). Do NOT release the impl children.
-  Surface the findings, add the missing `satisfies:<id>` label(s) (or revise the
-  plan/draft), and re-run `jit gate pass <B> <coverage_gate_preset>` until it
-  passes.
-- **Coverage-preview PASSES** (status `passed`): the deterministic *coverage* half
-  is satisfied. This does **not** by itself approve the breakdown or release the impl
-  children — `B` still carries the PENDING `breakdown-review` gate, so it stays
-  `Gated` (not `Done`) and the children stay blocked. `B` reaches `Done` and releases
-  the fan-out only once **both** gates pass.
-
-> **The `breakdown-review` gate is run by the standard gate runner, not by this
-> skill** — exactly like the `plan-review` gate on `P`, which Step 1.5 only *checks*
-> rather than runs. You do not invoke it here: jit's gate enforcement holds the
-> fan-out (impl children depend on `B`, and `B` cannot go `Done` while any required
-> gate is unpassed) until the runner passes it. The skill's contribution is to draft
-> a decomposition that *passes* that review — which is why Step 4's analysis prompt
-> is aligned to the reviewer's rubric. If you ARE the orchestrator running `B`'s
-> gates, run `jit gate pass <B-UUID> <breakdown_review_gate_preset>` and block on its
-> recorded status the same way as coverage-preview above.
-
-So the explicit sequence is: **create bracket → run coverage-preview inline → block
-on its fail; the runner separately passes breakdown-review → impl releases only when
-`B` is `Done` (both gates passed).**
-
-> Do NOT also run 6d-plain. The bracket spine REPLACES parent-centric containment:
-> `C` depends on sinks only, children never copy `C`'s deps, and the container does
-> not depend on `B` or every child.
-
-### 6e. Error handling
+### 6d. Error handling
 
 If any `jit issue create` or `jit dep add` fails:
 - Report which step failed and why.
 - Do **not** roll back already-created issues (partial state is recoverable).
 - Show the ref-to-UUID map so the user can complete the wiring manually.
 
-### 6f. Recurse into oversized children (multi-level breakdown)
+### 6e. Recurse into oversized children (multi-level breakdown)
 
 For each created child whose plan entry had `decompose_further: true` **and** a finer
 child type exists below it in the hierarchy, break that child down another level by
@@ -507,12 +398,9 @@ leaves. Keep depth proportional to size — do not force a story level onto smal
      (Step 1.5 step 5) is carried by at least one child as a `satisfies:<id>` label, so
      the coverage-preview gate on `B` can credit it. The standard gate runner records
      that gate's verdict on `B` when you run `jit gate pass <B> <coverage_gate_preset>`
-     (6d-bracket step 5); a `[hard]` criterion no child satisfies is reported uncovered
+     (references/bracket-spine.md step 5); a `[hard]` criterion no child satisfies is reported uncovered
      and the gate fails — add the missing `satisfies:<id>` label
      (`jit issue update <child> --label satisfies:<id>`) and re-run the gate.
-   Report violations and offer to fix them (`jit issue update --label … --remove-label …`
-   for labels, `jit issue update -d` for descriptions, `jit gate add` for gates) before
-   declaring done.
 
 3. Show a summary (shape-aware):
 
