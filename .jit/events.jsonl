@@ -2956,3 +2956,4 @@
 {"type":"issue_completed","id":"4c0763f5-1d69-4585-b6a4-33eb327623c6","issue_id":"cb8cdf1b-2375-4a0a-b864-683dfab97367","timestamp":"2026-06-18T20:08:56.566941106Z"}
 {"type":"issue_state_changed","id":"7b1f4016-6397-482d-9606-e3e8613eba41","issue_id":"2fbd2a82-14ba-4e6e-90f6-e0c34f0f912c","timestamp":"2026-06-18T20:10:25.277031526Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"2546f590-45c8-42ea-bae7-ef8c90932c77","issue_id":"2fbd2a82-14ba-4e6e-90f6-e0c34f0f912c","timestamp":"2026-06-18T20:10:25.277061396Z"}
+{"type":"issue_created","id":"243443bd-e0c1-4a73-b28b-09cef5587590","issue_id":"eed6750c-270a-43c6-8c35-161553b25d75","timestamp":"2026-06-20T18:17:26.496277704Z","title":"Planning skill: interview-driven plan authoring for the P node","priority":"high"}
