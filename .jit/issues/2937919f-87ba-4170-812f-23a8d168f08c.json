@@ -13,7 +13,7 @@
     "plan-review": {
       "status": "failed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-06-21T21:58:35.302850531Z"
+      "updated_at": "2026-06-21T22:04:45.965447439Z"
     }
   },
   "context": {},
@@ -30,5 +30,5 @@
     "type:planning"
   ],
   "created_at": "2026-06-21T20:44:33.340215081+00:00",
-  "updated_at": "2026-06-21T22:00:48.767957686+00:00"
+  "updated_at": "2026-06-21T22:07:11.853375948+00:00"
 }
