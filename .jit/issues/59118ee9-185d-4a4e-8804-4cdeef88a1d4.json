@@ -1,0 +1,37 @@
+{
+  "id": "59118ee9-185d-4a4e-8804-4cdeef88a1d4",
+  "title": "Breakdown: Graph templates: configurable parameterized subgraphs applied to the work DAG",
+  "description": "Breakdown node bracketing epic **Graph templates: configurable parameterized subgraphs applied to the work DAG** (`9ac9fdac`).\n\nHolds the decomposition of the approved plan into well-ordered child issues that cover the container's `[hard]` success criteria (REQ-01–REQ-08).",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "7d88e37d-2946-4ea8-9f71-e3956e5bc96d"
+  ],
+  "gates_required": [
+    "coverage-preview",
+    "breakdown-review"
+  ],
+  "gates_status": {
+    "coverage-preview": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-06-21T23:20:16.981207692Z"
+    },
+    "breakdown-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-06-21T23:20:16.984878123Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:breakdown",
+    "brackets:9ac9fdac",
+    "epic:graph-templates",
+    "milestone:v1.0"
+  ],
+  "created_at": "2026-06-21T23:20:16.975529561+00:00",
+  "updated_at": "2026-06-21T23:26:47.032463617+00:00"
+}
