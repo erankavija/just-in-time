@@ -35,6 +35,12 @@ where the title is fully self-explanatory.]
 
 - `## Success Criteria` is **mandatory** on every issue. Items must be verifiable — prefer
   outcomes ("function returns X for input Y") over actions ("implement X").
+- **Criticality markers.** Where the project distinguishes criterion maturity (the
+  planning-bracket / coverage model — see `issue-extraction-prompt.md`), prefix **every**
+  criterion with `[hard]` or `[aspirational]` and a stable `REQ-N` id. **Default to
+  `[hard]`.** Never leave a criterion unmarked or mix marked and unmarked items in one
+  issue. `[hard]` criteria must be covered by a child and fail review if unmet;
+  `[aspirational]` ones are amendable in-loop while the aggregate contract holds.
 - Descriptions use second-level headings (`##`) — never `#` (reserved for the title if
   rendered standalone) or deeper than `###`.
 - Write in present tense, imperative voice for criteria ("Returns…", "Handles…", "Emits…").
@@ -50,6 +56,10 @@ The DAG is the source of truth for dependencies and containment. Do not duplicat
 - ❌ No cross-references between sibling issues ("Same as A1", "Per A2's protocol").
   Issues must be standalone-readable; a worker reading the issue with no other context
   must understand it.
+- ❌ No tracker mechanics in the description — don't instruct how to pass gates, don't
+  spell out commands (`jit …`), and don't name the reviewer/checker (it is pluggable; the
+  current one is incidental). That gates must pass to advance is implicit; describe the
+  *work*, not how jit enforces it.
 
 When existing repo issues conflict with these standards, this document is canonical. Apply
 the standards to new issues; do not retroactively rename existing ones unless asked.
