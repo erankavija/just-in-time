@@ -1,16 +1,16 @@
 {
   "gates": {
-    "fmt": {
+    "tests": {
       "version": 1,
-      "key": "fmt",
-      "title": "Code Formatted",
-      "description": "Code must be formatted with cargo fmt",
+      "key": "tests",
+      "title": "All Tests Pass",
+      "description": "Full test suite must pass",
       "stage": "postcheck",
       "mode": "auto",
       "checker": {
         "type": "exec",
-        "command": "cargo fmt -- --check",
-        "timeout_seconds": 30,
+        "command": "cargo test --lib",
+        "timeout_seconds": 300,
         "working_dir": null,
         "env": {},
         "pass_context": false
@@ -37,6 +37,46 @@
         },
         "pass_context": true,
         "prompt_file": "./scripts/code-review-prompt.md"
+      },
+      "priority": 100,
+      "reserved": {},
+      "auto": true,
+      "example_integration": null
+    },
+    "jit-validate": {
+      "version": 1,
+      "key": "jit-validate",
+      "title": "JIT Validate",
+      "description": "Repository graph and content validation must pass (jit validate exits 0)",
+      "stage": "postcheck",
+      "mode": "auto",
+      "checker": {
+        "type": "exec",
+        "command": "jit validate",
+        "timeout_seconds": 120,
+        "working_dir": null,
+        "env": {},
+        "pass_context": false
+      },
+      "priority": 100,
+      "reserved": {},
+      "auto": true,
+      "example_integration": null
+    },
+    "fmt": {
+      "version": 1,
+      "key": "fmt",
+      "title": "Code Formatted",
+      "description": "Code must be formatted with cargo fmt",
+      "stage": "postcheck",
+      "mode": "auto",
+      "checker": {
+        "type": "exec",
+        "command": "cargo fmt -- --check",
+        "timeout_seconds": 30,
+        "working_dir": null,
+        "env": {},
+        "pass_context": false
       },
       "priority": 100,
       "reserved": {},
@@ -75,26 +115,6 @@
       "auto": false,
       "example_integration": null
     },
-    "tests": {
-      "version": 1,
-      "key": "tests",
-      "title": "All Tests Pass",
-      "description": "Full test suite must pass",
-      "stage": "postcheck",
-      "mode": "auto",
-      "checker": {
-        "type": "exec",
-        "command": "cargo test --lib",
-        "timeout_seconds": 300,
-        "working_dir": null,
-        "env": {},
-        "pass_context": false
-      },
-      "priority": 100,
-      "reserved": {},
-      "auto": true,
-      "example_integration": null
-    },
     "plan-review": {
       "version": 1,
       "key": "plan-review",
@@ -118,46 +138,6 @@
       "auto": true,
       "example_integration": null
     },
-    "npm-ci": {
-      "version": 1,
-      "key": "npm-ci",
-      "title": "NPM CI (test + lint + build)",
-      "description": "Web workspace checks: vitest suite, ESLint, and production build all clean. Web-side equivalent of cargo-ci.",
-      "stage": "postcheck",
-      "mode": "auto",
-      "checker": {
-        "type": "exec",
-        "command": "cd web && npm test -- --run && npm run lint && npm run build",
-        "timeout_seconds": 600,
-        "working_dir": null,
-        "env": {},
-        "pass_context": false
-      },
-      "priority": 100,
-      "reserved": {},
-      "auto": true,
-      "example_integration": null
-    },
-    "jit-validate": {
-      "version": 1,
-      "key": "jit-validate",
-      "title": "JIT Validate",
-      "description": "Repository graph and content validation must pass (jit validate exits 0)",
-      "stage": "postcheck",
-      "mode": "auto",
-      "checker": {
-        "type": "exec",
-        "command": "jit validate",
-        "timeout_seconds": 120,
-        "working_dir": null,
-        "env": {},
-        "pass_context": false
-      },
-      "priority": 100,
-      "reserved": {},
-      "auto": true,
-      "example_integration": null
-    },
     "breakdown-review": {
       "version": 1,
       "key": "breakdown-review",
@@ -175,6 +155,26 @@
         },
         "pass_context": true,
         "prompt_file": "./scripts/breakdown-review-prompt.md"
+      },
+      "priority": 100,
+      "reserved": {},
+      "auto": true,
+      "example_integration": null
+    },
+    "npm-ci": {
+      "version": 1,
+      "key": "npm-ci",
+      "title": "NPM CI (test + lint + build)",
+      "description": "Web workspace checks: vitest suite, ESLint, and production build all clean. Web-side equivalent of cargo-ci.",
+      "stage": "postcheck",
+      "mode": "auto",
+      "checker": {
+        "type": "exec",
+        "command": "cd web && npm test -- --run && npm run lint && npm run build",
+        "timeout_seconds": 600,
+        "working_dir": null,
+        "env": {},
+        "pass_context": false
       },
       "priority": 100,
       "reserved": {},

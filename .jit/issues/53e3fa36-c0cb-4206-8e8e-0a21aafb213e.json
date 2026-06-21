@@ -1,0 +1,29 @@
+{
+  "id": "53e3fa36-c0cb-4206-8e8e-0a21aafb213e",
+  "title": "Agent-facing CLI ergonomics: gate verdicts, --json contract, and workflow primitives",
+  "description": "Improve jit's agent-facing ergonomics based on session mining of 42 real Claude Code transcripts across this repo and ../gf2 (jit's primary downstream consumer). 209 friction findings from 37 sessions.\n\n## Top failure patterns\n1. `jit gate pass` exit code does not reflect the gate verdict (21 sessions) — agents cannot branch on $?, get silently misled, must follow every pass with a separate gate check.\n2. `gate pass` on failure hides checker output, forcing a mandatory `gate check` follow-up (18 sessions).\n3. Unstable `--json` schema: short_id missing on fresh/done issues, envelope keys differ per command, gate-check stdout nesting varies (18 sessions; Python KeyError crashes).\n4. `gate check`/`check-all` bury the verdict in prose; no structured verdict field (16 sessions).\n5. `jit validate` errors on isolated terminal-state issues and cannot be scoped (10 sessions).\n6. `gate list`/`gate status` reject an issue ID (9 sessions).\n7. `gate pass` no-ops silently when already passed; no pass-all (8 sessions).\n\n## Top unintuitive tool sequencing\n1. No `jit gate wait` — agents poll with bespoke sleep+python loops, guessed 45-220s durations (15 sessions).\n2. `issue claim` blocks on incomplete deps; error omits `issue assign` (5 sessions).\n3. `claim release` needs the opaque lease UUID, not the issue ID; no --agent-id (3 sessions).\n4. `issue delete` leaves dangling edges; `validate --fix` won't repair them (2 sessions).\n5. No batch issue creation with DAG wiring — agents write hundred-line Python loops (3 sessions).\n\n## Other\nPervasive python3 reshaping of --json (25+ sessions, no --field flag); gates_required/gates_status split; gate-check filesystem spelunking; noisy idempotent gate add; recover false-positive monitors; search missing --label; undiscoverable JIT_ALLOW_DELETION; alias gaps; create --gate possibly no-op; missing gate runs; graph deps --transitive/--flat missing; cargo-ci floods reviewer context.\n\nFull analysis with verbatim evidence and per-item fixes: dev/studies/session-mining-jit-improvements.md\n\nThis epic is the parent for breakdown into prioritized work items (see the 12 prioritized recommendations in the study doc). Some findings predate 0.2.1 and must be re-verified against the current binary before implementation.",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "2937919f-87ba-4170-812f-23a8d168f08c"
+  ],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [
+    {
+      "path": "dev/studies/session-mining-jit-improvements.md",
+      "commit": null,
+      "label": "Session-mining findings & prioritized fixes",
+      "doc_type": "study",
+      "format": "markdown"
+    }
+  ],
+  "labels": [
+    "type:epic",
+    "epic:agent-ergonomics"
+  ],
+  "created_at": "2026-06-21T20:37:24.853834740+00:00",
+  "updated_at": "2026-06-21T20:44:33.351298884+00:00"
+}

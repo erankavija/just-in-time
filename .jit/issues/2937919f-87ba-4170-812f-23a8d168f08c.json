@@ -1,0 +1,34 @@
+{
+  "id": "2937919f-87ba-4170-812f-23a8d168f08c",
+  "title": "Plan: Agent-facing CLI ergonomics: gate verdicts, --json contract, and workflow primitives",
+  "description": "",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "plan-review"
+  ],
+  "gates_status": {
+    "plan-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-06-21T20:44:33.351855124Z"
+    }
+  },
+  "context": {},
+  "documents": [
+    {
+      "path": "dev/active/53e3fa36-c0cb-4206-8e8e-0a21aafb213e-plan.md",
+      "commit": null,
+      "label": "plan",
+      "doc_type": null
+    }
+  ],
+  "labels": [
+    "epic:agent-ergonomics",
+    "type:planning"
+  ],
+  "created_at": "2026-06-21T20:44:33.340215081+00:00",
+  "updated_at": "2026-06-21T20:44:33.351981964+00:00"
+}
