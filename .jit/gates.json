@@ -1,25 +1,5 @@
 {
   "gates": {
-    "coverage-preview": {
-      "version": 1,
-      "key": "coverage-preview",
-      "title": "Coverage Preview",
-      "description": "Run scoped validation for the container resolved from the breakdown node's brackets: label; blocks when a [hard] criterion is uncovered at plan time",
-      "stage": "postcheck",
-      "mode": "auto",
-      "checker": {
-        "type": "exec",
-        "command": "./scripts/coverage-preview.sh",
-        "timeout_seconds": 300,
-        "working_dir": null,
-        "env": {},
-        "pass_context": true
-      },
-      "priority": 100,
-      "reserved": {},
-      "auto": true,
-      "example_integration": null
-    },
     "cargo-ci": {
       "version": 1,
       "key": "cargo-ci",
@@ -40,87 +20,6 @@
       "auto": true,
       "example_integration": null
     },
-    "plan-review": {
-      "version": 1,
-      "key": "plan-review",
-      "title": "AI Plan Review",
-      "description": "AI-powered plan/design review before fan-out, against the planning issue's success criteria and linked design document",
-      "stage": "postcheck",
-      "mode": "auto",
-      "checker": {
-        "type": "exec",
-        "command": "./scripts/ai-review.sh",
-        "timeout_seconds": 1800,
-        "working_dir": null,
-        "env": {
-          "REVIEWER_AGENT": "codex exec"
-        },
-        "pass_context": true,
-        "prompt_file": "./scripts/plan-review-prompt.md"
-      },
-      "priority": 100,
-      "reserved": {},
-      "auto": true,
-      "example_integration": null
-    },
-    "breakdown-review": {
-      "version": 1,
-      "key": "breakdown-review",
-      "title": "AI Breakdown Review",
-      "description": "AI-powered adversarial review of a breakdown against the design doc and content standards",
-      "stage": "postcheck",
-      "mode": "auto",
-      "checker": {
-        "type": "exec",
-        "command": "./scripts/ai-review.sh",
-        "timeout_seconds": 1800,
-        "working_dir": null,
-        "env": {
-          "REVIEWER_AGENT": "codex exec"
-        },
-        "pass_context": true,
-        "prompt_file": "./scripts/breakdown-review-prompt.md"
-      },
-      "priority": 100,
-      "reserved": {},
-      "auto": true,
-      "example_integration": null
-    },
-    "code-review": {
-      "version": 1,
-      "key": "code-review",
-      "title": "AI Code Review",
-      "description": "AI-powered code review against just-in-time project standards",
-      "stage": "postcheck",
-      "mode": "auto",
-      "checker": {
-        "type": "exec",
-        "command": "./scripts/ai-review.sh",
-        "timeout_seconds": 1800,
-        "working_dir": null,
-        "env": {
-          "REVIEWER_AGENT": "codex exec"
-        },
-        "pass_context": true,
-        "prompt_file": "./scripts/code-review-prompt.md"
-      },
-      "priority": 100,
-      "reserved": {},
-      "auto": true,
-      "example_integration": null
-    },
-    "tdd-reminder": {
-      "version": 1,
-      "key": "tdd-reminder",
-      "title": "TDD Reminder",
-      "description": "Write tests first",
-      "stage": "precheck",
-      "mode": "manual",
-      "priority": 100,
-      "reserved": {},
-      "auto": false,
-      "example_integration": null
-    },
     "tests": {
       "version": 1,
       "key": "tests",
@@ -132,66 +31,6 @@
         "type": "exec",
         "command": "cargo test --lib",
         "timeout_seconds": 300,
-        "working_dir": null,
-        "env": {},
-        "pass_context": false
-      },
-      "priority": 100,
-      "reserved": {},
-      "auto": true,
-      "example_integration": null
-    },
-    "cargo-ci-features": {
-      "version": 1,
-      "key": "cargo-ci-features",
-      "title": "Cargo CI (feature-gated parsers)",
-      "description": "Compiles and tests the optional html/xml content-parser features: feature-enabled clippy (zero warnings) and the cross-format parity test suite. Required on issues that touch feature-gated code so the default-only cargo-ci gate does not leave them unexercised.",
-      "stage": "postcheck",
-      "mode": "auto",
-      "checker": {
-        "type": "exec",
-        "command": "cargo clippy -p jit --features html,xml --all-targets -- -D warnings && cargo test -p jit --features html,xml",
-        "timeout_seconds": 600,
-        "working_dir": null,
-        "env": {},
-        "pass_context": false
-      },
-      "priority": 100,
-      "reserved": {},
-      "auto": true,
-      "example_integration": null
-    },
-    "clippy": {
-      "version": 1,
-      "key": "clippy",
-      "title": "Clippy Lints Pass",
-      "description": "Zero clippy warnings allowed",
-      "stage": "postcheck",
-      "mode": "auto",
-      "checker": {
-        "type": "exec",
-        "command": "cargo clippy --lib -- -D warnings",
-        "timeout_seconds": 120,
-        "working_dir": null,
-        "env": {},
-        "pass_context": false
-      },
-      "priority": 100,
-      "reserved": {},
-      "auto": true,
-      "example_integration": null
-    },
-    "jit-validate": {
-      "version": 1,
-      "key": "jit-validate",
-      "title": "JIT Validate",
-      "description": "Repository graph and content validation must pass (jit validate exits 0)",
-      "stage": "postcheck",
-      "mode": "auto",
-      "checker": {
-        "type": "exec",
-        "command": "jit validate",
-        "timeout_seconds": 120,
         "working_dir": null,
         "env": {},
         "pass_context": false
@@ -221,6 +60,124 @@
       "auto": true,
       "example_integration": null
     },
+    "breakdown-review": {
+      "version": 1,
+      "key": "breakdown-review",
+      "title": "AI Breakdown Review",
+      "description": "AI-powered adversarial review of a breakdown against the design doc and content standards",
+      "stage": "postcheck",
+      "mode": "auto",
+      "checker": {
+        "type": "exec",
+        "command": "./scripts/ai-review.sh",
+        "timeout_seconds": 1800,
+        "working_dir": null,
+        "env": {
+          "REVIEWER_AGENT": "codex exec"
+        },
+        "pass_context": true,
+        "prompt_file": "./scripts/breakdown-review-prompt.md"
+      },
+      "priority": 100,
+      "reserved": {},
+      "auto": true,
+      "example_integration": null
+    },
+    "tdd-reminder": {
+      "version": 1,
+      "key": "tdd-reminder",
+      "title": "TDD Reminder",
+      "description": "Write tests first",
+      "stage": "precheck",
+      "mode": "manual",
+      "priority": 100,
+      "reserved": {},
+      "auto": false,
+      "example_integration": null
+    },
+    "plan-review": {
+      "version": 1,
+      "key": "plan-review",
+      "title": "AI Plan Review",
+      "description": "AI-powered plan/design review before fan-out, against the planning issue's success criteria and linked design document",
+      "stage": "postcheck",
+      "mode": "auto",
+      "checker": {
+        "type": "exec",
+        "command": "./scripts/ai-review.sh",
+        "timeout_seconds": 1800,
+        "working_dir": null,
+        "env": {
+          "REVIEWER_AGENT": "codex exec"
+        },
+        "pass_context": true,
+        "prompt_file": "./scripts/plan-review-prompt.md"
+      },
+      "priority": 100,
+      "reserved": {},
+      "auto": true,
+      "example_integration": null
+    },
+    "jit-validate": {
+      "version": 1,
+      "key": "jit-validate",
+      "title": "JIT Validate",
+      "description": "Repository graph and content validation must pass (jit validate exits 0)",
+      "stage": "postcheck",
+      "mode": "auto",
+      "checker": {
+        "type": "exec",
+        "command": "jit validate",
+        "timeout_seconds": 120,
+        "working_dir": null,
+        "env": {},
+        "pass_context": false
+      },
+      "priority": 100,
+      "reserved": {},
+      "auto": true,
+      "example_integration": null
+    },
+    "coverage-preview": {
+      "version": 1,
+      "key": "coverage-preview",
+      "title": "Coverage Preview",
+      "description": "Run scoped validation for the container resolved from the breakdown node's brackets: label; blocks when a [hard] criterion is uncovered at plan time",
+      "stage": "postcheck",
+      "mode": "auto",
+      "checker": {
+        "type": "exec",
+        "command": "./scripts/coverage-preview.sh",
+        "timeout_seconds": 300,
+        "working_dir": null,
+        "env": {},
+        "pass_context": true
+      },
+      "priority": 100,
+      "reserved": {},
+      "auto": true,
+      "example_integration": null
+    },
+    "clippy": {
+      "version": 1,
+      "key": "clippy",
+      "title": "Clippy Lints Pass",
+      "description": "Zero clippy warnings allowed",
+      "stage": "postcheck",
+      "mode": "auto",
+      "checker": {
+        "type": "exec",
+        "command": "cargo clippy --lib -- -D warnings",
+        "timeout_seconds": 120,
+        "working_dir": null,
+        "env": {},
+        "pass_context": false
+      },
+      "priority": 100,
+      "reserved": {},
+      "auto": true,
+      "example_integration": null
+    },
     "npm-ci": {
       "version": 1,
       "key": "npm-ci",
@@ -235,6 +192,49 @@
         "working_dir": null,
         "env": {},
         "pass_context": false
+      },
+      "priority": 100,
+      "reserved": {},
+      "auto": true,
+      "example_integration": null
+    },
+    "cargo-ci-features": {
+      "version": 1,
+      "key": "cargo-ci-features",
+      "title": "Cargo CI (feature-gated parsers)",
+      "description": "Compiles and tests the optional html/xml content-parser features: feature-enabled clippy (zero warnings) and the cross-format parity test suite. Required on issues that touch feature-gated code so the default-only cargo-ci gate does not leave them unexercised.",
+      "stage": "postcheck",
+      "mode": "auto",
+      "checker": {
+        "type": "exec",
+        "command": "cargo clippy -p jit --features html,xml --all-targets -- -D warnings && cargo test -p jit --features html,xml",
+        "timeout_seconds": 600,
+        "working_dir": null,
+        "env": {},
+        "pass_context": false
+      },
+      "priority": 100,
+      "reserved": {},
+      "auto": true,
+      "example_integration": null
+    },
+    "code-review": {
+      "version": 1,
+      "key": "code-review",
+      "title": "AI Code Review",
+      "description": "AI-powered code review against just-in-time project standards",
+      "stage": "postcheck",
+      "mode": "auto",
+      "checker": {
+        "type": "exec",
+        "command": "./scripts/ai-review.sh",
+        "timeout_seconds": 1800,
+        "working_dir": null,
+        "env": {
+          "REVIEWER_AGENT": "codex exec"
+        },
+        "pass_context": true,
+        "prompt_file": "./scripts/code-review-prompt.md"
       },
       "priority": 100,
       "reserved": {},

@@ -1,0 +1,24 @@
+{
+  "id": "ea717ef1-17bc-419b-a8f1-e80b7016aa03",
+  "title": "Add command and flag aliases",
+  "description": "Add convenience aliases for the command/flag names agents repeatedly reached for.\n\n## Success Criteria\n\n- [ ] `jit dependency` and `jit document` resolve to `jit dep` and `jit doc`.\n- [ ] `jit issue list` resolves to (or redirects to) `jit query`.\n- [ ] `--add-label` is accepted as an alias for `--label` on `issue update`.\n\n## Notes\n\nPlan task T11.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "838483f3-6f4b-4d7e-a8aa-3512fd648841"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:agent-ergonomics"
+  ],
+  "created_at": "2026-06-22T21:20:41.128104286+00:00",
+  "updated_at": "2026-06-22T21:22:02.282415984+00:00"
+}

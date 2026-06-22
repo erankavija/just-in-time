@@ -1,0 +1,24 @@
+{
+  "id": "6ec1dd6f-76a7-4b54-bb7b-df4ac686325d",
+  "title": "Batch-create issues with dependency wiring from JSON",
+  "description": "Add declarative batch issue creation with dependency wiring from a JSON file (replacing hand-written create+dep loops).\n\n## Success Criteria\n\n- [ ] `jit issue batch-create --from-json <file>` accepts an array of issue defs `{key, title, description?, type?, priority?, labels?, gates?, depends_on?}` with symbolic `key` references.\n- [ ] It fully pre-validates (duplicate/unknown keys, unknown depends_on refs, cycle detection, type/label/gate validity) before any write, exiting non-zero listing offending entries on failure.\n- [ ] On success it creates all issues and dependency edges and returns a `{key: id}` map.\n\n## Notes\n\nPlan task T10.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "838483f3-6f4b-4d7e-a8aa-3512fd648841"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:agent-ergonomics"
+  ],
+  "created_at": "2026-06-22T21:20:41.122832975+00:00",
+  "updated_at": "2026-06-22T21:22:02.274139342+00:00"
+}

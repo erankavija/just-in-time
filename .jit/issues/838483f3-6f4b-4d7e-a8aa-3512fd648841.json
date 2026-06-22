@@ -1,0 +1,36 @@
+{
+  "id": "838483f3-6f4b-4d7e-a8aa-3512fd648841",
+  "title": "Breakdown: agent-ergonomics fan-out",
+  "description": "Breakdown node for the agent-ergonomics bracket: gates the fan-out of REQ-01..REQ-11 behind coverage and decomposition review.\n\n## Success Criteria\n\n- [ ] coverage-preview passes: every `[hard]` REQ criterion of epic 53e3fa36 is credited by a child via `satisfies:REQ-NN`.\n- [ ] breakdown-review passes: the decomposition is coherent, right-sized, and correctly wired.\n\n## Notes\n\nBreakdown node `B` for container 53e3fa36; consumes the approved plan node 2937919f.",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "2937919f-87ba-4170-812f-23a8d168f08c"
+  ],
+  "gates_required": [
+    "coverage-preview",
+    "breakdown-review"
+  ],
+  "gates_status": {
+    "breakdown-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-06-22T21:20:41.056463036Z"
+    },
+    "coverage-preview": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-22T21:22:13.757188347Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:breakdown",
+    "epic:agent-ergonomics",
+    "brackets:53e3fa36"
+  ],
+  "created_at": "2026-06-22T21:20:41.047298043+00:00",
+  "updated_at": "2026-06-22T21:22:13.860781487+00:00"
+}

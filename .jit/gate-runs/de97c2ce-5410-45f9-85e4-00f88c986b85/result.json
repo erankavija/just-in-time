@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "de97c2ce-5410-45f9-85e4-00f88c986b85",
+  "gate_key": "coverage-preview",
+  "stage": "postcheck",
+  "issue_id": "838483f3-6f4b-4d7e-a8aa-3512fd648841",
+  "commit": "9ee8478e19d1a7a63879a5f2288af500f95b5c9a",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-06-22T21:20:51.402770956Z",
+  "completed_at": "2026-06-22T21:20:51.505804615Z",
+  "duration_ms": 103,
+  "exit_code": 4,
+  "stdout": "❌ [default:namespace-registry] at raw_labels.2: \"satisfies:REQ-09\" is not valid under the given pattern (expected to match ^(brackets|component|epic|milestone|resolution|story|team|type):)\n❌ [default:namespace-registry] at raw_labels.2: \"satisfies:REQ-02\" is not valid under the given pattern (expected to match ^(brackets|component|epic|milestone|resolution|story|team|type):)\n❌ [default:namespace-registry] at raw_labels.2: \"satisfies:REQ-04\" is not valid under the given pattern (expected to match ^(brackets|component|epic|milestone|resolution|story|team|type):)\n❌ [default:namespace-registry] at raw_labels.2: \"satisfies:REQ-10\" is not valid under the given pattern (expected to match ^(brackets|component|epic|milestone|resolution|story|team|type):)\n❌ [default:namespace-registry] at raw_labels.2: \"satisfies:REQ-08\" is not valid under the given pattern (expected to match ^(brackets|component|epic|milestone|resolution|story|team|type):)\n❌ [default:namespace-registry] at raw_labels.2: \"satisfies:REQ-01\" is not valid under the given pattern (expected to match ^(brackets|component|epic|milestone|resolution|story|team|type):)\n❌ [default:namespace-registry] at raw_labels.2: \"satisfies:REQ-05\" is not valid under the given pattern (expected to match ^(brackets|component|epic|milestone|resolution|story|team|type):)\n❌ [default:namespace-registry] at raw_labels.2: \"satisfies:REQ-06\" is not valid under the given pattern (expected to match ^(brackets|component|epic|milestone|resolution|story|team|type):)\n❌ [default:namespace-registry] at raw_labels.2: \"satisfies:REQ-07\" is not valid under the given pattern (expected to match ^(brackets|component|epic|milestone|resolution|story|team|type):)\n❌ [default:namespace-registry] at raw_labels.2: \"satisfies:REQ-11\" is not valid under the given pattern (expected to match ^(brackets|component|epic|milestone|resolution|story|team|type):)\n❌ [default:namespace-registry] at raw_labels.2: \"satisfies:REQ-03\" is not valid under the given pattern (expected to match ^(brackets|component|epic|milestone|resolution|story|team|type):)\n",
+  "stderr": "Scope validation failed with 11 error(s)\n",
+  "command": "./scripts/coverage-preview.sh",
+  "by": "auto:executor",
+  "message": null
+}

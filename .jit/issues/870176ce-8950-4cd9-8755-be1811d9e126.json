@@ -1,0 +1,24 @@
+{
+  "id": "870176ce-8950-4cd9-8755-be1811d9e126",
+  "title": "Add short_id and stable array fields to issue show --json",
+  "description": "Add `short_id` to the `issue show --json` root and always emit `labels` and `dependencies` as arrays, so agents parse show output without defensive guards.\n\n## Success Criteria\n\n- [ ] `jit issue show <id> --json` includes a `short_id` field at the root (from `id[0:8]`) for issues in every lifecycle state.\n- [ ] `labels` and `dependencies` are always present as JSON arrays (empty `[]` when none), never absent.\n- [ ] CLI JSON-asserting tests cover the shape across states.\n\n## Notes\n\nCLI presentation only; the domain model and server/web are unchanged. Plan task T1. See `dev/active/53e3fa36-c0cb-4206-8e8e-0a21aafb213e-plan.md`.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "838483f3-6f4b-4d7e-a8aa-3512fd648841"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:agent-ergonomics"
+  ],
+  "created_at": "2026-06-22T21:20:41.076501371+00:00",
+  "updated_at": "2026-06-22T21:22:02.197969050+00:00"
+}
