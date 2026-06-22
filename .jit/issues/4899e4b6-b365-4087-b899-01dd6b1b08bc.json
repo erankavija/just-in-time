@@ -1,7 +1,7 @@
 {
   "id": "4899e4b6-b365-4087-b899-01dd6b1b08bc",
   "title": "Project gate state as a gates array in issue show --json",
-  "description": "Replace the split `gates_required`/`gates_status` in `issue show --json` with a single `gates` array, enriched from each gate's latest run.\n\n## Success Criteria\n\n- [ ] `jit issue show <id> --json` emits `gates: [{key, status, last_run_at, exit_code}]`, one entry per required gate, and no longer emits `gates_required` or `gates_status`.\n- [ ] `last_run_at` and `exit_code` come from the gate's latest `GateRunResult` and are `null` when no run exists; `status` reflects `GateState` (or `pending`).\n- [ ] The change covers `build_gate_context` (which serializes the response), the CLI schema, tests, and CLI-command docs; the domain `Issue` model and the server/web are untouched.\n\n## Notes\n\nDepends on T1. Plan task T2.",
+  "description": "Replace the split `gates_required`/`gates_status` in `issue show --json` with a single `gates` array, enriched from each gate's latest run.\n\n## Success Criteria\n\n- [ ] `jit issue show <id> --json` emits `gates: [{key, status, last_run_at, exit_code}]`, one entry per required gate, and no longer emits `gates_required` or `gates_status`.\n- [ ] `last_run_at` and `exit_code` come from the gate's latest `GateRunResult` and are `null` when no run exists; `status` reflects `GateState` (or `pending`).\n- [ ] The change covers `build_gate_context` (which serializes the response), the CLI schema, tests, and CLI-command docs; the domain `Issue` model and the server/web are untouched.",
   "state": "backlog",
   "priority": "normal",
   "assignee": null,
@@ -20,5 +20,5 @@
     "epic:agent-ergonomics"
   ],
   "created_at": "2026-06-22T21:20:41.081821293+00:00",
-  "updated_at": "2026-06-22T21:22:02.206614403+00:00"
+  "updated_at": "2026-06-22T21:30:39.235331756+00:00"
 }

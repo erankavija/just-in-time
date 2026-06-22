@@ -1,7 +1,7 @@
 {
   "id": "4597743e-5685-46b5-a1f1-ff8e8bfa3e0a",
   "title": "Add --label filter to issue search",
-  "description": "Add label filtering to `issue search`, with the positional query optional when a filter is present.\n\n## Success Criteria\n\n- [ ] `jit issue search --label <ns:val>` returns issues carrying that label with no positional query argument.\n- [ ] The positional query is optional whenever any filter flag is provided.\n\n## Notes\n\nPlan task T9.",
+  "description": "Add label filtering to `issue search`, with the positional query optional when a filter is present.\n\n## Success Criteria\n\n- [ ] `jit issue search --label <ns:val>` returns issues carrying that label with no positional query argument.\n- [ ] The positional query is optional whenever any filter flag is provided.",
   "state": "backlog",
   "priority": "normal",
   "assignee": null,
@@ -20,5 +20,5 @@
     "epic:agent-ergonomics"
   ],
   "created_at": "2026-06-22T21:20:41.117858333+00:00",
-  "updated_at": "2026-06-22T21:22:02.265846550+00:00"
+  "updated_at": "2026-06-22T21:30:39.293099632+00:00"
 }

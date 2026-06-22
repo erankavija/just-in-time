@@ -3026,3 +3026,5 @@
 {"type":"issue_state_changed","id":"7e87d523-037d-46ab-b169-3a1e4ed575e6","issue_id":"c623fd50-d666-4d63-b496-b1de5b6ec848","timestamp":"2026-06-22T21:27:29.079474702Z","from":"ready","to":"backlog"}
 {"type":"issue_created","id":"9e06209d-ba57-4f75-b34e-37cfec1f2ec5","issue_id":"545f0673-c1e3-4563-953a-350435af49f9","timestamp":"2026-06-22T21:27:29.136643048Z","title":"Batch creation and aliases","priority":"normal"}
 {"type":"issue_state_changed","id":"ecc981af-47bf-4c43-971d-a2c527156584","issue_id":"545f0673-c1e3-4563-953a-350435af49f9","timestamp":"2026-06-22T21:27:29.169207858Z","from":"ready","to":"backlog"}
+{"type":"gate_passed","id":"5804ae0b-4a46-44d5-9ac8-70dad69dd3e9","issue_id":"838483f3-6f4b-4d7e-a8aa-3512fd648841","timestamp":"2026-06-22T21:27:48.709060498Z","gate_key":"coverage-preview","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"e6f8baf6-c83c-4d0b-bdc6-07dc9c1d9991","issue_id":"838483f3-6f4b-4d7e-a8aa-3512fd648841","timestamp":"2026-06-22T21:29:11.262881357Z","gate_key":"breakdown-review","updated_by":"auto:executor"}

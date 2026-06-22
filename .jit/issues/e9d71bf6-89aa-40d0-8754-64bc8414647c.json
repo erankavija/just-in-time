@@ -1,7 +1,7 @@
 {
   "id": "e9d71bf6-89aa-40d0-8754-64bc8414647c",
   "title": "Release a claim by issue id regardless of owner",
-  "description": "Allow releasing a claim by issue id (no lease UUID), regardless of lease owner, with an audit trail.\n\n## Success Criteria\n\n- [ ] `jit claim release <issue-id>` resolves the issue's active lease and releases it without requiring the lease UUID.\n- [ ] Release succeeds regardless of the lease owner (reusing the existing `force_evict_lease` path), and the acting identity is recorded for audit.\n- [ ] A clear error is returned when the issue has no active lease.\n\n## Notes\n\nReuses `force_evict_lease`; no new coordinator method. Plan task T7.",
+  "description": "Allow releasing a claim by issue id (no lease UUID), regardless of lease owner, with an audit trail.\n\n## Success Criteria\n\n- [ ] `jit claim release <issue-id>` resolves the issue's active lease and releases it without requiring the lease UUID.\n- [ ] Release succeeds regardless of the lease owner, and the acting identity is recorded for audit.\n- [ ] A clear error is returned when the issue has no active lease.\n\n## Notes\n\nReuses the existing `force_evict_lease` path; no new coordinator method.",
   "state": "backlog",
   "priority": "normal",
   "assignee": null,
@@ -20,5 +20,5 @@
     "epic:agent-ergonomics"
   ],
   "created_at": "2026-06-22T21:20:41.107865690+00:00",
-  "updated_at": "2026-06-22T21:22:02.248784185+00:00"
+  "updated_at": "2026-06-22T21:30:39.276828848+00:00"
 }
