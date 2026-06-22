@@ -2,9 +2,9 @@
   "id": "7d88e37d-2946-4ea8-9f71-e3956e5bc96d",
   "title": "Plan: Graph templates: configurable parameterized subgraphs applied to the work DAG",
   "description": "Planning node for epic **Graph templates: configurable parameterized subgraphs applied to the work DAG** (`9ac9fdac`).\n\nProduce the plan that decomposes this epic before fan-out: address the container's `[hard]` success criteria (REQ-01–REQ-08) and make it concrete enough to break into well-ordered work.\n\nPlan document: `dev/active/9ac9fdac-828a-40f2-9d73-71af14f44ff8-plan.md`.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [],
   "gates_required": [
     "plan-review"
@@ -31,5 +31,5 @@
     "type:planning"
   ],
   "created_at": "2026-06-21T23:20:16.951854564+00:00",
-  "updated_at": "2026-06-21T23:26:47.025800205+00:00"
+  "updated_at": "2026-06-22T21:04:33.237594820+00:00"
 }
