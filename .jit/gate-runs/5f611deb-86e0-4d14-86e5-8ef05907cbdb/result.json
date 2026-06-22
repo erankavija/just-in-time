@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "5f611deb-86e0-4d14-86e5-8ef05907cbdb",
+  "gate_key": "breakdown-review",
+  "stage": "postcheck",
+  "issue_id": "838483f3-6f4b-4d7e-a8aa-3512fd648841",
+  "commit": "bf35aee36601a920fa27496534748c8968e1bac5",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-06-22T21:30:48.117392737Z",
+  "completed_at": "2026-06-22T21:32:17.582405203Z",
+  "duration_ms": 89465,
+  "exit_code": 0,
+  "stdout": "**Content Standards**\n\nPass. The current child issues have clean titles, mandatory `## Success Criteria`, and self-contained descriptions. The prior dependency-prose offenders are fixed:\n\n- `4899e4b6` no longer says “Depends on T1. Plan task T2.”\n- `f646f7a5` no longer says “Depends on T2…”\n- `9bfcc474` no longer says “Depends on T4…”\n- `df7f934c` no longer says “Depends on T4 and T5…”\n\nThe four story nodes also no longer contain the prior “Containment for tasks …” notes. Story labels are meaningful kebab slugs: `story:cli-json-show-contract`, `story:gate-pass-workflow`, `story:batch-creation-aliases`, and `story:issue-search-claim-workflow`. No short IDs are used as strategic slugs.\n\n**Coverage Vs Design**\n\nDesign source: `dev/active/53e3fa36-c0cb-4206-8e8e-0a21aafb213e-plan.md`, section “Proposed decomposition”, Waves 1-4.\n\n| Design item | Issue | Matches? |\n|---|---:|---|\n| T1: `issue show --json` root `short_id`, stable arrays | `870176ce` | Yes |\n| T2: project gate state as `gates[]` | `4899e4b6` | Yes |\n| T3: `--field`, `--fields`, multi-id JSON array | `f646f7a5` | Yes |\n| T4: `gate pass` exit-code taxonomy and `verdict` | `65ef3741` | Yes |\n| T5: skip already-passed gate at HEAD, `--force` | `9bfcc474` | Yes |\n| T6: `gate pass-all` fail-fast | `df7f934c` | Yes |\n| T7: `claim release <ISSUE_ID>` regardless of owner | `e9d71bf6` | Yes |\n| T8: claim-blocked assign hint and `--assign-only` | `7bb91384` | Yes |\n| T9: `issue search --label`, optional query | `4597743e` | Yes |\n| T10: `issue batch-create --from-json` | `6ec1dd6f` | Yes |\n| T11: command/flag aliases | `ea717ef1` | Yes |\n\nNo missing, extra, mis-scoped, or wrongly merged/split design item found.\n\n**Dependency DAG Correctness**\n\nPass. Implemented reachability matches the design’s intended ordering:\n\n- T1 → T2 → T3: `f646f7a5` depends on `4899e4b6`, which depends on `870176ce`.\n- T4 → T5 → T6: `df7f934c` depends on `9bfcc474`, which depends on `65ef3741`.\n- T7, T8, T9, T10, and T11 remain parallel after the breakdown gate.\n\nBlank-workspace reachability passes. The root implementation tasks (`870176ce`, `65ef3741`, `e9d71bf6`, `7bb91384`, `4597743e`, `6ec1dd6f`, `ea717ef1`) all target existing CLI subsystems and do not require a sibling-created crate, directory, or skeleton.\n\n**Structural Integrity**\n\nPass. The prior flat decomposition is fixed. `53e3fa36` now depends on four `type:story` nodes, and those stories aggregate the relevant task chains/sets:\n\n- `861e9a5e` → JSON contract chain\n- `f38c15e4` → gate workflow chain\n- `c623fd50` → claim/search tasks\n- `545f0673` → batch/aliases tasks\n\nNo isolated or dangling issue was found in the reviewed subtree.\n\n**Prior Review Feedback**\n\nPass. The latest failed run identified unresolved dependency prose in four leaf tasks and containment prose in four stories. Those exact descriptions have been rewritten or removed in the current issue bodies. The earlier structural flatness finding was also addressed by adding the story layer.\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
