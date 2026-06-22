@@ -2,7 +2,7 @@
   "id": "2937919f-87ba-4170-812f-23a8d168f08c",
   "title": "Plan: Agent-facing CLI ergonomics: gate verdicts, --json contract, and workflow primitives",
   "description": "",
-  "state": "in_progress",
+  "state": "done",
   "priority": "high",
   "assignee": "agent:claude",
   "dependencies": [],
@@ -11,9 +11,9 @@
   ],
   "gates_status": {
     "plan-review": {
-      "status": "failed",
+      "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-06-22T21:00:41.936405125Z"
+      "updated_at": "2026-06-22T21:07:04.303021981Z"
     }
   },
   "context": {},
@@ -30,5 +30,5 @@
     "type:planning"
   ],
   "created_at": "2026-06-21T20:44:33.340215081+00:00",
-  "updated_at": "2026-06-22T21:02:20.104858041+00:00"
+  "updated_at": "2026-06-22T21:09:08.153324094+00:00"
 }
