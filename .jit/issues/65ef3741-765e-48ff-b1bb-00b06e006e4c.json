@@ -17,8 +17,9 @@
   "documents": [],
   "labels": [
     "type:task",
-    "epic:agent-ergonomics"
+    "epic:agent-ergonomics",
+    "satisfies:REQ-04"
   ],
   "created_at": "2026-06-22T21:20:41.092645156+00:00",
-  "updated_at": "2026-06-22T21:32:38.257987748+00:00"
+  "updated_at": "2026-06-22T21:48:56.319854044+00:00"
 }

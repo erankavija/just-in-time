@@ -104,3 +104,8 @@ examples = ["resolution:wont-fix", "resolution:duplicate", "resolution:obsolete"
 description = "Planning-bracket container pointer: on a breakdown node, names the container it brackets"
 unique = true
 examples = ["brackets:2fbd2a82"]
+
+[namespaces.satisfies]
+description = "Coverage credit: on an impl child, names a container [hard] criterion id it satisfies (read by the label-coverage gate)"
+unique = false
+examples = ["satisfies:REQ-01"]

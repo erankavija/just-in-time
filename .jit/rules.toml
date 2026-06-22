@@ -41,6 +41,18 @@ enforce = true
 assert = { require-label = { label = "type:*", min = 0, max = 1 } }
 
 [[rules]]
+name = "bracket:coverage-preview"
+# Fires on the breakdown node B, redirects to its bracketed container C via the
+# brackets: label, and asserts every [hard] REQ-id in C's Success Criteria is
+# credited by some issue in C's dependency closure (stories/tasks) carrying a
+# satisfies:<id> label. The breakdown/planning nodes bound the walk. No
+# child-state: coverage is a plan-time preview, so backlog children count.
+when = { type = "breakdown" }
+severity = "error"
+enforce = true
+assert = { label-coverage = { criteria-section = "success_criteria", marker = "[hard]", id-pattern = "REQ-[0-9]+", satisfies-namespace = "satisfies", container-from-label = "brackets", child-link = "dependencies", child-type-exclude = ["breakdown", "planning"] } }
+
+[[rules]]
 name = "default:orphan-leaf"
 severity = "warn"
 enforce = false
