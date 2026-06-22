@@ -1,0 +1,23 @@
+{
+  "id": "545f0673-c1e3-4563-953a-350435af49f9",
+  "title": "Batch creation and aliases",
+  "description": "Groups batch issue creation and CLI aliases (REQ-10, REQ-11).\n\n## Success Criteria\n\n- [ ] `issue batch-create --from-json` creates issues and dependency edges from one file (REQ-10).\n- [ ] Command/flag aliases (`dependency`, `document`, `issue list`, `--add-label`) resolve (REQ-11).\n\n## Notes\n\nContainment for tasks T10, T11.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "6ec1dd6f-76a7-4b54-bb7b-df4ac686325d",
+    "ea717ef1-17bc-419b-a8f1-e80b7016aa03"
+  ],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:story",
+    "epic:agent-ergonomics",
+    "story:batch-creation-aliases"
+  ],
+  "created_at": "2026-06-22T21:27:29.134772068+00:00",
+  "updated_at": "2026-06-22T21:27:29.181557931+00:00"
+}

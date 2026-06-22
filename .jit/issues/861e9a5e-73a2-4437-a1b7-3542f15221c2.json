@@ -1,0 +1,22 @@
+{
+  "id": "861e9a5e-73a2-4437-a1b7-3542f15221c2",
+  "title": "CLI JSON show contract",
+  "description": "Groups the CLI-only `issue show` JSON contract changes (REQ-01..REQ-03) into a coherent milestone.\n\n## Success Criteria\n\n- [ ] `issue show --json` exposes `short_id`, always-array `labels`/`dependencies`, and the unified `gates` array (REQ-01, REQ-02).\n- [ ] Field projection (`--field`, `--fields`, multi-id) works against the finalized show response (REQ-03).\n\n## Notes\n\nContainment for tasks T1 → T2 → T3. CLI presentation only.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "f646f7a5-3fa7-4a96-a0f9-4cec4714bfbc"
+  ],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:story",
+    "epic:agent-ergonomics",
+    "story:cli-json-show-contract"
+  ],
+  "created_at": "2026-06-22T21:27:28.931475819+00:00",
+  "updated_at": "2026-06-22T21:27:28.966209949+00:00"
+}
