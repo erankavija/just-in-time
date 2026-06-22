@@ -20,6 +20,23 @@
       "label": "Design session: planning skill (2026-06-20)",
       "doc_type": "session",
       "format": "markdown"
+    },
+    {
+      "path": "dev/sessions/session-20260623-planning-skill-observations.md",
+      "commit": null,
+      "label": "Planning-skill observations from a live run (2026-06-23)",
+      "doc_type": "session",
+      "format": "markdown",
+      "assets": [
+        {
+          "original_path": "session-20260620-planning-skill-design.md",
+          "resolved_path": "dev/sessions/session-20260620-planning-skill-design.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "7ed671d1256776a2a338791edb76a111b281856d3f634551d008de1edd286519",
+          "is_shared": false
+        }
+      ]
     }
   ],
   "labels": [
@@ -27,5 +44,5 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-06-20T18:17:26.494159513+00:00",
-  "updated_at": "2026-06-21T23:36:33.114265666+00:00"
+  "updated_at": "2026-06-22T22:46:10.933470735+00:00"
 }
