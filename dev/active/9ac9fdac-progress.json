@@ -2,9 +2,18 @@
   "epic_id": "9ac9fdac-828a-40f2-9d73-71af14f44ff8",
   "epic_short_id": "9ac9fdac",
   "title": "Graph templates: configurable parameterized subgraphs applied to the work DAG",
-  "current_wave": 4,
-  "completed": {"45e7f203": "done (1bd86c1)", "8b15b679": "done (b4af01f)", "04559558": "story done (b4af01f)", "14137e1a": "done (d7b20c4)"},
-  "in_progress": {"73e5e853": "Wave 4 dispatched — edge wiring + transform; completes apply-engine story 643874f2"},
+  "current_wave": 9,
+  "handoff": "dev/active/9ac9fdac-handoff.md (session 1) — read its Traps section before dispatching.",
+  "completed": {
+    "stories_done": ["04559558 (W1, b4af01f)", "643874f2 (W2, 706b446)", "3143ad87 (W3, 5af6122)", "96fc8cd8 (W4, 2843505)"],
+    "tasks_done": ["45e7f203 (1bd86c1)", "8b15b679 (b4af01f)", "14137e1a (d7b20c4)", "73e5e853 (706b446)", "9cccfe0c (a270f95)", "e75805f6 (5af6122)", "c703a4b3 (6c72f26)", "3a7e13cf (2843505)"],
+    "repo_health": "46374a1 (jit-validate backfill + probe + transitive-reduction)"
+  },
+  "remaining": {
+    "wave_9_ready_parallel": ["6e38a577 (skills+memory migration + planning-bracket.md concept rewrite)", "840e155c (W6 tests)", "57f52018 (reseed 1eb0bdfd+2937919f)"],
+    "wave_10": ["c8aa199e (user docs + bracket-id; closes story adc640e4)", "fc414353 (dogfood; closes story 99a0c161)"],
+    "stories_remaining": ["adc640e4 (W5)", "99a0c161 (W6)"]
+  },
   "notes": "Breakdown + bracket gates (coverage-preview, breakdown-review) already PASSED. Impl interior = 6 stories + 13 leaf tasks. P(7d88e37d)/B(59118ee9) done. Dispatch per leaf task in topo order; close each story when its tasks land. Epic stays backlog (blocked) until all children done. RESOLVED pre-existing repo-wide blocker (commit 46374a1): code-review gate requires jit-validate green, which failed on 16 epics missing plan docs + isolated probe 313e01f6 + 10 redundant edges. User approved stub-plan-doc backfill. W1 task 45e7f203: cargo-ci PASSED, code-review rework in progress (add # Examples to 6 public types).",
   "blocker_log": [
     {"date": "2026-06-23", "blocker": "repo-wide jit-validate failure blocks all code-review gates", "resolution": "commit 46374a1: backfill 16 stub plan docs (user-approved), connect probe 313e01f6, jit validate --fix (10 redundant edges)", "note": "Durable fix for validation-lifecycle-inversion (require plan docs only for non-terminal breakable epics) deferred as separate concern."}
