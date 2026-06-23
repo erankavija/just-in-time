@@ -2,9 +2,9 @@
   "id": "840e155c-e273-48af-b7bb-9598c7f8914d",
   "title": "Unit, integration, and property tests",
   "description": "Add unit, isolated temp-repo integration, and property tests for the engine.\n\n## Success Criteria\n- [ ] [hard] TSTA-01: unit, temp-repo integration, and property tests pass and never touch the production store.\n- [ ] [hard] TSTA-02: tests cover `--force` idempotence, update-not-duplicate refresh, the JSON apply-result output, explicit anchor binding, attached gate presets, acyclicity, transitive reduction, and the pre-apply snapshot transform — all in isolated repositories.",
-  "state": "ready",
+  "state": "done",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [
     "96fc8cd8-3c83-4733-aa18-3ca100f2a1f1"
   ],
@@ -12,7 +12,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-23T20:38:21.702783812Z"
+    },
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-23T21:24:08.754541740Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -22,5 +33,5 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-06-22T22:28:29.500957587+00:00",
-  "updated_at": "2026-06-23T20:11:04.361821975+00:00"
+  "updated_at": "2026-06-23T21:29:37.448019620+00:00"
 }

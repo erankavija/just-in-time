@@ -1182,4 +1182,73 @@ mod tests {
             assert!(rendered.contains("Epic Y"));
         }
     }
+
+    #[test]
+    fn test_transform_kind_parse_accepts_move_upstream_to_role() {
+        // The one shipped kind parses to its variant.
+        assert_eq!(
+            TransformKind::parse("move-upstream-to-role").unwrap(),
+            TransformKind::MoveUpstreamToRole
+        );
+    }
+
+    #[test]
+    fn test_transform_kind_parse_rejects_unknown_kind() {
+        // An unrecognized kind errors (it is never silently ignored), and the
+        // message names both the offending kind and the supported set so the
+        // misconfiguration is actionable.
+        let err = TransformKind::parse("teleport").unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("teleport"), "{msg}");
+        assert!(msg.contains("move-upstream-to-role"), "{msg}");
+    }
+
+    #[test]
+    fn test_interpolate_leaves_unknown_token_verbatim() {
+        // The interpolation context is a fixed `{token}` substitution, not a
+        // templating language: an unsupported `{token}` is left untouched while the
+        // known container tokens around it still resolve.
+        let mut issue = Issue::new("Auth epic".to_string(), String::new());
+        issue.id = "abc123def456".to_string();
+        let ctx = InterpolationContext::for_container(&issue);
+        let rendered = ctx.interpolate("{container.title} then {totally.unknown} end");
+        assert_eq!(rendered, "Auth epic then {totally.unknown} end");
+    }
+
+    #[test]
+    fn test_node_labels_interpolates_and_replaces_container_type_label() {
+        // The final label set a created node carries: inherited container
+        // membership labels (NOT the container's own `type:`), the node's own
+        // `type:<node.type>`, and its interpolated `labels`. The `{container.short_id}`
+        // token in a node label must resolve to the container's short id.
+        let mut container = Issue::new_with_labels(
+            "Auth epic".to_string(),
+            String::new(),
+            vec!["type:epic".to_string(), "area:auth".to_string()],
+        );
+        container.id = "abc123def456".to_string();
+        let short = container.short_id();
+
+        let node = TemplateNode {
+            role: "breakdown".to_string(),
+            type_name: "breakdown".to_string(),
+            gates: vec![],
+            doc: None,
+            description: None,
+            labels: vec!["brackets:{container.short_id}".to_string()],
+            depends_on: vec![],
+        };
+        let inherited = inherited_membership_labels(&container);
+        let ctx = InterpolationContext::for_container(&container).with_doc(&node);
+        let labels = node_labels(&node, &inherited, &ctx);
+
+        // Inherited non-type label is carried; the container's `type:epic` is not.
+        assert!(labels.contains(&"area:auth".to_string()));
+        assert!(!labels.iter().any(|l| l == "type:epic"));
+        // The node's own type label is present.
+        assert!(labels.contains(&"type:breakdown".to_string()));
+        // The node label's `{container.short_id}` token resolved.
+        assert!(labels.contains(&format!("brackets:{short}")));
+        assert!(!labels.iter().any(|l| l.contains("{container.")));
+    }
 }

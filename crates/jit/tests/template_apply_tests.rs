@@ -726,3 +726,263 @@ applies_to  = ["epic"]
     // APPLY-04: the prospective cycle is caught before mutation — ZERO new issues.
     assert_eq!(h.all_issues().len(), before);
 }
+
+// === TSTA-02: the JSON apply-result output ===
+
+#[test]
+fn test_apply_result_serializes_to_expected_json_shape() {
+    // The `TemplateApplyResult` is what `jit apply --json` serializes. Pin its
+    // serialized contract directly (the CLI subprocess test in apply_cli_tests.rs
+    // covers the wired path; this pins the struct's own `Serialize` shape in an
+    // isolated in-process repo): the template name, the resolved anchor bindings,
+    // the role→id map, and the pre-apply snapshot must all round-trip with their
+    // exact field names and values.
+    let h = TestHarness::new();
+    let template = plan_template();
+    let upstream = h.create_issue("Upstream");
+    let epic = create_epic(&h, "JSON epic");
+    h.executor.add_dependency(&epic, &upstream).unwrap();
+    let upstream_full = h.get_issue(&upstream).id;
+    let epic_full = h.get_issue(&epic).id;
+
+    let (result, _w) = h
+        .executor
+        .apply_template_with(&template, &epic, &container_binding(&epic), false)
+        .unwrap();
+
+    let json = serde_json::to_value(&result).unwrap();
+
+    // Top-level fields are present under their documented names.
+    assert_eq!(json["template"], "plan");
+    assert_eq!(json["anchor_bindings"]["container"], epic_full);
+
+    // The role→id map names both roles with the ids the result reports.
+    let planning_id = &result.created_node_ids_by_role["planning"];
+    let breakdown_id = &result.created_node_ids_by_role["breakdown"];
+    assert_eq!(json["created_node_ids_by_role"]["planning"], *planning_id);
+    assert_eq!(json["created_node_ids_by_role"]["breakdown"], *breakdown_id);
+
+    // The pre-apply snapshot is serialized as the container's ORIGINAL upstream
+    // deps (the input the move-upstream transform consumed), not its post-apply
+    // deps.
+    assert_eq!(
+        json["anchor_dependency_snapshots"]["container"],
+        serde_json::json!([upstream_full])
+    );
+
+    // The serialized shape has exactly the four documented top-level keys — no
+    // stray or missing field leaks into the machine-readable contract.
+    let obj = json
+        .as_object()
+        .expect("result serializes to a JSON object");
+    let mut keys: Vec<&String> = obj.keys().collect();
+    keys.sort();
+    assert_eq!(
+        keys,
+        vec![
+            "anchor_bindings",
+            "anchor_dependency_snapshots",
+            "created_node_ids_by_role",
+            "template",
+        ]
+    );
+}
+
+// === TSTA-02: property-based engine invariants (proptest) ===
+//
+// These complement the example-based tests above by exercising the apply engine
+// over a RANDOMIZED input space: a fixed, valid `plan` template applied to a
+// container carrying an arbitrary set of pre-existing upstream dependencies (the
+// move-upstream transform's input). Each case runs in its own isolated
+// `TestHarness` (InMemoryStorage), so the production `.jit/` is never touched.
+// They pin invariants the single-shape examples cannot: acyclicity and
+// transitive-reduction must hold for ANY upstream arrangement, and a `--force`
+// refresh must be idempotent on the resulting node/edge set regardless of it.
+
+use proptest::prelude::*;
+
+/// Each apply case builds a fresh in-memory repo and does several real (in-memory)
+/// writes, so cap the case count well under the per-test time budget while still
+/// covering a wide range of upstream arrangements.
+fn engine_config() -> ProptestConfig {
+    ProptestConfig::with_cases(48)
+}
+
+/// Build an isolated harness with an `epic` container that has `upstream_count`
+/// pre-existing upstream dependencies. Returns the harness, the container's short
+/// id, and the full ids of its upstream deps (the move-upstream transform's
+/// snapshot input).
+fn harness_with_upstreams(
+    title: &str,
+    upstream_count: usize,
+) -> (TestHarness, String, Vec<String>) {
+    let h = TestHarness::new();
+    let epic = create_epic(&h, title);
+    let upstreams: Vec<String> = (0..upstream_count)
+        .map(|i| {
+            let up = h.create_issue(&format!("Upstream {i}"));
+            h.executor.add_dependency(&epic, &up).unwrap();
+            h.get_issue(&up).id
+        })
+        .collect();
+    (h, epic, upstreams)
+}
+
+/// True iff the whole store is acyclic, checked through the same `DependencyGraph`
+/// the engine uses (`Issue` implements `GraphNode`).
+fn store_is_acyclic(h: &TestHarness) -> bool {
+    let issues = h.all_issues();
+    let refs: Vec<&jit::domain::Issue> = issues.iter().collect();
+    jit::graph::DependencyGraph::new(&refs)
+        .validate_dag()
+        .is_ok()
+}
+
+/// True iff the store's dependency graph carries no transitively-redundant DIRECT
+/// edge: for every edge `from -> to`, `to` must NOT be reachable from `from`
+/// through any OTHER direct dependency. `add_dependency`'s eager transitive
+/// reduction must leave the result in this reduced form.
+fn store_is_transitively_reduced(h: &TestHarness) -> bool {
+    let issues = h.all_issues();
+    let deps_by_id: BTreeMap<String, Vec<String>> = issues
+        .iter()
+        .map(|i| (i.id.clone(), i.dependencies.clone()))
+        .collect();
+
+    // Reachability from `start` to `target` over the dependency edges, optionally
+    // ignoring a single direct edge `(start -> skip)` so we can ask "is `target`
+    // reachable WITHOUT the direct edge under test".
+    fn reachable(
+        deps_by_id: &BTreeMap<String, Vec<String>>,
+        start: &str,
+        target: &str,
+        skip: (&str, &str),
+    ) -> bool {
+        let mut stack = vec![start.to_string()];
+        let mut seen = std::collections::HashSet::new();
+        while let Some(node) = stack.pop() {
+            if !seen.insert(node.clone()) {
+                continue;
+            }
+            if let Some(deps) = deps_by_id.get(&node) {
+                for dep in deps {
+                    if node == skip.0 && dep == skip.1 {
+                        continue; // ignore the direct edge under test
+                    }
+                    if dep == target {
+                        return true;
+                    }
+                    stack.push(dep.clone());
+                }
+            }
+        }
+        false
+    }
+
+    deps_by_id.iter().all(|(from, deps)| {
+        deps.iter().all(|to| {
+            // The direct edge `from -> to` is redundant iff `to` is still reachable
+            // from `from` after removing that edge. A reduced graph has none.
+            !reachable(&deps_by_id, from, to, (from.as_str(), to.as_str()))
+        })
+    })
+}
+
+/// The set of `(issue_id, sorted dependency_ids)` pairs across the whole store —
+/// the canonical "node + edge set" fingerprint used to compare two graph states.
+fn edge_fingerprint(h: &TestHarness) -> BTreeMap<String, Vec<String>> {
+    h.all_issues()
+        .into_iter()
+        .map(|i| {
+            let mut deps = i.dependencies.clone();
+            deps.sort();
+            (i.id, deps)
+        })
+        .collect()
+}
+
+proptest! {
+    #![proptest_config(engine_config())]
+
+    /// Invariant: applying the template ALWAYS yields an acyclic DAG, for any
+    /// number of pre-existing upstream deps on the container. The spine wiring
+    /// (`C → B → P`) plus the move-upstream transform (`P → upstream*`) must never
+    /// introduce a cycle.
+    #[test]
+    fn prop_apply_always_yields_acyclic_dag(upstream_count in 0usize..6usize) {
+        let template = plan_template();
+        let (h, epic, _ups) = harness_with_upstreams("Acyclic prop", upstream_count);
+
+        h.executor
+            .apply_template_with(&template, &epic, &container_binding(&epic), false)
+            .unwrap();
+
+        prop_assert!(
+            store_is_acyclic(&h),
+            "apply with {upstream_count} upstream dep(s) must leave the store acyclic"
+        );
+    }
+
+    /// Invariant: the post-apply graph is transitively reduced — no direct edge is
+    /// redundant — regardless of the upstream arrangement. The example tests pin
+    /// this for one shape (the dropped direct `C → B` after a splice); this asserts
+    /// it as a global property over every edge in the store.
+    #[test]
+    fn prop_apply_yields_transitively_reduced_graph(upstream_count in 0usize..6usize) {
+        let template = plan_template();
+        let (h, epic, _ups) = harness_with_upstreams("Reduced prop", upstream_count);
+
+        h.executor
+            .apply_template_with(&template, &epic, &container_binding(&epic), false)
+            .unwrap();
+
+        prop_assert!(
+            store_is_transitively_reduced(&h),
+            "apply with {upstream_count} upstream dep(s) must leave the store transitively reduced"
+        );
+    }
+
+    /// Invariant: apply, then apply `--force`, is idempotent on the graph — the same
+    /// node set and the same edge set, with NO duplicate nodes — for any upstream
+    /// arrangement. A `--force` refresh only re-seeds prose; it must not create,
+    /// drop, or rewire any node or edge.
+    #[test]
+    fn prop_force_refresh_is_idempotent_on_node_and_edge_set(upstream_count in 0usize..6usize) {
+        let template = plan_template();
+        let (h, epic, _ups) = harness_with_upstreams("Idempotent prop", upstream_count);
+
+        let (first, _) = h
+            .executor
+            .apply_template_with(&template, &epic, &container_binding(&epic), false)
+            .unwrap();
+        let fingerprint_before = edge_fingerprint(&h);
+        let count_before = h.all_issues().len();
+
+        let (refreshed, _) = h
+            .executor
+            .apply_template_with(&template, &epic, &container_binding(&epic), true)
+            .unwrap();
+
+        // No duplicate nodes, and the role→id map is stable across the refresh.
+        prop_assert_eq!(
+            h.all_issues().len(),
+            count_before,
+            "force-refresh must not create or drop any node"
+        );
+        prop_assert_eq!(
+            &refreshed.created_node_ids_by_role,
+            &first.created_node_ids_by_role,
+            "force-refresh must map each role to the same id"
+        );
+
+        // The full node + edge set is byte-for-byte stable across the refresh.
+        prop_assert_eq!(
+            edge_fingerprint(&h),
+            fingerprint_before,
+            "force-refresh must leave the node/edge set unchanged"
+        );
+
+        // And the refreshed graph is still an acyclic DAG.
+        prop_assert!(store_is_acyclic(&h), "force-refresh must keep the store acyclic");
+    }
+}

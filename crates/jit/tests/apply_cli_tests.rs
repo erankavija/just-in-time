@@ -205,6 +205,74 @@ fn test_apply_plan_json_reports_template_and_created_nodes() {
     assert_ne!(planning, breakdown, "roles must map to distinct nodes");
 }
 
+/// SCFA-04: the SUCCESS path of an EXPLICIT `--anchor container=<epic>` — not just
+/// the positional auto-bind. Passing the container anchor explicitly must produce
+/// the same `C → B → P` bracket: both roles created, the `B → P` internal edge,
+/// and the `C → B` anchor edge.
+#[test]
+fn test_apply_with_explicit_container_anchor_creates_bracket() {
+    let temp = setup_repo();
+    let epic = create_epic(&temp, "Auth epic");
+
+    let out = jit_json(
+        &temp,
+        &[
+            "apply",
+            "plan",
+            &epic,
+            "--anchor",
+            &format!("container={epic}"),
+            "--json",
+        ],
+    );
+    let data = out.get("data").unwrap_or(&out);
+
+    // The explicit binding is reflected back in the result.
+    assert_eq!(
+        data["anchor_bindings"]["container"]
+            .as_str()
+            .map(str::to_string),
+        Some(epic.clone()),
+        "explicit --anchor container=<epic> must bind the container anchor, got: {out}"
+    );
+
+    // Both bracket roles were created with non-empty, distinct ids.
+    let roles = &data["created_node_ids_by_role"];
+    let planning_id = roles["planning"].as_str().expect("planning role id");
+    let breakdown_id = roles["breakdown"].as_str().expect("breakdown role id");
+    assert_ne!(
+        planning_id, breakdown_id,
+        "roles must map to distinct nodes"
+    );
+
+    // Read an issue's dependency ids (`issue show --json` expands deps into
+    // objects; pull each `id`).
+    let dep_ids = |id: &str| -> Vec<String> {
+        let issue = jit_json(&temp, &["issue", "show", id, "--json"]);
+        let issue = issue.get("data").unwrap_or(&issue);
+        issue
+            .get("dependencies")
+            .and_then(|d| d.as_array())
+            .map(|a| {
+                a.iter()
+                    .filter_map(|d| d.get("id").and_then(|i| i.as_str()).map(str::to_string))
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+
+    // C → B: the container depends on the breakdown node (the anchor edge).
+    assert!(
+        dep_ids(&epic).iter().any(|d| d == breakdown_id),
+        "container must depend on the breakdown node (C → B) under explicit anchor binding"
+    );
+    // B → P: the breakdown node depends on the planning node (the internal edge).
+    assert!(
+        dep_ids(breakdown_id).iter().any(|d| d == planning_id),
+        "breakdown node must depend on the planning node (B → P) under explicit anchor binding"
+    );
+}
+
 /// A malformed `--anchor` (missing `=`) is rejected with a clear error and
 /// creates nothing.
 #[test]
