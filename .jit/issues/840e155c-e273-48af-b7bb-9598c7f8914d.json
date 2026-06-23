@@ -1,0 +1,26 @@
+{
+  "id": "840e155c-e273-48af-b7bb-9598c7f8914d",
+  "title": "Unit, integration, and property tests",
+  "description": "Add unit, isolated temp-repo integration, and property tests for the engine.\n\n## Success Criteria\n- [ ] [hard] TSTA-01: unit, temp-repo integration, and property tests pass and never touch the production store.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "96fc8cd8-3c83-4733-aa18-3ca100f2a1f1"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "story:template-testing-dogfood",
+    "epic:graph-templates",
+    "milestone:v1.0"
+  ],
+  "created_at": "2026-06-22T22:28:29.500957587+00:00",
+  "updated_at": "2026-06-23T00:15:41.312913042+00:00"
+}

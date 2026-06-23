@@ -1,0 +1,26 @@
+{
+  "id": "3a7e13cf-487d-42f1-b38e-7e027904b315",
+  "title": "Remove the planning-config struct and flat blocks",
+  "description": "Drop the planning-config struct and its load validation, and remove every flat configuration block.\n\n## Success Criteria\n- [ ] [hard] CFGB-01: the planning-config struct and its load-time validation are removed.\n- [ ] [hard] CFGB-02: no flat configuration block remains anywhere, including the copyable example configs.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "c703a4b3-5e9c-4919-ba82-98727d20b21a"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "story:planning-config-removal",
+    "epic:graph-templates",
+    "milestone:v1.0"
+  ],
+  "created_at": "2026-06-22T22:28:29.445461031+00:00",
+  "updated_at": "2026-06-23T00:15:41.215944184+00:00"
+}

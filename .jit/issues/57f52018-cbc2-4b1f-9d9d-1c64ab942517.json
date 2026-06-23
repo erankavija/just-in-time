@@ -1,0 +1,26 @@
+{
+  "id": "57f52018-cbc2-4b1f-9d9d-1c64ab942517",
+  "title": "Reseed the existing empty planning-node descriptions",
+  "description": "Manually reseed the descriptions of the existing empty planning nodes so they match what the template now produces. This is a one-time manual data repair, not an engine feature.\n\n## Success Criteria\n- [ ] [hard] RESEED-01: the existing empty planning-node descriptions (`1eb0bdfd`, `2937919f`) are reseeded from their containers.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "96fc8cd8-3c83-4733-aa18-3ca100f2a1f1"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "story:template-testing-dogfood",
+    "epic:graph-templates",
+    "milestone:v1.0"
+  ],
+  "created_at": "2026-06-22T22:45:23.760866019+00:00",
+  "updated_at": "2026-06-23T00:15:41.353487934+00:00"
+}

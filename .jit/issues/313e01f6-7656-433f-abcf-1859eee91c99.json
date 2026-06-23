@@ -1,0 +1,24 @@
+{
+  "id": "313e01f6-7656-433f-abcf-1859eee91c99",
+  "title": "WAVE-DEBUG probe",
+  "description": "probe",
+  "state": "rejected",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:graph-templates",
+    "milestone:v1.0",
+    "satisfies:REQ-01"
+  ],
+  "created_at": "2026-06-22T21:57:52.356514875+00:00",
+  "updated_at": "2026-06-22T22:00:40.714306613+00:00"
+}

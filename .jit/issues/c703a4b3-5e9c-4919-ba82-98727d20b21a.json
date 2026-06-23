@@ -1,0 +1,26 @@
+{
+  "id": "c703a4b3-5e9c-4919-ba82-98727d20b21a",
+  "title": "Migrate scoped validation and plan-content to templates",
+  "description": "Move the scoped-validation boundary and plan-content resolution onto the template registry.\n\n## Success Criteria\n- [ ] [hard] CFGA-01: scoped validation still halts at the breakdown node, with the boundary derived from the template.\n- [ ] [hard] CFGA-02: plan-content resolution derives breakable types and doc location from the template.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "3143ad87-1991-4873-a013-9456cea7234a"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "story:planning-config-removal",
+    "epic:graph-templates",
+    "milestone:v1.0"
+  ],
+  "created_at": "2026-06-22T22:28:29.426874165+00:00",
+  "updated_at": "2026-06-23T00:15:41.201902090+00:00"
+}

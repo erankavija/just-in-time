@@ -1,0 +1,32 @@
+{
+  "id": "643874f2-fcca-48a4-96e5-b26b39a4f868",
+  "title": "Graph-template apply engine",
+  "description": "Add the engine that instantiates a graph template onto a container.\n\nValidate all preconditions and snapshot each anchor's dependencies before any mutation; create the template's nodes with interpolated descriptions and doc locations; wire internal and anchor edges; run the move-upstream-to-role transform against the pre-apply snapshot. Coexists with the existing scaffold path.\n\n## Success Criteria\n- [ ] [hard] APPLY-01: Applying a template creates its nodes with interpolated, non-empty descriptions and resolved doc locations.\n- [ ] [hard] APPLY-02: Internal and anchor edges are wired; the result is acyclic and transitively reduced.\n- [ ] [hard] APPLY-03: move-upstream-to-role moves the container's pre-apply dependencies onto the named node, never the freshly-created scaffold nodes.\n- [ ] [hard] APPLY-04: A precondition failure (bad anchor, wrong container type, cycle) creates zero nodes.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "04559558-289f-4325-891a-7b08532978a9",
+    "73e5e853-c8b5-4b65-b559-13cbb683f4c5",
+    "14137e1a-03e9-4da7-91e9-c28ed50efae8"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "epic:graph-templates",
+    "milestone:v1.0",
+    "satisfies:REQ-02",
+    "satisfies:REQ-03",
+    "satisfies:REQ-05",
+    "satisfies:REQ-06",
+    "type:story",
+    "story:apply-engine"
+  ],
+  "created_at": "2026-06-22T21:59:04.442748529+00:00",
+  "updated_at": "2026-06-22T22:28:29.386904224+00:00"
+}

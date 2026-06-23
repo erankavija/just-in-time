@@ -6,7 +6,8 @@
   "priority": "high",
   "assignee": null,
   "dependencies": [
-    "59118ee9-185d-4a4e-8804-4cdeef88a1d4"
+    "adc640e4-1307-4ef8-a6d8-612df86b3480",
+    "99a0c161-07a2-464a-be91-7dc7a43db987"
   ],
   "gates_required": [],
   "gates_status": {},
@@ -18,5 +19,5 @@
     "epic:graph-templates"
   ],
   "created_at": "2026-06-21T23:17:25.662247878+00:00",
-  "updated_at": "2026-06-22T21:26:00.927133241+00:00"
+  "updated_at": "2026-06-23T00:15:41.374073780+00:00"
 }

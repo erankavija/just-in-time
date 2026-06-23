@@ -1,0 +1,26 @@
+{
+  "id": "14137e1a-03e9-4da7-91e9-c28ed50efae8",
+  "title": "apply_template core: validate, snapshot, instantiate",
+  "description": "Validate all preconditions and snapshot anchor dependencies before any mutation, then create the template's nodes.\n\n## Success Criteria\n- [ ] [hard] APPA-01: all preconditions are validated before the first mutation; a failure creates zero nodes.\n- [ ] [hard] APPA-02: nodes are created with interpolated, non-empty descriptions and resolved doc locations.\n- [ ] [hard] APPA-03: `apply_template(template, anchor_bindings, force)` rejects an already-applied container unless `force`; with `--force` it locates the existing breakdown node via `brackets:<C>`, reaches the planning node through it, and refreshes node descriptions/docs in place rather than duplicating nodes.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "04559558-289f-4325-891a-7b08532978a9"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "story:apply-engine",
+    "epic:graph-templates",
+    "milestone:v1.0"
+  ],
+  "created_at": "2026-06-22T22:28:29.353578064+00:00",
+  "updated_at": "2026-06-23T00:20:11.512277747+00:00"
+}

@@ -1,0 +1,26 @@
+{
+  "id": "73e5e853-c8b5-4b65-b559-13cbb683f4c5",
+  "title": "Edge wiring and move-upstream-to-role transform",
+  "description": "Wire internal and anchor edges and run the move-upstream-to-role transform on the pre-apply snapshot.\n\n## Success Criteria\n- [ ] [hard] APPB-01: internal and anchor edges are wired; the result is acyclic and transitively reduced.\n- [ ] [hard] APPB-02: the transform uses the pre-apply snapshot and never moves the freshly-created scaffold nodes.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "14137e1a-03e9-4da7-91e9-c28ed50efae8"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "story:apply-engine",
+    "epic:graph-templates",
+    "milestone:v1.0"
+  ],
+  "created_at": "2026-06-22T22:28:29.372554100+00:00",
+  "updated_at": "2026-06-23T00:15:41.157028268+00:00"
+}

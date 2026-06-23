@@ -1,0 +1,26 @@
+{
+  "id": "45e7f203-ffa9-414a-927a-33fe32ee3d32",
+  "title": "Template and node types; templates.toml loader",
+  "description": "Define the graph-template types and load \\`.jit/templates.toml\\`, validated at config load.\n\n## Success Criteria\n- [ ] [hard] REGA-01: the template, node, anchor, edge, and transform types compile and round-trip through (de)serialization.\n- [ ] [hard] REGA-02: \\`.jit/templates.toml\\` loads at config time and an invalid template fails with a clear error.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "59118ee9-185d-4a4e-8804-4cdeef88a1d4"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "story:template-registry",
+    "epic:graph-templates",
+    "milestone:v1.0"
+  ],
+  "created_at": "2026-06-22T22:28:29.315977004+00:00",
+  "updated_at": "2026-06-22T22:41:20.800860247+00:00"
+}

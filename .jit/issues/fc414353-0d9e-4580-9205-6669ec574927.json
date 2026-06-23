@@ -1,0 +1,26 @@
+{
+  "id": "fc414353-0d9e-4580-9205-6669ec574927",
+  "title": "Dogfood apply plan on a real container",
+  "description": "Dogfood the graph-template engine by applying the plan template on a real container and confirming the bracket it produces.\n\n## Success Criteria\n- [ ] [hard] TSTB-01: applying the plan template on a real container produces the expected bracket (planning and breakdown nodes, spine, and gates).",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "840e155c-e273-48af-b7bb-9598c7f8914d"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "story:template-testing-dogfood",
+    "epic:graph-templates",
+    "milestone:v1.0"
+  ],
+  "created_at": "2026-06-22T22:28:29.519536822+00:00",
+  "updated_at": "2026-06-23T00:15:41.273886151+00:00"
+}

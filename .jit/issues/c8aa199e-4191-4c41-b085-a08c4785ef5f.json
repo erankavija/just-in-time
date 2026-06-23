@@ -1,0 +1,26 @@
+{
+  "id": "c8aa199e-4191-4c41-b085-a08c4785ef5f",
+  "title": "Update user docs; reconcile the bracket-id convention",
+  "description": "Update the user docs and make the bracket-pointer id convention consistent.\n\n## Success Criteria\n- [ ] [hard] DOCB-01: the user docs reference the new command and no removed-command references remain.\n- [ ] [hard] DOCB-02: the bracket-pointer id convention is consistent across template, tests, and docs.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "6e38a577-db65-4203-ac05-318d83de1e45"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "story:skills-docs-migration",
+    "epic:graph-templates",
+    "milestone:v1.0"
+  ],
+  "created_at": "2026-06-22T22:28:29.482595821+00:00",
+  "updated_at": "2026-06-23T00:15:41.244735543+00:00"
+}

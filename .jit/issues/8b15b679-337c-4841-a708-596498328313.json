@@ -1,0 +1,26 @@
+{
+  "id": "8b15b679-337c-4841-a708-596498328313",
+  "title": "Author the plan template and registry accessors",
+  "description": "Author this repo's plan template and expose the accessors the planning-config consumers will adopt.\n\n## Success Criteria\n- [ ] [hard] REGB-01: the plan template is authored and round-trips through the loader.\n- [ ] [hard] REGB-02: the registry yields, for a container type, the applicable template and its planning/breakdown node types, doc location, and breakable types.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "45e7f203-ffa9-414a-927a-33fe32ee3d32"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "story:template-registry",
+    "epic:graph-templates",
+    "milestone:v1.0"
+  ],
+  "created_at": "2026-06-22T22:28:29.334805439+00:00",
+  "updated_at": "2026-06-23T00:15:41.127906109+00:00"
+}

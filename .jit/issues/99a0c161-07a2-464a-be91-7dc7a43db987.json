@@ -1,0 +1,29 @@
+{
+  "id": "99a0c161-07a2-464a-be91-7dc7a43db987",
+  "title": "Tests and dogfood for the graph-template engine",
+  "description": "Cover the engine with tests and dogfood it.\n\nAdd unit, isolated temporary-repository integration, and property tests (the applied graph is acyclic and transitively reduced; gates are attached; re-apply is idempotent; the transform uses the pre-apply snapshot). Dogfood applying the plan template on a real container, and reseed the existing empty planning-node descriptions.\n\n## Success Criteria\n- [ ] [hard] TEST-01: Unit, temp-repo integration, and property tests pass and never touch the production store.\n- [ ] [hard] TEST-02: The plan template is applied on a real container, producing the expected bracket.\n- [ ] [hard] TEST-03: The existing empty planning-node descriptions are reseeded.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "fc414353-0d9e-4580-9205-6669ec574927",
+    "57f52018-cbc2-4b1f-9d9d-1c64ab942517"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "epic:graph-templates",
+    "milestone:v1.0",
+    "satisfies:REQ-08",
+    "satisfies:REQ-09",
+    "type:story",
+    "story:template-testing-dogfood"
+  ],
+  "created_at": "2026-06-22T21:59:04.471163488+00:00",
+  "updated_at": "2026-06-22T22:45:23.795641768+00:00"
+}
