@@ -16,38 +16,48 @@ use jit::commands::CommandExecutor;
 use jit::domain::{Issue, State};
 use jit::storage::{InMemoryStorage, IssueStore};
 
-/// A minimal `[planning]` block whose `breakdown_type` is the bare `"breakdown"`
-/// name. The scope walk's boundary type is config-driven (it is NOT baked into
-/// the engine), so any test that exercises the breakdown boundary must declare it
-/// here. The block omits `[type_hierarchy]`, so the cross-section hierarchy check
-/// at config load is skipped and only the in-isolation field checks run.
-const PLANNING_CONFIG: &str = r#"
-[planning]
-breakable_types = ["epic"]
-planning_type = "planning"
-breakdown_type = "breakdown"
-plan_doc_location = "inline"
-plan_gate_preset = "plan-quality"
-coverage_gate_preset = "coverage-preview"
+/// A `templates.toml` declaring the `plan` bracket with an INLINE plan: the
+/// breakdown node carries `type:breakdown` (the scope-walk boundary) and the
+/// planning node declares NO `doc`, so plan-content resolution skips epics (the
+/// engine reads each issue's body). The scope walk's boundary type and the
+/// breakable types are now TEMPLATE-driven (read off the registry, NOT baked into
+/// the engine and NOT read from `[planning]`), so a test that exercises the
+/// breakdown boundary must declare the template here. The omitted
+/// `[type_hierarchy]` means template node/applies_to types are not checked at
+/// config load.
+const PLAN_TEMPLATE_INLINE: &str = r#"
+[[template]]
+name = "plan"
+applies_to = ["epic"]
+[[template.nodes]]
+role = "planning"
+type = "planning"
+[[template.nodes]]
+role = "breakdown"
+type = "breakdown"
+depends_on = ["planning"]
 "#;
 
 /// Build an executor whose `.jit/rules.toml` holds exactly `rules_toml` and whose
-/// `config.toml` declares a `[planning]` bracket with `breakdown_type =
-/// "breakdown"`, so the `--scope` walk halts at `type:breakdown` nodes.
+/// `.jit/templates.toml` declares an inline `plan` bracket, so the `--scope` walk
+/// halts at `type:breakdown` nodes. NO `[planning]` block is written: the boundary
+/// and breakable types come purely from the template registry.
 fn executor_with_rules(rules_toml: &str) -> CommandExecutor<InMemoryStorage> {
-    executor_with_rules_and_config(rules_toml, PLANNING_CONFIG)
+    executor_with_rules_and_templates(rules_toml, PLAN_TEMPLATE_INLINE)
 }
 
-/// Build an executor with explicit `rules.toml` and `config.toml` contents.
-fn executor_with_rules_and_config(
+/// Build an executor with explicit `rules.toml` and `templates.toml` contents and
+/// NO `config.toml` (so the boundary/breakable-types/doc-location are derived
+/// entirely from the template registry).
+fn executor_with_rules_and_templates(
     rules_toml: &str,
-    config_toml: &str,
+    templates_toml: &str,
 ) -> CommandExecutor<InMemoryStorage> {
     std::env::set_var("JIT_TEST_MODE", "1");
     let storage = InMemoryStorage::new();
     storage.init().unwrap();
     std::fs::create_dir_all(storage.root()).unwrap();
-    std::fs::write(storage.root().join("config.toml"), config_toml).unwrap();
+    std::fs::write(storage.root().join("templates.toml"), templates_toml).unwrap();
     std::fs::write(storage.root().join("rules.toml"), rules_toml).unwrap();
     CommandExecutor::new(storage)
 }
@@ -263,22 +273,26 @@ assert = { label-coverage = { } }
 }
 
 #[test]
-fn test_scope_boundary_is_config_driven_custom_breakdown_type() {
-    // The breakdown boundary TYPE is read from `[planning].breakdown_type`, not
-    // baked into the engine. Configure a CUSTOM boundary name `synthesis` and
-    // build C -> impl -> S(synthesis) -> P(planning, violating). The walk must
-    // halt at the `type:synthesis` node: a rule keyed on `type:synthesis` fires
-    // (S is in scope) while the planning-keyed rule on P never fires (P, upstream
-    // of the boundary, is out of scope). This fails against any engine that
-    // hardcodes `type:breakdown` as the boundary.
-    let config = r#"
-[planning]
-breakable_types = ["goal"]
-planning_type = "planning"
-breakdown_type = "synthesis"
-plan_doc_location = "inline"
-plan_gate_preset = "plan-quality"
-coverage_gate_preset = "coverage-preview"
+fn test_scope_boundary_is_template_driven_custom_breakdown_type() {
+    // The breakdown boundary TYPE is read from the container template's breakdown
+    // node, not baked into the engine. Declare a template whose breakdown node has
+    // the CUSTOM type `synthesis` (applies_to `goal`) and build
+    // C -> impl -> S(synthesis) -> P(planning, violating). The walk must halt at
+    // the `type:synthesis` node: a rule keyed on `type:synthesis` fires (S is in
+    // scope) while the planning-keyed rule on P never fires (P, upstream of the
+    // boundary, is out of scope). This fails against any engine that hardcodes
+    // `type:breakdown` as the boundary or reads it from `[planning]`.
+    let templates = r#"
+[[template]]
+name = "plan"
+applies_to = ["goal"]
+[[template.nodes]]
+role = "planning"
+type = "planning"
+[[template.nodes]]
+role = "breakdown"
+type = "synthesis"
+depends_on = ["planning"]
 "#;
     let rules = r#"
 [[rules]]
@@ -295,7 +309,7 @@ severity = "error"
 enforce = true
 assert = { label-coverage = { } }
 "#;
-    let executor = executor_with_rules_and_config(rules, config);
+    let executor = executor_with_rules_and_templates(rules, templates);
 
     // P (planning) declares an uncovered criterion: it is BEYOND the boundary, so
     // its rule must not fire.
@@ -371,16 +385,22 @@ fn test_scope_resolves_partial_container_id() {
 // (jit:1536006d)
 // ---------------------------------------------------------------------------
 
-/// A `[planning]` block whose `plan_doc_location` is EXTERNAL: the breakable
-/// container's plan/criteria live in `dev/active/{id}-plan.md`, NOT inline.
-const PLANNING_CONFIG_EXTERNAL: &str = r#"
-[planning]
-breakable_types = ["epic"]
-planning_type = "planning"
-breakdown_type = "breakdown"
-plan_doc_location = "dev/active/{id}-plan.md"
-plan_gate_preset = "plan-quality"
-coverage_gate_preset = "coverage-preview"
+/// A `plan` template whose planning node declares an EXTERNAL `doc`: the
+/// breakable container's plan/criteria live in `dev/active/{container.id}-plan.md`
+/// (the `{container.id}` token mirrors the production template), NOT inline. The
+/// breakdown node keeps `type:breakdown` as the scope-walk boundary.
+const PLAN_TEMPLATE_EXTERNAL: &str = r#"
+[[template]]
+name = "plan"
+applies_to = ["epic"]
+[[template.nodes]]
+role = "planning"
+type = "planning"
+doc = "dev/active/{container.id}-plan.md"
+[[template.nodes]]
+role = "breakdown"
+type = "breakdown"
+depends_on = ["planning"]
 "#;
 
 /// A `label-coverage` rule keyed on the breakable container itself (`type:epic`).
@@ -445,7 +465,7 @@ fn test_scope_reads_criteria_from_external_plan_uncovered_fails() {
     // satisfy it -> the engine must read the FILE and report it uncovered. This
     // is the failing-before-the-wiring case: with the resolver unwired the engine
     // reads the (criteria-free) body and the scope is spuriously clean.
-    let executor = executor_with_rules_and_config(COVERAGE_ON_EPIC, PLANNING_CONFIG_EXTERNAL);
+    let executor = executor_with_rules_and_templates(COVERAGE_ON_EPIC, PLAN_TEMPLATE_EXTERNAL);
     let c = container_with_external_plan(&executor, false);
 
     let report = executor.validate_scope(&c).expect("scope validation runs");
@@ -466,7 +486,7 @@ fn test_scope_reads_criteria_from_external_plan_uncovered_fails() {
 fn test_scope_reads_criteria_from_external_plan_covered_clean() {
     // Same external-plan criterion, now satisfied by the child -> clean. Proves
     // the file content (not the empty body) drove coverage.
-    let executor = executor_with_rules_and_config(COVERAGE_ON_EPIC, PLANNING_CONFIG_EXTERNAL);
+    let executor = executor_with_rules_and_templates(COVERAGE_ON_EPIC, PLAN_TEMPLATE_EXTERNAL);
     let c = container_with_external_plan(&executor, true);
 
     let report = executor.validate_scope(&c).expect("scope validation runs");
@@ -482,7 +502,7 @@ fn test_scope_reads_criteria_from_external_plan_covered_clean() {
 fn test_scope_missing_external_plan_surfaces_error() {
     // The container is breakable + the location is external, but the plan file is
     // absent -> the boundary surfaces a PlanDocError rather than silently passing.
-    let executor = executor_with_rules_and_config(COVERAGE_ON_EPIC, PLANNING_CONFIG_EXTERNAL);
+    let executor = executor_with_rules_and_templates(COVERAGE_ON_EPIC, PLAN_TEMPLATE_EXTERNAL);
     let impl_id = seed(&executor, "impl", &["type:task"], "", &[]);
     let c = seed(
         &executor,
@@ -501,9 +521,10 @@ fn test_scope_missing_external_plan_surfaces_error() {
 }
 
 #[test]
-fn test_inline_config_still_validates_from_body() {
-    // With an inline `[planning]` location the engine must keep reading the
-    // issue body: the empty plan-content map reproduces the legacy behavior.
+fn test_inline_template_still_validates_from_body() {
+    // With a `plan` template whose planning node declares no `doc` (an inline
+    // plan), the engine must keep reading the issue body: the empty plan-content
+    // map reproduces the legacy behavior.
     let executor = executor_with_rules(COVERAGE_ON_BREAKDOWN);
     let (c, _b) = spine_with_breakdown_criteria(&executor, false);
 
@@ -528,14 +549,15 @@ fn test_inline_config_still_validates_from_body() {
 // ---------------------------------------------------------------------------
 
 mod file_backed_external_plan {
-    use super::{COVERAGE_ON_EPIC, PLANNING_CONFIG_EXTERNAL};
+    use super::{COVERAGE_ON_EPIC, PLAN_TEMPLATE_EXTERNAL};
     use jit::commands::CommandExecutor;
     use jit::domain::{Issue, State};
     use jit::storage::{IssueStore, JsonFileStorage};
     use tempfile::TempDir;
 
     /// Build a `JsonFileStorage`-backed executor rooted at `<tmp>/.jit`, with the
-    /// rule set and `[planning]` (external location) config written into `.jit/`.
+    /// rule set and the external-`doc` `plan` template written into `.jit/` (NO
+    /// `[planning]` block: the doc location comes from the template registry).
     /// Returns the temp dir (kept alive = the repo root) and the executor.
     fn executor() -> (TempDir, CommandExecutor<JsonFileStorage>) {
         std::env::set_var("JIT_TEST_MODE", "1");
@@ -543,7 +565,7 @@ mod file_backed_external_plan {
         let jit_dir = repo_root.path().join(".jit");
         let storage = JsonFileStorage::new(&jit_dir);
         storage.init().unwrap();
-        std::fs::write(jit_dir.join("config.toml"), PLANNING_CONFIG_EXTERNAL).unwrap();
+        std::fs::write(jit_dir.join("templates.toml"), PLAN_TEMPLATE_EXTERNAL).unwrap();
         std::fs::write(jit_dir.join("rules.toml"), COVERAGE_ON_EPIC).unwrap();
         (repo_root, CommandExecutor::new(storage))
     }

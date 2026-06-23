@@ -1,13 +1,15 @@
 //! Plan-document location resolver (boundary, design doc D9 / Wave-1 task T4).
 //!
-//! A container's plan lives in one of two places, selected by the
-//! `[planning].plan_doc_location` template
-//! ([`PlanningConfig::plan_doc_location`](crate::config::PlanningConfig)):
+//! A container's plan lives in one of two places, selected by the plan-doc
+//! location template (the container's graph template's planning-node `doc`, via
+//! [`GraphTemplate::plan_doc_location`](crate::templates::GraphTemplate::plan_doc_location)):
 //!
-//! - the literal sentinel `"inline"` — the plan is the issue's own body
+//! - the absence of a `doc` (modeled by the caller as the literal sentinel
+//!   `"inline"`) — the plan is the issue's own body
 //!   ([`Issue::description`](crate::domain::Issue)); or
-//! - an external path template — a `{id}` placeholder (if present) is substituted
-//!   with the container id and the resulting file is read from disk.
+//! - an external path template — an `{id}` / `{container.id}` placeholder (if
+//!   present) is substituted with the container id and the resulting file is read
+//!   from disk.
 //!
 //! This module is the **boundary**: the only place filesystem I/O happens. It
 //! resolves the location, loads the content, and feeds the resulting string to
@@ -15,26 +17,26 @@
 //! ([`project`](crate::domain::project) + [`Projection::with_sections`]). The
 //! engine itself never touches the filesystem — an inline body and an external
 //! file carrying identical content therefore project to the *same*
-//! [`Projection`], so a `[planning]` bracket validates a plan the same way no
+//! [`Projection`], so a planning bracket validates a plan the same way no
 //! matter where it is stored (D9 success criterion).
 //!
 //! # Domain-agnostic
 //!
 //! No bracket type name (`epic` / `planning` / `breakdown`) is hardcoded here.
-//! The only literal compared against is the `"inline"` sentinel, which is a
-//! config-value convention defined by T1, not a domain type name.
+//! The only literal compared against is the `"inline"` sentinel, a resolver-value
+//! convention meaning "use the issue body", not a domain type name.
 
 use std::path::{Path, PathBuf};
 
 use crate::document::{content_parser_for, ContentParserError};
 use crate::domain::{project, ContentFormat, Issue, Projection};
 
-/// The `plan_doc_location` value that means "the plan is the issue body".
+/// The plan-doc location value that means "the plan is the issue body".
 ///
-/// Defined as a config-value convention by T1 (the `[planning]` block); the
-/// resolver compares the template against this sentinel to choose the inline
-/// path. It is NOT a domain type name, so comparing against it keeps the engine
-/// domain-agnostic.
+/// A resolver-value convention: a graph template whose planning node declares no
+/// `doc` has no external plan, which the caller models with this sentinel. The
+/// resolver compares the template against it to choose the inline path. It is NOT
+/// a domain type name, so comparing against it keeps the engine domain-agnostic.
 ///
 /// # Examples
 ///
@@ -51,8 +53,15 @@ use crate::domain::{project, ContentFormat, Issue, Projection};
 pub const INLINE_LOCATION: &str = "inline";
 
 /// The `{id}` placeholder substituted with the container id in an external
-/// `plan_doc_location` template.
+/// plan-doc location template.
 const ID_PLACEHOLDER: &str = "{id}";
+
+/// The `{container.id}` placeholder, an alias for [`ID_PLACEHOLDER`] used by
+/// graph-template `doc` strings (e.g. `dev/active/{container.id}-plan.md`). The
+/// apply engine interpolates the full `container.*` token family at apply time;
+/// at validation time the only available value is the container id, so the
+/// resolver substitutes this token with it exactly like `{id}`.
+const CONTAINER_ID_PLACEHOLDER: &str = "{container.id}";
 
 /// Error raised while resolving or loading a container's plan document.
 ///
@@ -132,9 +141,10 @@ pub enum PlanDocLocation {
 ///
 /// The literal sentinel [`INLINE_LOCATION`] (`"inline"`) yields
 /// [`PlanDocLocation::Inline`]. Any other value is treated as a path template:
-/// every occurrence of the `{id}` placeholder is replaced with `container_id`
-/// and the result wrapped in [`PlanDocLocation::External`]. A template with no
-/// `{id}` placeholder is used verbatim (a fixed shared plan path).
+/// every occurrence of the `{id}` placeholder — or its graph-template alias
+/// `{container.id}` — is replaced with `container_id` and the result wrapped in
+/// [`PlanDocLocation::External`]. A template with no placeholder is used verbatim
+/// (a fixed shared plan path).
 ///
 /// # Examples
 ///
@@ -152,7 +162,9 @@ pub fn resolve_plan_doc_location(template: &str, container_id: &str) -> PlanDocL
         PlanDocLocation::Inline
     } else {
         PlanDocLocation::External(PathBuf::from(
-            template.replace(ID_PLACEHOLDER, container_id),
+            template
+                .replace(CONTAINER_ID_PLACEHOLDER, container_id)
+                .replace(ID_PLACEHOLDER, container_id),
         ))
     }
 }
@@ -285,6 +297,17 @@ mod tests {
         assert_eq!(
             resolve_plan_doc_location("{id}/plan-{id}.md", "xyz"),
             PlanDocLocation::External(PathBuf::from("xyz/plan-xyz.md"))
+        );
+    }
+
+    #[test]
+    fn test_resolve_substitutes_container_id_alias() {
+        // Graph-template `doc` strings use `{container.id}`; the resolver maps it
+        // to the container id exactly like `{id}` so a template's plan-doc
+        // location resolves at validation time.
+        assert_eq!(
+            resolve_plan_doc_location("dev/active/{container.id}-plan.md", "abc123"),
+            PlanDocLocation::External(PathBuf::from("dev/active/abc123-plan.md"))
         );
     }
 

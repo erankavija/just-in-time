@@ -170,14 +170,15 @@ pub fn query_closed(issues: &[Issue]) -> Vec<Issue> {
 /// through `B` into its dependencies (`P` / upstream). The container id itself is
 /// always a member.
 ///
-/// The breakdown boundary type is **config-driven**, not baked in: `B` is the
-/// node carrying `type:<breakdown_type>`, where `breakdown_type` is the
-/// `[planning].breakdown_type` name passed by the caller (e.g. `"breakdown"` for
-/// SDD, or any custom name a different ruleset chooses). The label string is
-/// built at runtime from that name, so the engine stays domain-agnostic.
+/// The breakdown boundary type is supplied by the caller, not baked in: `B` is
+/// the node carrying `type:<breakdown_type>`, where `breakdown_type` is the
+/// caller's configured breakdown-node type (e.g. `"breakdown"`, or any custom
+/// name) — derived by the caller from the applicable graph template's breakdown
+/// node. The label string is built at runtime from that name, so the engine stays
+/// domain-agnostic.
 ///
-/// When `breakdown_type` is `None` — i.e. no `[planning]` block is configured, so
-/// the ruleset has no bracket — there is no breakdown boundary: the walk is the
+/// When `breakdown_type` is `None` — i.e. no applicable graph template, so the
+/// container is not bracketed — there is no breakdown boundary: the walk is the
 /// full transitive dependency closure of the container, with no halt.
 ///
 /// This is a pure graph walk over dependency edges (no I/O): a BFS from the
@@ -235,9 +236,10 @@ pub fn bracket_scope_ids(
 ) -> std::collections::HashSet<String> {
     use std::collections::{HashSet, VecDeque};
 
-    // The boundary label, derived from config (e.g. `type:breakdown`). Absent
-    // when no `[planning]` bracket is configured, in which case nothing halts the
-    // walk and the result is the full dependency closure.
+    // The boundary label, built from the caller-supplied breakdown-node type
+    // (e.g. `type:breakdown`). Absent when the container is not bracketed (no
+    // applicable graph template), in which case nothing halts the walk and the
+    // result is the full dependency closure.
     let breakdown_label = breakdown_type.map(|t| format!("type:{t}"));
 
     let is_breakdown = |id: &str| match &breakdown_label {
@@ -375,8 +377,8 @@ mod tests {
     }
 
     #[test]
-    fn test_bracket_scope_boundary_type_is_config_driven() {
-        // The boundary is whatever `[planning].breakdown_type` names — here a
+    fn test_bracket_scope_boundary_type_is_caller_supplied() {
+        // The boundary is whatever breakdown-node type the caller passes — here a
         // CUSTOM type `synthesis`, not the literal "breakdown". The walk must
         // halt at the `type:synthesis` node and exclude its upstream.
         let issues = vec![
@@ -405,10 +407,11 @@ mod tests {
     }
 
     #[test]
-    fn test_bracket_scope_no_planning_walks_full_closure() {
-        // With no `[planning]` configured (breakdown_type = None) there is no
-        // bracket boundary, so the walk is the full transitive closure: even a
-        // node that WOULD be a boundary under a config does not halt it.
+    fn test_bracket_scope_no_boundary_walks_full_closure() {
+        // With no boundary type (breakdown_type = None — a non-bracketed
+        // container) there is no bracket boundary, so the walk is the full
+        // transitive closure: even a node that WOULD be a boundary under a
+        // configured type does not halt it.
         let issues = bracket_spine();
         let ids = bracket_scope_ids("C0000000", &issues, None);
         assert!(

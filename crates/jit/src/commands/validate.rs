@@ -419,17 +419,21 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     /// Build the plan-document content map the graph engine consumes (boundary).
     ///
-    /// For every issue in `issues` whose effective `[planning].plan_doc_location`
-    /// is EXTERNAL (i.e. not the [`INLINE_LOCATION`](crate::commands::plan_doc::INLINE_LOCATION)
-    /// sentinel) and whose type is one of the configured `breakable_types`, this
-    /// resolves the criteria-source content from disk via the
+    /// For every issue in `issues` whose type is a **breakable container type**
+    /// (one some graph template's `applies_to` lists, per
+    /// [`TemplateRegistry::breakable_types`](crate::templates::TemplateRegistry::breakable_types))
+    /// AND whose template declares an EXTERNAL plan-doc location (the planning
+    /// node carries a `doc`, per
+    /// [`GraphTemplate::plan_doc_location`](crate::templates::GraphTemplate::plan_doc_location)),
+    /// this resolves the criteria-source content from disk via the
     /// [`plan_doc`](crate::commands::plan_doc) resolver, keyed by issue id. Issues
-    /// with the inline sentinel — or any issue when no `[planning]` block is
-    /// configured — are OMITTED, so the engine falls back to the issue's own
-    /// description for them (an empty map reproduces the legacy behavior exactly).
+    /// whose template declares no `doc` (an inline plan) — or any issue when the
+    /// template registry is empty — are OMITTED, so the engine falls back to the
+    /// issue's own description for them (an empty map reproduces the legacy
+    /// behavior exactly).
     ///
-    /// External `plan_doc_location` templates are REPO-ROOT-relative, so the
-    /// base dir passed to [`load_plan_content`](crate::commands::plan_doc::load_plan_content)
+    /// `plan_doc_location` templates are REPO-ROOT-relative, so the base dir
+    /// passed to [`load_plan_content`](crate::commands::plan_doc::load_plan_content)
     /// is the repo root (the PARENT of `.jit`), NOT `storage.root()` (which is
     /// the `.jit` directory). This is the ONLY place external plan files are read
     /// for validation; the pure engine never touches the filesystem. A missing or
@@ -445,7 +449,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
     /// let issues = executor.storage().list_issues().unwrap();
-    /// // Inline brackets (or no `[planning]` config) yield an empty map.
+    /// // Inline brackets (or an empty template registry) yield an empty map.
     /// let plan_content = executor.resolve_plan_content(&issues).unwrap();
     /// println!("{} external plan(s) resolved", plan_content.len());
     /// ```
@@ -453,24 +457,16 @@ impl<S: IssueStore> CommandExecutor<S> {
         &self,
         issues: &[Issue],
     ) -> Result<std::collections::HashMap<String, String>> {
-        use crate::commands::plan_doc::{load_plan_content, INLINE_LOCATION};
+        use crate::commands::plan_doc::load_plan_content;
 
-        // No `[planning]` block, or an inline location: nothing to resolve. The
-        // empty map makes the engine read each issue's own description.
-        let Some(planning) = self.cached_config()?.planning.as_ref() else {
-            return Ok(std::collections::HashMap::new());
-        };
-        if planning.plan_doc_location == INLINE_LOCATION {
-            return Ok(std::collections::HashMap::new());
-        }
+        let templates = &self.cached_config()?.templates;
 
-        // Breakable container types carry the plan doc at `plan_doc_location`;
-        // their `{type:<name>}` label marks an issue as a plan-doc holder.
-        let breakable: std::collections::HashSet<&str> = planning
-            .breakable_types
-            .iter()
-            .map(String::as_str)
-            .collect();
+        // Breakable container types come from the template registry: a type is
+        // breakable iff some template's `applies_to` lists it. An empty registry
+        // (no templates, the unbracketed-repo case) yields an empty set, so the
+        // map below is empty — the engine then reads each issue's own description.
+        let breakable: std::collections::HashSet<String> =
+            templates.breakable_types().into_iter().collect();
 
         // External plan templates are REPO-ROOT-relative (e.g.
         // `dev/active/{id}-plan.md`), so the base dir is the repo root — the
@@ -483,17 +479,25 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         issues
             .iter()
-            .filter(|issue| {
-                issue
+            .filter_map(|issue| {
+                // The issue's `type:` label selects its template; the template's
+                // planning-node `doc` is the per-issue plan-doc location.
+                let issue_type = issue
                     .labels
                     .iter()
                     .filter_map(|l| l.strip_prefix("type:"))
-                    .any(|t| breakable.contains(t))
+                    .find(|t| breakable.contains(*t))?;
+                // No template, or a template whose planning node declares no
+                // `doc` (an inline plan): skip — mirrors the legacy
+                // `INLINE_LOCATION` skip so the engine uses the description.
+                let location = templates
+                    .template_for_container(issue_type)
+                    .and_then(|t| t.plan_doc_location())?;
+                Some((issue, location.to_string()))
             })
-            .map(|issue| {
-                let content =
-                    load_plan_content(issue, &planning.plan_doc_location, &issue.id, base_dir)
-                        .map_err(|e| anyhow!("{e}"))?;
+            .map(|(issue, location)| {
+                let content = load_plan_content(issue, &location, &issue.id, base_dir)
+                    .map_err(|e| anyhow!("{e}"))?;
                 Ok((issue.id.clone(), content))
             })
             .collect()
@@ -662,18 +666,30 @@ impl<S: IssueStore> CommandExecutor<S> {
         let ruleset = self.effective_rules()?;
         let repo_format = self.repo_content_format()?;
 
-        // The breakdown boundary type is config-driven: derive it from the
-        // `[planning]` block when present. Absent → no bracket boundary, so the
-        // scope walk is the full dependency closure (see `bracket_scope_ids`).
-        let breakdown_type = self
-            .cached_config()?
-            .planning
-            .as_ref()
-            .map(|p| p.breakdown_type.clone());
-
         // Resolve the container (partial ids accepted) and build the slice.
         let container_full_id = self.storage.resolve_issue_id(container_id)?;
         let all = self.storage.list_issues()?;
+
+        // The breakdown boundary type is template-driven: resolve the container's
+        // `type:` label, look up its graph template, and read that template's
+        // breakdown-node type. No applicable template (a non-bracketed container)
+        // → no boundary, so the scope walk is the full dependency closure (see
+        // `bracket_scope_ids`).
+        let container_type = all
+            .iter()
+            .find(|i| i.id == container_full_id)
+            .and_then(|c| {
+                c.labels
+                    .iter()
+                    .find_map(|l| l.strip_prefix("type:").map(str::to_string))
+            });
+        let templates = &self.cached_config()?.templates;
+        let breakdown_type = container_type
+            .as_deref()
+            .and_then(|ty| templates.template_for_container(ty))
+            .and_then(|t| t.breakdown_type())
+            .map(str::to_string);
+
         let scope_ids = crate::domain::queries::bracket_scope_ids(
             &container_full_id,
             &all,
