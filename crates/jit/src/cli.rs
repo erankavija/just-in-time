@@ -75,6 +75,45 @@ pub enum Commands {
         json: bool,
     },
 
+    /// Apply a graph template to a container (generalized plan-before-fan-out)
+    ///
+    /// Instantiates the named template from `.jit/templates.toml` onto
+    /// `<container>`: creates the template's typed nodes (with their gate
+    /// presets, docs, and interpolated descriptions), wires the declared edges,
+    /// and runs its transforms (e.g. moving the container's upstream deps onto
+    /// the planning node). The `container` anchor is auto-bound to the positional
+    /// `<container>`; bind any additional anchors with `--anchor role=id`.
+    ///
+    /// The container's `type:` label must be one of the template's `applies_to`
+    /// types. Re-applying requires `--force`, which refreshes the existing nodes'
+    /// prose in place rather than re-creating them.
+    ///
+    /// Examples:
+    ///   jit apply plan epic-123                       # Apply the `plan` template
+    ///   jit apply plan epic-123 --json                # Machine-readable result
+    ///   jit apply plan epic-123 --anchor container=epic-123 --force
+    Apply {
+        /// Template name to apply (must be declared in `.jit/templates.toml`)
+        template: String,
+
+        /// Container issue ID to apply the template to
+        container: String,
+
+        /// Bind a template anchor: `role=id` (repeatable). The `container` anchor
+        /// is auto-bound to `<container>`; an explicit `--anchor container=…`
+        /// overrides it.
+        #[arg(long, value_name = "ROLE=ID")]
+        anchor: Vec<String>,
+
+        /// Bypass validation warnings and refresh an already-applied template
+        #[arg(long)]
+        force: bool,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Dependency management commands
     #[command(subcommand)]
     Dep(DepCommands),

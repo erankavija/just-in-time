@@ -116,6 +116,62 @@ fn print_plan_result(
     Ok(())
 }
 
+/// Print the outcome of a graph-template apply (`jit apply <template> <container>`).
+///
+/// In `--json` mode emits the structured
+/// [`TemplateApplyResult`](jit::commands::TemplateApplyResult) (template name,
+/// resolved anchor bindings, created/refreshed node ids by role, and the
+/// pre-apply anchor dependency snapshots) plus the freshly-loaded created
+/// issues, keyed by role. In quiet mode prints just the created node ids (one per
+/// line, role-ordered) for scripting; otherwise a short human summary.
+fn print_apply_result(
+    storage: &JsonFileStorage,
+    result: &jit::commands::TemplateApplyResult,
+    container: &str,
+    quiet: bool,
+    json: bool,
+) -> Result<()> {
+    if json {
+        // Load each created node so the JSON consumer gets the full issues
+        // alongside the role→id map (mirroring `print_plan_result`).
+        let created_issues: serde_json::Map<String, serde_json::Value> = result
+            .created_node_ids_by_role
+            .iter()
+            .map(|(role, id)| {
+                let issue = storage.load_issue(id)?;
+                Ok((role.clone(), serde_json::to_value(issue)?))
+            })
+            .collect::<Result<_>>()?;
+        let data = serde_json::json!({
+            "template": result.template,
+            "container": container,
+            "anchor_bindings": result.anchor_bindings,
+            "created_node_ids_by_role": result.created_node_ids_by_role,
+            "anchor_dependency_snapshots": result.anchor_dependency_snapshots,
+            "created_issues": created_issues,
+        });
+        let msg = format!("Applied template '{}' to {}", result.template, container);
+        let output = JsonOutput::success(data, "apply").with_message(msg);
+        println!("{}", output.to_json_string()?);
+    } else if quiet {
+        for id in result.created_node_ids_by_role.values() {
+            println!("{}", id);
+        }
+    } else {
+        let roles = result
+            .created_node_ids_by_role
+            .iter()
+            .map(|(role, id)| format!("{role}={id}"))
+            .collect::<Vec<_>>()
+            .join(" ");
+        println!(
+            "Applied template '{}' to {}: {}",
+            result.template, container, roles
+        );
+    }
+    Ok(())
+}
+
 /// Set up .gitattributes with merge drivers for jit files.
 /// Only runs if we're in a git repository.
 fn setup_gitattributes() -> Result<()> {
@@ -1097,6 +1153,39 @@ fn run() -> Result<()> {
                 eprintln!("⚠️  Warning: {}", warning);
             }
             print_plan_result(&storage, &result, quiet, json)?;
+        }
+        Commands::Apply {
+            template,
+            container,
+            anchor,
+            force,
+            json,
+        } => {
+            // Parse the repeatable `--anchor role=id` pairs. The `container`
+            // anchor (the `plan` template's only anchor) is auto-bound to the
+            // positional `<container>`; an explicit `--anchor container=…`
+            // overrides it because it is applied after the default.
+            let mut bindings: std::collections::BTreeMap<String, String> =
+                std::collections::BTreeMap::new();
+            bindings.insert("container".to_string(), container.clone());
+            for pair in &anchor {
+                let (role, id) = pair.split_once('=').ok_or_else(|| {
+                    anyhow!("malformed --anchor '{pair}'; expected role=id (with an '=')")
+                })?;
+                if role.is_empty() {
+                    return Err(anyhow!(
+                        "malformed --anchor '{pair}'; the role (left of '=') must not be empty"
+                    ));
+                }
+                bindings.insert(role.to_string(), id.to_string());
+            }
+
+            let (result, warnings) =
+                executor.apply_template(&template, &container, &bindings, force)?;
+            for warning in &warnings {
+                eprintln!("⚠️  Warning: {}", warning);
+            }
+            print_apply_result(&storage, &result, &container, quiet, json)?;
         }
         Commands::Dep(dep_cmd) => match dep_cmd {
             DepCommands::Add {
