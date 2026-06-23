@@ -62,13 +62,13 @@ Before any orchestration, discover the project's expectations. This context info
    - Identify strategic types
    - Map types to membership label namespaces via `[type_hierarchy.label_associations]`
 
-6. **Planning bracket (if the ruleset uses it).** From `.jit/config.toml` `[planning]`:
-   - `breakable_types` — container types that require a gated planning bracket before fan-out (e.g. `epic` for an SDD ruleset, `goal` for a research ruleset).
-   - `planning_type` / `breakdown_type` — the bracket node types (`P` and `B`).
-   - `plan_doc_location` — where `P`'s plan lives (inline body or an external `{id}`-templated path).
-   - `plan_gate_preset` / `coverage_gate_preset` — the gate presets applied to `P` (plan-review) and `B` (coverage-preview).
+6. **Planning bracket (if the ruleset uses it).** From `.jit/templates.toml`, the single source of truth for the bracket:
+   - A container type is **breakable** iff some template's `applies_to` list includes it (e.g. `epic` for an SDD ruleset, `goal` for a research ruleset).
+   - The bracket node types `P` and `B` are the template's `planning`- and `breakdown`-role node `type`s.
+   - `P`'s plan-doc location is the planning node's `doc` field (an `{container.id}`-templated path, or inline body when absent).
+   - The gate presets are the `gates` declared on each node — the planning node's gate(s) (plan-review) and the breakdown node's gates (coverage-preview + breakdown-review).
 
-   Breakable types are **always read from this config, never hardcoded**. If no `[planning]` block exists, the project does not use the bracket — drive the plain (non-bracketed) breakdown flow throughout (Section 3B).
+   Breakable types are **always read from the templates, never hardcoded**. If no template applies to the epic's type, the project does not use the bracket — drive the plain (non-bracketed) breakdown flow throughout (Section 3B).
 
 Hold all discovered context in working memory for the duration of the session.
 
@@ -107,24 +107,23 @@ If the epic already has children that fully cover its success criteria, skip to 
 
 **Choose the breakdown path by the epic's type** (discovered in Section 1):
 
-- If the epic's type is in the ruleset's `[planning].breakable_types`, follow **Section 3A — Bracketed breakdown**.
-- Otherwise (no `[planning]` block, or the epic type is not breakable), follow **Section 3B — Plain breakdown** (the legacy flow).
+- If the epic's type is in a `.jit/templates.toml` template's `applies_to`, follow **Section 3A — Bracketed breakdown**.
+- Otherwise (no template applies to it), follow **Section 3B — Plain breakdown** (the legacy flow).
 
 ### Section 3A: Bracketed breakdown (plan → review → breakdown → coverage → implement)
 
 A breakable container `C` (the epic) is bracketed by a planning node `P` and a breakdown node `B`, with the implementation subgraph spliced as a spine `C → impl → B → P` (precedence **P > B > impl > C**: plan first, then breakdown, then the work, then the container closes). Drive the bracket strictly in order — each gate blocks the next step:
 
-1. **Scaffold the bracket.** Create the planning node `P` and wire `C → P`:
-   - Retrofit an existing epic with `jit plan <epic-id>` (also moves `C`'s pre-existing upstream deps onto `P`). (`jit issue create --with-planning` does the same at creation time; for an epic already in the tracker, use `jit plan`.)
-   This creates `P` (`type:<planning_type>`), applies the `plan_gate_preset` (plan-review) to `P`, and sets `P`'s plan-doc location from config. Commit JIT state.
+1. **Scaffold the bracket.** Apply the `plan` template, which instantiates the whole bracket in one operation:
+   - `jit apply plan <epic-id>` creates BOTH `P` (`type:<planning_type>`, `plan-review` gate) and `B` (`type:<breakdown_type>`, `coverage-preview` + `breakdown-review` gates), wires the internal edge `B → P` and the anchor edge `C → B`, and moves `C`'s pre-existing upstream deps onto `P`. The node roles, types, gates, and `P`'s plan-doc location come from `.jit/templates.toml`. Commit JIT state.
 
 2. **Produce the plan on `P`.** `P`'s plan is the spec for the decomposition. If a design doc exists (Section 2), it is `P`'s plan-doc; otherwise dispatch an architect agent (Section 6, `design` classification) to author it at `P`'s configured plan-doc location. The plan must be concrete enough to decompose and to judge coverage of `C`'s `[hard]` success criteria.
 
-3. **Enforce the plan-quality gate on `P` — this BLOCKS breakdown.** Run `P`'s plan-quality gate (the `plan_gate_preset` discovered in Section 1 — `plan-review` in the default rulesets, but use whatever the config names). Breakdown does **not** begin until that gate shows `passed` (check the recorded status, not the exit code). If it fails, revise the plan (rework) and re-run. Breakdown consumes an **approved** plan only. The gate is inviolable — never bypass it.
+3. **Enforce the plan-quality gate on `P` — this BLOCKS breakdown.** Run `P`'s plan-quality gate (the gate preset the template declares on the planning node — `plan-review` in the default rulesets, but use whatever the template names). Breakdown does **not** begin until that gate shows `passed` (check the recorded status, not the exit code). If it fails, revise the plan (rework) and re-run. Breakdown consumes an **approved** plan only. The gate is inviolable — never bypass it.
 
-4. **Break down behind the approved plan.** Delegate to jit-breakdown (`.claude/skills/jit-breakdown/SKILL.md`), which for a breakable container takes the bracket path: it creates `B` (`type:<breakdown_type>`, `brackets:<C-id>` label, `coverage_gate_preset`) depending on `P`, drafts the impl children in Backlog carrying their `satisfies:<criterion-id>` coverage labels, and wires the spine (sources → `B`, `C` → sinks; transitive reduction drops the scaffold's `C → P` edge). Apply gate inheritance + per-task quality gates to the drafted children (Section 3B bullets apply to the children). Self-approve the decomposition (escalate only if it introduces stories or higher-level types, per `references/escalation-policy.md`).
+4. **Break down behind the approved plan.** Delegate to jit-breakdown (`.claude/skills/jit-breakdown/SKILL.md`), which for a breakable container takes the bracket path: it **consumes** the pre-created breakdown node `B` (created by `jit apply plan` in step 1, already typed `<breakdown_type>`, carrying the `brackets:<C-id>` label and its `coverage-preview` + `breakdown-review` gates, already depending on `P`), drafts the impl children in Backlog carrying their `satisfies:<criterion-id>` coverage labels, and splices the interior spine (sources → `B`, `C` → sinks; transitive reduction drops the scaffold's `C → B` edge). Apply gate inheritance + per-task quality gates to the drafted children (Section 3B bullets apply to the children). Self-approve the decomposition (escalate only if it introduces stories or higher-level types, per `references/escalation-policy.md`).
 
-5. **Enforce the coverage gate on `B` — this BLOCKS the implementation fan-out.** Run `B`'s coverage gate (the `coverage_gate_preset` discovered in Section 1 — `coverage-preview` in the default rulesets, but use whatever the config names) via the standard runner (deterministic; it runs `jit validate --scope <C>`). It blocks (exit 4) when the drafted children leave a `[hard]` criterion uncovered. Implementation waves are **not** dispatched until that gate shows `passed` (check the recorded status). If it fails, revise the decomposition (add or relabel children to cover the gap) and re-run — the coverage gap is closed at plan time, before any code is written.
+5. **Enforce the coverage gate on `B` — this BLOCKS the implementation fan-out.** Run `B`'s coverage gate (the gate preset the template declares on the breakdown node — `coverage-preview` in the default rulesets, but use whatever the template names) via the standard runner (deterministic; it runs `jit validate --scope <C>`). It blocks (exit 4) when the drafted children leave a `[hard]` criterion uncovered. Implementation waves are **not** dispatched until that gate shows `passed` (check the recorded status). If it fails, revise the decomposition (add or relabel children to cover the gap) and re-run — the coverage gap is closed at plan time, before any code is written.
 
 6. Commit JIT state in batch, then proceed to Section 4 (Wave Planning) over the **impl interior only**: `P` and `B` are bracket-infrastructure nodes, not implementation waves — exclude them from the wave plan (they are already `done`/gated by the time the impl waves run).
 

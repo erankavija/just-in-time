@@ -11,14 +11,15 @@ child issues with a correct dependency DAG, and populate JIT.
 
 **Two breakdown shapes, selected by the ruleset (Step 1.5):**
 
-- **Bracket breakdown** — when the parent is a *breakable container* declared in
-  the repo's `[planning]` config. The plan is a first-class, gated node `P`
-  sequenced *before* the fan-out, and breakdown splices a **source/sink spine**
-  `C → impl → B → P` (not parent-centric containment). This is the
-  plan-before-fan-out flow. See [The bracket](#the-bracket) below.
-- **Plain breakdown** — when the parent is NOT a breakable container (or the repo
-  declares no `[planning]` config). The classic parent-centric flow: create
-  children, then make the parent depend on all of them (Step 6c-plain).
+- **Bracket breakdown** — when the parent is a *breakable container*, i.e. its
+  type appears in some `.jit/templates.toml` template's `applies_to`. The plan is
+  a first-class, gated node `P` sequenced *before* the fan-out, and breakdown
+  splices a **source/sink spine** `C → impl → B → P` (not parent-centric
+  containment). This is the plan-before-fan-out flow. See [The bracket](#the-bracket) below.
+- **Plain breakdown** — when the parent is NOT a breakable container (no
+  `.jit/templates.toml` template applies to the parent's type). The classic
+  parent-centric flow: create children, then make the parent depend on all of
+  them (Step 6c-plain).
 
 Everything in Steps 2-5 (read hierarchy, membership label, analysis, plan review)
 is shared. The two shapes differ only in **Step 6 execution wiring**.
@@ -36,23 +37,23 @@ C ──dep→ {impl subgraph} ──dep→ B ──dep→ P
 precedence `P > B > impl > C` (plan first, then breakdown, then work, then the
 container closes). Concretely:
 
-- **`B`** (`type:<breakdown_type>` from config) carries a `brackets:<C-id>` label
-  and **both** of the breakdown node's preset gates — the **coverage-preview**
-  gate (`coverage_gate_preset`) and the **breakdown-review** gate
-  (`breakdown_review_gate_preset`) — and depends on `P`. Both gate the fan-out: jit
-  will not release the impl children until each passes. Run the 
-  coverage-preview inline for immediate feedback (Step 6c-bracket). 
-  **Breakdown-review is left PENDING** for the standard gate runner. Jit's own gate
-  enforcement holds the fan-out until both pass.
+- **`B`** (`type:<breakdown_type>`) was created by `jit apply plan <C>`, not by
+  breakdown — it already carries the `brackets:<C-id>` label, **both** of the
+  breakdown node's preset gates (the **coverage-preview** gate and the
+  **breakdown-review** gate), and a dependency on `P`. Breakdown CONSUMES this
+  pre-created `B`. Both gates the fan-out: jit will not release the impl children
+  until each passes. Run the coverage-preview inline for immediate feedback (Step
+  6c-bracket). **Breakdown-review is left PENDING** for the standard gate runner.
+  Jit's own gate enforcement holds the fan-out until both pass.
 - **Impl children** are created in backlog.
 - **Sources** (impl issues with no intra-subgraph predecessor) depend on `B`;
   internal chains carry the rest. This transitively gates ALL impl behind `B`.
 - **Sinks** (impl issues with no intra-subgraph successor) are depended-on by `C`
   (`C depends on each sink`). Transitive reduction drops the scaffold's direct
-  `C → P` edge and any redundant `C → non-sink` edge automatically.
+  `C → B` edge and any redundant `C → non-sink` edge automatically.
 
-The type names (`breakdown_type`, `planning_type`) and the gate preset names come
-from `[planning]` config.
+The node types (`breakdown_type`, `planning_type`) and the gate preset names come
+from the `.jit/templates.toml` template's node declarations.
 
 ---
 
@@ -100,28 +101,36 @@ from `[planning]` config.
 Decide which breakdown shape applies, and — if bracket — confirm the plan is
 approved before drafting any children.
 
-1. **Read the `[planning]` config.** Inspect `.jit/config.toml` for a `[planning]`
-   section. If absent, the repo does not use brackets → this is a **plain
-   breakdown**; skip the rest of this step and use the plain wiring (Step 6c-plain).
+1. **Read the templates.** Inspect `.jit/templates.toml` for a template whose
+   `applies_to` lists the parent's `type:*` value. If none applies, the repo does
+   not bracket this type → this is a **plain breakdown**; skip the rest of this
+   step and use the plain wiring (Step 6c-plain).
 
-2. **Is the parent breakable?** From `[planning].breakable_types`, check whether the
-   parent's `type:*` value is listed. If NOT listed → **plain breakdown** (skip the
-   rest of this step). If listed → **bracket breakdown**; continue. Read and record
-   `planning_type`, `breakdown_type`, `coverage_gate_preset`, and
-   `breakdown_review_gate_preset` from `[planning]` — never hardcode these names.
-   (`breakdown_review_gate_preset` defaults to `breakdown-review` when the key is
-   absent.)
+2. **Is the parent breakable?** From the templates' `applies_to` sets, check
+   whether the parent's `type:*` value appears. If NOT → **plain breakdown** (skip
+   the rest of this step). If it does → **bracket breakdown**; continue. From the
+   matching template's nodes, read and record `planning_type` and `breakdown_type`
+   (the planning- and breakdown-role node `type`s) and the gate presets they
+   declare — the planning node's gate (plan-review), and the breakdown node's two
+   gates (`coverage-preview`, then `breakdown-review`). The concrete gate names
+   shown throughout this doc (`plan-review`, `coverage-preview`, `breakdown-review`)
+   are the DEFAULT ruleset's; read the actual preset names from the template and
+   substitute them in the commands below whenever a ruleset differs.
 
-3. **Require a scaffolded planning node `P`.** The container must already be
-   bracketed (`C → P`) by the scaffold step (`jit plan <id>` or
-   `jit issue create --with-planning`). Find `P` among the container's dependencies:
+3. **Require a scaffolded bracket (`P` and `B`).** The container must already be
+   bracketed (`C → B → P`) by the scaffold step `jit apply plan <id>`, which
+   creates BOTH the planning node `P` and the breakdown node `B` and wires
+   `B → P`. Breakdown CONSUMES the pre-created `B`; it does not create it. Locate
+   `B`, then find `P` through it:
    ```bash
    jit issue show <C> --json | jq -r '.depends_on[]'
-   # inspect each: the one whose type: label == <planning_type> is P
+   # B is the dependency typed <breakdown_type> carrying brackets:<C-short-id>
+   jit issue show <B> --json | jq -r '.depends_on[]'
+   # P is B's dependency typed <planning_type>
    ```
-   If no planning node exists, STOP and tell the user:
-   > "This breakable container has no planning node. Scaffold it first with
-   > `jit plan <id>`, produce and review the plan, then re-run breakdown."
+   If no breakdown node exists, STOP and tell the user:
+   > "This breakable container has no bracket. Scaffold it first with
+   > `jit apply plan <id>`, produce and review the plan, then re-run breakdown."
 
 4. **Require an APPROVED plan.** Bracket breakdown consumes an *approved* plan, so
    the plan-quality gate on `P` must have passed. Check:
@@ -247,10 +256,11 @@ Breakdown plan for: "<Parent Issue Title>"  (N child issues, M sequencing edges)
 
   Wiring after creation:
     - Plain breakdown:   the parent will depend on all N children (containment).
-    - Bracket breakdown: a breakdown node B (coverage-preview gate) is created
-      depending on the approved plan P; children are drafted in Backlog; source
-      children depend on B; the container depends on the sink children. The
-      direct C → P edge is dropped by reduction. (See "The bracket".)
+    - Bracket breakdown: the pre-created breakdown node B (created by
+      `jit apply plan`, already depending on the approved plan P) is consumed;
+      children are drafted in Backlog; source children depend on B; the container
+      depends on the sink children. The scaffold's C → B edge is dropped by
+      reduction. (See "The bracket".)
 
 Notes from analysis agent:
   <notes field from JSON>
@@ -327,12 +337,13 @@ every child is complete. **Do NOT use this wiring for a bracket breakdown** — 
 ### 6c-bracket. Wire the bracket spine (BRACKET only)
 
 For a **breakable** parent with an approved plan (Step 1.5 selected bracket
-breakdown), create `B` and splice the source/sink spine `C → impl → B → P`, then
-run the coverage-preview gate inline and block the fan-out on its result.
+breakdown), splice the source/sink spine `C → impl → B → P` around the
+pre-created `B`, then run the coverage-preview gate inline and block the fan-out
+on its result.
 
 **Follow [references/bracket-spine.md](references/bracket-spine.md)** for the full
-procedure: create `B`, attach both gates and wire `B → P`, wire sources → `B` and
-`C` → sinks (transitive reduction drops the scaffold's `C → P` edge), then run
+procedure: locate the pre-created `B` (and `P` through it), wire sources → `B` and
+`C` → sinks (transitive reduction drops the scaffold's `C → B` edge), then run
 coverage-preview via the standard runner and gate the fan-out on its recorded
 status. The agent breakdown-review gate is left PENDING for the runner, like
 `plan-review` on `P`.
@@ -368,8 +379,9 @@ leaves. Keep depth proportional to size — do not force a story level onto smal
 
 > Bracket note: recursion shape is decided per-child in Step 1.5 by the *child's*
 > type, not the root's. A `decompose_further` child is itself a bracket breakdown
-> only if its own type is in `breakable_types` AND it has been scaffolded with its
-> own plan node; otherwise it recurses as a plain breakdown. In practice the impl
+> only if its own type is in a `.jit/templates.toml` template's `applies_to` AND it
+> has been scaffolded with its own plan node; otherwise it recurses as a plain
+> breakdown. In practice the impl
 > children of a bracket are leaves or plain sub-containers — the bracket lives at
 > the breakable-container level.
 
@@ -397,8 +409,9 @@ leaves. Keep depth proportional to size — do not force a story level onto smal
    - **Coverage credits present (bracket only)** — every container `[hard]` criterion
      (Step 1.5 step 5) is carried by at least one child as a `satisfies:<id>` label, so
      the coverage-preview gate on `B` can credit it. The standard gate runner records
-     that gate's verdict on `B` when you run `jit gate pass <B> <coverage_gate_preset>`
-     (references/bracket-spine.md step 5); a `[hard]` criterion no child satisfies is reported uncovered
+     that gate's verdict on `B` when you run `jit gate pass <B> <coverage-gate>` (the
+     breakdown node's coverage gate from the template; `coverage-preview` in the
+     default ruleset) (references/bracket-spine.md step 5); a `[hard]` criterion no child satisfies is reported uncovered
      and the gate fails — add the missing `satisfies:<id>` label
      (`jit issue update <child> --label satisfies:<id>`) and re-run the gate.
 

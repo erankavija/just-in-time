@@ -2,9 +2,9 @@
   "id": "6e38a577-db65-4203-ac05-318d83de1e45",
   "title": "Migrate skills and memory to apply plan",
   "description": "Update the project-lead and breakdown skills and the bracket-command memory to the new command and the apply-creates-the-breakdown-node model.\n\n## Success Criteria\n- [ ] [hard] DOCA-01: the skills and memory reference the new command and the apply-creates-the-breakdown-node model; no removed-command references remain in them.",
-  "state": "ready",
+  "state": "done",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [
     "96fc8cd8-3c83-4733-aa18-3ca100f2a1f1"
   ],
@@ -12,7 +12,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-23T21:26:17.732288110Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-23T20:55:28.521915237Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -22,5 +33,5 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-06-22T22:28:29.463700366+00:00",
-  "updated_at": "2026-06-23T20:11:04.339679099+00:00"
+  "updated_at": "2026-06-23T21:29:37.647630557+00:00"
 }
