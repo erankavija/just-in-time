@@ -1,7 +1,7 @@
 {
   "id": "9cccfe0c-46bb-4b80-9909-f7b13d6fa6f1",
   "title": "Add the apply command plumbing (additive)",
-  "description": "Add the `jit apply` command surface — argument parsing, dispatch, and result printing — as a purely additive command. The existing scaffold command keeps working and the scaffold is **not** flipped here, so this task leaves no broken intermediate.\n\n## Success Criteria\n- [ ] [hard] SCFA-01: `jit apply` is wired (parse, dispatch, print) and invokes the engine, with the existing scaffold command still fully working.\n- [ ] [hard] SCFA-02: this task is purely additive — no existing behavior or default scaffold path changes.\n- [ ] [hard] SCFA-03: the CLI accepts `<template> <container>` plus repeatable `--anchor role=id`, `--force`, and `--json`, per the approved contract.",
+  "description": "Add the `jit apply` command surface — argument parsing, dispatch, and result printing — as a purely additive command. The existing scaffold command keeps working and the scaffold is **not** flipped here, so this task leaves no broken intermediate.\n\n## Success Criteria\n- [ ] [hard] SCFA-01: `jit apply` is wired (parse, dispatch, print) and invokes the engine, with the existing scaffold command still fully working.\n- [ ] [hard] SCFA-02: this task is purely additive — no existing behavior or default scaffold path changes.\n- [ ] [hard] SCFA-03: the CLI accepts `<template> <container>` plus repeatable `--anchor role=id`, `--force`, and `--json`, per the approved contract.\n- [ ] [hard] SCFA-04: `--json` emits a machine-readable apply result containing the template name, the resolved anchor bindings, and the created or refreshed node ids by role.",
   "state": "backlog",
   "priority": "normal",
   "assignee": null,
@@ -22,5 +22,5 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-06-22T22:28:29.390914865+00:00",
-  "updated_at": "2026-06-23T00:20:11.497432153+00:00"
+  "updated_at": "2026-06-23T06:22:20.413963674+00:00"
 }
