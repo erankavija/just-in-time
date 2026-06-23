@@ -1,0 +1,46 @@
+# Graph templates for the research example ruleset. DECLARES the named parameterized
+# subgraphs that `jit apply <template> <container>` instantiates into the work DAG.
+# The mechanism is generic and domain-agnostic: nothing here is hardcoded in engine
+# logic — the strings (types, roles, gates, docs) come from THIS file. Validated at
+# every `jit` config load by the templates loader (templates.rs): roles unique;
+# depends_on/anchor_edges/transforms reference declared roles/anchors; node `type`s
+# exist in [type_hierarchy]; internal edges acyclic.
+#
+# This is the template-model replacement for the old flat planning config block, and the
+# proof of domain-agnosticism: the breakable container is a research `goal`, NOT a
+# software container. The SAME engine instantiates the plan-before-fan-out bracket
+# (planning node P, breakdown node B) over `goal`. Copy this file to
+# `.jit/templates.toml` alongside the example `config.toml`.
+
+[[template]]
+name        = "plan"
+description = "Plan-before-fan-out bracket: planning node P and breakdown node B."
+applies_to  = ["goal"]           # container types this template may be applied to
+
+  [[template.anchors]]
+  name = "container"             # bound at apply time to the target issue
+
+  [[template.nodes]]
+  role        = "planning"
+  type        = "planning"       # must exist in [type_hierarchy]
+  gates       = ["plan-review"]  # gate-preset names (apply_gate_preset)
+  doc         = "dev/active/{container.id}-plan.md"
+  description = "Planning node for {container.title} ({container.short_id}). Produce the plan that decomposes this goal before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Plan document: {doc}."
+
+  [[template.nodes]]
+  role        = "breakdown"
+  type        = "breakdown"
+  gates       = ["coverage-preview", "breakdown-review"]
+  labels      = ["brackets:{container.short_id}"]
+  description = "Breakdown node bracketing {container.title} ({container.short_id}). Holds the decomposition of the approved plan into well-ordered child issues that cover the goal's [hard] success criteria."
+  depends_on  = ["planning"]     # internal edge: B → P
+
+  # Edge to an anchor: container depends on the breakdown node (C → B)
+  [[template.anchor_edges]]
+  from = "container"             # anchor role
+  to   = "breakdown"            # node role
+  # direction is "anchor depends on node"
+
+  [[template.transforms]]
+  kind = "move-upstream-to-role"
+  role = "planning"             # move container's pre-existing upstream deps onto P

@@ -21,8 +21,8 @@ use jit::storage::{InMemoryStorage, IssueStore};
 /// planning node declares NO `doc`, so plan-content resolution skips epics (the
 /// engine reads each issue's body). The scope walk's boundary type and the
 /// breakable types are now TEMPLATE-driven (read off the registry, NOT baked into
-/// the engine and NOT read from `[planning]`), so a test that exercises the
-/// breakdown boundary must declare the template here. The omitted
+/// the engine and NOT read from any flat planning-config block), so a test that
+/// exercises the breakdown boundary must declare the template here. The omitted
 /// `[type_hierarchy]` means template node/applies_to types are not checked at
 /// config load.
 const PLAN_TEMPLATE_INLINE: &str = r#"
@@ -40,8 +40,8 @@ depends_on = ["planning"]
 
 /// Build an executor whose `.jit/rules.toml` holds exactly `rules_toml` and whose
 /// `.jit/templates.toml` declares an inline `plan` bracket, so the `--scope` walk
-/// halts at `type:breakdown` nodes. NO `[planning]` block is written: the boundary
-/// and breakable types come purely from the template registry.
+/// halts at `type:breakdown` nodes. NO flat planning-config block is written: the
+/// boundary and breakable types come purely from the template registry.
 fn executor_with_rules(rules_toml: &str) -> CommandExecutor<InMemoryStorage> {
     executor_with_rules_and_templates(rules_toml, PLAN_TEMPLATE_INLINE)
 }
@@ -281,7 +281,7 @@ fn test_scope_boundary_is_template_driven_custom_breakdown_type() {
     // the `type:synthesis` node: a rule keyed on `type:synthesis` fires (S is in
     // scope) while the planning-keyed rule on P never fires (P, upstream of the
     // boundary, is out of scope). This fails against any engine that hardcodes
-    // `type:breakdown` as the boundary or reads it from `[planning]`.
+    // `type:breakdown` as the boundary or reads it from a flat planning-config block.
     let templates = r#"
 [[template]]
 name = "plan"
@@ -557,7 +557,7 @@ mod file_backed_external_plan {
 
     /// Build a `JsonFileStorage`-backed executor rooted at `<tmp>/.jit`, with the
     /// rule set and the external-`doc` `plan` template written into `.jit/` (NO
-    /// `[planning]` block: the doc location comes from the template registry).
+    /// flat planning-config block: the doc location comes from the template registry).
     /// Returns the temp dir (kept alive = the repo root) and the executor.
     fn executor() -> (TempDir, CommandExecutor<JsonFileStorage>) {
         std::env::set_var("JIT_TEST_MODE", "1");

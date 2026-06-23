@@ -123,8 +123,10 @@ unified rule. (No back-compat mode: the only consumer is `../gf2`.)
 Dependencies are intra-epic; `→` means "depends on".
 
 **Wave 0 — engine primitives (parallel)**
-- **T1 `[planning]` config block.** `breakable-types`, plan-doc location template, gate
-  preset names; load + load-time validation. Files: `config.toml` loader, validation.
+- **T1 flat planning-config block** (HISTORICAL — superseded by the
+  `.jit/templates.toml` graph-template model in epic 9ac9fdac). As originally shipped:
+  `breakable-types`, plan-doc location template, gate preset names; load + load-time
+  validation. Files: `config.toml` loader, validation.
 - **T2 `jit validate --scope <id>`.** Deterministic, exit-coded validation over a
   container's bracket subtree. **Scope membership** = the container's transitive dependency
   closure **including `B`** (bounded so it stops at `B`, the gate node; it need not pull in

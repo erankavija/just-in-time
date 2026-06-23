@@ -16,19 +16,11 @@ use std::process::Command;
 use tempfile::TempDir;
 
 /// Hierarchy declaring the bracket node types so `epic`/`planning`/`breakdown`
-/// are valid types in the temp repo.
+/// are valid types in the temp repo. The bracket vocabulary itself comes from the
+/// `plan` template (`PLAN_TEMPLATE_TOML`), not from config.
 const CONFIG_TOML: &str = r#"
 [type_hierarchy]
 types = { epic = 1, planning = 2, breakdown = 2, task = 3 }
-
-[planning]
-breakable_types = ["epic"]
-planning_type = "planning"
-breakdown_type = "breakdown"
-plan_doc_location = "inline"
-plan_gate_preset = "plan-review"
-coverage_gate_preset = "coverage-preview"
-breakdown_review_gate_preset = "breakdown-review"
 "#;
 
 /// The repo's `plan`-shaped graph template: a planning node `P` and a breakdown

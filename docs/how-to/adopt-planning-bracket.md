@@ -20,7 +20,8 @@ rulesets ship it; this guide points you at the exact blocks to lift:
 
 > The files under `docs/examples/` are EXAMPLES, not active on this repository. To
 > use one, copy its `config.toml` to `.jit/config.toml`, its `rules.toml` to
-> `.jit/rules.toml`, and its `schemas/` directory to `.jit/schemas/`.
+> `.jit/rules.toml`, its `templates.toml` to `.jit/templates.toml`, and its
+> `schemas/` directory to `.jit/schemas/`.
 
 ## Prerequisites
 
@@ -35,8 +36,8 @@ rulesets ship it; this guide points you at the exact blocks to lift:
 
 ## Step 1 — Declare the breakable container and the two bracket types
 
-Add `planning` and `breakdown` to your type hierarchy as valid children of the
-breakable container, and add a `[planning]` block naming the vocabulary. From
+First add `planning` and `breakdown` to your type hierarchy in `.jit/config.toml`,
+as valid children of the breakable container. From
 [`docs/examples/sdd/config.toml`](../examples/sdd/config.toml):
 
 ```toml
@@ -44,38 +45,49 @@ breakable container, and add a `[planning]` block naming the vocabulary. From
 # `planning` and `breakdown` are the two bracket node types — function-typed
 # children of the breakable `epic`.
 types = { epic = 2, story = 3, planning = 3, breakdown = 3, task = 4, bug = 4 }
-
-[planning]
-breakable_types = ["epic"]          # container types that require a bracket
-planning_type = "planning"          # the type of node P
-breakdown_type = "breakdown"        # the type of node B
-plan_doc_location = "dev/active/{id}-plan.md"   # where P's plan doc lives ({id} -> container id)
-plan_gate_preset = "plan-review"        # agent gate applied to P
-coverage_gate_preset = "coverage-preview"     # deterministic gate applied to B
-breakdown_review_gate_preset = "breakdown-review"  # agent gate also applied to B
 ```
 
-The research example is identical in shape, with `goal` substituted for `epic`:
+Then declare the bracket itself as a `plan` `[[template]]` in
+`.jit/templates.toml`. `jit apply plan <C>` instantiates this subgraph onto a
+container. From [`docs/examples/sdd/templates.toml`](../examples/sdd/templates.toml):
 
 ```toml
-[type_hierarchy]
-types = { goal = 2, experiment = 3, planning = 3, breakdown = 3 }
+[[template]]
+name        = "plan"
+applies_to  = ["epic"]           # container types that require a bracket
 
-[planning]
-breakable_types = ["goal"]
-planning_type = "planning"
-breakdown_type = "breakdown"
-plan_doc_location = "dev/active/{id}-plan.md"
-plan_gate_preset = "plan-review"
-coverage_gate_preset = "coverage-preview"
-breakdown_review_gate_preset = "breakdown-review"
+  [[template.anchors]]
+  name = "container"             # bound at apply time to the target container
+
+  [[template.nodes]]
+  role        = "planning"       # node P
+  type        = "planning"       # P's issue type (must exist in [type_hierarchy])
+  gates       = ["plan-review"]  # agent gate applied to P
+  doc         = "dev/active/{container.id}-plan.md"   # where P's plan doc lives
+
+  [[template.nodes]]
+  role        = "breakdown"      # node B
+  type        = "breakdown"      # B's issue type
+  gates       = ["coverage-preview", "breakdown-review"]  # the TWO gates on B
+  labels      = ["brackets:{container.short_id}"]         # B's container pointer
+  depends_on  = ["planning"]     # internal edge B → P
+
+  [[template.anchor_edges]]
+  from = "container"             # container depends on the breakdown node (C → B)
+  to   = "breakdown"
+
+  [[template.transforms]]
+  kind = "move-upstream-to-role"
+  role = "planning"             # move C's pre-existing upstream deps onto P
 ```
 
+The research example is identical in shape, with `goal` substituted for `epic`
+(`applies_to = ["goal"]`) — see
+[`docs/examples/research/templates.toml`](../examples/research/templates.toml).
+
 The engine hardcodes **none** of these names — `epic`/`goal`, `planning`,
-`breakdown`, and the preset names are all read from this block.
-`breakdown_review_gate_preset` is optional: omit it and it defaults to the builtin
-`breakdown-review` preset, so an existing bracket config gains the review gate
-without an edit.
+`breakdown`, and the preset names are all read from the template. To make `P`'s
+plan an inline body rather than an external file, omit the `doc` field.
 
 > **Sync the type-known schema.** Adding a type to `[type_hierarchy].types`
 > updates the graph hierarchy, but if your project has a baked
@@ -211,35 +223,27 @@ jit gate preset show breakdown-review
 
 ## Step 5 — Scaffold a container
 
-The scaffolding commands apply the `plan-review` preset to `P` automatically. Two
-entry points (both read the breakable types and gate presets from your
-`[planning]` block):
-
-**Create a new container already bracketed:**
+Bracket an existing container `C` by applying the `plan` template (its `type:`
+label must be one of the template's `applies_to` types):
 
 ```bash
-jit issue create --type epic --title "Payment service" --with-planning
+jit apply plan epic-123
 ```
 
-This creates the container `C`, creates the planning node `P` (`type:planning`),
-wires `C → P`, sets `P`'s plan-doc location from `plan_doc_location`, and applies
-the `plan-review` preset to `P`. The container's `type:` label must be one of
-`[planning].breakable_types`. It does **not** create the breakdown node `B` —
-that is the breakdown step's job (Step 7).
+This reads the `plan` template (the node types, gate presets, doc location, and
+the `brackets:` label all come from `.jit/templates.toml`) and in one step:
 
-**Retrofit an existing container:**
+- creates the planning node `P` (`type:planning`), applies the `plan-review`
+  preset, and sets `P`'s plan-doc location from the template's `doc`;
+- creates the breakdown node `B` (`type:breakdown`, labelled `brackets:<C-id>`),
+  carrying the `coverage-preview` and `breakdown-review` presets, depending on `P`;
+- wires the anchor edge `C → B` and **moves `C`'s pre-existing upstream
+  dependencies onto `P`** (so planning waits on that upstream work and `C` becomes
+  the pure closure node).
 
-```bash
-jit plan epic-123
-```
-
-This brackets an already-existing container `C`: it creates `P`, wires `C → P`,
-**moves `C`'s pre-existing upstream dependencies onto `P`** (so planning waits on
-that upstream work and `C` becomes the pure closure node), applies the
-`plan-review` preset, and sets `P`'s plan-doc location. Add `--json` for a
-machine-readable result.
-
-After scaffolding the graph is just `C → P`:
+Add `--json` for a machine-readable result; re-applying requires `--force`, which
+refreshes the existing nodes' prose in place. After scaffolding the bracket is
+`C → B → P`:
 
 ```bash
 jit graph deps epic-123
@@ -256,17 +260,17 @@ inspecting agent gates.
 
 ## Step 7 — Break down behind the approved plan
 
-Once `P`'s plan-review gate passes, break the container down. The breakdown step:
+Once `P`'s plan-review gate passes, break the container down. The breakdown step
+**consumes the pre-created breakdown node `B`** (the one `jit apply plan` already
+scaffolded, carrying the `coverage-preview` and `breakdown-review` gates and the
+`brackets:<C-id>` label) — it does not create `B`. It then:
 
-1. creates the breakdown node `B` (`type:breakdown`, labelled `brackets:<C-id>`,
-   carrying **both** the `coverage-preview` and `breakdown-review` gates) depending
-   on `P`;
-2. drafts the implementation children in Backlog, each carrying the satisfies
+1. drafts the implementation children in Backlog, each carrying the satisfies
    label (`satisfies:<id>` / `tests:<id>`) for the criterion it covers;
-3. wires the **spine** — entry impl issues depend on `B` (sources), and the impl
+2. wires the **spine** — entry impl issues depend on `B` (sources), and the impl
    sinks are what `C` depends on; transitive reduction drops the now-redundant
-   `C → P` edge — yielding `C → impl → B → P`;
-4. runs `B`'s gates.
+   `C → B` anchor edge — yielding `C → impl → B → P`;
+3. runs `B`'s gates.
 
 `coverage-preview` runs `jit validate --scope <C>`, which fires your preview rule.
 If the drafted children leave a `[hard]` criterion with no satisfying child (in any

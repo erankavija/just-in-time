@@ -24,19 +24,49 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use tempfile::TempDir;
 
-/// `[planning]` vocabulary plus a hierarchy that declares the bracket types, and
-/// the coverage-preview deterministic rule keyed on `type:breakdown`.
-const PLANNING_CONFIG_TOML: &str = r#"
+/// Hierarchy that declares the bracket node types so `epic`/`planning`/`breakdown`
+/// are valid in the temp repo. The bracket vocabulary itself (and the
+/// `type:breakdown` boundary that `validate --scope` halts on) comes from the
+/// `plan` template in `BRACKET_TEMPLATE_TOML`, not from config.
+const BRACKET_CONFIG_TOML: &str = r#"
 [type_hierarchy]
 types = { epic = 1, planning = 2, breakdown = 2, task = 3 }
+"#;
 
-[planning]
-breakable_types = ["epic"]
-planning_type = "planning"
-breakdown_type = "breakdown"
-plan_doc_location = "inline"
-plan_gate_preset = "plan-review"
-coverage_gate_preset = "coverage-preview"
+/// The `plan`-shaped graph template: a planning node `P` (inline plan — no `doc`)
+/// and a breakdown node `B`, plus the `B → P` edge, the `C → B` anchor edge, and
+/// the `move-upstream-to-role` transform onto `planning`. `validate --scope <C>`
+/// reads `B`'s type from this template to bound the coverage walk at `type:breakdown`.
+const BRACKET_TEMPLATE_TOML: &str = r#"
+[[template]]
+name        = "plan"
+description = "Plan-before-fan-out bracket."
+applies_to  = ["epic"]
+
+  [[template.anchors]]
+  name = "container"
+
+  [[template.nodes]]
+  role        = "planning"
+  type        = "planning"
+  gates       = ["plan-review"]
+  description = "Planning node for {container.title}."
+
+  [[template.nodes]]
+  role        = "breakdown"
+  type        = "breakdown"
+  gates       = ["coverage-preview"]
+  labels      = ["brackets:{container.short_id}"]
+  description = "Breakdown node for {container.title}."
+  depends_on  = ["planning"]
+
+  [[template.anchor_edges]]
+  from = "container"
+  to   = "breakdown"
+
+  [[template.transforms]]
+  kind = "move-upstream-to-role"
+  role = "planning"
 "#;
 
 const COVERAGE_RULES_TOML: &str = r#"
@@ -109,15 +139,16 @@ fn create_issue(temp: &TempDir, title: &str, description: &str, labels: &[&str])
     json["id"].as_str().expect("created issue id").to_string()
 }
 
-/// Initialize a temp repo with the planning config, coverage rule, and a
-/// `coverage-preview` auto gate wired to the real checker (PATH points at the
-/// built binary so the script's bare `jit` resolves to this build).
+/// Initialize a temp repo with the bracket config, the `plan` template, the
+/// coverage rule, and a `coverage-preview` auto gate wired to the real checker
+/// (PATH points at the built binary so the script's bare `jit` resolves to this build).
 fn setup_bracket_repo() -> TempDir {
     let temp = TempDir::new().unwrap();
     jit(&temp).arg("init").assert().success();
 
     let jit_dir = temp.path().join(".jit");
-    std::fs::write(jit_dir.join("config.toml"), PLANNING_CONFIG_TOML).unwrap();
+    std::fs::write(jit_dir.join("config.toml"), BRACKET_CONFIG_TOML).unwrap();
+    std::fs::write(jit_dir.join("templates.toml"), BRACKET_TEMPLATE_TOML).unwrap();
     std::fs::write(jit_dir.join("rules.toml"), COVERAGE_RULES_TOML).unwrap();
 
     let script = coverage_script();

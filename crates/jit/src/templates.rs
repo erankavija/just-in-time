@@ -388,7 +388,7 @@ impl TemplateRegistry {
     /// The set of breakable container types: the union of every template's
     /// `applies_to`, deduplicated, in first-seen order.
     ///
-    /// This is the template-registry equivalent of `PlanningConfig.breakable_types`:
+    /// This is the set of breakable container types declared by the registry:
     /// a container type appears here iff some template may be applied to it.
     ///
     /// # Examples
@@ -624,8 +624,6 @@ impl GraphTemplate {
 
     /// The issue type carried by the planning node `P` (e.g. `"planning"`).
     ///
-    /// The template-registry equivalent of `PlanningConfig.planning_type`.
-    ///
     /// # Examples
     ///
     /// ```
@@ -647,8 +645,6 @@ impl GraphTemplate {
     }
 
     /// The issue type carried by the breakdown node `B` (e.g. `"breakdown"`).
-    ///
-    /// The template-registry equivalent of `PlanningConfig.breakdown_type`.
     ///
     /// # Examples
     ///
@@ -673,8 +669,6 @@ impl GraphTemplate {
     /// The planning node's doc-location template (e.g.
     /// `"dev/active/{container.id}-plan.md"`), with `{...}` tokens resolved at
     /// apply time.
-    ///
-    /// The template-registry equivalent of `PlanningConfig.plan_doc_location`.
     ///
     /// # Examples
     ///

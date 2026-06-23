@@ -1,8 +1,9 @@
 # Example ruleset: Research program
 #
 # This is an EXAMPLE configuration, not the rules active on this repository. To
-# use it, copy this file to `.jit/rules.toml` and the `schemas/` directory to
-# `.jit/schemas/` in your own project.
+# use it, copy this file to `.jit/rules.toml`, `templates.toml` to
+# `.jit/templates.toml`, and the `schemas/` directory to `.jit/schemas/` in your
+# own project.
 #
 # This example demonstrates that the validation engine carries NO software
 # assumptions. Every type name, label namespace, and section heading here is
@@ -65,14 +66,17 @@
 #   goal cannot complete until every [hard] hypothesis is covered. This mirrors
 #   the lifecycle-aware pattern from CC-8 / the SDD example.
 #
-# THE PLAN-BEFORE-FAN-OUT BRACKET (config.toml declares it; engine stays agnostic):
+# THE PLAN-BEFORE-FAN-OUT BRACKET (the `plan` template declares it; engine stays agnostic):
 #
-#   The companion `config.toml` declares the research `goal` a BREAKABLE container
+#   The companion `templates.toml` declares a `plan` template with
+#   `applies_to = ["goal"]`, making the research `goal` a BREAKABLE container
 #   — NOT a software container; the breakable type is research vocabulary, which is
 #   the whole point of this example (design D11: prove the bracket carries no
 #   software assumptions). It adds two function-typed bracket node types —
-#   `planning` (`P`) and `breakdown` (`B`) — plus the three gate presets. A breakable
-#   goal is bracketed as the reduced spine
+#   `planning` (`P`) and `breakdown` (`B`) — each carrying its gate presets.
+#   (`planning`/`breakdown` are added to `config.toml`'s `[type_hierarchy]` so they
+#   are valid child types.) A breakable goal is bracketed by `jit apply plan <goal>`
+#   as the reduced spine
 #
 #     C(goal) ──dep→ {experiment subgraph} ──dep→ B(type:breakdown) ──dep→ P(type:planning)
 #
@@ -256,7 +260,8 @@ assert = { label-coverage = { criteria-section = "hypotheses", marker = "[hard]"
 # tallies exactly the experiment interior between `C` and `B` — a `tests:` label on
 # `P` (beyond the boundary) does not count.
 #
-# The deterministic `coverage-preview` gate on `B` (wired in config.toml) runs
+# The deterministic `coverage-preview` gate on `B` (attached to the breakdown node
+# by the `plan` template when `jit apply plan` scaffolds the bracket) runs
 # `jit validate --scope <C>`, which evaluates this rule; an uncovered `[hard]`
 # hypothesis BLOCKS the breakdown gate (exit 4). `enforce = true` makes the
 # severity blocking at scoped-validate time.

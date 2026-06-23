@@ -25,12 +25,12 @@ Delivered the plan-before-fan-out bracket: a breakable container `C` is now brac
 - [x] **Breakdown gate blocks when drafted children leave a `[hard]` criterion uncovered, transitively over the impl interior (exit 4)** — T2 (`jit validate --scope`, exit 4) + T3 (transitive coverage) + T6 (coverage-preview preset + preview rule) + T10 (runs the gate via the standard runner) + T12 (steering scenario `bracket-coverage-gap`).
 - [x] **Coverage traversal is transitive by default; `child-type-exclude` excludes bracket nodes and halts descent at them** — T3 (`children_of` closure walk + `child-type-exclude` boundary + `container-from-label` indirection).
 - [x] **`jit plan <existing>` retrofits a container, moving upstream deps onto P** — T5 (retrofit path).
-- [x] **Demonstrated on SDD (epic) AND research (goal, no epic) with no methodology strings in Rust** — T7 (SDD example) + T8 (research example, no epic/milestone); domain-agnosticism enforced throughout T1/T2/T3 (type names read from `[planning]` config; production-Rust grep clean).
+- [x] **Demonstrated on SDD (epic) AND research (goal, no epic) with no methodology strings in Rust** — T7 (SDD example) + T8 (research example, no epic/milestone); domain-agnosticism enforced throughout T1/T2/T3 (type names read from the flat planning-config block, later superseded by `.jit/templates.toml` in epic 9ac9fdac; production-Rust grep clean).
 - [x] **jit-breakdown and project-lead drive plan→review→breakdown→coverage→implement; steering suite regression-tests it** — T10 (jit-breakdown re-sequenced) + T11 (project-lead re-sequenced, config-driven) + T12 (3 steering scenarios: plan rejected, coverage gap, clean path).
 
 ### Wave Execution Log
 
-- **Wave 1** (3, parallel worktrees) — engine primitives: T1 `[planning]` config + R5 schema regen, T2 `validate --scope`, T3 transitive coverage + `child-type-exclude` + container indirection.
+- **Wave 1** (3, parallel worktrees) — engine primitives: T1 flat planning-config block + R5 schema regen, T2 `validate --scope`, T3 transitive coverage + `child-type-exclude` + container indirection.
 - **Wave 2** (2, parallel worktrees) — T4 plan-doc location resolver (boundary I/O, pure engine), T6 plan-review + coverage-preview presets + preview rule.
 - **Wave 3** (3) — T5 scaffolding command, T7 SDD example, T8 research example.
 - **Wave 4** (2) — T10 jit-breakdown re-sequence (bracket builder + skill), T9 concept + how-to docs.
@@ -55,7 +55,7 @@ No additional JIT issues were created. Notable pre-existing fragilities surfaced
 
 ### Holistic Quality Notes
 
-- **Domain-agnosticism held end-to-end** — repeatedly grep-verified that no `epic`/`planning`/`breakdown` literals leaked into production Rust; all type/preset names flow from `[planning]` config. The two example rulesets (epic-based SDD, goal-based research) prove agnosticism.
+- **Domain-agnosticism held end-to-end** — repeatedly grep-verified that no `epic`/`planning`/`breakdown` literals leaked into production Rust; all type/preset names flow from the flat planning-config block (later superseded by `.jit/templates.toml`, epic 9ac9fdac). The two example rulesets (epic-based SDD, goal-based research) prove agnosticism.
 - **Consistent terminology** (`P`/`B`/spine/plan-review/coverage-preview) across engine, the jit-breakdown and project-lead skills, the concept/how-to docs, and the example rulesets.
 - **Clean layer separation** — filesystem I/O confined to `commands/` boundaries; `validation/graph.rs` and `domain/` stayed pure (the doc-resolver and bracket-builder reworks were both about restoring this).
 - **Side deliverable:** `scripts/cargo-ci.sh` — a project-wide gate-hygiene improvement beyond the epic's scope.

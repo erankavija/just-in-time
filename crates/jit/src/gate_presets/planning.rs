@@ -22,9 +22,10 @@
 //! breakdown type so it fires only on `B`.
 //!
 //! Everything here is **domain-agnostic**: no `epic`/`planning`/`breakdown`
-//! literal appears in engine logic. The breakdown type name is read from
-//! `[planning].breakdown_type` and threaded in by the caller; the coverage
-//! checker resolves its container generically from whatever issue it runs on.
+//! literal appears in engine logic. The breakdown type name is read from the
+//! `plan` graph template (`TemplateRegistry`) and threaded in by the caller; the
+//! coverage checker resolves its container generically from whatever issue it
+//! runs on.
 
 use super::{GatePresetDefinition, GateTemplate};
 use crate::domain::{GateChecker, GateMode, GateStage};
@@ -238,8 +239,8 @@ pub fn breakdown_review_preset() -> GatePresetDefinition {
 /// The closure rule's criteria knobs (`criteria-section`, `marker`,
 /// `id-pattern`, `satisfies-namespace`, `child-link`, `child-type-exclude`) are
 /// carried over verbatim, so the only authored difference is the dropped
-/// `child-state`. `breakdown_type` comes from `[planning].breakdown_type`; no
-/// type literal is baked in here.
+/// `child-state`. `breakdown_type` comes from the `plan` graph template (the
+/// breakdown node's `type`); no type literal is baked in here.
 ///
 /// # Errors
 ///

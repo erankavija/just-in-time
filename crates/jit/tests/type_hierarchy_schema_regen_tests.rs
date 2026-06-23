@@ -40,7 +40,8 @@ unique = true
     (temp, jit_dir)
 }
 
-/// Add a `planning` type to `[type_hierarchy].types` in an existing config.toml.
+/// Add `planning`/`breakdown` types to `[type_hierarchy].types` in an existing
+/// config.toml.
 fn add_planning_type(jit_dir: &std::path::Path) {
     let config_toml = r#"
 [type_hierarchy]
@@ -49,14 +50,6 @@ types = { milestone = 1, epic = 2, story = 3, planning = 3, breakdown = 3, task 
 [namespaces.type]
 description = "Issue type"
 unique = true
-
-[planning]
-breakable_types = ["epic"]
-planning_type = "planning"
-breakdown_type = "breakdown"
-plan_doc_location = "dev/active/{id}-plan.md"
-plan_gate_preset = "plan-review"
-coverage_gate_preset = "coverage-preview"
 "#;
     fs::write(jit_dir.join("config.toml"), config_toml).unwrap();
 }
@@ -153,35 +146,4 @@ fn test_reinit_refreshes_type_hierarchy_schema() {
         !warnings.iter().any(|w| w.contains("type-hierarchy-known")),
         "no warning for a declared type after re-init, got {warnings:?}"
     );
-}
-
-#[test]
-fn test_malformed_planning_block_rejected_at_load() {
-    // A `[planning]` block declaring a type absent from `[type_hierarchy]` is
-    // rejected when the executor loads config (malformed config rejected at load).
-    std::env::set_var("JIT_TEST_MODE", "1");
-    let temp = TempDir::new().unwrap();
-    let jit_dir = temp.path().join(".jit");
-    fs::create_dir(&jit_dir).unwrap();
-    let config_toml = r#"
-[type_hierarchy]
-types = { epic = 2, task = 4 }
-
-[planning]
-breakable_types = ["epic"]
-planning_type = "planning"
-breakdown_type = "breakdown"
-plan_doc_location = "inline"
-plan_gate_preset = "plan-review"
-coverage_gate_preset = "coverage-preview"
-"#;
-    fs::write(jit_dir.join("config.toml"), config_toml).unwrap();
-    let storage = JsonFileStorage::new(&jit_dir);
-    storage.init().unwrap();
-    let executor = CommandExecutor::new(storage);
-
-    // Any path that loads config surfaces the malformed-planning error.
-    let result = executor.regenerate_type_hierarchy_schema();
-    let err = result.unwrap_err().to_string();
-    assert!(err.contains("[planning]"), "{err}");
 }

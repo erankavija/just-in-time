@@ -3,6 +3,8 @@
 //! This library provides the core functionality for JIT issue tracking.
 //! It is primarily used for testing, but can also be embedded in other applications.
 
+#![deny(unsafe_code)]
+
 pub mod agent_config;
 pub mod build_info;
 pub mod cli;

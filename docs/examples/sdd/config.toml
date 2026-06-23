@@ -2,14 +2,16 @@
 #
 # This is an EXAMPLE configuration, not the config active on this repository. To
 # use it, copy this file to `.jit/config.toml`, `rules.toml` to `.jit/rules.toml`,
-# and the `schemas/` directory to `.jit/schemas/` in your own project.
+# `templates.toml` to `.jit/templates.toml`, and the `schemas/` directory to
+# `.jit/schemas/` in your own project.
 #
-# This config DECLARES the bracket vocabulary that the engine stays agnostic to.
-# The engine hardcodes NONE of these names: the container type (`epic`), the two
-# bracket node types (`planning` / `breakdown`), and the gate presets are read
-# from this config (design `dev/active/planning-bracket-design.md`, D1/D5/D9).
-# Swap the names here and the same engine drives a different methodology — see
-# the research example (`goal` breakable, no `epic`).
+# The plan-before-fan-out bracket vocabulary is DECLARED by the `plan` template in
+# the sibling `templates.toml`, which the engine stays agnostic to. The engine
+# hardcodes NONE of these names: the container type (`epic`), the two bracket node
+# types (`planning` / `breakdown`), and the gate presets are read from the template
+# (design `dev/active/planning-bracket-design.md`, D1/D5/D9). Swap the names there
+# and the same engine drives a different methodology — see the research example
+# (`goal` breakable, no `epic`).
 
 [version]
 schema = 2
@@ -29,33 +31,16 @@ strategic_types = ["epic"]
 epic = "epic"
 story = "story"
 
-[planning]
-# Plan-before-fan-out bracket. A breakable container `C` is bracketed by two
-# function-typed children: `P` (type:planning, carries the plan-quality gate)
+# The plan-before-fan-out bracket is declared by the `plan` template in the sibling
+# `templates.toml` (copy it to `.jit/templates.toml`) and applied with
+# `jit apply plan <epic>`. A breakable container `C` is bracketed by two
+# function-typed children: `P` (type:planning, carries the plan-review gate)
 # sequenced first, then `B` (type:breakdown, carries the deterministic
-# coverage-preview gate, born at the breakdown step) — read as the spine
-# `C ──dep→ {impl} ──dep→ B ──dep→ P`.
-#
-# - breakable_types: container types that require a planning bracket. SDD's is `epic`.
-# - planning_type / breakdown_type: the two bracket node types (P / B).
-# - plan_doc_location: where P's plan doc lives ({id} -> container id).
-# - plan_gate_preset: the gate preset applied to the planning node P.
-#     * plan-review     (agent)         -> attached to the planning node P.
-# - coverage_gate_preset / breakdown_review_gate_preset: the TWO gates applied to
-#   the breakdown node B (a quality-vs-coverage split):
-#     * coverage-preview (deterministic) -> its checker runs `jit validate --scope
-#       <C>`, resolving C from B's `brackets:<C-id>` label, so the preview coverage
-#       rule below fires; blocks when a [hard] criterion is uncovered.
-#     * breakdown-review (agent)         -> AI review of the decomposition itself:
-#       per-child content standards, dependency-DAG coherence (missing AND
-#       over-constraining edges), and right-sized depth. Does NOT re-check coverage.
-breakable_types = ["epic"]
-planning_type = "planning"
-breakdown_type = "breakdown"
-plan_doc_location = "dev/active/{id}-plan.md"
-plan_gate_preset = "plan-review"
-coverage_gate_preset = "coverage-preview"
-breakdown_review_gate_preset = "breakdown-review"
+# coverage-preview gate AND the agent breakdown-review gate) — read as the spine
+# `C ──dep→ {impl} ──dep→ B ──dep→ P`. coverage-preview's checker runs
+# `jit validate --scope <C>` (resolving C from B's `brackets:<C-id>` label, so the
+# preview coverage rule fires and blocks when a [hard] criterion is uncovered);
+# breakdown-review is the AI review of the decomposition itself.
 
 [validation]
 strictness = "loose"

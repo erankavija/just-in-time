@@ -102,8 +102,8 @@ That shapes the spine edges:
   removed automatically by reduction once the spine connects
   `C → impl → B → P`.
 - **`B → P`.** The breakdown depends on the plan (breakdown after plan approved).
-- **Retrofit moves upstream deps onto `P`.** When you bracket an *existing*
-  container (`jit plan <C>`), `C`'s pre-existing upstream dependencies **move onto
+- **Retrofit moves upstream deps onto `P`.** When you bracket a container
+  (`jit apply plan <C>`), `C`'s pre-existing upstream dependencies **move onto
   `P`** — planning waits on that upstream work, and `C` becomes the pure closure
   node at the back of its own bracket.
 

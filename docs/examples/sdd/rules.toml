@@ -1,8 +1,9 @@
 # Example ruleset: Spec-Driven Development (SDD)
 #
 # This is an EXAMPLE configuration, not the rules active on this repository. To
-# use it, copy this file to `.jit/rules.toml` and the `schemas/` directory to
-# `.jit/schemas/` in your own project.
+# use it, copy this file to `.jit/rules.toml`, `templates.toml` to
+# `.jit/templates.toml`, and the `schemas/` directory to `.jit/schemas/` in your
+# own project.
 #
 # SDD models the methodology where an epic's specification body is the single
 # canonical source of truth. The body has three structured sections:
@@ -18,11 +19,14 @@
 #   * a child issue that implements REQ-01 carries `satisfies:REQ-01`;
 #   * the graph rules below CHECK the labels against the canonical criteria.
 #
-# THE PLAN-BEFORE-FAN-OUT BRACKET (config.toml declares it; engine stays agnostic):
+# THE PLAN-BEFORE-FAN-OUT BRACKET (the `plan` template declares it; engine stays agnostic):
 #
-#   The companion `config.toml` declares `epic` a BREAKABLE container and adds two
+#   The companion `templates.toml` declares a `plan` template with
+#   `applies_to = ["epic"]` (making `epic` a BREAKABLE container) and two
 #   function-typed bracket node types — `planning` (`P`) and `breakdown` (`B`) —
-#   plus the three gate presets. A breakable epic is bracketed as the reduced spine
+#   each carrying its gate presets. (`planning`/`breakdown` are added to
+#   `config.toml`'s `[type_hierarchy]` so they are valid child types.) A breakable
+#   epic is bracketed by `jit apply plan <epic>` as the reduced spine
 #
 #     C(epic) ──dep→ {impl subgraph} ──dep→ B(type:breakdown) ──dep→ P(type:planning)
 #
@@ -225,7 +229,8 @@ assert = { label-coverage = { criteria-section = "success_criteria", marker = "[
 # tallies exactly the impl interior between `C` and `B` — a `satisfies:` label on
 # `P` (beyond the boundary) does not count.
 #
-# The deterministic `coverage-preview` gate on `B` (wired in config.toml) runs
+# The deterministic `coverage-preview` gate on `B` (attached to the breakdown node
+# by the `plan` template when `jit apply plan` scaffolds the bracket) runs
 # `jit validate --scope <C>`, which evaluates this rule; an uncovered `[hard]`
 # criterion BLOCKS the breakdown gate (exit 4). `enforce = true` makes the
 # severity blocking at scoped-validate time.

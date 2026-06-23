@@ -94,10 +94,14 @@ This overlaps the existing `research-librarian` skill (gf2), whose job is ingest
 
 Read the real definitions rather than guessing.
 
-**`[planning]` config** (`.jit/config.toml`) — read, never hardcode:
-- `breakable_types = ["epic"]` here; the **research ruleset uses `["goal"]`** (so "reproduce the article" is a `goal` container there). Skill must read this from config.
-- `planning_type = "planning"`, `breakdown_type = "breakdown"`, `plan_doc_location = "dev/active/{id}-plan.md"`.
-- `plan_gate_preset = "plan-review"`, `coverage_gate_preset = "coverage-preview"`, `breakdown_review_gate_preset = "breakdown-review"`.
+**Bracket vocabulary** — read, never hardcode. (HISTORICAL: at the time of this
+session this lived in a flat planning-config block in `.jit/config.toml`; epic
+9ac9fdac superseded it with the `plan` graph template in `.jit/templates.toml`,
+read via `TemplateRegistry`. The values below are unchanged, now sourced from the
+template:)
+- breakable container `["epic"]` here (the template's `applies_to`); the **research ruleset uses `["goal"]`** (so "reproduce the article" is a `goal` container there). Skill must read this from the template registry.
+- planning node `type = "planning"`, breakdown node `type = "breakdown"`, planning `doc = "dev/active/{container.id}-plan.md"`.
+- planning gate `plan-review`; breakdown gates `coverage-preview` + `breakdown-review`.
 
 **`plan-review` rubric** — it is an auto Exec gate (`codex exec` via `./scripts/ai-review.sh`, prompt `./scripts/plan-review-prompt.md`), run by the **standard runner**, so the skill leaves it PENDING (never runs it). Four verdict-affecting areas:
 
@@ -153,6 +157,6 @@ graph TD
 ## References
 
 - Issue `eed6750c`; epic `2fbd2a82` (planning bracket); milestone `9db27a3a` (v1.0).
-- `.jit/config.toml` `[planning]`; `crates/jit/src/gate_presets/planning.rs`; `scripts/plan-review-prompt.md`.
+- `.jit/templates.toml` `plan` template (originally a flat planning-config block in `.jit/config.toml`, superseded by epic 9ac9fdac); `crates/jit/src/gate_presets/planning.rs`; `scripts/plan-review-prompt.md`.
 - Research corpus: `../jit-research/{BMAD-METHOD,cc-sdd,get-shit-done,OpenSpec,ruflo,superpowers}`.
 - Memory: `project-planning-skill-gap`.

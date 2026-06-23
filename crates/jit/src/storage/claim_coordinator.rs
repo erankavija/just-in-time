@@ -246,6 +246,30 @@ impl ClaimCoordinator {
     /// Set `false` only in tests that verify in-memory/rebuild invariants
     /// rather than crash durability; it removes the per-write fsync that
     /// otherwise dominates I/O-heavy property tests.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::storage::worktree_paths::WorktreePaths;
+    /// use jit::storage::{ClaimCoordinator, FileLocker};
+    /// use std::time::Duration;
+    ///
+    /// let paths = WorktreePaths {
+    ///     common_dir: "/tmp/demo/.git".into(),
+    ///     worktree_root: "/tmp/demo".into(),
+    ///     local_jit: "/tmp/demo/.jit".into(),
+    ///     shared_jit: "/tmp/demo/.git/jit".into(),
+    /// };
+    /// // Builder: start fsync-on (the default), then opt out for a fast test run.
+    /// let coordinator = ClaimCoordinator::new(
+    ///     paths,
+    ///     FileLocker::new(Duration::from_secs(5)),
+    ///     "wt:demo".to_string(),
+    ///     "agent:demo".to_string(),
+    /// )
+    /// .with_fsync(false);
+    /// let _ = coordinator;
+    /// ```
     #[must_use]
     pub fn with_fsync(mut self, fsync: bool) -> Self {
         self.fsync = fsync;

@@ -138,50 +138,55 @@ fn test_sdd_example_declares_preview_coverage_rule() {
 }
 
 #[test]
-fn test_sdd_example_declares_planning_config() {
+fn test_sdd_example_declares_planning_template() {
     // The container/bracket TYPE NAMES and the wired gate presets live in the
-    // example's OWN config (config.toml), never in engine Rust. This proves the
-    // example declares its breakable container, the two bracket node types, and
-    // wires both gate presets (plan-review on P, coverage-preview on B).
+    // example's OWN `plan` template (templates.toml), never in engine Rust. This
+    // proves the example declares its breakable container, the two bracket node
+    // types, and wires both gate presets (plan-review on P, coverage-preview on B).
     let dir = example_dir("sdd");
-    let config_toml = std::fs::read_to_string(dir.join("config.toml"))
-        .expect("sdd example must ship a config.toml declaring the bracket");
-    let cfg: toml::Value =
-        toml::from_str(&config_toml).expect("sdd example config.toml must parse");
+    let templates_toml = std::fs::read_to_string(dir.join("templates.toml"))
+        .expect("sdd example must ship a templates.toml declaring the bracket");
+    let reg = jit::templates::TemplateRegistry::from_toml_str(
+        &templates_toml,
+        &["epic", "planning", "breakdown"],
+    )
+    .expect("sdd example templates.toml must load and validate");
 
-    let planning = cfg
-        .get("planning")
-        .expect("config.toml must declare a [planning] block");
+    let plan = reg
+        .get("plan")
+        .expect("templates.toml must declare a `plan` template");
     assert_eq!(
-        planning.get("breakable_types").and_then(|v| v.as_array()),
-        Some(&vec![toml::Value::String("epic".to_string())]),
+        plan.applies_to,
+        vec!["epic".to_string()],
         "the SDD example declares epic as its breakable container"
     );
     assert_eq!(
-        planning.get("planning_type").and_then(|v| v.as_str()),
+        plan.planning_type(),
         Some("planning"),
         "the planning bracket node type"
     );
     assert_eq!(
-        planning.get("breakdown_type").and_then(|v| v.as_str()),
+        plan.breakdown_type(),
         Some("breakdown"),
         "the breakdown bracket node type"
     );
     assert_eq!(
-        planning.get("plan_gate_preset").and_then(|v| v.as_str()),
-        Some("plan-review"),
+        plan.planning_node().map(|n| n.gates.as_slice()),
+        Some(["plan-review".to_string()].as_slice()),
         "plan-review wired on the planning node",
     );
-    assert_eq!(
-        planning
-            .get("coverage_gate_preset")
-            .and_then(|v| v.as_str()),
-        Some("coverage-preview"),
+    assert!(
+        plan.breakdown_node()
+            .is_some_and(|n| n.gates.iter().any(|g| g == "coverage-preview")),
         "coverage-preview wired on the breakdown node",
     );
 
-    // The bracket node types must also be declared in the type hierarchy so they
-    // are valid children of the breakable container.
+    // The config still declares the bracket node types in the type hierarchy so
+    // they are valid children of the breakable container.
+    let config_toml = std::fs::read_to_string(dir.join("config.toml"))
+        .expect("sdd example must ship a config.toml");
+    let cfg: toml::Value =
+        toml::from_str(&config_toml).expect("sdd example config.toml must parse");
     let types = cfg
         .get("type_hierarchy")
         .and_then(|t| t.get("types"))

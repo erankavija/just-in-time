@@ -164,7 +164,7 @@
   <table>
     <thead><tr><th>wave</th><th>delivered</th></tr></thead>
     <tbody>
-      <tr><td>1 · engine</td><td><code>[planning]</code> config + schema regen, <code>validate --scope</code>, transitive coverage</td></tr>
+      <tr><td>1 · engine</td><td>flat planning-config block (later superseded by the <code>.jit/templates.toml</code> graph template, epic 9ac9fdac) + schema regen, <code>validate --scope</code>, transitive coverage</td></tr>
       <tr><td>2 · plumbing</td><td>plan-doc resolver, plan-review + coverage-preview presets</td></tr>
       <tr><td>3 · surface</td><td><code>jit plan</code> / <code>--with-planning</code>, SDD + research examples</td></tr>
       <tr><td>4 · orchestrate</td><td>jit-breakdown builds the spine; concept + how-to docs</td></tr>
@@ -189,7 +189,7 @@
       <p><code>goal</code> is breakable (<b>no epic</b>); <code>[hard]</code> hypotheses tested by experiments.</p>
     </div>
   </div>
-  <div class="note">Verified repeatedly: no <code>epic</code> / <code>planning</code> / <code>breakdown</code> string literals in production Rust — every type name flows from <code>[planning]</code> config.</div>
+  <div class="note">Verified repeatedly: no <code>epic</code> / <code>planning</code> / <code>breakdown</code> string literals in production Rust — every type name flows from config (the flat planning-config block then, the <code>.jit/templates.toml</code> graph template now).</div>
 </section>
 
 <!-- ── STEERING EVAL ───────────────────────────────────────────────────── -->

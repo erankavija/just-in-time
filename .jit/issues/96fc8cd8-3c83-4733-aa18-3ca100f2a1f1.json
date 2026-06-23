@@ -2,7 +2,7 @@
   "id": "96fc8cd8-3c83-4733-aa18-3ca100f2a1f1",
   "title": "Migrate remaining planning-config consumers; remove the flat config",
   "description": "Move the remaining planning-config consumers onto the template registry, then remove the flat configuration.\n\nMigrate scoped-validation boundary lookup and plan-content resolution to derive from templates, drop the planning-config struct and its load-time validation, and remove the flat configuration block from this repo's config and from the copyable example configs.\n\n## Success Criteria\n- [ ] [hard] CONFIG-01: Scoped validation still halts at the breakdown node, with the boundary derived from the template.\n- [ ] [hard] CONFIG-02: Plan-content resolution derives breakable types and doc location from the template.\n- [ ] [hard] CONFIG-03: The planning-config struct and every flat config block are gone; a repo-wide scan (including example configs) finds none.\n- [ ] [hard] CONFIG-04: Validation behavior is unchanged for a bracketed container.",
-  "state": "backlog",
+  "state": "done",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -12,7 +12,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-23T20:09:14.793014127Z"
+    },
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-23T20:08:21.996675642Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -23,5 +34,5 @@
     "story:planning-config-removal"
   ],
   "created_at": "2026-06-22T21:59:04.457181794+00:00",
-  "updated_at": "2026-06-23T12:38:01.632525246+00:00"
+  "updated_at": "2026-06-23T20:11:04.256594995+00:00"
 }
