@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "62beb285-9e71-4c00-be89-02466a8ba206",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "57f52018-cbc2-4b1f-9d9d-1c64ab942517",
+  "commit": "459dff81564048a189a6e910f9416ecb8e27a4a2",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-06-23T21:00:12.460420673Z",
+  "completed_at": "2026-06-23T21:00:58.796735950Z",
+  "duration_ms": 46336,
+  "exit_code": 1,
+  "stdout": "**Acceptance Criteria**\n\nRESEED-01 is functionally met for description text. The two target planning nodes now match the active `plan` template wording from [.jit/templates.toml](/home/vkaskivuo/Projects/just-in-time/.jit/templates.toml:22):\n\n- [.jit/issues/1eb0bdfd-ee5a-432d-97b1-c0cd45385c97.json](/home/vkaskivuo/Projects/just-in-time/.jit/issues/1eb0bdfd-ee5a-432d-97b1-c0cd45385c97.json:4)\n- [.jit/issues/2937919f-87ba-4170-812f-23a8d168f08c.json](/home/vkaskivuo/Projects/just-in-time/.jit/issues/2937919f-87ba-4170-812f-23a8d168f08c.json:4)\n\n**Prior Review Feedback**\n\nBlocking prior feedback remains unresolved. The issue descriptions and `updated_at` fields changed, but the appended event range in [.jit/events.jsonl](/home/vkaskivuo/Projects/just-in-time/.jit/events.jsonl:3229) through [.jit/events.jsonl](/home/vkaskivuo/Projects/just-in-time/.jit/events.jsonl:3254) contains claims and gate events only. There is still no `issue_updated` event for either `1eb0bdfd-ee5a-432d-97b1-c0cd45385c97` or `2937919f-87ba-4170-812f-23a8d168f08c` recording the description mutation. Repository-local issue state changes must be event logged, so this is blocking.\n\n**Architecture And Separation Of Concerns**\n\nNo production boundary violation found in the Rust diff. The Rust changes are test-only additions under command/integration test surfaces.\n\n**Functional Paradigm**\n\nNo blocking concern. The new imperative traversal code is test-only graph assertion code and is acceptable.\n\n**Correctness And Invariants**\n\nBlocking: event logging invariant is violated for the manual data repair. The issue JSON files were directly mutated without corresponding `issue_updated` events in `events.jsonl`.\n\nNo new PID, unsafe, label-format, assignee-format, or gate-transition regression found in the reviewed diff.\n\n**Safety**\n\nNo unsafe code introduced in the reviewed changes.\n\n**Testing And Lint**\n\nI did not run cargo tests because the issue context reports `cargo-ci` passed and the prompt says not to rerun tests when that gate succeeded.\n\nI ran `./scripts/jit-validate.sh`; it passed with label warnings only, which are allowed.\n\n**Error Handling**\n\nNo new production fallible paths were added. New `unwrap()` and `expect()` usage appears in tests only.\n\n**CLI Contract**\n\nNo CLI contract regression found. Added CLI coverage continues to exercise `--json`.\n\n**Documentation**\n\nNo new public API surface requiring documentation was introduced.\n\n**Jit Issue Management**\n\nThe prerequisite issue `96fc8cd8` is marked `done` with both required gates passed in [.jit/issues/96fc8cd8-3c83-4733-aa18-3ca100f2a1f1.json](/home/vkaskivuo/Projects/just-in-time/.jit/issues/96fc8cd8-3c83-4733-aa18-3ca100f2a1f1.json:5). `jit-validate` passed with allowed warnings.\n\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 5133 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.137.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019ef648-95e3-72b0-be8e-ee11baaa8461\n--------\nuser\n--- 5120 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

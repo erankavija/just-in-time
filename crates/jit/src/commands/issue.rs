@@ -229,14 +229,28 @@ impl<S: IssueStore> CommandExecutor<S> {
             issue.labels.retain(|l| l != label);
         }
 
-        // Whether the edits actually changed the issue (not merely whether
-        // edit flags were provided). Drives whether a gate-blocked `--state
-        // done` must still persist the issue to keep real edits.
-        let has_field_edits = issue.title != original_title
-            || issue.description != original_description
-            || issue.priority != original_priority
-            || issue.labels != original_labels
-            || issue.content_format != original_content_format;
+        // Which editable fields actually changed (not merely whether edit flags
+        // were provided). Drives whether a gate-blocked `--state done` must still
+        // persist the issue to keep real edits, and supplies the `issue_updated`
+        // event's field list (mirroring `bulk_update`, which logs the same event
+        // for content edits).
+        let mut changed_fields = Vec::new();
+        if issue.title != original_title {
+            changed_fields.push("title".to_string());
+        }
+        if issue.description != original_description {
+            changed_fields.push("description".to_string());
+        }
+        if issue.priority != original_priority {
+            changed_fields.push("priority".to_string());
+        }
+        if issue.labels != original_labels {
+            changed_fields.push("labels".to_string());
+        }
+        if issue.content_format != original_content_format {
+            changed_fields.push("content_format".to_string());
+        }
+        let has_field_edits = !changed_fields.is_empty();
 
         let old_state = issue.state;
 
@@ -320,6 +334,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 &mut issue,
                 old_state,
                 persist,
+                &changed_fields,
                 &validation.bypassed_rules,
                 force,
             );
@@ -355,6 +370,18 @@ impl<S: IssueStore> CommandExecutor<S> {
                     let event = Event::new_issue_completed(full_id.clone());
                     self.storage.append_event(&event)?;
                 }
+            }
+
+            // Log the field-edit event (after the save), mirroring `bulk_update`
+            // so every content mutation is captured in the event log, not only
+            // state transitions.
+            if !changed_fields.is_empty() {
+                let event = Event::new_issue_updated(
+                    full_id.clone(),
+                    "issue-update".to_string(),
+                    changed_fields,
+                );
+                self.storage.append_event(&event)?;
             }
         }
 
@@ -477,7 +504,14 @@ impl<S: IssueStore> CommandExecutor<S> {
                     let persist = old_state != State::Gated;
                     // This path runs no local-rule validation, so there are no
                     // bypassed rules to log; it also carries no --force flag.
-                    return self.handle_gate_blocking(&mut issue, old_state, persist, &[], false);
+                    return self.handle_gate_blocking(
+                        &mut issue,
+                        old_state,
+                        persist,
+                        &[],
+                        &[],
+                        false,
+                    );
                 }
             }
             State::Gated => {
@@ -758,6 +792,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue: &mut Issue,
         old_state: State,
         persist: bool,
+        changed_fields: &[String],
         bypassed_rules: &[String],
         force: bool,
     ) -> Result<Vec<String>> {
@@ -804,6 +839,18 @@ impl<S: IssueStore> CommandExecutor<S> {
             if old_state != State::Gated {
                 let event =
                     Event::new_issue_state_changed(issue_id.clone(), old_state, State::Gated);
+                self.storage.append_event(&event)?;
+            }
+
+            // Log the field-edit event for any persisted content changes, so a
+            // gate-blocked `--state done` that still keeps real edits records them
+            // (same contract as the non-blocked path and `bulk_update`).
+            if !changed_fields.is_empty() {
+                let event = Event::new_issue_updated(
+                    issue_id.clone(),
+                    "issue-update".to_string(),
+                    changed_fields.to_vec(),
+                );
                 self.storage.append_event(&event)?;
             }
         }
@@ -1276,11 +1323,25 @@ enforce_leases = "off"
             after.title, "New Title",
             "field edits must persist even when done is gate-blocked"
         );
+        // The persisted title edit is event-logged (no spurious gated -> gated
+        // state-change event, but the field edit itself must be recorded).
+        let events = executor.storage.read_events().unwrap();
         assert_eq!(
-            executor.storage.read_events().unwrap().len(),
-            events_after_first,
-            "no spurious gated -> gated state-change event should be logged"
+            events.len(),
+            events_after_first + 1,
+            "the persisted field edit must append exactly one issue_updated event"
         );
+        let logged = events
+            .iter()
+            .find(|e| e.get_type() == "issue_updated" && e.get_issue_id() == issue_id)
+            .expect("a gate-blocked field edit must log an issue_updated event");
+        match logged {
+            Event::IssueUpdated { fields, .. } => assert!(
+                fields.iter().any(|f| f == "title"),
+                "issue_updated must record the changed field, got: {fields:?}"
+            ),
+            other => panic!("expected IssueUpdated, got {other:?}"),
+        }
     }
 
     /// Providing an edit flag whose value matches the current value (e.g.
@@ -1417,6 +1478,50 @@ enforce_leases = "off"
             events_before,
             "a no-change issue update must not append events"
         );
+    }
+
+    #[test]
+    fn test_update_issue_description_logs_issue_updated_event() {
+        let executor = setup();
+
+        let issue = crate::domain::Issue::new("Test".to_string(), "old".to_string());
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(issue).unwrap();
+        let events_before = executor.storage.read_events().unwrap().len();
+
+        // A real description edit must be captured in the event log, not only
+        // state transitions (mirrors the bulk-update event-logging contract).
+        executor
+            .update_issue(
+                &issue_id,
+                None,
+                Some("new description".to_string()),
+                None,
+                None,
+                vec![],
+                vec![],
+                None,
+                false,
+            )
+            .unwrap();
+
+        let events = executor.storage.read_events().unwrap();
+        assert_eq!(
+            events.len(),
+            events_before + 1,
+            "a description edit must append exactly one event"
+        );
+        let logged = events
+            .iter()
+            .find(|e| e.get_type() == "issue_updated" && e.get_issue_id() == issue_id)
+            .expect("description edit must log an issue_updated event");
+        match logged {
+            Event::IssueUpdated { fields, .. } => assert!(
+                fields.iter().any(|f| f == "description"),
+                "issue_updated must record the changed field, got: {fields:?}"
+            ),
+            other => panic!("expected IssueUpdated, got {other:?}"),
+        }
     }
 
     #[test]

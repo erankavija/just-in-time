@@ -1,7 +1,7 @@
 {
   "id": "2937919f-87ba-4170-812f-23a8d168f08c",
   "title": "Plan: Agent-facing CLI ergonomics: gate verdicts, --json contract, and workflow primitives",
-  "description": "",
+  "description": "Planning node for Agent-facing CLI ergonomics: gate verdicts, --json contract, and workflow primitives (53e3fa36). Produce the plan that decomposes this container before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Plan document: dev/active/53e3fa36-c0cb-4206-8e8e-0a21aafb213e-plan.md.",
   "state": "done",
   "priority": "high",
   "assignee": "agent:claude",
@@ -30,5 +30,5 @@
     "type:planning"
   ],
   "created_at": "2026-06-21T20:44:33.340215081+00:00",
-  "updated_at": "2026-06-22T21:09:08.153324094+00:00"
+  "updated_at": "2026-06-23T21:09:03.107270252+00:00"
 }

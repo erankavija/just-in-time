@@ -2,7 +2,7 @@
   "id": "c8aa199e-4191-4c41-b085-a08c4785ef5f",
   "title": "Update user docs; reconcile the bracket-id convention",
   "description": "Update the user docs and make the bracket-pointer id convention consistent.\n\n## Success Criteria\n- [ ] [hard] DOCB-01: the user docs reference the new command and no removed-command references remain.\n- [ ] [hard] DOCB-02: the bracket-pointer id convention is consistent across template, tests, and docs.\n- [ ] [hard] DOCB-03: the user docs state that a project without the planning bracket needs no migration and document the opt-in path — declaring planning and breakdown types plus a plan template.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -22,5 +22,5 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-06-22T22:28:29.482595821+00:00",
-  "updated_at": "2026-06-23T06:25:36.125901767+00:00"
+  "updated_at": "2026-06-23T21:29:37.787889857+00:00"
 }
