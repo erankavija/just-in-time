@@ -20,15 +20,28 @@ fn setup_coordinator(temp_dir: &TempDir) -> ClaimCoordinator {
     };
 
     let locker = FileLocker::new(std::time::Duration::from_secs(5));
+    // fsync(false): these properties verify index/rebuild invariants, not crash
+    // durability. An fsync per write costs ~10ms; with hundreds of cases each
+    // doing several writes, leaving it on made these tests minutes long.
     let coordinator = ClaimCoordinator::new(
         paths,
         locker,
         "wt:proptest".to_string(),
         "agent:proptest".to_string(),
-    );
+    )
+    .with_fsync(false);
 
     coordinator.init().unwrap();
     coordinator
+}
+
+// Config for file-touching properties. Each case creates a temp dir and does
+// several real filesystem writes/reads, so the default 256 cases pushed these
+// tests to seconds (and minutes with fsync on). 64 cases keeps every test well
+// under the 1s budget while still exercising a wide range of generated inputs.
+// Pure-logic properties below keep the default 256 cases (they are already fast).
+fn io_config() -> ProptestConfig {
+    ProptestConfig::with_cases(64)
 }
 
 // Generator for valid issue IDs
@@ -50,6 +63,7 @@ fn ttl_strategy() -> impl Strategy<Value = u64> {
 // Property 1: Index rebuild produces consistent results
 // The same log rebuilt twice produces the same set of active issues
 proptest! {
+    #![proptest_config(io_config())]
     #[test]
     fn prop_index_rebuild_idempotent(
         issue_ids in prop::collection::vec(issue_id_strategy(), 1..10),
@@ -85,6 +99,7 @@ proptest! {
 // Property 2: Lease count invariant
 // Number of active leases = acquires - (releases + evictions)
 proptest! {
+    #![proptest_config(io_config())]
     #[test]
     fn prop_lease_count_invariant(
         issue_ids in prop::collection::vec(issue_id_strategy(), 1..10),
@@ -124,6 +139,7 @@ proptest! {
 
 // Property 3: Sequence numbers are strictly increasing with no gaps
 proptest! {
+    #![proptest_config(io_config())]
     #[test]
     fn prop_sequence_numbers_monotonic(
         operations in prop::collection::vec(
@@ -178,6 +194,7 @@ proptest! {
 
 // Property 4: Concurrent claims - exactly one succeeds per issue
 proptest! {
+    #![proptest_config(io_config())]
     #[test]
     fn prop_concurrent_claims_exclusive(
         thread_count in 2u8..21u8,  // 2-20 threads
@@ -217,6 +234,7 @@ proptest! {
 // Property 5: No data loss in index rebuild
 // Every acquired lease appears in rebuilt index (unless expired/released)
 proptest! {
+    #![proptest_config(io_config())]
     #[test]
     fn prop_no_data_loss_in_rebuild(
         issue_ids in prop::collection::hash_set(issue_id_strategy(), 1..10)
@@ -255,6 +273,7 @@ proptest! {
 
 // Property 7: Concurrent claims on different issues succeed
 proptest! {
+    #![proptest_config(io_config())]
     #[test]
     fn prop_concurrent_different_issues_succeed(
         issue_ids in prop::collection::hash_set(issue_id_strategy(), 2..10)
@@ -372,6 +391,7 @@ proptest! {
 
 // Property 10: Staleness field is correctly set during index rebuild
 proptest! {
+    #![proptest_config(io_config())]
     #[test]
     fn prop_staleness_computed_during_rebuild(
         issue_ids in prop::collection::vec(issue_id_strategy(), 1..5)

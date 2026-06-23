@@ -209,6 +209,12 @@ pub struct ClaimCoordinator {
     locker: FileLocker,
     worktree_id: String,
     agent_id: String,
+    /// Whether to fsync the audit log and index on every write. Defaults to
+    /// `true` for crash durability in production. Tests that exercise pure
+    /// index/rebuild logic (not crash recovery) disable it via
+    /// [`ClaimCoordinator::with_fsync`]: an fsync costs ~10ms and property
+    /// tests do hundreds of writes, so leaving it on makes them minutes long.
+    fsync: bool,
 }
 
 impl ClaimCoordinator {
@@ -231,7 +237,19 @@ impl ClaimCoordinator {
             locker,
             worktree_id,
             agent_id,
+            fsync: true,
         }
+    }
+
+    /// Override the fsync-on-write behavior (see the `fsync` field).
+    ///
+    /// Set `false` only in tests that verify in-memory/rebuild invariants
+    /// rather than crash durability; it removes the per-write fsync that
+    /// otherwise dominates I/O-heavy property tests.
+    #[must_use]
+    pub fn with_fsync(mut self, fsync: bool) -> Self {
+        self.fsync = fsync;
+        self
     }
 
     /// Initialize control plane directories
@@ -538,9 +556,11 @@ impl ClaimCoordinator {
         fs::write(&temp_path, json)?;
 
         // Fsync for durability
-        let file = fs::File::open(&temp_path)?;
-        file.sync_all()?;
-        drop(file);
+        if self.fsync {
+            let file = fs::File::open(&temp_path)?;
+            file.sync_all()?;
+            drop(file);
+        }
 
         // Atomic rename
         fs::rename(temp_path, index_path)?;
@@ -598,7 +618,9 @@ impl ClaimCoordinator {
             .append(true)
             .open(&log_path)?;
         file.write_all(line.as_bytes())?;
-        file.sync_all()?; // Fsync for durability
+        if self.fsync {
+            file.sync_all()?; // Fsync for durability
+        }
 
         Ok(())
     }

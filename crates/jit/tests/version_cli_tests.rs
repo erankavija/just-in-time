@@ -68,7 +68,13 @@ fn test_version_command_reports_json_provenance_without_repo() {
     assert!(json.get("target").is_some());
 }
 
+// Ignored from the default suite: this spawns a fresh `cargo run` into a clean
+// CARGO_TARGET_DIR, forcing a full cold compile (~85s) to exercise the build
+// script under a specific git state. Compilation is intrinsic to what it tests,
+// so it cannot meet the per-test speed budget. Run on demand / in CI with:
+//   cargo test -p jit --test version_cli_tests -- --ignored
 #[test]
+#[ignore = "full cold rebuild (~85s); run explicitly with --ignored"]
 fn test_version_build_without_git_metadata_reports_unknowns() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let workspace_root = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -100,7 +106,10 @@ fn test_version_build_without_git_metadata_reports_unknowns() {
     assert_eq!(json["build_timestamp"].as_str(), Some("0"));
 }
 
+// Ignored from the default suite (full cold rebuild ~85s). See the note on
+// test_version_build_without_git_metadata_reports_unknowns. Run with --ignored.
 #[test]
+#[ignore = "full cold rebuild (~85s); run explicitly with --ignored"]
 fn test_version_build_from_clean_git_checkout_reports_not_dirty() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let source_dir = clean_git_checkout(&temp_dir);
@@ -118,7 +127,10 @@ fn test_version_build_from_clean_git_checkout_reports_not_dirty() {
     assert_eq!(json["git_dirty"].as_bool(), Some(false));
 }
 
+// Ignored from the default suite (full cold rebuild ~85s). See the note on
+// test_version_build_without_git_metadata_reports_unknowns. Run with --ignored.
 #[test]
+#[ignore = "full cold rebuild (~85s); run explicitly with --ignored"]
 fn test_version_build_from_untracked_dirty_checkout_reports_dirty() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let source_dir = clean_git_checkout(&temp_dir);

@@ -59,11 +59,13 @@ ensure_real_cargo
 export TMPDIR="${CARGO_CI_TMPDIR:-${XDG_CACHE_HOME:-$HOME/.cache}/jit-cargo-ci-tmp}"
 mkdir -p "$TMPDIR"
 
-# Single-threaded test harness: avoids a pre-existing load-sensitive concurrency
-# proptest (storage::claim_coordinator prop_concurrent_different_issues_succeed)
-# flaking when heavy parallel build+test load starves its file-lock timeout.
-# All tests still run; only scheduling changes. Overridable.
-export RUST_TEST_THREADS="${RUST_TEST_THREADS:-1}"
+# Parallel test harness across 20 threads. The suite is I/O-bound (the
+# storage::claim_coordinator proptests do real filesystem locking over hundreds
+# of cases each), so serial execution pushed the gate past two minutes. Capped
+# at 20 (not nproc) to leave headroom: a pre-existing load-sensitive concurrency
+# proptest (prop_concurrent_different_issues_succeed) can starve its file-lock
+# timeout when every core is saturated by parallel build+test load. Overridable.
+export RUST_TEST_THREADS="${RUST_TEST_THREADS:-20}"
 
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
