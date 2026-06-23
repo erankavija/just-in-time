@@ -1,0 +1,49 @@
+{
+  "epic_id": "9ac9fdac-828a-40f2-9d73-71af14f44ff8",
+  "epic_short_id": "9ac9fdac",
+  "title": "Graph templates: configurable parameterized subgraphs applied to the work DAG",
+  "current_wave": 1,
+  "notes": "Breakdown + bracket gates (coverage-preview, breakdown-review) already PASSED. Impl interior = 6 stories + 13 leaf tasks. P(7d88e37d)/B(59118ee9) done. Dispatch per leaf task in topo order; close each story when its tasks land. Epic stays backlog (blocked) until all children done. RESOLVED pre-existing repo-wide blocker (commit 46374a1): code-review gate requires jit-validate green, which failed on 16 epics missing plan docs + isolated probe 313e01f6 + 10 redundant edges. User approved stub-plan-doc backfill. W1 task 45e7f203: cargo-ci PASSED, code-review rework in progress (add # Examples to 6 public types).",
+  "blocker_log": [
+    {"date": "2026-06-23", "blocker": "repo-wide jit-validate failure blocks all code-review gates", "resolution": "commit 46374a1: backfill 16 stub plan docs (user-approved), connect probe 313e01f6, jit validate --fix (10 redundant edges)", "note": "Durable fix for validation-lifecycle-inversion (require plan docs only for non-terminal breakable epics) deferred as separate concern."}
+  ],
+  "waves": [
+    {"wave_number": 1, "issues": [
+      {"id": "45e7f203-ffa9-414a-927a-33fe32ee3d32", "short_id": "45e7f203", "title": "Template and node types; templates.toml loader", "classification": "implementation", "status": "pending", "story": "template-registry (04559558)"}
+    ]},
+    {"wave_number": 2, "issues": [
+      {"id": "8b15b679", "short_id": "8b15b679", "title": "Author the plan template and registry accessors", "classification": "implementation", "status": "pending", "story": "template-registry (04559558)", "closes_story": "04559558"}
+    ]},
+    {"wave_number": 3, "issues": [
+      {"id": "14137e1a", "short_id": "14137e1a", "title": "apply_template core: validate, snapshot, instantiate", "classification": "implementation", "status": "pending", "story": "apply-engine (643874f2)"}
+    ]},
+    {"wave_number": 4, "issues": [
+      {"id": "73e5e853", "short_id": "73e5e853", "title": "Edge wiring and move-upstream-to-role transform", "classification": "implementation", "status": "pending", "story": "apply-engine (643874f2)", "closes_story": "643874f2"}
+    ]},
+    {"wave_number": 5, "issues": [
+      {"id": "9cccfe0c", "short_id": "9cccfe0c", "title": "Add the apply command plumbing (additive)", "classification": "implementation", "status": "pending", "story": "scaffold-switch (3143ad87)"}
+    ]},
+    {"wave_number": 6, "issues": [
+      {"id": "e75805f6", "short_id": "e75805f6", "title": "Atomically switch the scaffold and update breakdown", "classification": "implementation", "status": "pending", "story": "scaffold-switch (3143ad87)", "closes_story": "3143ad87"}
+    ]},
+    {"wave_number": 7, "issues": [
+      {"id": "c703a4b3", "short_id": "c703a4b3", "title": "Migrate scoped validation and plan-content to templates", "classification": "implementation", "status": "pending", "story": "planning-config-removal (96fc8cd8)"}
+    ]},
+    {"wave_number": 8, "issues": [
+      {"id": "3a7e13cf", "short_id": "3a7e13cf", "title": "Remove the planning-config struct and flat blocks", "classification": "implementation", "status": "pending", "story": "planning-config-removal (96fc8cd8)", "closes_story": "96fc8cd8"}
+    ]},
+    {"wave_number": 9, "issues": [
+      {"id": "6e38a577", "short_id": "6e38a577", "title": "Migrate skills and memory to apply plan", "classification": "documentation", "status": "pending", "story": "skills-docs-migration (adc640e4)"},
+      {"id": "840e155c", "short_id": "840e155c", "title": "Unit, integration, and property tests", "classification": "implementation", "status": "pending", "story": "template-testing-dogfood (99a0c161)"},
+      {"id": "57f52018", "short_id": "57f52018", "title": "Reseed the existing empty planning-node descriptions", "classification": "implementation", "status": "pending", "story": "template-testing-dogfood (99a0c161)"}
+    ]},
+    {"wave_number": 10, "issues": [
+      {"id": "c8aa199e", "short_id": "c8aa199e", "title": "Update user docs; reconcile the bracket-id convention", "classification": "documentation", "status": "pending", "story": "skills-docs-migration (adc640e4)", "closes_story": "adc640e4"},
+      {"id": "fc414353", "short_id": "fc414353", "title": "Dogfood apply plan on a real container", "classification": "implementation", "status": "pending", "story": "template-testing-dogfood (99a0c161)", "closes_story": "99a0c161"}
+    ]}
+  ],
+  "created_during_execution": [],
+  "escalations": [],
+  "rework_counts": {},
+  "started_at": "2026-06-23T07:00:00Z"
+}

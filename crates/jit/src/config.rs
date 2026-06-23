@@ -600,6 +600,19 @@ impl JitConfig {
             }
         }
 
+        // Load and validate `.jit/templates.toml` at config time, mirroring the
+        // `[planning]` guard above: an absent file is fine (empty registry), an
+        // invalid template fails config load with a descriptive error. Node
+        // `type`s are checked against `[type_hierarchy].types` when a hierarchy
+        // is configured (an empty slice skips that check).
+        let hierarchy_types: Vec<&str> = config
+            .type_hierarchy
+            .as_ref()
+            .map(|h| h.types.keys().map(|s| s.as_str()).collect())
+            .unwrap_or_default();
+        crate::templates::TemplateRegistry::load(jit_root, &hierarchy_types)
+            .context("invalid .jit/templates.toml")?;
+
         Ok(config)
     }
 }
