@@ -6,9 +6,7 @@
   "priority": "normal",
   "assignee": null,
   "dependencies": [
-    "59118ee9-185d-4a4e-8804-4cdeef88a1d4",
-    "8b15b679-337c-4841-a708-596498328313",
-    "45e7f203-ffa9-414a-927a-33fe32ee3d32"
+    "8b15b679-337c-4841-a708-596498328313"
   ],
   "gates_required": [
     "cargo-ci",
@@ -25,5 +23,5 @@
     "story:template-registry"
   ],
   "created_at": "2026-06-22T21:59:04.435372907+00:00",
-  "updated_at": "2026-06-22T22:28:29.349144913+00:00"
+  "updated_at": "2026-06-23T12:38:01.629951755+00:00"
 }

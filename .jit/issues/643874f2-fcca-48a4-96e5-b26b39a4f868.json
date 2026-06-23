@@ -6,9 +6,7 @@
   "priority": "normal",
   "assignee": null,
   "dependencies": [
-    "04559558-289f-4325-891a-7b08532978a9",
-    "73e5e853-c8b5-4b65-b559-13cbb683f4c5",
-    "14137e1a-03e9-4da7-91e9-c28ed50efae8"
+    "73e5e853-c8b5-4b65-b559-13cbb683f4c5"
   ],
   "gates_required": [
     "cargo-ci",
@@ -28,5 +26,5 @@
     "story:apply-engine"
   ],
   "created_at": "2026-06-22T21:59:04.442748529+00:00",
-  "updated_at": "2026-06-23T06:22:20.397626009+00:00"
+  "updated_at": "2026-06-23T12:38:01.631478446+00:00"
 }

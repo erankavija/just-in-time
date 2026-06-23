@@ -6,9 +6,7 @@
   "priority": "normal",
   "assignee": null,
   "dependencies": [
-    "3a7e13cf-487d-42f1-b38e-7e027904b315",
-    "3143ad87-1991-4873-a013-9456cea7234a",
-    "c703a4b3-5e9c-4919-ba82-98727d20b21a"
+    "3a7e13cf-487d-42f1-b38e-7e027904b315"
   ],
   "gates_required": [
     "cargo-ci",
@@ -25,5 +23,5 @@
     "story:planning-config-removal"
   ],
   "created_at": "2026-06-22T21:59:04.457181794+00:00",
-  "updated_at": "2026-06-22T22:28:29.459659385+00:00"
+  "updated_at": "2026-06-23T12:38:01.632525246+00:00"
 }

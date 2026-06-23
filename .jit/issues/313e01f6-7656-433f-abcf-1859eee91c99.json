@@ -5,7 +5,9 @@
   "state": "rejected",
   "priority": "normal",
   "assignee": null,
-  "dependencies": [],
+  "dependencies": [
+    "59118ee9-185d-4a4e-8804-4cdeef88a1d4"
+  ],
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -20,5 +22,5 @@
     "satisfies:REQ-01"
   ],
   "created_at": "2026-06-22T21:57:52.356514875+00:00",
-  "updated_at": "2026-06-22T22:00:40.714306613+00:00"
+  "updated_at": "2026-06-23T12:37:27.025681925+00:00"
 }
