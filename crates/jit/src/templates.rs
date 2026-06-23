@@ -54,7 +54,7 @@ use thiserror::Error;
 /// role = "a"
 /// type = "planning"
 /// "#;
-/// let err = TemplateRegistry::from_toml_str(toml, &["planning"]).unwrap_err();
+/// let err = TemplateRegistry::from_toml_str(toml, &["epic", "planning"]).unwrap_err();
 /// assert!(matches!(err, TemplateConfigError::DuplicateRole { .. }));
 /// ```
 #[derive(Debug, Error)]
@@ -126,6 +126,16 @@ pub enum TemplateConfigError {
         /// The role of the offending node.
         role: String,
         /// The undeclared type name.
+        type_name: String,
+    },
+
+    /// An `applies_to` entry names a container type absent from
+    /// `[type_hierarchy].types`.
+    #[error("template '{template}': applies_to contains '{type_name}', which is not declared in [type_hierarchy].types")]
+    UnknownAppliesToType {
+        /// Name of the offending template.
+        template: String,
+        /// The undeclared container type name.
         type_name: String,
     },
 
@@ -254,7 +264,7 @@ pub struct AnchorSlot {
 /// role = "planning"
 /// type = "planning"
 /// "#;
-/// let reg = TemplateRegistry::from_toml_str(toml, &["planning", "breakdown"]).unwrap();
+/// let reg = TemplateRegistry::from_toml_str(toml, &["epic", "planning", "breakdown"]).unwrap();
 /// let node = &reg.get("plan").unwrap().nodes[0];
 /// assert_eq!(node.role, "breakdown");
 /// assert_eq!(node.type_name, "breakdown");
@@ -375,6 +385,62 @@ impl TemplateRegistry {
         self.templates.iter().find(|t| t.name == name)
     }
 
+    /// The set of breakable container types: the union of every template's
+    /// `applies_to`, deduplicated, in first-seen order.
+    ///
+    /// This is the template-registry equivalent of `PlanningConfig.breakable_types`:
+    /// a container type appears here iff some template may be applied to it.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::templates::TemplateRegistry;
+    ///
+    /// let toml = r#"
+    /// [[template]]
+    /// name = "plan"
+    /// applies_to = ["epic", "milestone"]
+    /// [[template]]
+    /// name = "other"
+    /// applies_to = ["epic"]
+    /// "#;
+    /// let reg = TemplateRegistry::from_toml_str(toml, &["epic", "milestone"]).unwrap();
+    /// assert_eq!(reg.breakable_types(), vec!["epic".to_string(), "milestone".to_string()]);
+    /// ```
+    pub fn breakable_types(&self) -> Vec<String> {
+        let mut seen = HashSet::new();
+        self.templates
+            .iter()
+            .flat_map(|t| t.applies_to.iter())
+            .filter(|ty| seen.insert(ty.as_str()))
+            .cloned()
+            .collect()
+    }
+
+    /// The template applicable to a container `type` (e.g. `"epic"`): the first
+    /// template whose `applies_to` lists that type, or `None` when no template
+    /// brackets it.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::templates::TemplateRegistry;
+    ///
+    /// let toml = r#"
+    /// [[template]]
+    /// name = "plan"
+    /// applies_to = ["epic"]
+    /// "#;
+    /// let reg = TemplateRegistry::from_toml_str(toml, &["epic"]).unwrap();
+    /// assert_eq!(reg.template_for_container("epic").unwrap().name, "plan");
+    /// assert!(reg.template_for_container("task").is_none());
+    /// ```
+    pub fn template_for_container(&self, container_type: &str) -> Option<&GraphTemplate> {
+        self.templates
+            .iter()
+            .find(|t| t.applies_to.iter().any(|ty| ty == container_type))
+    }
+
     /// Load and validate `.jit/templates.toml` relative to the given `.jit` root.
     ///
     /// Returns an empty registry when the file does not exist. `hierarchy_types`
@@ -425,7 +491,7 @@ impl TemplateRegistry {
     /// role = "planning"
     /// type = "planning"
     /// "#;
-    /// let reg = TemplateRegistry::from_toml_str(toml, &["planning"]).unwrap();
+    /// let reg = TemplateRegistry::from_toml_str(toml, &["epic", "planning"]).unwrap();
     /// assert_eq!(reg.templates[0].name, "plan");
     /// ```
     pub fn from_toml_str<S: AsRef<str>>(
@@ -458,7 +524,182 @@ impl TemplateRegistry {
     }
 }
 
+/// Conventional role of the planning node within a `plan`-shaped template.
+///
+/// Roles are template metadata (not stored on created issues); the `plan`
+/// template models the planning node `P` with this role. Accessors that derive
+/// the bracket vocabulary (planning type, doc location) look it up by name.
+///
+/// # Examples
+///
+/// ```
+/// use jit::templates::PLANNING_ROLE;
+///
+/// assert_eq!(PLANNING_ROLE, "planning");
+/// ```
+pub const PLANNING_ROLE: &str = "planning";
+
+/// Conventional role of the breakdown node within a `plan`-shaped template.
+///
+/// The breakdown node `B` carries this role. Accessors that derive the
+/// breakdown type look it up by name.
+///
+/// # Examples
+///
+/// ```
+/// use jit::templates::BREAKDOWN_ROLE;
+///
+/// assert_eq!(BREAKDOWN_ROLE, "breakdown");
+/// ```
+pub const BREAKDOWN_ROLE: &str = "breakdown";
+
 impl GraphTemplate {
+    /// The node carrying the given `role`, or `None` if no node declares it.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::templates::{TemplateRegistry, PLANNING_ROLE};
+    ///
+    /// let toml = r#"
+    /// [[template]]
+    /// name = "plan"
+    /// applies_to = ["epic"]
+    /// [[template.nodes]]
+    /// role = "planning"
+    /// type = "planning"
+    /// "#;
+    /// let reg = TemplateRegistry::from_toml_str(toml, &["epic", "planning"]).unwrap();
+    /// let template = reg.get("plan").unwrap();
+    /// assert_eq!(template.node(PLANNING_ROLE).unwrap().type_name, "planning");
+    /// assert!(template.node("missing").is_none());
+    /// ```
+    pub fn node(&self, role: &str) -> Option<&TemplateNode> {
+        self.nodes.iter().find(|n| n.role == role)
+    }
+
+    /// The planning node `P` ([`PLANNING_ROLE`]), or `None` if the template has none.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::templates::TemplateRegistry;
+    ///
+    /// let toml = r#"
+    /// [[template]]
+    /// name = "plan"
+    /// applies_to = ["epic"]
+    /// [[template.nodes]]
+    /// role = "planning"
+    /// type = "planning"
+    /// "#;
+    /// let reg = TemplateRegistry::from_toml_str(toml, &["epic", "planning"]).unwrap();
+    /// assert_eq!(reg.get("plan").unwrap().planning_node().unwrap().role, "planning");
+    /// ```
+    pub fn planning_node(&self) -> Option<&TemplateNode> {
+        self.node(PLANNING_ROLE)
+    }
+
+    /// The breakdown node `B` ([`BREAKDOWN_ROLE`]), or `None` if the template has none.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::templates::TemplateRegistry;
+    ///
+    /// let toml = r#"
+    /// [[template]]
+    /// name = "plan"
+    /// applies_to = ["epic"]
+    /// [[template.nodes]]
+    /// role = "breakdown"
+    /// type = "breakdown"
+    /// "#;
+    /// let reg = TemplateRegistry::from_toml_str(toml, &["epic", "breakdown"]).unwrap();
+    /// assert_eq!(reg.get("plan").unwrap().breakdown_node().unwrap().role, "breakdown");
+    /// ```
+    pub fn breakdown_node(&self) -> Option<&TemplateNode> {
+        self.node(BREAKDOWN_ROLE)
+    }
+
+    /// The issue type carried by the planning node `P` (e.g. `"planning"`).
+    ///
+    /// The template-registry equivalent of `PlanningConfig.planning_type`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::templates::TemplateRegistry;
+    ///
+    /// let toml = r#"
+    /// [[template]]
+    /// name = "plan"
+    /// applies_to = ["epic"]
+    /// [[template.nodes]]
+    /// role = "planning"
+    /// type = "planning"
+    /// "#;
+    /// let reg = TemplateRegistry::from_toml_str(toml, &["epic", "planning"]).unwrap();
+    /// assert_eq!(reg.get("plan").unwrap().planning_type(), Some("planning"));
+    /// ```
+    pub fn planning_type(&self) -> Option<&str> {
+        self.planning_node().map(|n| n.type_name.as_str())
+    }
+
+    /// The issue type carried by the breakdown node `B` (e.g. `"breakdown"`).
+    ///
+    /// The template-registry equivalent of `PlanningConfig.breakdown_type`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::templates::TemplateRegistry;
+    ///
+    /// let toml = r#"
+    /// [[template]]
+    /// name = "plan"
+    /// applies_to = ["epic"]
+    /// [[template.nodes]]
+    /// role = "breakdown"
+    /// type = "breakdown"
+    /// "#;
+    /// let reg = TemplateRegistry::from_toml_str(toml, &["epic", "breakdown"]).unwrap();
+    /// assert_eq!(reg.get("plan").unwrap().breakdown_type(), Some("breakdown"));
+    /// ```
+    pub fn breakdown_type(&self) -> Option<&str> {
+        self.breakdown_node().map(|n| n.type_name.as_str())
+    }
+
+    /// The planning node's doc-location template (e.g.
+    /// `"dev/active/{container.id}-plan.md"`), with `{...}` tokens resolved at
+    /// apply time.
+    ///
+    /// The template-registry equivalent of `PlanningConfig.plan_doc_location`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::templates::TemplateRegistry;
+    ///
+    /// let toml = r#"
+    /// [[template]]
+    /// name = "plan"
+    /// applies_to = ["epic"]
+    /// [[template.nodes]]
+    /// role = "planning"
+    /// type = "planning"
+    /// doc = "dev/active/{container.id}-plan.md"
+    /// "#;
+    /// let reg = TemplateRegistry::from_toml_str(toml, &["epic", "planning"]).unwrap();
+    /// assert_eq!(
+    ///     reg.get("plan").unwrap().plan_doc_location(),
+    ///     Some("dev/active/{container.id}-plan.md"),
+    /// );
+    /// ```
+    pub fn plan_doc_location(&self) -> Option<&str> {
+        self.planning_node().and_then(|n| n.doc.as_deref())
+    }
+
     /// Validate one template's internal structure: unique roles/anchors, every
     /// reference resolves, node types are known, and `depends_on` is acyclic.
     ///
@@ -469,6 +710,18 @@ impl GraphTemplate {
             return Err(TemplateConfigError::EmptyAppliesTo {
                 template: self.name.clone(),
             });
+        }
+
+        // Each declared container type must exist in the hierarchy (skipped when
+        // no hierarchy is configured, via `known_type`), so a typo'd
+        // `applies_to` type is rejected rather than silently registered.
+        for container_type in &self.applies_to {
+            if !known_type(container_type) {
+                return Err(TemplateConfigError::UnknownAppliesToType {
+                    template: self.name.clone(),
+                    type_name: container_type.clone(),
+                });
+            }
         }
 
         // Roles unique within the template.
@@ -895,6 +1148,41 @@ applies_to = []
     }
 
     #[test]
+    fn test_unknown_applies_to_type_rejected() {
+        // Nodes are valid, but `applies_to` names a type absent from the
+        // hierarchy (a typo) — config load must fail rather than silently
+        // register an invalid container type.
+        let toml = r#"
+[[template]]
+name = "t"
+applies_to = ["nonexistent"]
+[[template.nodes]]
+role = "planning"
+type = "planning"
+"#;
+        let err = TemplateRegistry::from_toml_str(toml, &HIERARCHY).unwrap_err();
+        match err {
+            TemplateConfigError::UnknownAppliesToType { type_name, .. } => {
+                assert_eq!(type_name, "nonexistent")
+            }
+            other => panic!("expected UnknownAppliesToType, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_empty_hierarchy_skips_applies_to_check() {
+        // With no hierarchy configured, `applies_to` types are not checked.
+        let toml = r#"
+[[template]]
+name = "t"
+applies_to = ["whatever"]
+"#;
+        let empty: [&str; 0] = [];
+        let reg = TemplateRegistry::from_toml_str(toml, &empty).unwrap();
+        assert_eq!(reg.templates[0].applies_to, vec!["whatever".to_string()]);
+    }
+
+    #[test]
     fn test_cyclic_depends_on_rejected() {
         let toml = r#"
 [[template]]
@@ -926,6 +1214,86 @@ depends_on = ["a"]
 "#;
         let err = TemplateRegistry::from_toml_str(toml, &HIERARCHY).unwrap_err();
         assert!(matches!(err, TemplateConfigError::CyclicDependsOn { .. }));
+    }
+
+    // REGB-01: this repo's authored `.jit/templates.toml` round-trips through the
+    // loader. The path is resolved relative to the crate manifest so the test does
+    // not depend on the process working directory or on production issue state.
+
+    #[test]
+    fn test_repo_plan_template_parses() {
+        let repo_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(|p| p.parent())
+            .expect("crate is nested two levels under the repo root");
+        let jit_dir = repo_root.join(".jit");
+        let reg = TemplateRegistry::load(&jit_dir, &HIERARCHY).unwrap();
+        let plan = reg
+            .get("plan")
+            .expect("repo .jit/templates.toml declares a `plan` template");
+        assert_eq!(plan.applies_to, vec!["epic"]);
+        assert_eq!(plan.planning_type(), Some("planning"));
+        assert_eq!(plan.breakdown_type(), Some("breakdown"));
+    }
+
+    // REGB-02: the registry yields, for a container type, the applicable template
+    // and its planning/breakdown node types, doc location, and breakable types.
+
+    #[test]
+    fn test_breakable_types_is_union_of_applies_to() {
+        let toml = r#"
+[[template]]
+name = "plan"
+applies_to = ["epic", "milestone"]
+[[template]]
+name = "other"
+applies_to = ["epic"]
+"#;
+        // `milestone` must be in the hierarchy or the applies_to check rejects it.
+        let reg =
+            TemplateRegistry::from_toml_str(toml, &["epic", "milestone", "planning", "breakdown"])
+                .unwrap();
+        assert_eq!(
+            reg.breakable_types(),
+            vec!["epic".to_string(), "milestone".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_template_for_container_resolves_epic() {
+        let reg = TemplateRegistry::from_toml_str(plan_template_toml(), &HIERARCHY).unwrap();
+        let t = reg.template_for_container("epic").unwrap();
+        assert_eq!(t.name, "plan");
+        assert!(reg.template_for_container("task").is_none());
+    }
+
+    #[test]
+    fn test_accessors_derive_bracket_vocabulary_for_epic() {
+        let reg = TemplateRegistry::from_toml_str(plan_template_toml(), &HIERARCHY).unwrap();
+        let t = reg.template_for_container("epic").unwrap();
+        assert_eq!(t.planning_type(), Some("planning"));
+        assert_eq!(t.breakdown_type(), Some("breakdown"));
+        assert_eq!(
+            t.plan_doc_location(),
+            Some("dev/active/{container.id}-plan.md")
+        );
+        assert_eq!(reg.breakable_types(), vec!["epic".to_string()]);
+    }
+
+    #[test]
+    fn test_node_lookup_by_role() {
+        let reg = TemplateRegistry::from_toml_str(plan_template_toml(), &HIERARCHY).unwrap();
+        let t = reg.get("plan").unwrap();
+        assert_eq!(t.node(PLANNING_ROLE).unwrap().type_name, "planning");
+        assert_eq!(t.node(BREAKDOWN_ROLE).unwrap().type_name, "breakdown");
+        assert!(t.node("nonexistent").is_none());
+    }
+
+    #[test]
+    fn test_empty_registry_has_no_breakable_types() {
+        let reg = TemplateRegistry::empty();
+        assert!(reg.breakable_types().is_empty());
+        assert!(reg.template_for_container("epic").is_none());
     }
 
     #[test]

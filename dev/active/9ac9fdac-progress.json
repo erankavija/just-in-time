@@ -44,6 +44,6 @@
   ],
   "created_during_execution": [],
   "escalations": [],
-  "rework_counts": {},
+  "rework_counts": {"45e7f203": 1, "8b15b679": 2, "04559558": 1},
   "started_at": "2026-06-23T07:00:00Z"
 }

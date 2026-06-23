@@ -33,6 +33,13 @@ pub struct JitConfig {
     pub events: Option<EventsConfig>,
     /// Plan-before-fan-out bracket configuration (optional).
     pub planning: Option<PlanningConfig>,
+    /// Graph templates loaded and validated from `.jit/templates.toml`.
+    ///
+    /// Not read from `config.toml`: populated by [`JitConfig::load`] from the
+    /// sibling `templates.toml` (absent file → empty registry), so it carries
+    /// `#[serde(skip)]` and defaults to an empty [`TemplateRegistry`].
+    #[serde(skip)]
+    pub templates: crate::templates::TemplateRegistry,
 }
 
 /// Plan-before-fan-out bracket configuration (`[planning]`).
@@ -571,6 +578,12 @@ impl JitConfig {
                 locks: None,
                 events: None,
                 planning: None,
+                // No config.toml means no type hierarchy, so node-`type` checks
+                // are skipped (empty slice); a sibling `templates.toml` is still
+                // loaded and validated, and a load/validation error propagates
+                // exactly as on the config-present path below.
+                templates: crate::templates::TemplateRegistry::load(jit_root, &[] as &[&str])
+                    .context("invalid .jit/templates.toml")?,
             });
         }
 
@@ -581,7 +594,8 @@ impl JitConfig {
         // (`require_type_label`, namespace `values`/`pattern`/`required`, etc.).
         // serde ignores them (no `deny_unknown_fields`), so the file still parses;
         // the keys simply have no effect — `.jit/rules.toml` is the sole source.
-        let config: JitConfig = toml::from_str(&content).context("Failed to parse config.toml")?;
+        let mut config: JitConfig =
+            toml::from_str(&content).context("Failed to parse config.toml")?;
 
         // Reject a malformed `[planning]` block at LOAD time (T1 success
         // criterion): both the in-isolation field checks and, when a hierarchy is
@@ -610,7 +624,7 @@ impl JitConfig {
             .as_ref()
             .map(|h| h.types.keys().map(|s| s.as_str()).collect())
             .unwrap_or_default();
-        crate::templates::TemplateRegistry::load(jit_root, &hierarchy_types)
+        config.templates = crate::templates::TemplateRegistry::load(jit_root, &hierarchy_types)
             .context("invalid .jit/templates.toml")?;
 
         Ok(config)
@@ -1019,6 +1033,39 @@ mod tests {
 
     fn env_lock() -> MutexGuard<'static, ()> {
         ENV_MUTEX.lock().expect("environment test mutex poisoned")
+    }
+
+    #[test]
+    fn test_load_templates_when_config_absent() {
+        // A repo with `.jit/templates.toml` but NO `.jit/config.toml` must still
+        // load the registry (the absent-config path), not silently return empty.
+        let dir = TempDir::new().unwrap();
+        std::fs::write(
+            dir.path().join("templates.toml"),
+            r#"
+[[template]]
+name = "plan"
+applies_to = ["epic"]
+[[template.nodes]]
+role = "planning"
+type = "planning"
+doc = "dev/active/{container.id}-plan.md"
+[[template.nodes]]
+role = "breakdown"
+type = "breakdown"
+depends_on = ["planning"]
+"#,
+        )
+        .unwrap();
+
+        let config = JitConfig::load(dir.path()).unwrap();
+        let plan = config
+            .templates
+            .get("plan")
+            .expect("templates.toml is loaded even without config.toml");
+        assert_eq!(plan.planning_type(), Some("planning"));
+        assert_eq!(plan.breakdown_type(), Some("breakdown"));
+        assert_eq!(config.templates.breakable_types(), vec!["epic".to_string()]);
     }
 
     #[test]

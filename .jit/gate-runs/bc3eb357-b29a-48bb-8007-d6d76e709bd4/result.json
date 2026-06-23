@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "bc3eb357-b29a-48bb-8007-d6d76e709bd4",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "8b15b679-337c-4841-a708-596498328313",
+  "commit": "1bd86c1991417fd821ba4e4a3921f9ad39ba9389",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-06-23T13:12:49.719591362Z",
+  "completed_at": "2026-06-23T13:14:09.684775481Z",
+  "duration_ms": 79965,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n- No blocking findings.\n- REGB-01 is met: `.jit/templates.toml` is now added to git (`git ls-files --stage .jit/templates.toml` shows it tracked), and the repo template round-trip is covered by `crates/jit/src/templates.rs:1167`.\n- REGB-02 is met: container lookup and breakable type accessors are implemented at `crates/jit/src/templates.rs:400` and `crates/jit/src/templates.rs:428`; planning/breakdown/doc accessors are at `crates/jit/src/templates.rs:567`, `crates/jit/src/templates.rs:589`, `crates/jit/src/templates.rs:611`, `crates/jit/src/templates.rs:635`, `crates/jit/src/templates.rs:659`, and `crates/jit/src/templates.rs:689`.\n\n**Prior Review Feedback**\n- The first blocker is addressed: `JitConfig::load` now loads `.jit/templates.toml` even when `.jit/config.toml` is absent at `crates/jit/src/config.rs:567`.\n- The second blocker is addressed: `.jit/templates.toml` is tracked as an added file.\n\n**Jit Issue Management**\n- Dependency `45e7f203` is done per the issue metadata.\n- `./scripts/jit-validate.sh` passed. It reported 26 warnings, all label/strategic-consistency warnings allowed by the review instructions.\n\n**Architecture And Separation Of Concerns**\n- No blocking boundary violations found. Template parsing/validation/accessors remain in `crates/jit/src/templates.rs`; config loading wires the registry in `crates/jit/src/config.rs`.\n- No CLI/output/storage concern is introduced into domain logic.\n\n**Functional Paradigm**\n- No blocking issue. New query paths use iterator-style accessors where appropriate, e.g. `breakable_types` at `crates/jit/src/templates.rs:400` and `template_for_container` at `crates/jit/src/templates.rs:428`.\n\n**Correctness And Invariants**\n- No issue state-transition, gate semantics, event logging, PID, assignee, or label mutation code is introduced by the Rust changes.\n- The authored plan template at `.jit/templates.toml:9` through `.jit/templates.toml:40` matches the intended bracket shape: `plan` applies to `epic`, creates planning and breakdown nodes, wires `breakdown` to `planning`, and anchors container to breakdown.\n\n**Safety**\n- No `unsafe` code observed in the reviewed changes.\n\n**Testing**\n- I did not run cargo tests because the issue has a passed `cargo-ci` gate.\n- Provided gate evidence reports `cargo-ci` passed at `2026-06-23T12:54:03Z`.\n- Added coverage includes repo template load at `crates/jit/src/templates.rs:1167`, accessor behavior at `crates/jit/src/templates.rs:1185` through `crates/jit/src/templates.rs:1237`, and absent-config template loading at `crates/jit/src/config.rs:1039`.\n\n**Error Handling**\n- Template loading errors are propagated with context from config loading at `crates/jit/src/config.rs:585` and `crates/jit/src/config.rs:627`.\n- No new non-test `unwrap()` or `expect()` was found in the reviewed additions.\n\n**CLI Contract**\n- No CLI command surface is changed, so no new `--json` obligation is introduced.\n\n**Documentation**\n- New public template accessors/constants include doc comments with examples.\n- `JitConfig.templates` is documented at `crates/jit/src/config.rs:36`, and the implementation now matches that documented load behavior.\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

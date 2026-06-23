@@ -2,7 +2,7 @@
   "id": "04559558-289f-4325-891a-7b08532978a9",
   "title": "Graph-template registry: templates.toml schema, loader, and the plan template",
   "description": "Add the graph-template registry that the apply engine reads.\n\nDefine the template types in a new module (a template; nodes with role, type, gates, doc and description; named anchors; transforms) and a `.jit/templates.toml` loader validated at config load. Author this repo's `plan` template (planning + breakdown nodes, applying to the breakable container type) and expose accessors the existing planning-config consumers will switch to. Additive — the current configuration path stays untouched this wave.\n\n## Success Criteria\n- [ ] [hard] REG-01: `.jit/templates.toml` parses into typed templates; an invalid template fails at config load with a clear error.\n- [ ] [hard] REG-02: The `plan` template is authored and round-trips through the loader.\n- [ ] [hard] REG-03: The registry yields, for a container type, the applicable template and its planning/breakdown node types, doc location, and breakable types.\n- [ ] [hard] REG-04: Existing behavior is unchanged this wave.",
-  "state": "backlog",
+  "state": "done",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -12,7 +12,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-23T13:45:29.207287346Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-23T14:02:55.397843164Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -23,5 +34,5 @@
     "story:template-registry"
   ],
   "created_at": "2026-06-22T21:59:04.435372907+00:00",
-  "updated_at": "2026-06-23T12:38:01.629951755+00:00"
+  "updated_at": "2026-06-23T14:05:38.961675970+00:00"
 }
