@@ -280,15 +280,11 @@ fn test_apply_rejects_already_applied_without_force() {
     let template = plan_template();
     let epic = create_epic(&h, "Twice epic");
 
-    // First apply succeeds. Wire C→B so the breakdown node is among the
-    // container's deps (this engine does not wire edges, so do it manually to
-    // simulate the applied shape the next task produces).
-    let (first, _) = h
-        .executor
+    // First apply succeeds and wires C→B (the fresh-apply path), so the breakdown
+    // node is among the container's deps.
+    h.executor
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap();
-    let breakdown_id = first.created_node_ids_by_role["breakdown"].clone();
-    h.executor.add_dependency(&epic, &breakdown_id).unwrap();
 
     let before = h.all_issues().len();
     let err = h
@@ -313,11 +309,7 @@ fn test_force_refreshes_nodes_in_place_without_duplicating() {
     let planning_id = first.created_node_ids_by_role["planning"].clone();
     let breakdown_id = first.created_node_ids_by_role["breakdown"].clone();
 
-    // Wire the applied shape: C→B and B→P, as the edge task will.
-    h.executor.add_dependency(&epic, &breakdown_id).unwrap();
-    h.executor
-        .add_dependency(&breakdown_id, &planning_id)
-        .unwrap();
+    // The fresh apply already wired the applied shape: C→B and B→P.
 
     // Rename the container, then force-refresh.
     h.executor
@@ -354,6 +346,72 @@ fn test_force_refreshes_nodes_in_place_without_duplicating() {
     assert!(planning.description.contains("Renamed title"));
     assert!(breakdown.description.contains("Renamed title"));
     assert!(!planning.description.contains("Original title"));
+}
+
+#[test]
+fn test_force_finds_breakdown_after_spine_reshaping_no_duplicate() {
+    // Regression: after a breakdown splices the spine (C → child → … → B), the
+    // direct C → B edge is dropped by transitive reduction, so `B` is no longer a
+    // DIRECT dependency of `C`. A `--force` refresh must still locate the existing
+    // `B` (and `P` through it) by the unique `brackets:<C>` label — scanning only
+    // `C`'s direct deps would miss it and duplicate the whole bracket.
+    let h = TestHarness::new();
+    let template = plan_template();
+    let epic = create_epic(&h, "Spine epic");
+
+    let (first, _) = h
+        .executor
+        .apply_template_with(&template, &epic, &container_binding(&epic), false)
+        .unwrap();
+    let planning_id = first.created_node_ids_by_role["planning"].clone();
+    let breakdown_id = first.created_node_ids_by_role["breakdown"].clone();
+
+    // Fresh apply wired C → B directly.
+    assert!(h.get_issue(&epic).dependencies.contains(&breakdown_id));
+
+    // Simulate the breakdown splice: a child depends on B, and C depends on the
+    // child. Transitive reduction then DROPS the direct C → B edge.
+    let child = h.create_issue("impl child");
+    h.executor.add_dependency(&child, &breakdown_id).unwrap();
+    h.executor.add_dependency(&epic, &child).unwrap();
+    assert!(
+        !h.get_issue(&epic).dependencies.contains(&breakdown_id),
+        "reduction must drop the now-redundant direct C → B edge"
+    );
+
+    let count_before = h.all_issues().len();
+    let (refreshed, _) = h
+        .executor
+        .apply_template_with(&template, &epic, &container_binding(&epic), true)
+        .unwrap();
+
+    // The existing B + P are refreshed in place — no fresh-apply duplication.
+    assert_eq!(
+        h.all_issues().len(),
+        count_before,
+        "force-refresh must NOT create duplicate nodes when B is not a direct dep"
+    );
+    assert_eq!(
+        refreshed.created_node_ids_by_role["breakdown"],
+        breakdown_id
+    );
+    assert_eq!(refreshed.created_node_ids_by_role["planning"], planning_id);
+
+    // Exactly one breakdown node (with brackets:<C>) and one planning node remain.
+    let short_id: String = epic.chars().take(8).collect();
+    let bracket_label = format!("brackets:{short_id}");
+    let breakdown_count = h
+        .all_issues()
+        .into_iter()
+        .filter(|i| type_of(i).as_deref() == Some("breakdown") && i.labels.contains(&bracket_label))
+        .count();
+    assert_eq!(breakdown_count, 1, "exactly one breakdown node for C");
+    let planning_count = h
+        .all_issues()
+        .into_iter()
+        .filter(|i| type_of(i).as_deref() == Some("planning"))
+        .count();
+    assert_eq!(planning_count, 1, "exactly one planning node");
 }
 
 // === APPA-01: gate presets validated before any mutation ===

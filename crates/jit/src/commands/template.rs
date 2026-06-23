@@ -17,9 +17,9 @@
 //!    [`add_dependency`](CommandExecutor::add_dependency), so the result is
 //!    acyclic and transitively reduced.
 //!
-//! This generalizes the create+gate+doc+wire sequence that
-//! [`bracket_container`](super::plan) performs for the hardcoded planning
-//! bracket. The `--force` refresh path re-seeds existing nodes' prose in place
+//! This is the plan-before-fan-out scaffold: the create+gate+doc+wire sequence
+//! that produces the `C → B → P` bracket from a template. The `--force` refresh
+//! path re-seeds existing nodes' prose in place
 //! and re-runs neither node creation, edge wiring, nor transforms (the spine
 //! already exists; re-running the transform over now-scaffold-bearing live deps
 //! would corrupt it).
@@ -135,7 +135,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// [`apply_template`](Self::apply_template).
     ///
     /// Separated so the engine is testable without an on-disk `templates.toml`
-    /// (mirroring the `*_with_config` split in [`plan`](super::plan)). Steps:
+    /// (the registry-independent core). Steps:
     ///
     /// 1. **Validate before mutating** — the single complete gate. The container
     ///    type is in the template's `applies_to`; every declared anchor is bound
@@ -661,8 +661,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     /// `move-upstream-to-role`: move the container's PRE-APPLY upstream deps onto
-    /// the node created for `role`, mirroring `bracket_container` (snapshot deps,
-    /// wire each onto the role node, then drop them from the container).
+    /// the node created for `role` (snapshot deps, wire each onto the role node,
+    /// then drop them from the container).
     ///
     /// Operates on the step-2 snapshot — taken before any mutation, so it cannot
     /// contain the freshly-wired anchor/scaffold nodes — never a live read of the
@@ -853,13 +853,21 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(())
     }
 
-    /// Locate an already-applied template's breakdown node among the container's
-    /// dependencies: the dep carrying the breakdown node's `type:` label AND the
+    /// Locate an already-applied template's breakdown node `B` for `container`:
+    /// the issue carrying the breakdown node's `type:` label AND the
     /// `brackets:<container-short-id>` label the template seeds onto it.
     ///
     /// Returns the breakdown node's full id, or `None` when the template has not
-    /// been applied (no such dep). Only the breakdown node carries a `brackets:`
-    /// label, so this uniquely identifies an applied bracket.
+    /// been applied (no such issue). Only `B` carries the `brackets:<C>` label, so
+    /// the pair uniquely identifies an applied bracket.
+    ///
+    /// The lookup is **store-wide**, not limited to `container.dependencies`: a
+    /// fresh apply wires `C → B` directly, but a subsequent breakdown splices the
+    /// spine `C → sink … → B` and relies on transitive reduction to DROP the direct
+    /// `C → B` edge — after which `B` is still in `C`'s closure but no longer a
+    /// direct dependency. Scanning only direct deps would then miss `B` and let
+    /// `--force` take the fresh-apply path, duplicating `P` + `B`. Matching by the
+    /// unique label pair across the store finds `B` regardless of edge distance.
     fn find_applied_breakdown(
         &self,
         template: &GraphTemplate,
@@ -869,16 +877,11 @@ impl<S: IssueStore> CommandExecutor<S> {
             return Ok(None);
         };
         let bracket_label = format!("brackets:{}", container.short_id());
-        for dep_id in &container.dependencies {
-            let dep = self.storage.load_issue(dep_id)?;
-            let has_type =
-                type_label_value(&dep.labels).as_deref() == Some(&breakdown_node.type_name);
-            let has_bracket = dep.labels.iter().any(|l| l == &bracket_label);
-            if has_type && has_bracket {
-                return Ok(Some(dep.id));
-            }
-        }
-        Ok(None)
+        let found = self.storage.list_issues()?.into_iter().find(|issue| {
+            type_label_value(&issue.labels).as_deref() == Some(&breakdown_node.type_name)
+                && issue.labels.iter().any(|l| l == &bracket_label)
+        });
+        Ok(found.map(|issue| issue.id))
     }
 
     /// Find the first dependency of `issue` carrying the given `type:` label.
@@ -944,7 +947,7 @@ impl TransformKind {
 
 /// The container membership labels every created node inherits: all of the
 /// container's labels EXCEPT its own `type:` label (which each node replaces with
-/// its own), as `bracket_container` does today. Pure helper, shared by the
+/// its own). Pure helper, shared by the
 /// pre-validation and instantiation paths so both see the identical label set.
 fn inherited_membership_labels(container: &Issue) -> Vec<String> {
     container

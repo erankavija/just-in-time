@@ -1,10 +1,13 @@
 //! Tests for the bracket-aware breakdown path (T10, design doc
 //! `dev/active/planning-bracket-design.md`).
 //!
-//! Given a breakable container `C` already scaffolded to its planning node `P`
-//! (`C → P`), the bracket breakdown step creates the breakdown node `B`
-//! (`type:breakdown`, `brackets:<C-id>` label, coverage-preview gate), wires
-//! `B → P`, drafts the impl children in Backlog, and splices the spine:
+//! A breakable container `C` is first scaffolded by the `jit apply plan` engine
+//! into the bracket `C → B → P` (planning node `P` carries the plan-review gate;
+//! breakdown node `B` carries `type:breakdown`, the `brackets:<C-short-id>` label,
+//! and the coverage-preview + breakdown-review gates; `B → P` and `C → B` are
+//! wired). After `P`'s plan-review gate is PASSED, the bracket breakdown step
+//! **consumes** that pre-created `B` (it does NOT create one), finds `P` through
+//! `B`, drafts the impl children in Backlog, and splices the spine:
 //!
 //! ```text
 //! C ──dep→ {impl subgraph} ──dep→ B ──dep→ P
@@ -12,33 +15,67 @@
 //!
 //! Source children (no intra-subgraph predecessor) depend on `B`; sink children
 //! (no intra-subgraph successor) are depended-on by `C`. Transitive reduction
-//! drops the scaffold's direct `C → P` edge once the spine connects them.
+//! drops the scaffold's direct `C → B` edge once the spine connects them.
 //!
 //! These exercise `CommandExecutor` in-process via `TestHarness`
-//! (InMemoryStorage); the `[planning]` vocabulary is injected explicitly via a
-//! `PlanningConfig` passed to the `*_with_config` core method.
+//! (InMemoryStorage). The template is authored in-test via
+//! `TemplateRegistry::from_toml_str` and passed explicitly to the
+//! `*_with_template` core methods (mirroring the apply-engine tests), so no
+//! on-disk `templates.toml` is needed.
 
 mod harness;
 
 use harness::TestHarness;
 use jit::commands::{BracketChild, CommandExecutor};
-use jit::config::PlanningConfig;
 use jit::domain::{Issue, Priority, State};
 use jit::labels::parse_label;
 use jit::storage::{InMemoryStorage, IssueStore};
+use jit::templates::{GraphTemplate, TemplateRegistry};
+use std::collections::BTreeMap;
 
-/// SDD-mirroring `[planning]` vocabulary (epic containers, planning/breakdown
-/// bracket types, inline plan doc, the three gate presets).
-fn sdd_planning_config() -> PlanningConfig {
-    PlanningConfig {
-        breakable_types: vec!["epic".to_string()],
-        planning_type: "planning".to_string(),
-        breakdown_type: "breakdown".to_string(),
-        plan_doc_location: "inline".to_string(),
-        plan_gate_preset: "plan-review".to_string(),
-        coverage_gate_preset: "coverage-preview".to_string(),
-        breakdown_review_gate_preset: "breakdown-review".to_string(),
-    }
+const HIERARCHY: [&str; 3] = ["epic", "planning", "breakdown"];
+
+/// The repo's `plan`-shaped template: planning node `P` (plan-review gate),
+/// breakdown node `B` (`brackets:<short-id>`, coverage-preview + breakdown-review
+/// gates, `B → P`), `C → B` anchor edge, and the `move-upstream-to-role`
+/// transform onto `P`. Mirrors `.jit/templates.toml` and the apply-engine tests.
+fn plan_template() -> GraphTemplate {
+    let toml = r#"
+[[template]]
+name        = "plan"
+applies_to  = ["epic"]
+
+  [[template.anchors]]
+  name = "container"
+
+  [[template.nodes]]
+  role        = "planning"
+  type        = "planning"
+  gates       = ["plan-review"]
+  doc         = "dev/active/{container.id}-plan.md"
+  description = "Planning node for {container.title}."
+
+  [[template.nodes]]
+  role        = "breakdown"
+  type        = "breakdown"
+  gates       = ["coverage-preview", "breakdown-review"]
+  labels      = ["brackets:{container.short_id}"]
+  description = "Breakdown node for {container.title}."
+  depends_on  = ["planning"]
+
+  [[template.anchor_edges]]
+  from = "container"
+  to   = "breakdown"
+
+  [[template.transforms]]
+  kind = "move-upstream-to-role"
+  role = "planning"
+"#;
+    TemplateRegistry::from_toml_str(toml, &HIERARCHY)
+        .unwrap()
+        .get("plan")
+        .unwrap()
+        .clone()
 }
 
 /// The `type:*` value of an issue, if any.
@@ -50,23 +87,26 @@ fn type_of(issue: &Issue) -> Option<String> {
     })
 }
 
+fn container_binding(id: &str) -> BTreeMap<String, String> {
+    BTreeMap::from([("container".to_string(), id.to_string())])
+}
+
 /// Mark the planning node `P`'s plan-review gate PASSED, so a breakdown that
-/// requires an approved plan is allowed to proceed. Mirrors the established
-/// "pass this gate" pattern used elsewhere in the suite.
-fn approve_plan(h: &TestHarness, cfg: &PlanningConfig, planning_id: &str) {
+/// requires an approved plan is allowed to proceed.
+fn approve_plan(h: &TestHarness, planning_id: &str) {
     let mut p = h.get_issue(planning_id);
     let gate = p
         .gates_status
-        .get_mut(&cfg.plan_gate_preset)
+        .get_mut("plan-review")
         .expect("planning node carries the plan gate");
     gate.status = jit::domain::GateStatus::Passed;
     h.storage.save_issue(p).unwrap();
 }
 
-/// Scaffold a breakable container `C` bracketed by its planning node `P`
-/// (`C → P`) with an APPROVED plan (P's plan-review gate passed), returning
+/// Scaffold a breakable container `C` via the apply engine into `C → B → P`, with
+/// an APPROVED plan (P's plan-review gate passed), returning
 /// `(container_id, planning_id)`.
-fn scaffold_container(h: &TestHarness, cfg: &PlanningConfig, title: &str) -> (String, String) {
+fn scaffold_container(h: &TestHarness, template: &GraphTemplate, title: &str) -> (String, String) {
     let (id, _) = h
         .executor
         .create_issue(
@@ -81,10 +121,11 @@ fn scaffold_container(h: &TestHarness, cfg: &PlanningConfig, title: &str) -> (St
         .unwrap();
     let (result, _) = h
         .executor
-        .plan_existing_with_config(cfg, &id, false)
+        .apply_template_with(template, &id, &container_binding(&id), false)
         .unwrap();
-    approve_plan(h, cfg, &result.planning_id);
-    (result.container_id, result.planning_id)
+    let planning_id = result.created_node_ids_by_role["planning"].clone();
+    approve_plan(h, &planning_id);
+    (id, planning_id)
 }
 
 /// A simple child with no intra-subgraph dependencies and no labels.
@@ -99,118 +140,94 @@ fn child(title: &str) -> BracketChild {
     }
 }
 
-// ===================== B creation + B → P =====================
+// =============== B is CONSUMED, not re-created; B → P found ===============
 
 #[test]
-fn test_bracket_breakdown_creates_breakdown_node_typed_from_config() {
+fn test_bracket_breakdown_consumes_pre_created_breakdown_node() {
     let h = TestHarness::new();
-    let cfg = sdd_planning_config();
-    let (c, _p) = scaffold_container(&h, &cfg, "Auth epic");
+    let template = plan_template();
+    let (c, _p) = scaffold_container(&h, &template, "Auth epic");
+
+    // Exactly one breakdown node exists after scaffolding.
+    let breakdown_before: Vec<String> = h
+        .all_issues()
+        .into_iter()
+        .filter(|i| type_of(i).as_deref() == Some("breakdown"))
+        .map(|i| i.id)
+        .collect();
+    assert_eq!(breakdown_before.len(), 1, "scaffold creates exactly one B");
 
     let result = h
         .executor
-        .bracket_breakdown_with_config(&cfg, &c, vec![child("Build login")])
+        .bracket_breakdown_with_template(&template, &c, vec![child("Build login")])
         .unwrap();
 
-    let b = h.get_issue(&result.breakdown_id);
+    // Breakdown CONSUMED the pre-created B (same id), did not create a new one.
     assert_eq!(
-        type_of(&b).as_deref(),
-        Some("breakdown"),
-        "B must be typed from config.breakdown_type"
+        result.breakdown_id, breakdown_before[0],
+        "breakdown must consume the pre-created B, not create a new one"
+    );
+    let breakdown_after = h
+        .all_issues()
+        .into_iter()
+        .filter(|i| type_of(i).as_deref() == Some("breakdown"))
+        .count();
+    assert_eq!(
+        breakdown_after, 1,
+        "no duplicate breakdown node may be created"
     );
 }
 
 #[test]
-fn test_bracket_breakdown_node_carries_brackets_label_for_container() {
+fn test_bracket_breakdown_node_typed_breakdown() {
     let h = TestHarness::new();
-    let cfg = sdd_planning_config();
-    let (c, _p) = scaffold_container(&h, &cfg, "Auth epic");
+    let template = plan_template();
+    let (c, _p) = scaffold_container(&h, &template, "Auth epic");
 
     let result = h
         .executor
-        .bracket_breakdown_with_config(&cfg, &c, vec![child("Build login")])
+        .bracket_breakdown_with_template(&template, &c, vec![child("Build login")])
         .unwrap();
 
     let b = h.get_issue(&result.breakdown_id);
+    assert_eq!(type_of(&b).as_deref(), Some("breakdown"));
+}
+
+#[test]
+fn test_bracket_breakdown_node_carries_brackets_short_id_label() {
+    let h = TestHarness::new();
+    let template = plan_template();
+    let (c, _p) = scaffold_container(&h, &template, "Auth epic");
+
+    let result = h
+        .executor
+        .bracket_breakdown_with_template(&template, &c, vec![child("Build login")])
+        .unwrap();
+
+    // The apply engine seeds `brackets:<C-short-id>` (not the full id); breakdown
+    // locates B by that label.
+    let short_id: String = c.chars().take(8).collect();
+    let b = h.get_issue(&result.breakdown_id);
     assert!(
-        b.labels.contains(&format!("brackets:{c}")),
-        "B must carry brackets:<C-id> naming its container, got {:?}",
+        b.labels.contains(&format!("brackets:{short_id}")),
+        "B must carry brackets:<C-short-id> naming its container, got {:?}",
         b.labels
     );
 }
 
 #[test]
-fn test_bracket_breakdown_applies_coverage_preview_gate_to_breakdown_node() {
+fn test_bracket_breakdown_finds_plan_through_breakdown_node() {
     let h = TestHarness::new();
-    let cfg = sdd_planning_config();
-    let (c, _p) = scaffold_container(&h, &cfg, "Auth epic");
+    let template = plan_template();
+    let (c, p) = scaffold_container(&h, &template, "Auth epic");
 
     let result = h
         .executor
-        .bracket_breakdown_with_config(&cfg, &c, vec![child("Build login")])
+        .bracket_breakdown_with_template(&template, &c, vec![child("Build login")])
         .unwrap();
 
-    let b = h.get_issue(&result.breakdown_id);
-    assert!(
-        b.gates_required.contains(&"coverage-preview".to_string()),
-        "B must carry the coverage-preview gate, got {:?}",
-        b.gates_required
-    );
-    // The gate is registered by the preset-apply path.
-    let registry = h.storage.load_gate_registry().unwrap();
-    assert!(registry.gates.contains_key("coverage-preview"));
-}
-
-#[test]
-fn test_bracket_breakdown_applies_breakdown_review_gate_to_breakdown_node() {
-    let h = TestHarness::new();
-    let cfg = sdd_planning_config();
-    let (c, _p) = scaffold_container(&h, &cfg, "Auth epic");
-
-    let result = h
-        .executor
-        .bracket_breakdown_with_config(&cfg, &c, vec![child("Build login")])
-        .unwrap();
-
-    let b = h.get_issue(&result.breakdown_id);
-    // B carries BOTH bracket gates: the deterministic coverage-preview gate and
-    // the agent breakdown-review gate (the quality-vs-coverage split on B).
-    assert!(
-        b.gates_required.contains(&"breakdown-review".to_string()),
-        "B must carry the breakdown-review gate, got {:?}",
-        b.gates_required
-    );
-    assert!(
-        b.gates_required.contains(&"coverage-preview".to_string()),
-        "B must still carry the coverage-preview gate, got {:?}",
-        b.gates_required
-    );
-    assert_eq!(
-        result.breakdown_review_gate_preset, "breakdown-review",
-        "result reports the attached breakdown-review preset name"
-    );
-    // The agent gate is registered by the preset-apply path and left PENDING
-    // (the builder attaches but never runs it).
-    let registry = h.storage.load_gate_registry().unwrap();
-    assert!(registry.gates.contains_key("breakdown-review"));
-    assert_eq!(
-        b.gates_status.get("breakdown-review").map(|s| s.status),
-        Some(jit::domain::GateStatus::Pending),
-        "the breakdown-review gate is attached PENDING, not run by the builder"
-    );
-}
-
-#[test]
-fn test_bracket_breakdown_wires_breakdown_node_to_plan() {
-    let h = TestHarness::new();
-    let cfg = sdd_planning_config();
-    let (c, p) = scaffold_container(&h, &cfg, "Auth epic");
-
-    let result = h
-        .executor
-        .bracket_breakdown_with_config(&cfg, &c, vec![child("Build login")])
-        .unwrap();
-
+    // P is reported correctly, and B → P is the edge through which it was found.
+    assert_eq!(result.planning_id, p, "P must be found through B (B → P)");
     let b = h.get_issue(&result.breakdown_id);
     assert!(
         b.dependencies.contains(&p),
@@ -219,17 +236,51 @@ fn test_bracket_breakdown_wires_breakdown_node_to_plan() {
     );
 }
 
+#[test]
+fn test_bracket_breakdown_reports_breakdown_node_gate_presets() {
+    let h = TestHarness::new();
+    let template = plan_template();
+    let (c, _p) = scaffold_container(&h, &template, "Auth epic");
+
+    let result = h
+        .executor
+        .bracket_breakdown_with_template(&template, &c, vec![child("Build login")])
+        .unwrap();
+
+    // The gates were attached by the apply engine; breakdown reports their names.
+    assert_eq!(result.coverage_gate_preset, "coverage-preview");
+    assert_eq!(result.breakdown_review_gate_preset, "breakdown-review");
+
+    // B still carries both gates, left PENDING (breakdown neither re-attaches nor
+    // runs them).
+    let b = h.get_issue(&result.breakdown_id);
+    assert!(b.gates_required.contains(&"coverage-preview".to_string()));
+    assert!(b.gates_required.contains(&"breakdown-review".to_string()));
+    assert_eq!(
+        b.gates_status.get("breakdown-review").map(|s| s.status),
+        Some(jit::domain::GateStatus::Pending),
+    );
+    assert!(matches!(
+        b.gates_status.get("coverage-preview").map(|s| s.status),
+        None | Some(jit::domain::GateStatus::Pending)
+    ));
+}
+
 // ===================== children drafted in Backlog =====================
 
 #[test]
 fn test_bracket_breakdown_drafts_children_in_backlog() {
     let h = TestHarness::new();
-    let cfg = sdd_planning_config();
-    let (c, _p) = scaffold_container(&h, &cfg, "Auth epic");
+    let template = plan_template();
+    let (c, _p) = scaffold_container(&h, &template, "Auth epic");
 
     let result = h
         .executor
-        .bracket_breakdown_with_config(&cfg, &c, vec![child("Build login"), child("Build logout")])
+        .bracket_breakdown_with_template(
+            &template,
+            &c,
+            vec![child("Build login"), child("Build logout")],
+        )
         .unwrap();
 
     for id in &result.child_ids {
@@ -244,15 +295,15 @@ fn test_bracket_breakdown_drafts_children_in_backlog() {
 }
 
 #[test]
-fn test_bracket_breakdown_children_carry_breakdown_type_and_membership() {
+fn test_bracket_breakdown_children_carry_membership_not_bracket_types() {
     let h = TestHarness::new();
-    let cfg = sdd_planning_config();
+    let template = plan_template();
     // Container carries a membership label children should inherit.
     let (c, _) = h
         .executor
         .create_issue(
             "Auth epic".to_string(),
-            String::new(),
+            "## Success Criteria\n\n- [hard] REQ-01: it works\n".to_string(),
             Priority::Normal,
             vec![],
             vec!["type:epic".to_string(), "epic:auth".to_string()],
@@ -260,15 +311,15 @@ fn test_bracket_breakdown_children_carry_breakdown_type_and_membership() {
             false,
         )
         .unwrap();
-    let (plan, _) = h
+    let (apply_result, _) = h
         .executor
-        .plan_existing_with_config(&cfg, &c, false)
+        .apply_template_with(&template, &c, &container_binding(&c), false)
         .unwrap();
-    approve_plan(&h, &cfg, &plan.planning_id);
+    approve_plan(&h, &apply_result.created_node_ids_by_role["planning"]);
 
     let result = h
         .executor
-        .bracket_breakdown_with_config(&cfg, &c, vec![child("Build login")])
+        .bracket_breakdown_with_template(&template, &c, vec![child("Build login")])
         .unwrap();
 
     let kid = h.get_issue(&result.child_ids[0]);
@@ -287,8 +338,8 @@ fn test_bracket_breakdown_children_carry_breakdown_type_and_membership() {
 #[test]
 fn test_bracket_breakdown_source_children_depend_on_breakdown_node() {
     let h = TestHarness::new();
-    let cfg = sdd_planning_config();
-    let (c, _p) = scaffold_container(&h, &cfg, "Auth epic");
+    let template = plan_template();
+    let (c, _p) = scaffold_container(&h, &template, "Auth epic");
 
     // Chain: child0 (source) -> child1 -> child2 (sink). Only child0 is a source.
     let mut c1 = child("middle");
@@ -297,7 +348,7 @@ fn test_bracket_breakdown_source_children_depend_on_breakdown_node() {
     c2.deps = vec![1];
     let result = h
         .executor
-        .bracket_breakdown_with_config(&cfg, &c, vec![child("source"), c1, c2])
+        .bracket_breakdown_with_template(&template, &c, vec![child("source"), c1, c2])
         .unwrap();
 
     let source = h.get_issue(&result.child_ids[0]);
@@ -319,15 +370,15 @@ fn test_bracket_breakdown_source_children_depend_on_breakdown_node() {
 #[test]
 fn test_bracket_breakdown_container_depends_on_sinks_only() {
     let h = TestHarness::new();
-    let cfg = sdd_planning_config();
-    let (c, _p) = scaffold_container(&h, &cfg, "Auth epic");
+    let template = plan_template();
+    let (c, _p) = scaffold_container(&h, &template, "Auth epic");
 
     // child0 -> child1 (sink). child0 is a source, NOT a sink.
     let mut c1 = child("sink");
     c1.deps = vec![0];
     let result = h
         .executor
-        .bracket_breakdown_with_config(&cfg, &c, vec![child("source"), c1])
+        .bracket_breakdown_with_template(&template, &c, vec![child("source"), c1])
         .unwrap();
 
     let container = h.get_issue(&c);
@@ -348,14 +399,14 @@ fn test_bracket_breakdown_container_depends_on_sinks_only() {
 #[test]
 fn test_bracket_breakdown_internal_edges_preserved() {
     let h = TestHarness::new();
-    let cfg = sdd_planning_config();
-    let (c, _p) = scaffold_container(&h, &cfg, "Auth epic");
+    let template = plan_template();
+    let (c, _p) = scaffold_container(&h, &template, "Auth epic");
 
     let mut c1 = child("middle");
     c1.deps = vec![0];
     let result = h
         .executor
-        .bracket_breakdown_with_config(&cfg, &c, vec![child("source"), c1])
+        .bracket_breakdown_with_template(&template, &c, vec![child("source"), c1])
         .unwrap();
 
     let middle = h.get_issue(&result.child_ids[1]);
@@ -366,32 +417,38 @@ fn test_bracket_breakdown_internal_edges_preserved() {
     );
 }
 
-// ===================== reduced form: C → P dropped =====================
+// ===================== reduced form: C → B dropped =====================
 
 #[test]
-fn test_bracket_breakdown_removes_direct_container_to_plan_edge() {
+fn test_bracket_breakdown_removes_direct_container_to_breakdown_edge() {
     let h = TestHarness::new();
-    let cfg = sdd_planning_config();
-    let (c, p) = scaffold_container(&h, &cfg, "Auth epic");
+    let template = plan_template();
+    let (c, p) = scaffold_container(&h, &template, "Auth epic");
 
-    // Pre-condition: scaffold left a direct C -> P edge.
-    assert!(h.get_issue(&c).dependencies.contains(&p));
+    // Pre-condition: scaffold left a direct C -> B edge (C → B → P).
+    let b_before: String = h
+        .all_issues()
+        .into_iter()
+        .find(|i| type_of(i).as_deref() == Some("breakdown"))
+        .map(|i| i.id)
+        .unwrap();
+    assert!(h.get_issue(&c).dependencies.contains(&b_before));
 
     let result = h
         .executor
-        .bracket_breakdown_with_config(&cfg, &c, vec![child("only")])
+        .bracket_breakdown_with_template(&template, &c, vec![child("only")])
         .unwrap();
 
-    // After breakdown the spine C -> child -> B -> P makes C -> P redundant;
-    // transitive reduction must have dropped it.
+    // After breakdown the spine C -> child -> B makes C -> B redundant;
+    // transitive reduction must have dropped the direct edge.
     let container = h.get_issue(&c);
     assert!(
-        !container.dependencies.contains(&p),
-        "the direct C -> P edge must be dropped by reduction once the spine \
+        !container.dependencies.contains(&result.breakdown_id),
+        "the direct C -> B edge must be dropped by reduction once the spine \
          connects them, got {:?}",
         container.dependencies
     );
-    // C reaches P transitively: C -> child -> B -> P.
+    // C reaches B (and P) transitively: C -> child -> B -> P.
     let only_child = &result.child_ids[0];
     assert!(container.dependencies.contains(only_child));
     let b = h.get_issue(&result.breakdown_id);
@@ -403,21 +460,19 @@ fn test_bracket_breakdown_removes_direct_container_to_plan_edge() {
 #[test]
 fn test_bracket_breakdown_does_not_use_parent_centric_wiring() {
     let h = TestHarness::new();
-    let cfg = sdd_planning_config();
-    let (c, _p) = scaffold_container(&h, &cfg, "Auth epic");
+    let template = plan_template();
+    let (c, _p) = scaffold_container(&h, &template, "Auth epic");
 
     // Three independent children -> all are both sources AND sinks.
     let result = h
         .executor
-        .bracket_breakdown_with_config(&cfg, &c, vec![child("a"), child("b"), child("c")])
+        .bracket_breakdown_with_template(&template, &c, vec![child("a"), child("b"), child("c")])
         .unwrap();
 
     let container = h.get_issue(&c);
-    // Parent-centric wiring would make C depend on EVERY child directly AND
-    // copy C's deps onto every child. Here C depends on every child only
-    // because they are ALL sinks (independent). The distinguishing assertion:
-    // no child copied C's pre-existing dependency (P). Children depend on B
-    // (sources), never on P.
+    // Parent-centric wiring would copy C's deps onto every child. The
+    // distinguishing assertion: no child copied C's pre-existing dependency.
+    // Children depend on B (sources), never on P.
     for id in &result.child_ids {
         let kid = h.get_issue(id);
         assert!(
@@ -440,29 +495,33 @@ fn test_bracket_breakdown_does_not_use_parent_centric_wiring() {
 // ===================== validation / events =====================
 
 #[test]
-fn test_bracket_breakdown_logs_breakdown_node_creation_event() {
+fn test_bracket_breakdown_logs_no_breakdown_node_creation_event() {
     let h = TestHarness::new();
-    let cfg = sdd_planning_config();
-    let (c, _p) = scaffold_container(&h, &cfg, "Auth epic");
+    let template = plan_template();
+    let (c, _p) = scaffold_container(&h, &template, "Auth epic");
 
+    // Capture the event count before breakdown: B was created during scaffolding,
+    // so breakdown must NOT emit a second issue_created for the same B.
     let result = h
         .executor
-        .bracket_breakdown_with_config(&cfg, &c, vec![child("only")])
+        .bracket_breakdown_with_template(&template, &c, vec![child("only")])
         .unwrap();
 
     let events = h.storage.read_events().unwrap();
-    assert!(
-        events
-            .iter()
-            .any(|e| e.get_type() == "issue_created" && e.get_issue_id() == result.breakdown_id),
-        "creating B must log an issue_created event"
+    let b_created = events
+        .iter()
+        .filter(|e| e.get_type() == "issue_created" && e.get_issue_id() == result.breakdown_id)
+        .count();
+    assert_eq!(
+        b_created, 1,
+        "B is created exactly once (by the scaffold), never re-created by breakdown"
     );
 }
 
 #[test]
 fn test_bracket_breakdown_rejects_non_breakable_container() {
     let h = TestHarness::new();
-    let cfg = sdd_planning_config();
+    let template = plan_template();
     let (task, _) = h
         .executor
         .create_issue(
@@ -478,7 +537,7 @@ fn test_bracket_breakdown_rejects_non_breakable_container() {
 
     let err = h
         .executor
-        .bracket_breakdown_with_config(&cfg, &task, vec![child("x")])
+        .bracket_breakdown_with_template(&template, &task, vec![child("x")])
         .unwrap_err();
     assert!(
         err.to_string().contains("breakable") || err.to_string().contains("task"),
@@ -487,10 +546,10 @@ fn test_bracket_breakdown_rejects_non_breakable_container() {
 }
 
 #[test]
-fn test_bracket_breakdown_requires_planning_node() {
+fn test_bracket_breakdown_errors_when_bracket_absent_points_at_apply_plan() {
     let h = TestHarness::new();
-    let cfg = sdd_planning_config();
-    // Breakable container that was NEVER scaffolded (no P).
+    let template = plan_template();
+    // Breakable container that was NEVER scaffolded (no B, no P).
     let (c, _) = h
         .executor
         .create_issue(
@@ -504,25 +563,39 @@ fn test_bracket_breakdown_requires_planning_node() {
         )
         .unwrap();
 
+    let issues_before = h.storage.list_issues().unwrap().len();
+
     let err = h
         .executor
-        .bracket_breakdown_with_config(&cfg, &c, vec![child("x")])
+        .bracket_breakdown_with_template(&template, &c, vec![child("x")])
         .unwrap_err();
+    let msg = err.to_string();
     assert!(
-        err.to_string().contains("planning") || err.to_string().contains("plan"),
-        "must require a scaffolded planning node, got: {err}"
+        msg.contains("breakdown bracket") || msg.contains("no 'breakdown'"),
+        "must report the missing breakdown bracket, got: {msg}"
+    );
+    assert!(
+        msg.contains("jit apply plan"),
+        "must point the user at `jit apply plan`, got: {msg}"
+    );
+
+    // Nothing was created.
+    assert_eq!(
+        h.storage.list_issues().unwrap().len(),
+        issues_before,
+        "a rejected breakdown must create NOTHING"
     );
 }
 
 #[test]
 fn test_bracket_breakdown_rejects_empty_children() {
     let h = TestHarness::new();
-    let cfg = sdd_planning_config();
-    let (c, _p) = scaffold_container(&h, &cfg, "Auth epic");
+    let template = plan_template();
+    let (c, _p) = scaffold_container(&h, &template, "Auth epic");
 
     let err = h
         .executor
-        .bracket_breakdown_with_config(&cfg, &c, vec![])
+        .bracket_breakdown_with_template(&template, &c, vec![])
         .unwrap_err();
     assert!(
         err.to_string().contains("child") || err.to_string().contains("empty"),
@@ -530,37 +603,59 @@ fn test_bracket_breakdown_rejects_empty_children() {
     );
 }
 
-// ============= config-reading public wrapper (reads [planning]) =============
+// ============= config-reading public wrapper (reads templates.toml) =============
 
-const PLANNING_CONFIG_TOML: &str = r#"
-[type_hierarchy]
-types = { epic = 1, planning = 2, breakdown = 2, task = 3 }
+const TEMPLATES_TOML: &str = r#"
+[[template]]
+name        = "plan"
+applies_to  = ["epic"]
 
-[planning]
-breakable_types = ["epic"]
-planning_type = "planning"
-breakdown_type = "breakdown"
-plan_doc_location = "inline"
-plan_gate_preset = "plan-review"
-coverage_gate_preset = "coverage-preview"
+  [[template.anchors]]
+  name = "container"
+
+  [[template.nodes]]
+  role        = "planning"
+  type        = "planning"
+  gates       = ["plan-review"]
+
+  [[template.nodes]]
+  role        = "breakdown"
+  type        = "breakdown"
+  gates       = ["coverage-preview", "breakdown-review"]
+  labels      = ["brackets:{container.short_id}"]
+  depends_on  = ["planning"]
+
+  [[template.anchor_edges]]
+  from = "container"
+  to   = "breakdown"
+
+  [[template.transforms]]
+  kind = "move-upstream-to-role"
+  role = "planning"
 "#;
 
-fn executor_with_planning_config() -> CommandExecutor<InMemoryStorage> {
+const CONFIG_TOML: &str = r#"
+[type_hierarchy]
+types = { epic = 1, planning = 2, breakdown = 2, task = 3 }
+"#;
+
+fn executor_with_templates() -> CommandExecutor<InMemoryStorage> {
     std::env::set_var("JIT_TEST_MODE", "1");
     let storage = InMemoryStorage::new();
     storage.init().unwrap();
     std::fs::create_dir_all(storage.root()).unwrap();
-    std::fs::write(storage.root().join("config.toml"), PLANNING_CONFIG_TOML).unwrap();
+    std::fs::write(storage.root().join("config.toml"), CONFIG_TOML).unwrap();
+    std::fs::write(storage.root().join("templates.toml"), TEMPLATES_TOML).unwrap();
     CommandExecutor::new(storage)
 }
 
 #[test]
-fn test_bracket_breakdown_reads_planning_config_from_disk() {
-    let executor = executor_with_planning_config();
+fn test_bracket_breakdown_reads_template_from_disk() {
+    let executor = executor_with_templates();
     let (c, _) = executor
         .create_issue(
             "Auth epic".to_string(),
-            String::new(),
+            "## Success Criteria\n\n- [hard] REQ-01: it works\n".to_string(),
             Priority::Normal,
             vec![],
             vec!["type:epic".to_string()],
@@ -568,18 +663,23 @@ fn test_bracket_breakdown_reads_planning_config_from_disk() {
             false,
         )
         .unwrap();
-    let (plan, _) = executor.plan_existing(&c, false).unwrap();
+    // Scaffold via the public apply command (resolves the template from disk).
+    let (apply_result, _) = executor
+        .apply_template("plan", &c, &container_binding(&c), false)
+        .unwrap();
+    let planning_id = apply_result.created_node_ids_by_role["planning"].clone();
 
     // Approve P's plan-review gate: breakdown consumes an approved plan.
-    let mut p = executor.storage().load_issue(&plan.planning_id).unwrap();
+    let mut p = executor.storage().load_issue(&planning_id).unwrap();
     p.gates_status.get_mut("plan-review").unwrap().status = jit::domain::GateStatus::Passed;
     executor.storage().save_issue(p).unwrap();
 
-    // The public wrapper reads [planning] from config.toml; no config injected.
+    // The public wrapper resolves the template from templates.toml; none injected.
     let result = executor.bracket_breakdown(&c, vec![child("only")]).unwrap();
     let b = executor.storage().load_issue(&result.breakdown_id).unwrap();
     assert_eq!(type_of(&b).as_deref(), Some("breakdown"));
-    assert!(b.labels.contains(&format!("brackets:{c}")));
+    let short_id: String = c.chars().take(8).collect();
+    assert!(b.labels.contains(&format!("brackets:{short_id}")));
 }
 
 // ===================== Finding 1: approved plan required =====================
@@ -587,7 +687,7 @@ fn test_bracket_breakdown_reads_planning_config_from_disk() {
 #[test]
 fn test_bracket_breakdown_rejected_when_plan_gate_not_passed() {
     let h = TestHarness::new();
-    let cfg = sdd_planning_config();
+    let template = plan_template();
     // Scaffold a container WITHOUT approving its plan (do not use the helper,
     // which auto-approves).
     let (c, _) = h
@@ -602,38 +702,33 @@ fn test_bracket_breakdown_rejected_when_plan_gate_not_passed() {
             false,
         )
         .unwrap();
-    let (plan, _) = h
+    let (apply_result, _) = h
         .executor
-        .plan_existing_with_config(&cfg, &c, false)
+        .apply_template_with(&template, &c, &container_binding(&c), false)
         .unwrap();
+    let planning_id = apply_result.created_node_ids_by_role["planning"].clone();
     // P's plan-review gate is PENDING (never passed).
 
     let issues_before = h.storage.list_issues().unwrap().len();
 
     let err = h
         .executor
-        .bracket_breakdown_with_config(&cfg, &c, vec![child("Build login")])
+        .bracket_breakdown_with_template(&template, &c, vec![child("Build login")])
         .unwrap_err();
     assert!(
         err.to_string().contains("approved plan") && err.to_string().contains("plan-review"),
         "must reject breakdown when the plan gate is not passed, got: {err}"
     );
 
-    // Nothing was created: no B, no children. (Only C and P exist.)
+    // Nothing was created: no children. (C, B, P from the scaffold still exist.)
     let issues_after = h.storage.list_issues().unwrap();
     assert_eq!(
         issues_after.len(),
         issues_before,
-        "a rejected breakdown must create NOTHING (no B/children)"
-    );
-    assert!(
-        !issues_after
-            .iter()
-            .any(|i| type_of(i).as_deref() == Some("breakdown")),
-        "no breakdown node may exist after a rejected breakdown"
+        "a rejected breakdown must create NOTHING (no children)"
     );
     // P's gate is untouched.
-    let p = h.get_issue(&plan.planning_id);
+    let p = h.get_issue(&planning_id);
     assert_eq!(
         p.gates_status.get("plan-review").map(|g| g.status),
         Some(jit::domain::GateStatus::Pending),
@@ -645,8 +740,8 @@ fn test_bracket_breakdown_rejected_when_plan_gate_not_passed() {
 #[test]
 fn test_bracket_breakdown_rejects_cyclic_child_plan() {
     let h = TestHarness::new();
-    let cfg = sdd_planning_config();
-    let (c, _p) = scaffold_container(&h, &cfg, "Auth epic");
+    let template = plan_template();
+    let (c, _p) = scaffold_container(&h, &template, "Auth epic");
 
     // A cyclic child plan: 0 -> 1 -> 2 -> 0.
     let mut a = child("a");
@@ -660,35 +755,27 @@ fn test_bracket_breakdown_rejects_cyclic_child_plan() {
 
     let err = h
         .executor
-        .bracket_breakdown_with_config(&cfg, &c, vec![a, b, d])
+        .bracket_breakdown_with_template(&template, &c, vec![a, b, d])
         .unwrap_err();
     assert!(
         err.to_string().contains("cycle"),
         "must reject a cyclic child plan, got: {err}"
     );
 
-    // No B/children created: the cycle is caught BEFORE any mutation.
+    // No children created: the cycle is caught BEFORE any mutation.
     let issues_after = h.storage.list_issues().unwrap();
     assert_eq!(
         issues_after.len(),
         issues_before,
         "a cyclic child plan must create NOTHING (pre-mutation rejection)"
     );
-    assert!(
-        !issues_after
-            .iter()
-            .any(|i| type_of(i).as_deref() == Some("breakdown")),
-        "no breakdown node may exist after a rejected cyclic plan"
-    );
 }
 
-// ============ coverage-preview gate is ATTACHED, not run, by the helper =======
+// ============ coverage gate is ATTACHED (by the scaffold), not run =======
 //
-// The helper is a pure bracket-builder: it ATTACHES the coverage-preview gate to
-// B (left PENDING) and never runs/stamps/fabricates a verdict. The gate is run
-// later by the standard gate runner (`jit gate pass <B> coverage-preview`) as a
-// breakdown-workflow step (see the jit-breakdown skill and the integration test
-// in `bracket_coverage_gate_run_test.rs`). These tests assert attachment-only.
+// The breakdown step is a spine-splicer: B's coverage gate was attached by
+// `jit apply plan` and is never run/stamped/fabricated by breakdown. The gate is
+// run later by the standard gate runner (`jit gate pass <B> coverage-preview`).
 
 /// A child that credits the given `[hard]` criterion id via `satisfies:<id>`.
 fn child_satisfying(title: &str, req_id: &str) -> BracketChild {
@@ -703,26 +790,26 @@ fn child_satisfying(title: &str, req_id: &str) -> BracketChild {
 }
 
 #[test]
-fn test_bracket_breakdown_attaches_coverage_gate_pending_not_run() {
+fn test_bracket_breakdown_leaves_coverage_gate_pending_and_forwards_credit() {
     let h = TestHarness::new();
-    let cfg = sdd_planning_config();
+    let template = plan_template();
     // Container declares [hard] REQ-01 (scaffold_container's body), covered by
     // the child's satisfies:REQ-01 label.
-    let (c, _p) = scaffold_container(&h, &cfg, "Auth epic");
+    let (c, _p) = scaffold_container(&h, &template, "Auth epic");
 
     let result = h
         .executor
-        .bracket_breakdown_with_config(&cfg, &c, vec![child_satisfying("Build login", "REQ-01")])
+        .bracket_breakdown_with_template(
+            &template,
+            &c,
+            vec![child_satisfying("Build login", "REQ-01")],
+        )
         .unwrap();
 
-    assert_eq!(
-        result.coverage_gate_preset, "coverage-preview",
-        "the result names the coverage gate preset attached to B"
-    );
+    assert_eq!(result.coverage_gate_preset, "coverage-preview");
 
     // The child carries its satisfies:<id> coverage credit (forwarded by the
-    // helper to create_issue's labels) — this is what the coverage-preview gate
-    // reads when the runner later evaluates it.
+    // splicer to create_issue's labels) — what the coverage gate later reads.
     let kid = h.get_issue(&result.child_ids[0]);
     assert!(
         kid.labels.contains(&"satisfies:REQ-01".to_string()),
@@ -730,80 +817,23 @@ fn test_bracket_breakdown_attaches_coverage_gate_pending_not_run() {
         kid.labels
     );
 
-    // The coverage-preview gate is ATTACHED to B (in gates_required)...
+    // The coverage gate stays PENDING (breakdown never runs it), and no gate
+    // verdict event is emitted for B by breakdown.
     let b = h.get_issue(&result.breakdown_id);
-    assert!(
-        b.gates_required.contains(&"coverage-preview".to_string()),
-        "B must carry the coverage-preview gate, got {:?}",
-        b.gates_required
-    );
-
-    // ...but the helper does NOT run it: the gate is PENDING/unset (never stamped
-    // Passed or Failed by breakdown). The preset-apply path may initialize the
-    // status to Pending; the helper must never advance it past that.
     let coverage_status = b.gates_status.get("coverage-preview").map(|g| g.status);
     assert!(
         matches!(
             coverage_status,
             None | Some(jit::domain::GateStatus::Pending)
         ),
-        "the helper must leave the coverage gate PENDING/unset (it does not run \
-         it), got {coverage_status:?}"
+        "the splicer must leave the coverage gate PENDING/unset, got {coverage_status:?}"
     );
-
-    // The helper emits NO gate_passed/gate_failed event for B (it is a clean
-    // bracket-builder — only genuine create/dep state changes are logged).
     let events = h.storage.read_events().unwrap();
     assert!(
         !events.iter().any(|e| {
             (e.get_type() == "gate_passed" || e.get_type() == "gate_failed")
                 && e.get_issue_id() == result.breakdown_id
         }),
-        "the helper must NOT emit a gate verdict event for B (no faked gate run)"
-    );
-}
-
-#[test]
-fn test_bracket_breakdown_does_not_stamp_coverage_gate_when_uncovered() {
-    let h = TestHarness::new();
-    let cfg = sdd_planning_config();
-    // Container declares [hard] REQ-01, but the child satisfies nothing. The
-    // helper still must NOT run the coverage gate or fabricate a Failed verdict —
-    // surfacing the gap is the runner's job (run as a workflow step).
-    let (c, _p) = scaffold_container(&h, &cfg, "Auth epic");
-
-    let result = h
-        .executor
-        .bracket_breakdown_with_config(&cfg, &c, vec![child("Build something unrelated")])
-        .unwrap();
-
-    // B and the child ARE created (the bracket is built regardless of coverage).
-    assert!(
-        h.storage.load_issue(&result.breakdown_id).is_ok(),
-        "B must be created by the bracket-builder"
-    );
-    assert_eq!(result.child_ids.len(), 1);
-
-    // The coverage gate is attached but NOT stamped Failed by the helper.
-    let b = h.get_issue(&result.breakdown_id);
-    assert!(b.gates_required.contains(&"coverage-preview".to_string()));
-    let coverage_status = b.gates_status.get("coverage-preview").map(|g| g.status);
-    assert!(
-        matches!(
-            coverage_status,
-            None | Some(jit::domain::GateStatus::Pending)
-        ),
-        "the helper must NOT stamp the coverage gate Failed (the runner evaluates \
-         it), got {coverage_status:?}"
-    );
-
-    // No gate verdict event for B.
-    let events = h.storage.read_events().unwrap();
-    assert!(
-        !events.iter().any(|e| {
-            (e.get_type() == "gate_passed" || e.get_type() == "gate_failed")
-                && e.get_issue_id() == result.breakdown_id
-        }),
-        "the helper must NOT emit a gate_failed event for B (no faked gate run)"
+        "breakdown must NOT emit a gate verdict event for B (no faked gate run)"
     );
 }

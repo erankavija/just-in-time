@@ -8,9 +8,8 @@
 //! `breakdown-review`) are builtins, so no preset registration is needed.
 //!
 //! Every fixture lives in its own `TempDir` — the production `.jit/` is NEVER
-//! touched. The tests assert that `jit apply` creates the bracket and emits a
-//! machine-readable result, and that the pre-existing `jit plan` scaffold command
-//! still works unchanged (the additive guarantee).
+//! touched. The tests assert that `jit apply plan` creates the `C → B → P`
+//! bracket and emits a machine-readable result.
 
 use assert_cmd::prelude::*;
 use std::process::Command;
@@ -226,25 +225,4 @@ fn test_apply_rejects_malformed_anchor() {
         .assert()
         .failure()
         .stderr(predicates::str::contains("role=id"));
-}
-
-/// SCFA-01/02: the additive guarantee — the pre-existing `jit plan` scaffold
-/// command still works unchanged against the same fixture vocabulary.
-#[test]
-fn test_plan_scaffold_still_works() {
-    let temp = setup_repo();
-    let epic = create_epic(&temp, "Auth epic");
-
-    // `jit plan <epic>` retrofits the planning bracket via the untouched path.
-    let out = jit_json(&temp, &["plan", &epic, "--json"]);
-    let data = out.get("data").unwrap_or(&out);
-    let planning_id = data["planning_id"].as_str().expect("planning_id");
-    assert!(
-        !planning_id.is_empty(),
-        "jit plan must still create a planning node, got: {out}"
-    );
-    assert_eq!(
-        data["planning_type"], "planning",
-        "jit plan must still read the planning type from config"
-    );
 }

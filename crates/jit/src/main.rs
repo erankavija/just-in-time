@@ -75,47 +75,6 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
     }
 }
 
-/// Print the outcome of a bracket-scaffolding operation (`jit plan` /
-/// `issue create --with-planning`).
-///
-/// In `--json` mode emits the structured [`PlanResult`](jit::commands::PlanResult)
-/// plus the freshly-loaded container and planning issues. In quiet mode prints
-/// just the planning node id (for scripting); otherwise a short human summary.
-fn print_plan_result(
-    storage: &JsonFileStorage,
-    result: &jit::commands::PlanResult,
-    quiet: bool,
-    json: bool,
-) -> Result<()> {
-    if json {
-        let container = storage.load_issue(&result.container_id)?;
-        let planning = storage.load_issue(&result.planning_id)?;
-        let data = serde_json::json!({
-            "container_id": result.container_id,
-            "planning_id": result.planning_id,
-            "planning_type": result.planning_type,
-            "plan_gate_preset": result.plan_gate_preset,
-            "plan_doc_location": result.plan_doc_location,
-            "container": container,
-            "planning": planning,
-        });
-        let msg = format!(
-            "Bracketed {} with planning node {}",
-            result.container_id, result.planning_id
-        );
-        let output = JsonOutput::success(data, "plan").with_message(msg);
-        println!("{}", output.to_json_string()?);
-    } else if quiet {
-        println!("{}", result.planning_id);
-    } else {
-        println!(
-            "Bracketed {} with planning node {} (type:{}, gate preset {})",
-            result.container_id, result.planning_id, result.planning_type, result.plan_gate_preset
-        );
-    }
-    Ok(())
-}
-
 /// Print the outcome of a graph-template apply (`jit apply <template> <container>`).
 ///
 /// In `--json` mode emits the structured
@@ -133,7 +92,7 @@ fn print_apply_result(
 ) -> Result<()> {
     if json {
         // Load each created node so the JSON consumer gets the full issues
-        // alongside the role→id map (mirroring `print_plan_result`).
+        // alongside the role→id map.
         let created_issues: serde_json::Map<String, serde_json::Value> = result
             .created_node_ids_by_role
             .iter()
@@ -446,33 +405,12 @@ fn run() -> Result<()> {
                     content_format,
                     force,
                     orphan,
-                    with_planning,
                     json,
                 } => {
                     let prio = Priority::from_str(&priority)?;
                     let content_format = content_format
                         .map(|s| jit::domain::ContentFormat::from_str(&s))
                         .transpose()?;
-
-                    // `--with-planning` brackets the new container with a
-                    // planning node in one shot (T5/D10). It has distinct
-                    // output (container + planning node), so it returns early.
-                    if with_planning {
-                        let (result, warnings) = executor.create_with_planning(
-                            title,
-                            description,
-                            prio,
-                            gate,
-                            label,
-                            content_format,
-                            force,
-                        )?;
-                        for warning in &warnings {
-                            eprintln!("⚠️  Warning: {}", warning);
-                        }
-                        print_plan_result(&storage, &result, quiet, json)?;
-                        return Ok(());
-                    }
 
                     let (id, warnings) = executor.create_issue(
                         title,
@@ -1146,13 +1084,6 @@ fn run() -> Result<()> {
                     }
                 }
             }
-        }
-        Commands::Plan { id, force, json } => {
-            let (result, warnings) = executor.plan_existing(&id, force)?;
-            for warning in &warnings {
-                eprintln!("⚠️  Warning: {}", warning);
-            }
-            print_plan_result(&storage, &result, quiet, json)?;
         }
         Commands::Apply {
             template,

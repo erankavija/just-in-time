@@ -7,9 +7,9 @@
 //! - `issue`: Issue CRUD operations and lifecycle management
 //! - `dependency`: Dependency graph operations  
 //! - `breakdown`: Issue breakdown operations
-//! - `plan`: Bracket scaffolding (`jit plan` / `create --with-planning`)
 //! - `template`: Graph-template apply engine (`jit apply <template> <container>`):
-//!   validate, snapshot anchors, and instantiate the template's nodes
+//!   the plan-before-fan-out scaffold (planning node `P` + breakdown node `B`),
+//!   validating, snapshotting anchors, and instantiating the template's nodes
 //! - `gate`: Quality gate operations
 //! - `graph`: Graph visualization and traversal
 //! - `query`: Issue query operations
@@ -34,7 +34,6 @@ pub mod graph;
 pub mod hooks;
 mod issue;
 mod labels;
-mod plan;
 pub mod plan_doc;
 mod query;
 mod search;
@@ -50,7 +49,6 @@ pub mod test_helpers;
 pub use breakdown::{BracketBreakdownResult, BracketChild};
 pub use bulk_update::{BulkUpdatePreview, BulkUpdateResult, UpdateOperations};
 pub use gate::GatePassFailed;
-pub use plan::PlanResult;
 pub use template::TemplateApplyResult;
 
 // Re-export WorktreeIdentity for init return type

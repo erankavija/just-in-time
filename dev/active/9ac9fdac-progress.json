@@ -48,6 +48,7 @@
   "escalations": [],
   "rework_counts": {"45e7f203": 1, "8b15b679": 2, "04559558": 1, "14137e1a": 3, "73e5e853": 1},
   "class_watch": "validate-before-mutate gaps: gate-presets(14137e1a r1), labels(14137e1a r2), transform-kinds(73e5e853 r1), cycle-simulation(643874f2 story). 4th occurrence ESCALATED to user 2026-06-23; user chose 'fix it' (edge-simulation pre-check). After this, the precondition phase is the complete gate (types/anchors/presets/node-writes/transform-kinds/acyclicity).",
-  "story_rework_counts": {"643874f2": 1},
+  "story_rework_counts": {"643874f2": 1, "3143ad87": 1},
+  "note_w6": "Scaffold switch (e75805f6) done + story 3143ad87 review found cross-task bug: find_applied_breakdown scanned only direct deps, so apply plan --force after breakdown (spine reshapes C->B to transitive) would duplicate scaffold. Fix: locate B by brackets:<C> label store-wide. Plus expect() in breakdown first_child_cycle. Rework dispatched.",
   "started_at": "2026-06-23T07:00:00Z"
 }

@@ -2,9 +2,9 @@
   "id": "e75805f6-96cb-4d5a-82cc-67225b3f79ba",
   "title": "Atomically switch the scaffold and update breakdown",
   "description": "In one slice, flip the scaffold and update breakdown **together**, so no intermediate state has `apply plan`'s graph incompatible with breakdown: make `jit apply plan` the scaffold (producing C→B→P), refactor breakdown to consume the pre-created breakdown node (locate B, then the approved planning node through it, preserving the plan-review precondition), and remove the old scaffold command and its create-time flag.\n\n## Success Criteria\n- [ ] [hard] SCFB-01: after this task `jit apply plan <container>` is the scaffold and breakdown consumes the pre-created B against the C→B→P shape.\n- [ ] [hard] SCFB-02: the old command and flag are removed and the bracket workflow is green before and after — no broken intermediate.",
-  "state": "backlog",
+  "state": "done",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [
     "9cccfe0c-46bb-4b80-9909-f7b13d6fa6f1"
   ],
@@ -12,7 +12,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-23T18:10:47.885729115Z"
+    },
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-23T18:04:43.937192869Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -22,5 +33,5 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-06-22T22:28:29.409261630+00:00",
-  "updated_at": "2026-06-23T00:15:41.187012196+00:00"
+  "updated_at": "2026-06-23T18:13:00.205605392+00:00"
 }

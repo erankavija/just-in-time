@@ -2,7 +2,7 @@
   "id": "3143ad87-1991-4873-a013-9456cea7234a",
   "title": "Switch scaffold to apply plan; breakdown consumes the pre-created B",
   "description": "Make `jit apply plan` the bracket scaffold and have breakdown consume the pre-created breakdown node — in one slice, so the workflow is never half-migrated.\n\nAdd the apply command; refactor breakdown to locate the existing breakdown node and reach the planning node through it (preserving the approved-plan precondition) against the new container → breakdown → planning shape; remove the old scaffold command and its create-time flag. Move the affected modules off the flat planning configuration.\n\n## Success Criteria\n- [ ] [hard] SCAFFOLD-01: `jit apply plan <container>` produces the planning and breakdown nodes and the bracket spine.\n- [ ] [hard] SCAFFOLD-02: Breakdown locates the pre-created breakdown node and the approved planning node, and errors clearly when the bracket is absent.\n- [ ] [hard] SCAFFOLD-03: The old scaffold command and flag are gone; affected tests are updated.\n- [ ] [hard] SCAFFOLD-04: The bracket workflow builds and is green before and after this change.",
-  "state": "backlog",
+  "state": "done",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -12,7 +12,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-23T18:27:31.758622486Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-23T18:34:02.406116981Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -24,5 +35,5 @@
     "story:scaffold-switch"
   ],
   "created_at": "2026-06-22T21:59:04.450474652+00:00",
-  "updated_at": "2026-06-23T12:38:01.630590596+00:00"
+  "updated_at": "2026-06-23T18:36:19.150746994+00:00"
 }

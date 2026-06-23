@@ -8,13 +8,20 @@
 //!   (non-breakable) containers where simple containment is the desired shape.
 //! - [`bracket_breakdown`](CommandExecutor::bracket_breakdown) — the
 //!   **bracket-aware** path (design doc T10). For a breakable container `C`
-//!   already scaffolded to its planning node `P` (`C → P`), it creates the
-//!   breakdown node `B`, drafts the impl children in Backlog, and splices a
-//!   **source/sink-only spine** `C → impl → B → P`. It deliberately does NOT
-//!   reuse the parent-centric wiring.
+//!   already scaffolded by `jit apply plan <C>` into the bracket `C → B → P`,
+//!   it **consumes** the pre-created breakdown node `B` (it does NOT create it),
+//!   drafts the impl children in Backlog, and splices a **source/sink-only
+//!   spine** `C → impl → B → P`. It deliberately does NOT reuse the
+//!   parent-centric wiring.
+//!
+//! The bracket-aware path reads its vocabulary (planning/breakdown types, the
+//! plan-quality gate) from the [`TemplateRegistry`](crate::templates::TemplateRegistry)
+//! / [`GraphTemplate`](crate::templates::GraphTemplate) — the same source the
+//! `jit apply plan` scaffold uses, so the two halves of the workflow agree on the
+//! `C → B → P` shape.
 
 use super::*;
-use crate::config::PlanningConfig;
+use crate::templates::{GraphTemplate, BREAKDOWN_ROLE, PLANNING_ROLE};
 use serde::Serialize;
 
 /// One drafted implementation child for [`bracket_breakdown`].
@@ -74,18 +81,20 @@ pub struct BracketChild {
 
 /// Outcome of a [`bracket_breakdown`] operation.
 ///
-/// Names the bracketed container, the breakdown node `B` created in front of it,
-/// the planning node `P` the breakdown waits on, and the drafted impl children
-/// (in declaration order, so indices match the input). Used for `--json` output
-/// and as the in-process return value.
+/// Names the bracketed container, the **pre-created** breakdown node `B` the
+/// children fan out behind, the planning node `P` the breakdown waits on, and the
+/// drafted impl children (in declaration order, so indices match the input). Used
+/// for `--json` output and as the in-process return value.
 ///
-/// This is a purely structural result. The helper is a **bracket-builder**: it
-/// ATTACHES the coverage-preview gate to `B` (left PENDING) and reports its
-/// preset name in [`coverage_gate_preset`](Self::coverage_gate_preset). It does
-/// **not** run, stamp, or fabricate a coverage verdict — the coverage-preview
-/// gate is run separately by the standard gate runner (`jit gate pass`) as a
-/// breakdown-workflow step, exactly as every gate in the project is run by the
-/// orchestrator. So there is no `coverage_passed`/`coverage_report` field here.
+/// This is a purely structural result. The breakdown step is a **spine-splicer**:
+/// the breakdown node `B` and its two gates were already created/attached by
+/// `jit apply plan <C>`; breakdown CONSUMES that `B` and reports the gate-preset
+/// names `B` carries in [`coverage_gate_preset`](Self::coverage_gate_preset) and
+/// [`breakdown_review_gate_preset`](Self::breakdown_review_gate_preset). It does
+/// **not** run, stamp, or fabricate a coverage verdict — those gates are run
+/// separately by the standard gate runner (`jit gate pass`) as breakdown-workflow
+/// steps, exactly as every gate in the project is run by the orchestrator. So
+/// there is no `coverage_passed`/`coverage_report` field here.
 ///
 /// # Examples
 ///
@@ -107,27 +116,31 @@ pub struct BracketChild {
 pub struct BracketBreakdownResult {
     /// The bracketed container `C`.
     pub container_id: String,
-    /// The breakdown node `B` created by this step.
+    /// The pre-created breakdown node `B` this step consumed.
     pub breakdown_id: String,
-    /// The planning node `P` the breakdown node depends on.
+    /// The planning node `P` the breakdown node depends on (found through `B`).
     pub planning_id: String,
     /// The drafted impl children, in declaration order.
     pub child_ids: Vec<String>,
-    /// The gate preset ATTACHED to `B` (from `[planning].coverage_gate_preset`),
-    /// left PENDING for the standard gate runner to evaluate as a workflow step.
+    /// The deterministic coverage gate preset `B` carries (the FIRST gate on the
+    /// template's breakdown node, e.g. `coverage-preview`), attached by
+    /// `jit apply plan` and left PENDING for the standard gate runner. Reported
+    /// for `--json` consumers; breakdown does not re-attach or run it.
     pub coverage_gate_preset: String,
-    /// The agent-review preset ATTACHED to `B` (from
-    /// `[planning].breakdown_review_gate_preset`), left PENDING for the standard
-    /// gate runner. Like the coverage gate, the helper only attaches it — it does
-    /// not run or stamp a verdict.
+    /// The agent-review gate preset `B` carries (the SECOND gate on the
+    /// template's breakdown node, e.g. `breakdown-review`), attached by
+    /// `jit apply plan` and left PENDING for the standard gate runner. Reported
+    /// for `--json` consumers; breakdown does not re-attach or run it.
     pub breakdown_review_gate_preset: String,
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
-    /// Bracket-aware breakdown (`jit issue breakdown --bracket`, design doc T10).
+    /// Bracket-aware breakdown (design doc T10).
     ///
-    /// Reads the `[planning]` vocabulary from `.jit/config.toml` and delegates to
-    /// [`bracket_breakdown_with_config`](Self::bracket_breakdown_with_config).
+    /// Resolves the container's `plan`-shaped [`GraphTemplate`] from the cached
+    /// [`TemplateRegistry`](crate::templates::TemplateRegistry)
+    /// (`.jit/templates.toml`) by the container's `type:` label and delegates to
+    /// [`bracket_breakdown_with_template`](Self::bracket_breakdown_with_template).
     /// See that method for the full spine-wiring contract.
     ///
     /// # Examples
@@ -147,100 +160,120 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///     deps: vec![],
     /// }];
     /// let result = executor.bracket_breakdown("epic-123", children).unwrap();
-    /// println!("created breakdown node {}", result.breakdown_id);
+    /// println!("consumed breakdown node {}", result.breakdown_id);
     /// ```
     pub fn bracket_breakdown(
         &self,
         container_id: &str,
         children: Vec<BracketChild>,
     ) -> Result<BracketBreakdownResult> {
-        let config = self.bracket_planning_config()?;
-        self.bracket_breakdown_with_config(&config, container_id, children)
-    }
-
-    /// Resolve the effective `[planning]` configuration, erroring clearly when
-    /// the repository has not declared a bracket vocabulary.
-    fn bracket_planning_config(&self) -> Result<PlanningConfig> {
-        self.cached_config()?.planning.clone().ok_or_else(|| {
+        // Resolve the container's type up front so the template can be selected by
+        // `applies_to`, mirroring how `jit apply plan` picks the template.
+        let full_container_id = self.storage.resolve_issue_id(container_id)?;
+        let container = self.storage.load_issue(&full_container_id)?;
+        let container_type = type_label_value(&container.labels).ok_or_else(|| {
             anyhow!(
-                "no [planning] section in .jit/config.toml: planning brackets require a \
-                 declared vocabulary (breakable_types, planning_type, breakdown_type, ...)"
+                "container '{}' has no type: label; bracket breakdown requires a breakable type",
+                container.short_id()
             )
-        })
+        })?;
+        // Clone the template out of the cached registry: breakdown mutates issues
+        // through `&self`, so it cannot hold a borrow into the config cache.
+        let template = self
+            .cached_config()?
+            .templates
+            .template_for_container(&container_type)
+            .cloned()
+            .ok_or_else(|| {
+                anyhow!(
+                    "container type '{container_type}' has no graph template in \
+                     .jit/templates.toml; declare a template whose applies_to lists it"
+                )
+            })?;
+        self.bracket_breakdown_with_template(&template, container_id, children)
     }
 
-    /// Bracket-aware breakdown using an explicit `[planning]` config.
+    /// Bracket-aware breakdown using an explicit [`GraphTemplate`].
     ///
-    /// The config-injecting core of [`bracket_breakdown`](Self::bracket_breakdown),
-    /// separated so the bracket logic is testable without an on-disk
-    /// `config.toml`. Given a breakable container `C` already scaffolded to its
-    /// planning node `P` (`C → P`), and a set of drafted children with their
+    /// The template-injecting core of [`bracket_breakdown`](Self::bracket_breakdown),
+    /// separated so the spine logic is testable without an on-disk
+    /// `templates.toml` (mirroring the `*_with` split in [`template`](super::template)).
+    /// Given a breakable container `C` already scaffolded by `jit apply plan <C>`
+    /// into the bracket `C → B → P`, and a set of drafted children with their
     /// intra-subgraph dependency structure, it:
     ///
-    /// 1. Validates `C`'s `type:` label is breakable and locates its planning
-    ///    node `P` (a `type:<planning_type>` dependency of `C`).
-    /// 2. Creates the breakdown node `B` (`type:<breakdown_type>`, a
-    ///    `brackets:<C-id>` label, inheriting `C`'s membership labels), ATTACHES
-    ///    both bracket gates to it — the deterministic coverage-preview preset
-    ///    and the agent breakdown-review preset (gates left PENDING — the helper
-    ///    does not run them), and wires `B → P`.
-    /// 3. Creates the impl children in **Backlog** (they each gain a dependency,
+    /// 1. Validates `C`'s `type:` label is in the template's `applies_to`, then
+    ///    LOCATES the pre-created breakdown node `B`: the dependency of `C` typed
+    ///    as the template's breakdown type AND carrying the `brackets:<C-short-id>`
+    ///    label the apply engine seeds. If absent, errors: run `jit apply plan <C>`
+    ///    first. It does NOT create `B` or re-attach `B`'s gates.
+    /// 2. Finds the planning node `P` THROUGH `B`: `P` is `B`'s dependency typed as
+    ///    the template's planning type (the apply engine wired `B → P`).
+    /// 3. Enforces an APPROVED plan: `P`'s plan-quality gate (the planning node's
+    ///    first declared gate, e.g. `plan-review`) must have PASSED.
+    /// 4. Creates the impl children in **Backlog** (they each gain a dependency,
     ///    so [`create_issue`](Self::create_issue)'s auto-Ready promotion is
     ///    immediately demoted).
-    /// 4. Splices the spine: each SOURCE child (no intra-subgraph predecessor)
+    /// 5. Splices the spine: each SOURCE child (no intra-subgraph predecessor)
     ///    depends on `B`; the internal edges are added as given; finally `C` is
     ///    made to depend on each SINK child (no intra-subgraph successor).
     ///    Transitive reduction (maintained by [`add_dependency`](Self::add_dependency))
-    ///    drops the scaffold's now-redundant `C → P` edge and any redundant
+    ///    drops the scaffold's now-redundant `C → B` edge and any redundant
     ///    `C → non-sink` edge.
     ///
     /// It deliberately does **not** reuse the parent-centric wiring of
     /// [`breakdown_issue`](Self::breakdown_issue): children never copy `C`'s
     /// dependencies, and `C` depends on sinks only — not on every child.
     ///
-    /// All pre-mutation checks (empty child set, out-of-range/self `deps`,
-    /// cycles in the child subgraph, breakable container type, and an APPROVED
-    /// plan) run BEFORE any `create_issue`/`add_dependency`, so a rejected
+    /// All pre-mutation checks (empty child set, out-of-range/self `deps`, cycles
+    /// in the child subgraph, breakable container type, a located `B`, and an
+    /// APPROVED plan) run BEFORE any `create_issue`/`add_dependency`, so a rejected
     /// breakdown leaves NO partial state.
     ///
-    /// This helper is a pure **bracket-builder**: it ATTACHES `B`'s two gates —
-    /// the deterministic coverage-preview gate (via `config.coverage_gate_preset`)
-    /// and the agent breakdown-review gate (via
-    /// `config.breakdown_review_gate_preset`) — leaving both PENDING. It does
-    /// **not** run, stamp, or fabricate any verdict. Both gates are run separately
-    /// by the standard gate runner (`jit gate pass <B> <gate>`) as breakdown-workflow
-    /// steps — the orchestrator runs every gate in this project, never command code.
-    /// The coverage gate executes the deterministic `jit validate --scope <C>`
-    /// check; the review gate runs the command-backed AI reviewer. Each persists a
-    /// `GateRunResult`, updates `B`'s gate status, and logs the event. Because the
-    /// impl subgraph transitively depends on `B`, jit's gate enforcement is
-    /// self-guiding: the fan-out cannot release until both gates on `B` pass.
+    /// `B`'s two gates — the deterministic coverage gate and the agent
+    /// breakdown-review gate — were ATTACHED by `jit apply plan` and are left
+    /// PENDING. Breakdown neither re-attaches nor runs them: they are run later by
+    /// the standard gate runner (`jit gate pass <B> <gate>`) as breakdown-workflow
+    /// steps — the orchestrator runs every gate in this project, never command
+    /// code. Because the impl subgraph transitively depends on `B`, jit's gate
+    /// enforcement is self-guiding: the fan-out cannot release until both gates on
+    /// `B` pass.
     ///
     /// # Errors
     ///
-    /// Returns an error if the container is not breakable, has no scaffolded
-    /// planning node, that planning node's plan-review gate has not passed, the
-    /// child set is empty, a child's `deps` index is out of range or self-referent,
-    /// or the children's `deps` form a cycle.
+    /// Returns an error if the container is not breakable, has no pre-created
+    /// breakdown node (run `jit apply plan <C>` first), `B` has no planning-node
+    /// dependency, that planning node's plan-quality gate has not passed, the child
+    /// set is empty, a child's `deps` index is out of range or self-referent, or
+    /// the children's `deps` form a cycle.
     ///
     /// # Examples
     ///
     /// ```no_run
     /// use jit::commands::{BracketChild, CommandExecutor};
-    /// use jit::config::PlanningConfig;
     /// use jit::domain::Priority;
     /// use jit::storage::JsonFileStorage;
+    /// use jit::templates::TemplateRegistry;
+    ///
+    /// let toml = r#"
+    /// [[template]]
+    /// name = "plan"
+    /// applies_to = ["epic"]
+    /// [[template.nodes]]
+    /// role = "planning"
+    /// type = "planning"
+    /// gates = ["plan-review"]
+    /// [[template.nodes]]
+    /// role = "breakdown"
+    /// type = "breakdown"
+    /// gates = ["coverage-preview", "breakdown-review"]
+    /// depends_on = ["planning"]
+    /// "#;
+    /// let registry =
+    ///     TemplateRegistry::from_toml_str(toml, &["epic", "planning", "breakdown"]).unwrap();
+    /// let template = registry.get("plan").unwrap();
     ///
     /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
-    /// let config = PlanningConfig {
-    ///     breakable_types: vec!["epic".into()],
-    ///     planning_type: "planning".into(),
-    ///     breakdown_type: "breakdown".into(),
-    ///     plan_doc_location: "inline".into(),
-    ///     plan_gate_preset: "plan-review".into(),
-    ///     coverage_gate_preset: "coverage-preview".into(),
-    ///     breakdown_review_gate_preset: "breakdown-review".into(),
-    /// };
     /// let children = vec![BracketChild {
     ///     title: "Build login".into(),
     ///     description: String::new(),
@@ -250,13 +283,13 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///     deps: vec![],
     /// }];
     /// let result = executor
-    ///     .bracket_breakdown_with_config(&config, "epic-123", children)
+    ///     .bracket_breakdown_with_template(template, "epic-123", children)
     ///     .unwrap();
     /// assert_eq!(result.coverage_gate_preset, "coverage-preview");
     /// ```
-    pub fn bracket_breakdown_with_config(
+    pub fn bracket_breakdown_with_template(
         &self,
-        config: &PlanningConfig,
+        template: &GraphTemplate,
         container_id: &str,
         children: Vec<BracketChild>,
     ) -> Result<BracketBreakdownResult> {
@@ -304,85 +337,91 @@ impl<S: IssueStore> CommandExecutor<S> {
         let full_container_id = self.storage.resolve_issue_id(container_id)?;
         let container = self.storage.load_issue(&full_container_id)?;
 
-        // 1. Validate the container is breakable.
+        // 1. Validate the container is breakable: its type must be in the
+        //    template's `applies_to` (the same gate `jit apply plan` enforces).
         let container_type = type_label_value(&container.labels);
         match container_type.as_deref() {
-            Some(ty) if config.breakable_types.iter().any(|b| b == ty) => {}
+            Some(ty) if template.applies_to.iter().any(|b| b == ty) => {}
             Some(ty) => {
                 return Err(anyhow!(
-                    "container type '{ty}' is not breakable; declared breakable types: {}",
-                    config.breakable_types.join(", ")
+                    "container type '{ty}' is not breakable; template '{}' applies to: {}",
+                    template.name,
+                    template.applies_to.join(", ")
                 ))
             }
             None => {
                 return Err(anyhow!(
-                    "container has no type: label; planning brackets require a breakable type \
+                    "container has no type: label; bracket breakdown requires a breakable type \
                      (one of: {})",
-                    config.breakable_types.join(", ")
+                    template.applies_to.join(", ")
                 ))
             }
         }
 
-        // 1b. Locate the planning node P: a dependency of C typed as the
-        //     planning type. The scaffold (`jit plan`) created the `C → P` edge.
-        let planning_id = self.find_planning_node(&container, config)?;
+        // The template must declare the conventional planning + breakdown nodes;
+        // their types name what we locate among the scaffold's nodes.
+        let breakdown_type = template.breakdown_type().ok_or_else(|| {
+            anyhow!(
+                "template '{}' declares no '{}' node; bracket breakdown needs a breakdown node",
+                template.name,
+                BREAKDOWN_ROLE
+            )
+        })?;
+        let planning_type = template.planning_type().ok_or_else(|| {
+            anyhow!(
+                "template '{}' declares no '{}' node; bracket breakdown needs a planning node",
+                template.name,
+                PLANNING_ROLE
+            )
+        })?;
 
-        // 1c. Enforce an APPROVED plan BEFORE any mutation: P's plan-review gate
-        //     (config.plan_gate_preset) must have PASSED. Breakdown consumes an
-        //     approved plan; a pending/unset plan gate rejects with no partial
-        //     state created.
+        // 1b. LOCATE the pre-created breakdown node B (created by `jit apply
+        //     plan <C>`): a dependency of C typed as the breakdown type AND
+        //     carrying the `brackets:<C-short-id>` label the apply engine seeds.
+        //     Breakdown consumes this B; it does not create one.
+        let breakdown_id = self.find_breakdown_node(&container, breakdown_type)?;
+
+        // 1c. Find the planning node P THROUGH B: P is B's dependency typed as the
+        //     planning type (the apply engine wired `B → P`). The container no
+        //     longer points directly at P (the spine is `C → B → P`).
+        let breakdown_node = self.storage.load_issue(&breakdown_id)?;
+        let planning_id = self.find_planning_node(&breakdown_node, planning_type)?;
+
+        // 1d. Enforce an APPROVED plan BEFORE any mutation: P's plan-quality gate
+        //     (the planning node's first declared gate, e.g. `plan-review`) must
+        //     have PASSED. Breakdown consumes an approved plan; a pending/unset
+        //     plan gate rejects with no partial state created.
+        let plan_gate = template
+            .planning_node()
+            .and_then(|n| n.gates.first())
+            .ok_or_else(|| {
+                anyhow!(
+                    "template '{}' planning node declares no gate; cannot verify an approved plan",
+                    template.name
+                )
+            })?;
         let planning_node = self.storage.load_issue(&planning_id)?;
         let plan_gate_passed = matches!(
-            planning_node.gates_status.get(&config.plan_gate_preset),
+            planning_node.gates_status.get(plan_gate),
             Some(gate_state) if gate_state.status == GateStatus::Passed
         );
         if !plan_gate_passed {
             return Err(anyhow!(
-                "planning node P ({}) {} gate has not passed; breakdown requires an \
+                "planning node P ({}) {plan_gate} gate has not passed; breakdown requires an \
                  approved plan",
-                planning_node.short_id(),
-                config.plan_gate_preset
+                planning_node.short_id()
             ));
         }
 
-        // 2. Create the breakdown node B. It inherits C's non-type labels
-        //    (epic/milestone membership), carries the breakdown type and a
-        //    brackets:<C-id> label, and gets the coverage-preview preset.
-        let mut breakdown_labels = membership_labels(&container.labels);
-        breakdown_labels.push(format!("type:{}", config.breakdown_type));
-        breakdown_labels.push(format!("brackets:{}", full_container_id));
-
-        let (breakdown_id, _create_warnings) = self.create_issue(
-            format!("Breakdown: {}", container.title),
-            String::new(),
-            container.priority,
-            vec![],
-            breakdown_labels,
-            None,
-            false,
-        )?;
-
-        // Apply the two gates that bracket `B` (the quality-vs-coverage split):
-        // the deterministic coverage-preview gate and the agent breakdown-review
-        // gate. Each registers its gate, initializes status, and logs events; both
-        // are left PENDING for the standard gate runner. Then wire B → P.
-        self.apply_gate_preset(
-            &breakdown_id,
-            &config.coverage_gate_preset,
-            None,
-            false,
-            false,
-            &[],
-        )?;
-        self.apply_gate_preset(
-            &breakdown_id,
-            &config.breakdown_review_gate_preset,
-            None,
-            false,
-            false,
-            &[],
-        )?;
-        self.add_dependency(&breakdown_id, &planning_id)?;
+        // The breakdown node B and its two gates already exist (attached by
+        // `jit apply plan`); breakdown does NOT re-create B or re-attach its gates.
+        // Report the gate-preset names B carries for `--json` consumers.
+        let breakdown_gates = template
+            .breakdown_node()
+            .map(|n| n.gates.clone())
+            .unwrap_or_default();
+        let coverage_gate_preset = breakdown_gates.first().cloned().unwrap_or_default();
+        let breakdown_review_gate_preset = breakdown_gates.get(1).cloned().unwrap_or_default();
 
         // 3. Create the impl children. They inherit C's membership labels (not
         //    its type). Children are created dependency-less (so auto-Ready),
@@ -430,7 +469,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // 4c. C → sinks. A sink has no intra-subgraph successor, i.e. no other
         //     child lists it in `deps`. C depends on each sink; reduction drops
-        //     the redundant C → P edge once the spine connects them.
+        //     the redundant C → B edge once the spine connects them.
         let has_successor: Vec<bool> = {
             let mut flags = vec![false; n];
             for child in &children {
@@ -446,38 +485,60 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
-        // The coverage-preview gate is ATTACHED to B (step 2, left PENDING) but
-        // NOT run here. The standard gate runner (`jit gate pass <B>
-        // <coverage-gate>`) evaluates it as a breakdown-workflow step — the
-        // orchestrator runs every gate, never this command code. The helper is a
-        // clean bracket-builder: no faked verdict, no gate stamping, no gate
-        // events emitted by breakdown.
+        // B's two gates were ATTACHED by `jit apply plan` and left PENDING; the
+        // standard gate runner (`jit gate pass <B> <gate>`) evaluates them as
+        // breakdown-workflow steps — the orchestrator runs every gate, never this
+        // command code. Breakdown is a clean spine-splicer: no faked verdict, no
+        // gate stamping, no gate events emitted by breakdown.
         Ok(BracketBreakdownResult {
             container_id: full_container_id,
             breakdown_id,
             planning_id,
             child_ids,
-            coverage_gate_preset: config.coverage_gate_preset.clone(),
-            breakdown_review_gate_preset: config.breakdown_review_gate_preset.clone(),
+            coverage_gate_preset,
+            breakdown_review_gate_preset,
         })
     }
 
-    /// Locate the planning node `P` for a scaffolded container `C`.
+    /// Locate the pre-created breakdown node `B` among a container `C`'s
+    /// dependencies.
     ///
-    /// `P` is the dependency of `C` typed as `config.planning_type` (the scaffold
-    /// step wired `C → P`). Errors clearly if `C` has not been scaffolded.
-    fn find_planning_node(&self, container: &Issue, config: &PlanningConfig) -> Result<String> {
+    /// `B` is the dependency of `C` typed as `breakdown_type` AND carrying the
+    /// `brackets:<C-short-id>` label that `jit apply plan` seeds (matching the
+    /// engine's [`find_applied_breakdown`](super::template) convention). Errors
+    /// clearly if `C` has not been scaffolded.
+    fn find_breakdown_node(&self, container: &Issue, breakdown_type: &str) -> Result<String> {
+        let bracket_label = format!("brackets:{}", container.short_id());
         for dep_id in &container.dependencies {
             let dep = self.storage.load_issue(dep_id)?;
-            if type_label_value(&dep.labels).as_deref() == Some(config.planning_type.as_str()) {
+            let has_type = type_label_value(&dep.labels).as_deref() == Some(breakdown_type);
+            let has_bracket = dep.labels.iter().any(|l| l == &bracket_label);
+            if has_type && has_bracket {
                 return Ok(dep_id.clone());
             }
         }
         Err(anyhow!(
-            "container '{}' has no scaffolded planning node (no '{}'-typed dependency); \
-             run `jit plan <id>` first",
-            container.short_id(),
-            config.planning_type
+            "container '{}' has no breakdown bracket (no '{breakdown_type}'-typed dependency \
+             carrying '{bracket_label}'); run `jit apply plan <id>` first",
+            container.short_id()
+        ))
+    }
+
+    /// Locate the planning node `P` THROUGH the breakdown node `B`.
+    ///
+    /// `P` is the dependency of `B` typed as `planning_type` (the apply engine
+    /// wired `B → P`). Errors clearly if `B` has no planning-node dependency.
+    fn find_planning_node(&self, breakdown: &Issue, planning_type: &str) -> Result<String> {
+        for dep_id in &breakdown.dependencies {
+            let dep = self.storage.load_issue(dep_id)?;
+            if type_label_value(&dep.labels).as_deref() == Some(planning_type) {
+                return Ok(dep_id.clone());
+            }
+        }
+        Err(anyhow!(
+            "breakdown node '{}' has no planning node (no '{planning_type}'-typed dependency); \
+             the bracket is incomplete — re-run `jit apply plan <id>`",
+            breakdown.short_id()
         ))
     }
 }
@@ -506,10 +567,13 @@ fn first_child_cycle(children: &[BracketChild]) -> Option<Vec<usize>> {
         }
         let mut stack: Vec<(usize, usize)> = vec![(start, 0)];
         mark[start] = Mark::InStack;
-        while let Some(&(node, next)) = stack.last() {
-            if next < children[node].deps.len() {
-                stack.last_mut().expect("stack non-empty").1 += 1;
-                let dep = children[node].deps[next];
+        // Take a mutable handle to the top frame each iteration; `last_mut()`
+        // returning `Some` is also the loop condition, so no fallible unwrap is
+        // needed (and library code must not `expect`).
+        while let Some(&mut (node, ref mut next)) = stack.last_mut() {
+            if *next < children[node].deps.len() {
+                let dep = children[node].deps[*next];
+                *next += 1;
                 match mark[dep] {
                     Mark::Unvisited => {
                         mark[dep] = Mark::InStack;
@@ -517,12 +581,12 @@ fn first_child_cycle(children: &[BracketChild]) -> Option<Vec<usize>> {
                     }
                     Mark::InStack => {
                         // Back-edge to `dep`: the cycle is the path suffix from
-                        // `dep` to the current node, closed by `node -> dep`.
-                        let from = stack
-                            .iter()
-                            .position(|&(id, _)| id == dep)
-                            .expect("on stack");
-                        return Some(stack[from..].iter().map(|&(id, _)| id).collect());
+                        // `dep` to the current node, closed by `node -> dep`. `dep`
+                        // is marked InStack, so it is on the stack; guard with
+                        // `if let` rather than `expect` (no panic in library code).
+                        if let Some(from) = stack.iter().position(|&(id, _)| id == dep) {
+                            return Some(stack[from..].iter().map(|&(id, _)| id).collect());
+                        }
                     }
                     Mark::Done => {}
                 }
