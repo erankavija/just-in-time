@@ -1,25 +1,28 @@
-//! Graph-template apply engine — validate, snapshot, and instantiate
-//! (W2 task 1 of the `jit apply` engine).
+//! Graph-template apply engine (the `jit apply` engine).
 //!
 //! [`apply_template`](CommandExecutor::apply_template) instantiates a
-//! [`GraphTemplate`](crate::templates::GraphTemplate) onto a container: it
-//! validates every non-edge precondition BEFORE the first mutation, snapshots
-//! each bound anchor's current dependencies, then creates the template's nodes
-//! with interpolated descriptions / docs and their declared gate presets.
+//! [`GraphTemplate`](crate::templates::GraphTemplate) onto a container. On a
+//! fresh apply it:
 //!
-//! This module generalizes the create+gate+doc sequence that
+//! 1. validates every precondition BEFORE the first mutation (anchors resolve,
+//!    container type ∈ `applies_to`, gate presets exist, node writes would pass
+//!    validation, not already-applied unless `--force`);
+//! 2. snapshots each bound anchor's current dependencies;
+//! 3. creates the template's nodes with interpolated descriptions / docs and
+//!    their declared gate presets; then
+//! 4. wires the template's edges and runs its transforms: the internal
+//!    `depends_on` edges (e.g. `B → P`), the `anchor_edges` (e.g. `C → B`), and
+//!    the `move-upstream-to-role` transform that moves the container's pre-apply
+//!    snapshot deps onto the named role's node — all via
+//!    [`add_dependency`](CommandExecutor::add_dependency), so the result is
+//!    acyclic and transitively reduced.
+//!
+//! This generalizes the create+gate+doc+wire sequence that
 //! [`bracket_container`](super::plan) performs for the hardcoded planning
-//! bracket. It deliberately stops short of edge wiring and graph transforms:
-//!
-//! - **internal `depends_on` edges** (e.g. `B → P`),
-//! - **`anchor_edges`** (e.g. `C → B`), and
-//! - the **`move-upstream-to-role`** transform that moves the container's
-//!   pre-apply upstream deps onto the planning node,
-//!
-//! are the next task's responsibility (W2 task 2, jit:73e5e853). The snapshot
-//! captured here (the anchors' pre-apply dependency sets) is exactly what that
-//! transform consumes, so it is carried out of this engine on
-//! [`TemplateApplyResult`].
+//! bracket. The `--force` refresh path re-seeds existing nodes' prose in place
+//! and re-runs neither node creation, edge wiring, nor transforms (the spine
+//! already exists; re-running the transform over now-scaffold-bearing live deps
+//! would corrupt it).
 //!
 //! # Domain-agnostic
 //!
@@ -42,9 +45,11 @@ use serde::Serialize;
 /// Names the template applied and the anchor bindings used, maps each created
 /// node's template ROLE to the id of the issue created (or refreshed) for it,
 /// and carries the PRE-APPLY snapshot of each bound anchor's dependencies. The
-/// snapshot is the input the edge-wiring + `move-upstream-to-role` transform
-/// (the next task) consumes; capturing it before any mutation is what lets that
-/// transform move exactly the container's ORIGINAL upstream deps.
+/// snapshot is what the `move-upstream-to-role` transform moves onto the planning
+/// node; capturing it before any mutation is what lets the transform move exactly
+/// the container's ORIGINAL upstream deps (and never the freshly-wired scaffold
+/// edges). It is also surfaced for callers/tests that inspect the pre-apply
+/// shape.
 ///
 /// # Examples
 ///
@@ -75,7 +80,8 @@ pub struct TemplateApplyResult {
     /// Template node role → the created (or `--force`-refreshed) issue id.
     pub created_node_ids_by_role: BTreeMap<String, String>,
     /// Anchor name → that anchor's `dependencies` as snapshotted BEFORE any
-    /// mutation. Consumed by the edge-wiring + transform task (jit:73e5e853).
+    /// mutation. Consumed by the `move-upstream-to-role` transform and surfaced
+    /// for callers inspecting the pre-apply shape.
     pub anchor_dependency_snapshots: BTreeMap<String, Vec<String>>,
 }
 
@@ -131,21 +137,26 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Separated so the engine is testable without an on-disk `templates.toml`
     /// (mirroring the `*_with_config` split in [`plan`](super::plan)). Steps:
     ///
-    /// 1. **Validate before mutating.** The container type is in the template's
-    ///    `applies_to`; every declared anchor is bound and resolves to an
-    ///    existing issue; the container is not already-applied unless `force`.
-    ///    Any failure aborts BEFORE the first `create_issue`, so a validation
-    ///    failure creates zero nodes.
-    /// 2. **Snapshot** each bound anchor's `dependencies` (carried on the result
-    ///    for the edge-wiring + transform task).
+    /// 1. **Validate before mutating** — the single complete gate. The container
+    ///    type is in the template's `applies_to`; every declared anchor is bound
+    ///    and resolves to an existing issue; every node's gate presets exist and
+    ///    its projected write would pass validation; every transform's `kind` is
+    ///    supported; the container is not already-applied unless `force`. Any
+    ///    failure aborts BEFORE the first `create_issue`, so a validation failure
+    ///    creates zero nodes. After this gate the mutation phase can only fail on
+    ///    I/O.
+    /// 2. **Snapshot** each bound anchor's `dependencies` (the
+    ///    `move-upstream-to-role` transform reads this pre-apply set).
     /// 3. **Instantiate** each template node in order (or refresh in place under
     ///    `force`): create the typed issue with inherited container membership
     ///    labels plus the node's interpolated labels and a non-empty interpolated
     ///    description, set the node's interpolated `doc` as a [`DocumentReference`],
     ///    and attach each declared gate preset.
-    ///
-    /// It does NOT wire internal/anchor edges or run transforms — see the module
-    /// docs and the seam left in this method.
+    /// 4. **Wire edges + run transforms** (fresh apply only): the template's
+    ///    internal `depends_on` edges and `anchor_edges` via
+    ///    [`add_dependency`](Self::add_dependency) (cycle-checked + transitively
+    ///    reduced), then each transform (`move-upstream-to-role`) over the step-2
+    ///    snapshot. The `--force` refresh path skips this: the edges already exist.
     ///
     /// # Examples
     ///
@@ -254,6 +265,21 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
+        // Every declared transform's `kind` must be a supported kind BEFORE the
+        // first mutation. The mutation-phase dispatch in `wire_template_edges`
+        // parses the kind too, but doing it ONLY there would let an unknown kind
+        // create nodes/edges and then fail — violating validate-before-mutate. The
+        // loader validates a transform's role-target but not its kind, so this is
+        // the gate for kinds. (Pure parse, no I/O.)
+        for transform in &template.transforms {
+            TransformKind::parse(&transform.kind).with_context(|| {
+                format!(
+                    "template '{}' declares an unsupported transform kind '{}'",
+                    template.name, transform.kind
+                )
+            })?;
+        }
+
         // Already-applied detection: the breakdown node carries
         // `brackets:<container-short-id>` and sits among the container's deps.
         let existing_breakdown = self.find_applied_breakdown(template, &container)?;
@@ -286,24 +312,52 @@ impl<S: IssueStore> CommandExecutor<S> {
         // create issues, so it has no such window.)
         if existing_breakdown.is_none() {
             self.prevalidate_node_writes(template, &container, &context)?;
+
+            // Simulate the FULL prospective edge set over the current store + the
+            // to-be-created nodes and verify it is acyclic, with ZERO mutation if
+            // not. `wire_template_edges` adds edges one-by-one, so a cycle-forming
+            // LATER edge would otherwise fail only after nodes + earlier edges are
+            // persisted (a partial apply). This pre-check makes the precondition
+            // phase the complete gate: acyclicity is verified up front (APPLY-04).
+            self.prevalidate_acyclic(
+                template,
+                &full_container_id,
+                &resolved_bindings,
+                &anchor_dependency_snapshots,
+            )?;
         }
 
         let mut warnings = Vec::new();
         let created_node_ids_by_role = if let Some(breakdown_id) = existing_breakdown {
             // === Force refresh: update existing nodes in place, no duplicates ===
+            // Edges + transforms are NOT re-run here: they were wired by the
+            // original fresh apply, the nodes already exist among the container's
+            // deps, and a re-run transform would snapshot the (now scaffold-bearing)
+            // live deps and move `B` onto `P`, breaking the spine. Refresh only
+            // re-seeds prose.
             self.refresh_template_nodes(template, &breakdown_id, &context, &mut warnings)?
         } else {
             // === 3. Instantiate nodes (fresh apply) ===
-            self.instantiate_template_nodes(template, &container, &context, &mut warnings)?
-        };
+            let created =
+                self.instantiate_template_nodes(template, &container, &context, &mut warnings)?;
 
-        // === SEAM: W2 task 2 (jit:73e5e853) — wire edges + run transforms here ===
-        // The next task wires the template's internal `depends_on` edges (by
-        // role) and `anchor_edges` (anchor↔node) via `add_dependency`, then runs
-        // the `move-upstream-to-role` transform over `anchor_dependency_snapshots`
-        // (NOT a live re-read of the container's deps). It consumes
-        // `created_node_ids_by_role` + `anchor_dependency_snapshots` from the
-        // result below. This engine intentionally creates only the NODES.
+            // === 4. Wire edges + run transforms (jit:73e5e853) ===
+            // Internal `depends_on` + `anchor_edges` via `add_dependency` (which
+            // runs cycle-check + eager transitive reduction, giving APPB-01's
+            // acyclic+reduced result), then `move-upstream-to-role` over the
+            // PRE-APPLY snapshot (APPB-02) — never a live read of the container's
+            // deps, which now include the freshly-wired anchor edges.
+            self.wire_template_edges(
+                template,
+                &full_container_id,
+                &resolved_bindings,
+                &created,
+                &anchor_dependency_snapshots,
+                &mut warnings,
+            )?;
+
+            created
+        };
 
         Ok((
             TemplateApplyResult {
@@ -346,6 +400,115 @@ impl<S: IssueStore> CommandExecutor<S> {
                         template.name, node.role
                     )
                 })?;
+        }
+        Ok(())
+    }
+
+    /// Simulate the full prospective post-apply edge set, read-only, and verify it
+    /// is acyclic BEFORE any mutation (APPLY-04 / plan: "simulate edges for
+    /// acyclicity").
+    ///
+    /// `wire_template_edges` adds edges one at a time, so a cycle introduced by a
+    /// LATER edge would only surface after nodes and earlier edges are persisted —
+    /// a partial apply. Here the complete prospective graph is built over the
+    /// current store plus PLACEHOLDER ids for the to-be-created role nodes, and
+    /// checked once with [`DependencyGraph::validate_dag`]. The prospective edges
+    /// mirror `wire_template_edges` exactly:
+    ///
+    /// - internal `depends_on`: role placeholder → dep-role placeholder;
+    /// - anchor edges: bound anchor existing id → role placeholder;
+    /// - `move-upstream-to-role`: the target role placeholder gains the container's
+    ///   pre-apply snapshot deps, and the container ANCHOR loses them (the
+    ///   transform's removal — modeled so a cycle the removal actually breaks is
+    ///   not falsely flagged).
+    ///
+    /// Extra (un-reduced) edges only make a cycle MORE likely, so an acyclic
+    /// prospective graph guarantees the reduced result `add_dependency` produces is
+    /// acyclic too. On a cycle, returns a clear error before the first
+    /// `create_issue`.
+    fn prevalidate_acyclic(
+        &self,
+        template: &GraphTemplate,
+        full_container_id: &str,
+        resolved_bindings: &BTreeMap<String, String>,
+        anchor_dependency_snapshots: &BTreeMap<String, Vec<String>>,
+    ) -> Result<()> {
+        // Stable placeholder id per role for the not-yet-created nodes. Prefixed
+        // so it cannot collide with a real (uuid) issue id in the store.
+        let placeholder = |role: &str| format!("__apply_placeholder__:{role}");
+
+        // Start from the current store's edges, keyed by id → deps, so we can apply
+        // the transform's REMOVALS without mutating stored issues.
+        let store_issues = self.storage.list_issues()?;
+        let mut deps_by_id: BTreeMap<String, Vec<String>> = store_issues
+            .iter()
+            .map(|i| (i.id.clone(), i.dependencies.clone()))
+            .collect();
+
+        // The container anchor (the bound anchor resolving to this container) is
+        // the one whose snapshot the `move-upstream-to-role` transform moves.
+        let container_anchor = resolved_bindings
+            .iter()
+            .find(|(_, id)| id.as_str() == full_container_id)
+            .map(|(name, _)| name.clone());
+
+        // Placeholder nodes for the created roles, with their internal depends_on
+        // edges (role → dep-role placeholder).
+        for node in &template.nodes {
+            let role_deps: Vec<String> = node.depends_on.iter().map(|r| placeholder(r)).collect();
+            deps_by_id.insert(placeholder(&node.role), role_deps);
+        }
+
+        // Anchor edges: the bound anchor gains a dep on the created role node.
+        for edge in &template.anchor_edges {
+            let Some(anchor_id) = resolved_bindings.get(&edge.from) else {
+                continue; // unbound anchors are rejected earlier; skip defensively
+            };
+            deps_by_id
+                .entry(anchor_id.clone())
+                .or_default()
+                .push(placeholder(&edge.to));
+        }
+
+        // Transforms: move-upstream-to-role moves the container's snapshot deps
+        // onto the target role placeholder and removes them from the container.
+        for transform in &template.transforms {
+            match TransformKind::parse(&transform.kind)? {
+                TransformKind::MoveUpstreamToRole => {
+                    let snapshot = container_anchor
+                        .as_deref()
+                        .and_then(|name| anchor_dependency_snapshots.get(name))
+                        .cloned()
+                        .unwrap_or_default();
+                    // Role placeholder gains each snapshot dep.
+                    deps_by_id
+                        .entry(placeholder(&transform.role))
+                        .or_default()
+                        .extend(snapshot.iter().cloned());
+                    // Container loses each snapshot dep (the transform's removal).
+                    if let Some(container_deps) = deps_by_id.get_mut(full_container_id) {
+                        container_deps.retain(|d| !snapshot.contains(d));
+                    }
+                }
+            }
+        }
+
+        // Build the prospective graph and check it is a DAG. A dep that names an
+        // id outside the node set simply has no outgoing edges during traversal
+        // (the DAG check tolerates missing targets), so the structure that matters
+        // for cycle detection is fully represented.
+        let nodes: Vec<ProspectiveNode> = deps_by_id
+            .into_iter()
+            .map(|(id, dependencies)| ProspectiveNode { id, dependencies })
+            .collect();
+        let refs: Vec<&ProspectiveNode> = nodes.iter().collect();
+        let graph = crate::graph::DependencyGraph::new(&refs);
+        if graph.validate_dag().is_err() {
+            return Err(anyhow!(
+                "applying template '{}' to container {full_container_id} would create a \
+                 dependency cycle; no nodes were created",
+                template.name
+            ));
         }
         Ok(())
     }
@@ -409,6 +572,144 @@ impl<S: IssueStore> CommandExecutor<S> {
             created.insert(node.role.clone(), node_id);
         }
         Ok(created)
+    }
+
+    /// Wire the template's edges, then run its transforms, over the freshly
+    /// created nodes (jit:73e5e853 — APPB-01 / APPB-02).
+    ///
+    /// In order:
+    ///
+    /// 1. **Internal `depends_on` edges (by role):** for each node, for each role
+    ///    it depends on, wire `node → dep_node` (e.g. breakdown
+    ///    `depends_on = ["planning"]` → `B → P`).
+    /// 2. **Anchor edges:** for each `{from: anchor, to: role}`, wire the bound
+    ///    anchor depending on the created node (`C → B` for `container → breakdown`).
+    /// 3. **Transforms:** dispatched by `kind`. `move-upstream-to-role` moves the
+    ///    container's PRE-APPLY snapshot deps onto the named role's node.
+    ///
+    /// Every edge goes through [`add_dependency`](Self::add_dependency), which runs
+    /// cycle detection and eager transitive reduction, so the resulting graph is
+    /// acyclic and transitively reduced (APPB-01). Transforms read the snapshot,
+    /// not live deps, so a freshly-wired anchor edge cannot be moved (APPB-02).
+    fn wire_template_edges(
+        &self,
+        template: &GraphTemplate,
+        full_container_id: &str,
+        resolved_bindings: &BTreeMap<String, String>,
+        created: &BTreeMap<String, String>,
+        anchor_dependency_snapshots: &BTreeMap<String, Vec<String>>,
+        warnings: &mut Vec<String>,
+    ) -> Result<()> {
+        // 1. Internal depends_on edges (node → dep-role node).
+        for node in &template.nodes {
+            let Some(node_id) = created.get(&node.role) else {
+                continue;
+            };
+            for dep_role in &node.depends_on {
+                let dep_id = created.get(dep_role).ok_or_else(|| {
+                    anyhow!(
+                        "template '{}' node '{}' depends_on role '{dep_role}', \
+                         which was not created",
+                        template.name,
+                        node.role
+                    )
+                })?;
+                let (_, mut w) = self.add_dependency(node_id, dep_id)?;
+                warnings.append(&mut w);
+            }
+        }
+
+        // 2. Anchor edges (bound anchor → created node): "anchor depends on node".
+        for edge in &template.anchor_edges {
+            let anchor_id = resolved_bindings.get(&edge.from).ok_or_else(|| {
+                anyhow!(
+                    "template '{}' anchor_edge references unbound anchor '{}'",
+                    template.name,
+                    edge.from
+                )
+            })?;
+            let node_id = created.get(&edge.to).ok_or_else(|| {
+                anyhow!(
+                    "template '{}' anchor_edge points to role '{}', which was not created",
+                    template.name,
+                    edge.to
+                )
+            })?;
+            let (_, mut w) = self.add_dependency(anchor_id, node_id)?;
+            warnings.append(&mut w);
+        }
+
+        // 3. Transforms, dispatched by kind (extensible). Kinds were already
+        //    validated in the precondition phase, so this parse cannot reach a
+        //    caller as a partial-apply error; it stays the single dispatch point.
+        for transform in &template.transforms {
+            match TransformKind::parse(&transform.kind)? {
+                TransformKind::MoveUpstreamToRole => {
+                    self.move_upstream_to_role(
+                        template,
+                        full_container_id,
+                        &transform.role,
+                        created,
+                        resolved_bindings,
+                        anchor_dependency_snapshots,
+                        warnings,
+                    )?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// `move-upstream-to-role`: move the container's PRE-APPLY upstream deps onto
+    /// the node created for `role`, mirroring `bracket_container` (snapshot deps,
+    /// wire each onto the role node, then drop them from the container).
+    ///
+    /// Operates on the step-2 snapshot — taken before any mutation, so it cannot
+    /// contain the freshly-wired anchor/scaffold nodes — never a live read of the
+    /// container's deps (APPB-02). `add_dependency` then keeps the graph acyclic
+    /// and transitively reduced (APPB-01).
+    #[allow(clippy::too_many_arguments)]
+    fn move_upstream_to_role(
+        &self,
+        template: &GraphTemplate,
+        full_container_id: &str,
+        role: &str,
+        created: &BTreeMap<String, String>,
+        resolved_bindings: &BTreeMap<String, String>,
+        anchor_dependency_snapshots: &BTreeMap<String, Vec<String>>,
+        warnings: &mut Vec<String>,
+    ) -> Result<()> {
+        let role_node_id = created.get(role).ok_or_else(|| {
+            anyhow!(
+                "template '{}' transform targets role '{role}', which was not created",
+                template.name
+            )
+        })?;
+
+        // The container's pre-apply snapshot: the anchor whose bound id is the
+        // container. The loader guarantees a transform's role is declared; the
+        // container anchor is the one resolving to this container.
+        let container_anchor = resolved_bindings
+            .iter()
+            .find(|(_, id)| id.as_str() == full_container_id)
+            .map(|(name, _)| name.as_str());
+        let original_deps = container_anchor
+            .and_then(|name| anchor_dependency_snapshots.get(name))
+            .cloned()
+            .unwrap_or_default();
+
+        // Move each pre-apply upstream dep onto the role node, then drop it from
+        // the container. Wire the new edges before removing the old ones so
+        // transitive reduction never strands an edge mid-operation (plan.rs order).
+        for dep_id in &original_deps {
+            let (_, mut w) = self.add_dependency(role_node_id, dep_id)?;
+            warnings.append(&mut w);
+        }
+        for dep_id in &original_deps {
+            let mut w = self.remove_dependency(full_container_id, dep_id)?;
+            warnings.append(&mut w);
+        }
+        Ok(())
     }
 
     /// Refresh an already-applied template's nodes IN PLACE (the `--force` path).
@@ -589,6 +890,55 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
         Ok(None)
+    }
+}
+
+/// A synthetic graph node for the prospective-cycle simulation: an id and its
+/// dependency ids, implementing [`GraphNode`](crate::graph::GraphNode) so the
+/// prospective post-apply graph (store issues + placeholder role nodes) can be
+/// checked with the existing [`DependencyGraph`](crate::graph::DependencyGraph)
+/// without mutating any stored issue.
+struct ProspectiveNode {
+    id: String,
+    dependencies: Vec<String>,
+}
+
+impl crate::graph::GraphNode for ProspectiveNode {
+    fn id(&self) -> &str {
+        &self.id
+    }
+
+    fn dependencies(&self) -> &[String] {
+        &self.dependencies
+    }
+}
+
+/// A recognized graph-transform kind, parsed from a [`Transform::kind`] string.
+///
+/// Dispatch is by `kind` so the transform set stays extensible; only
+/// `move-upstream-to-role` ships this epic. An unknown kind is rejected with a
+/// clear error rather than silently ignored.
+///
+/// [`Transform::kind`]: crate::templates::Transform::kind
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TransformKind {
+    /// Move the container's pre-apply upstream deps onto a named role's node.
+    MoveUpstreamToRole,
+}
+
+impl TransformKind {
+    /// The `kind` string of `move-upstream-to-role`.
+    const MOVE_UPSTREAM_TO_ROLE: &'static str = "move-upstream-to-role";
+
+    /// Parse a transform `kind` string, erroring on an unrecognized kind.
+    fn parse(kind: &str) -> Result<Self> {
+        match kind {
+            Self::MOVE_UPSTREAM_TO_ROLE => Ok(Self::MoveUpstreamToRole),
+            other => Err(anyhow!(
+                "unknown graph transform kind '{other}'; supported kinds: {}",
+                Self::MOVE_UPSTREAM_TO_ROLE
+            )),
+        }
     }
 }
 

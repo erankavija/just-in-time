@@ -2,7 +2,9 @@
   "epic_id": "9ac9fdac-828a-40f2-9d73-71af14f44ff8",
   "epic_short_id": "9ac9fdac",
   "title": "Graph templates: configurable parameterized subgraphs applied to the work DAG",
-  "current_wave": 1,
+  "current_wave": 4,
+  "completed": {"45e7f203": "done (1bd86c1)", "8b15b679": "done (b4af01f)", "04559558": "story done (b4af01f)", "14137e1a": "done (d7b20c4)"},
+  "in_progress": {"73e5e853": "Wave 4 dispatched — edge wiring + transform; completes apply-engine story 643874f2"},
   "notes": "Breakdown + bracket gates (coverage-preview, breakdown-review) already PASSED. Impl interior = 6 stories + 13 leaf tasks. P(7d88e37d)/B(59118ee9) done. Dispatch per leaf task in topo order; close each story when its tasks land. Epic stays backlog (blocked) until all children done. RESOLVED pre-existing repo-wide blocker (commit 46374a1): code-review gate requires jit-validate green, which failed on 16 epics missing plan docs + isolated probe 313e01f6 + 10 redundant edges. User approved stub-plan-doc backfill. W1 task 45e7f203: cargo-ci PASSED, code-review rework in progress (add # Examples to 6 public types).",
   "blocker_log": [
     {"date": "2026-06-23", "blocker": "repo-wide jit-validate failure blocks all code-review gates", "resolution": "commit 46374a1: backfill 16 stub plan docs (user-approved), connect probe 313e01f6, jit validate --fix (10 redundant edges)", "note": "Durable fix for validation-lifecycle-inversion (require plan docs only for non-terminal breakable epics) deferred as separate concern."}
@@ -44,6 +46,8 @@
   ],
   "created_during_execution": [],
   "escalations": [],
-  "rework_counts": {"45e7f203": 1, "8b15b679": 2, "04559558": 1, "14137e1a": 2},
+  "rework_counts": {"45e7f203": 1, "8b15b679": 2, "04559558": 1, "14137e1a": 3, "73e5e853": 1},
+  "class_watch": "validate-before-mutate gaps: gate-presets(14137e1a r1), labels(14137e1a r2), transform-kinds(73e5e853 r1), cycle-simulation(643874f2 story). 4th occurrence ESCALATED to user 2026-06-23; user chose 'fix it' (edge-simulation pre-check). After this, the precondition phase is the complete gate (types/anchors/presets/node-writes/transform-kinds/acyclicity).",
+  "story_rework_counts": {"643874f2": 1},
   "started_at": "2026-06-23T07:00:00Z"
 }

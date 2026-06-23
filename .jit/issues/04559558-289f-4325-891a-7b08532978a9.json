@@ -16,7 +16,7 @@
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-06-23T13:45:29.207287346Z"
+      "updated_at": "2026-06-23T13:58:20.202637020Z"
     },
     "code-review": {
       "status": "passed",
@@ -34,5 +34,5 @@
     "story:template-registry"
   ],
   "created_at": "2026-06-22T21:59:04.435372907+00:00",
-  "updated_at": "2026-06-23T14:05:38.961675970+00:00"
+  "updated_at": "2026-06-23T14:09:31.257350220+00:00"
 }

@@ -2,7 +2,7 @@
   "id": "643874f2-fcca-48a4-96e5-b26b39a4f868",
   "title": "Graph-template apply engine",
   "description": "Add the engine that instantiates a graph template onto a container.\n\nValidate all preconditions and snapshot each anchor's dependencies before any mutation; create the template's nodes with interpolated descriptions and doc locations; attach each node's declared gate presets; wire internal and anchor edges; run the move-upstream-to-role transform against the pre-apply snapshot. Coexists with the existing scaffold path.\n\n## Success Criteria\n- [ ] [hard] APPLY-01: Applying a template creates its nodes with interpolated, non-empty descriptions and resolved doc locations.\n- [ ] [hard] APPLY-02: Internal and anchor edges are wired; the result is acyclic and transitively reduced.\n- [ ] [hard] APPLY-03: move-upstream-to-role moves the container's pre-apply dependencies onto the named node, never the freshly-created scaffold nodes.\n- [ ] [hard] APPLY-04: A precondition failure (bad anchor, wrong container type, cycle) creates zero nodes.\n- [ ] [hard] APPLY-05: Each created node has its template-declared gate presets attached to its required gates.\n- [ ] [hard] APPLY-06: Applying a template returns a result that identifies the template, the resolved anchor bindings, and the created node ids keyed by role.",
-  "state": "backlog",
+  "state": "done",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -12,7 +12,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-23T17:05:46.832048465Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-23T17:12:57.673873290Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -26,5 +37,5 @@
     "story:apply-engine"
   ],
   "created_at": "2026-06-22T21:59:04.442748529+00:00",
-  "updated_at": "2026-06-23T12:38:01.631478446+00:00"
+  "updated_at": "2026-06-23T17:14:55.470286032+00:00"
 }

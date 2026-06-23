@@ -1,17 +1,18 @@
-//! Engine tests for the graph-template apply core (W2 task 1, jit:14137e1a):
-//! `apply_template_with` — validate, snapshot, instantiate.
+//! Engine tests for the graph-template apply core: `apply_template_with` —
+//! validate, snapshot, instantiate (jit:14137e1a), plus edge wiring + the
+//! `move-upstream-to-role` transform (jit:73e5e853).
 //!
-//! These exercise the real `create_issue` + gate-preset + storage path through
-//! the in-process `TestHarness` (InMemoryStorage), which is fully isolated from
-//! the production `.jit/`. The template is authored in-test via
-//! `TemplateRegistry::from_toml_str` and passed explicitly to
+//! These exercise the real `create_issue` + gate-preset + `add_dependency` +
+//! storage path through the in-process `TestHarness` (InMemoryStorage), which is
+//! fully isolated from the production `.jit/`. The template is authored in-test
+//! via `TemplateRegistry::from_toml_str` and passed explicitly to
 //! `apply_template_with`, so no on-disk `templates.toml` is needed (mirroring the
 //! `*_with_config` split the planning scaffold uses).
 //!
-//! Edge wiring + the `move-upstream-to-role` transform are a SEPARATE task
-//! (jit:73e5e853); this engine creates only the nodes, so the tests assert on
-//! node creation, descriptions/docs, gates, snapshots, and force-refresh — NOT
-//! on the B→P / C→B edges.
+//! A fresh apply now also wires the template's internal `depends_on` edges (B→P),
+//! its `anchor_edges` (C→B), and runs `move-upstream-to-role` (the container's
+//! pre-apply upstream deps move onto P), yielding the acyclic, transitively
+//! reduced spine C→B→P→upstream.
 
 mod harness;
 
@@ -25,8 +26,8 @@ const HIERARCHY: [&str; 3] = ["epic", "planning", "breakdown"];
 
 /// The repo's `plan`-shaped template: a planning node `P` and a breakdown node
 /// `B` with `brackets:<short-id>`, each with gate presets, doc, and seeded
-/// description. `depends_on`/`anchor_edges`/`transforms` are present (they are
-/// the next task's input) but this engine does not act on them.
+/// description. A fresh apply wires the `depends_on` edge (B→P), the `anchor_edge`
+/// (C→B), and runs the `move-upstream-to-role` transform onto P.
 fn plan_template() -> GraphTemplate {
     let toml = r#"
 [[template]]
@@ -476,9 +477,13 @@ fn test_force_errors_when_planning_node_unreachable() {
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap();
     let breakdown_id = first.created_node_ids_by_role["breakdown"].clone();
-    // Wire C→B so the bracket is detected as applied, but DO NOT wire B→P, so
-    // the planning node is unreachable through the breakdown node's depends_on.
-    h.executor.add_dependency(&epic, &breakdown_id).unwrap();
+    let planning_id = first.created_node_ids_by_role["planning"].clone();
+    // The fresh apply wired C→B and B→P. Sever B→P so the planning node becomes
+    // unreachable through the breakdown node's depends_on: a broken bracket the
+    // --force refresh must reject rather than silently refresh only B.
+    h.executor
+        .remove_dependency(&breakdown_id, &planning_id)
+        .unwrap();
 
     let before = h.all_issues().len();
     let err = h
@@ -490,5 +495,176 @@ fn test_force_errors_when_planning_node_unreachable() {
     let msg = err.to_string();
     assert!(msg.contains("planning"), "{msg}");
     // No nodes created or duplicated by the failed refresh.
+    assert_eq!(h.all_issues().len(), before);
+}
+
+// === APPB-01 / APPB-02: edge wiring + move-upstream-to-role transform ===
+
+#[test]
+fn test_apply_wires_spine_and_moves_upstream_onto_planning() {
+    let h = TestHarness::new();
+    let template = plan_template();
+    let up1 = h.create_issue("Upstream 1");
+    let up2 = h.create_issue("Upstream 2");
+    let epic = create_epic(&h, "Spine epic");
+    h.executor.add_dependency(&epic, &up1).unwrap();
+    h.executor.add_dependency(&epic, &up2).unwrap();
+    let up1_full = h.get_issue(&up1).id;
+    let up2_full = h.get_issue(&up2).id;
+
+    let (result, _w) = h
+        .executor
+        .apply_template_with(&template, &epic, &container_binding(&epic), false)
+        .unwrap();
+    let planning_id = result.created_node_ids_by_role["planning"].clone();
+    let breakdown_id = result.created_node_ids_by_role["breakdown"].clone();
+
+    let container = h.get_issue(&epic);
+    let breakdown = h.get_issue(&breakdown_id);
+    let planning = h.get_issue(&planning_id);
+
+    // APPB-01: spine C→B→P→{originals}, transitively reduced.
+    // C depends only on B now (its originals moved off, so C→up* is gone).
+    assert_eq!(container.dependencies, vec![breakdown_id.clone()]);
+    assert!(!container.dependencies.contains(&up1_full));
+    assert!(!container.dependencies.contains(&up2_full));
+
+    // B depends on P (internal depends_on edge).
+    assert_eq!(breakdown.dependencies, vec![planning_id.clone()]);
+
+    // P carries the container's pre-apply upstream deps (move-upstream-to-role).
+    assert!(planning.dependencies.contains(&up1_full));
+    assert!(planning.dependencies.contains(&up2_full));
+
+    // Acyclic + reduced: no back-edges off the spine. In particular P does not
+    // depend on B or C, and B does not depend on C.
+    assert!(!planning.dependencies.contains(&breakdown_id));
+    assert!(!planning.dependencies.contains(&container.id));
+    assert!(!breakdown.dependencies.contains(&container.id));
+}
+
+#[test]
+fn test_transform_does_not_move_freshly_created_breakdown_onto_planning() {
+    // APPB-02: the transform must read the PRE-APPLY snapshot, not live deps. If
+    // it read live deps it would see the freshly-wired C→B edge and move B onto P
+    // (creating P→B, which conflicts with B→P). Assert no such edge exists.
+    let h = TestHarness::new();
+    let template = plan_template();
+    let epic = create_epic(&h, "No-upstream epic"); // C has NO upstream deps
+
+    let (result, _w) = h
+        .executor
+        .apply_template_with(&template, &epic, &container_binding(&epic), false)
+        .unwrap();
+    let planning_id = result.created_node_ids_by_role["planning"].clone();
+    let breakdown_id = result.created_node_ids_by_role["breakdown"].clone();
+
+    let planning = h.get_issue(&planning_id);
+    // P must have NO dependency on the freshly-created breakdown node.
+    assert!(
+        !planning.dependencies.contains(&breakdown_id),
+        "transform moved the scaffold breakdown node onto planning (read live deps, not snapshot)"
+    );
+    // With no upstream, P has no dependencies at all.
+    assert!(planning.dependencies.is_empty());
+    // The spine B→P is intact and not inverted.
+    let breakdown = h.get_issue(&breakdown_id);
+    assert_eq!(breakdown.dependencies, vec![planning_id]);
+}
+
+#[test]
+fn test_apply_rejects_unknown_transform_kind_and_creates_nothing() {
+    let h = TestHarness::new();
+    // A template declaring an unsupported transform kind. The loader validates
+    // the transform's ROLE but not its KIND, so the engine must reject it — and,
+    // per validate-before-mutate, BEFORE creating any node.
+    let toml = r#"
+[[template]]
+name        = "weird"
+applies_to  = ["epic"]
+  [[template.nodes]]
+  role        = "planning"
+  type        = "planning"
+  description = "Plan {container.title}."
+  [[template.transforms]]
+  kind = "teleport"
+  role = "planning"
+"#;
+    let template = TemplateRegistry::from_toml_str(toml, &HIERARCHY)
+        .unwrap()
+        .get("weird")
+        .unwrap()
+        .clone();
+    let epic = create_epic(&h, "Weird epic");
+
+    let before = h.all_issues().len();
+    let err = h
+        .executor
+        .apply_template_with(&template, &epic, &container_binding(&epic), false)
+        .unwrap_err();
+    assert!(err.to_string().contains("teleport"), "{err}");
+    // The unknown kind is caught in the precondition phase, before any mutation:
+    // ZERO new issues (and thus zero edges) were created.
+    assert_eq!(h.all_issues().len(), before);
+}
+
+// === APPLY-04: a prospective cycle is caught before any mutation ===
+
+#[test]
+fn test_apply_rejects_prospective_cycle_and_creates_nothing() {
+    let h = TestHarness::new();
+    // A multi-anchor template that, given C→U pre-existing, forms a cycle once
+    // applied: anchor edge U→B (U depends on the breakdown node), B→P (internal),
+    // and move-upstream-to-role planning moves C's snapshot dep U onto P (P→U).
+    // The resulting U→B→P→U is a cycle. It must be caught BEFORE any node is
+    // created (validate-before-mutate / "simulate edges for acyclicity").
+    let toml = r#"
+[[template]]
+name        = "cyclic"
+applies_to  = ["epic"]
+  [[template.anchors]]
+  name = "container"
+  [[template.anchors]]
+  name = "upstream"
+  [[template.nodes]]
+  role        = "planning"
+  type        = "planning"
+  description = "Plan {container.title}."
+  [[template.nodes]]
+  role        = "breakdown"
+  type        = "breakdown"
+  description = "Break down {container.title}."
+  labels      = ["brackets:{container.short_id}"]
+  depends_on  = ["planning"]
+  [[template.anchor_edges]]
+  from = "upstream"
+  to   = "breakdown"
+  [[template.transforms]]
+  kind = "move-upstream-to-role"
+  role = "planning"
+"#;
+    let template = TemplateRegistry::from_toml_str(toml, &HIERARCHY)
+        .unwrap()
+        .get("cyclic")
+        .unwrap()
+        .clone();
+
+    let upstream = h.create_issue("Upstream U");
+    let epic = create_epic(&h, "Cyclic epic");
+    // C → U pre-existing.
+    h.executor.add_dependency(&epic, &upstream).unwrap();
+
+    let bindings = BTreeMap::from([
+        ("container".to_string(), epic.clone()),
+        ("upstream".to_string(), upstream.clone()),
+    ]);
+
+    let before = h.all_issues().len();
+    let err = h
+        .executor
+        .apply_template_with(&template, &epic, &bindings, false)
+        .unwrap_err();
+    assert!(err.to_string().contains("cycle"), "{err}");
+    // APPLY-04: the prospective cycle is caught before mutation — ZERO new issues.
     assert_eq!(h.all_issues().len(), before);
 }
