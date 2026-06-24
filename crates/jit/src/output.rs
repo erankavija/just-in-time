@@ -746,6 +746,8 @@ pub struct GraphRootsResponse {
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct IssueShowResponse {
     pub id: String,
+    /// Short ID (first 8 chars of the full UUID), for human-readable references.
+    pub short_id: String,
     pub title: String,
     pub description: String,
     pub state: State,
@@ -769,6 +771,7 @@ impl IssueShowResponse {
     /// Create from Issue with enriched dependencies
     pub fn from_issue(issue: crate::domain::Issue, enriched_deps: Vec<MinimalIssue>) -> Self {
         Self {
+            short_id: issue.short_id(),
             id: issue.id,
             title: issue.title,
             description: issue.description,
@@ -1080,6 +1083,25 @@ pub struct WorktreeListResponse {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn test_show_response_root_shape_short_id_and_arrays() {
+        use crate::domain::Issue;
+        // short_id is id[0..8]; labels and dependencies always serialize as arrays.
+        let issue = Issue::new("T".to_string(), "B".to_string());
+        let expected_short = issue.short_id();
+        let resp = IssueShowResponse::from_issue(issue, vec![]);
+        let v = serde_json::to_value(&resp).unwrap();
+
+        assert_eq!(v["short_id"], serde_json::Value::String(expected_short));
+        assert!(v["labels"].is_array(), "labels must serialize as an array");
+        assert!(
+            v["dependencies"].is_array(),
+            "dependencies must serialize as an array"
+        );
+        assert_eq!(v["labels"].as_array().unwrap().len(), 0);
+        assert_eq!(v["dependencies"].as_array().unwrap().len(), 0);
+    }
 
     #[test]
     fn test_show_response_exposes_content_format() {

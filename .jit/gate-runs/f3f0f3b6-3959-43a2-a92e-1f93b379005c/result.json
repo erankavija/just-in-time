@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "f3f0f3b6-3959-43a2-a92e-1f93b379005c",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "870176ce-8950-4cd9-8755-be1811d9e126",
+  "commit": "da24bc6ac231279150cff1eb959eca84adfcf2d8",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-06-24T12:22:40.411389994Z",
+  "completed_at": "2026-06-24T12:24:19.506224605Z",
+  "duration_ms": 99094,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nNo blocking findings. `IssueShowResponse` now includes root `short_id` from `issue.short_id()` and serializes `labels` and `dependencies` as non-optional `Vec` fields in [crates/jit/src/output.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/output.rs:747) and [crates/jit/src/output.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/output.rs:772). The CLI default `issue show --json` path uses this response shape at [crates/jit/src/main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:538). The short ID source is `id.chars().take(8)` in [crates/jit/src/domain/types.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/types.rs:233).\n\n**Architecture And Separation**\n\nNo boundary violations found. The change is presentation-only in `output.rs` plus CLI-facing tests/docs. Domain, storage, and command behavior are unchanged.\n\n**Functional Paradigm**\n\nNo new imperative production logic of concern. The production change is struct shaping and field assignment.\n\n**Correctness And Invariants**\n\nNo state mutation paths were touched, so atomic writes, event logging, gate semantics, assignee/label validation, and PID safety are unaffected. `labels` and `dependencies` are not annotated with `skip_serializing_if`, so empty arrays serialize as `[]`.\n\n**Safety**\n\nNo unsafe code introduced. Workspace-level `#![deny(unsafe_code)]` remains present in the Rust entry points checked.\n\n**Testing**\n\nThe issue has a succeeded `cargo-ci` gate, so I did not rerun Rust tests. Gate evidence at [.jit/gate-runs/951036c5-8796-4a0c-9359-de33f7e18461/result.json](/home/vkaskivuo/Projects/just-in-time/.jit/gate-runs/951036c5-8796-4a0c-9359-de33f7e18461/result.json:9) reports fmt ok, clippy ok, and `2152 passed, 0 failed, 12 ignored`. New CLI JSON tests assert root `short_id`, empty array behavior, populated arrays, and more than one lifecycle state in [crates/jit/tests/issue_show_shape_test.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/issue_show_shape_test.rs:45).\n\n**Error Handling**\n\nNo new fallible production operations or library `unwrap()`/`expect()` were introduced. `unwrap()` usage is confined to tests.\n\n**CLI Contract**\n\nThe affected command already supports `--json`; the JSON path now emits the updated shape. The docs example was updated at [docs/reference/cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:770).\n\n**Documentation**\n\nThe new public `short_id` field has a doc comment. No new public API lacking documentation was introduced.\n\n**Prior Review Feedback**\n\n`run_history` is empty, so there was no prior review feedback to verify.\n\n**Jit Issue Management**\n\nThe prerequisite dependency in the issue context is `done`. I ran `./scripts/jit-validate.sh`; it passed with `Repository validation passed`.\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

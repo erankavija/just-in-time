@@ -772,7 +772,7 @@ await jit_gate_pass({ id: "003f", gate_key: "tests" });
 // Inspect response for available fields
 const issue = await jit_issue_show({ id, json: true });
 console.log(issue.data);
-// { id, title, state, priority, assignee, dependencies, gates_status, ... }
+// { id, short_id, title, state, priority, assignee, dependencies, gates_status, ... }
 ```
 
 ### Testing MCP Tools
