@@ -939,6 +939,38 @@ jit issue update --filter "label:milestone:v0.9" --remove-label "milestone:v0.9"
 
 <!-- Additional jit issue commands -->
 
+### Searching Issues (`jit issue search`)
+
+`jit issue search` matches issues by a text query and/or filter flags. The text
+query searches the title, description, and ID.
+
+```bash
+# Text query only
+jit issue search auth
+
+# Label filter, NO positional query
+jit issue search --label type:epic
+
+# Repeatable --label is ANDed: an issue must carry EVERY label
+jit issue search --label type:task --label area:auth
+
+# Combine a query with filters (both narrow the result)
+jit issue search task --state ready --json
+```
+
+**Flag rules:**
+- The positional query is **optional** whenever at least one filter flag is
+  given (`--label`, `--state`/`-s`, `--assignee`/`-a`, `--priority`/`-p`). With a
+  filter present the search matches all issues and the filters narrow it.
+- Providing **neither** a query **nor** any filter is a usage error (exit code
+  `2`): "provide a search query or at least one filter".
+- `--label`/`-l` (format `namespace:value`) is repeatable. Multiple labels are
+  **ANDed**: an issue is returned only when it carries every requested label. A
+  malformed label is a usage error.
+- `--full` returns full issue objects; the default `--json` shape uses compact
+  `MinimalIssue` summaries. The `query` field is `null` when no positional query
+  was given.
+
 ### Inspecting Issues (`jit issue show`)
 
 `jit issue show` accepts one or more issue ids and supports field projection so

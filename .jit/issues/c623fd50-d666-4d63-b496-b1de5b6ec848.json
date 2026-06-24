@@ -2,7 +2,7 @@
   "id": "c623fd50-d666-4d63-b496-b1de5b6ec848",
   "title": "Issue search and claim workflow",
   "description": "Groups the issue-search and claim-coordination ergonomics (REQ-07..REQ-09).\n\n## Success Criteria\n\n- [ ] `claim release <issue-id>` releases by issue id regardless of owner (REQ-07).\n- [ ] claim-blocked errors name `jit issue assign`, and `--assign-only` exists (REQ-08).\n- [ ] `issue search --label` works with an optional query (REQ-09).",
-  "state": "backlog",
+  "state": "done",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -20,5 +20,5 @@
     "story:issue-search-claim-workflow"
   ],
   "created_at": "2026-06-22T21:27:29.046146892+00:00",
-  "updated_at": "2026-06-22T21:30:39.333983044+00:00"
+  "updated_at": "2026-06-24T15:12:51.601716118+00:00"
 }

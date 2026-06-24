@@ -341,10 +341,22 @@ pub enum IssueCommands {
         json: bool,
     },
 
-    /// Search issues by text query
+    /// Search issues by text query and/or filters.
+    ///
+    /// The positional query searches title, description, and ID. It is optional
+    /// whenever at least one filter flag is given, in which case the search
+    /// matches all issues and the filters narrow the result. `--label` is
+    /// repeatable and ANDed: an issue must carry EVERY requested label.
+    ///
+    /// Examples:
+    ///   jit issue search auth                       # text query only
+    ///   jit issue search --label type:epic          # label filter, no query
+    ///   jit issue search --label a:b --label c:d     # must carry BOTH labels
+    ///   jit issue search task --state ready          # query + filter
     Search {
-        /// Search query (searches title, description, and ID)
-        query: String,
+        /// Search query (searches title, description, and ID). Optional when any
+        /// filter flag is provided.
+        query: Option<String>,
 
         #[arg(short, long)]
         state: Option<String>,
@@ -354,6 +366,11 @@ pub enum IssueCommands {
 
         #[arg(short, long)]
         priority: Option<String>,
+
+        /// Filter by label (format: namespace:value). Repeatable; labels are
+        /// ANDed, so an issue must carry every label given.
+        #[arg(short = 'l', long = "label")]
+        labels: Vec<String>,
 
         /// Return full issue objects instead of minimal summaries
         #[arg(long)]

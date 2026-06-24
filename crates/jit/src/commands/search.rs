@@ -24,12 +24,40 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(results)
     }
 
+    /// Search issues by text `query`, then narrow by optional filters.
+    ///
+    /// An empty `query` matches every issue, so callers can pass `""` to search
+    /// across the whole repository and rely on the filters alone. The
+    /// `label_filters` are ANDed: an issue is kept only when it carries every
+    /// requested label. The priority, state, and assignee filters each keep an
+    /// issue only when it matches exactly.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use jit::commands::CommandExecutor;
+    /// use jit::storage::JsonFileStorage;
+    ///
+    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
+    ///
+    /// // No text query: match all, then keep only issues labelled `type:epic`.
+    /// let epics = executor.search_issues_with_filters(
+    ///     "",
+    ///     None,
+    ///     None,
+    ///     None,
+    ///     &["type:epic".to_string()],
+    /// )?;
+    /// assert!(epics.iter().all(|i| i.labels.contains(&"type:epic".to_string())));
+    /// # Ok::<(), anyhow::Error>(())
+    /// ```
     pub fn search_issues_with_filters(
         &self,
         query: &str,
         priority_filter: Option<Priority>,
         state_filter: Option<State>,
         assignee_filter: Option<String>,
+        label_filters: &[String],
     ) -> Result<Vec<Issue>> {
         let mut results = self.search_issues(query)?;
 
@@ -49,6 +77,13 @@ impl<S: IssueStore> CommandExecutor<S> {
                 if issue.assignee.as_ref() != Some(assignee) {
                     return false;
                 }
+            }
+            // Label filters are ANDed: keep only issues carrying every label.
+            if !label_filters
+                .iter()
+                .all(|wanted| issue.labels.contains(wanted))
+            {
+                return false;
             }
             true
         });

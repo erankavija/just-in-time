@@ -651,17 +651,41 @@ fn run() -> Result<()> {
                     state,
                     assignee,
                     priority,
+                    labels,
                     full,
                     json,
                 } => {
                     let output_ctx = OutputContext::new(quiet, json);
+
+                    // The positional query is optional only when at least one
+                    // filter narrows the search; otherwise the command would
+                    // dump every issue, which is almost never intended.
+                    let has_filter = state.is_some()
+                        || assignee.is_some()
+                        || priority.is_some()
+                        || !labels.is_empty();
+                    if query.is_none() && !has_filter {
+                        return Err(anyhow!(
+                            "invalid arguments: provide a search query or at least one filter (--label/--state/--assignee/--priority)"
+                        ));
+                    }
+
+                    // Reject malformed label filters up front with a clear,
+                    // argument-classified error rather than silently matching
+                    // nothing.
+                    for label in &labels {
+                        jit::labels::validate_label(label)
+                            .with_context(|| format!("invalid --label filter '{label}'"))?;
+                    }
+
                     let state_filter = state.map(|s| State::from_str(&s)).transpose()?;
                     let priority_filter = priority.map(|p| Priority::from_str(&p)).transpose()?;
                     let issues = executor.search_issues_with_filters(
-                        &query,
+                        query.as_deref().unwrap_or(""),
                         priority_filter,
                         state_filter,
                         assignee,
+                        &labels,
                     )?;
 
                     if json {
@@ -686,7 +710,10 @@ fn run() -> Result<()> {
                             })
                         };
 
-                        let msg = format!("Found {} issue(s) matching '{}'", issues.len(), query);
+                        let msg = match &query {
+                            Some(q) => format!("Found {} issue(s) matching '{}'", issues.len(), q),
+                            None => format!("Found {} issue(s)", issues.len()),
+                        };
                         let output =
                             JsonOutput::success(output_data, "issue search").with_message(msg);
                         println!("{}", output.to_json_string()?);
