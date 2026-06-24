@@ -11,8 +11,8 @@
   "completed_at": "2026-05-14T21:58:30.580924098Z",
   "duration_ms": 5205,
   "exit_code": 0,
-  "stdout": "",
-  "stderr": "   Compiling jit v0.2.1 (/home/vkaskivuo/Projects/just-in-time/crates/jit)\n   Compiling jit-server v0.1.0 (/home/vkaskivuo/Projects/just-in-time/crates/server)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.12s\n",
+  "stdout": "  ✓ clippy: ok\n\n",
+  "stderr": "",
   "command": "cargo clippy --lib -- -D warnings",
   "by": "auto:executor",
   "message": null
