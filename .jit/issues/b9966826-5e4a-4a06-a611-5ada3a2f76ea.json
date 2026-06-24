@@ -1,0 +1,26 @@
+{
+  "id": "b9966826-5e4a-4a06-a611-5ada3a2f76ea",
+  "title": "Resolve node-to-item links by qualified id across kinds",
+  "description": "Make node-to-item link labels resolve to their addressed item by qualified id, across all four kinds. A label in each shipped namespace (`satisfies:`, `per:`, `mitigates:`/`resolves:`, `enforces:`) on a node resolves to the item it addresses, whether that item is a `requirement`, `decision`, `risk`, or `invariant`. An unresolvable qualified id is reported as a finding rather than silently dropped, so dangling links surface during validation.\n\n## Success Criteria\n\n- [hard] For each shipped namespace (`satisfies:`, `per:`, `mitigates:`/`resolves:`, `enforces:`), a label of the form `<ns>:<scope>/<self-id>` resolves to the addressed item of the corresponding kind.\n- [hard] Link resolution works across all four kinds: `requirement`, `decision`, `risk`, and `invariant`.\n- [hard] An unresolvable qualified id is reported as a finding, not silently dropped.\n- [hard] The behavior is covered by `cargo test`.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "205472c4-edc1-46f5-874f-507aa582e653",
+    "69bd8cd5-2646-457a-a413-ced3b1873dd9"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:structured-knowledge",
+    "satisfies:REQ-08"
+  ],
+  "created_at": "2026-06-24T22:44:37.791124789+00:00",
+  "updated_at": "2026-06-24T22:45:09.112738180+00:00"
+}

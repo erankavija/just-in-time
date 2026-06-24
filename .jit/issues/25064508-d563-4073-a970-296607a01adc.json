@@ -6,8 +6,11 @@
   "priority": "high",
   "assignee": null,
   "dependencies": [
-    "56ab0224-fd6e-4929-a61e-ffb1a3104496",
-    "5f5735c3-8b9a-492d-8fb1-7d8b597bf435"
+    "b121fd51-1a96-4943-80d1-95bedb068425",
+    "0d593d90-fe03-4a3c-9a8a-46725c757060",
+    "52ad3b1f-1048-489a-8595-f04ec846b8b9",
+    "72cdf315-7440-41cb-976b-ecea19b794bd",
+    "b9966826-5e4a-4a06-a611-5ada3a2f76ea"
   ],
   "gates_required": [],
   "gates_status": {},
@@ -19,5 +22,5 @@
     "epic:structured-knowledge"
   ],
   "created_at": "2026-06-21T22:20:43.845860410+00:00",
-  "updated_at": "2026-06-24T20:45:07.755447256+00:00"
+  "updated_at": "2026-06-24T22:45:09.283545069+00:00"
 }

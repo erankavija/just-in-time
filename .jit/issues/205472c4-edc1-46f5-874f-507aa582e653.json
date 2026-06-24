@@ -1,0 +1,28 @@
+{
+  "id": "205472c4-edc1-46f5-874f-507aa582e653",
+  "title": "Add the decision and risk item kinds",
+  "description": "Add `decision` and `risk` as markdown-first item kinds, configured and indexed alongside `requirement`, so that decisions and risks authored in issue descriptions become addressable, queryable items. Their link namespaces (`per:` for decisions, `mitigates:`/`resolves:` for risks) reference items by qualified id. The markdown description remains the sole source of truth: items are parsed and indexed from descriptions with no duplicated structured store. Indexing reuses the generic triple-driven parse path the existing `requirement` kind already uses.\n\nThis is the markdown-first half of the cross-substrate model; it is sized at story altitude and will be broken into tasks.\n\n## Success Criteria\n\n- [hard] `jit item list --kind decision` returns decision items parsed from issue descriptions.\n- [hard] `jit item list --kind risk` returns risk items parsed from issue descriptions.\n- [hard] A `per:<qualified-id>` label resolves to the addressed decision item.\n- [hard] A `mitigates:<qualified-id>` (and `resolves:<qualified-id>`) label resolves to the addressed risk item.\n- [hard] The markdown description is the only source for decision and risk items; no parallel structured store duplicates them.",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "be3eb6ca-d9b1-4963-b1ec-e73baacf4708",
+    "b629686b-b1d6-4b5c-833d-558f0022f063"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:story",
+    "epic:structured-knowledge",
+    "satisfies:REQ-03",
+    "satisfies:REQ-04",
+    "story:decision-risk-kinds"
+  ],
+  "created_at": "2026-06-24T22:44:37.686555299+00:00",
+  "updated_at": "2026-06-24T22:48:30.059010551+00:00"
+}

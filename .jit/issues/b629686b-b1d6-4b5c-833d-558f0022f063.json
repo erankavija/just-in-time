@@ -1,0 +1,28 @@
+{
+  "id": "b629686b-b1d6-4b5c-833d-558f0022f063",
+  "title": "Add the decision item kind",
+  "description": "Add `decision` as a markdown-first item kind so decisions authored in issue descriptions become addressable, queryable items. Configure the kind in `[item_kinds]` (its section, id-pattern, marker, and the `per:` link namespace) and index decisions from descriptions via the generic triple-driven parse path the `requirement` kind already uses. The markdown description stays the sole source of truth, with no duplicated structured store. Builds on scoped-id addressing and the six-tuple kind registry.\n\n## Success Criteria\n\n- [hard] `jit item list --kind decision` returns decision items parsed from issue descriptions.\n- [hard] A `per:<qualified-id>` label resolves to the addressed decision item.\n- [hard] The markdown description is the only source for decision items; no parallel structured store duplicates them.\n- [hard] The behavior is covered by `cargo test`.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "1e1ea81d-e583-4a1a-9e50-db9ea8eddef5",
+    "61b17603-df87-4bd8-8cc5-57bca6be2e71"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:structured-knowledge",
+    "story:decision-risk-kinds",
+    "satisfies:REQ-03",
+    "satisfies:REQ-04"
+  ],
+  "created_at": "2026-06-24T22:48:18.985807473+00:00",
+  "updated_at": "2026-06-24T22:48:29.923105752+00:00"
+}
