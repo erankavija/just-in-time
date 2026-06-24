@@ -79,6 +79,19 @@ fn get_issue_json(temp: &TempDir, id: &str) -> serde_json::Value {
     json.clone()
 }
 
+/// Extract the set of required gate keys from an `issue show --json` response.
+///
+/// `issue show --json` emits `gates: [{ key, status, last_run_at, exit_code }]`;
+/// these tests assert membership of gate keys, so collapse it to the key list.
+fn gate_keys(issue: &serde_json::Value) -> Vec<String> {
+    issue["gates"]
+        .as_array()
+        .expect("issue show --json must include a gates array")
+        .iter()
+        .map(|g| g["key"].as_str().expect("gate key is a string").to_string())
+        .collect()
+}
+
 #[test]
 fn test_add_single_gate() {
     let temp = setup_test_repo();
@@ -99,8 +112,8 @@ fn test_add_single_gate() {
     );
 
     let issue = get_issue_json(&temp, &id);
-    let gates = issue["gates_required"].as_array().unwrap();
-    assert!(gates.contains(&serde_json::json!("tests")));
+    let gates = gate_keys(&issue);
+    assert!(gates.contains(&"tests".to_string()));
 }
 
 #[test]
@@ -132,9 +145,9 @@ fn test_add_multiple_gates_multiple_flags() {
     );
 
     let issue = get_issue_json(&temp, &id);
-    let gates = issue["gates_required"].as_array().unwrap();
-    assert!(gates.contains(&serde_json::json!("tests")));
-    assert!(gates.contains(&serde_json::json!("clippy")));
+    let gates = gate_keys(&issue);
+    assert!(gates.contains(&"tests".to_string()));
+    assert!(gates.contains(&"clippy".to_string()));
 }
 
 #[test]
@@ -158,9 +171,9 @@ fn test_add_multiple_gates_comma_separated() {
     );
 
     let issue = get_issue_json(&temp, &id);
-    let gates = issue["gates_required"].as_array().unwrap();
-    assert!(gates.contains(&serde_json::json!("tests")));
-    assert!(gates.contains(&serde_json::json!("clippy")));
+    let gates = gate_keys(&issue);
+    assert!(gates.contains(&"tests".to_string()));
+    assert!(gates.contains(&"clippy".to_string()));
 }
 
 #[test]
@@ -206,9 +219,9 @@ fn test_remove_gate() {
     );
 
     let issue = get_issue_json(&temp, id);
-    let gates = issue["gates_required"].as_array().unwrap();
-    assert!(!gates.contains(&serde_json::json!("tests")));
-    assert!(gates.contains(&serde_json::json!("clippy")));
+    let gates = gate_keys(&issue);
+    assert!(!gates.contains(&"tests".to_string()));
+    assert!(gates.contains(&"clippy".to_string()));
 }
 
 #[test]
@@ -256,10 +269,10 @@ fn test_add_and_remove_gates_combined() {
     );
 
     let issue = get_issue_json(&temp, id);
-    let gates = issue["gates_required"].as_array().unwrap();
-    assert!(!gates.contains(&serde_json::json!("tests")));
-    assert!(gates.contains(&serde_json::json!("clippy")));
-    assert!(gates.contains(&serde_json::json!("fmt")));
+    let gates = gate_keys(&issue);
+    assert!(!gates.contains(&"tests".to_string()));
+    assert!(gates.contains(&"clippy".to_string()));
+    assert!(gates.contains(&"fmt".to_string()));
 }
 
 #[test]
@@ -308,9 +321,9 @@ fn test_add_gate_idempotent() {
     assert!(output.status.success());
 
     let issue = get_issue_json(&temp, &id);
-    let gates = issue["gates_required"].as_array().unwrap();
+    let gates = gate_keys(&issue);
     // Should have exactly one "tests" gate
-    let test_count = gates.iter().filter(|g| g == &"tests").count();
+    let test_count = gates.iter().filter(|g| g.as_str() == "tests").count();
     assert_eq!(test_count, 1, "Gate should only appear once");
 }
 
@@ -400,8 +413,8 @@ fn test_gates_in_json_output() {
 
     assert!(show.status.success());
     let result: serde_json::Value = serde_json::from_slice(&show.stdout).unwrap();
-    let gates = result["gates_required"].as_array().unwrap();
-    assert!(gates.contains(&serde_json::json!("tests")));
+    let gates = gate_keys(&result);
+    assert!(gates.contains(&"tests".to_string()));
 }
 
 #[test]
@@ -435,10 +448,7 @@ fn test_combine_with_other_updates() {
 
     let issue = get_issue_json(&temp, &id);
     assert_eq!(issue["state"], "ready");
-    assert!(issue["gates_required"]
-        .as_array()
-        .unwrap()
-        .contains(&serde_json::json!("tests")));
+    assert!(gate_keys(&issue).contains(&"tests".to_string()));
     assert!(issue["labels"]
         .as_array()
         .unwrap()
@@ -464,7 +474,7 @@ fn test_remove_nonexistent_gate_is_noop() {
     );
 
     let issue = get_issue_json(&temp, &id);
-    let gates = issue["gates_required"].as_array().unwrap();
+    let gates = gate_keys(&issue);
     assert!(gates.is_empty());
 }
 

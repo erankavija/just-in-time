@@ -772,7 +772,7 @@ await jit_gate_pass({ id: "003f", gate_key: "tests" });
 // Inspect response for available fields
 const issue = await jit_issue_show({ id, json: true });
 console.log(issue.data);
-// { id, short_id, title, state, priority, assignee, dependencies, gates_status, ... }
+// { id, short_id, title, state, priority, assignee, dependencies, gates, ... }
 ```
 
 ### Testing MCP Tools
@@ -1260,23 +1260,32 @@ jit issue update abc123 --remove-gate tests --remove-gate clippy
 ### Gate Status in Issue Queries
 
 **View gate status:**
+
+`jit issue show <id> --json` emits a `gates` array — one entry per required
+gate, enriched from that gate's latest run. `status` is `pending`, `passed`, or
+`failed`; `last_run_at` and `exit_code` come from the gate's latest run and are
+both `null` when no run has been recorded (required-but-never-run, or a manual
+gate attested without a run).
+
 ```bash
 # Show all gate information for issue
-jit issue show abc123 --json | jq 'gates_status'
+jit issue show abc123 --json | jq '.gates'
 
 # Example output:
-{
-  "tests": {
+[
+  {
+    "key": "tests",
     "status": "passed",
-    "updated_by": "ci:github-actions",
-    "updated_at": "2026-01-02T10:30:00Z"
+    "last_run_at": "2026-01-02T10:30:00Z",
+    "exit_code": 0
   },
-  "code-review": {
-    "status": "passed",
-    "updated_by": "human:alice",
-    "updated_at": "2026-01-02T11:00:00Z"
+  {
+    "key": "code-review",
+    "status": "pending",
+    "last_run_at": null,
+    "exit_code": null
   }
-}
+]
 ```
 
 **Find issues with specific gate status:**
@@ -1284,7 +1293,8 @@ jit issue show abc123 --json | jq 'gates_status'
 # Find all gated issues (waiting for gates)
 jit query all --state gated
 
-# Use jq to filter by specific gate
+# Use jq to filter by specific gate (query all returns the stored issue shape,
+# which keeps the gates_status map)
 jit query all --json | jq '.issues[] | select(.gates_status.tests.status == "failed")'
 ```
 

@@ -742,6 +742,68 @@ pub struct GraphRootsResponse {
 // Issue Show Response
 // ============================================================================
 
+/// Per-gate view emitted in `issue show --json`.
+///
+/// One entry per gate in the issue's `gates_required`. `status` reflects the
+/// gate's [`GateState`] (or `pending` when none exists). `last_run_at` and
+/// `exit_code` come from the gate's latest [`GateRunResult`] and are both
+/// `null` when no run has been recorded (required-but-never-run, or a manual
+/// gate attested without a run).
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::Issue;
+/// use jit::output::IssueShowResponse;
+///
+/// // A required-but-never-run gate surfaces as a pending `GateView` with both
+/// // run fields absent.
+/// let mut issue = Issue::new("Title".into(), "Body".into());
+/// issue.gates_required = vec!["tests".into()];
+/// let response = IssueShowResponse::from_issue(issue, vec![], &[]);
+///
+/// let gate = &response.gates[0];
+/// assert_eq!(gate.key, "tests");
+/// assert!(gate.last_run_at.is_none());
+/// assert!(gate.exit_code.is_none());
+/// ```
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct GateView {
+    /// Gate key.
+    pub key: String,
+    /// Gate status: `pending`, `passed`, or `failed`.
+    pub status: crate::domain::GateStatus,
+    /// Timestamp of the gate's latest run, or `null` when never run.
+    pub last_run_at: Option<String>,
+    /// Exit code of the gate's latest run, or `null` when never run.
+    pub exit_code: Option<i32>,
+}
+
+impl GateView {
+    /// Build the per-gate view for a single required gate.
+    ///
+    /// `state` is the issue's recorded [`GateState`] for this gate (if any) and
+    /// `runs` are all recorded runs for the issue; the latest run matching
+    /// `key` supplies `last_run_at`/`exit_code`.
+    fn build(key: &str, state: Option<&crate::domain::GateState>, runs: &[GateRunResult]) -> Self {
+        let status = state
+            .map(|s| s.status)
+            .unwrap_or(crate::domain::GateStatus::Pending);
+
+        let latest = runs
+            .iter()
+            .filter(|r| r.gate_key == key)
+            .max_by_key(|r| r.started_at);
+
+        GateView {
+            key: key.to_string(),
+            status,
+            last_run_at: latest.map(|r| r.started_at.to_rfc3339()),
+            exit_code: latest.and_then(|r| r.exit_code),
+        }
+    }
+}
+
 /// Response for `issue show` command with enriched dependencies
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct IssueShowResponse {
@@ -755,8 +817,9 @@ pub struct IssueShowResponse {
     pub assignee: Option<String>,
     /// Enriched dependency list with full metadata
     pub dependencies: Vec<MinimalIssue>,
-    pub gates_required: Vec<String>,
-    pub gates_status: std::collections::HashMap<String, crate::domain::GateState>,
+    /// Per-gate view, one entry per required gate, enriched from each gate's
+    /// latest run.
+    pub gates: Vec<GateView>,
     pub context: std::collections::HashMap<String, String>,
     pub documents: Vec<crate::domain::DocumentReference>,
     pub labels: Vec<String>,
@@ -768,8 +831,35 @@ pub struct IssueShowResponse {
 }
 
 impl IssueShowResponse {
-    /// Create from Issue with enriched dependencies
-    pub fn from_issue(issue: crate::domain::Issue, enriched_deps: Vec<MinimalIssue>) -> Self {
+    /// Create from Issue with enriched dependencies and the issue's gate runs.
+    ///
+    /// `gate_runs` are all recorded [`GateRunResult`]s for the issue; the
+    /// latest run per required gate enriches that gate's `last_run_at` and
+    /// `exit_code`. Pass an empty slice when no runs exist.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::Issue;
+    /// use jit::output::IssueShowResponse;
+    ///
+    /// let issue = Issue::new("Refactor".into(), "Body".into());
+    /// // No required gates and no runs -> an empty `gates` array.
+    /// let response = IssueShowResponse::from_issue(issue.clone(), vec![], &[]);
+    /// assert_eq!(response.id, issue.id);
+    /// assert!(response.gates.is_empty());
+    /// ```
+    pub fn from_issue(
+        issue: crate::domain::Issue,
+        enriched_deps: Vec<MinimalIssue>,
+        gate_runs: &[GateRunResult],
+    ) -> Self {
+        let gates = issue
+            .gates_required
+            .iter()
+            .map(|key| GateView::build(key, issue.gates_status.get(key), gate_runs))
+            .collect();
+
         Self {
             short_id: issue.short_id(),
             id: issue.id,
@@ -779,8 +869,7 @@ impl IssueShowResponse {
             priority: issue.priority,
             assignee: issue.assignee,
             dependencies: enriched_deps,
-            gates_required: issue.gates_required,
-            gates_status: issue.gates_status,
+            gates,
             context: issue.context,
             documents: issue.documents,
             labels: issue.labels,
@@ -1090,7 +1179,7 @@ mod tests {
         // short_id is id[0..8]; labels and dependencies always serialize as arrays.
         let issue = Issue::new("T".to_string(), "B".to_string());
         let expected_short = issue.short_id();
-        let resp = IssueShowResponse::from_issue(issue, vec![]);
+        let resp = IssueShowResponse::from_issue(issue, vec![], &[]);
         let v = serde_json::to_value(&resp).unwrap();
 
         assert_eq!(v["short_id"], serde_json::Value::String(expected_short));
@@ -1109,15 +1198,100 @@ mod tests {
         // Set -> appears in `jit issue show --json` (create/show parity).
         let mut issue = Issue::new("T".to_string(), "B".to_string());
         issue.content_format = Some(ContentFormat::Html);
-        let resp = IssueShowResponse::from_issue(issue, vec![]);
+        let resp = IssueShowResponse::from_issue(issue, vec![], &[]);
         let v = serde_json::to_value(&resp).unwrap();
         assert_eq!(v["content_format"], "html");
 
         // Absent -> omitted (existing issues without the field stay clean).
         let issue2 = Issue::new("T".to_string(), "B".to_string());
-        let resp2 = IssueShowResponse::from_issue(issue2, vec![]);
+        let resp2 = IssueShowResponse::from_issue(issue2, vec![], &[]);
         let v2 = serde_json::to_value(&resp2).unwrap();
         assert!(v2.get("content_format").is_none());
+    }
+
+    #[test]
+    fn test_show_response_gates_array_replaces_split_fields() {
+        use crate::domain::Issue;
+        // `gates` replaces `gates_required`/`gates_status`; neither legacy field
+        // appears in the `issue show --json` shape.
+        let mut issue = Issue::new("T".to_string(), "B".to_string());
+        issue.gates_required = vec!["tests".to_string()];
+        let resp = IssueShowResponse::from_issue(issue, vec![], &[]);
+        let v = serde_json::to_value(&resp).unwrap();
+
+        assert!(v["gates"].is_array(), "gates must serialize as an array");
+        assert!(
+            v.get("gates_required").is_none(),
+            "gates_required must be gone"
+        );
+        assert!(v.get("gates_status").is_none(), "gates_status must be gone");
+    }
+
+    #[test]
+    fn test_show_response_gate_never_run_is_null() {
+        use crate::domain::Issue;
+        // Required-but-never-run gate: status pending, last_run_at/exit_code null.
+        let mut issue = Issue::new("T".to_string(), "B".to_string());
+        issue.gates_required = vec!["tests".to_string()];
+        let resp = IssueShowResponse::from_issue(issue, vec![], &[]);
+        let v = serde_json::to_value(&resp).unwrap();
+
+        let gate = &v["gates"][0];
+        assert_eq!(gate["key"], "tests");
+        assert_eq!(gate["status"], "pending");
+        assert!(gate["last_run_at"].is_null(), "last_run_at must be null");
+        assert!(gate["exit_code"].is_null(), "exit_code must be null");
+    }
+
+    #[test]
+    fn test_show_response_gate_with_run_is_enriched() {
+        use crate::domain::{
+            GateRunResult, GateRunStatus, GateStage, GateState, GateStatus, Issue,
+        };
+        use chrono::Utc;
+
+        // A gate that has run: status from GateState, last_run_at/exit_code from
+        // the latest matching GateRunResult.
+        let mut issue = Issue::new("T".to_string(), "B".to_string());
+        issue.gates_required = vec!["tests".to_string()];
+        let run_at = Utc::now();
+        issue.gates_status.insert(
+            "tests".to_string(),
+            GateState {
+                status: GateStatus::Passed,
+                updated_by: Some("ci:test".to_string()),
+                updated_at: run_at,
+            },
+        );
+
+        let run = GateRunResult {
+            schema_version: 1,
+            run_id: "run-1".to_string(),
+            gate_key: "tests".to_string(),
+            stage: GateStage::Postcheck,
+            issue_id: issue.id.clone(),
+            commit: None,
+            branch: None,
+            status: GateRunStatus::Passed,
+            started_at: run_at,
+            completed_at: Some(run_at),
+            duration_ms: Some(42),
+            exit_code: Some(0),
+            stdout: String::new(),
+            stderr: String::new(),
+            command: "cargo test".to_string(),
+            by: None,
+            message: None,
+        };
+
+        let resp = IssueShowResponse::from_issue(issue, vec![], std::slice::from_ref(&run));
+        let v = serde_json::to_value(&resp).unwrap();
+
+        let gate = &v["gates"][0];
+        assert_eq!(gate["key"], "tests");
+        assert_eq!(gate["status"], "passed");
+        assert_eq!(gate["exit_code"], 0);
+        assert_eq!(gate["last_run_at"], run_at.to_rfc3339());
     }
 
     #[test]

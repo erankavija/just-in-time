@@ -265,8 +265,12 @@ fn test_attached_coverage_gate_runs_and_passes_when_hard_criterion_covered() {
 
     // The breakdown node's gate status reflects the real run.
     let issue = jit_json(&temp, &["issue", "show", &b, "--json"]);
+    let gate = issue["gates"]
+        .as_array()
+        .and_then(|gs| gs.iter().find(|g| g["key"] == "coverage-preview"))
+        .expect("coverage-preview in gates array");
     assert_eq!(
-        issue["gates_status"]["coverage-preview"]["status"].as_str(),
+        gate["status"].as_str(),
         Some("passed"),
         "covered run must record B's coverage-preview gate Passed: {issue}"
     );
@@ -299,8 +303,12 @@ fn test_attached_coverage_gate_runs_and_fails_when_hard_criterion_uncovered() {
 
     // The breakdown node's gate status reflects the real failing run.
     let issue = jit_json(&temp, &["issue", "show", &b, "--json"]);
+    let gate = issue["gates"]
+        .as_array()
+        .and_then(|gs| gs.iter().find(|g| g["key"] == "coverage-preview"))
+        .expect("coverage-preview in gates array");
     assert_eq!(
-        issue["gates_status"]["coverage-preview"]["status"].as_str(),
+        gate["status"].as_str(),
         Some("failed"),
         "uncovered run must record B's coverage-preview gate Failed: {issue}"
     );

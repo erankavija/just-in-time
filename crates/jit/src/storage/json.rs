@@ -670,7 +670,12 @@ impl IssueStore for JsonFileStorage {
         let result_path = run_dir.join("result.json");
         let json =
             serde_json::to_string_pretty(result).context("Failed to serialize gate run result")?;
-        fs::write(&result_path, json).context("Failed to write gate run result")?;
+
+        // Atomic write: write to temp file, then rename
+        let temp_path = result_path.with_extension("json.tmp");
+        fs::write(&temp_path, json).context("Failed to write temporary gate run result")?;
+        fs::rename(&temp_path, &result_path)
+            .context("Failed to rename temporary gate run result")?;
 
         Ok(())
     }
@@ -707,13 +712,21 @@ impl IssueStore for JsonFileStorage {
             if entry.file_type()?.is_dir() {
                 let result_path = entry.path().join("result.json");
                 if result_path.exists() {
-                    let contents = fs::read_to_string(&result_path)?;
-                    if let Ok(result) =
-                        serde_json::from_str::<crate::domain::GateRunResult>(&contents)
-                    {
-                        if result.issue_id == issue_id {
-                            results.push(result);
-                        }
+                    let contents = fs::read_to_string(&result_path).with_context(|| {
+                        format!(
+                            "Failed to read gate run result at {}",
+                            result_path.display()
+                        )
+                    })?;
+                    let result: crate::domain::GateRunResult = serde_json::from_str(&contents)
+                        .with_context(|| {
+                            format!(
+                                "Failed to deserialize gate run result at {}",
+                                result_path.display()
+                            )
+                        })?;
+                    if result.issue_id == issue_id {
+                        results.push(result);
                     }
                 }
             }
@@ -917,6 +930,82 @@ mod tests {
         storage.init().unwrap();
 
         assert!(storage.root.join(ISSUES_DIR).exists());
+    }
+
+    #[test]
+    fn test_list_gate_runs_errors_on_corrupt_result() {
+        // A corrupt result.json must surface a contextual error (naming the
+        // offending path), not be silently dropped from the listing.
+        let (_temp, storage) = setup_storage();
+        storage.init().unwrap();
+
+        let run_dir = storage.root.join("gate-runs").join("corrupt-run");
+        fs::create_dir_all(&run_dir).unwrap();
+        let result_path = run_dir.join("result.json");
+        fs::write(&result_path, "{ not valid json").unwrap();
+
+        let err = storage
+            .list_gate_runs_for_issue("any-issue")
+            .expect_err("corrupt gate-run record must produce an error, not a silent drop");
+
+        // Top-level context plus the deserialize cause and offending path.
+        let chain = format!("{err:#}");
+        assert!(
+            chain.contains("Failed to deserialize gate run result"),
+            "expected a deserialize context in the chain, got: {chain}"
+        );
+        assert!(
+            chain.contains("result.json"),
+            "error chain must name the offending path, got: {chain}"
+        );
+    }
+
+    #[test]
+    fn test_save_gate_run_result_is_atomic_no_tmp_left() {
+        // The atomic write must leave only result.json (no .json.tmp residue).
+        use crate::domain::{GateRunResult, GateRunStatus, GateStage};
+        use chrono::Utc;
+
+        let (_temp, storage) = setup_storage();
+        storage.init().unwrap();
+
+        let now = Utc::now();
+        let result = GateRunResult {
+            schema_version: 1,
+            run_id: "run-atomic".to_string(),
+            gate_key: "tests".to_string(),
+            stage: GateStage::Postcheck,
+            issue_id: "issue-1".to_string(),
+            commit: None,
+            branch: None,
+            status: GateRunStatus::Passed,
+            started_at: now,
+            completed_at: Some(now),
+            duration_ms: Some(1),
+            exit_code: Some(0),
+            stdout: String::new(),
+            stderr: String::new(),
+            command: "true".to_string(),
+            by: None,
+            message: None,
+        };
+
+        storage.save_gate_run_result(&result).unwrap();
+
+        let run_dir = storage.root.join("gate-runs").join("run-atomic");
+        assert!(
+            run_dir.join("result.json").exists(),
+            "result.json must exist"
+        );
+        assert!(
+            !run_dir.join("result.json.tmp").exists(),
+            "temp file must be renamed away, not left behind"
+        );
+
+        // And it round-trips.
+        let loaded = storage.list_gate_runs_for_issue("issue-1").unwrap();
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(loaded[0].run_id, "run-atomic");
     }
 
     #[test]

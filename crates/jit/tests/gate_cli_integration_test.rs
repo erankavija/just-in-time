@@ -15,6 +15,12 @@ fn setup_repo() -> TempDir {
     temp
 }
 
+/// Look up a single gate entry from the `gates` array of an `issue show --json`
+/// response by gate key. Returns `None` when the gate is not present.
+fn gate_entry<'a>(issue: &'a serde_json::Value, key: &str) -> Option<&'a serde_json::Value> {
+    issue["gates"].as_array()?.iter().find(|g| g["key"] == key)
+}
+
 /// Define a simple auto gate and create an issue with it.
 /// Returns (TempDir, issue_id_short).
 fn setup_auto_gate_issue(checker_command: &str) -> (TempDir, String) {
@@ -138,7 +144,7 @@ fn test_gate_check_no_prior_runs_shows_not_run_message() {
         .success()
         .stdout(predicate::str::contains("not been run").or(predicate::str::contains("no run")));
 
-    // Confirm non-mutating: gates_status should still be Pending
+    // Confirm non-mutating: gate status should still be pending
     let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
         .args(["issue", "show", &issue_id, "--json"])
@@ -148,12 +154,51 @@ fn test_gate_check_no_prior_runs_shows_not_run_message() {
         .stdout
         .clone();
     let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
-    let gate_status = json["gates_status"]["test-gate"]["status"]
-        .as_str()
-        .unwrap_or("Pending");
+    let gate = gate_entry(&json, "test-gate").expect("test-gate in gates array");
+    assert_eq!(gate["status"], "pending", "Expected pending, got: {gate}");
     assert!(
-        gate_status == "Pending" || gate_status == "pending",
-        "Expected Pending, got: {gate_status}"
+        gate["last_run_at"].is_null(),
+        "last_run_at must be null before any run: {gate}"
+    );
+    assert!(
+        gate["exit_code"].is_null(),
+        "exit_code must be null before any run: {gate}"
+    );
+}
+
+#[test]
+fn test_issue_show_errors_on_corrupt_gate_run() {
+    // A truncated/garbage result.json must make `issue show --json` fail loudly
+    // with the offending path, not silently omit the run and fabricate
+    // last_run_at: null / exit_code: null.
+    let (temp, issue_id) = setup_auto_gate_issue("exit 0");
+
+    // Plant a corrupt gate-run record on disk.
+    let run_dir = temp
+        .path()
+        .join(".jit")
+        .join("gate-runs")
+        .join("corrupt-run");
+    fs::create_dir_all(&run_dir).unwrap();
+    let result_path = run_dir.join("result.json");
+    fs::write(&result_path, "{ this is not valid json").unwrap();
+
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["issue", "show", &issue_id, "--json"])
+        .assert()
+        .failure()
+        .get_output()
+        .stderr
+        .clone();
+
+    // The command must fail loudly with the gate-run load context (the
+    // deserialize cause + offending path live in the error's source chain).
+    // It must NOT silently succeed with an omitted run.
+    let stderr = String::from_utf8_lossy(&output);
+    assert!(
+        stderr.contains("Failed to load gate runs for issue"),
+        "expected a contextual gate-run load error, got: {stderr}"
     );
 }
 
@@ -209,13 +254,8 @@ fn test_gate_check_shows_last_run_after_failure() {
         .stdout
         .clone();
     let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
-    let gate_status = json["gates_status"]["test-gate"]["status"]
-        .as_str()
-        .unwrap_or("");
-    assert!(
-        gate_status.to_lowercase() == "failed",
-        "Expected Failed, got: {gate_status}"
-    );
+    let gate = gate_entry(&json, "test-gate").expect("test-gate in gates array");
+    assert_eq!(gate["status"], "failed", "Expected failed, got: {gate}");
 }
 
 #[test]
@@ -260,11 +300,12 @@ fn test_gate_pass_json_failure_matches_persisted_status() {
         .stdout
         .clone();
     let issue: serde_json::Value = serde_json::from_slice(&output).unwrap();
-    assert_eq!(issue["gates_status"]["test-gate"]["status"], "failed");
-    assert_eq!(
-        json["error"]["details"]["status"],
-        issue["gates_status"]["test-gate"]["status"]
-    );
+    let gate = gate_entry(&issue, "test-gate").expect("test-gate in gates array");
+    assert_eq!(gate["status"], "failed");
+    assert_eq!(json["error"]["details"]["status"], gate["status"]);
+    // The failed run is enriched onto the gate view.
+    assert_eq!(gate["exit_code"], 1);
+    assert!(gate["last_run_at"].is_string());
 }
 
 #[test]
@@ -328,12 +369,10 @@ fn test_gate_check_is_non_mutating() {
         .stdout
         .clone();
     let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
-    let gate_status = json["gates_status"]["test-gate"]["status"]
-        .as_str()
-        .unwrap_or("Pending");
-    assert!(
-        gate_status == "Pending" || gate_status == "pending",
-        "Expected Pending after check-only, got: {gate_status}"
+    let gate = gate_entry(&json, "test-gate").expect("test-gate in gates array");
+    assert_eq!(
+        gate["status"], "pending",
+        "Expected pending after check-only, got: {gate}"
     );
 }
 
@@ -377,7 +416,7 @@ fn test_gate_pass_auto_executes_checker() {
         .assert()
         .success();
 
-    // gates_status should be Passed
+    // The gate should be passed and enriched with its run.
     let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
         .args(["issue", "show", &issue_id, "--json"])
@@ -387,12 +426,15 @@ fn test_gate_pass_auto_executes_checker() {
         .stdout
         .clone();
     let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
-    let gate_status = json["gates_status"]["test-gate"]["status"]
-        .as_str()
-        .unwrap_or("");
+    let gate = gate_entry(&json, "test-gate").expect("test-gate in gates array");
+    assert_eq!(gate["status"], "passed", "Expected passed, got: {gate}");
+    assert_eq!(
+        gate["exit_code"], 0,
+        "exit_code should reflect the run: {gate}"
+    );
     assert!(
-        gate_status.to_lowercase() == "passed",
-        "Expected Passed, got: {gate_status}"
+        gate["last_run_at"].is_string(),
+        "last_run_at should be set after a run: {gate}"
     );
 
     // A gate run result file should exist in .jit/gate-runs/
@@ -733,12 +775,14 @@ fn test_gate_check_all_no_prior_runs_is_non_mutating() {
 
     let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
     for gate_key in ["gate-1", "gate-2"] {
-        let gate_status = json["gates_status"][gate_key]["status"]
-            .as_str()
-            .unwrap_or("Pending");
+        let gate = gate_entry(&json, gate_key).expect("gate in gates array");
+        assert_eq!(
+            gate["status"], "pending",
+            "Expected pending for {gate_key}, got: {gate}"
+        );
         assert!(
-            gate_status == "Pending" || gate_status == "pending",
-            "Expected Pending for {gate_key}, got: {gate_status}"
+            gate["last_run_at"].is_null(),
+            "last_run_at must be null for un-run {gate_key}: {gate}"
         );
     }
 }

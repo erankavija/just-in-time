@@ -192,10 +192,14 @@ impl<S: IssueStore> CommandExecutor<S> {
             prompt.map(|s| s.to_string())
         };
 
+        // Load all runs for this issue once: they enrich the per-gate `gates`
+        // array in IssueShowResponse and seed this gate's run history below.
+        let all_runs = self.storage.list_gate_runs_for_issue(issue_id)?;
+
         // Build issue data (reuse IssueShowResponse for consistent JSON structure)
         let issue = self.storage.load_issue(issue_id)?;
         let enriched_deps = self.get_dependencies_enriched(&issue);
-        let issue_response = IssueShowResponse::from_issue(issue, enriched_deps);
+        let issue_response = IssueShowResponse::from_issue(issue, enriched_deps, &all_runs);
         let issue_json =
             serde_json::to_value(&issue_response).context("Failed to serialize issue to JSON")?;
 
@@ -209,7 +213,6 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Load run history for this gate+issue pair, sorted chronologically.
         // Cap to the most recent N runs to bound context size.
-        let all_runs = self.storage.list_gate_runs_for_issue(issue_id)?;
         let mut run_history: Vec<_> = all_runs
             .into_iter()
             .filter(|r| r.gate_key == gate_key)

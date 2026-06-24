@@ -2,7 +2,7 @@
   "id": "f646f7a5-3fa7-4a96-a0f9-4cec4714bfbc",
   "title": "Field projection for issue show",
   "description": "Add field projection to `issue show` so agents stop piping `--json` through jq/python for single fields (the dominant friction in the session mining).\n\n## Success Criteria\n\n- [ ] `jit issue show <id> --field <name>` prints the named top-level field as plain text.\n- [ ] `jit issue show <id> --fields a,b` prints those fields as compact JSON.\n- [ ] `jit issue show <id1> <id2> --json` returns a JSON array of issue objects.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -21,5 +21,5 @@
     "satisfies:REQ-03"
   ],
   "created_at": "2026-06-22T21:20:41.087586584+00:00",
-  "updated_at": "2026-06-22T21:48:56.311204482+00:00"
+  "updated_at": "2026-06-24T12:59:24.721319172+00:00"
 }

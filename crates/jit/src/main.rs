@@ -536,9 +536,14 @@ fn run() -> Result<()> {
                             return Ok(());
                         }
                         let enriched_deps = executor.get_dependencies_enriched(&issue);
+                        let gate_runs =
+                            executor.list_gate_runs(&issue.id, None).with_context(|| {
+                                format!("Failed to load gate runs for issue {}", issue.id)
+                            })?;
                         let response = jit::output::IssueShowResponse::from_issue(
                             issue,
                             enriched_deps.clone(),
+                            &gate_runs,
                         );
 
                         let show_msg = format!(
@@ -579,8 +584,19 @@ fn run() -> Result<()> {
                                 }
                             }
 
-                            println!("Gates Required: {:?}", response.gates_required);
-                            println!("Gates Status: {:?}", response.gates_status);
+                            if response.gates.is_empty() {
+                                println!("Gates: (none)");
+                            } else {
+                                println!("Gates:");
+                                for gate in &response.gates {
+                                    let last_run =
+                                        gate.last_run_at.as_deref().unwrap_or("never run");
+                                    println!(
+                                        "  - {} [{:?}] (last run: {})",
+                                        gate.key, gate.status, last_run
+                                    );
+                                }
+                            }
                             if !response.created_at.is_empty() {
                                 println!("Created: {}", response.created_at);
                             }

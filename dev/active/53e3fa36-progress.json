@@ -14,7 +14,7 @@
     {
       "wave_number": 1,
       "issues": [
-        {"id": "870176ce-8950-4cd9-8755-be1811d9e126", "short_id": "870176ce", "req": "REQ-01", "title": "Add short_id and stable array fields to issue show --json", "classification": "implementation", "status": "pending"},
+        {"id": "870176ce-8950-4cd9-8755-be1811d9e126", "short_id": "870176ce", "req": "REQ-01", "title": "Add short_id and stable array fields to issue show --json", "classification": "implementation", "status": "done"},
         {"id": "65ef3741-765e-48ff-b1bb-00b06e006e4c", "short_id": "65ef3741", "req": "REQ-04", "title": "Gate pass exit-code taxonomy and verdict field", "classification": "implementation", "status": "pending"},
         {"id": "e9d71bf6-89aa-40d0-8754-64bc8414647c", "short_id": "e9d71bf6", "req": "REQ-07", "title": "Release a claim by issue id regardless of owner", "classification": "implementation", "status": "pending"},
         {"id": "7bb91384-0f41-4c23-bb14-02250b06efd8", "short_id": "7bb91384", "req": "REQ-08", "title": "Name assign in claim-blocked error and add --assign-only", "classification": "implementation", "status": "pending"},
@@ -26,7 +26,7 @@
     {
       "wave_number": 2,
       "issues": [
-        {"id": "4899e4b6-b365-4087-b899-01dd6b1b08bc", "short_id": "4899e4b6", "req": "REQ-02", "title": "Project gate state as a gates array in issue show --json", "classification": "implementation", "status": "pending", "depends_on": ["870176ce"]},
+        {"id": "4899e4b6-b365-4087-b899-01dd6b1b08bc", "short_id": "4899e4b6", "req": "REQ-02", "title": "Project gate state as a gates array in issue show --json", "classification": "implementation", "status": "done", "depends_on": ["870176ce"]},
         {"id": "9bfcc474-d09b-4b0f-9c02-684f3d056cd3", "short_id": "9bfcc474", "req": "REQ-05", "title": "Skip gate pass when already passed at HEAD", "classification": "implementation", "status": "pending", "depends_on": ["65ef3741"]}
       ]
     },
@@ -40,6 +40,6 @@
   ],
   "created_during_execution": [],
   "escalations": [],
-  "rework_counts": {},
+  "rework_counts": {"4899e4b6": 2},
   "started_at": "2026-06-24"
 }
