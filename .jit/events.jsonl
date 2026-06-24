@@ -3497,3 +3497,8 @@
 {"type":"gate_passed","id":"e3f4bf6f-c055-4a9f-8c50-fbea49db9646","issue_id":"57269494-9531-45d9-8eb9-df5e32b6a621","timestamp":"2026-06-24T19:52:35.932400572Z","gate_key":"code-review","updated_by":"auto:executor"}
 {"type":"issue_state_changed","id":"96de7e0e-0064-45d1-b743-fe8f9de56783","issue_id":"57269494-9531-45d9-8eb9-df5e32b6a621","timestamp":"2026-06-24T19:53:12.355211433Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"fb0c1591-d7af-40fc-bc07-0c4493118b78","issue_id":"57269494-9531-45d9-8eb9-df5e32b6a621","timestamp":"2026-06-24T19:53:12.355241393Z"}
+{"type":"issue_updated","id":"545f2be2-9411-49cb-bb80-42f3165a6259","issue_id":"0d753ba5-356a-4342-a1fb-f880a1b0341d","timestamp":"2026-06-24T20:44:34.623487527Z","updated_by":"dependency-remove","fields":["dependencies"]}
+{"type":"issue_state_changed","id":"7e350724-98ce-48d1-809f-cf1e4916d49c","issue_id":"0d753ba5-356a-4342-a1fb-f880a1b0341d","timestamp":"2026-06-24T20:44:34.634468240Z","from":"backlog","to":"ready"}
+{"type":"issue_updated","id":"096212c2-cb95-4520-84a9-950a83f17ae9","issue_id":"25064508-d563-4073-a970-296607a01adc","timestamp":"2026-06-24T20:45:07.755752776Z","updated_by":"dependency-add","fields":["dependencies"]}
+{"type":"issue_state_changed","id":"ff90a4db-4833-4190-907f-61fc433a2dd9","issue_id":"eed6750c-270a-43c6-8c35-161553b25d75","timestamp":"2026-06-24T20:47:35.906885582Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"7f8a8960-dc16-4a49-a7c2-eeb4eda6f51a","issue_id":"eed6750c-270a-43c6-8c35-161553b25d75","timestamp":"2026-06-24T20:47:35.909852033Z","assignee":"agent:claude"}
