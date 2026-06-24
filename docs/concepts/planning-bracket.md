@@ -16,6 +16,15 @@ Two worked rulesets ship it: [`docs/examples/sdd/`](../examples/sdd/config.toml)
 (research, `goal` breakable, no `epic` anywhere). To adopt it in your own project,
 see [How-To: Adopt the Planning Bracket](../how-to/adopt-planning-bracket.md).
 
+**A project that never adopted the bracket needs no migration.** It is purely
+additive configuration: a project with no `planning`/`breakdown` types and no
+`plan` template behaves exactly as before, and `jit apply plan` simply has no
+template to apply. Adopting it is opt-in — declare the `planning` and `breakdown`
+types in the type hierarchy and add a `plan` template to `.jit/templates.toml`
+(plus the two coverage rules), then `jit apply plan <C>` on a container scaffolds
+the bracket. Existing issues are untouched until you bracket them. The
+[how-to guide](../how-to/adopt-planning-bracket.md) walks through every block.
+
 ## The problem it solves
 
 A container — an epic, a research goal, whatever a ruleset's top type is — usually
@@ -42,11 +51,12 @@ A **breakable container** `C` — a type a ruleset *declares* as requiring plann
 
 - **`P` — the planning node** (`type:planning`). It produces the plan and carries
   an **agent plan-quality gate** (`plan-review`).
-- **`B` — the breakdown node** (`type:breakdown`). It is created **by the
-  breakdown step, not at scaffold**, carries **two gates** — a **deterministic
+- **`B` — the breakdown node** (`type:breakdown`). It is created **at scaffold
+  time** by `jit apply plan`, carries **two gates** — a **deterministic
   coverage-preview gate** (`coverage-preview`) and an **agent breakdown-review
-  gate** (`breakdown-review`) — and wears a `brackets:<C-id>` label naming the
-  container it brackets.
+  gate** (`breakdown-review`) — and wears a `brackets:<C-short-id>` label naming
+  the container it brackets. The breakdown step **consumes** this pre-created `B`;
+  it does not create one.
 
 "Function-typed" means the role lives in the **type axis**, not a separate `role:`
 namespace: `planning` and `breakdown` are real types an adopting ruleset adds to
@@ -55,17 +65,29 @@ altitude and function — `bug`, `chore`, `spike` — so this fits the grain.)
 
 ### The spine
 
-At scaffold time only `C` and `P` exist: the container simply depends on its
-planning node.
+`jit apply plan <C>` scaffolds **both** `P` and `B` in one step, wiring
+`B → P` (the breakdown waits on the plan) and the anchor edge `C → B` (the
+container waits on the breakdown). At scaffold time the spine is therefore:
 
-The breakdown step then creates `B` and the implementation subgraph and splices
-them into the `C → P` link, forming a **spine**:
+```mermaid
+graph LR
+  C["C — container"]
+  B["B — type:breakdown<br/>brackets:&lt;C-short-id&gt;, coverage-preview gate"]
+  P["P — type:planning<br/>plan-review gate"]
+  C -->|depends on| B
+  B -->|depends on| P
+```
+
+The breakdown step then **consumes** the pre-created `B`, drafts the
+implementation subgraph, and splices it onto the spine — entry impl issues depend
+on `B`, the impl sinks become what `C` depends on, and transitive reduction drops
+the now-redundant `C → B` anchor edge, yielding `C → impl → B → P`:
 
 ```mermaid
 graph LR
   C["C — container"]
   impl["{impl subgraph}"]
-  B["B — type:breakdown<br/>brackets:C, coverage-preview gate"]
+  B["B — type:breakdown<br/>brackets:&lt;C-short-id&gt;, coverage-preview gate"]
   P["P — type:planning<br/>plan-review gate"]
   C -->|depends on| impl
   impl -->|depends on| B
@@ -98,10 +120,13 @@ That shapes the spine edges:
 - **impl → `B`: sources only.** Only entry impl issues (those with no
   intra-subgraph predecessor) depend on `B`; internal chains carry the rest. This
   transitively gates *all* impl work behind the approved breakdown.
-- **`C → P` disappears after breakdown.** The scaffold's direct `C → P` edge is
-  removed automatically by reduction once the spine connects
-  `C → impl → B → P`.
-- **`B → P`.** The breakdown depends on the plan (breakdown after plan approved).
+- **The `C → B` anchor edge disappears after breakdown.** `jit apply plan` wires
+  a direct `C → B` edge at scaffold time. Once breakdown splices the impl subgraph
+  in (`C → impl → B`), reduction removes that now-redundant direct edge
+  automatically, leaving the spine `C → impl → B → P`. There is never a direct
+  `C → P` edge.
+- **`B → P`.** The breakdown depends on the plan (breakdown after plan approved);
+  `jit apply plan` wires this internal edge at scaffold time.
 - **Retrofit moves upstream deps onto `P`.** When you bracket a container
   (`jit apply plan <C>`), `C`'s pre-existing upstream dependencies **move onto
   `P`** — planning waits on that upstream work, and `C` becomes the pure closure
@@ -125,7 +150,7 @@ is the design sound, complete, the right approach? A FAIL leaves the drafted pla
 in place for revision (drafts stay in Backlog; nothing is archived on rejection).
 
 **`coverage-preview`** is deterministic. Its checker resolves the container `C`
-from `B`'s `brackets:<C-id>` label and runs `jit validate --scope <C>`. That
+from `B`'s `brackets:<C-short-id>` label and runs `jit validate --scope <C>`. That
 scoped validation evaluates the **preview coverage rule** (below), which exits 4
 — failing the gate — when the drafted children leave a `[hard]` criterion
 uncovered. No human judgment, no agent: pure structural coverage over the drafted
@@ -203,8 +228,8 @@ Two mechanics make the preview rule fire on `B` yet evaluate `C`'s criteria:
   `type:breakdown`, so it fires only while `B` exists — never on an in-progress
   container. But a breakdown node has no success criteria of its own; this knob
   redirects the criteria source from `B` to its container `C`, recovered from the
-  `brackets:<C-id>` label. So a rule keyed on the breakdown node evaluates `C`'s
-  coverage.
+  `brackets:<C-short-id>` label. So a rule keyed on the breakdown node evaluates
+  `C`'s coverage.
 
 - **`child-type-exclude = ["planning", "breakdown"]`.** Coverage traversal is
   **transitive by default** — it walks `C`'s dependency closure, so a criterion

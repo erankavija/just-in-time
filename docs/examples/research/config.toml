@@ -46,7 +46,7 @@ experiment = "experiment"
 # `C ──dep→ {impl} ──dep→ B ──dep→ P`. Here the breakable container is the research
 # `goal` — NOT a software container; the engine reads the breakable type from the
 # template and bakes in nothing. coverage-preview's checker runs
-# `jit validate --scope <C>` (resolving C from B's `brackets:<C-id>` label, so the
+# `jit validate --scope <C>` (resolving C from B's `brackets:<C-short-id>` label, so the
 # preview coverage rule fires and blocks when a [hard] criterion is uncovered);
 # breakdown-review is the AI review of the decomposition itself, judging the same
 # structure for a research goal as for a software epic.

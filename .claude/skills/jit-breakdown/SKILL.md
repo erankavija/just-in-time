@@ -38,7 +38,7 @@ precedence `P > B > impl > C` (plan first, then breakdown, then work, then the
 container closes). Concretely:
 
 - **`B`** (`type:<breakdown_type>`) was created by `jit apply plan <C>`, not by
-  breakdown — it already carries the `brackets:<C-id>` label, **both** of the
+  breakdown — it already carries the `brackets:<C-short-id>` label, **both** of the
   breakdown node's preset gates (the **coverage-preview** gate and the
   **breakdown-review** gate), and a dependency on `P`. Breakdown CONSUMES this
   pre-created `B`. Both gates the fan-out: jit will not release the impl children

@@ -38,7 +38,7 @@ story = "story"
 # sequenced first, then `B` (type:breakdown, carries the deterministic
 # coverage-preview gate AND the agent breakdown-review gate) — read as the spine
 # `C ──dep→ {impl} ──dep→ B ──dep→ P`. coverage-preview's checker runs
-# `jit validate --scope <C>` (resolving C from B's `brackets:<C-id>` label, so the
+# `jit validate --scope <C>` (resolving C from B's `brackets:<C-short-id>` label, so the
 # preview coverage rule fires and blocks when a [hard] criterion is uncovered);
 # breakdown-review is the AI review of the decomposition itself.
 

@@ -33,7 +33,7 @@
 #   read as precedence `P > B > impl > C`: plan first, then breakdown, then the
 #   work, then the container closes. `P` carries the agent `plan-review` gate; `B`
 #   carries the deterministic `coverage-preview` gate (checker: `jit validate
-#   --scope <C>`). `B` carries a `brackets:<C-id>` label naming its container.
+#   --scope <C>`). `B` carries a `brackets:<C-short-id>` label naming its container.
 #
 #   Coverage is checked at BOTH ends of the bracket, by ONE rule kind
 #   (`label-coverage`) instanced twice — see (3) closure and (3b) preview below.
@@ -49,7 +49,7 @@
 #
 #   BREAKDOWN GATE (the bracket's plan-time check)
 #     — `sdd-coverage-preview` (3b) fires on the transient `B` node (keyed on
-#       `type:breakdown`), resolves its container `C` via the `brackets:<C-id>`
+#       `type:breakdown`), resolves its container `C` via the `brackets:<C-short-id>`
 #       label, and checks that every `[hard]` criterion has a `satisfies:` child
 #       in ANY state (drafts sit in Backlog at breakdown time). An uncovered
 #       criterion BLOCKS the breakdown gate (exit 4 from `jit validate --scope`).
@@ -211,7 +211,7 @@ assert = { label-coverage = { criteria-section = "success_criteria", marker = "[
 #   * WHEN it fires. This rule is keyed on `type:breakdown` (the transient `B`
 #     node), not on the epic. So it never fires on an in-progress epic; it fires
 #     only while the bracket's breakdown node exists. `B` carries a
-#     `brackets:<C-id>` label, and `container-from-label = "brackets"` redirects
+#     `brackets:<C-short-id>` label, and `container-from-label = "brackets"` redirects
 #     the criteria source from `B` to its container `C` — so a rule keyed on the
 #     breakdown node evaluates `C`'s `## Success Criteria` coverage.
 #

@@ -23,6 +23,15 @@ rulesets ship it; this guide points you at the exact blocks to lift:
 > `.jit/rules.toml`, its `templates.toml` to `.jit/templates.toml`, and its
 > `schemas/` directory to `.jit/schemas/`.
 
+**No migration needed to skip the bracket.** The bracket is purely additive
+configuration. A project that never adopts it — no `planning`/`breakdown` types
+and no `plan` template — keeps working exactly as before; nothing in this guide is
+required. The opt-in path is the three additions below: declare the `planning` and
+`breakdown` types ([Step 1](#step-1--declare-the-breakable-container-and-the-two-bracket-types)),
+add a `plan` template ([Step 1](#step-1--declare-the-breakable-container-and-the-two-bracket-types)),
+and add the preview + closure coverage rules ([Steps 2–3](#step-2--add-the-closure-coverage-rule)).
+Existing issues are untouched until you bracket one with `jit apply plan <C>`.
+
 ## Prerequisites
 
 - A JIT repository (`jit init`).
@@ -158,7 +167,7 @@ describes:
    is not a valid token; the *absence* of the key is how "any state" is expressed.)
 2. **`container-from-label = "brackets"`** redirects the criteria source from `B`
    (which has no criteria of its own) to its container `C`, recovered from the
-   `brackets:<C-id>` label. The rule is keyed on `type:breakdown`, so it fires only
+   `brackets:<C-short-id>` label. The rule is keyed on `type:breakdown`, so it fires only
    while `B` exists — never on an in-progress container.
 
 Keep every other knob identical to the closure rule (`criteria-section`, `marker`,
@@ -198,7 +207,7 @@ are already present at `scripts/` — skip this step.)
 What each does:
 
 - **`coverage-preview.sh`** (the `coverage-preview` gate's checker) reads the gated
-  breakdown node's `brackets:<C-id>` label via `jit issue show ... --json | jq`,
+  breakdown node's `brackets:<C-short-id>` label via `jit issue show ... --json | jq`,
   recovers the container `C`, and runs `jit validate --scope <C>`. That scoped
   validation evaluates your **preview rule** from Step 3 and exits 4 — failing the
   gate — when a `[hard]` criterion is left uncovered.
@@ -235,7 +244,7 @@ the `brackets:` label all come from `.jit/templates.toml`) and in one step:
 
 - creates the planning node `P` (`type:planning`), applies the `plan-review`
   preset, and sets `P`'s plan-doc location from the template's `doc`;
-- creates the breakdown node `B` (`type:breakdown`, labelled `brackets:<C-id>`),
+- creates the breakdown node `B` (`type:breakdown`, labelled `brackets:<C-short-id>`),
   carrying the `coverage-preview` and `breakdown-review` presets, depending on `P`;
 - wires the anchor edge `C → B` and **moves `C`'s pre-existing upstream
   dependencies onto `P`** (so planning waits on that upstream work and `C` becomes
@@ -263,7 +272,7 @@ inspecting agent gates.
 Once `P`'s plan-review gate passes, break the container down. The breakdown step
 **consumes the pre-created breakdown node `B`** (the one `jit apply plan` already
 scaffolded, carrying the `coverage-preview` and `breakdown-review` gates and the
-`brackets:<C-id>` label) — it does not create `B`. It then:
+`brackets:<C-short-id>` label) — it does not create `B`. It then:
 
 1. drafts the implementation children in Backlog, each carrying the satisfies
    label (`satisfies:<id>` / `tests:<id>`) for the criterion it covers;

@@ -66,7 +66,7 @@ jit gate pass <B-UUID> <coverage-gate>   # the breakdown node's coverage gate fr
 ```
 
 This is the standard auto-gate execution path: it runs the checker
-(`jit validate --scope <C>`, resolved from `B`'s `brackets:<C-id>` label),
+(`jit validate --scope <C>`, resolved from `B`'s `brackets:<C-short-id>` label),
 persists a `GateRunResult`, updates `B`'s gate status, and logs the gate event.
 For coverage to register, each child must carry the `satisfies:<id>` label(s) for
 the `[hard]` criteria it covers (pass them via the child's `labels`, or

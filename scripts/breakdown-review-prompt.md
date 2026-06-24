@@ -6,7 +6,7 @@ You are an ADVERSARIAL reviewer auditing a **breakdown** — the child issues cr
 
 The gated issue is the **breakdown node**. From it:
 
-- Read its `brackets:<C-id>` label to find the container `C`.
+- Read its `brackets:<C-short-id>` label to find the container `C`.
 - Traverse `C`'s subtree with `jit graph deps <C> --depth 8` and `jit issue show <id> --json` — the stories/tasks this breakdown created.
 - Read the **design document** linked to `C`'s planning child (the `type:planning` issue's `documents` path) — this is the spec the breakdown must implement.
 - Read `.claude/skills/jit-manage/references/content-standards.md` — the canonical content standards.

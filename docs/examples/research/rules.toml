@@ -83,7 +83,7 @@
 #   read as precedence `P > B > experiments > C`: plan first, then breakdown, then
 #   the experiments, then the goal closes. `P` carries the agent `plan-review`
 #   gate; `B` carries the deterministic `coverage-preview` gate (checker: `jit
-#   validate --scope <C>`). `B` carries a `brackets:<C-id>` label naming its
+#   validate --scope <C>`). `B` carries a `brackets:<C-short-id>` label naming its
 #   container goal.
 #
 #   Hypothesis coverage is checked at BOTH ends of the bracket, by ONE rule kind
@@ -93,7 +93,7 @@
 # BREAKDOWN GATE (the bracket's plan-time check):
 #   The preview rule `research-hypotheses-covered-preview` (5) fires on the
 #   transient `B` node (keyed on `type:breakdown`), resolves its container goal `C`
-#   via the `brackets:<C-id>` label, and checks that every `[hard]` hypothesis has
+#   via the `brackets:<C-short-id>` label, and checks that every `[hard]` hypothesis has
 #   a `tests:` child in ANY state (drafted experiments sit in backlog at breakdown
 #   time). An uncovered hypothesis BLOCKS the breakdown gate (exit 4 from `jit
 #   validate --scope`). This rule never fires on the goal, so an in-progress goal
@@ -242,7 +242,7 @@ assert = { label-coverage = { criteria-section = "hypotheses", marker = "[hard]"
 #   * WHEN it fires. This rule is keyed on `type:breakdown` (the transient `B`
 #     node), not on the goal. So it never fires on an in-progress goal; it fires
 #     only while the bracket's breakdown node exists. `B` carries a
-#     `brackets:<C-id>` label, and `container-from-label = "brackets"` redirects
+#     `brackets:<C-short-id>` label, and `container-from-label = "brackets"` redirects
 #     the criteria source from `B` to its container goal `C` — so a rule keyed on
 #     the breakdown node evaluates `C`'s `## Hypotheses` coverage.
 #

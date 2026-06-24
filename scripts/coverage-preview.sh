@@ -4,7 +4,7 @@ set -euo pipefail
 # Coverage-preview gate checker for jit (planning bracket, T6 / D8 / D13).
 #
 # Runs scoped validation for the container `C` bracketed by the breakdown node
-# `B` this gate is attached to. `C` is recovered from `B`'s `brackets:<C-id>`
+# `B` this gate is attached to. `C` is recovered from `B`'s `brackets:<C-short-id>`
 # label, then the deterministic scope validator is invoked:
 #
 #   jit validate --scope <C>
@@ -29,13 +29,13 @@ if [[ -z "${JIT_ISSUE_ID:-}" ]]; then
   exit 1
 fi
 
-# Read the breakdown node's labels and pull the brackets:<C-id> pointer.
+# Read the breakdown node's labels and pull the brackets:<C-short-id> pointer.
 container=$(jit issue show "$JIT_ISSUE_ID" --json \
   | jq -r '.labels[] | select(startswith("brackets:")) | sub("^brackets:"; "")' \
   | head -n1)
 
 if [[ -z "$container" ]]; then
-  echo "coverage-preview: issue $JIT_ISSUE_ID has no brackets:<C-id> label;" \
+  echo "coverage-preview: issue $JIT_ISSUE_ID has no brackets:<C-short-id> label;" \
        "it is not a breakdown node bracketing a container" >&2
   exit 1
 fi
