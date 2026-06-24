@@ -419,6 +419,12 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         self.storage.delete_issue(&full_id)?;
+
+        // Deletion is a state change; record it after the delete commits so a
+        // failed delete never leaves a ghost event (event-logging invariant).
+        let event = Event::new_issue_deleted(full_id.clone());
+        self.storage.append_event(&event)?;
+
         Ok(warnings)
     }
 
@@ -1522,6 +1528,167 @@ enforce_leases = "off"
             ),
             other => panic!("expected IssueUpdated, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn test_delete_issue_logs_issue_deleted_event() {
+        let executor = setup();
+
+        let issue = crate::domain::Issue::new("Doomed".to_string(), "Test".to_string());
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(issue).unwrap();
+        let events_before = executor.storage.read_events().unwrap().len();
+
+        // Deletion is a state change and must be captured in the event log.
+        executor.delete_issue(&issue_id).unwrap();
+
+        let events = executor.storage.read_events().unwrap();
+        assert_eq!(
+            events.len(),
+            events_before + 1,
+            "a deletion must append exactly one event"
+        );
+        let logged = events
+            .iter()
+            .find(|e| e.get_type() == "issue_deleted" && e.get_issue_id() == issue_id)
+            .expect("deletion must log an issue_deleted event");
+        assert!(matches!(logged, Event::IssueDeleted { .. }));
+    }
+
+    #[test]
+    fn test_add_dependency_logs_issue_updated_event() {
+        let executor = setup();
+
+        let a = crate::domain::Issue::new("A".to_string(), "Test".to_string());
+        let a_id = a.id.clone();
+        executor.storage.save_issue(a).unwrap();
+        let b = crate::domain::Issue::new("B".to_string(), "Test".to_string());
+        let b_id = b.id.clone();
+        executor.storage.save_issue(b).unwrap();
+
+        let events_before = executor.storage.read_events().unwrap().len();
+        executor.add_dependency(&a_id, &b_id).unwrap();
+
+        // Adding a dependency edits `A`; the change must be event-logged.
+        let logged = executor
+            .storage
+            .read_events()
+            .unwrap()
+            .into_iter()
+            .skip(events_before)
+            .find(|e| e.get_type() == "issue_updated" && e.get_issue_id() == a_id)
+            .expect("dependency addition must log an issue_updated event");
+        match logged {
+            Event::IssueUpdated { fields, .. } => assert!(
+                fields.iter().any(|f| f == "dependencies"),
+                "issue_updated must record the dependencies edit, got: {fields:?}"
+            ),
+            other => panic!("expected IssueUpdated, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_remove_dependency_logs_issue_updated_event() {
+        let executor = setup();
+
+        let a = crate::domain::Issue::new("A".to_string(), "Test".to_string());
+        let a_id = a.id.clone();
+        executor.storage.save_issue(a).unwrap();
+        let b = crate::domain::Issue::new("B".to_string(), "Test".to_string());
+        let b_id = b.id.clone();
+        executor.storage.save_issue(b).unwrap();
+        executor.add_dependency(&a_id, &b_id).unwrap();
+
+        // Snapshot AFTER the add so we isolate the removal's event.
+        let events_before = executor.storage.read_events().unwrap().len();
+        executor.remove_dependency(&a_id, &b_id).unwrap();
+
+        // Removing a dependency edits `A`; the change must be event-logged.
+        let logged = executor
+            .storage
+            .read_events()
+            .unwrap()
+            .into_iter()
+            .skip(events_before)
+            .find(|e| e.get_type() == "issue_updated" && e.get_issue_id() == a_id)
+            .expect("dependency removal must log an issue_updated event");
+        match logged {
+            Event::IssueUpdated { fields, .. } => assert!(
+                fields.iter().any(|f| f == "dependencies"),
+                "issue_updated must record the dependencies edit, got: {fields:?}"
+            ),
+            other => panic!("expected IssueUpdated, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_remove_dependencies_logs_issue_updated_event() {
+        // The CLI `jit dep rm` path goes through the plural `remove_dependencies`,
+        // which must also event-log the edit.
+        let executor = setup();
+
+        let a = crate::domain::Issue::new("A".to_string(), "Test".to_string());
+        let a_id = a.id.clone();
+        executor.storage.save_issue(a).unwrap();
+        let b = crate::domain::Issue::new("B".to_string(), "Test".to_string());
+        let b_id = b.id.clone();
+        executor.storage.save_issue(b).unwrap();
+        executor.add_dependency(&a_id, &b_id).unwrap();
+
+        let events_before = executor.storage.read_events().unwrap().len();
+        executor
+            .remove_dependencies(&a_id, std::slice::from_ref(&b_id))
+            .unwrap();
+
+        let logged = executor
+            .storage
+            .read_events()
+            .unwrap()
+            .into_iter()
+            .skip(events_before)
+            .find(|e| e.get_type() == "issue_updated" && e.get_issue_id() == a_id)
+            .expect("CLI dependency removal must log an issue_updated event");
+        match logged {
+            Event::IssueUpdated { fields, .. } => assert!(
+                fields.iter().any(|f| f == "dependencies"),
+                "issue_updated must record the dependencies edit, got: {fields:?}"
+            ),
+            other => panic!("expected IssueUpdated, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_remove_dependency_noop_does_not_save_or_log() {
+        // Removing an edge that is not present must not persist (no `updated_at`
+        // bump) and must not append an event, both for the single and bulk paths.
+        let executor = setup();
+
+        let a = crate::domain::Issue::new("A".to_string(), "Test".to_string());
+        let a_id = a.id.clone();
+        executor.storage.save_issue(a).unwrap();
+        // B exists but A does NOT depend on it, so removing B from A is a no-op.
+        let b = crate::domain::Issue::new("B".to_string(), "Test".to_string());
+        let b_id = b.id.clone();
+        executor.storage.save_issue(b).unwrap();
+
+        let updated_before = executor.storage.load_issue(&a_id).unwrap().updated_at;
+        let events_before = executor.storage.read_events().unwrap().len();
+
+        executor.remove_dependency(&a_id, &b_id).unwrap();
+        executor
+            .remove_dependencies(&a_id, std::slice::from_ref(&b_id))
+            .unwrap();
+
+        assert_eq!(
+            executor.storage.load_issue(&a_id).unwrap().updated_at,
+            updated_before,
+            "a no-op dependency removal must not bump updated_at"
+        );
+        assert_eq!(
+            executor.storage.read_events().unwrap().len(),
+            events_before,
+            "a no-op dependency removal must not append an event"
+        );
     }
 
     #[test]

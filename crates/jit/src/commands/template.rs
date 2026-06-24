@@ -291,6 +291,33 @@ impl<S: IssueStore> CommandExecutor<S> {
             ));
         }
 
+        // Legacy P-only bracket detection: a container scaffolded by the removed
+        // `jit plan` carries a planning node but no breakdown node. A fresh apply
+        // would create a SECOND planning node, and the `move-upstream-to-role`
+        // transform would demote the old planning node into the new one's deps —
+        // a duplicate, malformed bracket. Detect a pre-existing planning-typed
+        // dependency (with no breakdown node) and reject with guidance. (`--force`
+        // targets the refresh path, which requires a breakdown node to locate the
+        // bracket, so it cannot adopt a legacy P-only container either.)
+        if existing_breakdown.is_none() {
+            if let Some(planning_type) = template.planning_type() {
+                let existing_planning = container.dependencies.iter().find_map(|dep_id| {
+                    let dep = self.storage.load_issue(dep_id).ok()?;
+                    (type_label_value(&dep.labels).as_deref() == Some(planning_type)).then_some(dep)
+                });
+                if let Some(planning) = existing_planning {
+                    return Err(anyhow!(
+                        "container {full_container_id} already has a planning node ({}) but no \
+                         breakdown node — a legacy P-only bracket. Applying '{}' would create a \
+                         duplicate planning node. Remove the legacy planning node and its \
+                         container edge first, then re-apply.",
+                        planning.short_id(),
+                        template.name
+                    ));
+                }
+            }
+        }
+
         // === 2. Snapshot each bound anchor's dependencies BEFORE any mutation ===
         // (The container's own deps are part of this when it is a bound anchor;
         // the edge-wiring + transform task consumes these pre-apply sets.)
@@ -858,7 +885,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// `brackets:<container-short-id>` label the template seeds onto it.
     ///
     /// Returns the breakdown node's full id, or `None` when the template has not
-    /// been applied (no such issue). Only `B` carries the `brackets:<C>` label, so
+    /// been applied (no such issue). Only `B` carries the `brackets:<C-short-id>` label, so
     /// the pair uniquely identifies an applied bracket.
     ///
     /// The lookup is **store-wide**, not limited to `container.dependencies`: a

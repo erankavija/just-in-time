@@ -13,7 +13,7 @@
 //! The research example declares:
 //!
 //!   * a **preview** coverage rule keyed on the `type:breakdown` node `B`, which
-//!     resolves its criteria-bearing container goal `C` via the `brackets:<C-id>`
+//!     resolves its criteria-bearing container goal `C` via the `brackets:<C-short-id>`
 //!     label (`container-from-label = "brackets"`) and OMITS `child-state` (any
 //!     state counts) — so an uncovered `[hard]` hypothesis is BLOCKED at the
 //!     breakdown gate while the drafted experiments still sit in backlog;
@@ -237,7 +237,7 @@ fn test_research_uncovered_hard_hypothesis_blocked_at_breakdown_gate() {
     let mut breakdown = Issue::new("breakdown".to_string(), String::new());
     breakdown.labels = vec![
         "type:breakdown".to_string(),
-        format!("brackets:{}", container.id),
+        format!("brackets:{}", container.short_id()),
     ];
 
     // Containment spine: C depends on experiment; experiment depends on B.
@@ -271,7 +271,7 @@ fn test_research_preview_passes_when_backlog_experiment_carries_mapping() {
     let mut breakdown = Issue::new("breakdown".to_string(), String::new());
     breakdown.labels = vec![
         "type:breakdown".to_string(),
-        format!("brackets:{}", container.id),
+        format!("brackets:{}", container.short_id()),
     ];
     container.dependencies = vec![experiment.id.clone()];
     experiment.dependencies = vec![breakdown.id.clone()];
@@ -301,7 +301,7 @@ fn test_research_preview_excludes_bracket_types_and_halts_walk() {
     let mut breakdown = Issue::new("breakdown".to_string(), String::new());
     breakdown.labels = vec![
         "type:breakdown".to_string(),
-        format!("brackets:{}", container.id),
+        format!("brackets:{}", container.short_id()),
     ];
     // P, beyond the boundary, is the only carrier of tests:H-1.
     let mut plan = Issue::new("plan".to_string(), String::new());
@@ -338,7 +338,7 @@ fn test_research_preview_credits_non_sink_experiment_interior() {
     let mut breakdown = Issue::new("breakdown".to_string(), String::new());
     breakdown.labels = vec![
         "type:breakdown".to_string(),
-        format!("brackets:{}", container.id),
+        format!("brackets:{}", container.short_id()),
     ];
 
     container.dependencies = vec![exp_a.id.clone()];

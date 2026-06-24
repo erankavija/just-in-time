@@ -14,7 +14,7 @@
 //! It exercises the real subprocess path end-to-end (built `jit` binary against a
 //! temp `.jit` repo). The bracket spine `C → child → B` is built by hand so that
 //! `B` (which carries the coverage rule's `type:breakdown` selector and the
-//! `brackets:<C>` pointer) is inside `C`'s dependency closure — exactly the shape
+//! `brackets:<C-short-id>` pointer) is inside `C`'s dependency closure — exactly the shape
 //! `bracket_breakdown` produces. The checker (`coverage-preview.sh`) resolves `C`
 //! from `B`'s `brackets:` label and shells out to the built `jit` binary, so the
 //! gate's PATH is set to the built-binary directory.
@@ -201,7 +201,7 @@ fn build_bracket(
         temp,
         &format!("Breakdown: {container_title}"),
         "",
-        &["type:breakdown", &format!("brackets:{c}")],
+        &["type:breakdown", &format!("brackets:{}", &c[..8])],
     );
 
     // Attach the coverage-preview gate to B (PENDING — as the bracket-builder

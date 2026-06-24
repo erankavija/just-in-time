@@ -8,7 +8,7 @@
 //!   even when that gate has not been hand-defined yet.
 //! - [`coverage_preview_preset`] attaches the **deterministic** coverage-preview
 //!   gate to the breakdown node `B` (`type:breakdown`). Its checker resolves the
-//!   container `C` from `B`'s `brackets:<C-id>` label and runs
+//!   container `C` from `B`'s `brackets:<C-short-id>` label and runs
 //!   `jit validate --scope <C>` (T2), which exits 4 when a `[hard]` criterion is
 //!   left uncovered.
 //! - [`breakdown_review_preset`] attaches the **agent** breakdown-quality gate to
@@ -103,7 +103,7 @@ pub fn plan_review_preset() -> GatePresetDefinition {
 ///
 /// The bundled gate is an auto postcheck whose checker is
 /// `./scripts/coverage-preview.sh`. JIT sets `JIT_ISSUE_ID` to the gated
-/// issue (the breakdown node `B`); the script reads `B`'s `brackets:<C-id>`
+/// issue (the breakdown node `B`); the script reads `B`'s `brackets:<C-short-id>`
 /// label to recover the container `C` and runs `jit validate --scope <C>` (T2),
 /// which exits 4 — failing the gate — when the drafted children leave a
 /// `[hard]` criterion uncovered. The container thus reaches the checker via

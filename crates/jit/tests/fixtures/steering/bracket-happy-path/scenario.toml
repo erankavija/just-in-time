@@ -48,13 +48,13 @@ argv = [
 capture = "id"
 id_slot = "child"
 
-# Breakdown node B carries brackets:$container so the preview rule resolves C.
+# Breakdown node B carries brackets:$container_short so the preview rule resolves C.
 [[steps]]
 argv = [
   "issue", "create",
   "--title", "Breakdown node",
   "--label", "type:breakdown",
-  "--label", "brackets:$container",
+  "--label", "brackets:$container_short",
   "--force",
   "--description", "Breakdown of the container epic.",
 ]

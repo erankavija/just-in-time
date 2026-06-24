@@ -297,6 +297,43 @@ fn test_apply_rejects_already_applied_without_force() {
 }
 
 #[test]
+fn test_apply_rejects_legacy_planning_only_bracket() {
+    let h = TestHarness::new();
+    let template = plan_template();
+    let epic = create_epic(&h, "Legacy P-only epic");
+
+    // Simulate a legacy P-only bracket (from the removed `jit plan`): a planning
+    // node wired as the container's dependency, with NO breakdown node. Applying
+    // must reject rather than create a duplicate planning node.
+    let (planning, _) = h
+        .executor
+        .create_issue(
+            "Plan: Legacy".to_string(),
+            String::new(),
+            Priority::Normal,
+            vec![],
+            vec!["type:planning".to_string()],
+            None,
+            false,
+        )
+        .unwrap();
+    h.executor.add_dependency(&epic, &planning).unwrap();
+
+    let before = h.all_issues().len();
+    let err = h
+        .executor
+        .apply_template_with(&template, &epic, &container_binding(&epic), false)
+        .unwrap_err();
+    let msg = err.to_string();
+    assert!(
+        msg.contains("planning node") && msg.contains("legacy"),
+        "expected a legacy P-only rejection, got: {msg}"
+    );
+    // Nothing was created on the rejected apply (precondition phase, no mutation).
+    assert_eq!(h.all_issues().len(), before);
+}
+
+#[test]
 fn test_force_refreshes_nodes_in_place_without_duplicating() {
     let h = TestHarness::new();
     let template = plan_template();
@@ -353,7 +390,7 @@ fn test_force_finds_breakdown_after_spine_reshaping_no_duplicate() {
     // Regression: after a breakdown splices the spine (C → child → … → B), the
     // direct C → B edge is dropped by transitive reduction, so `B` is no longer a
     // DIRECT dependency of `C`. A `--force` refresh must still locate the existing
-    // `B` (and `P` through it) by the unique `brackets:<C>` label — scanning only
+    // `B` (and `P` through it) by the unique `brackets:<C-short-id>` label — scanning only
     // `C`'s direct deps would miss it and duplicate the whole bracket.
     let h = TestHarness::new();
     let template = plan_template();
@@ -397,7 +434,7 @@ fn test_force_finds_breakdown_after_spine_reshaping_no_duplicate() {
     );
     assert_eq!(refreshed.created_node_ids_by_role["planning"], planning_id);
 
-    // Exactly one breakdown node (with brackets:<C>) and one planning node remain.
+    // Exactly one breakdown node (with brackets:<C-short-id>) and one planning node remain.
     let short_id: String = epic.chars().take(8).collect();
     let bracket_label = format!("brackets:{short_id}");
     let breakdown_count = h

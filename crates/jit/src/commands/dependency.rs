@@ -82,19 +82,30 @@ impl<S: IssueStore> CommandExecutor<S> {
         // issue Ready with an unmet dependency — a corrupt state. So it bypasses the
         // chokepoint deliberately.
         let dep_issue = self.storage.load_issue(&full_dep_id)?;
+        let from_id = from_issue.id.clone();
         if from_issue.state == State::Ready && dep_issue.state != State::Done {
             let old_state = from_issue.state;
             from_issue.state = State::Backlog;
 
-            let issue_id = from_issue.id.clone();
             self.storage.save_issue(from_issue)?;
 
             // Log state change
-            let event = Event::new_issue_state_changed(issue_id, old_state, State::Backlog);
+            let event = Event::new_issue_state_changed(from_id.clone(), old_state, State::Backlog);
             self.storage.append_event(&event)?;
         } else {
             self.storage.save_issue(from_issue)?;
         }
+
+        // Adding a dependency edits the issue; record the field edit (after the
+        // save) so the change is event-logged. Reached only when a NEW edge is
+        // actually added (AlreadyExists / transitive-redundant returned earlier),
+        // so this mirrors `update_issue` and `remove_dependency(_ies)`.
+        let event = Event::new_issue_updated(
+            from_id,
+            "dependency-add".to_string(),
+            vec!["dependencies".to_string()],
+        );
+        self.storage.append_event(&event)?;
 
         Ok((DependencyAddResult::Added, warnings))
     }
@@ -113,11 +124,24 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         let mut issue = self.storage.load_issue(&full_issue_id)?;
+        let before = issue.dependencies.len();
         issue.dependencies.retain(|d| d != &full_dep_id);
-        self.storage.save_issue(issue)?;
+        let removed = issue.dependencies.len() != before;
 
-        // Check if this issue can now transition to ready
-        self.auto_transition_to_ready(&full_issue_id)?;
+        // Only persist (and event-log) when an edge was actually removed: a no-op
+        // removal (edge absent) must not bump `updated_at` or emit an event, the
+        // same no-change contract as `update_issue`. Removing an edge can unblock
+        // the issue, so the readiness check runs only on the real-change path.
+        if removed {
+            self.storage.save_issue(issue)?;
+            let event = Event::new_issue_updated(
+                full_issue_id.clone(),
+                "dependency-remove".to_string(),
+                vec!["dependencies".to_string()],
+            );
+            self.storage.append_event(&event)?;
+            self.auto_transition_to_ready(&full_issue_id)?;
+        }
 
         Ok(warnings)
     }
@@ -195,11 +219,21 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
-        // Save issue once with all removals
-        self.storage.save_issue(issue)?;
-
-        // Check if this issue can now transition to ready
-        self.auto_transition_to_ready(&full_issue_id)?;
+        // Only persist (and event-log) when at least one edge was actually
+        // removed: a no-op `jit dep rm` (every target absent) must not bump
+        // `updated_at` or emit an event, the same no-change contract as
+        // `update_issue`. Removing edges can unblock the issue, so the readiness
+        // check runs only on the real-change path.
+        if !removed.is_empty() {
+            self.storage.save_issue(issue)?;
+            let event = Event::new_issue_updated(
+                full_issue_id.clone(),
+                "dependency-remove".to_string(),
+                vec!["dependencies".to_string()],
+            );
+            self.storage.append_event(&event)?;
+            self.auto_transition_to_ready(&full_issue_id)?;
+        }
 
         Ok(DependenciesRemoveResult { removed, not_found })
     }

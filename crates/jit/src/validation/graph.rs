@@ -1004,15 +1004,20 @@ enum ContainerMatch<'a> {
 /// mirroring storage's full-id-or-unique-prefix semantics but purely over the
 /// slice (graph.rs stays I/O-free). Preference order:
 ///   1. exact full-id match,
-///   2. exact short-id match (`i.short_id() == value`),
+///   2. exact short-id match (`i.short_id() == value`); two issues sharing the
+///      same short id is ambiguous (the `brackets:<C-short-id>` convention must
+///      surface a collision, never silently resolve the first match),
 ///   3. unique id-prefix match (`i.id.starts_with(value)`); more than one prefix
 ///      match is ambiguous.
 fn resolve_container<'a>(value: &str, issues: &'a [Issue]) -> ContainerMatch<'a> {
     if let Some(c) = issues.iter().find(|i| i.id == value) {
         return ContainerMatch::Unique(c);
     }
-    if let Some(c) = issues.iter().find(|i| i.short_id() == value) {
-        return ContainerMatch::Unique(c);
+    let mut short = issues.iter().filter(|i| i.short_id() == value);
+    match (short.next(), short.next()) {
+        (Some(c), None) => return ContainerMatch::Unique(c),
+        (Some(_), Some(_)) => return ContainerMatch::Ambiguous,
+        _ => {}
     }
     let mut prefix = issues.iter().filter(|i| i.id.starts_with(value));
     match (prefix.next(), prefix.next()) {
@@ -1889,7 +1894,7 @@ mod tests {
     #[test]
     fn test_container_indirection_evaluates_container_criteria() {
         // Preview instance: rule keyed on type:breakdown resolves its container
-        // from `brackets:<C-id>` and evaluates C's criteria coverage. C carries
+        // from `brackets:<C-short-id>` and evaluates C's criteria coverage. C carries
         // the criteria; B carries no criteria of its own.
         let rule = rule_from(
             "[[rules]]\nname = \"preview\"\nwhen = { type = \"breakdown\" }\n\
@@ -1901,7 +1906,9 @@ mod tests {
         let mut breakdown = issue("B", &["type:breakdown"]);
         // Container depends on impl (its subtree); B brackets the container.
         container.dependencies = vec![impl_node.id.clone()];
-        breakdown.labels.push(format!("brackets:{}", container.id));
+        breakdown
+            .labels
+            .push(format!("brackets:{}", container.short_id()));
         // B sits on the spine after impl, but the walk runs from the container.
         impl_node.dependencies = vec![breakdown.id.clone()];
 
@@ -1933,7 +1940,9 @@ mod tests {
         let impl_node = issue("impl", &["type:task"]); // does NOT satisfy
         let mut breakdown = issue("B", &["type:breakdown"]);
         container.dependencies = vec![impl_node.id.clone()];
-        breakdown.labels.push(format!("brackets:{}", container.id));
+        breakdown
+            .labels
+            .push(format!("brackets:{}", container.short_id()));
 
         let rules = vec![&rule];
         let findings = evaluate_graph(
@@ -1966,7 +1975,9 @@ mod tests {
         impl_node.state = State::Backlog; // drafted, not done
         let mut breakdown = issue("B", &["type:breakdown"]);
         container.dependencies = vec![impl_node.id.clone()];
-        breakdown.labels.push(format!("brackets:{}", container.id));
+        breakdown
+            .labels
+            .push(format!("brackets:{}", container.short_id()));
 
         let rules = vec![&rule];
         let findings = evaluate_graph(
@@ -2051,7 +2062,9 @@ mod tests {
 
     #[test]
     fn test_container_indirection_full_id_label_still_resolves() {
-        // Backward compatibility: a full-id brackets label still resolves.
+        // Backward compatibility: a full-id brackets label still resolves, even
+        // though the convention (and `test_container_indirection_resolves_short_id_label`)
+        // is the short id. The resolver accepts both, so this guards the full-id path.
         let rule = rule_from(
             "[[rules]]\nname = \"preview\"\nwhen = { type = \"breakdown\" }\n\
              severity = \"error\"\nassert = { label-coverage = { \
@@ -2112,6 +2125,48 @@ mod tests {
         assert!(
             findings[0].finding.message.contains("ambiguous"),
             "ambiguity must be reported clearly: {findings:?}"
+        );
+    }
+
+    #[test]
+    fn test_container_indirection_exact_short_id_collision_is_ambiguous() {
+        // Two issues sharing the SAME 8-char short id is the worst case for the
+        // `brackets:<C-short-id>` convention: an exact short-id pointer matches
+        // both, so resolution must report ambiguity, never silently pick the
+        // first. (The prefix-ambiguity test above covers a shorter shared prefix;
+        // this guards the exact short-id branch specifically.)
+        let rule = rule_from(
+            "[[rules]]\nname = \"preview\"\nwhen = { type = \"breakdown\" }\n\
+             severity = \"error\"\nassert = { label-coverage = { \
+             container-from-label = \"brackets\" } }\n",
+        );
+        let mut a = epic_with_criteria(&["REQ-01"]);
+        let mut b = epic_with_criteria(&["REQ-02"]);
+        // Identical first 8 chars (the short id) but distinct full ids.
+        a.id = "abcd1234-1111-0000-0000-000000000000".to_string();
+        b.id = "abcd1234-2222-0000-0000-000000000000".to_string();
+        assert_eq!(
+            a.short_id(),
+            b.short_id(),
+            "test setup: short ids must collide"
+        );
+        let mut breakdown = issue("B", &["type:breakdown"]);
+        breakdown.labels.push("brackets:abcd1234".to_string());
+
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[a, b, breakdown],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+            &HashMap::new(),
+        );
+        assert_eq!(findings.len(), 1, "exact short-id collision: {findings:?}");
+        assert!(findings[0].finding.message.contains("config error"));
+        assert!(
+            findings[0].finding.message.contains("ambiguous"),
+            "exact short-id collision must be reported as ambiguous: {findings:?}"
         );
     }
 

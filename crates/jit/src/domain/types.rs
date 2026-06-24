@@ -788,6 +788,15 @@ pub enum Event {
         /// When this occurred
         timestamp: DateTime<Utc>,
     },
+    /// Issue was permanently deleted
+    IssueDeleted {
+        /// Event ID
+        id: String,
+        /// Issue that was deleted
+        issue_id: String,
+        /// When this occurred
+        timestamp: DateTime<Utc>,
+    },
     /// Issue was released from assignee
     IssueReleased {
         /// Event ID
@@ -1045,6 +1054,28 @@ impl Event {
         }
     }
 
+    /// Create an issue deleted event.
+    ///
+    /// Records that an issue was permanently deleted, preserving an audit trail
+    /// of the removal in the event log (the issue file itself is gone).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::Event;
+    ///
+    /// let event = Event::new_issue_deleted("issue-123".to_string());
+    /// assert_eq!(event.get_issue_id(), "issue-123");
+    /// assert_eq!(event.get_type(), "issue_deleted");
+    /// ```
+    pub fn new_issue_deleted(issue_id: String) -> Self {
+        Event::IssueDeleted {
+            id: Uuid::new_v4().to_string(),
+            issue_id,
+            timestamp: Utc::now(),
+        }
+    }
+
     /// Create a local-rule-bypassed event.
     ///
     /// Records that a `--force` write deliberately bypassed an `enforce` rule
@@ -1140,6 +1171,7 @@ impl Event {
             Event::GateAdded { issue_id, .. } => issue_id,
             Event::GateRemoved { issue_id, .. } => issue_id,
             Event::IssueCompleted { issue_id, .. } => issue_id,
+            Event::IssueDeleted { issue_id, .. } => issue_id,
             Event::IssueReleased { issue_id, .. } => issue_id,
             Event::IssueUpdated { issue_id, .. } => issue_id,
             Event::DocumentArchived { .. } => "", // No associated issue
@@ -1161,6 +1193,7 @@ impl Event {
             Event::GateAdded { .. } => "gate_added",
             Event::GateRemoved { .. } => "gate_removed",
             Event::IssueCompleted { .. } => "issue_completed",
+            Event::IssueDeleted { .. } => "issue_deleted",
             Event::IssueReleased { .. } => "issue_released",
             Event::IssueUpdated { .. } => "issue_updated",
             Event::DocumentArchived { .. } => "document_archived",

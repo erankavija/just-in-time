@@ -6,7 +6,7 @@
 #
 #   * C (type:epic) owns a [hard] criterion REQ-01 (req:REQ-01 label + criterion
 #     in ## Success Criteria).
-#   * B (type:breakdown) carries brackets:$C, putting it inside C's dependency
+#   * B (type:breakdown) carries brackets:$container_short, putting it inside C's dependency
 #     closure so the preview rule `sdd-coverage-preview` evaluates B and resolves
 #     its container C via the brackets: label.
 #   * The impl child does NOT carry satisfies:REQ-01, so REQ-01 is uncovered.
@@ -51,13 +51,13 @@ argv = [
 capture = "id"
 id_slot = "child"
 
-# Breakdown node B carries brackets:$container so the preview rule resolves C.
+# Breakdown node B carries brackets:$container_short so the preview rule resolves C.
 [[steps]]
 argv = [
   "issue", "create",
   "--title", "Breakdown node",
   "--label", "type:breakdown",
-  "--label", "brackets:$container",
+  "--label", "brackets:$container_short",
   "--force",
   "--description", "Breakdown of the container epic.",
 ]
