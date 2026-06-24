@@ -939,6 +939,48 @@ jit issue update --filter "label:milestone:v0.9" --remove-label "milestone:v0.9"
 
 <!-- Additional jit issue commands -->
 
+### Inspecting Issues (`jit issue show`)
+
+`jit issue show` accepts one or more issue ids and supports field projection so
+agents can read a single value without piping `--json` through `jq`/`python`.
+
+```bash
+# Full human-readable view (default)
+jit issue show abc123
+
+# Compact response without the description or enriched dependencies (--json only)
+jit issue show abc123 --summary --json
+
+# Project a single top-level field as PLAIN TEXT (unquoted)
+jit issue show abc123 --field state          # -> ready
+jit issue show abc123 --field title          # -> Implement login
+
+# Project several fields as one COMPACT JSON object (requested key order preserved)
+jit issue show abc123 --fields state,title   # -> {"state":"ready","title":"Implement login"}
+
+# Show multiple issues as a JSON array (argument order preserved)
+jit issue show abc123 def456 --json          # -> [ {...}, {...} ]
+```
+
+**Field projection (`--field` / `--fields`):**
+- Projected names are the serialized keys of the `issue show --json` object
+  (`id`, `short_id`, `title`, `state`, `priority`, `assignee`, `dependencies`,
+  `gates`, `labels`, `description`, `created_at`, `updated_at`, …).
+- `--field <name>` prints the field as plain text: string fields print raw
+  (unquoted), scalar fields (number/bool/null) print their value, and
+  array/object fields fall back to compact JSON for that field.
+- `--fields a,b,c` prints `{"a":...,"b":...,"c":...}` as a single compact JSON
+  object, keeping the requested order.
+- An unknown field name (or any unknown name in `--fields`) is a usage error
+  (exit code `2`).
+
+**Flag rules:**
+- `--field` and `--fields` are mutually exclusive.
+- `--field`/`--fields` require **exactly one** issue id; passing them with two or
+  more ids is rejected as a usage error (exit code `2`).
+- Passing two or more ids with `--json` returns a JSON **array** of full issue
+  objects in argument order. A single id with `--json` stays a single object.
+
 ### Rejecting Issues
 
 Use `jit issue reject` to close an issue without implementation:

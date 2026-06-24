@@ -33,13 +33,13 @@
     {
       "wave_number": 3,
       "issues": [
-        {"id": "f646f7a5-3fa7-4a96-a0f9-4cec4714bfbc", "short_id": "f646f7a5", "req": "REQ-03", "title": "Field projection for issue show", "classification": "implementation", "status": "pending", "depends_on": ["4899e4b6"]},
+        {"id": "f646f7a5-3fa7-4a96-a0f9-4cec4714bfbc", "short_id": "f646f7a5", "req": "REQ-03", "title": "Field projection for issue show", "classification": "implementation", "status": "done", "depends_on": ["4899e4b6"], "note": "story 861e9a5e closed"},
         {"id": "df7f934c-41fe-4019-977b-361ff9b8fc58", "short_id": "df7f934c", "req": "REQ-06", "title": "Add gate pass-all with fail-fast", "classification": "implementation", "status": "pending", "depends_on": ["9bfcc474"]}
       ]
     }
   ],
   "created_during_execution": [],
   "escalations": [],
-  "rework_counts": {"4899e4b6": 2},
+  "rework_counts": {"4899e4b6": 2, "f646f7a5": 2},
   "started_at": "2026-06-24"
 }

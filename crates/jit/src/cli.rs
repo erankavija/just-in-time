@@ -363,15 +363,43 @@ pub enum IssueCommands {
         json: bool,
     },
 
-    /// Show issue details. Use `--summary` for a compact response without the description field.
+    /// Show issue details. Use `--summary` for a compact response without the
+    /// description field.
+    ///
+    /// Field projection (single id only):
+    ///   --field <name>   print one top-level field as plain text (arrays/objects
+    ///                    fall back to compact JSON for that field)
+    ///   --fields a,b,c   print those fields as one compact JSON object
+    ///
+    /// Pass two or more ids with `--json` to get a JSON array of issue objects
+    /// in argument order. Projection flags (`--field`/`--fields`) require exactly
+    /// one id.
+    ///
+    /// Examples:
+    ///   jit issue show abc123 --field state          # -> ready
+    ///   jit issue show abc123 --fields state,title    # -> {"state":"ready",...}
+    ///   jit issue show abc123 def456 --json           # -> [ {...}, {...} ]
     Show {
-        id: String,
+        /// Issue id(s). Two or more ids with `--json` produce a JSON array.
+        #[arg(required = true)]
+        ids: Vec<String>,
 
         /// Return a compact response (id, short_id, title, state, priority,
         /// labels, gates_required, gates_status) without the description or
         /// enriched dependencies. Affects --json output only.
         #[arg(long)]
         summary: bool,
+
+        /// Print a single top-level field as plain text. String/scalar fields
+        /// print raw; array/object fields fall back to compact JSON. Requires a
+        /// single id.
+        #[arg(long, value_name = "NAME", conflicts_with = "fields")]
+        field: Option<String>,
+
+        /// Print the named comma-separated top-level fields as one compact JSON
+        /// object (`{"a":...,"b":...}`). Requires a single id.
+        #[arg(long, value_name = "A,B,C", value_delimiter = ',')]
+        fields: Vec<String>,
 
         #[arg(long)]
         json: bool,

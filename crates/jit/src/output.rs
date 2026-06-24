@@ -9,6 +9,7 @@ use serde::Serialize;
 use serde_json::Value;
 use std::fmt::Display;
 use std::io::{self, Write};
+use thiserror::Error;
 
 use crate::domain::{
     GateRunResult, GateRunStatus, GateStage, GateState, Issue, MinimalBlockedIssue, MinimalIssue,
@@ -878,6 +879,107 @@ impl IssueShowResponse {
             updated_at: issue.updated_at,
         }
     }
+}
+
+/// Render a single top-level field of a serialized issue value as plain text.
+///
+/// `value` must be the JSON object produced by serializing an
+/// [`IssueShowResponse`]. The field is looked up by its serialized key (e.g.
+/// `state`, `title`, `labels`). String fields render as their raw contents and
+/// scalar fields (number/bool/null) as their textual value; array and object
+/// fields fall back to compact JSON, since a plain-text rendering of those is
+/// ambiguous. An unknown key returns `None` so callers can signal a usage error.
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::Issue;
+/// use jit::output::{project_field, IssueShowResponse};
+///
+/// let issue = Issue::new("My Title".into(), "Body".into());
+/// let value = serde_json::to_value(IssueShowResponse::from_issue(issue, vec![], &[])).unwrap();
+///
+/// // String field -> raw, unquoted.
+/// assert_eq!(project_field(&value, "title").unwrap(), "My Title");
+/// // Array field -> compact JSON.
+/// assert_eq!(project_field(&value, "labels").unwrap(), "[]");
+/// // Unknown field -> None.
+/// assert!(project_field(&value, "bogus").is_none());
+/// ```
+pub fn project_field(value: &Value, name: &str) -> Option<String> {
+    value.get(name).map(|field| match field {
+        Value::String(s) => s.clone(),
+        Value::Null => "null".to_string(),
+        Value::Bool(b) => b.to_string(),
+        Value::Number(n) => n.to_string(),
+        other => other.to_string(),
+    })
+}
+
+/// Error returned when a requested projection field is not a known top-level
+/// field of the serialized issue. Carries the offending field name.
+///
+/// # Examples
+///
+/// ```
+/// use jit::output::UnknownFieldError;
+///
+/// let err = UnknownFieldError("bogus".into());
+/// assert_eq!(err.to_string(), "unknown field 'bogus'");
+/// assert_eq!(err.0, "bogus");
+/// ```
+#[derive(Debug, Error, PartialEq)]
+#[error("unknown field '{0}'")]
+pub struct UnknownFieldError(pub String);
+
+/// Render the named top-level fields of a serialized issue value as a single
+/// compact JSON object, preserving the requested order.
+///
+/// `value` must be the JSON object produced by serializing an
+/// [`IssueShowResponse`]. Each name is looked up by its serialized key. The
+/// first unknown key is returned as `Err(UnknownFieldError(name))` so callers
+/// can signal a usage error; otherwise the result is a compact object
+/// `{"a":...,"b":...}` whose keys keep the requested order (so the output is
+/// stable regardless of the `serde_json` map-ordering feature).
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::Issue;
+/// use jit::output::{project_fields, IssueShowResponse, UnknownFieldError};
+///
+/// let issue = Issue::new("My Title".into(), "Body".into());
+/// let value = serde_json::to_value(IssueShowResponse::from_issue(issue, vec![], &[])).unwrap();
+///
+/// let out = project_fields(&value, &["title".into(), "state".into()]).unwrap();
+/// assert_eq!(out, r#"{"title":"My Title","state":"backlog"}"#);
+///
+/// // Unknown field reports its name.
+/// assert_eq!(
+///     project_fields(&value, &["bogus".into()]).unwrap_err(),
+///     UnknownFieldError("bogus".into()),
+/// );
+/// ```
+pub fn project_fields(value: &Value, names: &[String]) -> Result<String, UnknownFieldError> {
+    let pairs = names
+        .iter()
+        .map(|name| {
+            value
+                .get(name)
+                .map(|field| (name.as_str(), field))
+                .ok_or_else(|| UnknownFieldError(name.clone()))
+        })
+        .collect::<Result<Vec<_>, UnknownFieldError>>()?;
+
+    // Build the object by hand so the requested key order is preserved
+    // regardless of whether `serde_json`'s `preserve_order` feature is enabled.
+    // `Value::to_string` yields compact JSON for both the key and the value.
+    let body = pairs
+        .iter()
+        .map(|(name, field)| format!("{}:{}", Value::String((*name).to_string()), field))
+        .collect::<Vec<_>>()
+        .join(",");
+    Ok(format!("{{{body}}}"))
 }
 
 // ============================================================================

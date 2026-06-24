@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "528a4dff-9290-441f-8e3b-11c35a825d82",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "f646f7a5-3fa7-4a96-a0f9-4cec4714bfbc",
+  "commit": "a3a0004f559b78f61e730f63a2bbb61bc88ad8ec",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-06-24T13:26:25.690951495Z",
+  "completed_at": "2026-06-24T13:27:40.121679410Z",
+  "duration_ms": 74430,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nPass. All requested behaviors are present:\n- `jit issue show <id> --field <name>` prints a single projected top-level field as plain text via `project_field` at `crates/jit/src/main.rs:677`.\n- `jit issue show <id> --fields a,b` prints compact JSON via `project_fields` at `crates/jit/src/main.rs:687`.\n- `jit issue show <id1> <id2> --json` serializes `Vec<IssueShowResponse>` as a root JSON array at `crates/jit/src/main.rs:637`.\n\n**Architecture And Separation Of Concerns**\n\nPass. Issue loading stays routed through `CommandExecutor` and storage abstractions. Projection formatting lives in `crates/jit/src/output.rs:884`. The prior duplicated human renderer feedback is resolved by shared `print_issue_show_human` at `crates/jit/src/main.rs:293`, used by the single-id and multi-id human paths.\n\n**Functional Paradigm**\n\nPass. Projection logic uses iterator pipelines in `crates/jit/src/output.rs:964`, and multi-id JSON collection uses iterator collection at `crates/jit/src/main.rs:638`. Remaining loops are in CLI output rendering.\n\n**Correctness And Invariants**\n\nPass. This is read-only behavior, so atomic writes, event logging, gate transitions, assignee/label validation, and PID safety are not affected. The prerequisite issue `4899e4b6` is marked `done` in the supplied context.\n\n**Safety**\n\nPass. `#![deny(unsafe_code)]` remains enforced, and no unsafe code is introduced in the reviewed changes.\n\n**Testing**\n\nPass with supplied evidence. I did not run tests because the issue has a passed `cargo-ci` gate. Integration coverage exists in `crates/jit/tests/issue_show_projection_test.rs:45`, `:89`, `:105`, `:121`, `:132`, `:145`, `:158`, and `:174` for projection, compact JSON, multi-id JSON, stability, and error cases.\n\n**Error Handling**\n\nPass. The prior `Result<String, String>` issue is fixed: `project_fields` now returns `Result<String, UnknownFieldError>` at `crates/jit/src/output.rs:963`, and `UnknownFieldError` derives `thiserror::Error` at `crates/jit/src/output.rs:931`. CLI-facing errors include context at `crates/jit/src/main.rs:680` and `:689`.\n\n**CLI Contract**\n\nPass. `issue show` retains `--json`; single-id JSON remains an object, and multi-id JSON returns an array. Projection output follows the issue contract: `--field` plain text, `--fields` compact JSON.\n\n**Documentation**\n\nPass. Public projection APIs include doc comments and `# Examples`: `project_field` at `crates/jit/src/output.rs:884`, `UnknownFieldError` at `:919`, and `project_fields` at `:935`. CLI docs were updated in `docs/reference/cli-commands.md:939`.\n\n**Prior Review Feedback**\n\nPass. The most recent blocker, missing `# Examples` documentation for `UnknownFieldError`, is addressed at `crates/jit/src/output.rs:919`. Earlier feedback about duplicated human rendering and typed projection errors also remains resolved.\n\n**JIT Issue Management**\n\nPass. The dependency is complete, and the supplied issue context shows `cargo-ci` passed on 2026-06-24. Label warnings, if any, are non-blocking per the review instructions.\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

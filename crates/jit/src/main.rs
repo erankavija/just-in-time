@@ -262,6 +262,101 @@ fn print_dependency_tree(nodes: &[jit::output::DependencyTreeNode], prefix: &str
     }
 }
 
+/// Build the [`IssueShowResponse`](jit::output::IssueShowResponse) for a single
+/// issue id, loading its enriched dependencies and gate runs.
+///
+/// Shared by the multi-id `--json` array path and the multi-id non-JSON loop so
+/// each issue renders from the same shape as `issue show --json`.
+fn build_issue_show_response<S: IssueStore>(
+    executor: &CommandExecutor<S>,
+    id: &str,
+) -> Result<jit::output::IssueShowResponse> {
+    let issue = executor
+        .show_issue(id)
+        .with_context(|| format!("Failed to load issue {}", id))?;
+    let enriched_deps = executor.get_dependencies_enriched(&issue);
+    let gate_runs = executor
+        .list_gate_runs(&issue.id, None)
+        .with_context(|| format!("Failed to load gate runs for issue {}", issue.id))?;
+    Ok(jit::output::IssueShowResponse::from_issue(
+        issue,
+        enriched_deps,
+        &gate_runs,
+    ))
+}
+
+/// Print the human-readable `issue show` view for an already-built response.
+///
+/// Single source of the `issue show` human field rendering: both the single-id
+/// non-JSON branch and the multi-id non-JSON loop delegate here so the field
+/// set, order, and document/`[HEAD]` formatting stay identical.
+fn print_issue_show_human(response: &jit::output::IssueShowResponse) {
+    println!("ID: {}", response.id);
+    println!("Title: {}", response.title);
+    println!("Description: {}", response.description);
+    println!("State: {:?}", response.state);
+    println!("Priority: {:?}", response.priority);
+    println!("Assignee: {:?}", response.assignee);
+
+    if response.dependencies.is_empty() {
+        println!("Dependencies: None");
+    } else {
+        let done_count = response
+            .dependencies
+            .iter()
+            .filter(|d| d.state.is_terminal())
+            .count();
+        println!(
+            "Dependencies ({}/{} complete):",
+            done_count,
+            response.dependencies.len()
+        );
+        for dep in &response.dependencies {
+            println!(
+                "  {} {} - {} [{}]",
+                dep.state_symbol(),
+                dep.short_id(),
+                dep.title,
+                format!("{:?}", dep.state).to_lowercase()
+            );
+        }
+    }
+
+    if response.gates.is_empty() {
+        println!("Gates: (none)");
+    } else {
+        println!("Gates:");
+        for gate in &response.gates {
+            let last_run = gate.last_run_at.as_deref().unwrap_or("never run");
+            println!(
+                "  - {} [{:?}] (last run: {})",
+                gate.key, gate.status, last_run
+            );
+        }
+    }
+    if !response.created_at.is_empty() {
+        println!("Created: {}", response.created_at);
+    }
+    if !response.updated_at.is_empty() {
+        println!("Updated: {}", response.updated_at);
+    }
+    if !response.documents.is_empty() {
+        println!("Documents:");
+        for doc in &response.documents {
+            print!("  - {}", doc.path);
+            if let Some(ref label) = doc.label {
+                print!(" ({})", label);
+            }
+            if let Some(ref commit) = doc.commit {
+                print!(" [{}]", &commit[..7.min(commit.len())]);
+            } else {
+                print!(" [HEAD]");
+            }
+            println!();
+        }
+    }
+}
+
 fn main() {
     let exit_code = match run() {
         Ok(()) => ExitCode::Success,
@@ -518,116 +613,136 @@ fn run() -> Result<()> {
                         }
                     }
                 }
-                IssueCommands::Show { id, summary, json } => match executor.show_issue(&id) {
-                    Ok(issue) => {
-                        if summary && json {
-                            let summary_response =
-                                jit::output::IssueShowSummaryResponse::from(&issue);
-                            let msg = format!(
-                                "Issue {}: {} [{:?}]",
-                                summary_response.short_id,
-                                summary_response.title,
-                                summary_response.state
-                            );
-                            let output =
-                                jit::output::JsonOutput::success(summary_response, "issue show")
-                                    .with_message(msg);
-                            println!("{}", output.to_json_string()?);
-                            return Ok(());
+                IssueCommands::Show {
+                    ids,
+                    summary,
+                    field,
+                    fields,
+                    json,
+                } => {
+                    let projecting = field.is_some() || !fields.is_empty();
+
+                    // Projection targets a single issue: `--field`/`--fields`
+                    // with multiple ids is ambiguous, so reject it.
+                    if projecting && ids.len() > 1 {
+                        return Err(anyhow!(
+                            "invalid arguments: --field/--fields require exactly one issue id (got {})",
+                            ids.len()
+                        ));
+                    }
+
+                    // Multi-id: return a JSON array of full issue objects in
+                    // argument order. Without --json, fall through to printing
+                    // each issue's human view in order.
+                    if ids.len() > 1 && json {
+                        let responses = ids
+                            .iter()
+                            .map(|id| build_issue_show_response(&executor, id))
+                            .collect::<Result<Vec<_>>>()?;
+                        let output = jit::output::JsonOutput::success(responses, "issue show");
+                        println!("{}", output.to_json_string()?);
+                        return Ok(());
+                    }
+
+                    if ids.len() > 1 {
+                        // Non-JSON multi-id: print each issue's human view.
+                        for id in &ids {
+                            let response = build_issue_show_response(&executor, id)?;
+                            print_issue_show_human(&response);
                         }
-                        let enriched_deps = executor.get_dependencies_enriched(&issue);
-                        let gate_runs =
-                            executor.list_gate_runs(&issue.id, None).with_context(|| {
-                                format!("Failed to load gate runs for issue {}", issue.id)
-                            })?;
-                        let response = jit::output::IssueShowResponse::from_issue(
-                            issue,
-                            enriched_deps.clone(),
-                            &gate_runs,
-                        );
+                        return Ok(());
+                    }
 
-                        let show_msg = format!(
-                            "Issue {}: {} [{:?}]",
-                            &response.id[..8],
-                            response.title,
-                            response.state
-                        );
-                        output_data!(quiet, json, "issue show", response, show_msg, {
-                            println!("ID: {}", response.id);
-                            println!("Title: {}", response.title);
-                            println!("Description: {}", response.description);
-                            println!("State: {:?}", response.state);
-                            println!("Priority: {:?}", response.priority);
-                            println!("Assignee: {:?}", response.assignee);
-
-                            // Enhanced dependency display
-                            if enriched_deps.is_empty() {
-                                println!("Dependencies: None");
-                            } else {
-                                let done_count = enriched_deps
-                                    .iter()
-                                    .filter(|d| d.state.is_terminal())
-                                    .count();
-                                println!(
-                                    "Dependencies ({}/{} complete):",
-                                    done_count,
-                                    enriched_deps.len()
+                    // Single id (guaranteed by clap `required = true`).
+                    let id = ids[0].clone();
+                    match executor.show_issue(&id) {
+                        Ok(issue) => {
+                            // Field projection: print the named field(s) and return.
+                            if projecting {
+                                let enriched_deps = executor.get_dependencies_enriched(&issue);
+                                let gate_runs = executor
+                                    .list_gate_runs(&issue.id, None)
+                                    .with_context(|| {
+                                        format!("Failed to load gate runs for issue {}", issue.id)
+                                    })?;
+                                let response = jit::output::IssueShowResponse::from_issue(
+                                    issue,
+                                    enriched_deps,
+                                    &gate_runs,
                                 );
-                                for dep in &enriched_deps {
-                                    println!(
-                                        "  {} {} - {} [{}]",
-                                        dep.state_symbol(),
-                                        dep.short_id(),
-                                        dep.title,
-                                        format!("{:?}", dep.state).to_lowercase()
-                                    );
+                                let value = serde_json::to_value(&response).with_context(|| {
+                                    "Failed to serialize issue for field projection".to_string()
+                                })?;
+
+                                if let Some(name) = field {
+                                    let rendered = jit::output::project_field(&value, &name)
+                                        .ok_or_else(|| {
+                                            anyhow!(
+                                                "invalid field: unknown field '{}' for issue show",
+                                                name
+                                            )
+                                        })?;
+                                    println!("{}", rendered);
+                                } else {
+                                    let rendered = jit::output::project_fields(&value, &fields)
+                                        .map_err(|unknown| {
+                                            anyhow!(
+                                                "invalid field: unknown field '{}' for issue show",
+                                                unknown.0
+                                            )
+                                        })?;
+                                    println!("{}", rendered);
                                 }
+                                return Ok(());
                             }
 
-                            if response.gates.is_empty() {
-                                println!("Gates: (none)");
-                            } else {
-                                println!("Gates:");
-                                for gate in &response.gates {
-                                    let last_run =
-                                        gate.last_run_at.as_deref().unwrap_or("never run");
-                                    println!(
-                                        "  - {} [{:?}] (last run: {})",
-                                        gate.key, gate.status, last_run
-                                    );
-                                }
+                            if summary && json {
+                                let summary_response =
+                                    jit::output::IssueShowSummaryResponse::from(&issue);
+                                let msg = format!(
+                                    "Issue {}: {} [{:?}]",
+                                    summary_response.short_id,
+                                    summary_response.title,
+                                    summary_response.state
+                                );
+                                let output = jit::output::JsonOutput::success(
+                                    summary_response,
+                                    "issue show",
+                                )
+                                .with_message(msg);
+                                println!("{}", output.to_json_string()?);
+                                return Ok(());
                             }
-                            if !response.created_at.is_empty() {
-                                println!("Created: {}", response.created_at);
-                            }
-                            if !response.updated_at.is_empty() {
-                                println!("Updated: {}", response.updated_at);
-                            }
-                            if !response.documents.is_empty() {
-                                println!("Documents:");
-                                for doc in &response.documents {
-                                    print!("  - {}", doc.path);
-                                    if let Some(ref label) = doc.label {
-                                        print!(" ({})", label);
-                                    }
-                                    if let Some(ref commit) = doc.commit {
-                                        print!(" [{}]", &commit[..7.min(commit.len())]);
-                                    } else {
-                                        print!(" [HEAD]");
-                                    }
-                                    println!();
-                                }
-                            }
-                        });
+                            let enriched_deps = executor.get_dependencies_enriched(&issue);
+                            let gate_runs =
+                                executor.list_gate_runs(&issue.id, None).with_context(|| {
+                                    format!("Failed to load gate runs for issue {}", issue.id)
+                                })?;
+                            let response = jit::output::IssueShowResponse::from_issue(
+                                issue,
+                                enriched_deps,
+                                &gate_runs,
+                            );
+
+                            let show_msg = format!(
+                                "Issue {}: {} [{:?}]",
+                                &response.id[..8],
+                                response.title,
+                                response.state
+                            );
+                            output_data!(quiet, json, "issue show", response, show_msg, {
+                                print_issue_show_human(&response);
+                            });
+                        }
+                        Err(e) => {
+                            handle_json_error!(
+                                json,
+                                e,
+                                jit::output::JsonError::issue_not_found(&id, "issue show")
+                            );
+                        }
                     }
-                    Err(e) => {
-                        handle_json_error!(
-                            json,
-                            e,
-                            jit::output::JsonError::issue_not_found(&id, "issue show")
-                        );
-                    }
-                },
+                }
                 IssueCommands::Update {
                     id,
                     filter,
