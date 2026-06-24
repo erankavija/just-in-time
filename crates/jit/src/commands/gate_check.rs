@@ -8,6 +8,23 @@ use crate::output::IssueShowResponse;
 use std::collections::HashMap;
 
 impl<S: IssueStore> CommandExecutor<S> {
+    /// Repository root used as the checker working directory and as the `git`
+    /// context for stamping [`GateRunResult::commit`](crate::domain::GateRunResult).
+    ///
+    /// This is the parent of the `.jit` directory. For `InMemoryStorage` in tests
+    /// the root is `"."`, whose parent is the empty path, so we fall back to the
+    /// current working directory to keep the path usable.
+    pub(crate) fn checker_repo_root(&self) -> std::path::PathBuf {
+        self.storage
+            .root()
+            .parent()
+            .filter(|p| !p.as_os_str().is_empty())
+            .map(|p| p.to_path_buf())
+            .unwrap_or_else(|| {
+                std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."))
+            })
+    }
+
     /// Check a single gate for an issue
     ///
     /// Runs the gate checker if it's an automated gate, updates the issue status,
@@ -48,17 +65,8 @@ impl<S: IssueStore> CommandExecutor<S> {
             .as_ref()
             .ok_or_else(|| anyhow!("Gate '{}' has no checker configured", gate_key))?;
 
-        // Determine working directory: repo root (parent of .jit dir)
-        // For InMemoryStorage in tests, parent of "." is "", so fallback to current_dir
-        let repo_root = self
-            .storage
-            .root()
-            .parent()
-            .filter(|p| !p.as_os_str().is_empty())
-            .map(|p| p.to_path_buf())
-            .unwrap_or_else(|| {
-                std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."))
-            });
+        // Determine working directory: repo root (parent of .jit dir).
+        let repo_root = self.checker_repo_root();
 
         let working_dir = match checker {
             crate::domain::GateChecker::Exec {

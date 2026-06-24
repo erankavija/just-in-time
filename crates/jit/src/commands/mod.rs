@@ -48,7 +48,7 @@ pub mod test_helpers;
 
 pub use breakdown::{BracketBreakdownResult, BracketChild};
 pub use bulk_update::{BulkUpdatePreview, BulkUpdateResult, UpdateOperations};
-pub use gate::{GateNotRequiredError, GatePassFailed};
+pub use gate::{GateNotRequiredError, GatePassFailed, GatePassOutcome};
 pub use template::TemplateApplyResult;
 
 // Re-export WorktreeIdentity for init return type

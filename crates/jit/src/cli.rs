@@ -792,6 +792,10 @@ pub enum GateCommands {
     /// With --json, the response carries a `verdict` field: `pass` on success,
     /// `fail` on checker failure, `error` on runner error. Pre-verdict argument
     /// and lookup errors (codes 2 and 3) carry no `verdict` field.
+    ///
+    /// When the gate already passed at the current HEAD commit, the checker is
+    /// skipped: the command exits 0 and reports `already_passed: true` in --json.
+    /// Use --force to re-run the checker unconditionally.
     Pass {
         /// Issue ID
         id: String,
@@ -802,6 +806,10 @@ pub enum GateCommands {
         /// Who passed the gate (optional)
         #[arg(short, long)]
         by: Option<String>,
+
+        /// Re-run the checker even if the gate already passed at the current HEAD
+        #[arg(long)]
+        force: bool,
 
         #[arg(long)]
         json: bool,

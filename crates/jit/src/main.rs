@@ -1790,27 +1790,43 @@ fn run() -> Result<()> {
                 id,
                 gate_key,
                 by,
+                force,
                 json,
             } => {
                 let output_ctx = OutputContext::new(quiet, json);
-                match executor.pass_gate(&id, gate_key.clone(), by) {
-                    Ok(warnings) => {
+                match executor.pass_gate(&id, gate_key.clone(), by, force) {
+                    Ok(outcome) => {
                         // Print warnings first
-                        for warning in warnings {
-                            output_ctx.print_warning(&warning)?;
+                        for warning in &outcome.warnings {
+                            output_ctx.print_warning(warning)?;
                         }
 
+                        let already_passed = outcome.already_passed;
                         if json {
                             use jit::output::JsonOutput;
+                            let message = if already_passed {
+                                format!(
+                                    "Gate '{}' already passed at HEAD for issue {}; skipped",
+                                    gate_key, id
+                                )
+                            } else {
+                                format!("Passed gate '{}' for issue {}", gate_key, id)
+                            };
                             let response = serde_json::json!({
                                 "issue_id": id,
                                 "gate_key": gate_key,
                                 "status": "passed",
                                 "verdict": "pass",
-                                "message": format!("Passed gate '{}' for issue {}", gate_key, id)
+                                "already_passed": already_passed,
+                                "message": message,
                             });
                             let output = JsonOutput::success(response, "gate pass");
                             println!("{}", output.to_json_string()?);
+                        } else if already_passed {
+                            let _ = output_ctx.print_success(format!(
+                                "Gate '{}' already passed at HEAD for issue {}, skipping (use --force to re-run)",
+                                gate_key, id
+                            ));
                         } else {
                             let _ = output_ctx.print_success(format!(
                                 "Passed gate '{}' for issue {}",

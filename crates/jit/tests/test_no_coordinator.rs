@@ -152,7 +152,7 @@ fn test_gates_work_without_coordinator() {
 
     // Pass the gate
     h.executor
-        .pass_gate(&id, "test-gate".to_string(), None)
+        .pass_gate(&id, "test-gate".to_string(), None, false)
         .unwrap();
 
     // Issue should now auto-transition to Done

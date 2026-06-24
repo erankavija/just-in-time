@@ -27,7 +27,7 @@
       "wave_number": 2,
       "issues": [
         {"id": "4899e4b6-b365-4087-b899-01dd6b1b08bc", "short_id": "4899e4b6", "req": "REQ-02", "title": "Project gate state as a gates array in issue show --json", "classification": "implementation", "status": "done", "depends_on": ["870176ce"]},
-        {"id": "9bfcc474-d09b-4b0f-9c02-684f3d056cd3", "short_id": "9bfcc474", "req": "REQ-05", "title": "Skip gate pass when already passed at HEAD", "classification": "implementation", "status": "pending", "depends_on": ["65ef3741"]}
+        {"id": "9bfcc474-d09b-4b0f-9c02-684f3d056cd3", "short_id": "9bfcc474", "req": "REQ-05", "title": "Skip gate pass when already passed at HEAD", "classification": "implementation", "status": "done", "depends_on": ["65ef3741"]}
       ]
     },
     {
@@ -40,6 +40,6 @@
   ],
   "created_during_execution": [],
   "escalations": [],
-  "rework_counts": {"4899e4b6": 2, "f646f7a5": 2, "65ef3741": 1},
+  "rework_counts": {"4899e4b6": 2, "f646f7a5": 2, "65ef3741": 1, "9bfcc474": 1},
   "started_at": "2026-06-24"
 }

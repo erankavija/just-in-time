@@ -61,6 +61,42 @@ pub struct GateNotRequiredError {
     pub gate_key: String,
 }
 
+/// Outcome of a successful [`pass_gate`](CommandExecutor::pass_gate) call.
+///
+/// Carries any warnings gathered along the way (e.g. lease warnings) plus
+/// `already_passed`, which is `true` when the gate was found to have already
+/// passed at the current `HEAD` commit and the (potentially expensive) checker
+/// was skipped. On a normal run — manual attestation or a freshly executed
+/// checker — `already_passed` is `false`.
+///
+/// # Examples
+///
+/// ```rust
+/// use jit::commands::GatePassOutcome;
+///
+/// fn describe(outcome: &GatePassOutcome) -> &'static str {
+///     if outcome.already_passed {
+///         "already passed at HEAD; checker skipped"
+///     } else {
+///         "gate passed"
+///     }
+/// }
+///
+/// let outcome = GatePassOutcome {
+///     warnings: Vec::new(),
+///     already_passed: true,
+/// };
+/// assert_eq!(describe(&outcome), "already passed at HEAD; checker skipped");
+/// ```
+#[derive(Debug, Clone)]
+pub struct GatePassOutcome {
+    /// Warnings gathered while passing the gate (e.g. lease warnings).
+    pub warnings: Vec<String>,
+    /// `true` when the checker was skipped because the gate already passed at
+    /// the current `HEAD` commit.
+    pub already_passed: bool,
+}
+
 /// Result of adding multiple gates
 #[derive(Debug, Serialize)]
 pub struct GateAddResult {
@@ -233,13 +269,40 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     /// Mark a gate as passed.
     ///
-    /// Returns warnings (e.g., lease warnings) if any.
+    /// For an automated gate this runs the checker; for a manual gate it records
+    /// the attestation. When `force` is `false` and the gate's latest run already
+    /// passed at the current `HEAD` commit, the (often expensive) checker is
+    /// skipped and the returned outcome has `already_passed == true`. Passing
+    /// `force = true` always re-runs the checker.
+    ///
+    /// Returns a [`GatePassOutcome`] carrying any warnings (e.g. lease warnings)
+    /// and whether the checker was skipped.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use jit::commands::CommandExecutor;
+    /// use jit::{InMemoryStorage, IssueStore};
+    ///
+    /// let executor = CommandExecutor::new(InMemoryStorage::new());
+    /// let issue = jit::domain::Issue::new("Title".into(), "Body".into());
+    /// let id = issue.id.clone();
+    /// executor.storage().save_issue(issue).unwrap();
+    /// executor.add_gate(&id, "review".into()).unwrap();
+    ///
+    /// // Manual gate: not already passed, so the checker is not skipped.
+    /// let outcome = executor
+    ///     .pass_gate(&id, "review".into(), Some("human:alice".into()), false)
+    ///     .unwrap();
+    /// assert!(!outcome.already_passed);
+    /// ```
     pub fn pass_gate(
         &self,
         issue_id: &str,
         gate_key: String,
         by: Option<String>,
-    ) -> Result<Vec<String>> {
+        force: bool,
+    ) -> Result<GatePassOutcome> {
         let full_id = self.storage.resolve_issue_id(issue_id)?;
 
         // Collect warnings instead of printing
@@ -256,6 +319,23 @@ impl<S: IssueStore> CommandExecutor<S> {
                 gate_key,
             }
             .into());
+        }
+
+        // Skip the checker when the gate is CURRENTLY passed AND its latest run
+        // passed at the current HEAD, unless --force was given. Requiring the
+        // current `gates_status` to be Passed prevents a false success when the
+        // gate was reset to Pending (e.g. removed and re-added) while a stale
+        // passing run still lingers at this HEAD. A `None` HEAD (no git / no
+        // commit) cannot prove the prior pass is still valid, so we fall through.
+        let current_passed = matches!(
+            issue.gates_status.get(&gate_key),
+            Some(s) if s.status == GateStatus::Passed
+        );
+        if !force && current_passed && self.gate_passed_at_head(&full_id, &gate_key)? {
+            return Ok(GatePassOutcome {
+                warnings,
+                already_passed: true,
+            });
         }
 
         // Check if gate is automated - if so, run the checker instead
@@ -275,7 +355,10 @@ impl<S: IssueStore> CommandExecutor<S> {
                     }
                     .into());
                 }
-                return Ok(warnings);
+                return Ok(GatePassOutcome {
+                    warnings,
+                    already_passed: false,
+                });
             }
         }
 
@@ -299,7 +382,37 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Check if Gated issue can now transition to Done
         self.auto_transition_to_done(&full_id)?;
 
-        Ok(warnings)
+        Ok(GatePassOutcome {
+            warnings,
+            already_passed: false,
+        })
+    }
+
+    /// Whether the gate's latest run passed at the current `HEAD` commit.
+    ///
+    /// This is the historical-run half of the skip predicate. The full skip in
+    /// [`pass_gate`](Self::pass_gate) ALSO requires the issue's current
+    /// `gates_status` for this gate to be `Passed`, so a gate reset to `Pending`
+    /// (e.g. removed and re-added) is never skipped even if a stale passing run
+    /// lingers at this HEAD.
+    ///
+    /// Compares the current `HEAD` (resolved from the same repo root the checker
+    /// runs in, so the commit is apples-to-apples with the value stamped into
+    /// [`GateRunResult::commit`](crate::domain::GateRunResult)) against the latest
+    /// recorded run for `(issue, gate)`. Returns `true` only when that run passed
+    /// AND both commits are present and equal. A missing `HEAD` (no git / no
+    /// commit) yields `false`, since the prior pass cannot be proven current.
+    fn gate_passed_at_head(&self, full_id: &str, gate_key: &str) -> Result<bool> {
+        let head = crate::gate_execution::get_git_commit(&self.checker_repo_root());
+        let Some(head) = head else {
+            return Ok(false);
+        };
+        let passed = self
+            .get_last_gate_run(full_id, gate_key)?
+            .is_some_and(|run| {
+                run.status == GateRunStatus::Passed && run.commit.as_deref() == Some(head.as_str())
+            });
+        Ok(passed)
     }
 
     /// Mark a gate as failed.
@@ -738,6 +851,7 @@ enforce_leases = "off"
             &issue_id,
             "auto-gate".to_string(),
             Some("human:test".to_string()),
+            false,
         );
 
         assert!(
@@ -868,6 +982,7 @@ enforce_leases = "off"
             &issue_id,
             "auto-gate".to_string(),
             Some("human:test".to_string()),
+            false,
         );
 
         assert!(
@@ -920,6 +1035,7 @@ enforce_leases = "off"
             &issue_id,
             "manual-gate".to_string(),
             Some("human:reviewer".to_string()),
+            false,
         );
         assert!(result.is_ok(), "Manual pass of manual gate should succeed");
 

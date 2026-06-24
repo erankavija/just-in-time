@@ -296,7 +296,14 @@ fn get_git_context(working_dir: &Path) -> GitContext {
     GitContext { commit, branch }
 }
 
-fn get_git_commit(working_dir: &Path) -> Option<String> {
+/// Resolve the current `HEAD` commit hash for `working_dir`.
+///
+/// Returns `None` when `working_dir` is not inside a git repository, when git
+/// is unavailable, or when the `git rev-parse HEAD` invocation fails (e.g. a
+/// repository with no commits yet). The value is the full 40-character SHA, the
+/// same one stamped into [`GateRunResult::commit`](crate::domain::GateRunResult)
+/// via [`get_git_context`], so callers can compare the two directly.
+pub(crate) fn get_git_commit(working_dir: &Path) -> Option<String> {
     Command::new("git")
         .arg("rev-parse")
         .arg("HEAD")

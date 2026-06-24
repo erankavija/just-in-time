@@ -2,7 +2,7 @@
   "id": "df7f934c-41fe-4019-977b-361ff9b8fc58",
   "title": "Add gate pass-all with fail-fast",
   "description": "Add `gate pass-all` to run all of an issue's required gates in one command, fail-fast.\n\n## Success Criteria\n\n- [ ] `jit gate pass-all <id>` runs each required gate in turn, stops at the first non-pass, and exits non-zero per the exit-code taxonomy.\n- [ ] It inherits the skip-if-passed-at-HEAD behavior (already-passed gates are not re-run).",
-  "state": "backlog",
+  "state": "ready",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -21,5 +21,5 @@
     "satisfies:REQ-06"
   ],
   "created_at": "2026-06-22T21:20:41.102941189+00:00",
-  "updated_at": "2026-06-22T21:50:52.477869587+00:00"
+  "updated_at": "2026-06-24T14:07:16.471008879+00:00"
 }

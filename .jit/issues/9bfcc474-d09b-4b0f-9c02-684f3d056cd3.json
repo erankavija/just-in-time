@@ -2,9 +2,9 @@
   "id": "9bfcc474-d09b-4b0f-9c02-684f3d056cd3",
   "title": "Skip gate pass when already passed at HEAD",
   "description": "Skip re-running a gate's (often expensive) checker when it already passed at the current HEAD commit.\n\n## Success Criteria\n\n- [ ] `jit gate pass <id> <gate>` on a gate already passed for the current HEAD exits `0` without re-running the checker and reports `already_passed: true` in `--json`.\n- [ ] `--force` re-runs the checker unconditionally.",
-  "state": "ready",
+  "state": "done",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [
     "65ef3741-765e-48ff-b1bb-00b06e006e4c"
   ],
@@ -12,7 +12,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-24T14:05:01.625406449Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-24T14:05:37.094925857Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -21,5 +32,5 @@
     "satisfies:REQ-05"
   ],
   "created_at": "2026-06-22T21:20:41.097443987+00:00",
-  "updated_at": "2026-06-24T13:46:02.703505081+00:00"
+  "updated_at": "2026-06-24T14:07:16.376411861+00:00"
 }

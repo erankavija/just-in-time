@@ -1241,11 +1241,12 @@ Manually mark a gate as passed.
 
 **Usage:**
 ```bash
-jit gate pass <ISSUE_ID> <GATE_KEY> [--by <WHO>]
+jit gate pass <ISSUE_ID> <GATE_KEY> [--by <WHO>] [--force]
 ```
 
 **Options:**
 - `--by <WHO>` - Record who passed the gate (e.g., `human:alice`, `ci:github-actions`)
+- `--force` - Re-run the checker even if the gate already passed at the current HEAD commit
 
 **Examples:**
 ```bash
@@ -1257,12 +1258,28 @@ jit gate pass abc123 tdd-reminder
 
 # Pass automated gate manually (override checker)
 jit gate pass abc123 tests --by "human:admin"
+
+# Force a re-run even if it already passed at HEAD
+jit gate pass abc123 tests --force
 ```
 
 **Behavior:**
 - For a manual gate: updates gate status to `passed`, records who passed it and timestamp.
 - For an automated (auto) gate: runs the checker and only marks the gate passed if the checker passes.
 - If this was the last blocking gate, issue auto-transitions from `gated → done`.
+
+**Skip when already passed at HEAD:**
+- If the gate's latest run already passed at the current `HEAD` commit, `jit gate
+  pass` skips the (often expensive) checker, exits `0`, and reports
+  `already_passed: true` in `--json`. The non-`--json` path prints a concise
+  "already passed at HEAD, skipping (use --force to re-run)" line.
+- The skip compares the current `HEAD` against the commit stamped on the latest
+  recorded run; both must be present and equal. When there is no git repository
+  or no commit (`HEAD` unresolvable), the run is never skipped — the prior pass
+  cannot be proven current.
+- `--force` bypasses the check and re-runs the checker unconditionally.
+- On a normal run (manual attestation, or a freshly executed checker), `--json`
+  reports `already_passed: false`.
 
 **Exit-code taxonomy** (auto and manual gates):
 

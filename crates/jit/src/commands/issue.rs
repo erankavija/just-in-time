@@ -999,6 +999,7 @@ enforce_leases = "off"
                 &issue_id,
                 "tdd-reminder".to_string(),
                 Some("human:dev".to_string()),
+                false,
             )
             .unwrap();
 
