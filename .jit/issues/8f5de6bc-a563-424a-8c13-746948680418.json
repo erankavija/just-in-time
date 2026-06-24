@@ -1,0 +1,30 @@
+{
+  "id": "8f5de6bc-a563-424a-8c13-746948680418",
+  "title": "planning: jit-project-lead skill: milestone-level vision steward above the epic lead",
+  "description": "Planning node for jit-project-lead skill: milestone-level vision steward above the epic lead (f2532a2d). Produce the plan that decomposes this container before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Plan document: dev/active/f2532a2d-138d-46bf-9547-e1ea517f0170-plan.md.",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "eed6750c-270a-43c6-8c35-161553b25d75"
+  ],
+  "gates_required": [
+    "plan-review"
+  ],
+  "gates_status": {
+    "plan-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-06-24T17:28:58.569285156Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "milestone:v1.0",
+    "epic:jit-project-lead",
+    "type:planning"
+  ],
+  "created_at": "2026-06-24T17:28:58.568456395+00:00",
+  "updated_at": "2026-06-24T18:23:26.964993901+00:00"
+}

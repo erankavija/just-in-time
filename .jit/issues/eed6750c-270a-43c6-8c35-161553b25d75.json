@@ -37,6 +37,23 @@
           "is_shared": false
         }
       ]
+    },
+    {
+      "path": "dev/sessions/session-20260622-planning-failures-and-churn.md",
+      "commit": null,
+      "label": "Planning failures and churn from a live run (session 7ec82da2)",
+      "doc_type": "notes",
+      "format": "markdown",
+      "assets": [
+        {
+          "original_path": "session-20260623-planning-skill-observations.md",
+          "resolved_path": "dev/sessions/session-20260623-planning-skill-observations.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "a9d76ddf8030e5281c2d09fc7d7a2bfd924d45a3ce6a02246e8ed5f6d9186dbd",
+          "is_shared": false
+        }
+      ]
     }
   ],
   "labels": [
@@ -44,5 +61,5 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-06-20T18:17:26.494159513+00:00",
-  "updated_at": "2026-06-22T22:46:10.933470735+00:00"
+  "updated_at": "2026-06-23T12:35:45.424884147+00:00"
 }

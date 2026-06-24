@@ -1,0 +1,37 @@
+{
+  "id": "57269494-9531-45d9-8eb9-df5e32b6a621",
+  "title": "jit apply leaves a dangling doc reference: scaffolded bracket fails validation until the file is hand-created",
+  "description": "Eager validation fails a freshly-applied bracket before the lifecycle stage that produces what it checks has happened. Two coupled mechanisms: a not-yet-authored plan document is treated as a hard error, and `coverage-preview` fires before breakdown starts. Applying a bracket should leave the repository valid, with each check enforcing only once its subject is due.\n\n## Background\n\nApplying the `plan` template (`jit apply plan <container>`) scaffolds a planning node `P` and a breakdown node `B`. Two validation paths then fail a bracket that is correctly mid-lifecycle:\n\n1. **Plan document.** `P`'s `doc` field names a plan-doc path (e.g. `dev/active/<container.id>-plan.md`). Apply also attached a `plan`-labeled document reference to that not-yet-created file, and validation re-resolved the path repo-wide and read it, so `jit validate` reported a hard error the instant the bracket was applied — blocking unrelated transitions until a file was hand-created. The plan is `P`'s deliverable; it does not exist until `P` is worked.\n\n2. **Coverage preview.** `coverage-preview` fired the moment `B` existed (`when = { type = \"breakdown\" }`), asserting every `[hard]` criterion of the container is satisfied by a child. A freshly-applied `B` is in backlog with no children, so every criterion read as uncovered — coverage cannot exist before breakdown has produced anything.\n\nBoth observed live on epic `f2532a2d`.\n\n## Resolution\n\n- **No link, instruct instead.** Apply attaches no document reference; the planning node's `doc` location is seeded into its description as an instruction to author the plan there and link it once written. The author links it during planning.\n- **Plan-doc presence is gated on the planning node.** A missing external plan is acceptable while `P` is not `done` (skipped, no error); once `P` is `done` the plan must exist (downstream coverage reads it) and a still-missing file is an error. Other read failures always error.\n- **Coverage preview is gated on the breakdown node.** It enforces only when `B` is `in_progress`, `gated`, or `done` — silent while `B` is in backlog (breakdown not started), still firing as its own gate runs.\n- **Plan-review enforces placement + link.** The plan-review prompt confirms the plan exists at the instructed location and is linked, since structural validation no longer blocks before the plan is due.\n\n## Success Criteria\n\n- [hard] REQ-01: After `jit apply <template> <container>` succeeds, `jit validate` passes with no errors from the not-yet-authored plan or from coverage of an un-started breakdown; reaching a valid state requires no manual file-creation step.\n- [hard] REQ-02: Apply attaches no plan document reference. The planning node's description carries the resolved plan-doc location as an author-and-link instruction, and a `--force` refresh re-seeds that prose without creating a reference.\n- [hard] REQ-03: A missing external plan is tolerated while the bracket's planning node is not `done`, and surfaces as an error once it is `done`; any other read failure (unreadable, parse) always errors.\n- [hard] REQ-04: `coverage-preview` produces no finding while the breakdown node is in backlog, and enforces once it is `in_progress`, `gated`, or `done`.\n- [hard] REQ-05: `plan-review` verifies the plan is present at the instructed location and linked to the planning node.\n- [hard] REQ-06: Regression tests cover the apply-then-validate path (no link created; missing plan before/after planning is done) and the coverage state-gate (silent in backlog, enforcing in progress).\n\n## Non-goals\n\n- Changing the bracket graph shape or the set of nodes `jit apply` creates.\n- Authoring real plan content — the planning phase produces and links the plan.\n- A cross-repo migration pass; go-forward only, with the one live bracket reconciled by hand.",
+  "state": "done",
+  "priority": "high",
+  "assignee": "agent:claude",
+  "dependencies": [],
+  "gates_required": [
+    "code-review"
+  ],
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-24T19:50:12.123203638Z"
+    }
+  },
+  "context": {},
+  "documents": [
+    {
+      "path": "dev/active/57269494-apply-plan-doc.md",
+      "commit": null,
+      "label": "Solution plan: jit apply plan-doc fix",
+      "doc_type": "design",
+      "format": "markdown"
+    }
+  ],
+  "labels": [
+    "type:bug",
+    "component:cli",
+    "epic:graph-templates",
+    "milestone:v1.0"
+  ],
+  "created_at": "2026-06-24T17:33:16.925311042+00:00",
+  "updated_at": "2026-06-24T19:53:12.354976653+00:00"
+}

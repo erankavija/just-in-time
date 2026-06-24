@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "fde9e0fd-87a1-4dcb-b3a8-02de75b8e021",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "57269494-9531-45d9-8eb9-df5e32b6a621",
+  "commit": "1e6f85bb3ee14eecda900e2809e1bd755efc648c",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-06-24T19:50:12.123203638Z",
+  "completed_at": "2026-06-24T19:52:35.931987892Z",
+  "duration_ms": 143808,
+  "exit_code": 0,
+  "stdout": "**Findings**\nNo blocking findings.\n\n**Acceptance Criteria**\nREQ-01 through REQ-06 are satisfied. Apply no longer creates a dangling plan doc reference, and planning descriptions carry the author/link instruction at [.jit/templates.toml](/home/vkaskivuo/Projects/just-in-time/.jit/templates.toml:21). Template apply creates nodes and gates without adding a `DocumentReference` at [template.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/template.rs:581), with regression coverage at [template_apply_tests.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/template_apply_tests.rs:138).\n\nMissing external plans are skipped only before the planning node is `done`, and other read errors still propagate at [validate.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/validate.rs:518). Coverage preview is now state-gated in active, SDD, and research rules at [.jit/rules.toml](/home/vkaskivuo/Projects/just-in-time/.jit/rules.toml:54), [docs/examples/sdd/rules.toml](/home/vkaskivuo/Projects/just-in-time/docs/examples/sdd/rules.toml:243), and [docs/examples/research/rules.toml](/home/vkaskivuo/Projects/just-in-time/docs/examples/research/rules.toml:274). `plan-review` now explicitly requires the plan to exist at the instructed path and be linked at [scripts/plan-review-prompt.md](/home/vkaskivuo/Projects/just-in-time/scripts/plan-review-prompt.md:19).\n\n**Prior Review Feedback**\nThe previous blocker was the ungated research example selector. It is resolved: [docs/examples/research/rules.toml](/home/vkaskivuo/Projects/just-in-time/docs/examples/research/rules.toml:274) now uses `state = [\"in_progress\", \"gated\", \"done\"]`, and [research_bracket_tests.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/research_bracket_tests.rs:261) covers silence while the breakdown node is backlog.\n\n**Architecture And Boundaries**\nNo boundary violation found. File reads for external plan content stay in command-boundary code via `resolve_plan_content`, while graph evaluation receives injected content at [validate.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/validate.rs:403). Template apply remains command orchestration over storage/domain and does not mix CLI/output concerns.\n\n**Correctness And Invariants**\nNo unsafe code, PID handling, assignee/label-format, or gate-transition regressions found in the touched paths. Force refresh updates descriptions through storage and appends an event at [template.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/template.rs:814).\n\n**Testing And Lint**\n`./scripts/jit-validate.sh` passed. I also ran:\n`cargo test -p jit --test template_apply_tests --test scope_validation_tests --test sdd_bracket_tests --test research_bracket_tests` passed: 55 tests.\n`cargo clippy -p jit --all-targets -- -D warnings` passed.\n\n**Jit Issue Management**\nThe issue has no dependencies, so there is no prerequisite work to verify. Repository validation passed; label warnings were not present.\n\n**Documentation**\nPublic API documentation touched in `validate.rs` and `plan_doc.rs` includes examples. Shipped config/docs now describe the lifecycle-gated coverage-preview behavior consistently.\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

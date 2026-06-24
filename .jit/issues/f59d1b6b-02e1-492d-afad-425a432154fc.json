@@ -1,0 +1,37 @@
+{
+  "id": "f59d1b6b-02e1-492d-afad-425a432154fc",
+  "title": "breakdown: jit-project-lead skill: milestone-level vision steward above the epic lead",
+  "description": "Breakdown node bracketing jit-project-lead skill: milestone-level vision steward above the epic lead (f2532a2d). Holds the decomposition of the approved plan into well-ordered child issues that cover the container's [hard] success criteria.",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "8f5de6bc-a563-424a-8c13-746948680418"
+  ],
+  "gates_required": [
+    "coverage-preview",
+    "breakdown-review"
+  ],
+  "gates_status": {
+    "coverage-preview": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-06-24T17:28:58.570012656Z"
+    },
+    "breakdown-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-06-24T17:28:58.570323176Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "milestone:v1.0",
+    "epic:jit-project-lead",
+    "type:breakdown",
+    "brackets:f2532a2d"
+  ],
+  "created_at": "2026-06-24T17:28:58.569413486+00:00",
+  "updated_at": "2026-06-24T17:28:58.579747549+00:00"
+}
