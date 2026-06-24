@@ -2,12 +2,10 @@
   "id": "0d753ba5-356a-4342-a1fb-f880a1b0341d",
   "title": "planning: Structured project knowledge in jit: addressable items, qualified ids, and projected invariants",
   "description": "Planning node for Structured project knowledge in jit: addressable items, qualified ids, and projected invariants (25064508). Produce the plan that decomposes this container before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Plan document: dev/active/25064508-d563-4073-a970-296607a01adc-plan.md.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "high",
   "assignee": null,
-  "dependencies": [
-    "56ab0224-fd6e-4929-a61e-ffb1a3104496"
-  ],
+  "dependencies": [],
   "gates_required": [
     "plan-review"
   ],
@@ -33,5 +31,5 @@
     "type:planning"
   ],
   "created_at": "2026-06-23T21:38:17.502529208+00:00",
-  "updated_at": "2026-06-23T21:38:17.582834481+00:00"
+  "updated_at": "2026-06-24T20:44:34.634318550+00:00"
 }

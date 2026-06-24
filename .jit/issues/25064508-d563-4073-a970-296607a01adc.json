@@ -6,6 +6,7 @@
   "priority": "high",
   "assignee": null,
   "dependencies": [
+    "56ab0224-fd6e-4929-a61e-ffb1a3104496",
     "5f5735c3-8b9a-492d-8fb1-7d8b597bf435"
   ],
   "gates_required": [],
@@ -18,5 +19,5 @@
     "epic:structured-knowledge"
   ],
   "created_at": "2026-06-21T22:20:43.845860410+00:00",
-  "updated_at": "2026-06-23T21:38:17.583707972+00:00"
+  "updated_at": "2026-06-24T20:45:07.755447256+00:00"
 }
