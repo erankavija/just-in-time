@@ -222,6 +222,9 @@ fn test_sdd_uncovered_hard_criterion_blocked_at_breakdown_gate() {
         "type:breakdown".to_string(),
         format!("brackets:{}", container.short_id()),
     ];
+    // Breakdown is underway (the preview rule is state-gated to in_progress/
+    // gated/done, so a backlog B that has not started breakdown stays silent).
+    breakdown.state = State::InProgress;
 
     // Containment spine: C depends on impl; impl depends on B.
     container.dependencies = vec![impl_node.id.clone()];
@@ -235,6 +238,39 @@ fn test_sdd_uncovered_hard_criterion_blocked_at_breakdown_gate() {
                 && f.finding.message.contains("REQ-01")),
         "an uncovered [hard] criterion must be reported by the preview rule at \
          the breakdown gate: {findings:?}"
+    );
+}
+
+#[test]
+fn test_sdd_preview_silent_while_breakdown_node_in_backlog() {
+    // A freshly-applied bracket leaves B in Backlog: it depends on the planning
+    // node and breakdown has not started, so there is nothing to cover yet. The
+    // preview rule is state-gated (in_progress/gated/done), so even an uncovered
+    // [hard] criterion produces NO finding while B sits in backlog. This is the
+    // lifecycle gate that stops coverage failing before breakdown begins.
+    let set = load_example("sdd");
+    let rules = graph_rules(&set);
+
+    let mut container = breakable_container();
+    let mut impl_node = Issue::new("draft impl".to_string(), String::new());
+    impl_node.labels = vec!["type:task".to_string()]; // does NOT satisfy REQ-01
+    let mut breakdown = Issue::new("breakdown".to_string(), String::new());
+    breakdown.labels = vec![
+        "type:breakdown".to_string(),
+        format!("brackets:{}", container.short_id()),
+    ];
+    breakdown.state = State::Backlog; // breakdown not started
+
+    container.dependencies = vec![impl_node.id.clone()];
+    impl_node.dependencies = vec![breakdown.id.clone()];
+
+    let findings = issue_graph_findings(&rules, &[container, impl_node, breakdown]);
+    assert!(
+        !findings
+            .iter()
+            .any(|f| f.finding.rule == "sdd-coverage-preview"),
+        "coverage-preview must stay silent while the breakdown node is in backlog \
+         (breakdown not started): {findings:?}"
     );
 }
 
@@ -256,6 +292,9 @@ fn test_sdd_preview_passes_when_backlog_child_carries_mapping() {
         "type:breakdown".to_string(),
         format!("brackets:{}", container.short_id()),
     ];
+    // Breakdown is underway (the preview rule is state-gated to in_progress/
+    // gated/done, so a backlog B that has not started breakdown stays silent).
+    breakdown.state = State::InProgress;
     container.dependencies = vec![impl_node.id.clone()];
     impl_node.dependencies = vec![breakdown.id.clone()];
 
@@ -286,6 +325,9 @@ fn test_sdd_preview_excludes_bracket_types_and_halts_walk() {
         "type:breakdown".to_string(),
         format!("brackets:{}", container.short_id()),
     ];
+    // Breakdown is underway (the preview rule is state-gated to in_progress/
+    // gated/done, so a backlog B that has not started breakdown stays silent).
+    breakdown.state = State::InProgress;
     // P, beyond the boundary, is the only carrier of satisfies:REQ-01.
     let mut plan = Issue::new("plan".to_string(), String::new());
     plan.labels = vec!["type:planning".to_string(), "satisfies:REQ-01".to_string()];
@@ -323,6 +365,9 @@ fn test_sdd_preview_credits_non_sink_impl_interior() {
         "type:breakdown".to_string(),
         format!("brackets:{}", container.short_id()),
     ];
+    // Breakdown is underway (the preview rule is state-gated to in_progress/
+    // gated/done, so a backlog B that has not started breakdown stays silent).
+    breakdown.state = State::InProgress;
 
     container.dependencies = vec![impl_a.id.clone()];
     impl_a.dependencies = vec![impl_b.id.clone()];

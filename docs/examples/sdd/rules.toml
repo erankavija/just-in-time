@@ -236,7 +236,11 @@ assert = { label-coverage = { criteria-section = "success_criteria", marker = "[
 # severity blocking at scoped-validate time.
 [[rules]]
 name = "sdd-coverage-preview"
-when = { type = "breakdown" }
+# State-gated on the breakdown node: while B sits in backlog (freshly scaffolded,
+# breakdown not started) there is nothing to cover, so the rule is silent. It
+# enforces once breakdown is underway (in_progress), as the gate runs (gated),
+# and after (done).
+when = { type = "breakdown", state = ["in_progress", "gated", "done"] }
 severity = "error"
 enforce = true
 assert = { label-coverage = { criteria-section = "success_criteria", marker = "[hard]", id-pattern = "REQ-[0-9]+", satisfies-namespace = "satisfies", child-link = "dependencies", child-type-exclude = ["planning", "breakdown"], container-from-label = "brackets" } }

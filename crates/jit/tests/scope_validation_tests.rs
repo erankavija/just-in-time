@@ -499,9 +499,11 @@ fn test_scope_reads_criteria_from_external_plan_covered_clean() {
 }
 
 #[test]
-fn test_scope_missing_external_plan_surfaces_error() {
+fn test_scope_missing_external_plan_before_planning_done_is_not_an_error() {
     // The container is breakable + the location is external, but the plan file is
-    // absent -> the boundary surfaces a PlanDocError rather than silently passing.
+    // absent AND no bracket planning node has completed -> the plan is legitimately
+    // not authored yet, so the boundary skips it rather than erroring. This is the
+    // freshly-applied-bracket case: validate must stay clean before the plan exists.
     let executor = executor_with_rules_and_templates(COVERAGE_ON_EPIC, PLAN_TEMPLATE_EXTERNAL);
     let impl_id = seed(&executor, "impl", &["type:task"], "", &[]);
     let c = seed(
@@ -511,12 +513,59 @@ fn test_scope_missing_external_plan_surfaces_error() {
         "body without criteria",
         std::slice::from_ref(&impl_id),
     );
-    // No plan file written.
+    // No plan file written, no bracket planning node.
+    let report = executor
+        .validate_scope(&c)
+        .expect("a not-yet-authored plan must not surface as a hard error");
+    assert!(
+        !report.has_errors(),
+        "an un-bracketed container with no plan must validate clean: {:?}",
+        report.findings
+    );
+}
+
+#[test]
+fn test_scope_missing_external_plan_after_planning_done_surfaces_error() {
+    // Once the bracket's planning node is `done`, the plan MUST exist (downstream
+    // coverage reads it). A still-missing external plan then surfaces as a
+    // contextual error rather than silently passing.
+    let executor = executor_with_rules_and_templates(COVERAGE_ON_EPIC, PLAN_TEMPLATE_EXTERNAL);
+
+    // Planning node P, completed.
+    let p = seed(&executor, "planning", &["type:planning"], "", &[]);
+    let mut p_issue = executor.storage().load_issue(&p).unwrap();
+    p_issue.state = State::Done;
+    executor.storage().save_issue(p_issue).unwrap();
+
+    // Container C (external plan location, no file).
+    let c = seed(
+        &executor,
+        "container",
+        &["type:epic"],
+        "body without criteria",
+        &[],
+    );
+    let c_short = executor.storage().load_issue(&c).unwrap().short_id();
+
+    // Breakdown node B brackets C and depends on the (done) planning node.
+    let bracket_label = format!("brackets:{c_short}");
+    let b = seed(
+        &executor,
+        "breakdown",
+        &["type:breakdown", &bracket_label],
+        "",
+        std::slice::from_ref(&p),
+    );
+    // Wire C -> B so the bracket is in C's validation scope.
+    let mut c_issue = executor.storage().load_issue(&c).unwrap();
+    c_issue.dependencies = vec![b];
+    executor.storage().save_issue(c_issue).unwrap();
+
     let err = executor.validate_scope(&c).unwrap_err();
     let message = err.to_string();
     assert!(
         message.contains("plan document") && message.contains(&c[..8]),
-        "a missing external plan must surface as a contextual error: {message}"
+        "a plan missing after planning completed must surface as a contextual error: {message}"
     );
 }
 

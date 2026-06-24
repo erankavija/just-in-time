@@ -436,10 +436,18 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// passed to [`load_plan_content`](crate::commands::plan_doc::load_plan_content)
     /// is the repo root (the PARENT of `.jit`), NOT `storage.root()` (which is
     /// the `.jit` directory). This is the ONLY place external plan files are read
-    /// for validation; the pure engine never touches the filesystem. A missing or
-    /// unreadable external file surfaces as a
-    /// [`PlanDocError`](crate::commands::plan_doc::PlanDocError) (an error, never
-    /// a silent pass).
+    /// for validation; the pure engine never touches the filesystem.
+    ///
+    /// A missing external plan file is gated on the bracket's **planning node
+    /// state**: while the planning node has not yet completed, the plan is
+    /// legitimately unauthored, so the container is simply OMITTED from the map
+    /// (the engine falls back to its description) and no error is raised — this is
+    /// what lets a freshly-applied bracket validate cleanly before its plan
+    /// exists. Once the planning node is `done` the plan MUST exist (downstream
+    /// coverage reads its criteria), so a still-missing file surfaces as a
+    /// [`PlanDocError`](crate::commands::plan_doc::PlanDocError). Any OTHER read
+    /// failure (unreadable file, parse error) always surfaces as an error,
+    /// regardless of planning state — never a silent pass.
     ///
     /// # Examples
     ///
@@ -457,7 +465,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         &self,
         issues: &[Issue],
     ) -> Result<std::collections::HashMap<String, String>> {
-        use crate::commands::plan_doc::load_plan_content;
+        use crate::commands::plan_doc::{load_plan_content, PlanDocError};
+        use std::io::ErrorKind;
 
         let templates = &self.cached_config()?.templates;
 
@@ -477,30 +486,55 @@ impl<S: IssueStore> CommandExecutor<S> {
         let storage_root = self.storage.root();
         let base_dir = storage_root.parent().unwrap_or(storage_root);
 
-        issues
-            .iter()
-            .filter_map(|issue| {
-                // The issue's `type:` label selects its template; the template's
-                // planning-node `doc` is the per-issue plan-doc location.
-                let issue_type = issue
-                    .labels
-                    .iter()
-                    .filter_map(|l| l.strip_prefix("type:"))
-                    .find(|t| breakable.contains(*t))?;
-                // No template, or a template whose planning node declares no
-                // `doc` (an inline plan): skip — mirrors the legacy
-                // `INLINE_LOCATION` skip so the engine uses the description.
-                let location = templates
-                    .template_for_container(issue_type)
-                    .and_then(|t| t.plan_doc_location())?;
-                Some((issue, location.to_string()))
-            })
-            .map(|(issue, location)| {
-                let content = load_plan_content(issue, &location, &issue.id, base_dir)
-                    .map_err(|e| anyhow!("{e}"))?;
-                Ok((issue.id.clone(), content))
-            })
-            .collect()
+        // Id → issue over the WHOLE store (not just `issues`), for resolving a
+        // bracket's planning node when deciding whether a missing plan is "not
+        // authored yet" (skip) or "due" (error). The scoped-validation slice bounds
+        // out the bracket infrastructure (B/P), so the planning node must be looked
+        // up against the full graph for the gate to be consistent across scopes.
+        let all_issues = self.storage.list_issues()?;
+        let by_id: std::collections::HashMap<&str, &Issue> =
+            all_issues.iter().map(|i| (i.id.as_str(), i)).collect();
+
+        let mut out = std::collections::HashMap::new();
+        for issue in issues {
+            // The issue's `type:` label selects its template; the template's
+            // planning-node `doc` is the per-issue plan-doc location.
+            let Some(issue_type) = issue
+                .labels
+                .iter()
+                .filter_map(|l| l.strip_prefix("type:"))
+                .find(|t| breakable.contains(*t))
+            else {
+                continue;
+            };
+            let Some(template) = templates.template_for_container(issue_type) else {
+                continue;
+            };
+            // No `doc` (an inline plan): skip — the engine uses the description.
+            let Some(location) = template.plan_doc_location() else {
+                continue;
+            };
+
+            match load_plan_content(issue, location, &issue.id, base_dir) {
+                Ok(content) => {
+                    out.insert(issue.id.clone(), content);
+                }
+                Err(e) => {
+                    // A not-yet-authored plan is acceptable WHILE the bracket's
+                    // planning node is still open; only once it is `done` must the
+                    // plan exist. Every other read failure is always an error.
+                    let not_authored_yet = matches!(
+                        &e,
+                        PlanDocError::Read { source, .. } if source.kind() == ErrorKind::NotFound
+                    ) && !planning_node_done(issue, template, &by_id);
+                    if not_authored_yet {
+                        continue;
+                    }
+                    return Err(anyhow!("{e}"));
+                }
+            }
+        }
+        Ok(out)
     }
 
     /// Run the declarative rule set (`.jit/rules.toml`) as a per-issue or
@@ -1327,6 +1361,42 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         Ok(invalid_leases)
     }
+}
+
+/// Whether `container`'s bracket has a completed planning node.
+///
+/// A breakable container is bracketed by a breakdown node `B` (carrying
+/// `brackets:<container-short-id>`) that depends on a planning node `P` of the
+/// template's planning type. The plan is `P`'s deliverable, so the plan document
+/// is only "due" once `P` is `done`. Returns `false` when no bracket has been
+/// applied (no `B` found) or its planning node is not yet `done` — in which case
+/// a missing plan file is the legitimate not-yet-authored state, not an error.
+///
+/// Domain-agnostic: the planning type is read from the container's template, not
+/// hardcoded.
+fn planning_node_done(
+    container: &Issue,
+    template: &crate::templates::GraphTemplate,
+    by_id: &std::collections::HashMap<&str, &Issue>,
+) -> bool {
+    let Some(planning_type) = template.planning_type() else {
+        return false;
+    };
+    let bracket_label = format!("brackets:{}", container.short_id());
+    let planning_type_label = format!("type:{planning_type}");
+
+    // The breakdown node carries the `brackets:<container>` label and depends on
+    // the planning node; find it, then check that planning dependency's state.
+    by_id
+        .values()
+        .filter(|b| b.labels.contains(&bracket_label))
+        .any(|b| {
+            b.dependencies.iter().any(|dep_id| {
+                by_id.get(dep_id.as_str()).is_some_and(|p| {
+                    p.state == State::Done && p.labels.contains(&planning_type_label)
+                })
+            })
+        })
 }
 
 /// Build a human-readable error message from any `error`-severity graph-rule

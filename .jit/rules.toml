@@ -47,7 +47,11 @@ name = "bracket:coverage-preview"
 # credited by some issue in C's dependency closure (stories/tasks) carrying a
 # satisfies:<id> label. The breakdown/planning nodes bound the walk. No
 # child-state: coverage is a plan-time preview, so backlog children count.
-when = { type = "breakdown" }
+# State-gated on the breakdown node: a freshly-applied bracket leaves B in
+# backlog (it depends on the planning node), and breakdown has not begun, so no
+# coverage can exist yet — the rule stays silent. It enforces only once breakdown
+# is underway (in_progress), as its own gate runs (gated), and after (done).
+when = { type = "breakdown", state = ["in_progress", "gated", "done"] }
 severity = "error"
 enforce = true
 assert = { label-coverage = { criteria-section = "success_criteria", marker = "[hard]", id-pattern = "REQ-[0-9]+", satisfies-namespace = "satisfies", container-from-label = "brackets", child-link = "dependencies", child-type-exclude = ["breakdown", "planning"] } }

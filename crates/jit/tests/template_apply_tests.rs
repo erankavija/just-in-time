@@ -147,14 +147,24 @@ fn test_apply_resolves_node_doc_location() {
 
     let planning = h.get_issue(&result.created_node_ids_by_role["planning"]);
     let full_id = h.get_issue(&epic).id;
-    let plan_doc = planning
-        .documents
-        .iter()
-        .find(|d| d.label.as_deref() == Some("plan"))
-        .expect("planning node carries a plan-labeled doc reference");
-    assert_eq!(plan_doc.path, format!("dev/active/{full_id}-plan.md"));
-
-    // The breakdown node declares no doc, so it has no plan-labeled reference.
+    // The `{doc}` token resolves into the planning node's DESCRIPTION as an
+    // instruction (where to author and link the plan).
+    assert!(
+        planning
+            .description
+            .contains(&format!("dev/active/{full_id}-plan.md")),
+        "planning description must carry the resolved plan-doc location: {}",
+        planning.description
+    );
+    // Apply attaches NO document reference: the plan does not exist yet, so the
+    // author links it when authored. Neither node carries a plan-labeled ref.
+    assert!(
+        !planning
+            .documents
+            .iter()
+            .any(|d| d.label.as_deref() == Some("plan")),
+        "apply must not create a plan-labeled doc reference (no link to a missing file)"
+    );
     let breakdown = h.get_issue(&result.created_node_ids_by_role["breakdown"]);
     assert!(!breakdown
         .documents

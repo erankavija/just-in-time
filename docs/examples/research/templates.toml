@@ -25,7 +25,7 @@ applies_to  = ["goal"]           # container types this template may be applied 
   type        = "planning"       # must exist in [type_hierarchy]
   gates       = ["plan-review"]  # gate-preset names (apply_gate_preset)
   doc         = "dev/active/{container.id}-plan.md"
-  description = "Planning node for {container.title} ({container.short_id}). Produce the plan that decomposes this goal before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Plan document: {doc}."
+  description = "Planning node for {container.title} ({container.short_id}). Produce the plan that decomposes this goal before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Author the plan at {doc} and link it to this node once written."
 
   [[template.nodes]]
   role        = "breakdown"

@@ -16,6 +16,10 @@ Review the plan against the criteria *and against the actual codebase*. Cite con
 
 Each area below is verdict-affecting. A serious defect in any one is a blocking failure.
 
+### Plan document present and linked
+
+- The planning issue's description states where the plan must live (its plan-doc location) and that it must be linked to this node. Confirm a plan document actually exists at that location **and** is linked via `issue.documents`. If the plan is missing, empty, or unlinked, the review shall fail — there is nothing to decompose behind, and the author is responsible for placing and linking it.
+
 ### Completeness against the criteria
 
 - Every success criterion — especially every `[hard]` / critical one — must be addressed by the plan. If any is unaddressed, hand-waved, or only partially covered, the review shall fail.

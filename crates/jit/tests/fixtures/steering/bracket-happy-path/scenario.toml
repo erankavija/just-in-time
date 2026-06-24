@@ -70,6 +70,12 @@ capture = "none"
 argv = ["dep", "add", "$container", "$child"]
 capture = "none"
 
+# Breakdown is underway: B is claimed before the gate runs, so the state-gated
+# preview rule (in_progress/gated/done) actually evaluates it.
+[[steps]]
+argv = ["issue", "update", "$breakdown", "--state", "in_progress"]
+capture = "none"
+
 # The breakdown gate's deterministic checker passes: REQ-01 is covered, exit 0.
 [[steps]]
 argv = ["validate", "--scope", "$container"]
@@ -83,12 +89,9 @@ expect = { exit = 0, enforcement_point = "validate" }
 argv = ["issue", "update", "$container", "--state", "in_progress"]
 capture = "none"
 
-# B has no blocking gate in this fixture; walk it to done first (it is the sink
-# of the impl spine here).
-[[steps]]
-argv = ["issue", "update", "$breakdown", "--state", "in_progress"]
-capture = "none"
-
+# B has no blocking gate in this fixture; it is already in_progress (claimed
+# before the gate above), so walk it to done first (it is the sink of the impl
+# spine here).
 [[steps]]
 argv = ["issue", "update", "$breakdown", "--state", "done"]
 capture = "none"

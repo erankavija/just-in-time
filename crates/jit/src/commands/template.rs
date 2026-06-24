@@ -8,7 +8,7 @@
 //!    container type ∈ `applies_to`, gate presets exist, node writes would pass
 //!    validation, not already-applied unless `--force`);
 //! 2. snapshots each bound anchor's current dependencies;
-//! 3. creates the template's nodes with interpolated descriptions / docs and
+//! 3. creates the template's nodes with interpolated descriptions and
 //!    their declared gate presets; then
 //! 4. wires the template's edges and runs its transforms: the internal
 //!    `depends_on` edges (e.g. `B → P`), the `anchor_edges` (e.g. `C → B`), and
@@ -17,8 +17,11 @@
 //!    [`add_dependency`](CommandExecutor::add_dependency), so the result is
 //!    acyclic and transitively reduced.
 //!
-//! This is the plan-before-fan-out scaffold: the create+gate+doc+wire sequence
-//! that produces the `C → B → P` bracket from a template. The `--force` refresh
+//! This is the plan-before-fan-out scaffold: the create+gate+wire sequence
+//! that produces the `C → B → P` bracket from a template. The planning node's
+//! `doc` template seeds its description with the plan-doc location to author and
+//! link; the engine attaches no document reference (the author links the plan
+//! once written, so apply never leaves a reference to a not-yet-created file). The `--force` refresh
 //! path re-seeds existing nodes' prose in place
 //! and re-runs neither node creation, edge wiring, nor transforms (the spine
 //! already exists; re-running the transform over now-scaffold-bearing live deps
@@ -36,7 +39,6 @@
 use std::collections::BTreeMap;
 
 use super::*;
-use crate::domain::DocumentReference;
 use crate::templates::{GraphTemplate, TemplateNode, BREAKDOWN_ROLE};
 use serde::Serialize;
 
@@ -150,8 +152,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// 3. **Instantiate** each template node in order (or refresh in place under
     ///    `force`): create the typed issue with inherited container membership
     ///    labels plus the node's interpolated labels and a non-empty interpolated
-    ///    description, set the node's interpolated `doc` as a [`DocumentReference`],
-    ///    and attach each declared gate preset.
+    ///    description (the planning node's interpolated `doc` location is seeded
+    ///    into its description as an instruction to author and link there), and
+    ///    attach each declared gate preset.
     /// 4. **Wire edges + run transforms** (fresh apply only): the template's
     ///    internal `depends_on` edges and `anchor_edges` via
     ///    [`add_dependency`](Self::add_dependency) (cycle-checked + transitively
@@ -362,7 +365,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             // deps, and a re-run transform would snapshot the (now scaffold-bearing)
             // live deps and move `B` onto `P`, breaking the spine. Refresh only
             // re-seeds prose.
-            self.refresh_template_nodes(template, &breakdown_id, &context, &mut warnings)?
+            self.refresh_template_nodes(template, &breakdown_id, &context)?
         } else {
             // === 3. Instantiate nodes (fresh apply) ===
             let created =
@@ -564,8 +567,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue
     }
 
-    /// Instantiate every template node fresh: create the typed issue, set its
-    /// interpolated doc, and attach its gate presets. Returns role → created id.
+    /// Instantiate every template node fresh: create the typed issue and attach
+    /// its gate presets. Returns role → created id.
     fn instantiate_template_nodes(
         &self,
         template: &GraphTemplate,
@@ -593,7 +596,6 @@ impl<S: IssueStore> CommandExecutor<S> {
             )?;
             warnings.append(&mut create_warnings);
 
-            self.set_node_doc(node, &node_id, &node_context, warnings)?;
             self.attach_node_gates(node, &node_id, warnings)?;
 
             created.insert(node.role.clone(), node_id);
@@ -759,7 +761,6 @@ impl<S: IssueStore> CommandExecutor<S> {
         template: &GraphTemplate,
         breakdown_id: &str,
         context: &InterpolationContext,
-        warnings: &mut [String],
     ) -> Result<BTreeMap<String, String>> {
         let mut existing: BTreeMap<String, String> = BTreeMap::new();
         existing.insert(BREAKDOWN_ROLE.to_string(), breakdown_id.to_string());
@@ -819,51 +820,8 @@ impl<S: IssueStore> CommandExecutor<S> {
                     "agent:apply".to_string(),
                     vec!["description".to_string()],
                 ))?;
-
-            self.set_node_doc(node, &node_id, &node_context, warnings)?;
         }
         Ok(existing)
-    }
-
-    /// Set a node's interpolated `doc` as a `plan`-labeled [`DocumentReference`].
-    ///
-    /// A node with no `doc` template (or one resolving to the inline sentinel) is
-    /// left as its own body — nothing is attached. Otherwise the interpolated path
-    /// is recorded as a document reference (replacing any prior `plan`-labeled ref
-    /// so a `--force` refresh does not accumulate duplicates) and the change is
-    /// audited.
-    fn set_node_doc(
-        &self,
-        node: &TemplateNode,
-        node_id: &str,
-        node_context: &InterpolationContext,
-        _warnings: &mut [String],
-    ) -> Result<()> {
-        let Some(doc_template) = node.doc.as_deref() else {
-            return Ok(());
-        };
-        let resolved = node_context.interpolate(doc_template);
-        if resolved == plan_doc::INLINE_LOCATION || resolved.is_empty() {
-            return Ok(());
-        }
-
-        let mut issue = self.storage.load_issue(node_id)?;
-        // Drop any prior plan-labeled doc ref so refresh replaces rather than
-        // appends, then record the freshly-resolved one.
-        issue
-            .documents
-            .retain(|d| d.label.as_deref() != Some("plan"));
-        issue
-            .documents
-            .push(DocumentReference::new(resolved).with_label("plan".to_string()));
-        self.storage.save_issue(issue)?;
-        self.storage
-            .append_event(&crate::domain::Event::new_issue_updated(
-                node_id.to_string(),
-                "agent:apply".to_string(),
-                vec!["documents".to_string()],
-            ))?;
-        Ok(())
     }
 
     /// Attach every gate preset declared on a template node to the created issue.

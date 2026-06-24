@@ -74,6 +74,13 @@ capture = "none"
 argv = ["dep", "add", "$container", "$child"]
 capture = "none"
 
+# Breakdown is underway: the agent claims B before drafting children, so the
+# state-gated preview rule (it enforces in in_progress/gated/done, staying silent
+# on a freshly-scaffolded backlog B) evaluates it.
+[[steps]]
+argv = ["issue", "update", "$breakdown", "--state", "in_progress"]
+capture = "none"
+
 # The breakdown gate's deterministic checker (`jit validate --scope <C>`).
 # REQ-01 is uncovered -> blocked, exit 4, naming the uncovered criterion.
 [[steps]]

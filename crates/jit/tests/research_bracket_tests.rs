@@ -239,6 +239,9 @@ fn test_research_uncovered_hard_hypothesis_blocked_at_breakdown_gate() {
         "type:breakdown".to_string(),
         format!("brackets:{}", container.short_id()),
     ];
+    // Breakdown is underway (the preview rule is state-gated to in_progress/
+    // gated/done, so a backlog B that has not started breakdown stays silent).
+    breakdown.state = State::InProgress;
 
     // Containment spine: C depends on experiment; experiment depends on B.
     container.dependencies = vec![experiment.id.clone()];
@@ -252,6 +255,38 @@ fn test_research_uncovered_hard_hypothesis_blocked_at_breakdown_gate() {
                 && f.finding.message.contains("H-1")),
         "an uncovered [hard] hypothesis must be reported by the preview rule at \
          the breakdown gate: {findings:?}"
+    );
+}
+
+#[test]
+fn test_research_preview_silent_while_breakdown_node_in_backlog() {
+    // A freshly-applied research bracket leaves B in Backlog (it depends on the
+    // planning node and breakdown has not started), so there is nothing to cover
+    // yet. The preview rule is state-gated (in_progress/gated/done), so even an
+    // uncovered [hard] hypothesis produces NO finding while B sits in backlog.
+    let set = load_example("research");
+    let rules = graph_rules(&set);
+
+    let mut container = breakable_container();
+    let mut experiment = Issue::new("draft experiment".to_string(), String::new());
+    experiment.labels = vec!["type:experiment".to_string()]; // does NOT test H-1
+    let mut breakdown = Issue::new("breakdown".to_string(), String::new());
+    breakdown.labels = vec![
+        "type:breakdown".to_string(),
+        format!("brackets:{}", container.short_id()),
+    ];
+    breakdown.state = State::Backlog; // breakdown not started
+
+    container.dependencies = vec![experiment.id.clone()];
+    experiment.dependencies = vec![breakdown.id.clone()];
+
+    let findings = issue_graph_findings(&rules, &[container, experiment, breakdown]);
+    assert!(
+        !findings
+            .iter()
+            .any(|f| f.finding.rule == "research-hypotheses-covered-preview"),
+        "coverage-preview must stay silent while the breakdown node is in backlog \
+         (breakdown not started): {findings:?}"
     );
 }
 
@@ -273,6 +308,9 @@ fn test_research_preview_passes_when_backlog_experiment_carries_mapping() {
         "type:breakdown".to_string(),
         format!("brackets:{}", container.short_id()),
     ];
+    // Breakdown is underway (the preview rule is state-gated to in_progress/
+    // gated/done, so a backlog B that has not started breakdown stays silent).
+    breakdown.state = State::InProgress;
     container.dependencies = vec![experiment.id.clone()];
     experiment.dependencies = vec![breakdown.id.clone()];
 
@@ -303,6 +341,9 @@ fn test_research_preview_excludes_bracket_types_and_halts_walk() {
         "type:breakdown".to_string(),
         format!("brackets:{}", container.short_id()),
     ];
+    // Breakdown is underway (the preview rule is state-gated to in_progress/
+    // gated/done, so a backlog B that has not started breakdown stays silent).
+    breakdown.state = State::InProgress;
     // P, beyond the boundary, is the only carrier of tests:H-1.
     let mut plan = Issue::new("plan".to_string(), String::new());
     plan.labels = vec!["type:planning".to_string(), "tests:H-1".to_string()];
@@ -340,6 +381,9 @@ fn test_research_preview_credits_non_sink_experiment_interior() {
         "type:breakdown".to_string(),
         format!("brackets:{}", container.short_id()),
     ];
+    // Breakdown is underway (the preview rule is state-gated to in_progress/
+    // gated/done, so a backlog B that has not started breakdown stays silent).
+    breakdown.state = State::InProgress;
 
     container.dependencies = vec![exp_a.id.clone()];
     exp_a.dependencies = vec![exp_b.id.clone()];
