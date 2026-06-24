@@ -21,30 +21,30 @@
     "code-review"
   ],
   "gates_status": {
-    "tdd-reminder": {
-      "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-02-02T17:16:37.803866872Z"
-    },
     "tests": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-02-02T17:20:52.226062553Z"
     },
-    "code-review": {
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T17:21:12.240533859Z"
+    },
+    "tdd-reminder": {
       "status": "passed",
       "updated_by": null,
-      "updated_at": "2026-02-02T17:21:15.656241447Z"
+      "updated_at": "2026-02-02T17:16:37.803866872Z"
     },
     "fmt": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-02-02T17:21:12.443144067Z"
     },
-    "clippy": {
+    "code-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-02T17:21:12.240533859Z"
+      "updated_by": null,
+      "updated_at": "2026-02-02T17:21:15.656241447Z"
     }
   },
   "context": {},
@@ -95,8 +95,9 @@
     "type:story",
     "epic:parallel-work",
     "milestone:v1.0",
-    "component:cli"
+    "component:cli",
+    "story:config-system"
   ],
   "created_at": "2026-01-03T20:27:36.166661227Z",
-  "updated_at": "2026-02-02T17:21:18.579873173Z"
+  "updated_at": "2026-06-24T06:20:49.429711534+00:00"
 }

@@ -1,7 +1,7 @@
 {
   "id": "5bad7437-b121-4d2a-b2db-7aa8ee7f4d8b",
   "title": "Story: Reference Documentation",
-  "description": "Create information-oriented technical specifications and API documentation (CLI commands, storage format, programmatic API, configuration, glossary). Part of Epic cfb3ba94 (User Documentation Phase 2). Follows Di\u00e1taxis: Reference.",
+  "description": "Create information-oriented technical specifications and API documentation (CLI commands, storage format, programmatic API, configuration, glossary). Part of Epic cfb3ba94 (User Documentation Phase 2). Follows Diátaxis: Reference.",
   "state": "done",
   "priority": "normal",
   "assignee": null,
@@ -14,8 +14,9 @@
   "documents": [],
   "labels": [
     "epic:docs",
-    "type:story"
+    "type:story",
+    "story:reference-docs"
   ],
   "created_at": "2025-12-29T18:10:06.452449790Z",
-  "updated_at": "2026-02-04T11:51:25.672257550Z"
+  "updated_at": "2026-06-24T06:20:49.402189586+00:00"
 }

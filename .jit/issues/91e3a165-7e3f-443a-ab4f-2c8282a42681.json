@@ -25,8 +25,9 @@
     "type:story",
     "epic:production-polish",
     "milestone:v1.0",
-    "component:web"
+    "component:web",
+    "story:web-visual-enhancements"
   ],
   "created_at": "2026-02-07T22:54:44.903922532Z",
-  "updated_at": "2026-02-07T22:54:52.233199749Z"
+  "updated_at": "2026-06-24T06:20:49.465168474+00:00"
 }

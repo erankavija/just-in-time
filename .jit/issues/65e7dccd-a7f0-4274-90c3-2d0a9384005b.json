@@ -24,11 +24,6 @@
       "updated_by": null,
       "updated_at": "2026-01-06T21:01:00.912407039Z"
     },
-    "tests": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-06T21:01:21.787591784Z"
-    },
     "code-review": {
       "status": "passed",
       "updated_by": null,
@@ -38,6 +33,11 @@
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-01-06T21:01:02.122056802Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-06T21:01:21.787591784Z"
     },
     "fmt": {
       "status": "passed",
@@ -93,8 +93,9 @@
     "type:story",
     "epic:parallel-work",
     "milestone:v1.0",
-    "component:storage"
+    "component:storage",
+    "story:worktree-foundation"
   ],
   "created_at": "2026-01-06T21:01:02.119112192Z",
-  "updated_at": "2026-01-06T21:01:34.400236070Z"
+  "updated_at": "2026-06-24T06:20:49.411768539+00:00"
 }

@@ -18,8 +18,9 @@
   "labels": [
     "type:story",
     "epic:production-polish",
-    "component:core"
+    "component:core",
+    "story:domain-consolidation"
   ],
   "created_at": "2026-02-10T23:37:18.252926071Z",
-  "updated_at": "2026-02-19T18:34:19.977412745+00:00"
+  "updated_at": "2026-06-24T06:20:49.371445617+00:00"
 }

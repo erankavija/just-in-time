@@ -6,6 +6,10 @@
   "priority": "normal",
   "assignee": null,
   "dependencies": [
+    "82b8a519-d35a-4ebd-a3ac-82845729aa31",
+    "df0b551f-c60e-4c6f-951c-5a796a1c5635",
+    "b6aeb05b-dc02-435f-9ae1-ba0a1c6c63f4",
+    "0cce1a44-34d5-47e1-b1bb-8da3679f894a",
     "f847df3f-7730-4593-bb89-e847c4667584"
   ],
   "gates_required": [],
@@ -17,5 +21,5 @@
     "epic:core-maintenance"
   ],
   "created_at": "2026-06-16T18:30:52.029597744+00:00",
-  "updated_at": "2026-06-16T18:30:52.056913452+00:00"
+  "updated_at": "2026-06-24T06:20:57.328365004+00:00"
 }

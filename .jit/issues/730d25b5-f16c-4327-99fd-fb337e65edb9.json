@@ -20,30 +20,30 @@
     "code-review"
   ],
   "gates_status": {
-    "fmt": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-01T23:40:01.665555339Z"
-    },
     "tests": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-02-01T23:39:43.949495241Z"
-    },
-    "tdd-reminder": {
-      "status": "passed",
-      "updated_by": "agent:copilot-session",
-      "updated_at": "2026-02-01T23:39:43.950406061Z"
     },
     "clippy": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-02-01T23:40:01.462758541Z"
     },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": "agent:copilot-session",
+      "updated_at": "2026-02-01T23:39:43.950406061Z"
+    },
     "code-review": {
       "status": "passed",
       "updated_by": "agent:copilot-session",
       "updated_at": "2026-02-01T23:39:43.951778401Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-01T23:40:01.665555339Z"
     }
   },
   "context": {},
@@ -94,8 +94,9 @@
     "type:story",
     "epic:parallel-work",
     "milestone:v1.0",
-    "component:cli"
+    "component:cli",
+    "story:enforcement-validation"
   ],
   "created_at": "2026-01-03T20:27:03.121777712Z",
-  "updated_at": "2026-02-01T23:40:15.390792876Z"
+  "updated_at": "2026-06-24T06:20:49.439159457+00:00"
 }

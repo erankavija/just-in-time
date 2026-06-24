@@ -22,20 +22,15 @@
     "code-review"
   ],
   "gates_status": {
-    "fmt": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-02T13:14:20.745028898Z"
-    },
-    "code-review": {
-      "status": "passed",
-      "updated_by": "copilot:cli-session",
-      "updated_at": "2026-02-02T12:59:59.375112778Z"
-    },
     "tests": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-02-02T13:14:00.026221350Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T13:14:20.745028898Z"
     },
     "clippy": {
       "status": "passed",
@@ -46,6 +41,11 @@
       "status": "passed",
       "updated_by": "copilot:session",
       "updated_at": "2026-02-02T12:29:37.050180117Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "copilot:cli-session",
+      "updated_at": "2026-02-02T12:59:59.375112778Z"
     }
   },
   "context": {},
@@ -96,8 +96,9 @@
     "type:story",
     "epic:parallel-work",
     "milestone:v1.0",
-    "component:storage"
+    "component:storage",
+    "story:recovery-robustness"
   ],
   "created_at": "2026-01-03T20:27:36.165112456Z",
-  "updated_at": "2026-02-02T13:14:21.147711503Z"
+  "updated_at": "2026-06-24T06:20:49.474248167+00:00"
 }
