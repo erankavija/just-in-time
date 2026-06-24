@@ -87,6 +87,26 @@ Dependency-blocked example:
 }
 ```
 
+## Command and flag aliases
+
+A few convenience aliases exist for the names agents reach for most often. They
+behave identically to their canonical forms:
+
+| Alias | Canonical | Notes |
+|-------|-----------|-------|
+| `jit dependency ...` | `jit dep ...` | Dependency management commands |
+| `jit document ...` | `jit doc ...` | Document reference commands |
+| `jit issue list` | `jit query all` | Same filters/flags (`-s`/`-a`/`-p`/`-l`, `--full`, `--json`); identical output |
+| `jit issue update <id> --add-label <label>` | `... --label <label>` | `--add-label` is an accepted alias for `--label` |
+
+```bash
+# These pairs are equivalent
+jit dependency add a b      # == jit dep add a b
+jit document list <id>      # == jit doc list <id>
+jit issue list --json       # == jit query all --json
+jit issue update <id> --add-label area:foo  # == --label area:foo
+```
+
 Gate-blocked example:
 
 ```json

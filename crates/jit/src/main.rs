@@ -388,6 +388,73 @@ fn build_issue_show_response<S: IssueStore>(
     ))
 }
 
+/// Run the `query all` listing, shared by `jit query all` and `jit issue list`.
+///
+/// Both commands take identical filters/flags and must produce identical output,
+/// so they delegate to this single implementation.
+#[allow(clippy::too_many_arguments)]
+fn run_query_all<S: IssueStore>(
+    executor: &CommandExecutor<S>,
+    quiet: bool,
+    state: Option<String>,
+    assignee: Option<String>,
+    priority: Option<String>,
+    label: Option<String>,
+    full: bool,
+    json: bool,
+) -> Result<()> {
+    let output_ctx = OutputContext::new(quiet, json);
+    let state_filter = state.as_ref().map(|s| State::from_str(s)).transpose()?;
+    let priority_filter = priority
+        .as_ref()
+        .map(|p| Priority::from_str(p))
+        .transpose()?;
+    let issues = executor.query_all(
+        state_filter,
+        assignee.as_deref(),
+        priority_filter,
+        label.as_deref(),
+    )?;
+
+    if json {
+        use jit::domain::MinimalIssue;
+        use jit::output::JsonOutput;
+        use serde_json::json;
+
+        let msg = format!("Found {} issue(s)", issues.len());
+        let output = if full {
+            JsonOutput::success(
+                json!({
+                    "count": issues.len(),
+                    "issues": issues,
+                }),
+                "query all",
+            )
+        } else {
+            let minimal: Vec<MinimalIssue> = issues.iter().map(MinimalIssue::from).collect();
+            JsonOutput::success(
+                json!({
+                    "count": minimal.len(),
+                    "issues": minimal,
+                }),
+                "query all",
+            )
+        }
+        .with_message(msg);
+        println!("{}", output.to_json_string()?);
+    } else {
+        let _ = output_ctx.print_info("All issues (filtered):");
+        for issue in &issues {
+            println!(
+                "  {} | {} | {:?} | {:?}",
+                issue.id, issue.title, issue.state, issue.priority
+            );
+        }
+        let _ = output_ctx.print_info(format!("\nTotal: {}", issues.len()));
+    }
+    Ok(())
+}
+
 /// Print the human-readable `issue show` view for an already-built response.
 ///
 /// Single source of the `issue show` human field rendering: both the single-id
@@ -1415,6 +1482,18 @@ fn run() -> Result<()> {
                     } else {
                         let _ = output_ctx.print_success(format!("Claimed issue: {}", id));
                     }
+                }
+                IssueCommands::List {
+                    state,
+                    assignee,
+                    priority,
+                    label,
+                    full,
+                    json,
+                } => {
+                    run_query_all(
+                        &executor, quiet, state, assignee, priority, label, full, json,
+                    )?;
                 }
             }
         }
@@ -3046,56 +3125,9 @@ fn run() -> Result<()> {
                 full,
                 json,
             } => {
-                let output_ctx = OutputContext::new(quiet, json);
-                let state_filter = state.as_ref().map(|s| State::from_str(s)).transpose()?;
-                let priority_filter = priority
-                    .as_ref()
-                    .map(|p| Priority::from_str(p))
-                    .transpose()?;
-                let issues = executor.query_all(
-                    state_filter,
-                    assignee.as_deref(),
-                    priority_filter,
-                    label.as_deref(),
+                run_query_all(
+                    &executor, quiet, state, assignee, priority, label, full, json,
                 )?;
-
-                if json {
-                    use jit::domain::MinimalIssue;
-                    use jit::output::JsonOutput;
-                    use serde_json::json;
-
-                    let msg = format!("Found {} issue(s)", issues.len());
-                    let output = if full {
-                        JsonOutput::success(
-                            json!({
-                                "count": issues.len(),
-                                "issues": issues,
-                            }),
-                            "query all",
-                        )
-                    } else {
-                        let minimal: Vec<MinimalIssue> =
-                            issues.iter().map(MinimalIssue::from).collect();
-                        JsonOutput::success(
-                            json!({
-                                "count": minimal.len(),
-                                "issues": minimal,
-                            }),
-                            "query all",
-                        )
-                    }
-                    .with_message(msg);
-                    println!("{}", output.to_json_string()?);
-                } else {
-                    let _ = output_ctx.print_info("All issues (filtered):");
-                    for issue in &issues {
-                        println!(
-                            "  {} | {} | {:?} | {:?}",
-                            issue.id, issue.title, issue.state, issue.priority
-                        );
-                    }
-                    let _ = output_ctx.print_info(format!("\nTotal: {}", issues.len()));
-                }
             }
             jit::cli::QueryCommands::Available {
                 priority,

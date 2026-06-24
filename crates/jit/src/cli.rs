@@ -88,7 +88,7 @@ pub enum Commands {
     },
 
     /// Dependency management commands
-    #[command(subcommand)]
+    #[command(subcommand, visible_alias = "dependency")]
     Dep(DepCommands),
 
     /// Gate management commands
@@ -113,7 +113,7 @@ pub enum Commands {
     Events(EventCommands),
 
     /// Document reference commands
-    #[command(subcommand)]
+    #[command(subcommand, visible_alias = "document")]
     Doc(DocCommands),
 
     /// Graph query commands
@@ -485,7 +485,7 @@ pub enum IssueCommands {
         state: Option<String>,
 
         /// Add label(s) (format: namespace:value, repeatable)
-        #[arg(short, long, value_delimiter = ',')]
+        #[arg(short, long, value_delimiter = ',', visible_alias = "add-label")]
         label: Vec<String>,
 
         /// Remove label(s) (repeatable)
@@ -660,6 +660,32 @@ pub enum IssueCommands {
         filter: Option<String>,
 
         /// Output JSON format
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// List issues (equivalent to `jit query all`)
+    List {
+        /// Filter by state
+        #[arg(short = 's', long)]
+        state: Option<String>,
+
+        /// Filter by assignee (format: type:identifier)
+        #[arg(short = 'a', long)]
+        assignee: Option<String>,
+
+        /// Filter by priority
+        #[arg(short = 'p', long)]
+        priority: Option<String>,
+
+        /// Filter by label pattern (exact match or wildcard)
+        #[arg(short = 'l', long)]
+        label: Option<String>,
+
+        /// Return full issue objects instead of minimal summaries
+        #[arg(long)]
+        full: bool,
+
         #[arg(long)]
         json: bool,
     },

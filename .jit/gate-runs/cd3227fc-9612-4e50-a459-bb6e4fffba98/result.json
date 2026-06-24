@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "cd3227fc-9612-4e50-a459-bb6e4fffba98",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "ea717ef1-17bc-419b-a8f1-e80b7016aa03",
+  "commit": "3e2c100224769125999d81e750b39a4844aa9f9a",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-06-24T15:58:49.476644452Z",
+  "completed_at": "2026-06-24T15:59:57.268244888Z",
+  "duration_ms": 67791,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\n- `jit dependency` and `jit document` are accepted via clap `visible_alias` on `Dep` and `Doc`: [crates/jit/src/cli.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/cli.rs:91), [crates/jit/src/cli.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/cli.rs:116).\n- `jit issue list` is implemented and delegates to shared `query all` logic: [crates/jit/src/cli.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/cli.rs:667), [crates/jit/src/main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:391), [crates/jit/src/main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:1486).\n- `--add-label` is accepted as an alias for `--label` on `issue update`: [crates/jit/src/cli.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/cli.rs:488).\n- Integration coverage exists for all aliases in [crates/jit/tests/command_alias_tests.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/command_alias_tests.rs:36).\n\n**Prior Review Feedback**\n\nNo prior `run_history` entries were provided, so there are no unresolved prior-review findings to verify.\n\n**Architecture / Separation**\n\nNo blocking boundary violations found. The changes stay in CLI parsing (`cli.rs`), CLI orchestration/output (`main.rs`), docs, and CLI integration tests. No domain or storage responsibilities were moved into the CLI aliases.\n\n**Functional Paradigm**\n\nNo new technical debt found. The shared `run_query_all` helper removes duplicated query-output behavior and keeps parsing/filter construction expression-oriented. The remaining `for` loop is in CLI human-output rendering, which is within the allowed pragmatic exception.\n\n**Correctness / Invariants**\n\nNo blocking invariant regressions found. The aliases reuse existing command paths, so state changes still go through existing executor/storage behavior and event logging. This change does not introduce new file writes, gate transitions, assignee handling, label validation rules, or PID handling.\n\n**Safety**\n\n`#![deny(unsafe_code)]` remains enforced in [crates/jit/src/main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:14). No unsafe code introduced.\n\n**Testing / Lint**\n\nCargo CI evidence from `.jit/gate-runs/79eea15a-610c-4144-ae41-9c1177cf4f3b/result.json` shows `fmt: ok`, `clippy: ok`, and `test: 2264 passed, 0 failed, 12 ignored`. I did not rerun tests because the issue has a passed `cargo-ci` gate.\n\n**Error Handling**\n\nNo new library unwraps/expect calls were introduced. Fallible command execution remains `Result`-based in `main.rs`; test-only unwraps are limited to integration test setup/assertion code.\n\n**CLI Contract**\n\n`issue list` includes `--json`: [crates/jit/src/cli.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/cli.rs:689). The alias commands route to existing subcommands that already support their command-specific JSON behavior.\n\n**Documentation**\n\nAlias behavior is documented in [docs/reference/cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:90). No new public API requiring doc comments was added.\n\n**Jit Management**\n\n`./scripts/jit-validate.sh` passed. The listed prerequisite issue `838483f3` is marked `done` in the provided context, and this change builds directly on that completed dependency.\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
