@@ -781,6 +781,17 @@ pub enum GateCommands {
     },
 
     /// Run automated checker (auto gates) or record attestation (manual gates)
+    ///
+    /// Exit codes:
+    ///   0  - pass (checker passed or manual attestation recorded)
+    ///   2  - bad arguments (gate not required for this issue)
+    ///   3  - issue not found
+    ///   4  - checker failure (the checker ran and the verdict was fail)
+    ///   10 - runner error (timeout, command-not-found, crash; infra failure)
+    ///
+    /// With --json, the response carries a `verdict` field: `pass` on success,
+    /// `fail` on checker failure, `error` on runner error. Pre-verdict argument
+    /// and lookup errors (codes 2 and 3) carry no `verdict` field.
     Pass {
         /// Issue ID
         id: String,

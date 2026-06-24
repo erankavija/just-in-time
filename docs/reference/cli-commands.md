@@ -1260,9 +1260,51 @@ jit gate pass abc123 tests --by "human:admin"
 ```
 
 **Behavior:**
-- Updates gate status to `passed`
-- Records who passed it and timestamp
-- If this was the last blocking gate, issue auto-transitions from `gated → done`
+- For a manual gate: updates gate status to `passed`, records who passed it and timestamp.
+- For an automated (auto) gate: runs the checker and only marks the gate passed if the checker passes.
+- If this was the last blocking gate, issue auto-transitions from `gated → done`.
+
+**Exit-code taxonomy** (auto and manual gates):
+
+| Code | Meaning |
+|------|---------|
+| `0`  | pass — checker passed, or manual attestation recorded |
+| `2`  | bad arguments — the gate is not required for this issue |
+| `3`  | issue not found |
+| `4`  | checker failure — the checker ran and the verdict was `fail` |
+| `10` | runner error — timeout, command-not-found, or crash (infrastructure failure) |
+
+The codes `4` and `10` are split by the carried checker status: a clean non-zero
+verdict (e.g. tests failed) is `4`; a checker that could not produce a verdict
+(killed by timeout/signal, no exit code) is `10`. Pre-verdict argument (`2`) and
+lookup (`3`) errors are classified before the run path and are never reported as
+a runner error.
+
+**`--json` verdict field:**
+
+`jit gate pass --json` carries a `verdict` field describing the run-path outcome:
+
+- `pass` — top-level field on the success response.
+- `fail` — under `error.details` when the checker ran and failed (code `4`).
+- `error` — under `error.details` when the runner failed (code `10`).
+
+Pre-verdict errors (codes `2` and `3`) are argument/lookup errors, not gate
+verdicts, so they carry no `verdict` field.
+
+```bash
+# Success response
+jit gate pass abc123 tests --json
+# {
+#   "issue_id": "abc123",
+#   "gate_key": "tests",
+#   "status": "passed",
+#   "verdict": "pass",
+#   "message": "Passed gate 'tests' for issue abc123"
+# }
+
+# Checker failure (exit 4): error.details.verdict == "fail"
+# Runner error    (exit 10): error.details.verdict == "error"
+```
 
 ### `jit gate fail`
 
@@ -1345,9 +1387,13 @@ jit query all --json | jq '.issues[] | select(.gates_status.tests.status == "fai
 All gate commands use standard exit codes:
 
 - `0` - Success
-- `1` - Error (gate not found, issue not found, invalid input)
-- `2` - Validation error (cannot add duplicate gate, etc.)
-- `4` - Gate check failed (for `jit gate check` when checker returns non-zero)
+- `2` - Invalid argument (e.g. gate not required for the issue, duplicate gate)
+- `3` - Resource not found (issue or gate)
+- `4` - Validation/checker failure (e.g. `jit gate pass` checker verdict `fail`)
+- `10` - Runner/external error (e.g. `jit gate pass` checker timeout or crash)
+
+See [`jit gate pass`](#jit-gate-pass) above for the full pass-specific taxonomy
+and the `--json` `verdict` field.
 
 ## Gate Preset Commands
 

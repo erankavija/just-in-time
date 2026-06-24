@@ -36,6 +36,31 @@ pub struct GatePassFailed {
     pub warnings: Vec<String>,
 }
 
+/// Error returned when `jit gate pass` targets a gate that the issue does not require.
+///
+/// This is an argument/lookup error raised before any checker runs: the named
+/// gate is simply not in the issue's `gates_required` list. CLI callers classify
+/// it as an invalid-argument condition (exit code `2`), distinct from a checker
+/// failure or a runner error.
+///
+/// # Examples
+///
+/// ```rust
+/// use jit::commands::GateNotRequiredError;
+///
+/// fn remediation(error: &GateNotRequiredError) -> String {
+///     format!("jit gate add {} {}", error.issue_id, error.gate_key)
+/// }
+/// ```
+#[derive(Debug, thiserror::Error)]
+#[error("Gate '{gate_key}' is not required for issue {issue_id}")]
+pub struct GateNotRequiredError {
+    /// Issue that was targeted.
+    pub issue_id: String,
+    /// Gate key that is not in the issue's required set.
+    pub gate_key: String,
+}
+
 /// Result of adding multiple gates
 #[derive(Debug, Serialize)]
 pub struct GateAddResult {
@@ -226,10 +251,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         let mut issue = self.storage.load_issue(&full_id)?;
 
         if !issue.gates_required.contains(&gate_key) {
-            return Err(anyhow!(
-                "Gate '{}' is not required for this issue",
-                gate_key
-            ));
+            return Err(GateNotRequiredError {
+                issue_id: full_id,
+                gate_key,
+            }
+            .into());
         }
 
         // Check if gate is automated - if so, run the checker instead

@@ -31,11 +31,22 @@ use std::str::FromStr;
 
 /// Helper to determine exit code from error message
 fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
+    // A `gate pass` checker that ran but did not pass: split checker-failure
+    // (verdict `fail`, validation error) from runner/infra error (verdict
+    // `error`, external error). `Passed` never produces this error.
+    if let Some(gate_failure) = error.downcast_ref::<jit::commands::GatePassFailed>() {
+        return match gate_failure.status {
+            jit::domain::GateRunStatus::Error => ExitCode::ExternalError,
+            _ => ExitCode::ValidationFailed,
+        };
+    }
+    // Targeting a gate the issue does not require is an argument/lookup error,
+    // classified before the run path, never reported as a runner error.
     if error
-        .downcast_ref::<jit::commands::GatePassFailed>()
+        .downcast_ref::<jit::commands::GateNotRequiredError>()
         .is_some()
     {
-        return ExitCode::ValidationFailed;
+        return ExitCode::InvalidArgument;
     }
     if error
         .downcast_ref::<jit::errors::TransitionBlockedError>()
@@ -1795,6 +1806,7 @@ fn run() -> Result<()> {
                                 "issue_id": id,
                                 "gate_key": gate_key,
                                 "status": "passed",
+                                "verdict": "pass",
                                 "message": format!("Passed gate '{}' for issue {}", gate_key, id)
                             });
                             let output = JsonOutput::success(response, "gate pass");
@@ -1812,11 +1824,20 @@ fn run() -> Result<()> {
                             let json_error = if let Some(gate_failure) =
                                 e.downcast_ref::<jit::commands::GatePassFailed>()
                             {
-                                JsonError::new("GATE_FAILED", e.to_string(), "gate pass")
+                                // Distinguish a checker failure (verdict `fail`,
+                                // exit 4) from a runner/infra error (verdict
+                                // `error`, exit 10). The error code drives the
+                                // exit code, so the JSON and non-JSON paths agree.
+                                let (error_code, verdict) = match gate_failure.status {
+                                    jit::domain::GateRunStatus::Error => ("IO_ERROR", "error"),
+                                    _ => ("GATE_FAILED", "fail"),
+                                };
+                                JsonError::new(error_code, e.to_string(), "gate pass")
                                     .with_details(serde_json::json!({
                                         "issue_id": gate_failure.issue_id,
                                         "gate_key": gate_failure.gate_key,
                                         "status": "failed",
+                                        "verdict": verdict,
                                         "checker_result": gate_failure.result,
                                         "warnings": gate_failure.warnings,
                                     }))
@@ -1828,6 +1849,23 @@ fn run() -> Result<()> {
                                         "Fix the failing gate and rerun: jit gate pass {} {}",
                                         gate_failure.issue_id, gate_failure.gate_key
                                     ))
+                            } else if let Some(not_required) =
+                                e.downcast_ref::<jit::commands::GateNotRequiredError>()
+                            {
+                                // Pre-verdict argument error: not a gate verdict,
+                                // so it carries no `verdict` field.
+                                JsonError::new("INVALID_ARGUMENT", e.to_string(), "gate pass")
+                                    .with_details(serde_json::json!({
+                                        "issue_id": not_required.issue_id,
+                                        "gate_key": not_required.gate_key,
+                                    }))
+                                    .with_suggestion(format!(
+                                        "Add the gate first: jit gate add {} {}",
+                                        not_required.issue_id, not_required.gate_key
+                                    ))
+                            } else if e.to_string().to_lowercase().contains("not found") {
+                                // Pre-verdict lookup error: issue id did not resolve.
+                                JsonError::issue_not_found(&id, "gate pass")
                             } else {
                                 JsonError::new("GATE_ERROR", e.to_string(), "gate pass")
                             };

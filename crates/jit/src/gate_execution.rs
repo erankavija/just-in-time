@@ -88,8 +88,11 @@ pub fn execute_gate_checker_with_context(
 
     let status = match execution_result.exit_code {
         Some(0) => GateRunStatus::Passed,
+        // Shell could not execute the command: 127 = command not found,
+        // 126 = found but not executable. Runner/infra error, not a checker verdict.
+        Some(126) | Some(127) => GateRunStatus::Error,
         Some(_) => GateRunStatus::Failed,
-        None => GateRunStatus::Error,
+        None => GateRunStatus::Error, // killed by signal / timeout
     };
 
     Ok(GateRunResult {

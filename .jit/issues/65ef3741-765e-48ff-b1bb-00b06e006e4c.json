@@ -2,9 +2,9 @@
   "id": "65ef3741-765e-48ff-b1bb-00b06e006e4c",
   "title": "Gate pass exit-code taxonomy and verdict field",
   "description": "Give `gate pass` a clear exit-code taxonomy on jit's global `ExitCode` enum, plus a `verdict` field in JSON.\n\n## Success Criteria\n\n- [ ] `jit gate pass` exits `0` on pass, `4` (ValidationFailed) on checker failure, and `10` (ExternalError) on runner/infra error (timeout, command-not-found, crash).\n- [ ] Pre-verdict errors are classified before the run path: issue-not-found `3`, gate-not-required/bad-args `2`; they are never reported as runner error.\n- [ ] The codes are documented in `gate pass --help`, and `gate pass --json` carries a `verdict` field (`pass|fail|error`).\n\n## Notes\n\nMaps `GateRunStatus` Passed/Failed/Error onto the global `ExitCode` enum.",
-  "state": "ready",
+  "state": "done",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [
     "838483f3-6f4b-4d7e-a8aa-3512fd648841"
   ],
@@ -12,7 +12,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-24T13:43:40.725995081Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-24T13:44:17.286381501Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -21,5 +32,5 @@
     "satisfies:REQ-04"
   ],
   "created_at": "2026-06-22T21:20:41.092645156+00:00",
-  "updated_at": "2026-06-22T21:48:56.319854044+00:00"
+  "updated_at": "2026-06-24T13:46:02.629139490+00:00"
 }

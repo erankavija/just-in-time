@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "20669560-59e0-479a-bb66-38dc849038ea",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "65ef3741-765e-48ff-b1bb-00b06e006e4c",
+  "commit": "31e0d1c125ac6c53cd1b368538019c060db7f349",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-06-24T13:39:08.401621278Z",
+  "completed_at": "2026-06-24T13:40:18.727301188Z",
+  "duration_ms": 70325,
+  "exit_code": 1,
+  "stdout": "**Findings**\n\n- Blocking: `command-not-found` is still classified as checker failure, not runner/infra error. The runner executes configured commands via `sh -c`, so a missing command normally exits `127`. That is mapped to `GateRunStatus::Failed` in [gate_execution.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/gate_execution.rs:89), then to exit `4` in [main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:37) and JSON `verdict: \"fail\"` in [main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:1831). The issue explicitly requires command-not-found to be runner/infra error: exit `10`, verdict `error`. The new tests cover `false` and `kill -9 $$`, but not a nonexistent command: [gate_pass_exit_code_test.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/gate_pass_exit_code_test.rs:88).\n\n**Acceptance Criteria**\n\n- Pass maps to exit `0` and JSON `verdict: \"pass\"`: implemented.\n- Checker non-zero maps to exit `4` and `verdict: \"fail\"`: implemented for generic non-zero exits.\n- Runner/infra maps to exit `10` and `verdict: \"error\"`: incomplete because command-not-found maps to `4`/`fail`.\n- Pre-verdict issue-not-found `3` and gate-not-required `2`: implemented.\n- Help/docs mention taxonomy and JSON verdict: implemented in [cli.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/cli.rs:781) and docs.\n\n**Architecture / Separation**\n\nNo new domain/storage boundary violation found. The new classification type lives in `commands`, and CLI formatting remains in `main.rs`/output paths.\n\n**Correctness / Invariants**\n\nAtomic writes, event logging, gate transition semantics, assignee/label formats, PID safety, and unsafe-code policy were not regressed by this diff. Existing PID guard remains in the timeout path.\n\n**Testing**\n\nProvided issue context shows `cargo-ci` passed at `2026-06-24T13:38:31Z`; I did not rerun tests per instruction. Test coverage is missing the required command-not-found case, which is the failing acceptance edge.\n\n**Error Handling / CLI Contract**\n\nThe new `GateNotRequiredError` is typed and contextual. The remaining issue is taxonomy: shell exit `127` is treated as validation failure instead of external error.\n\n**Documentation**\n\nPublic added API has doc comments with an example. CLI docs describe the intended command-not-found behavior, but implementation does not match it.\n\n**Jit Issue Management**\n\nDependency `838483f3` is marked done in the provided context. No prior review run history was provided.\n\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 2032 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.137.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019ef9db-2585-7190-aeac-124cfd1e5a8c\n--------\nuser\n--- 2019 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
