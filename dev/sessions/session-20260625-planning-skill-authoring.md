@@ -91,12 +91,48 @@ verdict-meaningful — `0` pass, `4` FAIL (`ValidationFailed`), `10` runner erro
 caution narrows to "prefer the recorded gate status over an outer wrapper's success
 signal." The skill's Phase 7 reflects this.
 
+## Dogfood outcome (separate unprimed session `a7c51c9d`, 2026-06-25)
+
+Invoked as `/jit-plan epic 25064508` (existing-container reconcile path). The unprimed
+agent followed the orchestrator closely and **plan-review passed on the first round**
+(109s) — vs 5 rounds for the same class of epic planned by hand (commit `c74680f`, plan at
+`dev/active/25064508-d563-4073-a970-296607a01adc-plan.md`).
+
+What the design bought, evidenced in the transcript + artifact:
+- All three roles dispatched verbatim (investigator → synthesizer → adversarial reviewer);
+  **research (4b) correctly skipped** ("no new external dependency… disproportionate").
+- **Interview scaled to the input** (epic was well-specified) yet still surfaced the one
+  genuine owner-owned fork — the repo strategy study's "narrow scope" rec — as a decision
+  instead of resolving it silently. Owner judged the study invalid (→ memory
+  `project-strategy-study-invalid`); full scope retained (plan D1).
+- Adversarial self-review caught 4 blocking findings **before** the gate → first-try pass.
+
+Gaps surfaced and fixed in `eed6750c` (this is what the live run was for):
+- **A** — Phase 7: a recorded `passed` is **terminal**; only a FAIL re-runs. The agent had
+  started to "fix a minor note and re-run" the expensive gate; the owner stopped it. Now
+  encoded.
+- **1** — `plan-doc-template` + `synthesizer-prompt`: the criterion→item mapping lives once
+  (the §3 coverage map is the single source); §1 is approach-narrative only. Removes the
+  drift class that produced the lone reviewer nit (REQ-03 row vs coverage map).
+- **B** — `synthesizer-prompt`: the plan header `> Planning node:` takes **P**'s short-id,
+  not the container's (the agent self-caught this mid-run).
+- **2** — `investigator-prompt`: name the cited construct accurately (a comment is not a
+  docstring); the reviewer checks citations.
+- **C** (investigator + reviewer only) — an **architectural-invariant / purity guard**:
+  the investigator reports whether engine/pure-layer items preserve the project's stated
+  invariants; the reviewer adversarially hunts design-level domain leakage. Plan-time half
+  of purity defense — the impl diff stays a code-review concern. Kept domain-agnostic. The
+  synthesizer was deliberately left out (purity acceptance checks come from the container's
+  criteria/invariants, not auto-injected).
+
+**Untested:** REQ-01's **cold-start** path (vague prompt → created container + criteria);
+this run exercised reconcile-existing only. Also autonomous (description-match) triggering —
+the run used the explicit `/jit-plan` slash command.
+
 ## Next
 
-- Dogfood `jit-plan` in a **separate unprimed session** to test triggering and guidance
-  without context priming; then analyze the session record and fold any gaps back into
-  `eed6750c` (dogfood-findings-fix-in-epic) before running the `code-review` gate and
-  completing the task.
+- Run the `code-review` gate on `eed6750c` to a recorded pass, then complete the task.
+- Optional: a second dogfood from a bare cold-start prompt to exercise REQ-01's core.
 
 ## References
 

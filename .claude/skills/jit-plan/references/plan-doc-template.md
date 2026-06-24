@@ -17,12 +17,15 @@ declares.
 
 ## 1. Completeness vs criteria
 
-How the plan addresses **every** `[hard]` criterion of <C-short-id>. One row per criterion;
-no silent narrowing. Flag (do not invent) any gap discovered.
+How the plan addresses **every** `[hard]` criterion of <C-short-id> — the *approach* per
+criterion, in prose. One row per criterion; no silent narrowing. Flag (do not invent) any
+gap discovered. **Do not restate the criterion→item mapping here** — that lives once, in
+the §3 coverage map (the single source). This table is the narrative; that table is the
+contract. (They drift if both list items; keep them disjoint.)
 
-| Criterion | Addressed by | Notes |
+| Criterion | Approach (how it is met) | Notes / open gap |
 |---|---|---|
-| REQ-01 … | <approach / which sketch group> | |
+| REQ-01 … | <prose: the design that satisfies it> | |
 | REQ-02 … | | |
 
 ## 2. Technical soundness and architectural fit
@@ -52,9 +55,10 @@ boundary). Express ordering through the `depends-on` field — never as prose or
 ### Group B: <name>  — covers REQ-05, REQ-06, REQ-07
 - …
 
-**Coverage map** (every `[hard]` criterion → ≥1 item):
+**Coverage map** (the single source for criterion→item; every `[hard]` criterion → ≥1 item).
+§1 must not duplicate this:
 
-| Criterion | Satisfied by |
+| Criterion | Satisfied by (item) |
 |---|---|
 | REQ-01 | <item> |
 | … | |

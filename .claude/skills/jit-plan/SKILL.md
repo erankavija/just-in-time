@@ -219,14 +219,19 @@ this reduces but never replaces gate rounds.
 2. **Run the gate yourself** (Invariant 7): `jit gate pass <P> plan-review`.
 3. **Read the recorded verdict** — `jit gate check <P> plan-review` (`.status`). The exit
    code is now meaningful (0 = pass, 4 = FAIL, 10 = runner error), but trust the recorded
-   status over any outer wrapper/notification signal. On FAIL, read the findings from the
-   recorded run.
-4. **Iterate as a bounded convergent loop with an escalation checkpoint.** Expect several
-   rounds — the reviewer is a genuine adversary. **Address ALL blocking findings, no
-   cherry-picking** (including ones in secondary sections), revise, re-run. Distinguish
-   **convergence** (findings shrink each round) from **pathology** (a *new class* of
-   finding every round); at ~3–4 rounds without genuine convergence, **escalate** rather
-   than grind. "Passed" is only the recorded status.
+   status over any outer wrapper/notification signal.
+4. **A recorded `passed` is terminal — stop.** The gate runs an external reviewer and is
+   expensive (~minutes). Once `.status` is `passed`, you are done with the loop; go to
+   Phase 8. The reviewer may attach **minor/advisory** notes to a pass (the rubric says
+   minors do not fail a review) — you MAY fix them in the doc opportunistically, but do
+   **NOT** re-run the gate to "clean up" a pass. Only a **FAIL** re-runs.
+5. **On FAIL, iterate as a bounded convergent loop with an escalation checkpoint.** Read
+   the findings from the recorded run. Expect several rounds — the reviewer is a genuine
+   adversary. **Address ALL blocking findings, no cherry-picking** (including ones in
+   secondary sections), revise, re-run. Distinguish **convergence** (findings shrink each
+   round) from **pathology** (a *new class* of finding every round); at ~3–4 rounds
+   without genuine convergence, **escalate** rather than grind. "Passed" is only the
+   recorded status — never a proxy.
 
 > Repo-wide validation coupling: `plan-review` and the later P-transition validate the
 > whole repo. If an *unrelated* bracket's broken plan-doc blocks you, surface it (offer a

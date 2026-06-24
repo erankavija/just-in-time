@@ -58,9 +58,17 @@ findings report:
 5. **Architecture fit.** Note the existing primitives the plan should reuse and the layer
    boundaries it must respect, so the synthesizer does not reinvent or cross them.
 
+6. **Architectural-invariant check.** Read the project's stated invariants (purity / I·O-free
+   layers, a config-driven engine that hardcodes no domain concepts, boundary rules). For
+   any item touching a protected layer, report whether the design preserves them — flag a
+   domain literal or concept that would leak into engine/pure code. Cite source + `file:line`.
+
 ## Rules
 
 - Cite concrete `file:line` for every finding. No vague advice.
+- **Name the construct accurately** — a comment is not a docstring, a `const` is not a
+  function, a warning string is not a doc comment. The plan reviewer checks citations
+  against the code; a mislabelled construct reads as a stale or wrong claim.
 - Do not write the plan, do not edit code, do not change `.jit/` state.
 - If a claim cannot be verified from the code, say so explicitly — an unverifiable
   load-bearing claim is itself a finding for the decision log.

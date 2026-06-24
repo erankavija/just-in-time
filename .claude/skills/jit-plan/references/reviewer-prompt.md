@@ -35,7 +35,9 @@ fan-out. Read the **actual codebase** to check the plan's claims; cite `file:lin
    primitives? Are its claims about existing behavior accurate? Where the plan asserts a
    property (atomic / validated-first / reuses X), confirm the cited operation delivers it.
    A plan built on a mistaken understanding fails. Stale/contradicted assumptions are
-   blocking.
+   blocking. Hunt **design-level domain leakage**: a domain concept or literal proposed to
+   live in pure/engine code, or types/categories hardcoded where the project derives them
+   from config — a blocking failure even when the prose claims "respects boundaries."
 
 4. **Decomposition + dependencies.** Coherent, well-scoped sketch items, each independently
    implementable and testable, no overlaps/gaps. Dependency ordering correct — no item
