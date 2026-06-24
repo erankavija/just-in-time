@@ -2,18 +2,20 @@
   "epic_id": "9ac9fdac-828a-40f2-9d73-71af14f44ff8",
   "epic_short_id": "9ac9fdac",
   "title": "Graph templates: configurable parameterized subgraphs applied to the work DAG",
-  "current_wave": 9,
+  "current_wave": 10,
   "handoff": "dev/active/9ac9fdac-handoff.md (session 1) — read its Traps section before dispatching.",
   "completed": {
     "stories_done": ["04559558 (W1, b4af01f)", "643874f2 (W2, 706b446)", "3143ad87 (W3, 5af6122)", "96fc8cd8 (W4, 2843505)"],
-    "tasks_done": ["45e7f203 (1bd86c1)", "8b15b679 (b4af01f)", "14137e1a (d7b20c4)", "73e5e853 (706b446)", "9cccfe0c (a270f95)", "e75805f6 (5af6122)", "c703a4b3 (6c72f26)", "3a7e13cf (2843505)"],
+    "tasks_done": ["45e7f203 (1bd86c1)", "8b15b679 (b4af01f)", "14137e1a (d7b20c4)", "73e5e853 (706b446)", "9cccfe0c (a270f95)", "e75805f6 (5af6122)", "c703a4b3 (6c72f26)", "3a7e13cf (2843505)", "840e155c (W9, fcaa036)", "6e38a577 (W9, cd4c456)", "57f52018 (W9, 04e404d)"],
     "repo_health": "46374a1 (jit-validate backfill + probe + transitive-reduction)"
   },
+  "wave_9_notes": "Session 2: 840e155c (tests) 1 rework (add in-source unit tests + CLI explicit-anchor test). 6e38a577 (docs) 2 reworks (exhaustive [planning]-config + C->P sweep; then gate-name hardcode consistency). 57f52018 (reseed) 3 reworks: (1) match template literal not polished 7d88e37d variant; (2,3) jit issue update did NOT log issue_updated for field edits (event-logging-invariant gap) -> fixed update_issue + handle_gate_blocking to emit issue_updated mirroring bulk_update, added tests, corrected test_update_issue_field_edits_persist_when_done_blocked_on_gated. Reseed re-run with fixed binary so events log. Committed fcaa036/cd4c456/04e404d.",
   "remaining": {
-    "wave_9_ready_parallel": ["6e38a577 (skills+memory migration + planning-bracket.md concept rewrite)", "840e155c (W6 tests)", "57f52018 (reseed 1eb0bdfd+2937919f)"],
-    "wave_10": ["c8aa199e (user docs + bracket-id; closes story adc640e4)", "fc414353 (dogfood; closes story 99a0c161)"],
-    "stories_remaining": ["adc640e4 (W5)", "99a0c161 (W6)"]
+    "wave_10_parallel": ["c8aa199e (user docs + bracket-id; closes story adc640e4) — dispatched to userdocs agent", "fc414353 (dogfood DONE by lead; closes story 99a0c161)"],
+    "stories_remaining": ["adc640e4 (closes after c8aa199e)", "99a0c161 (closes after fc414353)"]
   },
+  "session2_blocker": "2026-06-24 ~01:54 EEST: ALL work complete + validated (fmt/clippy/full-suite/jit-validate green), uncommitted. Only remaining step: 99a0c161 story code-review gate. BLOCKED by codex usage limit ('try again at 1:34 AM' in codex's tz). Last substantive review resolved every finding (legacy-P apply rejection + IssueDeleted event + dep-rm logging + backfill + # Examples on new_issue_deleted); only a transient/quota no-output remains. Retry `jit gate pass 99a0c161 code-review` when codex quota resets, then transition adc640e4 + 99a0c161 + epic to done, commit, completion report.",
+  "wave_10_notes": "fc414353 dogfood: user chose clean-migrate of 25064508 (legacy P-only bracket from removed jit plan). Removed legacy P 1eb0bdfd (dep rm + JIT_ALLOW_DELETION=1 delete), then jit apply plan 25064508 -> clean C->B(5f5735c3)->P(0d753ba5), gates+labels+move-upstream all correct, scope validation passes. Evidence: dev/active/9ac9fdac-dogfood-25064508.md (linked to fc414353). FINDING: apply detects only an existing B, not an existing P -> duplicates the planning node on a legacy P-only container (candidate follow-up). RESEED caveat: 57f52018 reseeded 1eb0bdfd which the dogfood then deleted; 2937919f reseed stands; new P auto-seeded.",
   "notes": "Breakdown + bracket gates (coverage-preview, breakdown-review) already PASSED. Impl interior = 6 stories + 13 leaf tasks. P(7d88e37d)/B(59118ee9) done. Dispatch per leaf task in topo order; close each story when its tasks land. Epic stays backlog (blocked) until all children done. RESOLVED pre-existing repo-wide blocker (commit 46374a1): code-review gate requires jit-validate green, which failed on 16 epics missing plan docs + isolated probe 313e01f6 + 10 redundant edges. User approved stub-plan-doc backfill. W1 task 45e7f203: cargo-ci PASSED, code-review rework in progress (add # Examples to 6 public types).",
   "blocker_log": [
     {"date": "2026-06-23", "blocker": "repo-wide jit-validate failure blocks all code-review gates", "resolution": "commit 46374a1: backfill 16 stub plan docs (user-approved), connect probe 313e01f6, jit validate --fix (10 redundant edges)", "note": "Durable fix for validation-lifecycle-inversion (require plan docs only for non-terminal breakable epics) deferred as separate concern."}

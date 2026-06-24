@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "d629eebc-daf0-4224-8675-c00370a65e5f",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "c8aa199e-4191-4c41-b085-a08c4785ef5f",
+  "commit": "04e404d0198f1fbdc3fcbbfbfbc8a104c7826cc9",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-06-23T22:21:56.762380964Z",
+  "completed_at": "2026-06-23T22:23:07.415455208Z",
+  "duration_ms": 70653,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\n- **DOCB-01: PASS.** User docs now reference `jit apply plan`; I found no active removed-command references (`jit plan`, `--with-planning`) in the reviewed docs/tests/scripts paths.\n- **DOCB-02: PASS.** The bracket pointer convention is now consistent:\n  - Templates emit `brackets:{container.short_id}` in `docs/examples/sdd/templates.toml:33` and `docs/examples/research/templates.toml:34`.\n  - Tests and fixtures use short IDs, e.g. `crates/jit/tests/sdd_bracket_tests.rs:223`, `crates/jit/tests/research_bracket_tests.rs:240`, `crates/jit/tests/bracket_coverage_gate_run_test.rs:204`, and steering fixtures at `crates/jit/tests/fixtures/steering/bracket-happy-path/scenario.toml:57`.\n  - Docs/scripts use `brackets:<C-short-id>`, e.g. `docs/concepts/planning-bracket.md:57`, `docs/how-to/adopt-planning-bracket.md:81`, and `scripts/coverage-preview.sh:38`.\n- **DOCB-03: PASS.** The no-migration and opt-in path is documented at `docs/concepts/planning-bracket.md:19` and `docs/how-to/adopt-planning-bracket.md:26`.\n\n**Prior Review Feedback**\n\nThe latest blocker is resolved. `resolve_container` now treats duplicate exact short IDs as ambiguous at `crates/jit/src/validation/graph.rs:1016`, and the exact collision regression test was added at `crates/jit/src/validation/graph.rs:2132`.\n\n**Jit Issue Management**\n\nThe dependency `6e38a577-db65-4203-ac05-318d83de1e45` is `done`. `./scripts/jit-validate.sh` passes with 26 warnings, all label/orphan warnings allowed by the prompt.\n\n**Test And Lint Evidence**\n\nI did not rerun cargo tests because the issue has a passed `cargo-ci` gate. Existing evidence shows `cargo-ci` passed. I did run the required `./scripts/jit-validate.sh`, which passed.\n\n**Architecture And Separation Of Concerns**\n\nNo boundary violation found. The production resolver change stays in validation/domain-style graph logic at `crates/jit/src/validation/graph.rs`; docs, scripts, and tests remain in their expected layers.\n\n**Functional Paradigm**\n\nNo blocking functional-style issue found. The resolver uses iterator filtering and a small match expression at `crates/jit/src/validation/graph.rs:1016`.\n\n**Correctness And Invariants**\n\nThe prior short-id collision correctness issue is fixed. Full IDs still resolve first at `graph.rs:1013`, unique short IDs resolve at `graph.rs:1018`, and duplicate short IDs return `Ambiguous` at `graph.rs:1019`.\n\nNo new atomic-write, event-log, gate-transition, assignee-format, label-format, PID-safety, or unsafe-code regression found in the reviewed changes.\n\n**Safety**\n\nNo unsafe Rust was introduced.\n\n**Testing**\n\nShort-id behavior is covered across SDD/research/gate-run paths, and the exact short-id collision edge case is covered by `test_container_indirection_exact_short_id_collision_is_ambiguous` at `crates/jit/src/validation/graph.rs:2132`.\n\n**Error Handling**\n\nAmbiguous exact short-id resolution now reaches the existing config-error path and produces an ambiguity finding, covered by assertions at `crates/jit/src/validation/graph.rs:2165`.\n\n**CLI Contract**\n\nNo new CLI command was added. The docs continue to present the active `jit apply plan` path.\n\n**Documentation**\n\nUser-facing docs are consistent on the new command, the short-id bracket pointer convention, and the opt-in/no-migration story.\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

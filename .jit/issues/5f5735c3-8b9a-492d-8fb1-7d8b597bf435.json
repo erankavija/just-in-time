@@ -1,0 +1,37 @@
+{
+  "id": "5f5735c3-8b9a-492d-8fb1-7d8b597bf435",
+  "title": "breakdown: Structured project knowledge in jit: addressable items, qualified ids, and projected invariants",
+  "description": "Breakdown node bracketing Structured project knowledge in jit: addressable items, qualified ids, and projected invariants (25064508). Holds the decomposition of the approved plan into well-ordered child issues that cover the container's [hard] success criteria.",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "0d753ba5-356a-4342-a1fb-f880a1b0341d"
+  ],
+  "gates_required": [
+    "coverage-preview",
+    "breakdown-review"
+  ],
+  "gates_status": {
+    "breakdown-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-06-23T21:38:17.516364802Z"
+    },
+    "coverage-preview": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-06-23T21:38:17.515158862Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "milestone:v1.0",
+    "epic:structured-knowledge",
+    "type:breakdown",
+    "brackets:25064508"
+  ],
+  "created_at": "2026-06-23T21:38:17.511021111+00:00",
+  "updated_at": "2026-06-23T21:38:17.538391469+00:00"
+}

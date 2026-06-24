@@ -2,7 +2,7 @@
   "id": "c8aa199e-4191-4c41-b085-a08c4785ef5f",
   "title": "Update user docs; reconcile the bracket-id convention",
   "description": "Update the user docs and make the bracket-pointer id convention consistent.\n\n## Success Criteria\n- [ ] [hard] DOCB-01: the user docs reference the new command and no removed-command references remain.\n- [ ] [hard] DOCB-02: the bracket-pointer id convention is consistent across template, tests, and docs.\n- [ ] [hard] DOCB-03: the user docs state that a project without the planning bracket needs no migration and document the opt-in path — declaring planning and breakdown types plus a plan template.",
-  "state": "ready",
+  "state": "done",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -12,9 +12,78 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-23T22:21:56.762380964Z"
+    },
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-23T22:19:17.602742158Z"
+    }
+  },
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "docs/concepts/planning-bracket.md",
+      "commit": null,
+      "label": "Documentation",
+      "doc_type": "documentation",
+      "format": "markdown",
+      "assets": [
+        {
+          "original_path": "../how-to/adopt-planning-bracket.md",
+          "resolved_path": "docs/how-to/adopt-planning-bracket.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "6cfb6b6d491fc57224686976846441f827007dac2f4e65271816eb4a7d13cabd",
+          "is_shared": false
+        },
+        {
+          "original_path": "../how-to/validation-rules.md",
+          "resolved_path": "docs/how-to/validation-rules.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "47f3557c629a8e35a2a24f09a8cbd0b6765845e89886dc573d84262eca9efb59",
+          "is_shared": false
+        },
+        {
+          "original_path": "../examples/research/config.toml",
+          "resolved_path": "docs/examples/research/config.toml",
+          "asset_type": "local",
+          "mime_type": null,
+          "content_hash": "93e12f5aa593fa8612ec413635654f9004ae53615aeb7b3e19bd175a250607c5",
+          "is_shared": false
+        },
+        {
+          "original_path": "../examples/sdd/config.toml",
+          "resolved_path": "docs/examples/sdd/config.toml",
+          "asset_type": "local",
+          "mime_type": null,
+          "content_hash": "d709dfa9f5e0d130642250b5c0a33eef10f9a07f8c039bf6a12c77f9f06b5543",
+          "is_shared": false
+        },
+        {
+          "original_path": "validation-engine.md",
+          "resolved_path": "docs/concepts/validation-engine.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "53fb59fee3ae0565a625d1ff4d08e5055309473b4a6ddf43162e339fc068b806",
+          "is_shared": false
+        },
+        {
+          "original_path": "../how-to/custom-gates.md",
+          "resolved_path": "docs/how-to/custom-gates.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "52f48cf02f38dd0aa5d3ad0493c652c39ea4d85e24fff04a4806341c649bc5fa",
+          "is_shared": false
+        }
+      ]
+    }
+  ],
   "labels": [
     "type:task",
     "story:skills-docs-migration",
@@ -22,5 +91,5 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-06-22T22:28:29.482595821+00:00",
-  "updated_at": "2026-06-23T21:29:37.787889857+00:00"
+  "updated_at": "2026-06-23T22:24:07.790911172+00:00"
 }
