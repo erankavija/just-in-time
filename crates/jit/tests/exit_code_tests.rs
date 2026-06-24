@@ -790,3 +790,168 @@ fn test_claim_next_json_skips_non_ready_issues() {
     let done_json: serde_json::Value = serde_json::from_slice(&done_output.stdout).unwrap();
     assert!(done_json["assignee"].is_null());
 }
+
+/// Build a dependency-blocked fixture: returns (dependency, dependent) where
+/// `dependent` is in `backlog` and depends on the still-incomplete `dependency`.
+fn dependency_blocked_fixture(temp_dir: &TempDir) -> (String, String) {
+    let dependency = json_issue_id(
+        &Command::new(jit_binary())
+            .current_dir(temp_dir)
+            .args(["issue", "create", "--title", "Prerequisite", "--json"])
+            .output()
+            .unwrap(),
+    );
+    let dependent = json_issue_id(
+        &Command::new(jit_binary())
+            .current_dir(temp_dir)
+            .args(["issue", "create", "--title", "Dependent work", "--json"])
+            .output()
+            .unwrap(),
+    );
+    let status = Command::new(jit_binary())
+        .current_dir(temp_dir)
+        .args(["dep", "add", &dependent, &dependency])
+        .status()
+        .unwrap();
+    assert!(status.success());
+    (dependency, dependent)
+}
+
+/// A claim blocked by incomplete dependencies must name `jit issue assign` in
+/// its human-readable error so the operator learns how to assign without
+/// starting work.
+#[test]
+fn test_claim_blocked_by_dependencies_human_names_assign() {
+    let temp_dir = setup_test_env();
+    let (_dependency, dependent) = dependency_blocked_fixture(&temp_dir);
+
+    let output = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["issue", "claim", &dependent, "agent:test"])
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(4));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("jit issue assign"),
+        "expected human error to name 'jit issue assign', got: {}",
+        stderr
+    );
+    assert!(stderr.contains(&dependent));
+}
+
+/// The same hint must appear in `--json` output, in the error's suggestions /
+/// remediation list.
+#[test]
+fn test_claim_blocked_by_dependencies_json_names_assign() {
+    let temp_dir = setup_test_env();
+    let (_dependency, dependent) = dependency_blocked_fixture(&temp_dir);
+
+    let output = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["issue", "claim", &dependent, "agent:test", "--json"])
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(4));
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "BLOCKED");
+
+    let suggestions = json["error"]["suggestions"].as_array().unwrap();
+    assert!(
+        suggestions.iter().any(|cmd| cmd
+            .as_str()
+            .unwrap()
+            .contains(&format!("jit issue assign {}", dependent))),
+        "expected suggestions to name 'jit issue assign', got: {:?}",
+        suggestions
+    );
+
+    let remediation = json["error"]["details"]["remediation"].as_array().unwrap();
+    assert!(remediation.iter().any(|cmd| cmd
+        .as_str()
+        .unwrap()
+        .contains(&format!("jit issue assign {}", dependent))));
+}
+
+/// `jit issue claim <id> <assignee> --assign-only` sets the assignee without
+/// transitioning the issue's state.
+#[test]
+fn test_claim_assign_only_sets_assignee_without_transition() {
+    let temp_dir = setup_test_env();
+    let issue = json_issue_id(
+        &Command::new(jit_binary())
+            .current_dir(&temp_dir)
+            .args(["issue", "create", "--title", "Assign-only work", "--json"])
+            .output()
+            .unwrap(),
+    );
+
+    let output = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args([
+            "issue",
+            "claim",
+            &issue,
+            "agent:test",
+            "--assign-only",
+            "--json",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "assign-only claim failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let show = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["issue", "show", &issue, "--json"])
+        .output()
+        .unwrap();
+    assert!(show.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&show.stdout).unwrap();
+    assert_eq!(json["assignee"], "agent:test");
+    // State is unchanged by --assign-only: a fresh, dependency-free issue is
+    // `ready`, and crucially it was NOT transitioned to `in_progress`.
+    assert_ne!(json["state"], "in_progress");
+    assert_eq!(json["state"], "ready");
+}
+
+/// Regression: a normal claim on a ready (unblocked) issue still transitions to
+/// in_progress.
+#[test]
+fn test_claim_ready_issue_transitions_to_in_progress() {
+    let temp_dir = setup_test_env();
+    let issue = json_issue_id(
+        &Command::new(jit_binary())
+            .current_dir(&temp_dir)
+            .args(["issue", "create", "--title", "Ready work", "--json"])
+            .output()
+            .unwrap(),
+    );
+    let status = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["issue", "update", &issue, "--state", "ready"])
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let output = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["issue", "claim", &issue, "agent:test", "--json"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+
+    let show = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["issue", "show", &issue, "--json"])
+        .output()
+        .unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&show.stdout).unwrap();
+    assert_eq!(json["assignee"], "agent:test");
+    assert_eq!(json["state"], "in_progress");
+}

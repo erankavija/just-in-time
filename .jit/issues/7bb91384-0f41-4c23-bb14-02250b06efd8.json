@@ -2,9 +2,9 @@
   "id": "7bb91384-0f41-4c23-bb14-02250b06efd8",
   "title": "Name assign in claim-blocked error and add --assign-only",
   "description": "Make claim-blocked errors actionable and add assign-without-transition.\n\n## Success Criteria\n\n- [ ] When `jit issue claim` fails because the issue is blocked by incomplete dependencies, the error names `jit issue assign` as the way to assign without starting work.\n- [ ] `jit issue claim <id> <assignee> --assign-only` assigns the issue without transitioning its state.",
-  "state": "ready",
+  "state": "done",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [
     "838483f3-6f4b-4d7e-a8aa-3512fd648841"
   ],
@@ -12,7 +12,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-24T15:00:40.017731820Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-24T15:01:18.980995308Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -21,5 +32,5 @@
     "satisfies:REQ-08"
   ],
   "created_at": "2026-06-22T21:20:41.112669382+00:00",
-  "updated_at": "2026-06-22T21:48:56.354381204+00:00"
+  "updated_at": "2026-06-24T15:03:10.330492365+00:00"
 }

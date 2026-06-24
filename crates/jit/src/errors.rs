@@ -283,6 +283,16 @@ impl TransitionBlockedError {
             _ => format!("jit graph deps {}", self.issue_id),
         };
 
+        // When the transition is blocked by an incomplete (or missing)
+        // dependency, surface how to assign the issue without starting work.
+        // This is the actionable answer to a failed `jit issue claim`.
+        let assign_hint = self.is_dependency_blocked().then(|| {
+            format!(
+                "To assign without starting work (no state change): jit issue assign {} <assignee>",
+                self.issue_id
+            )
+        });
+
         std::iter::once(inspect_command)
             .chain(self.blockers.iter().map(|blocker| match blocker {
                 TransitionBlocker::Dependency { issue_id, .. } => {
@@ -301,7 +311,22 @@ impl TransitionBlockedError {
                     )
                 }
             }))
+            .chain(assign_hint)
             .collect()
+    }
+
+    /// True when any blocker is an incomplete or missing dependency.
+    ///
+    /// Used to gate the "assign without starting work" remediation so it only
+    /// appears for the dependency-blocked (claim-blocked) case, not for gate or
+    /// graph-rule failures.
+    fn is_dependency_blocked(&self) -> bool {
+        self.blockers.iter().any(|blocker| {
+            matches!(
+                blocker,
+                TransitionBlocker::Dependency { .. } | TransitionBlocker::MissingDependency { .. }
+            )
+        })
     }
 }
 
@@ -598,6 +623,40 @@ mod tests {
         // It is NOT misreported as a gate or dependency block.
         assert!(!rendered.contains("incomplete dependencies"));
         assert!(!rendered.contains("gate(s) not passed"));
+    }
+
+    #[test]
+    fn test_dependency_block_names_assign_in_remediation() {
+        let error = TransitionBlockedError::dependencies(
+            "issue-123".to_string(),
+            State::InProgress,
+            State::Backlog,
+            vec![TransitionBlocker::MissingDependency {
+                issue_id: "dep-456".to_string(),
+            }],
+        );
+
+        let rendered = error.to_string();
+        assert!(rendered.contains("jit issue assign issue-123 <assignee>"));
+        assert!(rendered.contains("no state change"));
+
+        // The same hint is present in the remediation list (the JSON path).
+        assert!(error
+            .remediation_commands()
+            .iter()
+            .any(|cmd| cmd.contains("jit issue assign issue-123")));
+    }
+
+    #[test]
+    fn test_gate_block_does_not_name_assign_in_remediation() {
+        let error = TransitionBlockedError::gates(
+            "issue-123".to_string(),
+            State::Done,
+            State::Gated,
+            vec![("code-review".to_string(), GateStatus::Pending)],
+        );
+
+        assert!(!error.to_string().contains("jit issue assign"));
     }
 
     #[test]

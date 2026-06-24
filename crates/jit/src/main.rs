@@ -1170,9 +1170,40 @@ fn run() -> Result<()> {
                         let _ = output_ctx.print_success(format!("Assigned issue: {}", full_id));
                     }
                 }
-                IssueCommands::Claim { id, assignee, json } => {
+                IssueCommands::Claim {
+                    id,
+                    assignee,
+                    assign_only,
+                    json,
+                } => {
                     let output_ctx = OutputContext::new(quiet, json);
                     let full_id = storage.resolve_issue_id(&id)?;
+
+                    if assign_only {
+                        // Assign without transitioning state: reuse the same
+                        // path as `jit issue assign`.
+                        let warnings = executor.assign_issue(&full_id, assignee)?;
+                        for warning in warnings {
+                            output_ctx.print_warning(&warning)?;
+                        }
+
+                        if json {
+                            let issue = storage.load_issue(&full_id)?;
+                            let msg = format!(
+                                "Assigned issue {} to {} (assign-only)",
+                                issue.short_id(),
+                                issue.assignee.as_deref().unwrap_or("unknown")
+                            );
+                            let output =
+                                JsonOutput::success(issue, "issue claim").with_message(msg);
+                            println!("{}", output.to_json_string()?);
+                        } else {
+                            let _ = output_ctx
+                                .print_success(format!("Assigned issue {} (assign-only)", full_id));
+                        }
+                        return Ok(());
+                    }
+
                     if let Err(e) = executor.claim_issue(&full_id, assignee) {
                         if json {
                             if let Some(blocked) =

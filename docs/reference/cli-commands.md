@@ -981,6 +981,45 @@ jit issue show abc123 def456 --json          # -> [ {...}, {...} ]
 - Passing two or more ids with `--json` returns a JSON **array** of full issue
   objects in argument order. A single id with `--json` stays a single object.
 
+### Assigning and Claiming Issues
+
+There are two ways to put an assignee on an issue:
+
+- **`jit issue assign <id> <assignee>`** sets the assignee and makes no state
+  change. The issue stays in whatever state it is in (`backlog`, `ready`, ...).
+- **`jit issue claim <id> <assignee>`** assigns the issue *and* transitions a
+  `ready` issue to `in_progress` (the "start work" path). It is atomic and
+  refuses an already-assigned issue.
+
+```bash
+# Assign without starting work (no state change)
+jit issue assign $ISSUE agent:worker-1
+
+# Claim: assign and transition ready -> in_progress
+jit issue claim $ISSUE agent:worker-1
+
+# Claim but skip the state transition (equivalent to `issue assign`)
+jit issue claim $ISSUE agent:worker-1 --assign-only
+```
+
+**`--assign-only`:** Assign the issue without transitioning its state to
+`in_progress`. Use it when you want to take ownership of work that is not yet
+`ready` (e.g. still `backlog` behind dependencies) without forcing a transition.
+
+**Dependency-blocked claims:** `jit issue claim` fails (exit 4) when the issue is
+still `backlog` behind incomplete dependencies, because it cannot transition to
+`in_progress`. The error (in both human and `--json` output) names how to assign
+without starting work:
+
+```text
+To assign without starting work (no state change): jit issue assign <issue-id> <assignee>
+```
+
+In `--json` this hint appears in `error.suggestions` and
+`error.details.remediation`. To take ownership of a dependency-blocked issue,
+use `jit issue assign <id> <assignee>` (or `jit issue claim <id> <assignee>
+--assign-only`).
+
 ### Rejecting Issues
 
 Use `jit issue reject` to close an issue without implementation:

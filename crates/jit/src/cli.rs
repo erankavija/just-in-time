@@ -553,6 +553,10 @@ pub enum IssueCommands {
         /// Assignee (format: type:identifier, e.g., agent:worker-1)
         assignee: String,
 
+        /// Assign the issue without transitioning its state to in_progress
+        #[arg(long)]
+        assign_only: bool,
+
         #[arg(long)]
         json: bool,
     },

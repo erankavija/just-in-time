@@ -17,7 +17,7 @@
         {"id": "870176ce-8950-4cd9-8755-be1811d9e126", "short_id": "870176ce", "req": "REQ-01", "title": "Add short_id and stable array fields to issue show --json", "classification": "implementation", "status": "done"},
         {"id": "65ef3741-765e-48ff-b1bb-00b06e006e4c", "short_id": "65ef3741", "req": "REQ-04", "title": "Gate pass exit-code taxonomy and verdict field", "classification": "implementation", "status": "done"},
         {"id": "e9d71bf6-89aa-40d0-8754-64bc8414647c", "short_id": "e9d71bf6", "req": "REQ-07", "title": "Release a claim by issue id regardless of owner", "classification": "implementation", "status": "done"},
-        {"id": "7bb91384-0f41-4c23-bb14-02250b06efd8", "short_id": "7bb91384", "req": "REQ-08", "title": "Name assign in claim-blocked error and add --assign-only", "classification": "implementation", "status": "pending"},
+        {"id": "7bb91384-0f41-4c23-bb14-02250b06efd8", "short_id": "7bb91384", "req": "REQ-08", "title": "Name assign in claim-blocked error and add --assign-only", "classification": "implementation", "status": "done"},
         {"id": "4597743e-5685-46b5-a1f1-ff8e8bfa3e0a", "short_id": "4597743e", "req": "REQ-09", "title": "Add --label filter to issue search", "classification": "implementation", "status": "pending"},
         {"id": "6ec1dd6f-76a7-4b54-bb7b-df4ac686325d", "short_id": "6ec1dd6f", "req": "REQ-10", "title": "Batch-create issues with dependency wiring from JSON", "classification": "implementation", "status": "pending"},
         {"id": "ea717ef1-17bc-419b-a8f1-e80b7016aa03", "short_id": "ea717ef1", "req": "REQ-11", "title": "Add command and flag aliases", "classification": "implementation", "status": "pending"}
