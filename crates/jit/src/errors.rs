@@ -416,6 +416,59 @@ pub fn lease_not_found(lease_id: &str) -> ActionableError {
         .with_remedy("Check lease status: jit claim status --json")
 }
 
+/// Helper to create "no acting identity" errors with standard remediation.
+///
+/// Used by `jit claim release <issue-id>` when neither a configured agent id
+/// (`JIT_AGENT_ID` / `~/.config/jit/agent.toml`) nor a git `user.name` is
+/// available. A release must be attributable in the audit trail, so the command
+/// errors rather than fabricating a placeholder identity.
+///
+/// # Examples
+///
+/// ```
+/// use jit::errors::no_acting_identity;
+///
+/// let err = no_acting_identity();
+/// assert!(err.to_error_message().contains("no acting identity"));
+/// ```
+pub fn no_acting_identity() -> ActionableError {
+    ActionableError::new("Cannot release: no acting identity for the audit trail")
+        .with_cause("No agent identity is configured (JIT_AGENT_ID or ~/.config/jit/agent.toml)")
+        .with_cause("Git user.name is not set")
+        .with_remedy("Set an agent identity: export JIT_AGENT_ID=agent:your-name")
+        .with_remedy("Or configure git: git config user.name \"Your Name\"")
+}
+
+/// Helper to create "issue has no active lease" errors with standard remediation.
+///
+/// Used by `jit claim release <issue-id>` when the issue has no active lease to
+/// release. The message contains "not found" so callers that map error text to
+/// exit codes treat it like other lookup failures.
+///
+/// # Examples
+///
+/// ```
+/// use jit::errors::no_active_lease;
+///
+/// let err = no_active_lease("abc12345");
+/// let msg = err.to_error_message();
+/// assert!(msg.contains("abc12345"));
+/// assert!(msg.contains("not found"));
+/// ```
+pub fn no_active_lease(issue_id: &str) -> ActionableError {
+    ActionableError::new(format!(
+        "Issue {} has no active lease to release (not found)",
+        issue_id
+    ))
+    .with_cause("No agent currently holds a lease on this issue")
+    .with_cause("The lease may have already expired or been released")
+    .with_remedy(format!(
+        "Check active leases for this issue: jit claim status --issue {} --json",
+        issue_id
+    ))
+    .with_remedy("List all active leases: jit claim list --json")
+}
+
 /// Helper to create already claimed errors with standard remediation.
 pub fn already_claimed(issue_id: &str, agent_id: &str, expires_info: &str) -> ActionableError {
     ActionableError::new(format!(

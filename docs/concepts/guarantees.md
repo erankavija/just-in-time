@@ -293,7 +293,7 @@ Understanding limitations prevents incorrect assumptions:
 jit claim acquire <issue>
 # Work on issue
 jit issue update <issue> --state done
-jit claim release <lease-id>
+jit claim release <issue-id>
 
 # Polling for ready work (eventually consistent)
 while true; do

@@ -168,7 +168,7 @@ After merging to main, other worktrees will see your issue updates via git.
 Release your claim (if not expired):
 
 ```bash
-jit claim release <lease-id>
+jit claim release <issue-id>
 ```
 
 Remove the worktree when done:

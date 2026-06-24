@@ -140,7 +140,7 @@ Error: Issue abc123 already claimed by agent:worker-1 until 2026-02-02 17:30:00 
    ```
 2. **Release** if done:
    ```bash
-   jit claim release <lease-id>
+   jit claim release <issue-id>
    ```
 3. **Force evict** if agent is gone:
    ```bash
@@ -162,7 +162,7 @@ Agent copilot:worker-1 already has 2 indefinite lease(s) (max: 2).
 1. **Release an existing indefinite lease:**
    ```bash
    jit claim status  # Find your indefinite leases
-   jit claim release <lease-id>
+   jit claim release <issue-id>
    ```
 2. **Use finite TTL instead:**
    ```bash

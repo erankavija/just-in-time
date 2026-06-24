@@ -263,33 +263,82 @@ fn test_claim_release_happy_path() {
         .unwrap();
 
     let acquire_json: Value = serde_json::from_slice(&acquire_output.stdout).unwrap();
-    let lease_id = acquire_json["lease_id"].as_str().unwrap();
+    let _lease_id = acquire_json["lease_id"].as_str().unwrap();
 
-    // Release claim
+    // Release claim by ISSUE id (no lease UUID required).
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
         .env("JIT_AGENT_ID", "agent:test-1")
-        .args(["claim", "release", lease_id])
+        .args(["claim", "release", &issue_id])
         .assert()
         .success()
         .stdout(predicate::str::contains("Released lease"));
 }
 
 #[test]
-fn test_claim_release_not_found_error() {
+fn test_claim_release_no_active_lease_error() {
     let temp = setup_repo();
+    let issue_id = create_issue(temp.path(), "Unclaimed Issue");
 
-    // Try to release non-existent lease - should fail with actionable error
+    // Releasing an existing issue with no active lease should fail with an
+    // actionable error that mentions "not found".
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
         .env("JIT_AGENT_ID", "agent:test")
-        .args(["claim", "release", "01FAKE0000000000000000000"])
+        .args(["claim", "release", &issue_id])
         .assert()
         .failure()
+        .stderr(predicate::str::contains("no active lease"))
         .stderr(predicate::str::contains("not found"))
         .stderr(predicate::str::contains("Possible causes:"))
         .stderr(predicate::str::contains("To fix:"))
         .stderr(predicate::str::contains("jit claim list"));
+}
+
+#[test]
+fn test_claim_release_by_issue_succeeds_for_different_owner() {
+    let temp = setup_repo();
+    let issue_id = create_issue(temp.path(), "Owned Issue");
+
+    // Agent A acquires the lease.
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args([
+            "claim",
+            "acquire",
+            &issue_id,
+            "--ttl",
+            "600",
+            "--agent-id",
+            "agent:owner",
+            "--json",
+        ])
+        .assert()
+        .success();
+
+    // A DIFFERENT agent releases by issue id; the audit reports the prior owner
+    // and the acting identity.
+    let release_output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .env("JIT_AGENT_ID", "agent:stranger")
+        .args(["claim", "release", &issue_id, "--json"])
+        .output()
+        .unwrap();
+
+    assert!(release_output.status.success());
+    let release_json: Value = serde_json::from_slice(&release_output.stdout).unwrap();
+    assert_eq!(release_json["issue_id"], issue_id);
+    assert_eq!(release_json["previous_owner"], "agent:owner");
+    assert_eq!(release_json["actor"], "agent:stranger");
+
+    // Lease is gone.
+    let list_output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["claim", "list", "--json"])
+        .output()
+        .unwrap();
+    let list_json: Value = serde_json::from_slice(&list_output.stdout).unwrap();
+    assert_eq!(list_json["leases"].as_array().unwrap().len(), 0);
 }
 
 #[test]
@@ -330,11 +379,11 @@ fn test_claim_workflow_end_to_end() {
     assert_eq!(leases.len(), 1);
     assert_eq!(leases[0]["lease_id"], lease_id);
 
-    // Step 3: Release claim
+    // Step 3: Release claim by issue id
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
         .env("JIT_AGENT_ID", "agent:workflow-test")
-        .args(["claim", "release", lease_id])
+        .args(["claim", "release", &issue_id])
         .assert()
         .success();
 
@@ -722,11 +771,11 @@ fn test_claim_ttl0_workflow_acquire_heartbeat_release() {
     assert_eq!(leases.len(), 1);
     assert_eq!(leases[0]["lease_id"], lease_id);
 
-    // Step 5: Release
+    // Step 5: Release by issue id
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
         .env("JIT_AGENT_ID", "agent:workflow-test")
-        .args(["claim", "release", lease_id])
+        .args(["claim", "release", &issue_id])
         .assert()
         .success();
 

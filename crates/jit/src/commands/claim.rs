@@ -133,11 +133,120 @@ pub fn execute_claim_heartbeat(lease_id: &str) -> Result<()> {
     Ok(())
 }
 
-/// Execute `jit claim release` command.
+/// Details of a lease released via `jit claim release <issue-id>`.
 ///
-/// Releases a previously acquired lease.
-pub fn execute_claim_release(lease_id: &str) -> Result<()> {
+/// Returned by [`execute_claim_release_by_issue`] so the caller can report which
+/// lease was released, on which issue, and which identity performed the release
+/// (the actor recorded in the audit trail).
+///
+/// # Examples
+///
+/// ```
+/// use jit::commands::claim::ReleasedLeaseInfo;
+///
+/// let info = ReleasedLeaseInfo {
+///     lease_id: "00914031-7aeb-4d42-b3b3-bdb0d3d16134".to_string(),
+///     issue_id: "f7a0ad17-8baf-41f3-a0b2-34edc650c409".to_string(),
+///     previous_owner: "agent:owner".to_string(),
+///     actor: "agent:stranger".to_string(),
+/// };
+/// assert_eq!(info.previous_owner, "agent:owner");
+/// assert_eq!(info.actor, "agent:stranger");
+/// ```
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct ReleasedLeaseInfo {
+    /// The lease ID that was released (resolved from the issue, not supplied by the user).
+    pub lease_id: String,
+    /// The full issue ID whose lease was released.
+    pub issue_id: String,
+    /// The prior owner of the released lease.
+    pub previous_owner: String,
+    /// The acting identity recorded in the eviction audit trail.
+    pub actor: String,
+}
+
+/// Build a valid `human:{identifier}` actor id from an optional git user name.
+///
+/// Whitespace in the name is collapsed to `-` so any returned value satisfies the
+/// agent-identity invariant (see `agent_config::validate_agent_id`): it contains
+/// a `:`, has a non-empty type and identifier, and no whitespace in either part.
+/// Returns `None` when there is no usable name (absent, empty, or whitespace
+/// only), so callers can treat the actor as unattributable rather than
+/// fabricating a placeholder identity.
+fn sanitize_actor(name: Option<&str>) -> Option<String> {
+    name.map(|n| n.split_whitespace().collect::<Vec<_>>().join("-"))
+        .filter(|s| !s.is_empty())
+        .map(|id| format!("human:{}", id))
+}
+
+/// Resolve the acting identity for an owner-bypass release.
+///
+/// Prefers the configured agent id (`JIT_AGENT_ID` > `~/.config/jit/agent.toml`,
+/// already validated), falling back to the git `user.name` (sanitized via
+/// [`sanitize_actor`]). The returned string is always a valid
+/// `{type}:{identifier}` agent identity, so it can safely be used as the
+/// `ClaimCoordinator` agent id and recorded in the eviction audit trail.
+///
+/// # Errors
+///
+/// Returns an error (see [`crate::errors::no_acting_identity`]) when neither a
+/// configured agent id nor a git `user.name` is available. A release must be
+/// attributable, so no placeholder identity is invented.
+fn resolve_release_actor() -> Result<String> {
     use crate::agent_config::resolve_agent_id;
+
+    if let Ok(agent) = resolve_agent_id(None) {
+        return Ok(agent);
+    }
+
+    let git_name = Command::new("git")
+        .args(["config", "user.name"])
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string());
+
+    sanitize_actor(git_name.as_deref())
+        .ok_or_else(|| anyhow::anyhow!("{}", crate::errors::no_acting_identity()))
+}
+
+/// Execute `jit claim release <issue-id>` command.
+///
+/// Resolves the issue's active lease and releases it regardless of the lease
+/// owner, recording the acting identity in the eviction audit trail. Reuses the
+/// admin/owner-bypass [`ClaimCoordinator::force_evict_lease`] path so a non-owner
+/// (or an actor with no configured agent identity) can release the lease.
+///
+/// The positional argument is an ISSUE ID (short ids are resolved), not a lease
+/// UUID. If the issue holds more than one active lease (which should not happen
+/// under exclusive claiming), every active lease is released; the returned
+/// [`ReleasedLeaseInfo`] reports the last one released.
+///
+/// # Errors
+///
+/// Returns an error if the issue id cannot be resolved, if the issue has no
+/// active lease (see [`crate::errors::no_active_lease`]), or if the underlying
+/// eviction fails.
+///
+/// # Examples
+///
+/// ```no_run
+/// use jit::commands::claim::execute_claim_release_by_issue;
+/// use jit::storage::JsonFileStorage;
+///
+/// let storage = JsonFileStorage::new(".jit");
+/// // Release whatever lease is active on issue `abc123`, regardless of owner.
+/// let released = execute_claim_release_by_issue(&storage, "abc123").unwrap();
+/// println!("released {} on {} by {}", released.lease_id, released.issue_id, released.actor);
+/// ```
+pub fn execute_claim_release_by_issue<S: IssueStore>(
+    storage: &S,
+    issue_id: &str,
+) -> Result<ReleasedLeaseInfo> {
+    // Resolve short ID to full ID (errors if the issue does not exist).
+    let full_id = storage
+        .resolve_issue_id(issue_id)
+        .with_context(|| format!("Failed to resolve issue id {}", issue_id))?;
 
     // Detect worktree context
     let paths = WorktreePaths::detect()
@@ -150,24 +259,57 @@ pub fn execute_claim_release(lease_id: &str) -> Result<()> {
     let identity =
         load_or_create_worktree_identity(&paths.local_jit, &paths.worktree_root, &branch)?;
 
-    // Resolve agent ID using proper priority: JIT_AGENT_ID > ~/.config/jit/agent.toml > error
-    let agent = resolve_agent_id(None)?;
+    // Resolve the acting identity for the audit trail BEFORE evicting anything,
+    // so a release never happens without an attributable actor. This is
+    // independent of lease ownership: any identified actor may release by issue id.
+    let actor = resolve_release_actor()
+        .context("Cannot release lease without an attributable acting identity")?;
 
-    // Create file locker
+    // Create file locker and coordinator using the actor as the agent id.
     let locker = FileLocker::new(Duration::from_secs(5));
-
-    // Create claim coordinator
     let coordinator = ClaimCoordinator::new(
         paths.clone(),
         locker,
         identity.worktree_id.clone(),
-        agent.clone(),
+        actor.clone(),
     );
+    coordinator.init().with_context(|| {
+        format!(
+            "Failed to initialize claim coordinator for issue {}",
+            full_id
+        )
+    })?;
 
-    // Release the lease
-    coordinator.release_lease(lease_id)?;
+    // Resolve the issue's active (non-expired) lease(s).
+    let leases = coordinator
+        .get_active_leases(Some(&full_id), None)
+        .with_context(|| format!("Failed to look up active leases for issue {}", full_id))?;
 
-    Ok(())
+    let released = leases
+        .into_iter()
+        .map(|lease| {
+            let reason = format!("released by {} via claim release", actor);
+            coordinator
+                .force_evict_lease(&lease.lease_id, &reason)
+                .with_context(|| {
+                    format!(
+                        "Failed to release lease {} for issue {}",
+                        lease.lease_id, full_id
+                    )
+                })?;
+            Ok(ReleasedLeaseInfo {
+                lease_id: lease.lease_id,
+                issue_id: lease.issue_id,
+                previous_owner: lease.agent_id,
+                actor: actor.clone(),
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    released
+        .into_iter()
+        .next_back()
+        .ok_or_else(|| anyhow::anyhow!("{}", crate::errors::no_active_lease(&full_id)))
 }
 
 /// Renews an existing lease, extending its expiry time.
@@ -532,6 +674,184 @@ mod tests {
 
         // Release lease
         coordinator.release_lease(lease_id)?;
+        Ok(())
+    }
+
+    /// Execute claim release-by-issue with manually constructed paths (for testing).
+    ///
+    /// Mirrors [`execute_claim_release_by_issue`] but takes explicit test paths
+    /// and an explicit actor (simulating the resolved identity) so tests can act
+    /// as an arbitrary identity without touching `JIT_AGENT_ID` / config.
+    fn execute_claim_release_by_issue_test(
+        temp: &TempDir,
+        storage: &JsonFileStorage,
+        issue_id: &str,
+        actor: &str,
+    ) -> Result<ReleasedLeaseInfo> {
+        let full_id = storage.resolve_issue_id(issue_id)?;
+        let paths = create_test_paths(temp);
+
+        let locker = FileLocker::new(Duration::from_secs(5));
+        let coordinator =
+            ClaimCoordinator::new(paths, locker, "wt:test".to_string(), actor.to_string());
+        coordinator.init()?;
+
+        let leases = coordinator.get_active_leases(Some(&full_id), None)?;
+
+        let released = leases
+            .into_iter()
+            .map(|lease| {
+                let reason = format!("released by {} via claim release", actor);
+                coordinator.force_evict_lease(&lease.lease_id, &reason)?;
+                Ok(ReleasedLeaseInfo {
+                    lease_id: lease.lease_id,
+                    issue_id: lease.issue_id,
+                    previous_owner: lease.agent_id,
+                    actor: actor.to_string(),
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        released
+            .into_iter()
+            .next_back()
+            .ok_or_else(|| anyhow::anyhow!("{}", crate::errors::no_active_lease(&full_id)))
+    }
+
+    /// Assert a string satisfies the agent-identity invariant: has a `:`,
+    /// non-empty type and identifier, and no whitespace in either part.
+    fn assert_valid_actor(actor: &str) {
+        assert!(actor.contains(':'), "actor must contain ':': {}", actor);
+        assert!(
+            !actor.chars().any(char::is_whitespace),
+            "actor must not contain whitespace: {}",
+            actor
+        );
+        let (type_part, id_part) = actor.split_once(':').unwrap();
+        assert!(
+            !type_part.is_empty(),
+            "type part must be non-empty: {}",
+            actor
+        );
+        assert!(
+            !id_part.is_empty(),
+            "identifier part must be non-empty: {}",
+            actor
+        );
+    }
+
+    #[test]
+    fn test_sanitize_actor_collapses_whitespace_in_git_name() {
+        let actor = sanitize_actor(Some("Alice Example")).expect("name yields an identity");
+        assert_eq!(actor, "human:Alice-Example");
+        assert_valid_actor(&actor);
+    }
+
+    #[test]
+    fn test_sanitize_actor_handles_multiple_and_trailing_whitespace() {
+        let actor = sanitize_actor(Some("  Bob   Q.  Smith  ")).expect("name yields an identity");
+        assert_eq!(actor, "human:Bob-Q.-Smith");
+        assert_valid_actor(&actor);
+    }
+
+    #[test]
+    fn test_sanitize_actor_returns_none_without_usable_name() {
+        // No release identity may be fabricated: these must all yield None so
+        // the caller errors rather than attributing the release to a placeholder.
+        assert_eq!(sanitize_actor(None), None);
+        assert_eq!(sanitize_actor(Some("")), None);
+        assert_eq!(sanitize_actor(Some("   ")), None);
+    }
+
+    #[test]
+    fn test_no_acting_identity_error_is_actionable() {
+        // The mapping `sanitize_actor(None) -> Err(no_acting_identity())` used by
+        // resolve_release_actor must surface a clear, actionable error so a
+        // release is never attributed to a fabricated identity.
+        let err: Result<String> = sanitize_actor(None)
+            .ok_or_else(|| anyhow::anyhow!("{}", crate::errors::no_acting_identity()));
+        assert!(err.is_err());
+        let msg = err.unwrap_err().to_string();
+        assert!(msg.contains("no acting identity"));
+        assert!(msg.contains("JIT_AGENT_ID"));
+        assert!(msg.contains("git config user.name"));
+    }
+
+    #[test]
+    fn test_release_by_issue_succeeds_for_different_actor() -> Result<()> {
+        let (temp, storage) = setup_test_repo()?;
+        let issue_id = create_test_issue(&storage, "Test Issue")?;
+
+        // Agent A acquires the lease.
+        let lease_id = execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:owner")?;
+        assert_eq!(execute_claim_list_test(&temp)?.len(), 1);
+
+        // A DIFFERENT actor releases by issue id (no lease UUID).
+        let released =
+            execute_claim_release_by_issue_test(&temp, &storage, &issue_id, "agent:stranger")?;
+
+        assert_eq!(released.lease_id, lease_id);
+        assert_eq!(released.issue_id, issue_id);
+        assert_eq!(released.previous_owner, "agent:owner");
+        assert_eq!(released.actor, "agent:stranger");
+
+        // Lease is gone.
+        assert_eq!(execute_claim_list_test(&temp)?.len(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn test_release_by_issue_records_actor_in_audit_trail() -> Result<()> {
+        let (temp, storage) = setup_test_repo()?;
+        let issue_id = create_test_issue(&storage, "Test Issue")?;
+
+        execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:owner")?;
+        execute_claim_release_by_issue_test(&temp, &storage, &issue_id, "agent:auditor")?;
+
+        // The eviction is recorded in the append-only claims log with the actor
+        // embedded in the reason.
+        let claims_log = temp.path().join(".git/jit/claims.jsonl");
+        let content = fs::read_to_string(&claims_log)?;
+        assert!(
+            content.contains("released by agent:auditor via claim release"),
+            "claims log should record the acting identity, got: {}",
+            content
+        );
+        assert!(content.contains("force-evict"));
+        Ok(())
+    }
+
+    #[test]
+    fn test_release_by_issue_errors_when_no_active_lease() -> Result<()> {
+        let (temp, storage) = setup_test_repo()?;
+        let issue_id = create_test_issue(&storage, "Unclaimed Issue")?;
+
+        let result = execute_claim_release_by_issue_test(&temp, &storage, &issue_id, "agent:actor");
+
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("no active lease") && msg.contains("not found"),
+            "error should clearly state no active lease and contain 'not found', got: {}",
+            msg
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_release_by_issue_resolves_short_id() -> Result<()> {
+        let (temp, storage) = setup_test_repo()?;
+        let issue_id = create_test_issue(&storage, "Test Issue")?;
+
+        execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:owner")?;
+
+        // Use a short prefix of the issue id.
+        let short_id = &issue_id[..8];
+        let released =
+            execute_claim_release_by_issue_test(&temp, &storage, short_id, "agent:actor")?;
+
+        assert_eq!(released.issue_id, issue_id);
+        assert_eq!(execute_claim_list_test(&temp)?.len(), 0);
         Ok(())
     }
 

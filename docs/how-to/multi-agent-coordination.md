@@ -51,7 +51,7 @@ jit claim acquire <issue-id>
 jit issue update <issue-id> --state done
 
 # Release when done (or let it expire)
-jit claim release <lease-id>
+jit claim release <issue-id>
 ```
 
 ## Coordination Patterns
@@ -391,7 +391,7 @@ git add -A && git commit -m "feat: complete issue description"
 git push origin <branch-name>
 
 # Clean up lease (or let it expire)
-jit claim release <lease-id>
+jit claim release <issue-id>
 ```
 
 Then merge from main:

@@ -1528,17 +1528,18 @@ pub enum ClaimCommands {
         json: bool,
     },
 
-    /// Release a lease
+    /// Release the active lease on an issue
     ///
-    /// Explicitly releases a lease before it expires, making the issue available
-    /// for other agents to claim.
+    /// Resolves the issue's active lease and releases it WITHOUT requiring the
+    /// lease UUID, regardless of which agent owns it. The acting identity is
+    /// recorded in the audit trail. Errors if the issue has no active lease.
     ///
     /// Examples:
-    ///   jit claim release abc12345-6789-...
-    ///   jit claim release abc12345-6789-... --json
+    ///   jit claim release abc123          # release whatever lease is active on issue abc123
+    ///   jit claim release abc123 --json
     Release {
-        /// Lease ID to release
-        lease_id: String,
+        /// Issue ID whose active lease should be released (short ids accepted)
+        issue_id: String,
 
         /// Output as JSON
         #[arg(long)]

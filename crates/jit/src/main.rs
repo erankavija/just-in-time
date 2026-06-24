@@ -4754,21 +4754,33 @@ fn run() -> Result<()> {
                     }
                 }
             }
-            ClaimCommands::Release { lease_id, json } => {
-                use jit::commands::claim::execute_claim_release;
+            ClaimCommands::Release { issue_id, json } => {
+                use jit::commands::claim::execute_claim_release_by_issue;
                 use jit::output::{JsonError, JsonOutput};
 
-                match execute_claim_release(&lease_id) {
-                    Ok(()) => {
+                match execute_claim_release_by_issue(&storage, &issue_id) {
+                    Ok(released) => {
                         if json {
                             let response = serde_json::json!({
-                                "lease_id": lease_id,
-                                "message": format!("Released lease {}", lease_id),
+                                "lease_id": released.lease_id,
+                                "issue_id": released.issue_id,
+                                "previous_owner": released.previous_owner,
+                                "actor": released.actor,
+                                "message": format!(
+                                    "Released lease {} on issue {} (was held by {}) by {}",
+                                    released.lease_id,
+                                    released.issue_id,
+                                    released.previous_owner,
+                                    released.actor
+                                ),
                             });
                             let output = JsonOutput::success(response, "claim release");
                             println!("{}", output.to_json_string()?);
                         } else {
-                            println!("✓ Released lease: {}", lease_id);
+                            println!("✓ Released lease: {}", released.lease_id);
+                            println!("  Issue: {}", released.issue_id);
+                            println!("  Previous owner: {}", released.previous_owner);
+                            println!("  Released by: {}", released.actor);
                         }
                     }
                     Err(e) => {

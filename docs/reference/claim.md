@@ -96,38 +96,50 @@ max_indefinite_leases_per_repo = 10
 
 ## jit claim release
 
-Explicitly release a lease before expiration.
+Release the active lease on an issue, by issue id.
 
 ### Synopsis
 
 ```bash
-jit claim release [OPTIONS] <LEASE_ID>
+jit claim release [OPTIONS] <ISSUE_ID>
 ```
 
 ### Description
 
-Releases a lease before it expires, making the issue immediately available for other agents to claim. Only the lease owner can release it.
+Resolves the issue's active lease and releases it **without** requiring the lease
+UUID, making the issue immediately available for other agents to claim.
+
+Release succeeds **regardless of which agent owns the lease** (it reuses the
+force-evict path). The release requires an acting identity: it is resolved from
+`JIT_AGENT_ID` / `~/.config/jit/agent.toml`, falling back to the git `user.name`
+(sanitized to `human:<name>` with whitespace collapsed to `-`). This identity is
+recorded in the eviction audit trail (`claims.jsonl`) so every release is
+attributable. If neither an agent id nor a git `user.name` is available, the
+command **errors** rather than fabricating an identity.
+
+If the issue has no active lease, the command fails with an actionable
+"no active lease ... (not found)" error.
 
 ### Arguments
 
 | Argument | Description |
 |----------|-------------|
-| `<LEASE_ID>` | Lease ID to release (UUID from acquire) |
+| `<ISSUE_ID>` | Issue ID whose active lease should be released (short ids accepted) |
 
 ### Options
 
 | Option | Description |
 |--------|-------------|
-| `--json` | Output as JSON |
+| `--json` | Output as JSON (`lease_id`, `issue_id`, `previous_owner`, `actor`, `message`) |
 
 ### Examples
 
 ```bash
-# Release a lease
-jit claim release abc12345-6789-0123-4567-89abcdef0123
+# Release whatever lease is active on issue abc123 (any owner)
+jit claim release abc123
 
 # JSON output
-jit claim release abc12345-6789-... --json
+jit claim release abc123 --json
 ```
 
 ### Exit Codes
@@ -135,8 +147,7 @@ jit claim release abc12345-6789-... --json
 | Code | Description |
 |------|-------------|
 | 0 | Lease released successfully |
-| 1 | Lease not found |
-| 1 | Not authorized (different owner) |
+| 1 | Issue not found, issue has no active lease to release, or no acting identity available |
 
 ---
 
