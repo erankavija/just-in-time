@@ -54,6 +54,22 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
     {
         return ExitCode::ValidationFailed;
     }
+    // A failed batch-create pre-validation is an argument error (exit 2): no
+    // writes happened, the file is malformed.
+    if error
+        .downcast_ref::<jit::commands::BatchValidationError>()
+        .is_some()
+    {
+        return ExitCode::InvalidArgument;
+    }
+    // A mid-write batch-create failure is an infra/external error (exit 10): some
+    // issues were created, then a write failed.
+    if error
+        .downcast_ref::<jit::commands::BatchWriteError>()
+        .is_some()
+    {
+        return ExitCode::ExternalError;
+    }
 
     let error_msg = error.to_string().to_lowercase();
 
@@ -643,6 +659,45 @@ fn run() -> Result<()> {
                                 let _ =
                                     output_ctx.print_warning(format!("\n⚠ {}", gf.finding.message));
                             }
+                        }
+                    }
+                }
+                IssueCommands::BatchCreate { from_json, json } => {
+                    use jit::commands::BatchIssueDef;
+
+                    // Read + parse the file (both fallible I/O paths carry context).
+                    let contents = std::fs::read_to_string(&from_json).with_context(|| {
+                        format!("Failed to read batch file {}", from_json.display())
+                    })?;
+                    let defs: Vec<BatchIssueDef> =
+                        serde_json::from_str(&contents).with_context(|| {
+                            format!(
+                                "Failed to parse batch file {} as a JSON array of issue definitions",
+                                from_json.display()
+                            )
+                        })?;
+
+                    // The method does FULL pre-validation before any write and
+                    // returns a typed error (validation list or partial-write map)
+                    // on failure, which the top-level handler maps to an exit code.
+                    let outcome = executor.batch_create_from_json(defs)?;
+
+                    if json {
+                        // Print EXACTLY the pure `{key: id}` map: every top-level
+                        // entry is a symbolic key, no envelope/`message` field.
+                        // A BTreeMap gives deterministic (sorted-key) output.
+                        let map: std::collections::BTreeMap<&str, &str> = outcome
+                            .key_to_id
+                            .iter()
+                            .map(|(k, v)| (k.as_str(), v.as_str()))
+                            .collect();
+                        println!("{}", serde_json::to_string_pretty(&map)?);
+                    } else {
+                        let output_ctx = OutputContext::new(quiet, json);
+                        let _ = output_ctx
+                            .print_info(format!("Created {} issue(s):", outcome.key_to_id.len()));
+                        for (key, id) in &outcome.key_to_id {
+                            println!("  {key} -> {id}");
                         }
                     }
                 }

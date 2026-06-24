@@ -939,6 +939,73 @@ jit issue update --filter "label:milestone:v0.9" --remove-label "milestone:v0.9"
 
 <!-- Additional jit issue commands -->
 
+### Batch-Create with Dependency Wiring (`jit issue batch-create`)
+
+`jit issue batch-create --from-json <file>` creates a whole set of issues and
+their dependency edges from one declarative JSON file, replacing hand-written
+`create` + `dependency add` loops. Entries reference each other by a symbolic
+`key`, so you describe the dependency graph directly instead of threading
+generated IDs through follow-up commands.
+
+```bash
+jit issue batch-create --from-json plan.json
+jit issue batch-create --from-json plan.json --json
+```
+
+**File schema** — a JSON array of objects:
+
+| Field         | Required | Default              | Notes                                              |
+|---------------|----------|----------------------|----------------------------------------------------|
+| `key`         | yes      | —                    | Symbolic key, unique within the file               |
+| `title`       | yes      | —                    | Issue title                                        |
+| `description` | no       | `""`                 | Issue body                                         |
+| `type`        | no       | project default type | Applied as a `type:<t>` label                      |
+| `priority`    | no       | `normal`             | `low` / `normal` / `high` / `critical`             |
+| `labels`      | no       | `[]`                 | Each must be `namespace:value`                     |
+| `gates`       | no       | `[]`                 | Each must be a registered gate key                 |
+| `depends_on`  | no       | `[]`                 | Symbolic `key`s of other entries in the same file  |
+
+Example `plan.json`:
+
+```json
+[
+  { "key": "spec", "title": "Write the spec", "type": "story" },
+  { "key": "impl", "title": "Implement it", "type": "task", "depends_on": ["spec"] },
+  { "key": "test", "title": "Test it", "type": "task", "depends_on": ["impl"] }
+]
+```
+
+**Pre-validation (ALL before any write).** The entire file is validated before
+a single issue is created. Validation collects EVERY problem (it does not stop
+at the first) and, on any failure, creates **zero** issues and exits with code
+`2` (invalid argument), listing each offending entry. Checks performed:
+
+- duplicate `key`s,
+- `depends_on` references to keys not defined in the file,
+- cycles in the symbolic `depends_on` graph,
+- priority strings that do not parse,
+- `type` values not in the project's `[type_hierarchy]` (when one is configured),
+- labels that are not `namespace:value`,
+- gates not present in the gate registry.
+
+**Atomicity caveat.** Pre-validation is atomic: a malformed file changes
+nothing. The **write phase is NOT atomic** — once creation begins, a failure
+partway through reports the partial `{key: id}` map produced so far plus the
+failing step and exits non-zero. There is no rollback; recover manually (inspect
+or delete the partially-created issues, fix the file, and re-run).
+
+**Output.** On success the command returns the `{key: full_id}` map. With
+`--json` the output is EXACTLY that map as the top-level JSON object — every
+entry is a symbolic key mapping to the created issue's full id, with no envelope
+or `message` field (keys are emitted sorted). Human output lists each `key -> id`.
+
+```json
+{
+  "impl": "54a9f64c-7117-483e-b59d-3ccc16c5b55e",
+  "spec": "48453126-9f6b-4f7a-a5a6-cb30ef833f92"
+}
+```
+
 ### Searching Issues (`jit issue search`)
 
 `jit issue search` matches issues by a text query and/or filter flags. The text

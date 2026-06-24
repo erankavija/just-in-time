@@ -21,6 +21,7 @@
 //! - `events`: Event log operations
 //! - `search`: Issue search operations
 
+pub mod batch_create;
 mod breakdown;
 pub mod bulk_update;
 pub mod claim;
@@ -46,6 +47,10 @@ pub mod worktree;
 #[cfg(test)]
 pub mod test_helpers;
 
+pub use batch_create::{
+    BatchCreateOutcome, BatchIssueDef, BatchValidationError, BatchValidationProblem,
+    BatchWriteError,
+};
 pub use breakdown::{BracketBreakdownResult, BracketChild};
 pub use bulk_update::{BulkUpdatePreview, BulkUpdateResult, UpdateOperations};
 pub use gate::{

@@ -341,6 +341,45 @@ pub enum IssueCommands {
         json: bool,
     },
 
+    /// Batch-create issues with dependency wiring from a JSON file.
+    ///
+    /// Reads a JSON array of issue definitions that reference each other by a
+    /// symbolic `key`, then FULLY pre-validates the whole file before any write
+    /// (duplicate/unknown keys, unknown `depends_on` references, cycles,
+    /// type/label/gate validity, priority parse). On any validation failure it
+    /// creates ZERO issues and exits 2, listing every offending entry. On success
+    /// it creates all issues and dependency edges and returns a `{key: id}` map.
+    ///
+    /// The write phase is NOT atomic: if a write fails partway, the partial
+    /// `{key: id}` map and the failing step are reported; recovery is manual.
+    ///
+    /// Schema (array of objects):
+    ///   key         (required) symbolic key, unique within the file
+    ///   title       (required) issue title
+    ///   description (optional, default "")
+    ///   type        (optional, default = project default type)
+    ///   priority    (optional, default "normal")
+    ///   labels      (optional, array of "namespace:value")
+    ///   gates       (optional, array of registered gate keys)
+    ///   depends_on  (optional, array of symbolic keys in the same file)
+    ///
+    /// Example file:
+    ///   [
+    ///     { "key": "spec", "title": "Write spec", "type": "story" },
+    ///     { "key": "impl", "title": "Implement", "type": "task",
+    ///       "depends_on": ["spec"] }
+    ///   ]
+    ///
+    /// Example: jit issue batch-create --from-json plan.json --json
+    BatchCreate {
+        /// Path to the JSON file containing the array of issue definitions.
+        #[arg(long)]
+        from_json: std::path::PathBuf,
+
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Search issues by text query and/or filters.
     ///
     /// The positional query searches title, description, and ID. It is optional
