@@ -2,7 +2,7 @@
   "id": "f38c15e4-476a-4c30-993e-486e53a8bb6c",
   "title": "Gate pass workflow",
   "description": "Groups the `gate pass` workflow improvements (REQ-04..REQ-06).\n\n## Success Criteria\n\n- [ ] `gate pass` uses the 0/4/10 exit-code taxonomy with a `verdict` field (REQ-04).\n- [ ] `gate pass` skips already-passed gates at HEAD, with a `--force` override (REQ-05).\n- [ ] `gate pass-all` runs required gates fail-fast (REQ-06).",
-  "state": "backlog",
+  "state": "done",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -18,5 +18,5 @@
     "story:gate-pass-workflow"
   ],
   "created_at": "2026-06-22T21:27:28.990676566+00:00",
-  "updated_at": "2026-06-22T21:30:39.325342342+00:00"
+  "updated_at": "2026-06-24T14:17:39.647975201+00:00"
 }

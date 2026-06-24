@@ -1323,6 +1323,55 @@ jit gate pass abc123 tests --json
 # Runner error    (exit 10): error.details.verdict == "error"
 ```
 
+### `jit gate pass-all`
+
+Pass all of an issue's required gates in one command, **fail-fast**.
+
+**Usage:**
+```bash
+jit gate pass-all <ISSUE_ID> [--by <WHO>] [--force]
+```
+
+**Options:**
+- `--by <WHO>` - Record who passed the gates (e.g., `human:alice`, `ci:github-actions`)
+- `--force` - Re-run every gate's checker even if it already passed at the current HEAD commit
+
+**Behavior:**
+- Runs each required gate in declaration order, delegating to `jit gate pass`, so
+  every gate inherits the same exit-code taxonomy, `verdict` semantics, and the
+  **skip-if-passed-at-HEAD** behaviour (an already-passed gate is not re-run;
+  its entry reports `already_passed: true`).
+- **Fail-fast:** on the FIRST gate that does not pass, the command stops
+  immediately and exits with that gate's code from the
+  [`jit gate pass`](#jit-gate-pass) taxonomy (`0` pass / `2` bad-args / `3`
+  not-found / `4` checker-failed / `10` runner-error). Later gates are never
+  attempted.
+- An issue with **no required gates** succeeds with exit `0` and an empty
+  `gates` array.
+- `--json` emits a top-level `verdict: "pass"` plus a `gates` array, one entry
+  per gate (`gate_key`, `status`, `verdict`, `already_passed`). On the first
+  failure it emits the same JSON-error shape as `jit gate pass` (with
+  `error.details.verdict` `fail` or `error` and `error.details.gate_key` naming
+  the offending gate).
+
+```bash
+# All gates pass (one already passed at HEAD, one freshly run)
+jit gate pass-all abc123 --json
+# {
+#   "issue_id": "abc123",
+#   "status": "passed",
+#   "verdict": "pass",
+#   "gates": [
+#     { "gate_key": "tests",  "status": "passed", "verdict": "pass", "already_passed": true },
+#     { "gate_key": "clippy", "status": "passed", "verdict": "pass", "already_passed": false }
+#   ],
+#   "message": "Passed 2 required gate(s) for issue abc123"
+# }
+
+# Fail-fast: first failing gate sets the exit code; later gates do not run.
+jit gate pass-all abc123          # exit 4 if a checker fails, 10 on runner error
+```
+
 ### `jit gate fail`
 
 Manually mark a gate as failed.

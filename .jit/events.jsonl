@@ -3414,3 +3414,12 @@
 {"type":"issue_state_changed","id":"ba73b39d-54fa-4c17-9ef1-1b4777a6c29e","issue_id":"9bfcc474-d09b-4b0f-9c02-684f3d056cd3","timestamp":"2026-06-24T14:07:16.376583922Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"b5c3a5df-8cdb-4e8b-b791-4e792cdee124","issue_id":"9bfcc474-d09b-4b0f-9c02-684f3d056cd3","timestamp":"2026-06-24T14:07:16.376604952Z"}
 {"type":"issue_state_changed","id":"1890b745-3f20-4091-99f4-8fbf0b3d51bd","issue_id":"df7f934c-41fe-4019-977b-361ff9b8fc58","timestamp":"2026-06-24T14:07:16.473117219Z","from":"backlog","to":"ready"}
+{"type":"issue_state_changed","id":"fecb4f73-e0ed-4348-b06d-53cb7a5a75f9","issue_id":"df7f934c-41fe-4019-977b-361ff9b8fc58","timestamp":"2026-06-24T14:07:45.612196766Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"5963b75d-7722-4f34-8d1d-7c0216c6cc43","issue_id":"df7f934c-41fe-4019-977b-361ff9b8fc58","timestamp":"2026-06-24T14:07:45.615047537Z","assignee":"agent:claude"}
+{"type":"gate_passed","id":"fb9d8d52-0068-4bf5-a43a-08d83fc1120c","issue_id":"df7f934c-41fe-4019-977b-361ff9b8fc58","timestamp":"2026-06-24T14:15:15.687886014Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"6941c6da-c2b7-4a9b-af3b-48783bac7003","issue_id":"df7f934c-41fe-4019-977b-361ff9b8fc58","timestamp":"2026-06-24T14:17:28.785536163Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"issue_state_changed","id":"d75db5cd-f19e-45ec-9c85-ec825a7be83a","issue_id":"df7f934c-41fe-4019-977b-361ff9b8fc58","timestamp":"2026-06-24T14:17:39.523665585Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"67785bdb-0559-4faf-8aa9-d01f292836ba","issue_id":"df7f934c-41fe-4019-977b-361ff9b8fc58","timestamp":"2026-06-24T14:17:39.523690185Z"}
+{"type":"issue_state_changed","id":"0a2cdfee-6f87-42aa-a543-b95cbd19737c","issue_id":"f38c15e4-476a-4c30-993e-486e53a8bb6c","timestamp":"2026-06-24T14:17:39.629108035Z","from":"backlog","to":"ready"}
+{"type":"issue_state_changed","id":"6e0959c3-16f8-458b-9feb-a572e53cf30a","issue_id":"f38c15e4-476a-4c30-993e-486e53a8bb6c","timestamp":"2026-06-24T14:17:39.648152351Z","from":"ready","to":"done"}
+{"type":"issue_completed","id":"e3a4d5b1-5196-4523-8821-7e24031836e7","issue_id":"f38c15e4-476a-4c30-993e-486e53a8bb6c","timestamp":"2026-06-24T14:17:39.648179681Z"}

@@ -815,6 +815,33 @@ pub enum GateCommands {
         json: bool,
     },
 
+    /// Pass all of an issue's required gates in one command, fail-fast
+    ///
+    /// Runs each required gate in declaration order, stopping at the FIRST gate
+    /// that does not pass and exiting with that gate's code from the `gate pass`
+    /// taxonomy (0 pass / 2 bad-args / 3 not-found / 4 checker-failed / 10
+    /// runner-error). Later gates are not attempted once one fails.
+    ///
+    /// Each gate inherits the skip-if-passed-at-HEAD behaviour: a gate already
+    /// passed at the current HEAD commit is not re-run. Use --force to re-run
+    /// every gate's checker unconditionally. An issue with no required gates
+    /// succeeds (exit 0) with an empty result set.
+    PassAll {
+        /// Issue ID
+        id: String,
+
+        /// Who passed the gates (optional)
+        #[arg(short, long)]
+        by: Option<String>,
+
+        /// Re-run checkers even if gates already passed at the current HEAD
+        #[arg(long)]
+        force: bool,
+
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Mark a gate as failed
     Fail {
         /// Issue ID

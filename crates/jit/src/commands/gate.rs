@@ -97,6 +97,63 @@ pub struct GatePassOutcome {
     pub already_passed: bool,
 }
 
+/// Per-gate entry in a [`PassAllOutcome`].
+///
+/// Records which gate was passed and whether its checker actually ran
+/// (`already_passed == false`) or was skipped because it already passed at the
+/// current `HEAD` (`already_passed == true`), plus any warnings gathered.
+///
+/// # Examples
+///
+/// ```rust
+/// use jit::commands::GatePassAllEntry;
+///
+/// let entry = GatePassAllEntry {
+///     gate_key: "tests".into(),
+///     already_passed: false,
+///     warnings: Vec::new(),
+/// };
+/// assert_eq!(entry.gate_key, "tests");
+/// ```
+#[derive(Debug, Clone)]
+pub struct GatePassAllEntry {
+    /// The gate that was passed.
+    pub gate_key: String,
+    /// `true` when the checker was skipped (gate already passed at `HEAD`).
+    pub already_passed: bool,
+    /// Warnings gathered while passing this gate.
+    pub warnings: Vec<String>,
+}
+
+/// Outcome of a successful [`pass_all_gates`](CommandExecutor::pass_all_gates) run.
+///
+/// `results` holds one [`GatePassAllEntry`] per required gate, in declaration
+/// order. When the issue has no required gates the list is empty (the command
+/// still succeeds with exit `0`). On the first non-passing gate `pass_all_gates`
+/// fails fast and returns the underlying error instead of this outcome, so a
+/// `PassAllOutcome` always describes an all-green run.
+///
+/// # Examples
+///
+/// ```rust
+/// use jit::commands::{GatePassAllEntry, PassAllOutcome};
+///
+/// let outcome = PassAllOutcome {
+///     results: vec![GatePassAllEntry {
+///         gate_key: "tests".into(),
+///         already_passed: true,
+///         warnings: Vec::new(),
+///     }],
+/// };
+/// assert_eq!(outcome.results.len(), 1);
+/// assert!(outcome.results[0].already_passed);
+/// ```
+#[derive(Debug, Clone)]
+pub struct PassAllOutcome {
+    /// Per-gate results, in `gates_required` order.
+    pub results: Vec<GatePassAllEntry>,
+}
+
 /// Result of adding multiple gates
 #[derive(Debug, Serialize)]
 pub struct GateAddResult {
@@ -386,6 +443,59 @@ impl<S: IssueStore> CommandExecutor<S> {
             warnings,
             already_passed: false,
         })
+    }
+
+    /// Pass every required gate for an issue in declaration order, fail-fast.
+    ///
+    /// Each gate is passed via [`pass_gate`](Self::pass_gate), so it inherits the
+    /// skip-if-passed-at-`HEAD` behaviour (already-passed gates are not re-run)
+    /// and the same error classification. On the FIRST gate that does not pass,
+    /// the underlying error is propagated unchanged and no later gate is
+    /// attempted, so the caller can map it to the right exit code (checker
+    /// failure, runner error, etc.). An issue with no required gates succeeds
+    /// with an empty result set.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use jit::commands::CommandExecutor;
+    /// use jit::{InMemoryStorage, IssueStore};
+    ///
+    /// let executor = CommandExecutor::new(InMemoryStorage::new());
+    /// let issue = jit::domain::Issue::new("Title".into(), "Body".into());
+    /// let id = issue.id.clone();
+    /// executor.storage().save_issue(issue).unwrap();
+    ///
+    /// // No required gates: succeeds with an empty result set.
+    /// let outcome = executor.pass_all_gates(&id, None, false).unwrap();
+    /// assert!(outcome.results.is_empty());
+    /// ```
+    pub fn pass_all_gates(
+        &self,
+        issue_id: &str,
+        by: Option<String>,
+        force: bool,
+    ) -> Result<PassAllOutcome> {
+        let full_id = self.storage.resolve_issue_id(issue_id)?;
+        let issue = self.storage.load_issue(&full_id)?;
+
+        // Fail-fast: pass each required gate in order, stopping at the first that
+        // does not pass and propagating its error unchanged. `try_fold` short-
+        // circuits on the first `Err`, so later gates are never attempted.
+        let results = issue.gates_required.iter().try_fold(
+            Vec::with_capacity(issue.gates_required.len()),
+            |mut results, gate_key| {
+                let outcome = self.pass_gate(&full_id, gate_key.clone(), by.clone(), force)?;
+                results.push(GatePassAllEntry {
+                    gate_key: gate_key.clone(),
+                    already_passed: outcome.already_passed,
+                    warnings: outcome.warnings,
+                });
+                Ok::<_, anyhow::Error>(results)
+            },
+        )?;
+
+        Ok(PassAllOutcome { results })
     }
 
     /// Whether the gate's latest run passed at the current `HEAD` commit.
