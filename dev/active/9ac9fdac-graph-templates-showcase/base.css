@@ -1,0 +1,271 @@
+/* ============================================================================
+   presentation-toolkit — base.css
+   Theme-agnostic structure. Every colour and font is a CSS custom property;
+   the active theme file (themes/<name>.css) supplies the :root token block.
+   Swap themes by changing the single <link id="theme"> href in the deck.
+   ============================================================================ */
+
+html, body, .reveal { background: var(--bg); color: var(--text); }
+
+.reveal {
+  font-family: var(--font-body);
+  font-size: 30px;
+  font-weight: 400;
+}
+
+/* ── Slide frame ─────────────────────────────────────────────────────────── */
+
+.reveal .slides > section,
+.reveal .slides > section > section {
+  text-align: left;
+  padding: 1.1em 1.8em 1.1em 1.8em;
+  line-height: 1.45;
+  box-sizing: border-box;
+}
+
+/* ── Section eyebrow label (e.g. "Method · 4 / 15") ──────────────────────── */
+
+.reveal .seclabel {
+  font-family: var(--font-label);
+  font-size: 0.5em;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 0.6em 0;
+  display: block;
+}
+.reveal .seclabel .num { color: var(--text-mute); font-weight: 400; margin-left: 0.6em; }
+
+/* ── Headings ────────────────────────────────────────────────────────────── */
+
+.reveal h1, .reveal h2, .reveal h3 {
+  font-family: var(--font-head);
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+  text-transform: none;
+  margin: 0 0 0.5em 0;
+}
+.reveal h1 { font-size: 2.0em; font-weight: 700; }
+.reveal h2 { font-size: 1.5em; }
+.reveal h3 { font-size: 1.0em; color: var(--text-mute); font-weight: 600; margin: 0.1em 0 0.4em 0; }
+
+/* ── Body text ───────────────────────────────────────────────────────────── */
+
+.reveal p { margin: 0 0 0.7em 0; }
+.reveal em { color: var(--text); font-style: italic; }
+.reveal strong { color: var(--text); font-weight: 700; }
+.reveal a { color: var(--link); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+.reveal ul, .reveal ol { margin: 0 0 0.7em 1.2em; }
+.reveal li { margin: 0.15em 0; }
+.reveal li::marker { color: var(--text-mute); }
+
+/* ── Code ────────────────────────────────────────────────────────────────── */
+
+.reveal pre {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: none;
+  margin: 0.6em 0;
+  padding: 0;
+  width: 100%;
+}
+.reveal pre code {
+  font-family: var(--font-mono);
+  font-size: 0.95em;
+  line-height: 1.4;
+  padding: 0.7em 0.9em;
+  background: transparent;
+  color: var(--text);
+  max-height: 560px;
+}
+
+.reveal :not(pre) > code {
+  font-family: var(--font-mono);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 0.05em 0.35em;
+  font-size: 0.88em;
+  color: var(--kw);
+  white-space: nowrap;
+}
+
+/* Syntax highlighting is driven entirely by theme tokens — no external
+   highlight.js stylesheet is loaded, so code recolours on every theme swap. */
+.reveal .hljs { background: transparent; color: var(--text); }
+.reveal .hljs-keyword, .reveal .hljs-built_in, .reveal .hljs-type { color: var(--kw); font-weight: 500; }
+.reveal .hljs-string, .reveal .hljs-meta-string { color: var(--str); }
+.reveal .hljs-comment, .reveal .hljs-quote { color: var(--cmt); font-style: italic; }
+.reveal .hljs-number, .reveal .hljs-literal { color: var(--kw); }
+.reveal .hljs-title, .reveal .hljs-function .hljs-title, .reveal .hljs-section { color: var(--fn); }
+.reveal .hljs-attr, .reveal .hljs-attribute, .reveal .hljs-name { color: var(--fn); }
+.reveal .hljs-meta { color: var(--text-mute); }
+.reveal .hljs-symbol, .reveal .hljs-bullet { color: var(--accent); }
+
+/* ── API / signature declaration box (rustdoc item-decl) ─────────────────── */
+
+.reveal .item-decl {
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  background: var(--surface);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 3px 3px 0;
+  padding: 0.5em 0.9em;
+  margin: 0.4em 0;
+  color: var(--text);
+  white-space: pre-wrap;
+}
+
+/* ── Math ────────────────────────────────────────────────────────────────── */
+
+.reveal .katex { color: var(--text); }
+.reveal .math-block,
+.reveal .katex-display {
+  background: color-mix(in srgb, var(--accent) 7%, var(--bg));
+  border-left: 4px solid var(--accent);
+  padding: 0.5em 0.9em;
+  border-radius: 0 3px 3px 0;
+  margin: 0.6em 0;
+  overflow-x: auto;
+}
+.reveal .math-block .katex-display { background: transparent; border: 0; padding: 0; margin: 0; }
+
+/* ── Callout / admonition boxes ──────────────────────────────────────────── */
+
+.reveal .def, .reveal .theorem, .reveal .lemma, .reveal .proof,
+.reveal .note, .reveal .warning, .reveal .example {
+  padding: 0.5em 0.85em;
+  border-radius: 0 4px 4px 0;
+  margin: 0.6em 0;
+  font-size: 0.92em;
+  line-height: 1.45;
+  border-left: 4px solid var(--border);
+}
+.reveal .def::before, .reveal .theorem::before, .reveal .lemma::before,
+.reveal .proof::before, .reveal .note::before, .reveal .warning::before,
+.reveal .example::before {
+  font-weight: 700;
+}
+
+.reveal .def     { border-left-color: var(--c-def);     background: color-mix(in srgb, var(--c-def) 12%, var(--bg)); }
+.reveal .def::before     { content: "Definition. "; color: var(--c-def); }
+
+.reveal .theorem { border-left-color: var(--c-thm);     background: color-mix(in srgb, var(--c-thm) 12%, var(--bg)); }
+.reveal .theorem::before { content: "Theorem. ";    color: var(--c-thm); }
+
+.reveal .lemma   { border-left-color: var(--c-lemma);   background: color-mix(in srgb, var(--c-lemma) 12%, var(--bg)); }
+.reveal .lemma::before   { content: "Lemma. ";      color: var(--c-lemma); }
+
+.reveal .proof   { border-left-color: var(--c-proof);   background: transparent; font-style: normal; }
+.reveal .proof::before   { content: "Proof. ";      color: var(--c-proof); }
+.reveal .proof::after    { content: " \220E"; }   /* ∎ end-of-proof box */
+
+.reveal .note    { border-left-color: var(--c-note);    background: color-mix(in srgb, var(--c-note) 12%, var(--bg)); }
+.reveal .note::before    { content: "Note. ";       color: var(--c-note); }
+
+.reveal .warning { border-left-color: var(--c-warn);    background: color-mix(in srgb, var(--c-warn) 14%, var(--bg)); }
+.reveal .warning::before { content: "Warning. ";    color: var(--c-warn); }
+
+.reveal .example { border-left-color: var(--c-example); background: color-mix(in srgb, var(--c-example) 10%, var(--bg)); }
+.reveal .example::before { content: "Example. ";    color: var(--c-example); }
+
+/* ── Tables ──────────────────────────────────────────────────────────────── */
+
+.reveal table { border-collapse: collapse; font-size: 0.7em; margin: 0.4em 0; }
+.reveal th, .reveal td { border-bottom: 1px solid var(--rule); padding: 0.35em 0.7em; text-align: left; vertical-align: top; }
+.reveal th { font-family: var(--font-head); font-weight: 600; color: var(--text-mute); }
+
+/* ── Blockquote ──────────────────────────────────────────────────────────── */
+
+.reveal blockquote {
+  border-left: 3px solid var(--accent);
+  background: transparent;
+  box-shadow: none;
+  padding: 0.1em 0 0.1em 1em;
+  margin: 0.6em 0;
+  font-style: italic;
+  color: var(--text);
+}
+
+/* ── Caption ─────────────────────────────────────────────────────────────── */
+
+.reveal .caption { color: var(--text-mute); font-size: 0.6em; font-style: italic; margin-top: 1.0em; }
+
+/* ── Multi-column layouts ────────────────────────────────────────────────── */
+
+.reveal .two-col,
+.reveal .columns { display: grid; grid-template-columns: 1fr 1fr; gap: 1.8em; align-items: start; }
+.reveal .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.4em; align-items: start; }
+.reveal .two-col.wide-left,  .reveal .columns.wide-left  { grid-template-columns: 2fr 1fr; }
+.reveal .two-col.wide-right, .reveal .columns.wide-right { grid-template-columns: 1fr 2fr; }
+.reveal .two-col h3, .reveal .three-col h3, .reveal .columns h3 {
+  margin-top: 0; color: var(--accent); font-family: var(--font-head); font-weight: 600;
+}
+
+.reveal hr { border: 0; border-top: 1px solid var(--rule); margin: 0.8em 0; }
+
+/* ── Slide number ────────────────────────────────────────────────────────── */
+
+.reveal .slide-number {
+  font-family: var(--font-mono);
+  color: var(--accent);
+  background: transparent;
+  font-size: 0.55em;
+  letter-spacing: 0.05em;
+}
+
+/* ── Title slide ─────────────────────────────────────────────────────────── */
+
+.reveal section.title, .reveal section.title-slide { padding-top: 4em; }
+.reveal section.title h1, .reveal section.title-slide h1 {
+  font-size: 2.6em; letter-spacing: -0.015em; margin-bottom: 0.1em;
+}
+.reveal section.title .tagline, .reveal section.title-slide .tagline {
+  font-family: var(--font-body);
+  font-style: italic; color: var(--text-mute);
+  font-weight: 400;
+  font-size: 1.05em; margin-bottom: 1.4em;
+}
+
+/* ── Badges ──────────────────────────────────────────────────────────────── */
+
+.reveal .badge {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.6em;
+  padding: 0.15em 0.55em;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--accent);
+  margin: 0 0.15em;
+  vertical-align: middle;
+}
+.reveal .badge.orange { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.reveal .badge.blue   { background: var(--link);   border-color: var(--link);   color: var(--bg); }
+.reveal .badge.green  { background: var(--str);    border-color: var(--str);    color: var(--bg); }
+.reveal .badge.gray   { background: var(--text-mute); border-color: var(--text-mute); color: var(--bg); }
+
+/* ── Inline keycap / tool list ───────────────────────────────────────────── */
+
+.reveal .kbd { font-family: var(--font-mono); font-size: 0.78em; color: var(--kw); }
+
+.reveal .tool-list { font-family: var(--font-mono); font-size: 0.7em; line-height: 1.7; }
+.reveal .tool-list .tool-name { color: var(--fn); font-weight: 600; }
+.reveal .tool-list .tool-desc { color: var(--text-mute); font-family: var(--font-body); font-size: 0.95em; font-style: italic; }
+
+/* ── Utilities ───────────────────────────────────────────────────────────── */
+
+.reveal .small  { font-size: 0.8em; }
+.reveal .muted  { color: var(--text-mute); }
+.reveal .center { text-align: center; }
+.reveal .right  { text-align: right; }
+.reveal .highlight { background: color-mix(in srgb, var(--accent) 22%, var(--bg)); border-radius: 2px; padding: 0 0.2em; }
+
+/* ── Dense mode — atomically unsplittable content only (last resort) ──────── */
+
+.reveal .slides section.dense { font-size: 0.8em; }

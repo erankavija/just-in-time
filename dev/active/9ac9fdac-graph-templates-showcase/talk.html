@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<title>Graph templates</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;0,700;1,400&family=Source+Code+Pro:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+
+<link rel="stylesheet" id="theme" href="themes/rust.css">
+<link rel="stylesheet" href="base.css">
+
+<!-- Deck-local diagram styles: a deterministic CSS spine (no Mermaid, so the
+     fit-checker measures a fixed height). Colours come from theme tokens. -->
+<style>
+  .spine { display:flex; align-items:stretch; justify-content:center;
+           gap:.5rem; margin:1.3rem 0 .9rem; flex-wrap:nowrap; }
+  .spine .node { display:flex; flex-direction:column; align-items:center;
+           justify-content:center; min-width:130px; padding:.55rem .7rem;
+           border:2px solid var(--rule, #888); border-radius:10px;
+           background:var(--panel, rgba(127,127,127,.08)); }
+  .spine .node b { font-family:"JetBrains Mono",monospace; font-size:1.5rem;
+           line-height:1.1; }
+  .spine .node small { font-size:.72rem; opacity:.8; margin-top:.15rem; }
+  .spine .node.gate { border-style:dashed; }
+  .spine .node.tmpl { background:var(--accent-soft, rgba(180,120,60,.16)); }
+  .spine .arrow { display:flex; flex-direction:column; align-items:center;
+           justify-content:center; font-size:1.4rem; opacity:.65;
+           min-width:60px; }
+  .spine .arrow small { font-size:.62rem; opacity:.85; }
+  .spine .impl { min-width:150px; }
+  .legend { display:flex; gap:1.4rem; justify-content:center; font-size:.8rem;
+           opacity:.85; margin-top:.2rem; }
+  .legend span b { font-family:"JetBrains Mono",monospace; }
+</style>
+</head>
+<body>
+<div class="reveal"><div class="slides">
+
+<!-- ── TITLE ───────────────────────────────────────────────────────────── -->
+<section class="title">
+  <h1>Graph Templates</h1>
+  <p class="tagline">Configurable, parameterized subgraphs spliced into the work DAG</p>
+  <p>just-in-time &nbsp;·&nbsp; epic <code>9ac9fdac</code> &nbsp;·&nbsp; 2026-06</p>
+  <p class="caption">Generalizing the hardcoded planning bracket into a reusable graph-macro layer</p>
+</section>
+
+<!-- ── AGENDA ──────────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Outline <span class="num">· 2 / 15</span></span>
+  <h2>Agenda</h2>
+  <ol>
+    <li>The problem: a hardcoded bracket, split across binary and skill prose</li>
+    <li>The idea: a graph template as a reusable subgraph</li>
+    <li>The model: <code>.jit/templates.toml</code></li>
+    <li>The command: <code>jit apply &lt;template&gt; &lt;container&gt;</code></li>
+    <li>Interpolation, transforms, and DAG safety</li>
+    <li>Breakdown alignment, dogfood, and what shipped</li>
+  </ol>
+</section>
+
+<!-- ── PROBLEM ─────────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Problem <span class="num">· 3 / 15</span></span>
+  <h2>The bracket was hardcoded — and split in two</h2>
+  <p>The earlier <em>plan-before-fan-out bracket</em> (epic <code>2fbd2a82</code>) worked, but its assembly was asymmetric:</p>
+  <ul>
+    <li><code>jit plan</code> created only <b>P</b>; the breakdown node <b>B</b> was hand-assembled by the jit-breakdown skill from primitives — wiring in skill prose, not the binary.</li>
+    <li><code>jit plan</code> left <b>P</b>'s description <em>empty</em>, weakening the <code>plan-review</code> gate, whose prompt reads <code>issue.description</code> for criteria.</li>
+    <li>The <code>[planning]</code> config block was effectively a hardcoded two-node bracket declaration.</li>
+  </ul>
+  <div class="warning">One specific shape, baked into engine logic and split across two layers — no room to express any other recurring subgraph.</div>
+</section>
+
+<!-- ── THE IDEA ────────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Idea <span class="num">· 4 / 15</span></span>
+  <h2>A graph template is a reusable subgraph</h2>
+  <p>Replace the one hardcoded bracket with a generic primitive. A <b>graph template</b> is a named, parameterized subgraph the engine instantiates and splices onto existing nodes:</p>
+  <div class="spine">
+    <span class="node tmpl"><b>template</b><small>declared in config</small></span>
+    <span class="arrow">＋<small>anchor bindings</small></span>
+    <span class="node"><b>C</b><small>target issue</small></span>
+    <span class="arrow">→<small>jit apply</small></span>
+    <span class="node tmpl"><b>subgraph</b><small>spliced into the DAG</small></span>
+  </div>
+  <div class="note">The planning bracket becomes the <em>first</em> template (<code>plan</code>). The mechanism is generic and domain-agnostic: nothing about <code>plan</code>, <code>P</code>, or <code>B</code> is hardcoded in engine logic.</div>
+</section>
+
+<!-- ── THE MODEL ───────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Model <span class="num">· 5 / 15</span></span>
+  <h2>The model: four ingredients</h2>
+  <ul>
+    <li><b>Nodes</b> — each with a <code>role</code>, a <code>type</code> (from the type hierarchy), <code>gates</code> (presets), and <code>doc</code> + <code>description</code> templates.</li>
+    <li><b>Internal edges</b> — role-based <code>depends_on</code> (e.g. <code>breakdown</code> depends on <code>planning</code>).</li>
+    <li><b>Named anchors</b> — roles (e.g. <code>container</code>) bound to existing issues at apply time; nodes wire to anchors.</li>
+    <li><b>Transforms</b> — a small, fixed, DAG-preserving vocabulary of edge rewrites on anchors.</li>
+  </ul>
+  <div class="note">Static, no deferred edges: a template fully instantiates at apply. Later structural changes (the breakdown interior splice) happen independently.</div>
+</section>
+
+<!-- ── TEMPLATES.TOML ──────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Model <span class="num">· 6 / 15</span></span>
+  <h2>Declared in <code>.jit/templates.toml</code></h2>
+<pre><code class="language-toml">[[template]]
+name = "plan"
+[[template.anchors]]
+name = "container"      # bound at apply to the target
+[[template.nodes]]
+role = "planning"
+type = "planning"       # must exist in [type_hierarchy]
+gates = ["plan-review"] # gate-preset names</code></pre>
+  <div class="note">The template declares <code>applies_to = ["epic"]</code> and a second <code>breakdown</code> node (two gates, a B → P edge). The loader validates roles, edges, types, and acyclicity at every config load.</div>
+</section>
+
+<!-- ── THE COMMAND ─────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Command <span class="num">· 7 / 15</span></span>
+  <h2>One command, one operation</h2>
+  <pre><code class="language-bash">jit apply plan &lt;container-C&gt;</code></pre>
+  <p>Applying <code>plan</code> to a container <code>C</code> does, atomically:</p>
+  <ul>
+    <li>create <b>P</b> (<code>type:planning</code>, <code>plan-review</code>) and <b>B</b> (<code>type:breakdown</code>, <code>coverage-preview</code> + <code>breakdown-review</code>) with fresh ids;</li>
+    <li>wire internal edge <b>B → P</b> and anchor edge <b>C → B</b>;</li>
+    <li>apply the gate presets and interpolate descriptions;</li>
+    <li>run the <code>move-upstream-to-planning</code> transform.</li>
+  </ul>
+  <div class="note">This replaces <em>both</em> the old <code>jit plan</code> (P-only) and the skill's hand-wiring of <b>B</b>. <code>jit plan</code> / <code>--with-planning</code> are gone.</div>
+</section>
+
+<!-- ── THE SPINE ───────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Result <span class="num">· 8 / 15</span></span>
+  <h2>The <code>plan</code> template reproduces the bracket</h2>
+  <div class="spine">
+    <span class="node"><b>C</b><small>container</small></span>
+    <span class="arrow">→<small>depends on</small></span>
+    <span class="node impl"><b>impl…</b><small>the work</small></span>
+    <span class="arrow">→<small>depends on</small></span>
+    <span class="node gate tmpl"><b>B</b><small>breakdown · coverage</small></span>
+    <span class="arrow">→<small>depends on</small></span>
+    <span class="node gate tmpl"><b>P</b><small>planning · plan-review</small></span>
+  </div>
+  <div class="legend">
+    <span>Precedence <b>P &gt; B &gt; impl &gt; C</b>:</span>
+    <span>plan first → breakdown → the work → the container closes.</span>
+  </div>
+  <div class="note">Identical spine to epic <code>2fbd2a82</code> — but now <b>P</b> and <b>B</b> are both born from config in a single <code>jit apply</code>, and the result is always re-validated as an acyclic DAG.</div>
+</section>
+
+<!-- ── INTERPOLATION ───────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Mechanism <span class="num">· 9 / 15</span></span>
+  <h2>Interpolation closes the empty-P gap</h2>
+  <p><code>description</code> and <code>doc</code> fields interpolate from anchor context — container title, id, short id, <code>[hard]</code> criteria, labels, resolved doc path:</p>
+  <pre><code class="language-toml">doc         = "dev/active/{container.id}-plan.md"
+description = "Planning node for {container.title} ({container.short_id}).
+  Produce the plan that decomposes this container before fan-out:
+  address its [hard] success criteria… Plan document: {doc}."</code></pre>
+  <div class="note">Applying <code>plan</code> now yields a planning node with a <em>populated</em> description, so <code>plan-review</code> reads real criteria. <b>REQ-03</b> closed; the two legacy empty-P descriptions (<code>1eb0bdfd</code>, <code>2937919f</code>) were reseeded to the exact template literal.</div>
+</section>
+
+<!-- ── TRANSFORMS ──────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Mechanism <span class="num">· 10 / 15</span></span>
+  <h2>Transforms: small, fixed, DAG-preserving</h2>
+  <p>A template may rewrite edges on its anchors through a fixed vocabulary with an extensible dispatch. This epic ships exactly one:</p>
+  <div class="item-decl">move-upstream-to-role &nbsp;·&nbsp; as <code>move-upstream-to-planning</code></div>
+  <ul>
+    <li>Moves the container <code>C</code>'s pre-existing <em>upstream</em> dependencies onto <b>P</b>, so planning waits on upstream work and <code>C</code> becomes the pure closure node.</li>
+    <li>Reproduces the retrofit behaviour the old <code>jit plan</code> did by hand — now declarative.</li>
+  </ul>
+  <div class="note">Other transforms (e.g. <code>redirect</code>) are deferred: the engine enables them, but only <code>move-upstream-to-role</code> ships. Every transform must keep the graph acyclic.</div>
+</section>
+
+<!-- ── DAG SAFETY ──────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Mechanism <span class="num">· 11 / 15</span></span>
+  <h2>Apply is atomic and cycle-safe</h2>
+  <div class="item-decl">validate → snapshot → instantiate → re-validate</div>
+  <ul>
+    <li>The whole apply is one operation: nodes, internal + anchor edges, gate presets, transforms — then the result is validated as an acyclic DAG.</li>
+    <li>A cycle-atomicity gap surfaced during the epic: apply could partially mutate before a cycle was detected.</li>
+    <li>Fixed with an <b>edge-simulation pre-check</b> — the resulting edge set is simulated for cycles <em>before</em> any node is created.</li>
+  </ul>
+  <div class="note">Tested entirely against <em>isolated temporary jit repositories</em>, never the production <code>.jit</code> store (<b>REQ-08</b>).</div>
+</section>
+
+<!-- ── BREAKDOWN ALIGNMENT ─────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Integration <span class="num">· 12 / 15</span></span>
+  <h2>Breakdown consumes the pre-created B</h2>
+  <p>With <b>B</b> now born at <code>jit apply</code>, the breakdown engine and the jit-breakdown skill no longer create it — they perform only the <em>interior splice</em>:</p>
+  <div class="spine">
+    <span class="node"><b>sources</b><small>entry impl</small></span>
+    <span class="arrow">→<small>depends on</small></span>
+    <span class="node gate tmpl"><b>B</b><small>pre-created</small></span>
+    <span class="arrow" style="opacity:.3">┊</span>
+    <span class="node"><b>C</b><small>container</small></span>
+    <span class="arrow">→<small>depends on</small></span>
+    <span class="node"><b>sinks</b><small>final impl</small></span>
+  </div>
+  <div class="note">B-creation removed from skill prose (<b>REQ-07</b>). The skill drafts children, wires <code>sources → B</code> and <code>C → sinks</code>, and runs the coverage gate — no hand-assembly of the bracket.</div>
+</section>
+
+<!-- ── WHAT SHIPPED ────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Delivery <span class="num">· 13 / 15</span></span>
+  <h2>What shipped — 10 waves, 19 children</h2>
+  <table>
+    <thead><tr><th>waves</th><th>delivered</th></tr></thead>
+    <tbody>
+      <tr><td>1–2 · registry</td><td>template loader + validation; authored the <code>plan</code> template</td></tr>
+      <tr><td>3–4 · core</td><td><code>apply_template</code> (validate → snapshot → instantiate) + <code>move-upstream-to-role</code></td></tr>
+      <tr><td>5–6 · surface</td><td><code>jit apply</code> CLI; atomic scaffold switch; removed <code>jit plan</code> / <code>--with-planning</code></td></tr>
+      <tr><td>7–8 · cleanup</td><td>scoped validation on the registry; removed <code>PlanningConfig</code> + every flat <code>[planning]</code> block</td></tr>
+      <tr><td>9–10 · adopt</td><td>skills + memory + docs migrated; engine tests; reseed; dogfood on a real container</td></tr>
+    </tbody>
+  </table>
+  <div class="note">19 / 19 children done (6 stories + 13 leaf tasks). All ten <code>[hard]</code> REQs met.</div>
+</section>
+
+<!-- ── DOGFOOD ─────────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Delivery <span class="num">· 14 / 15</span></span>
+  <h2>Dogfood surfaced three jit gaps — fixed in-epic</h2>
+  <p>Clean-migrating a real legacy container (<code>25064508</code>) to <code>jit apply plan</code> exercised delete + dep-rm on the production store and exposed pre-existing bugs:</p>
+  <ul>
+    <li><code>jit issue delete</code> logged no event — no <code>IssueDeleted</code> type existed.</li>
+    <li><code>jit dep add</code>/<code>rm</code> logged no <code>issue_updated</code>; no-op removals bumped <code>updated_at</code> without an event.</li>
+    <li><code>jit apply plan</code> detected only an existing breakdown node, so it could <em>duplicate</em> the planning node on a legacy P-only container.</li>
+  </ul>
+  <div class="note">All three fixed within the epic, not deferred. Only the aggregate dogfood — not the per-task reviews — caught them; story-level code-review earned its keep.</div>
+</section>
+
+<!-- ── SUMMARY / NEXT ──────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Wrap-up <span class="num">· 15 / 15</span></span>
+  <h2>Summary &amp; what it opens up</h2>
+  <ul>
+    <li>The hardcoded planning bracket is now <em>one configuration</em> of a generic graph-template engine.</li>
+    <li><code>jit apply plan</code> creates P + B from config in a single, cycle-safe, atomic operation — closing the empty-P gap and the binary/skill split.</li>
+    <li>The flat <code>[planning]</code> / <code>PlanningConfig</code> path is gone; nothing domain-specific is hardcoded in engine logic.</li>
+    <li><b>Next:</b> new recurring subgraphs become config, not code — additional templates and transforms need no further engine work.</li>
+  </ul>
+</section>
+
+<!-- ── CLOSING ─────────────────────────────────────────────────────────── -->
+<section class="title">
+  <h1>The bracket is now a template.</h1>
+  <p class="tagline">epic 9ac9fdac · 19 / 19 children · 10 / 10 REQs · done</p>
+  <p><code>.jit/templates.toml</code> &nbsp;·&nbsp; <code>jit apply plan &lt;container&gt;</code></p>
+</section>
+
+</div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script>
+  window.__deckReady = false;
+  window.__mathReady = false;
+
+  function initDeck() {
+    if (window.renderMathInElement) {
+      renderMathInElement(document.body, {
+        delimiters: [
+          { left: "\\[", right: "\\]", display: true },
+          { left: "\\(", right: "\\)", display: false },
+        ],
+        throwOnError: false,
+      });
+    }
+    window.__mathReady = true;
+
+    Reveal.initialize({
+      width: 1280,
+      height: 720,
+      margin: 0.04,
+      minScale: 0.4,
+      maxScale: 1.2,
+      hash: true,
+      center: false,
+      slideNumber: 'c/t',
+      transition: 'none',
+      backgroundTransition: 'none',
+      plugins: [ RevealHighlight ],
+    }).then(function () {
+      Promise.resolve(document.fonts ? document.fonts.ready : null)
+        .finally(function () { window.__deckReady = true; });
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', function () {
+      setTimeout(initDeck, 0);
+    });
+  } else {
+    setTimeout(initDeck, 0);
+  }
+</script>
+</body>
+</html>
