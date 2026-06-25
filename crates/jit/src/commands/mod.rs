@@ -284,14 +284,6 @@ pub struct CommandExecutor<S: IssueStore> {
     /// Lazily-built label namespace registry, derived from the cached config and
     /// cached alongside it for the same reason.
     namespaces: OnceLock<Result<LabelNamespaces, String>>,
-    /// Candidate items for the project scope (`@`), keyed by no issue.
-    ///
-    /// Project-scoped kinds are registry-first: their source is a config table
-    /// (e.g. `.jit/invariants.toml`) wired in a later Group C issue, not an issue
-    /// description. Until that source lands, this is empty, but the `@`
-    /// scope-resolution path is already live and exercised by tests via
-    /// [`with_project_items`](CommandExecutor::with_project_items) (REQ-01).
-    project_item_source: Vec<crate::domain::item::RawScopeItem>,
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
@@ -305,38 +297,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             effective_rules: OnceLock::new(),
             config: OnceLock::new(),
             namespaces: OnceLock::new(),
-            project_item_source: Vec::new(),
         }
-    }
-
-    /// Seed the project-scope (`@`) item source with explicit candidates.
-    ///
-    /// Project-scoped kinds are registry-first; their config-backed source is
-    /// built in a later Group C issue. This builder lets the `@` scope-resolution
-    /// path be exercised end-to-end before that source exists (REQ-01): the seeded
-    /// candidates are indexed under the project scope and resolved by
-    /// [`show_item`](Self::show_item) for `@/<self-id>` ids.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::commands::CommandExecutor;
-    /// use jit::domain::item::RawScopeItem;
-    /// use jit::storage::JsonFileStorage;
-    ///
-    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"))
-    ///     .with_project_items(vec![RawScopeItem {
-    ///         kind: "invariant".to_string(),
-    ///         self_id: "INV-01".to_string(),
-    ///         text: "all writes are atomic".to_string(),
-    ///     }]);
-    /// let shown = executor.show_item("@/INV-01")?;
-    /// assert_eq!(shown.item.self_id, "INV-01");
-    /// # Ok::<(), anyhow::Error>(())
-    /// ```
-    pub fn with_project_items(mut self, items: Vec<crate::domain::item::RawScopeItem>) -> Self {
-        self.project_item_source = items;
-        self
     }
 
     /// Get reference to the storage backend

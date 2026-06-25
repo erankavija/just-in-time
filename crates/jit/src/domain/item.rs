@@ -24,10 +24,10 @@
 //! Indexing is pure and substrate-specific but shares one derivation core
 //! ([`derive_scope_items`], which enforces per-scope uniqueness and mints
 //! qualified ids): [`index_items`] projects an issue's markdown (markdown is the
-//! single source of truth, recomputed on demand), while [`index_project_items`]
-//! projects registry-supplied project-scope (`@`) candidates. A list entry
-//! without a matching self-id is plain prose and incurs no addressing requirement
-//! (REQ-06).
+//! single source of truth, recomputed on demand), while [`index_markdown_items`]
+//! projects a standalone markdown source file (used for project-scope (`@`)
+//! kinds, whose source path comes from config). A list entry without a matching
+//! self-id is plain prose and incurs no addressing requirement (REQ-06).
 
 use crate::config::ItemKindConfig;
 use crate::document::ContentParser;
@@ -153,6 +153,95 @@ impl Scope {
     }
 }
 
+/// The declared addressing scope of an item *kind* (as opposed to a resolved
+/// [`Scope`], which carries a concrete issue short-id).
+///
+/// A kind is either issue-scoped (its items come from issue descriptions) or
+/// project-scoped (its items come from a config-declared `source` file and address
+/// as `@/<self-id>`). This is the `scope` half of the kind registry's six-tuple
+/// the epic builds toward; sibling work adds the remaining `source-of-truth` field
+/// without disturbing this one.
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::item::KindScope;
+///
+/// assert_eq!(KindScope::parse(None).unwrap(), KindScope::Issue);
+/// assert_eq!(KindScope::parse(Some("project")).unwrap(), KindScope::Project);
+/// assert!(KindScope::parse(Some("bogus")).is_err());
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KindScope {
+    /// Items are projected from issue descriptions (`<issue>/<self-id>`).
+    Issue,
+    /// Items are projected from a config-declared source file (`@/<self-id>`).
+    Project,
+}
+
+impl KindScope {
+    /// The token a kind declares its issue scope with.
+    pub const ISSUE_TOKEN: &'static str = "issue";
+    /// The token a kind declares its project scope with.
+    pub const PROJECT_TOKEN: &'static str = "project";
+
+    /// Parse a kind's optional `scope` config string.
+    ///
+    /// `None` defaults to [`KindScope::Issue`] (the prior, issue-scoped behavior).
+    /// An unrecognized value is rejected with the kind name supplied by the caller
+    /// via [`KindScope::parse_for`]; this `parse` variant uses a placeholder name
+    /// in its error.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::item::KindScope;
+    ///
+    /// assert_eq!(KindScope::parse(None).unwrap(), KindScope::Issue);
+    /// assert_eq!(KindScope::parse(Some("issue")).unwrap(), KindScope::Issue);
+    /// assert_eq!(KindScope::parse(Some("project")).unwrap(), KindScope::Project);
+    /// ```
+    pub fn parse(scope: Option<&str>) -> Result<Self, ItemError> {
+        Self::parse_for("<kind>", scope)
+    }
+
+    /// Parse a kind's optional `scope` config string, naming `kind` in any error.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::item::KindScope;
+    ///
+    /// let err = KindScope::parse_for("invariant", Some("global")).unwrap_err();
+    /// assert!(err.to_string().contains("invariant"));
+    /// ```
+    pub fn parse_for(kind: &str, scope: Option<&str>) -> Result<Self, ItemError> {
+        match scope {
+            None => Ok(KindScope::Issue),
+            Some(Self::ISSUE_TOKEN) => Ok(KindScope::Issue),
+            Some(Self::PROJECT_TOKEN) => Ok(KindScope::Project),
+            Some(other) => Err(ItemError::InvalidScope {
+                kind: kind.to_string(),
+                scope: other.to_string(),
+            }),
+        }
+    }
+
+    /// Whether this kind is project-scoped (`@`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::item::KindScope;
+    ///
+    /// assert!(KindScope::Project.is_project());
+    /// assert!(!KindScope::Issue.is_project());
+    /// ```
+    pub fn is_project(&self) -> bool {
+        matches!(self, KindScope::Project)
+    }
+}
+
 /// Errors raised while resolving item kinds or indexing items.
 #[derive(Debug, Error)]
 pub enum ItemError {
@@ -189,6 +278,24 @@ pub enum ItemError {
         /// The underlying parser error.
         source: crate::document::ContentParserError,
     },
+    /// A kind declares an unrecognized `scope` (not `issue` or `project`).
+    #[error("item kind '{kind}' has an invalid scope '{scope}'; expected 'issue' or 'project'")]
+    InvalidScope {
+        /// The offending kind name.
+        kind: String,
+        /// The unrecognized scope string.
+        scope: String,
+    },
+    /// A `scope = "project"` kind declares no `source` file to read its items
+    /// from, so it cannot be indexed at project scope.
+    #[error(
+        "project-scope item kind '{kind}' declares no 'source' file; \
+         a project-scope kind must name a repository-local markdown source"
+    )]
+    MissingProjectSource {
+        /// The offending kind name.
+        kind: String,
+    },
 }
 
 /// A resolved item-kind projection: the `(section, id-pattern, markers,
@@ -219,6 +326,8 @@ pub struct ItemKind {
     id_pattern: regex::Regex,
     markers: Vec<String>,
     link_namespaces: Vec<String>,
+    kind_scope: KindScope,
+    source: Option<String>,
 }
 
 impl ItemKind {
@@ -240,6 +349,7 @@ impl ItemKind {
     ///     id_pattern: Some("D-\\d+".to_string()),
     ///     markers: None,
     ///     link_namespaces: Some(vec!["per".to_string()]),
+    ///     ..Default::default()
     /// };
     /// let kind = ItemKind::from_config("decision", &cfg).unwrap();
     /// assert_eq!(kind.section(), "decisions");
@@ -265,6 +375,15 @@ impl ItemKind {
             .link_namespaces
             .clone()
             .unwrap_or_else(|| vec![DEFAULT_ITEM_LINK_NAMESPACE.to_string()]);
+        let kind_scope = KindScope::parse_for(name, config.scope.as_deref())?;
+        // A project-scope kind without a source cannot be indexed; reject at
+        // resolution so a misconfigured kind surfaces a typed error, not a silent
+        // empty result.
+        if kind_scope.is_project() && config.source.is_none() {
+            return Err(ItemError::MissingProjectSource {
+                kind: name.to_string(),
+            });
+        }
         Ok(Self {
             name: name.to_string(),
             section,
@@ -272,6 +391,8 @@ impl ItemKind {
             id_pattern,
             markers,
             link_namespaces,
+            kind_scope,
+            source: config.source.clone(),
         })
     }
 
@@ -299,6 +420,7 @@ impl ItemKind {
                 id_pattern: Some(DEFAULT_ITEM_ID_PATTERN.to_string()),
                 markers: Some(vec!["[hard]".to_string()]),
                 link_namespaces: Some(vec![DEFAULT_ITEM_LINK_NAMESPACE.to_string()]),
+                ..Default::default()
             },
         )
     }
@@ -321,6 +443,35 @@ impl ItemKind {
     /// The link-label namespaces that reference this kind by qualified id.
     pub fn link_namespaces(&self) -> &[String] {
         &self.link_namespaces
+    }
+
+    /// The kind's declared addressing scope (issue or project).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::item::{ItemKind, KindScope};
+    ///
+    /// let req = ItemKind::requirement_default().unwrap();
+    /// assert_eq!(req.kind_scope(), KindScope::Issue);
+    /// ```
+    pub fn kind_scope(&self) -> KindScope {
+        self.kind_scope
+    }
+
+    /// The repository-local source file a project-scope kind reads its items from,
+    /// or `None` for an issue-scope kind.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::item::ItemKind;
+    ///
+    /// // The built-in requirement kind is issue-scoped and has no source file.
+    /// assert_eq!(ItemKind::requirement_default().unwrap().source(), None);
+    /// ```
+    pub fn source(&self) -> Option<&str> {
+        self.source.as_deref()
     }
 
     /// The kind as the `(section, marker, id-pattern)` triple consumed by the
@@ -457,8 +608,8 @@ pub struct RawScopeItem {
 /// qualified ids `<scope>/<self-id>` (REQ-03, REQ-04, REQ-05).
 ///
 /// This is the one code path that turns extracted candidates into addressable
-/// items, shared by [`index_items`] (issue scope) and [`index_project_items`]
-/// (project scope). Uniqueness is keyed on the self-id alone (the kind is not part
+/// items, shared by [`index_items`] (issue scope) and [`index_markdown_items`]
+/// (any scope, including project). Uniqueness is keyed on the self-id alone (the kind is not part
 /// of the qualified id), so two kinds minting the same self-id in one scope is a
 /// [`ItemError::DuplicateSelfId`] naming the kind that first claimed it. The same
 /// self-id under a *different* scope is fine because each call is scoped to one
@@ -544,8 +695,24 @@ pub fn index_items(
 ) -> Result<Vec<AddressableItem>, ItemError> {
     let projection = project(issue).with_sections(&issue.description, parser);
     let sections = projection.sections.unwrap_or_default();
+    let raw = extract_raw_items(&sections, kinds);
+    derive_scope_items(&Scope::Issue(issue.short_id()), raw)
+}
 
-    let raw: Vec<RawScopeItem> = kinds
+/// Extract raw item candidates from already-parsed sections across all kinds.
+///
+/// The single section-scanning path shared by every markdown substrate
+/// ([`index_items`] for issue descriptions, [`index_markdown_items`] for a
+/// project-scope source file): for each kind it scans its declared section's list
+/// entries, keeps those that match the kind's markers, and extracts the self-id
+/// under its id-pattern. A line with no self-id match is plain prose and is
+/// skipped, never an error (REQ-06). Per-scope uniqueness is NOT enforced here —
+/// that is [`derive_scope_items`]' job — so this stays a pure, reusable scanner.
+fn extract_raw_items(
+    sections: &std::collections::BTreeMap<String, crate::domain::ProjectedSection>,
+    kinds: &[ItemKind],
+) -> Vec<RawScopeItem> {
+    kinds
         .iter()
         .filter_map(|kind| sections.get(kind.section()).map(|section| (kind, section)))
         .flat_map(|(kind, section)| {
@@ -562,36 +729,120 @@ pub fn index_items(
                 })
             })
         })
-        .collect();
-
-    derive_scope_items(&Scope::Issue(issue.short_id()), raw)
+        .collect()
 }
 
-/// Index the addressable items of the project scope (`@`) from registry-supplied
-/// candidates (REQ-01).
+/// Index the addressable items of a scope from a standalone markdown source.
 ///
-/// Project-scoped kinds are registry-first rather than markdown-first: their
-/// source is a config table (e.g. `.jit/invariants.toml`, built in a later Group C
-/// issue), not an issue description. This function takes the already-extracted
-/// candidates and runs them through the SAME [`derive_scope_items`] path used for
-/// issue scope, so qualified-id derivation and per-scope uniqueness (REQ-03,
-/// REQ-04, REQ-05) are identical across substrates. Each item's qualified id is
-/// `@/<self-id>` and resolution of `@/<self-id>` finds it.
+/// Project-scoped kinds are markdown-first, sourced from a repository-local file
+/// declared in config (the path comes only from config — no filename is
+/// hardcoded). This parses `markdown` with the SAME [`ContentParser`] and
+/// section-scanning path ([`extract_raw_items`]) as issue descriptions, then runs
+/// the candidates through the SAME [`derive_scope_items`] derivation, so
+/// qualified-id derivation and per-scope uniqueness (REQ-03, REQ-04, REQ-05) are
+/// identical across substrates. With `scope = Scope::Project` each item's
+/// qualified id is `@/<self-id>` and resolution of `@/<self-id>` finds it
+/// (REQ-01).
 ///
 /// # Examples
 ///
 /// ```
-/// use jit::domain::item::{index_project_items, RawScopeItem};
+/// use jit::document::MarkdownContentParser;
+/// use jit::domain::item::{index_markdown_items, ItemKind, Scope};
 ///
-/// let raw = vec![RawScopeItem {
-///     kind: "invariant".to_string(),
-///     self_id: "INV-01".to_string(),
-///     text: "all writes are atomic".to_string(),
-/// }];
-/// let items = index_project_items(raw).unwrap();
+/// let kinds = vec![ItemKind::requirement_default().unwrap()];
+/// let md = "## Success Criteria\n\n- [hard] INV-01: all writes are atomic\n";
+/// let items =
+///     index_markdown_items(md, &Scope::Project, &kinds, &MarkdownContentParser).unwrap();
 /// assert_eq!(items[0].qualified_id, "@/INV-01");
 /// ```
-pub fn index_project_items(raw: Vec<RawScopeItem>) -> Result<Vec<AddressableItem>, ItemError> {
+pub fn index_markdown_items(
+    markdown: &str,
+    scope: &Scope,
+    kinds: &[ItemKind],
+    parser: &dyn ContentParser,
+) -> Result<Vec<AddressableItem>, ItemError> {
+    let sections = sections_from_markdown(markdown, parser);
+    let raw = extract_raw_items(&sections, kinds);
+    derive_scope_items(scope, raw)
+}
+
+/// Parse standalone markdown into the section map [`extract_raw_items`] consumes.
+///
+/// A thin wrapper over the [`ContentParser`] reusing the exact section model the
+/// issue projection uses, so a project-scope source file is scanned identically to
+/// an issue description.
+fn sections_from_markdown(
+    markdown: &str,
+    parser: &dyn ContentParser,
+) -> std::collections::BTreeMap<String, crate::domain::ProjectedSection> {
+    parser
+        .parse(markdown)
+        .sections
+        .into_iter()
+        .map(|(name, section)| (name, section.into()))
+        .collect()
+}
+
+/// One project-scope source: a kind paired with the markdown text of its
+/// config-declared `source` file.
+///
+/// [`index_project_sources`] consumes these so several project-scope kinds (each
+/// reading its own file) are deduped together under the single `@` scope.
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::item::{ItemKind, ProjectSource};
+///
+/// let src = ProjectSource {
+///     kind: ItemKind::requirement_default().unwrap(),
+///     markdown: "## Success Criteria\n\n- [hard] INV-01: x\n".to_string(),
+/// };
+/// assert_eq!(src.kind.name(), "requirement");
+/// ```
+#[derive(Debug, Clone)]
+pub struct ProjectSource {
+    /// The project-scope kind whose items this source holds.
+    pub kind: ItemKind,
+    /// The markdown text of the kind's `source` file (already read from disk).
+    pub markdown: String,
+}
+
+/// Index every project-scope (`@`) source through ONE per-scope dedup pass.
+///
+/// Each [`ProjectSource`] is parsed and scanned (via [`extract_raw_items`]) with
+/// the SAME path as issue descriptions, then ALL candidates across all sources are
+/// run through a single [`derive_scope_items`] at [`Scope::Project`]. Pooling the
+/// candidates before deriving means a self-id repeated across two project kinds is
+/// reported as a duplicate (REQ-03), and qualified-id derivation matches issue
+/// scope (REQ-01, REQ-05). An empty input yields no items (graceful), never an
+/// error.
+///
+/// # Examples
+///
+/// ```
+/// use jit::document::MarkdownContentParser;
+/// use jit::domain::item::{index_project_sources, ItemKind, ProjectSource};
+///
+/// let sources = vec![ProjectSource {
+///     kind: ItemKind::requirement_default().unwrap(),
+///     markdown: "## Success Criteria\n\n- [hard] INV-01: atomic writes\n".to_string(),
+/// }];
+/// let items = index_project_sources(&sources, &MarkdownContentParser).unwrap();
+/// assert_eq!(items[0].qualified_id, "@/INV-01");
+/// ```
+pub fn index_project_sources(
+    sources: &[ProjectSource],
+    parser: &dyn ContentParser,
+) -> Result<Vec<AddressableItem>, ItemError> {
+    let raw: Vec<RawScopeItem> = sources
+        .iter()
+        .flat_map(|source| {
+            let sections = sections_from_markdown(&source.markdown, parser);
+            extract_raw_items(&sections, std::slice::from_ref(&source.kind))
+        })
+        .collect();
     derive_scope_items(&Scope::Project, raw)
 }
 
@@ -723,6 +974,7 @@ mod tests {
                 id_pattern: Some("REQ-\\d+".to_string()),
                 markers: None,
                 link_namespaces: None,
+                ..Default::default()
             },
         )
         .unwrap();
@@ -760,6 +1012,7 @@ mod tests {
             id_pattern: Some("D-\\d+".to_string()),
             markers: None,
             link_namespaces: Some(vec!["per".to_string()]),
+            ..Default::default()
         };
         let kind = ItemKind::from_config("decision", &cfg).unwrap();
         let issue = Issue::new(
@@ -779,6 +1032,7 @@ mod tests {
             id_pattern: Some("REQ-(".to_string()),
             markers: None,
             link_namespaces: None,
+            ..Default::default()
         };
         let err = ItemKind::from_config("broken", &cfg).unwrap_err();
         assert!(matches!(err, ItemError::InvalidIdPattern { .. }));
@@ -813,6 +1067,7 @@ mod tests {
                 id_pattern: Some("D-\\d+".to_string()),
                 markers: None,
                 link_namespaces: None,
+                ..Default::default()
             },
         );
         let kinds = resolve_item_kinds(Some(&map)).unwrap();
@@ -844,13 +1099,27 @@ mod tests {
     }
 
     #[test]
-    fn test_index_project_items_derives_at_scope() {
-        // REQ-01: project-scoped items resolve under the `@` prefix.
-        let items = index_project_items(vec![raw("invariant", "INV-01")]).unwrap();
+    fn test_derive_scope_items_derives_at_project_scope() {
+        // REQ-01: project-scoped candidates resolve under the `@` prefix.
+        let items = derive_scope_items(&Scope::Project, vec![raw("invariant", "INV-01")]).unwrap();
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].qualified_id, "@/INV-01");
         assert_eq!(items[0].scope, "@");
         assert_eq!(items[0].self_id, "INV-01");
+    }
+
+    #[test]
+    fn test_index_markdown_items_at_project_scope() {
+        // REQ-01: a markdown source scanned at project scope mints `@/<self-id>`,
+        // through the SAME parse + extract + derive path as issue scope.
+        let kinds = vec![req_kind()];
+        let md = "## Success Criteria\n\n- [hard] INV-01: all writes are atomic\n- prose line\n";
+        let items =
+            index_markdown_items(md, &Scope::Project, &kinds, &MarkdownContentParser).unwrap();
+        // The prose line without a self-id is skipped (REQ-06).
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].qualified_id, "@/INV-01");
+        assert_eq!(items[0].scope, "@");
     }
 
     #[test]
@@ -898,7 +1167,8 @@ mod tests {
             "## Success Criteria\n\n- [hard] REQ-01: issue one\n".to_string(),
         );
         let issue_items = index_items(&issue, &[req_kind()], &MarkdownContentParser).unwrap();
-        let project_items = index_project_items(vec![raw("requirement", "REQ-01")]).unwrap();
+        let project_items =
+            derive_scope_items(&Scope::Project, vec![raw("requirement", "REQ-01")]).unwrap();
 
         assert_eq!(issue_items.len(), 1);
         assert_eq!(project_items.len(), 1);

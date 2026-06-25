@@ -228,6 +228,27 @@ pub struct NamespaceConfig {
 /// assert_eq!(req.section.as_deref(), Some("success_criteria"));
 /// assert_eq!(req.markers, Some(vec!["[hard]".to_string()]));
 /// ```
+///
+/// A kind may instead be **project-scoped**, addressing items not tied to any
+/// single issue (qualified id `@/<self-id>`). Such a kind sets `scope = "project"`
+/// and a `source` file (a repository-local path, relative to the repo root) whose
+/// markdown is scanned the SAME way an issue description is:
+///
+/// ```
+/// use jit::config::JitConfig;
+///
+/// let config: JitConfig = toml::from_str(
+///     r#"
+/// [item_kinds.invariant]
+/// scope = "project"
+/// source = "project-items.md"
+/// "#,
+/// )
+/// .unwrap();
+/// let inv = &config.item_kinds.unwrap()["invariant"];
+/// assert_eq!(inv.scope.as_deref(), Some("project"));
+/// assert_eq!(inv.source.as_deref(), Some("project-items.md"));
+/// ```
 #[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
 pub struct ItemKindConfig {
     /// Section slug whose list items hold this kind's addressable items
@@ -244,6 +265,17 @@ pub struct ItemKindConfig {
     /// (e.g. `["satisfies"]`). Absent inherits the repo default namespace.
     #[serde(rename = "link-namespaces")]
     pub link_namespaces: Option<Vec<String>>,
+    /// Addressing scope: `"issue"` (default) for items projected from issue
+    /// descriptions (qualified id `<issue>/<self-id>`), or `"project"` for items
+    /// projected from a repository-local `source` file (qualified id
+    /// `@/<self-id>`). Absent inherits `"issue"`.
+    pub scope: Option<String>,
+    /// For a `scope = "project"` kind, the repository-local markdown file
+    /// (relative to the repo root) whose declared `section` is scanned for this
+    /// kind's items. The path comes ONLY from config — no filename is hardcoded in
+    /// engine logic. Ignored for issue-scoped kinds; an absent or missing file
+    /// yields no project items (graceful), not an error.
+    pub source: Option<String>,
 }
 
 /// Worktree and parallel work configuration.

@@ -282,37 +282,103 @@ fn test_item_command_failure_emits_json() {
     assert!(json.get("error").is_some());
 }
 
-#[test]
-fn test_item_show_project_scope_parses_and_reports() {
-    // REQ-01: the `@` project scope is a live resolution path through the CLI.
-    // No project-scope item source exists yet (it lands in a later Group C
-    // issue), so `@/<self-id>` resolves to a descriptive "project scope"
-    // not-found error rather than being misread as an issue scope or crashing.
-    let temp = setup_test_repo();
-    create_issue(
-        temp.path(),
-        "Foundational",
-        "## Success Criteria\n\n- [hard] REQ-01: a\n",
+/// Append to `.jit/config.toml` a project-scope `invariant` kind sourced from
+/// `project-items.md` (preserving any config `jit init` wrote), and optionally
+/// write that source file.
+fn configure_project_scope_kind(repo: &std::path::Path, source_md: Option<&str>) {
+    let config_path = repo.join(".jit").join("config.toml");
+    let mut config = std::fs::read_to_string(&config_path).unwrap_or_default();
+    config.push_str(
+        "\n[item_kinds.invariant]\n\
+         scope = \"project\"\n\
+         source = \"project-items.md\"\n\
+         id-pattern = \"INV-[0-9]+\"\n",
     );
+    std::fs::write(&config_path, config).unwrap();
+    if let Some(md) = source_md {
+        std::fs::write(repo.join("project-items.md"), md).unwrap();
+    }
+}
+
+#[test]
+fn test_item_show_project_scope_resolves_through_real_cli() {
+    // REQ-01: `@/<self-id>` RESOLVES through the actual `jit item show` binary,
+    // sourced from a config-declared repository-local file (no test seam).
+    let temp = setup_test_repo();
+    configure_project_scope_kind(
+        temp.path(),
+        Some("## Success Criteria\n\n- INV-01: all writes are atomic\n"),
+    );
+
+    for verb in ["show", "resolve"] {
+        let output = Command::new(jit_binary())
+            .args(["item", verb, "@/INV-01", "--json"])
+            .current_dir(temp.path())
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "@/INV-01 must resolve via item {verb}: {}",
+            String::from_utf8_lossy(&output.stdout)
+        );
+        let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(json["item"]["self_id"].as_str().unwrap(), "INV-01");
+        assert_eq!(json["item"]["qualified_id"].as_str().unwrap(), "@/INV-01");
+        assert_eq!(json["item"]["scope"].as_str().unwrap(), "@");
+        assert_eq!(json["item"]["kind"].as_str().unwrap(), "invariant");
+        assert!(json["item"]["text"].as_str().unwrap().contains("atomic"));
+    }
+
+    // The same `@` id resolves through `jit issue show <qualified>` too.
+    let output = Command::new(jit_binary())
+        .args(["issue", "show", "@/INV-01", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "issue show @/INV-01 must resolve");
+    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["item"]["qualified_id"].as_str().unwrap(), "@/INV-01");
+
+    // And it appears in `jit item list`.
+    let output = Command::new(jit_binary())
+        .args(["item", "list", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    let qids: Vec<&str> = json["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|i| i["qualified_id"].as_str().unwrap())
+        .collect();
+    assert!(
+        qids.contains(&"@/INV-01"),
+        "list must include @/INV-01: {qids:?}"
+    );
+}
+
+#[test]
+fn test_item_show_project_scope_absent_source_is_graceful() {
+    // REQ-01 (degradation): a project-scope kind whose source file is absent
+    // resolves to a descriptive not-found error (not a panic, not the issue
+    // resolver), with a JSON error object on stdout under --json.
+    let temp = setup_test_repo();
+    configure_project_scope_kind(temp.path(), None);
 
     let output = Command::new(jit_binary())
         .args(["item", "show", "@/INV-01", "--json"])
         .current_dir(temp.path())
         .output()
         .unwrap();
-    assert!(
-        !output.status.success(),
-        "no project-scope source yet: @/INV-01 must not resolve"
-    );
-    // --json failure still emits a JSON error object on stdout.
+    assert!(!output.status.success());
     let json: Value = serde_json::from_slice(&output.stdout)
         .expect("--json failure must emit valid JSON on stdout");
     let msg = json["error"]["message"].as_str().unwrap_or_default();
     assert!(
-        msg.contains("project scope"),
-        "error must name the project scope, got: {json}"
+        msg.contains("project scope") && msg.contains("no addressable item"),
+        "error must describe the missing project-scope item, got: {json}"
     );
-    // Crucially NOT treated as an issue scope: no "resolve issue scope" message.
     assert!(
         !msg.contains("resolve issue scope"),
         "@ must route to the project scope, not the issue resolver: {json}"

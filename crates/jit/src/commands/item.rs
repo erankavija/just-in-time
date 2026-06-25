@@ -9,8 +9,8 @@
 
 use super::*;
 use crate::domain::item::{
-    index_items, index_project_items, resolve_item_kinds, split_qualified_id, AddressableItem,
-    ItemKind, Scope,
+    index_items, index_project_sources, resolve_item_kinds, split_qualified_id, AddressableItem,
+    ItemKind, ProjectSource, Scope,
 };
 
 /// Result of a `jit item list` / `search` query.
@@ -46,6 +46,20 @@ impl<S: IssueStore> CommandExecutor<S> {
             .map_err(|err| anyhow!("invalid [item_kinds] configuration: {err}"))
     }
 
+    /// The issue-scope subset of the configured kinds.
+    ///
+    /// Project-scope kinds read a config-declared file, not issue descriptions, so
+    /// indexing an issue must apply only issue-scope kinds — otherwise a project
+    /// kind's id-pattern could spuriously match an issue line and collide with an
+    /// issue-scope self-id.
+    fn issue_item_kinds(&self) -> Result<Vec<ItemKind>> {
+        Ok(self
+            .item_kinds()?
+            .into_iter()
+            .filter(|k| !k.kind_scope().is_project())
+            .collect())
+    }
+
     /// Index every addressable item across the repository, optionally narrowed to
     /// one kind by NAME.
     ///
@@ -66,8 +80,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// # Ok::<(), anyhow::Error>(())
     /// ```
     pub fn list_items(&self, kind_filter: Option<&str>) -> Result<ItemListResult> {
+        // Only issue-scope kinds index issue descriptions; project-scope kinds are
+        // sourced from their config-declared file via `project_items`.
         let kinds: Vec<ItemKind> = self
-            .item_kinds()?
+            .issue_item_kinds()?
             .into_iter()
             .filter(|k| kind_filter.is_none_or(|f| k.name() == f))
             .collect();
@@ -78,11 +94,12 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let mut items = Vec::new();
         // Project-scope (`@`) items first, then issue-scope items in short-id
-        // order, so both substrates surface through one list (REQ-01).
+        // order, so both substrates surface through one list (REQ-01). The same
+        // `kind_filter` applies to both substrates.
         items.extend(
             self.project_items()?
                 .into_iter()
-                .filter(|i| kinds.iter().any(|k| k.name() == i.kind)),
+                .filter(|i| kind_filter.is_none_or(|f| i.kind == f)),
         );
         for issue in &issues {
             let parser = crate::document::content_parser_for(issue.content_format, repo_format)
@@ -135,16 +152,54 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(ItemListResult { items, count })
     }
 
-    /// Index the project-scope (`@`) addressable items.
+    /// Index the project-scope (`@`) addressable items from config-declared
+    /// sources.
     ///
-    /// Project-scoped kinds are registry-first (their source is a config table
-    /// wired in a later Group C issue); the seam is the executor's
-    /// [`with_project_items`](CommandExecutor::with_project_items) candidate list.
-    /// The candidates are run through the SAME [`index_project_items`] derivation
-    /// as issue scope, so per-scope uniqueness and qualified-id derivation are
-    /// identical across substrates (REQ-01, REQ-03, REQ-04).
+    /// For every configured kind with `scope = "project"`, its `source` file
+    /// (a repository-local markdown path, relative to the repo root) is read and
+    /// scanned the SAME way an issue description is, then all candidates are deduped
+    /// once through [`index_project_sources`] (REQ-01). The source path comes ONLY
+    /// from config — no filename is hardcoded here. A missing or absent source file
+    /// contributes no items (graceful), never an error; a source that is present
+    /// but unreadable IS reported, so a misconfigured repo is not silently empty.
     fn project_items(&self) -> Result<Vec<AddressableItem>> {
-        index_project_items(self.project_item_source.clone())
+        let repo_root = self
+            .storage
+            .root()
+            .parent()
+            .ok_or_else(|| anyhow!("invalid storage path: no repository root above .jit"))?;
+
+        let mut sources = Vec::new();
+        for kind in self.item_kinds()? {
+            if !kind.kind_scope().is_project() {
+                continue;
+            }
+            // A project kind without a source is rejected at kind resolution
+            // (MissingProjectSource), so `source()` is Some here; treat a None
+            // defensively as no items rather than panicking.
+            let Some(source_rel) = kind.source() else {
+                continue;
+            };
+            let full_path = repo_root.join(source_rel);
+            // Absent file -> no project items for this kind (graceful, REQ-01).
+            if !full_path.exists() {
+                continue;
+            }
+            let markdown = std::fs::read_to_string(&full_path).with_context(|| {
+                format!(
+                    "cannot read project-scope source '{source_rel}' for item kind '{}'",
+                    kind.name()
+                )
+            })?;
+            sources.push(ProjectSource { kind, markdown });
+        }
+
+        let repo_format = self.repo_content_format()?;
+        // Project-scope source files use the repo's content format (Markdown by
+        // default); reuse the same parser selection as issue descriptions.
+        let parser = crate::document::content_parser_for(None, repo_format)
+            .map_err(|err| anyhow!("cannot parse project-scope source: {err}"))?;
+        index_project_sources(&sources, parser.as_ref())
             .map_err(|err| anyhow!("indexing project-scope items failed: {err}"))
     }
 
@@ -175,7 +230,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         })?;
 
         match Scope::parse(scope_segment) {
-            // Project scope: registry-first, no owning issue (REQ-01).
+            // Project scope: sourced from a config-declared file, no owning issue
+            // (REQ-01).
             Scope::Project => {
                 let item = self
                     .project_items()?
@@ -200,7 +256,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 })?;
                 let issue = self.storage.load_issue(&full_id)?;
 
-                let kinds = self.item_kinds()?;
+                let kinds = self.issue_item_kinds()?;
                 let repo_format = self.repo_content_format()?;
                 let parser = crate::document::content_parser_for(issue.content_format, repo_format)
                     .map_err(|err| {
@@ -365,28 +421,47 @@ mod tests {
         assert!(shown.issue_full_id.as_deref().unwrap().starts_with(&short));
     }
 
-    use crate::domain::item::RawScopeItem;
+    use crate::storage::JsonFileStorage;
+    use tempfile::TempDir;
 
-    fn project_raw(kind: &str, self_id: &str, text: &str) -> RawScopeItem {
-        RawScopeItem {
-            kind: kind.to_string(),
-            self_id: self_id.to_string(),
-            text: text.to_string(),
+    /// Build a real file-backed executor in a temp repo that declares a
+    /// project-scope `invariant` kind sourced from `project-items.md`, with the
+    /// given markdown written to that source file (when `source_md` is `Some`).
+    ///
+    /// Returns the temp dir (kept alive by the caller) and the executor. This
+    /// exercises the SAME config-driven `CommandExecutor::new` path the real CLI
+    /// uses — there is no test-only injection seam.
+    fn project_repo(source_md: Option<&str>) -> (TempDir, CommandExecutor<JsonFileStorage>) {
+        let temp = TempDir::new().unwrap();
+        let jit_dir = temp.path().join(".jit");
+        let storage = JsonFileStorage::new(&jit_dir);
+        storage.init().unwrap();
+        std::fs::write(
+            jit_dir.join("config.toml"),
+            "[item_kinds.invariant]\n\
+             scope = \"project\"\n\
+             source = \"project-items.md\"\n\
+             id-pattern = \"INV-[0-9]+\"\n",
+        )
+        .unwrap();
+        if let Some(md) = source_md {
+            std::fs::write(temp.path().join("project-items.md"), md).unwrap();
         }
+        (temp, CommandExecutor::new(storage))
     }
 
     #[test]
     fn test_show_item_resolves_project_scope() {
-        // REQ-01: `@/<self-id>` resolves to the project-scoped item; no owning issue.
-        let exec = executor_with(vec![]).with_project_items(vec![project_raw(
-            "invariant",
-            "INV-01",
-            "all writes are atomic",
-        )]);
+        // REQ-01: `@/<self-id>` resolves through the REAL config-driven path
+        // (CommandExecutor::new + a config-declared source file), no test seam.
+        let (_temp, exec) = project_repo(Some(
+            "## Success Criteria\n\n- INV-01: all writes are atomic\n",
+        ));
         let shown = exec.show_item("@/INV-01").unwrap();
         assert_eq!(shown.item.self_id, "INV-01");
         assert_eq!(shown.item.qualified_id, "@/INV-01");
         assert_eq!(shown.item.scope, "@");
+        assert_eq!(shown.item.kind, "invariant");
         assert_eq!(shown.issue_full_id, None);
         assert_eq!(shown.issue_title, None);
     }
@@ -394,52 +469,69 @@ mod tests {
     #[test]
     fn test_show_item_project_scope_missing_self_id_errors() {
         // An unresolvable project-scope id is reported, never silently dropped.
-        let exec =
-            executor_with(vec![]).with_project_items(vec![project_raw("invariant", "INV-01", "x")]);
+        let (_temp, exec) = project_repo(Some("## Success Criteria\n\n- INV-01: x\n"));
         let err = exec.show_item("@/INV-99").unwrap_err();
         assert!(err.to_string().contains("project scope"));
         assert!(err.to_string().contains("no addressable item"));
     }
 
     #[test]
+    fn test_show_item_project_scope_absent_source_is_graceful() {
+        // REQ-01 (degradation): with no source file present, `@/<id>` resolves to a
+        // descriptive not-found error, not a panic and not an issue-resolver error.
+        let (_temp, exec) = project_repo(None);
+        let err = exec.show_item("@/INV-01").unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("project scope"));
+        assert!(!msg.contains("resolve issue scope"));
+    }
+
+    #[test]
     fn test_show_item_same_self_id_distinct_scopes() {
         // REQ-04: the same self-id under an issue scope and the project scope are
         // two distinct items, each resolved by its own qualified id.
-        let a = issue_with_criteria("A", "## Success Criteria\n\n- [hard] REQ-01: issue one\n");
-        let short = a.short_id();
-        let exec = executor_with(vec![a]).with_project_items(vec![project_raw(
-            "requirement",
-            "REQ-01",
-            "project one",
-        )]);
+        let (temp, exec) = project_repo(Some("## Success Criteria\n\n- INV-01: project one\n"));
+        let issue = Issue::new(
+            "A".to_string(),
+            "## Success Criteria\n\n- [hard] INV-01: issue one\n".to_string(),
+        );
+        let short = issue.short_id();
+        exec.storage().save_issue(issue).unwrap();
+        // The issue-scope `requirement` kind must also see INV-* ids, so declare it
+        // alongside the project kind in the same config.
+        std::fs::write(
+            temp.path().join(".jit").join("config.toml"),
+            "[item_kinds.requirement]\n\
+             markers = [\"[hard]\"]\n\
+             id-pattern = \"INV-[0-9]+\"\n\n\
+             [item_kinds.invariant]\n\
+             scope = \"project\"\n\
+             source = \"project-items.md\"\n\
+             id-pattern = \"INV-[0-9]+\"\n",
+        )
+        .unwrap();
+        // A fresh executor picks up the rewritten config (config is cached).
+        let exec = CommandExecutor::new(JsonFileStorage::new(temp.path().join(".jit")));
 
-        let from_issue = exec.show_item(&format!("{short}/REQ-01")).unwrap();
-        let from_project = exec.show_item("@/REQ-01").unwrap();
+        let from_issue = exec.show_item(&format!("{short}/INV-01")).unwrap();
+        let from_project = exec.show_item("@/INV-01").unwrap();
         assert!(from_issue.item.text.contains("issue one"));
-        assert_eq!(from_project.item.text, "project one");
+        assert!(from_project.item.text.contains("project one"));
         assert_ne!(from_issue.item.qualified_id, from_project.item.qualified_id);
     }
 
     #[test]
     fn test_list_items_includes_project_scope() {
         // REQ-01: project-scoped items surface in the cross-repo list alongside
-        // issue-scoped ones (filtered to configured kinds).
-        let a = issue_with_criteria("A", "## Success Criteria\n\n- [hard] REQ-01: a\n");
-        let exec = executor_with(vec![a]).with_project_items(vec![project_raw(
-            "requirement",
-            "REQ-99",
-            "project req",
-        )]);
+        // issue-scoped ones.
+        let (_temp, exec) = project_repo(Some("## Success Criteria\n\n- INV-01: project inv\n"));
         let result = exec.list_items(None).unwrap();
         let qids: Vec<&str> = result
             .items
             .iter()
             .map(|i| i.qualified_id.as_str())
             .collect();
-        assert!(qids.contains(&"@/REQ-99"));
-        assert!(qids
-            .iter()
-            .any(|q| q.ends_with("/REQ-01") && !q.starts_with('@')));
+        assert!(qids.contains(&"@/INV-01"));
     }
 
     #[test]
