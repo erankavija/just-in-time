@@ -301,18 +301,21 @@ fn test_item_command_failure_emits_json() {
     assert!(json.get("error").is_some());
 }
 
-/// Append to `.jit/config.toml` a project-scope `invariant` kind sourced from
-/// `project-items.md` (preserving any config `jit init` wrote), and optionally
-/// write that source file.
+/// Append to `.jit/config.toml` a markdown-first project-scope `glossary` kind
+/// sourced from `project-items.md` (preserving any config `jit init` wrote), and
+/// optionally write that source file.
+///
+/// Uses the non-reserved name `glossary` (not `invariant`, which is reserved as a
+/// registry-first kind) to exercise generic markdown-first project-scope sourcing.
 fn configure_project_scope_kind(repo: &std::path::Path, source_md: Option<&str>) {
     let config_path = repo.join(".jit").join("config.toml");
     let mut config = std::fs::read_to_string(&config_path).unwrap_or_default();
     config.push_str(
-        "\n[item_kinds.invariant]\n\
+        "\n[item_kinds.glossary]\n\
          section = \"success_criteria\"\n\
-         id-pattern = \"INV-[0-9]+\"\n\
+         id-pattern = \"GLOSS-[0-9]+\"\n\
          markers = []\n\
-         link-namespaces = [\"upholds\"]\n\
+         link-namespaces = [\"defines\"]\n\
          scope = \"project\"\n\
          source = \"project-items.md\"\n\
          source-of-truth = \"markdown-first\"\n",
@@ -330,37 +333,40 @@ fn test_item_show_project_scope_resolves_through_real_cli() {
     let temp = setup_test_repo();
     configure_project_scope_kind(
         temp.path(),
-        Some("## Success Criteria\n\n- INV-01: all writes are atomic\n"),
+        Some("## Success Criteria\n\n- GLOSS-01: all writes are atomic\n"),
     );
 
     for verb in ["show", "resolve"] {
         let output = Command::new(jit_binary())
-            .args(["item", verb, "@/INV-01", "--json"])
+            .args(["item", verb, "@/GLOSS-01", "--json"])
             .current_dir(temp.path())
             .output()
             .unwrap();
         assert!(
             output.status.success(),
-            "@/INV-01 must resolve via item {verb}: {}",
+            "@/GLOSS-01 must resolve via item {verb}: {}",
             String::from_utf8_lossy(&output.stdout)
         );
         let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-        assert_eq!(json["item"]["self_id"].as_str().unwrap(), "INV-01");
-        assert_eq!(json["item"]["qualified_id"].as_str().unwrap(), "@/INV-01");
+        assert_eq!(json["item"]["self_id"].as_str().unwrap(), "GLOSS-01");
+        assert_eq!(json["item"]["qualified_id"].as_str().unwrap(), "@/GLOSS-01");
         assert_eq!(json["item"]["scope"].as_str().unwrap(), "@");
-        assert_eq!(json["item"]["kind"].as_str().unwrap(), "invariant");
+        assert_eq!(json["item"]["kind"].as_str().unwrap(), "glossary");
         assert!(json["item"]["text"].as_str().unwrap().contains("atomic"));
     }
 
     // The same `@` id resolves through `jit issue show <qualified>` too.
     let output = Command::new(jit_binary())
-        .args(["issue", "show", "@/INV-01", "--json"])
+        .args(["issue", "show", "@/GLOSS-01", "--json"])
         .current_dir(temp.path())
         .output()
         .unwrap();
-    assert!(output.status.success(), "issue show @/INV-01 must resolve");
+    assert!(
+        output.status.success(),
+        "issue show @/GLOSS-01 must resolve"
+    );
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["item"]["qualified_id"].as_str().unwrap(), "@/INV-01");
+    assert_eq!(json["item"]["qualified_id"].as_str().unwrap(), "@/GLOSS-01");
 
     // And it appears in `jit item list`.
     let output = Command::new(jit_binary())
@@ -376,8 +382,8 @@ fn test_item_show_project_scope_resolves_through_real_cli() {
         .map(|i| i["qualified_id"].as_str().unwrap())
         .collect();
     assert!(
-        qids.contains(&"@/INV-01"),
-        "list must include @/INV-01: {qids:?}"
+        qids.contains(&"@/GLOSS-01"),
+        "list must include @/GLOSS-01: {qids:?}"
     );
 }
 
@@ -390,7 +396,7 @@ fn test_item_show_project_scope_absent_source_is_graceful() {
     configure_project_scope_kind(temp.path(), None);
 
     let output = Command::new(jit_binary())
-        .args(["item", "show", "@/INV-01", "--json"])
+        .args(["item", "show", "@/GLOSS-01", "--json"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -405,5 +411,119 @@ fn test_item_show_project_scope_absent_source_is_graceful() {
     assert!(
         !msg.contains("resolve issue scope"),
         "@ must route to the project scope, not the issue resolver: {json}"
+    );
+}
+
+#[test]
+fn test_item_list_kind_invariant_registry_first_through_real_cli() {
+    // REQ-01 + Finding 1/2 (rework): the SHIPPED CLI returns each invariant from
+    // `.jit/invariants.toml` as `@/<self-id>`, with NO `[item_kinds]` config (the
+    // built-in registry-first invariant kind), and NO markdown source involved.
+    let temp = setup_test_repo();
+    std::fs::write(
+        temp.path().join(".jit").join("invariants.toml"),
+        "[[invariants]]\n\
+         id = \"INV-01\"\n\
+         statement = \"Every dependency edge stays acyclic.\"\n\
+         kind = \"enforced\"\n\
+         enforced-by = \"dag-no-cycles\"\n\n\
+         [[invariants]]\n\
+         id = \"INV-02\"\n\
+         statement = \"All state changes are logged.\"\n\
+         kind = \"advisory\"\n",
+    )
+    .unwrap();
+    // An issue whose description carries an INV-looking line must NOT leak in as an
+    // invariant (registry is authoritative; no markdown index for invariants).
+    create_issue(
+        temp.path(),
+        "Decoy",
+        "## Success Criteria\n\n- [hard] INV-99: looks like an invariant\n",
+    );
+
+    let output = Command::new(jit_binary())
+        .args(["item", "list", "--kind", "invariant", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "item list --kind invariant failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["count"].as_u64().unwrap(), 2);
+    let items = json["items"].as_array().unwrap();
+    let qids: Vec<&str> = items
+        .iter()
+        .map(|i| i["qualified_id"].as_str().unwrap())
+        .collect();
+    assert!(
+        qids.contains(&"@/INV-01"),
+        "list must include @/INV-01: {qids:?}"
+    );
+    assert!(
+        qids.contains(&"@/INV-02"),
+        "list must include @/INV-02: {qids:?}"
+    );
+    // The decoy INV-99 from an issue description is NOT an invariant (REQ-02).
+    assert!(
+        !qids.iter().any(|q| q.contains("INV-99")),
+        "no markdown index for invariants: {qids:?}"
+    );
+    let inv01 = items.iter().find(|i| i["self_id"] == "INV-01").unwrap();
+    assert_eq!(inv01["kind"].as_str().unwrap(), "invariant");
+    assert_eq!(inv01["scope"].as_str().unwrap(), "@");
+    assert_eq!(
+        inv01["text"].as_str().unwrap(),
+        "Every dependency edge stays acyclic."
+    );
+
+    // `jit item show @/INV-02` resolves through the shipped binary too.
+    let output = Command::new(jit_binary())
+        .args(["item", "show", "@/INV-02", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "item show @/INV-02 must resolve");
+    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["item"]["qualified_id"].as_str().unwrap(), "@/INV-02");
+    assert_eq!(json["item"]["kind"].as_str().unwrap(), "invariant");
+}
+
+#[test]
+fn test_markdown_first_invariant_config_rejected_through_real_cli() {
+    // Finding 1 (rework): the SHIPPED CLI rejects a markdown-first
+    // `[item_kinds.invariant]` declaration — invariant is reserved as registry-first.
+    let temp = setup_test_repo();
+    let config_path = temp.path().join(".jit").join("config.toml");
+    let mut config = std::fs::read_to_string(&config_path).unwrap_or_default();
+    config.push_str(
+        "\n[item_kinds.invariant]\n\
+         section = \"success_criteria\"\n\
+         id-pattern = \"INV-[0-9]+\"\n\
+         markers = []\n\
+         link-namespaces = [\"enforces\"]\n\
+         scope = \"project\"\n\
+         source = \"project-items.md\"\n\
+         source-of-truth = \"markdown-first\"\n",
+    );
+    std::fs::write(&config_path, config).unwrap();
+
+    let output = Command::new(jit_binary())
+        .args(["item", "list", "--kind", "invariant", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        !output.status.success(),
+        "markdown-first invariant must be rejected"
+    );
+    let json: Value = serde_json::from_slice(&output.stdout)
+        .expect("--json failure must emit valid JSON on stdout");
+    let msg = json["error"]["message"].as_str().unwrap_or_default();
+    assert!(
+        msg.contains("must be registry-first"),
+        "error must explain the reserved registry-first rule, got: {json}"
     );
 }

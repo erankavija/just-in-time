@@ -11,7 +11,7 @@ use super::*;
 use crate::config::SourceOfTruth;
 use crate::domain::item::{
     index_items, index_project_sources, resolve_item_kinds, split_qualified_id, AddressableItem,
-    ItemKind, ProjectSource, RawScopeItem, Scope,
+    ItemError, ItemKind, ProjectSource, RawScopeItem, Scope, INVARIANT_KIND_NAME,
 };
 
 /// Result of a `jit item list` / `search` query.
@@ -167,11 +167,16 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///   reading both live in storage. An absent source file contributes no items
     ///   (storage returns `Ok(None)`), never an error; a source that is present but
     ///   unreadable, or a path that escapes the repo, IS reported.
-    /// - **registry-first** (e.g. `invariant`): items are projected directly from
-    ///   the loaded invariant registry ([`JitConfig::invariants`](crate::config::JitConfig)),
-    ///   which is the AUTHORITATIVE source — NO markdown index is read or produced
-    ///   for them (REQ-02). Each registry entry's `id` is its self-id, so its
-    ///   qualified id is `@/<id>` (REQ-01).
+    /// - **registry-first**: items are projected directly from a registered
+    ///   registry, NOT a markdown source — the registry is the AUTHORITATIVE source
+    ///   and NO markdown index is read or produced for them (REQ-02). Routing binds
+    ///   to an EXPLICIT registry by kind name: the only registered source is the
+    ///   invariant registry ([`JitConfig::invariants`](crate::config::JitConfig)),
+    ///   bound to the [`invariant`](crate::domain::item::INVARIANT_KIND_NAME) kind.
+    ///   Each invariant entry's `id` is its self-id, so its qualified id is `@/<id>`
+    ///   (REQ-01). Any OTHER registry-first project kind has no bound registry and
+    ///   is rejected with [`ItemError::UnknownRegistrySource`], never a silent
+    ///   projection of the invariant registry under the wrong kind name.
     ///
     /// Both substrates' candidates are deduped once through the single
     /// [`index_project_sources`] derivation, so per-scope uniqueness and
@@ -185,11 +190,21 @@ impl<S: IssueStore> CommandExecutor<S> {
                 continue;
             }
             match kind.source_of_truth() {
-                // Registry-first: project items come ONLY from the loaded registry,
-                // never from a markdown source file. The invariant registry is the
-                // authoritative source (REQ-02).
-                SourceOfTruth::RegistryFirst => {
+                // Registry-first: project items come ONLY from a registered
+                // registry, never from a markdown source file. The binding is
+                // explicit by kind name — only `invariant` is backed by a registry
+                // (the invariant registry); any other registry-first project kind is
+                // a typed error rather than a mislabeled invariant projection (REQ-02).
+                SourceOfTruth::RegistryFirst if kind.name() == INVARIANT_KIND_NAME => {
                     registry_items.extend(invariant_raw_items(kind.name(), config));
+                }
+                SourceOfTruth::RegistryFirst => {
+                    return Err(anyhow!(ItemError::UnknownRegistrySource {
+                        kind: kind.name().to_string(),
+                    }))
+                    .with_context(|| {
+                        format!("cannot index registry-first project kind '{}'", kind.name())
+                    });
                 }
                 // Markdown-first: read and scan the config-declared source file.
                 SourceOfTruth::MarkdownFirst => {
@@ -464,12 +479,17 @@ mod tests {
         assert!(shown.issue_full_id.as_deref().unwrap().starts_with(&short));
     }
 
-    /// Build an [`InMemoryStorage`] executor that declares a project-scope
-    /// `invariant` kind sourced from `project-items.md`, seeding the source through
-    /// the in-memory repo-file map (NO real source file). `config.toml` is written
-    /// to the synthetic root (the established `InMemoryStorage` config pattern, the
-    /// only on-disk file config loading requires). `extra_config` is appended to
-    /// the `[item_kinds]` block; `source_md` (when `Some`) seeds the source.
+    /// Build an [`InMemoryStorage`] executor that declares a markdown-first
+    /// project-scope `glossary` kind sourced from `project-items.md`, seeding the
+    /// source through the in-memory repo-file map (NO real source file). `config.toml`
+    /// is written to the synthetic root (the established `InMemoryStorage` config
+    /// pattern, the only on-disk file config loading requires). `extra_config` is
+    /// appended to the `[item_kinds]` block; `source_md` (when `Some`) seeds the
+    /// source.
+    ///
+    /// Uses the non-reserved name `glossary` (not `invariant`, which is reserved as
+    /// a registry-first kind) to exercise generic markdown-first project-scope
+    /// sourcing.
     fn project_exec(
         source_md: Option<&str>,
         extra_config: &str,
@@ -479,11 +499,11 @@ mod tests {
         storage.init().unwrap();
         std::fs::create_dir_all(storage.root()).unwrap();
         let config = format!(
-            "[item_kinds.invariant]\n\
+            "[item_kinds.glossary]\n\
              section = \"success_criteria\"\n\
-             id-pattern = \"INV-[0-9]+\"\n\
+             id-pattern = \"GLOSS-[0-9]+\"\n\
              markers = []\n\
-             link-namespaces = [\"upholds\"]\n\
+             link-namespaces = [\"defines\"]\n\
              scope = \"project\"\n\
              source = \"project-items.md\"\n\
              source-of-truth = \"markdown-first\"\n{extra_config}"
@@ -503,15 +523,15 @@ mod tests {
         // REQ-01: `@/<self-id>` resolves through the config-driven path with the
         // source served by the storage boundary (in-memory repo-file map, no fs).
         let exec = project_exec(
-            Some("## Success Criteria\n\n- INV-01: all writes are atomic\n"),
+            Some("## Success Criteria\n\n- GLOSS-01: all writes are atomic\n"),
             "",
             vec![],
         );
-        let shown = exec.show_item("@/INV-01").unwrap();
-        assert_eq!(shown.item.self_id, "INV-01");
-        assert_eq!(shown.item.qualified_id, "@/INV-01");
+        let shown = exec.show_item("@/GLOSS-01").unwrap();
+        assert_eq!(shown.item.self_id, "GLOSS-01");
+        assert_eq!(shown.item.qualified_id, "@/GLOSS-01");
         assert_eq!(shown.item.scope, "@");
-        assert_eq!(shown.item.kind, "invariant");
+        assert_eq!(shown.item.kind, "glossary");
         assert_eq!(shown.issue_full_id, None);
         assert_eq!(shown.issue_title, None);
     }
@@ -519,8 +539,8 @@ mod tests {
     #[test]
     fn test_show_item_project_scope_missing_self_id_errors() {
         // An unresolvable project-scope id is reported, never silently dropped.
-        let exec = project_exec(Some("## Success Criteria\n\n- INV-01: x\n"), "", vec![]);
-        let err = exec.show_item("@/INV-99").unwrap_err();
+        let exec = project_exec(Some("## Success Criteria\n\n- GLOSS-01: x\n"), "", vec![]);
+        let err = exec.show_item("@/GLOSS-99").unwrap_err();
         assert!(err.to_string().contains("project scope"));
         assert!(err.to_string().contains("no addressable item"));
     }
@@ -531,7 +551,7 @@ mod tests {
         // None and `@/<id>` resolves to a descriptive not-found error (not a panic,
         // not the issue resolver).
         let exec = project_exec(None, "", vec![]);
-        let err = exec.show_item("@/INV-01").unwrap_err();
+        let err = exec.show_item("@/GLOSS-01").unwrap_err();
         let msg = err.to_string();
         assert!(msg.contains("project scope"));
         assert!(!msg.contains("resolve issue scope"));
@@ -543,15 +563,15 @@ mod tests {
         // two distinct items, each resolved by its own qualified id.
         let issue = Issue::new(
             "A".to_string(),
-            "## Success Criteria\n\n- [hard] INV-01: issue one\n".to_string(),
+            "## Success Criteria\n\n- [hard] GLOSS-01: issue one\n".to_string(),
         );
         let short = issue.short_id();
-        // The issue-scope `requirement` kind must also see INV-* ids.
+        // The issue-scope `requirement` kind must also see GLOSS-* ids.
         let exec = project_exec(
-            Some("## Success Criteria\n\n- INV-01: project one\n"),
+            Some("## Success Criteria\n\n- GLOSS-01: project one\n"),
             "\n[item_kinds.requirement]\n\
              section = \"success_criteria\"\n\
-             id-pattern = \"INV-[0-9]+\"\n\
+             id-pattern = \"GLOSS-[0-9]+\"\n\
              markers = [\"[hard]\"]\n\
              link-namespaces = [\"satisfies\"]\n\
              scope = \"issue\"\n\
@@ -559,8 +579,8 @@ mod tests {
             vec![issue],
         );
 
-        let from_issue = exec.show_item(&format!("{short}/INV-01")).unwrap();
-        let from_project = exec.show_item("@/INV-01").unwrap();
+        let from_issue = exec.show_item(&format!("{short}/GLOSS-01")).unwrap();
+        let from_project = exec.show_item("@/GLOSS-01").unwrap();
         assert!(from_issue.item.text.contains("issue one"));
         assert!(from_project.item.text.contains("project one"));
         assert_ne!(from_issue.item.qualified_id, from_project.item.qualified_id);
@@ -571,7 +591,7 @@ mod tests {
         // REQ-01: project-scoped items surface in the cross-repo list alongside
         // issue-scoped ones.
         let exec = project_exec(
-            Some("## Success Criteria\n\n- INV-01: project inv\n"),
+            Some("## Success Criteria\n\n- GLOSS-01: project gloss\n"),
             "",
             vec![],
         );
@@ -581,7 +601,7 @@ mod tests {
             .iter()
             .map(|i| i.qualified_id.as_str())
             .collect();
-        assert!(qids.contains(&"@/INV-01"));
+        assert!(qids.contains(&"@/GLOSS-01"));
     }
 
     #[test]
@@ -594,18 +614,18 @@ mod tests {
         std::fs::create_dir_all(storage.root()).unwrap();
         std::fs::write(
             storage.root().join("config.toml"),
-            "[item_kinds.invariant]\n\
+            "[item_kinds.glossary]\n\
              section = \"success_criteria\"\n\
-             id-pattern = \"INV-[0-9]+\"\n\
+             id-pattern = \"GLOSS-[0-9]+\"\n\
              markers = []\n\
-             link-namespaces = [\"upholds\"]\n\
+             link-namespaces = [\"defines\"]\n\
              scope = \"project\"\n\
              source = \"../escape.md\"\n\
              source-of-truth = \"markdown-first\"\n",
         )
         .unwrap();
         let exec = CommandExecutor::new(storage);
-        let err = exec.show_item("@/INV-01").unwrap_err();
+        let err = exec.show_item("@/GLOSS-01").unwrap_err();
         // The typed InvalidPath cause is in the error chain (alternate Display
         // renders the full anyhow context chain).
         let msg = format!("{err:#}");
@@ -623,18 +643,18 @@ mod tests {
         std::fs::create_dir_all(storage.root()).unwrap();
         std::fs::write(
             storage.root().join("config.toml"),
-            "[item_kinds.invariant]\n\
+            "[item_kinds.glossary]\n\
              section = \"success_criteria\"\n\
-             id-pattern = \"INV-[0-9]+\"\n\
+             id-pattern = \"GLOSS-[0-9]+\"\n\
              markers = []\n\
-             link-namespaces = [\"upholds\"]\n\
+             link-namespaces = [\"defines\"]\n\
              scope = \"project\"\n\
              source = \"/etc/passwd\"\n\
              source-of-truth = \"markdown-first\"\n",
         )
         .unwrap();
         let exec = CommandExecutor::new(storage);
-        let err = exec.show_item("@/INV-01").unwrap_err();
+        let err = exec.show_item("@/GLOSS-01").unwrap_err();
         let msg = format!("{err:#}");
         assert!(
             msg.contains("absolute paths are not permitted"),
@@ -754,6 +774,86 @@ kind = \"advisory\"
         let issue = issue_with_criteria("A", "## Success Criteria\n\n- [hard] REQ-01: a\n");
         let exec = executor_with(vec![issue]);
         assert_eq!(exec.list_items(Some("invariant")).unwrap().count, 0);
+    }
+
+    /// Build an executor whose synthetic `.jit` root carries an explicit
+    /// `config.toml` (`config`) and an optional `invariants.toml`, for the
+    /// reserved-name and registry-binding rework tests.
+    fn config_exec(
+        config: &str,
+        invariants_toml: Option<&str>,
+        issues: Vec<Issue>,
+    ) -> CommandExecutor<InMemoryStorage> {
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+        std::fs::create_dir_all(storage.root()).unwrap();
+        std::fs::write(storage.root().join("config.toml"), config).unwrap();
+        if let Some(inv) = invariants_toml {
+            std::fs::write(storage.root().join("invariants.toml"), inv).unwrap();
+        }
+        for issue in issues {
+            storage.save_issue(issue).unwrap();
+        }
+        CommandExecutor::new(storage)
+    }
+
+    #[test]
+    fn test_markdown_first_invariant_config_is_rejected() {
+        // Finding 1: declaring `[item_kinds.invariant]` as markdown-first is
+        // rejected — the invariant kind is reserved as registry-first, so no markdown
+        // index can ever be produced for invariants (REQ-02). The rejection surfaces
+        // through the kind-resolution path that `list_items` uses.
+        let exec = config_exec(
+            "[item_kinds.invariant]\n\
+             section = \"success_criteria\"\n\
+             id-pattern = \"INV-[0-9]+\"\n\
+             markers = []\n\
+             link-namespaces = [\"enforces\"]\n\
+             scope = \"project\"\n\
+             source = \"project-items.md\"\n\
+             source-of-truth = \"markdown-first\"\n",
+            // Even with a registry present, the markdown-first declaration is invalid.
+            Some(TWO_INVARIANTS),
+            // An issue with an INV- line: it must NEVER become an invariant item.
+            vec![issue_with_criteria(
+                "A",
+                "## Success Criteria\n\n- [hard] INV-99: looks like an invariant\n",
+            )],
+        );
+        let err = exec.list_items(Some("invariant")).unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(
+            msg.contains("must be registry-first"),
+            "expected reserved-name rejection, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_registry_first_non_invariant_kind_is_typed_error() {
+        // Finding 2: a custom registry-first project kind that is NOT `invariant` has
+        // no bound registry source. It must produce a typed error rather than
+        // silently projecting the invariant registry under the wrong kind name.
+        let exec = config_exec(
+            "[item_kinds.foo]\n\
+             section = \"success_criteria\"\n\
+             id-pattern = \"FOO-[0-9]+\"\n\
+             markers = []\n\
+             link-namespaces = [\"foos\"]\n\
+             scope = \"project\"\n\
+             source-of-truth = \"registry-first\"\n",
+            // The invariant registry exists, but `foo` must NOT borrow its rows.
+            Some(TWO_INVARIANTS),
+            vec![],
+        );
+        let err = exec.list_items(None).unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(
+            msg.contains("no registered registry source") && msg.contains("foo"),
+            "expected UnknownRegistrySource for 'foo', got: {msg}"
+        );
+        // No invariant rows leaked under the `foo` kind: the whole list errors out
+        // rather than returning mislabeled rows.
+        assert!(exec.list_items(Some("foo")).is_err());
     }
 
     #[test]

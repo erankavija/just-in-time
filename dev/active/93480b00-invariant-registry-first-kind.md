@@ -43,3 +43,28 @@ line in an issue description is therefore NOT projected as an invariant (REQ-02)
 The `invariant` kind name and its constructor live in the DOMAIN layer
 (`domain/item.rs::invariant_default`, `INVARIANT_KIND_NAME`); no kind-name literal
 appears in `crates/jit/src/validation/`.
+
+## Rework (code-review attempt 1)
+
+### Finding 1 — `invariant` reserved as registry-first
+
+The `invariant` kind name is RESERVED as registry-first in
+`ItemKind::from_config`: declaring `[item_kinds.invariant]` with any
+`source-of-truth` other than `registry-first` (including the unset default,
+`markdown-first`) is rejected with the typed `ItemError::InvariantMustBeRegistryFirst`.
+This makes markdown-indexing of invariants impossible — invariants can ONLY come
+from `.jit/invariants.toml` (REQ-02).
+
+### Finding 2 — explicit registry binding in `project_items`
+
+`project_items()` no longer treats every registry-first project kind as backed by
+`config.invariants`. Routing binds by kind name: a registry-first kind that IS
+`invariant` projects from the invariant registry; any OTHER registry-first project
+kind has no registered registry source and is rejected with the typed
+`ItemError::UnknownRegistrySource` (no invariant rows mislabeled under a foreign
+kind name). The kind-name binding lives in the COMMANDS layer, keeping
+`crates/jit/src/validation/` free of the `invariant` literal.
+
+Pre-existing tests that had used `invariant` merely as a stand-in for a generic
+markdown-first project-scope kind were renamed to the non-reserved `glossary`
+kind, since `invariant` is now strictly registry-first.
