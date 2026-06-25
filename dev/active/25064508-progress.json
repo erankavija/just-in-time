@@ -113,7 +113,7 @@
           "short_id": "b9966826",
           "title": "Resolve node-to-item links by qualified id across kinds",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "72cdf315",
@@ -158,5 +158,8 @@
   ],
   "notes_escalation_boundary": [
     "0d593d90 reached 3 reworks: substantive work done by round 2; round-3 finding is a trivial # Examples doc gap (lead under-relayed round-2 Documentation note). Judged not escalation-worthy (not ambiguous/too-hard/systemic); did one final doc pass instead."
+  ],
+  "discovered": [
+    "Default repo namespace-registry rule does not include the item link namespaces (satisfies/per/mitigates/resolves/enforces), so such labels also trigger default:namespace-registry validation errors. Pre-existing, separate from item-links; candidate follow-up."
   ]
 }
