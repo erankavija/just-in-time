@@ -438,7 +438,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         self.storage.save_issue(issue)?;
 
         // Log event
-        let event = Event::new_gate_passed(issue_id, gate_key, by.map(|a| a.to_string()));
+        let event = Event::new_gate_passed(issue_id, gate_key, by);
         self.storage.append_event(&event)?;
 
         // Check if Gated issue can now transition to Done
@@ -585,7 +585,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         self.storage.save_issue(issue)?;
 
         // Log event
-        let event = Event::new_gate_failed(issue_id, gate_key, by.map(|a| a.to_string()));
+        let event = Event::new_gate_failed(issue_id, gate_key, by);
         self.storage.append_event(&event)?;
 
         Ok(warnings)

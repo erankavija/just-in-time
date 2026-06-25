@@ -913,8 +913,8 @@ pub enum Event {
         issue_id: String,
         /// When this occurred
         timestamp: DateTime<Utc>,
-        /// Who claimed it
-        assignee: String,
+        /// Who claimed it (format: "type:identifier")
+        assignee: Assignee,
     },
     /// Issue state transitioned
     IssueStateChanged {
@@ -939,8 +939,8 @@ pub enum Event {
         timestamp: DateTime<Utc>,
         /// Gate that passed
         gate_key: String,
-        /// Who marked it as passed
-        updated_by: Option<String>,
+        /// Who marked it as passed (format: "type:identifier")
+        updated_by: Option<Assignee>,
     },
     /// A quality gate failed
     GateFailed {
@@ -952,8 +952,8 @@ pub enum Event {
         timestamp: DateTime<Utc>,
         /// Gate that failed
         gate_key: String,
-        /// Who marked it as failed
-        updated_by: Option<String>,
+        /// Who marked it as failed (format: "type:identifier")
+        updated_by: Option<Assignee>,
     },
     /// A quality gate was added to an issue
     GateAdded {
@@ -1003,8 +1003,8 @@ pub enum Event {
         issue_id: String,
         /// When this occurred
         timestamp: DateTime<Utc>,
-        /// Previous assignee
-        assignee: String,
+        /// Previous assignee (format: "type:identifier")
+        assignee: Assignee,
         /// Reason for release
         reason: String,
     },
@@ -1124,8 +1124,22 @@ impl Event {
         }
     }
 
-    /// Create an issue claimed event
-    pub fn new_issue_claimed(issue_id: String, assignee: String) -> Self {
+    /// Create an issue claimed event.
+    ///
+    /// Takes a typed [`Assignee`] so a malformed actor can never be logged; the
+    /// caller parses (and thereby validates) the actor before constructing the
+    /// event.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::{Assignee, Event};
+    ///
+    /// let actor: Assignee = "agent:copilot".parse().unwrap();
+    /// let event = Event::new_issue_claimed("issue-123".to_string(), actor);
+    /// assert_eq!(event.get_type(), "issue_claimed");
+    /// ```
+    pub fn new_issue_claimed(issue_id: String, assignee: Assignee) -> Self {
         Event::IssueClaimed {
             id: Uuid::new_v4().to_string(),
             issue_id,
@@ -1145,8 +1159,25 @@ impl Event {
         }
     }
 
-    /// Create a gate passed event
-    pub fn new_gate_passed(issue_id: String, gate_key: String, updated_by: Option<String>) -> Self {
+    /// Create a gate passed event.
+    ///
+    /// `updated_by` is a typed [`Assignee`] (the actor who passed the gate), so
+    /// no malformed actor can be logged.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::{Assignee, Event};
+    ///
+    /// let by: Assignee = "ci:runner".parse().unwrap();
+    /// let event = Event::new_gate_passed("issue-123".to_string(), "tests".to_string(), Some(by));
+    /// assert_eq!(event.get_type(), "gate_passed");
+    /// ```
+    pub fn new_gate_passed(
+        issue_id: String,
+        gate_key: String,
+        updated_by: Option<Assignee>,
+    ) -> Self {
         Event::GatePassed {
             id: Uuid::new_v4().to_string(),
             issue_id,
@@ -1156,8 +1187,25 @@ impl Event {
         }
     }
 
-    /// Create a gate failed event
-    pub fn new_gate_failed(issue_id: String, gate_key: String, updated_by: Option<String>) -> Self {
+    /// Create a gate failed event.
+    ///
+    /// `updated_by` is a typed [`Assignee`] (the actor who failed the gate), so
+    /// no malformed actor can be logged.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::{Assignee, Event};
+    ///
+    /// let by: Assignee = "ci:runner".parse().unwrap();
+    /// let event = Event::new_gate_failed("issue-123".to_string(), "tests".to_string(), Some(by));
+    /// assert_eq!(event.get_type(), "gate_failed");
+    /// ```
+    pub fn new_gate_failed(
+        issue_id: String,
+        gate_key: String,
+        updated_by: Option<Assignee>,
+    ) -> Self {
         Event::GateFailed {
             id: Uuid::new_v4().to_string(),
             issue_id,
@@ -1196,8 +1244,22 @@ impl Event {
         }
     }
 
-    /// Create an issue released event
-    pub fn new_issue_released(issue_id: String, assignee: String, reason: String) -> Self {
+    /// Create an issue released event.
+    ///
+    /// `assignee` is the typed [`Assignee`] being released; callers emit this
+    /// event only when a prior assignee existed, so the actor is always a valid
+    /// `kind:identifier`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::{Assignee, Event};
+    ///
+    /// let prev: Assignee = "agent:copilot".parse().unwrap();
+    /// let event = Event::new_issue_released("issue-123".to_string(), prev, "timeout".to_string());
+    /// assert_eq!(event.get_type(), "issue_released");
+    /// ```
+    pub fn new_issue_released(issue_id: String, assignee: Assignee, reason: String) -> Self {
         Event::IssueReleased {
             id: Uuid::new_v4().to_string(),
             issue_id,
@@ -2156,6 +2218,65 @@ mod tests {
         let issue: Issue = serde_json::from_str(json).unwrap();
         assert_eq!(issue.assignee.unwrap().to_string(), "agent:copilot");
         assert_eq!(issue.created_at.timezone(), Utc);
+    }
+
+    mod event_assignee_tests {
+        use super::*;
+        use std::str::FromStr;
+
+        #[test]
+        fn test_issue_claimed_assignee_serde_round_trips_as_string() {
+            let actor = Assignee::from_str("agent:copilot").unwrap();
+            let event = Event::new_issue_claimed("issue-1".to_string(), actor);
+
+            let json = serde_json::to_string(&event).unwrap();
+            assert!(json.contains("\"assignee\":\"agent:copilot\""));
+
+            let back: Event = serde_json::from_str(&json).unwrap();
+            assert_eq!(back, event);
+        }
+
+        #[test]
+        fn test_issue_released_assignee_serde_round_trips_as_string() {
+            let prev = Assignee::from_str("copilot:session-1").unwrap();
+            let event =
+                Event::new_issue_released("issue-1".to_string(), prev, "timeout".to_string());
+
+            let json = serde_json::to_string(&event).unwrap();
+            assert!(json.contains("\"assignee\":\"copilot:session-1\""));
+
+            let back: Event = serde_json::from_str(&json).unwrap();
+            assert_eq!(back, event);
+        }
+
+        #[test]
+        fn test_gate_event_updated_by_serde_round_trips_as_string() {
+            let by = Assignee::from_str("ci:runner").unwrap();
+            let event =
+                Event::new_gate_passed("issue-1".to_string(), "tests".to_string(), Some(by));
+
+            let json = serde_json::to_string(&event).unwrap();
+            assert!(json.contains("\"updated_by\":\"ci:runner\""));
+
+            let back: Event = serde_json::from_str(&json).unwrap();
+            assert_eq!(back, event);
+        }
+
+        #[test]
+        fn test_event_actor_rejected_before_construction() {
+            // The constructors only accept an already-parsed `Assignee`, so a
+            // malformed actor is rejected at parse time and can never reach an
+            // event. (`"bulk-update"` is the kind of non-assignee actor that the
+            // string-typed `IssueUpdated.updated_by` still carries.)
+            assert!(Assignee::from_str("bulk-update").is_err());
+            assert!("nocolon".parse::<Assignee>().is_err());
+        }
+
+        #[test]
+        fn test_event_deserialize_rejects_malformed_assignee() {
+            let json = r#"{"type":"issue_claimed","id":"e1","issue_id":"i1","timestamp":"2026-01-01T00:00:00Z","assignee":"nocolon"}"#;
+            assert!(serde_json::from_str::<Event>(json).is_err());
+        }
     }
 }
 
