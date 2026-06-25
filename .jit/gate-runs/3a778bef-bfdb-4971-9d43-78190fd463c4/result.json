@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "3a778bef-bfdb-4971-9d43-78190fd463c4",
+  "gate_key": "coverage-preview",
+  "stage": "postcheck",
+  "issue_id": "5f5735c3-8b9a-492d-8fb1-7d8b597bf435",
+  "commit": "346d65da474dd17c2c88d66452baae8a12f8148e",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-06-25T05:12:53.130305537Z",
+  "completed_at": "2026-06-25T05:12:53.233107166Z",
+  "duration_ms": 102,
+  "exit_code": 0,
+  "stdout": "✓ Scope validation passed\n",
+  "stderr": "",
+  "command": "./scripts/coverage-preview.sh",
+  "by": "auto:executor",
+  "message": null
+}
