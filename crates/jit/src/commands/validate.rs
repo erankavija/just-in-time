@@ -206,6 +206,16 @@ impl<S: IssueStore> CommandExecutor<S> {
         // checks are NO LONGER here: they are default rules evaluated below.
         self.validate_integrity_silent()?;
 
+        // Built-in enforcement-drift pass (REQ-01/REQ-02), computed FIRST and
+        // tolerantly so an unloadable rule set / gate registry surfaces as a
+        // declared-but-unenforced finding rather than crashing the run (REQ-01
+        // "missing OR unloadable"). Gated on declared invariants, so a repo
+        // without `.jit/invariants.toml` is unaffected. Captured up front so the
+        // finding is reported even when the malformed ruleset makes the rule
+        // evaluation below hard-error.
+        let drift_findings = self.enforcement_drift_findings()?;
+        let drift_error_message = graph_findings_error_message(&drift_findings);
+
         // Local rules (built-in defaults + user rules) across every issue. The
         // former hard-coded label/type/namespace checks live here now: an
         // `error`-severity finding (e.g. a value outside a namespace enum, a bad
@@ -213,26 +223,34 @@ impl<S: IssueStore> CommandExecutor<S> {
         // `validate_labels`/`validate_type_hierarchy` hard-reject behavior — while
         // `warn` findings never fail.
         let issues = self.storage.list_issues()?;
-        if let Some(message) = self.local_rules_error_message(&issues)? {
-            return Err(anyhow!(message));
-        }
+        let rule_eval = self.rule_eval_error_message(&issues);
 
-        // Cross-issue graph rules. An `error`-severity violation (including a
-        // `config-error`, since the rule could not be applied) fails validation;
-        // `warn`/`off` findings never fail here.
-        let mut graph_findings = self.evaluate_graph_rules(&issues)?;
-        // Built-in dangling-item-link pass (REQ-08 clause i, REQ-03): a node→item
-        // link in a configured link-namespace whose qualified id cannot be
-        // resolved is a finding, surfaced here so `jit validate` fails on it.
-        graph_findings.extend(self.dangling_link_findings(&issues)?);
-        // Built-in enforcement-drift pass (REQ-01/REQ-02): gated on declared
-        // invariants, so a repo without `.jit/invariants.toml` is unaffected.
-        graph_findings.extend(self.enforcement_drift_findings()?);
-        if let Some(message) = graph_findings_error_message(&graph_findings) {
-            return Err(anyhow!(message));
+        // Combine the drift error (if any) with the rule-evaluation error (if any)
+        // so a malformed ruleset reports BOTH the drift finding AND the parse
+        // problem, rather than losing the drift finding to an early `?`.
+        match (drift_error_message, rule_eval) {
+            (Some(drift), Ok(Some(rules))) => Err(anyhow!("{drift}\n{rules}")),
+            (Some(drift), Err(load_err)) => Err(anyhow!("{drift}\n{load_err}")),
+            (Some(drift), Ok(None)) => Err(anyhow!(drift)),
+            (None, Ok(Some(rules))) => Err(anyhow!(rules)),
+            (None, Err(load_err)) => Err(load_err),
+            (None, Ok(None)) => Ok(()),
         }
+    }
 
-        Ok(())
+    /// Evaluate local + graph rules + the dangling-link pass and return a combined
+    /// error message if any produces an error-severity finding; `Ok(None)` when
+    /// clean. A malformed rule SOURCE surfaces as an `Err` (its own load failure),
+    /// which the caller combines with any enforcement-drift finding so neither is
+    /// lost. Does NOT include the enforcement-drift pass (the caller runs that
+    /// separately and tolerantly).
+    fn rule_eval_error_message(&self, issues: &[Issue]) -> Result<Option<String>> {
+        if let Some(message) = self.local_rules_error_message(issues)? {
+            return Ok(Some(message));
+        }
+        let mut graph_findings = self.evaluate_graph_rules(issues)?;
+        graph_findings.extend(self.dangling_link_findings(issues)?);
+        Ok(graph_findings_error_message(&graph_findings))
     }
 
     /// Built-in validate pass: report every node→item link label whose qualified
@@ -363,25 +381,13 @@ impl<S: IssueStore> CommandExecutor<S> {
     pub fn enforcement_drift_findings(
         &self,
     ) -> Result<Vec<crate::validation::graph::GraphFinding>> {
-        use crate::validation::drift::{enforcement_drift, DriftDirection};
+        use crate::validation::drift::DriftDirection;
         use crate::validation::engine::Finding;
         use crate::validation::graph::GraphFinding;
         use crate::validation::rules::Severity;
-        use std::collections::BTreeSet;
 
-        let config = self.cached_config()?;
-        let invariants = &config.invariants.invariants;
-        // Gated on declared invariants: a repo with none sees no drift findings.
-        if invariants.is_empty() {
-            return Ok(Vec::new());
-        }
-
-        let ruleset = self.effective_rules()?;
-        let gate_registry = self.storage.load_gate_registry()?;
-        let rule_names: BTreeSet<&str> = ruleset.rules.iter().map(|r| r.name.as_str()).collect();
-        let gate_keys: BTreeSet<&str> = gate_registry.gates.keys().map(|k| k.as_str()).collect();
-
-        let findings = enforcement_drift(invariants, &rule_names, &gate_keys)
+        let findings = self
+            .compute_drift_findings()?
             .into_iter()
             .map(|f| {
                 let severity = match f.direction {
@@ -398,6 +404,119 @@ impl<S: IssueStore> CommandExecutor<S> {
             })
             .collect();
         Ok(findings)
+    }
+
+    /// Compute the bidirectional enforcement-drift findings, tolerating an
+    /// unloadable rule set / gate registry (REQ-01 "missing OR unloadable").
+    ///
+    /// This is the SINGLE drift computation shared by the built-in validate pass
+    /// ([`enforcement_drift_findings`](Self::enforcement_drift_findings), which
+    /// assigns per-direction severity) and the
+    /// [`check_invariants`](crate::commands::CommandExecutor::check_invariants)
+    /// command (which serializes the raw findings), so both surfaces report
+    /// IDENTICALLY. Returns an empty list when no invariants are declared (the
+    /// pass is dormant — a repo without `.jit/invariants.toml` is unaffected).
+    ///
+    /// Each enforcement SOURCE is loaded defensively: a parse/load failure is NOT
+    /// propagated (it would crash the run) but treated as
+    /// [`SourceState::Unloadable`](crate::validation::drift::SourceState::Unloadable),
+    /// so a binding into it surfaces as a declared-but-unenforced finding flagged
+    /// `unloadable` instead of an error. Only `cached_config` (the invariant
+    /// registry itself) can still error.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use jit::commands::CommandExecutor;
+    /// use jit::storage::JsonFileStorage;
+    ///
+    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
+    /// let findings = executor.compute_drift_findings().unwrap();
+    /// println!("{} drift finding(s)", findings.len());
+    /// ```
+    pub fn compute_drift_findings(&self) -> Result<Vec<crate::validation::drift::DriftFinding>> {
+        use crate::validation::drift::{enforcement_drift_tolerant, SourceState};
+        use std::collections::BTreeSet;
+
+        let config = self.cached_config()?;
+        let invariants = &config.invariants.invariants;
+        // Gated on declared invariants: a repo with none sees no drift findings.
+        if invariants.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // Defensive (tolerant) loads: a failure -> unloadable, not an error.
+        let rule_names_owned = self.loadable_rule_names();
+        let gate_keys_owned: Option<Vec<String>> = self
+            .storage
+            .load_gate_registry()
+            .ok()
+            .map(|reg| reg.gates.keys().cloned().collect());
+
+        let rule_set: Option<BTreeSet<&str>> = rule_names_owned
+            .as_ref()
+            .map(|v| v.iter().map(String::as_str).collect());
+        let gate_set: Option<BTreeSet<&str>> = gate_keys_owned
+            .as_ref()
+            .map(|v| v.iter().map(String::as_str).collect());
+
+        let rules_state = match &rule_set {
+            Some(set) => SourceState::Loaded(set),
+            None => SourceState::Unloadable,
+        };
+        let gates_state = match &gate_set {
+            Some(set) => SourceState::Loaded(set),
+            None => SourceState::Unloadable,
+        };
+
+        Ok(enforcement_drift_tolerant(
+            invariants,
+            rules_state,
+            gates_state,
+        ))
+    }
+
+    /// Defensively resolve the names of every LOADABLE rule, returning `None` when
+    /// the rule SOURCE is unloadable.
+    ///
+    /// Mirrors [`effective_rules`](crate::commands::CommandExecutor::effective_rules)
+    /// resolution but tolerantly: a present-and-parseable `.jit/rules.toml` yields
+    /// its rule names; an ABSENT file yields the in-memory default rule set's names
+    /// (still loadable); a present-but-MALFORMED file (or an unresolvable namespace
+    /// registry) yields `None` (unloadable). Used only by the enforcement-drift
+    /// pass, which must not crash when the ruleset fails to parse.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use jit::commands::CommandExecutor;
+    /// use jit::storage::JsonFileStorage;
+    ///
+    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
+    /// match executor.loadable_rule_names() {
+    ///     Some(names) => println!("{} loadable rule(s)", names.len()),
+    ///     None => println!("rule set is unloadable"),
+    /// }
+    /// ```
+    pub fn loadable_rule_names(&self) -> Option<Vec<String>> {
+        let rules_path = self.storage.root().join("rules.toml");
+        if rules_path.exists() {
+            // Present: parse it directly (do NOT go through the cached
+            // `effective_rules`, which `?`-errors). A parse failure -> unloadable.
+            crate::validation::rules::RuleSet::load(self.storage.root())
+                .ok()
+                .map(|set| set.rules.into_iter().map(|r| r.name).collect())
+        } else {
+            // Absent: the in-memory defaults are loadable. A namespace-registry
+            // failure (rare) reads as unloadable rather than crashing.
+            self.cached_namespaces().ok().map(|namespaces| {
+                crate::validation::defaults::default_ruleset(namespaces)
+                    .rules
+                    .into_iter()
+                    .map(|r| r.name)
+                    .collect()
+            })
+        }
     }
 
     /// Evaluate the EFFECTIVE local rules for every issue and, if any produces an
@@ -771,7 +890,34 @@ impl<S: IssueStore> CommandExecutor<S> {
     pub fn run_rules(&self, id: Option<&str>) -> Result<crate::validation::report::RuleReport> {
         use crate::validation::report::{ReportedFinding, RuleReport};
 
-        let ruleset = self.effective_rules()?;
+        // If the rule SOURCE is unloadable, do NOT crash the whole report: the
+        // enforcement-drift pass still reports a declared-but-unenforced finding
+        // for a binding into the unloadable source (REQ-01), and the parse problem
+        // itself is surfaced as a config-error finding so validation still fails.
+        // This mirrors how a SEMANTIC config-error (a rule that parses but is
+        // rejected by its evaluator) is already reported as a finding rather than
+        // an early `?`.
+        let ruleset = match self.effective_rules() {
+            Ok(set) => set,
+            Err(e) => {
+                let mut findings: Vec<ReportedFinding> = Vec::new();
+                // The drift pass loads the ruleset tolerantly on its own.
+                for gf in self.enforcement_drift_findings()? {
+                    findings.push(ReportedFinding::new(gf.issue_id.clone(), &gf.finding));
+                }
+                // Surface the unparseable ruleset as an error-severity finding so
+                // the report still fails (config-error prefix keeps it grouped).
+                findings.push(ReportedFinding::new(
+                    None,
+                    &crate::validation::engine::Finding {
+                        rule: "rules-file".to_string(),
+                        severity: crate::validation::rules::Severity::Error,
+                        message: format!("config error: {e}"),
+                    },
+                ));
+                return Ok(RuleReport { findings });
+            }
+        };
         let repo_format = self.repo_content_format()?;
         let issues = self.storage.list_issues()?;
 

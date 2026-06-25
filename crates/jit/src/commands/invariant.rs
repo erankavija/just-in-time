@@ -13,7 +13,7 @@
 
 use super::*;
 use crate::config::InvariantProjectionConfig;
-use crate::validation::drift::{enforcement_drift, DriftFinding};
+use crate::validation::drift::DriftFinding;
 use crate::validation::projection::project_invariants;
 
 /// Result of a `jit invariant render` projection.
@@ -69,6 +69,7 @@ pub struct InvariantRenderResult {
 ///         direction: DriftDirection::DeclaredButUnenforced,
 ///         invariant_id: Some("INV-01".to_string()),
 ///         subject: "ghost-rule".to_string(),
+///         unloadable: false,
 ///     }],
 ///     count: 1,
 /// };
@@ -173,18 +174,12 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// # Ok::<(), anyhow::Error>(())
     /// ```
     pub fn check_invariants(&self) -> Result<InvariantCheckResult> {
-        let ruleset = self.effective_rules()?;
-        let gate_registry = self.storage().load_gate_registry()?;
-        let config = self.cached_config()?;
-
-        let rule_names: std::collections::BTreeSet<&str> =
-            ruleset.rules.iter().map(|r| r.name.as_str()).collect();
-        let gate_keys: std::collections::BTreeSet<&str> =
-            gate_registry.gates.keys().map(|k| k.as_str()).collect();
-
-        let findings: Vec<DriftFinding> =
-            enforcement_drift(&config.invariants.invariants, &rule_names, &gate_keys);
-
+        // Share the SINGLE tolerant drift computation with the built-in validate
+        // pass so both surfaces report identically, including the unloadable-source
+        // case (REQ-01 "missing OR unloadable"): a malformed `.jit/rules.toml`
+        // referenced by an `enforced-by` binding yields a declared-but-unenforced
+        // finding here too, not a raw parse error.
+        let findings: Vec<DriftFinding> = self.compute_drift_findings()?;
         Ok(InvariantCheckResult {
             count: findings.len(),
             findings,

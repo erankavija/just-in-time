@@ -117,6 +117,46 @@ fn test_validate_fails_on_declared_but_unenforced_drift() {
 }
 
 #[test]
+fn test_validate_reports_unloadable_target_drift_not_parse_error() {
+    // REQ-01 "unloadable" half (the named gap): an invariant binds to `bad-rule`
+    // and `.jit/rules.toml` is MALFORMED. `jit validate --json` must surface the
+    // declared-but-unenforced drift finding (worded as unloadable), not exit with a
+    // raw parse error that loses the finding.
+    let temp = setup_test_repo();
+    std::fs::write(
+        temp.path().join(".jit/rules.toml"),
+        "[[rules]]\nname = \"bad-rule\"\nseverity = \"error\"\n\
+         assert = { this-is-not-a-valid-kind = { foo = 1 } }\n",
+    )
+    .unwrap();
+    std::fs::write(
+        temp.path().join(".jit/invariants.toml"),
+        "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
+         enforced-by = \"bad-rule\"\n",
+    )
+    .unwrap();
+
+    let (code, json) = run_validate(&temp);
+    let messages = finding_messages(&json);
+
+    // The drift finding is present (worded to make the unloadable source clear).
+    assert!(
+        messages
+            .iter()
+            .any(|m| m.contains("declared-but-unenforced")
+                && m.contains("bad-rule")
+                && m.contains("failed to load")),
+        "validate did not surface the unloadable-target drift finding: {messages:?}"
+    );
+    // And validation fails (drift Error + ruleset parse config-error).
+    assert_ne!(
+        code,
+        Some(0),
+        "validate must fail when the ruleset is unloadable"
+    );
+}
+
+#[test]
 fn test_validate_clean_when_no_invariants_registry() {
     let temp = setup_test_repo();
     // No .jit/invariants.toml at all -> the drift pass is dormant. `jit validate`

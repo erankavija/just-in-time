@@ -143,3 +143,79 @@ fn test_check_human_output_names_both_directions() {
         "human output missing enforced direction: {stdout}"
     );
 }
+
+#[test]
+fn test_check_reports_unloadable_rule_source_not_a_parse_error() {
+    // REQ-01 "unloadable" half: an invariant binds to `bad-rule` and `.jit/rules.toml`
+    // is MALFORMED. `jit invariant check` must report a declared-but-unenforced
+    // finding and exit non-zero — NOT print a raw TOML parse error.
+    let temp = setup_test_repo();
+    write_rules(
+        &temp,
+        "[[rules]]\nname = \"bad-rule\"\nseverity = \"error\"\n\
+         assert = { this-is-not-a-valid-kind = { foo = 1 } }\n",
+    );
+    write_invariants(
+        &temp,
+        "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
+         enforced-by = \"bad-rule\"\n",
+    );
+
+    let output = Command::new(jit_binary())
+        .args(["invariant", "check", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    // Exit non-zero (drift present), and stdout is VALID JSON (not a parse error).
+    assert_eq!(output.status.code(), Some(4), "expected exit 4 on drift");
+    let json: Value = serde_json::from_slice(&output.stdout).unwrap_or_else(|e| {
+        panic!(
+            "expected valid JSON, not a raw parse error: {e}\nstdout: {}",
+            String::from_utf8_lossy(&output.stdout)
+        )
+    });
+    let findings = json["findings"].as_array().unwrap();
+    assert!(
+        findings
+            .iter()
+            .any(|f| f["direction"] == "declared-but-unenforced"
+                && f["subject"] == "bad-rule"
+                && f["unloadable"] == true),
+        "missing unloadable declared-but-unenforced finding: {json}"
+    );
+}
+
+#[test]
+fn test_check_reports_unloadable_gate_registry() {
+    // The gate registry is malformed and an invariant binds to a gate that would
+    // live there -> declared-but-unenforced (unloadable), exit non-zero.
+    let temp = setup_test_repo();
+    // Loadable (empty) rules so only the gate source is unloadable.
+    write_rules(&temp, "\n");
+    std::fs::write(temp.path().join(".jit/gates.json"), "not valid json {").unwrap();
+    write_invariants(
+        &temp,
+        "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
+         enforced-by = \"some-gate\"\n",
+    );
+
+    let output = Command::new(jit_binary())
+        .args(["invariant", "check", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(4));
+    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert!(
+        json["findings"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|f| f["direction"] == "declared-but-unenforced"
+                && f["subject"] == "some-gate"
+                && f["unloadable"] == true),
+        "missing unloadable gate finding: {json}"
+    );
+}
