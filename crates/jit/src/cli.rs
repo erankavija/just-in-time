@@ -163,6 +163,15 @@ pub enum Commands {
     #[command(subcommand)]
     Item(ItemCommands),
 
+    /// Project the project-invariant registry into its documentation target
+    ///
+    /// Invariants are declared in `.jit/invariants.toml`; `render` writes them
+    /// into the documentation target configured by `[invariant_projection]`
+    /// (default: a separate jit-owned file). The target path comes only from
+    /// config.
+    #[command(subcommand)]
+    Invariant(InvariantCommands),
+
     /// Search issues and documents
     Search {
         /// Search query string
@@ -373,6 +382,30 @@ pub enum ItemCommands {
         #[arg(long)]
         kind: Option<String>,
 
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+/// Project-invariant subcommands.
+///
+/// `render` projects the loaded `.jit/invariants.toml` registry into the
+/// `[invariant_projection]` target (the drift `check` verb is added by a sibling
+/// issue). The target path/mode/delimiters come only from config.
+#[derive(Subcommand)]
+pub enum InvariantCommands {
+    /// Render the invariant registry into its configured documentation target
+    ///
+    /// Reads `[invariant_projection]` from config (default: separate-file mode
+    /// targeting a jit-owned file) and writes the rendered registry there. In
+    /// region mode only the delimited region is rewritten; everything outside is
+    /// byte-preserved.
+    ///
+    /// Examples:
+    ///   jit invariant render          # Write the configured target
+    ///   jit invariant render --json   # Machine-readable result
+    Render {
         /// Output as JSON
         #[arg(long)]
         json: bool,

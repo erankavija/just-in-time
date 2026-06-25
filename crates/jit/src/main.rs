@@ -20,7 +20,7 @@ use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 use jit::cli::{
     ClaimCommands, Cli, Commands, DepCommands, DocCommands, EventCommands, GateCommands,
-    GraphCommands, IssueCommands, ItemCommands, RegistryCommands,
+    GraphCommands, InvariantCommands, IssueCommands, ItemCommands, RegistryCommands,
 };
 use jit::commands::CommandExecutor;
 use jit::domain::{GateRunResult, Priority, State};
@@ -489,6 +489,62 @@ fn run_item_inner<S: IssueStore>(
         | ItemCommands::Resolve { qualified_id, json } => {
             let result = executor.show_item(&qualified_id)?;
             print_item_show(&result, json, quiet)?;
+        }
+    }
+    Ok(())
+}
+
+/// Run `jit invariant <subcommand>`.
+///
+/// A thin delegation over the [`CommandExecutor`] invariant methods: it renders
+/// the project-invariant registry into its configured documentation target and
+/// reports the written target. On `--json` a failure is rendered as a JSON error
+/// object (honoring the machine-readable contract) rather than the top-level
+/// plain `Error: ...`.
+fn run_invariant<S: IssueStore>(
+    executor: &CommandExecutor<S>,
+    command: InvariantCommands,
+    quiet: bool,
+) -> Result<()> {
+    let json = match &command {
+        InvariantCommands::Render { json } => *json,
+    };
+
+    let result = run_invariant_inner(executor, command, quiet);
+    if let Err(e) = result {
+        handle_json_error!(
+            json,
+            e,
+            jit::output::JsonError::new("INVARIANT_COMMAND_FAILED", e.to_string(), "invariant")
+        );
+    }
+    Ok(())
+}
+
+/// Inner dispatch for `jit invariant`; errors are converted to JSON by
+/// [`run_invariant`] when `--json` is set.
+fn run_invariant_inner<S: IssueStore>(
+    executor: &CommandExecutor<S>,
+    command: InvariantCommands,
+    quiet: bool,
+) -> Result<()> {
+    match command {
+        InvariantCommands::Render { json } => {
+            let result = executor.render_invariants()?;
+            let output_ctx = OutputContext::new(quiet, json);
+            if json {
+                let msg = format!(
+                    "Rendered {} invariant(s) to {}",
+                    result.count, result.target
+                );
+                let output = JsonOutput::success(&result, "invariant render").with_message(msg);
+                println!("{}", output.to_json_string()?);
+            } else {
+                output_ctx.print_data(format!(
+                    "Rendered {} invariant(s) to {} ({} mode)",
+                    result.count, result.target, result.mode
+                ))?;
+            }
         }
     }
     Ok(())
@@ -4114,6 +4170,9 @@ fn run() -> Result<()> {
         },
         Commands::Item(item_cmd) => {
             run_item(&executor, item_cmd, quiet)?;
+        }
+        Commands::Invariant(invariant_cmd) => {
+            run_invariant(&executor, invariant_cmd, quiet)?;
         }
         Commands::Search {
             query,

@@ -35,6 +35,7 @@ mod gate_check;
 mod gate_cli_tests;
 pub mod graph;
 pub mod hooks;
+pub mod invariant;
 mod issue;
 pub mod item;
 mod labels;
@@ -59,6 +60,7 @@ pub use bulk_update::{BulkUpdatePreview, BulkUpdateResult, UpdateOperations};
 pub use gate::{
     GateNotRequiredError, GatePassAllEntry, GatePassFailed, GatePassOutcome, PassAllOutcome,
 };
+pub use invariant::InvariantRenderResult;
 pub use item::{ItemListResult, ItemShowResult};
 pub use template::TemplateApplyResult;
 
