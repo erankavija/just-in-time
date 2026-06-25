@@ -15,6 +15,8 @@
 //!   [`engine::Finding`]s;
 //! - [`local`] — write-path local-rule evaluation ([`evaluate_local`]);
 //! - [`graph`] — cross-issue graph-rule evaluation (validate / gate checkers);
+//! - [`invariants`] — the project-invariant registry and `.jit/invariants.toml`
+//!   loader (registry-first, project-scoped);
 //! - [`report`] — structured rule reports for `jit validate [--explain]`;
 //! - [`serialize`] — render a [`rules::RuleSet`] to `rules.toml` + schema files,
 //!   and the `jit init` scaffold writer ([`serialize::scaffold_default_rules`]).
@@ -23,6 +25,7 @@ pub mod defaults;
 pub mod desugar;
 pub mod engine;
 pub mod graph;
+pub mod invariants;
 pub mod local;
 pub mod report;
 pub mod rules;

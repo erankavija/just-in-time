@@ -48,6 +48,16 @@ pub struct JitConfig {
     /// `#[serde(skip)]` and defaults to an empty [`TemplateRegistry`].
     #[serde(skip)]
     pub templates: crate::templates::TemplateRegistry,
+    /// Project invariants loaded from `.jit/invariants.toml`.
+    ///
+    /// Not read from `config.toml`: populated by [`JitConfig::load`] from the
+    /// sibling `invariants.toml` (absent file → empty registry) on BOTH load
+    /// paths, so it carries `#[serde(skip)]` and defaults to an empty
+    /// [`InvariantRegistry`](crate::validation::invariants::InvariantRegistry).
+    /// Kept here so later indexing can project each entry as a project-scoped
+    /// (`@`) addressable item.
+    #[serde(skip)]
+    pub invariants: crate::validation::invariants::InvariantRegistry,
 }
 
 /// Schema version configuration.
@@ -753,6 +763,12 @@ impl JitConfig {
                 // exactly as on the config-present path below.
                 templates: crate::templates::TemplateRegistry::load(jit_root, &[] as &[&str])
                     .context("invalid .jit/templates.toml")?,
+                // The invariant registry is independent of `config.toml`, so it
+                // loads on this config-absent path too (absent file → empty
+                // registry; a malformed/invalid entry fails config load with a
+                // typed, descriptive error).
+                invariants: crate::validation::invariants::InvariantRegistry::load(jit_root)
+                    .context("invalid .jit/invariants.toml")?,
             });
         }
 
@@ -786,6 +802,12 @@ impl JitConfig {
         config
             .validate_item_kinds()
             .context("invalid [item_kinds] in .jit/config.toml")?;
+
+        // Chain-load `.jit/invariants.toml` on the config-present path too, with
+        // the same graceful-absent / typed-error contract as the early return
+        // above, so both load paths populate the registry identically.
+        config.invariants = crate::validation::invariants::InvariantRegistry::load(jit_root)
+            .context("invalid .jit/invariants.toml")?;
 
         Ok(config)
     }
@@ -1283,6 +1305,101 @@ depends_on = ["planning"]
         assert_eq!(plan.planning_type(), Some("planning"));
         assert_eq!(plan.breakdown_type(), Some("breakdown"));
         assert_eq!(config.templates.breakable_types(), vec!["epic".to_string()]);
+    }
+
+    #[test]
+    fn test_load_invariants_when_config_absent() {
+        // A repo with `.jit/invariants.toml` but NO `.jit/config.toml` must still
+        // load the registry (the config-absent early-return path).
+        let dir = TempDir::new().unwrap();
+        std::fs::write(
+            dir.path().join("invariants.toml"),
+            r#"
+[[invariants]]
+id = "INV-01"
+statement = "Every dependency edge stays acyclic."
+kind = "enforced"
+enforced-by = "dag-no-cycles"
+"#,
+        )
+        .unwrap();
+
+        let config = JitConfig::load(dir.path()).unwrap();
+        assert_eq!(config.invariants.invariants.len(), 1);
+        let inv = &config.invariants.invariants[0];
+        assert_eq!(inv.id, "INV-01");
+        assert_eq!(
+            inv.kind,
+            crate::validation::invariants::InvariantKind::Enforced
+        );
+        assert_eq!(inv.enforced_by.as_deref(), Some("dag-no-cycles"));
+    }
+
+    #[test]
+    fn test_load_invariants_when_config_present() {
+        // With BOTH `.jit/config.toml` and `.jit/invariants.toml`, the
+        // config-present path also chain-loads the invariant registry.
+        let dir = TempDir::new().unwrap();
+        std::fs::write(
+            dir.path().join("config.toml"),
+            "[type_hierarchy]\ntypes = { task = 1 }\n",
+        )
+        .unwrap();
+        std::fs::write(
+            dir.path().join("invariants.toml"),
+            "[[invariants]]\nid = \"INV-02\"\nstatement = \"s\"\nkind = \"advisory\"\n",
+        )
+        .unwrap();
+
+        let config = JitConfig::load(dir.path()).unwrap();
+        assert!(config.type_hierarchy.is_some());
+        assert_eq!(config.invariants.invariants.len(), 1);
+        assert_eq!(config.invariants.invariants[0].id, "INV-02");
+    }
+
+    #[test]
+    fn test_load_invariants_absent_file_is_empty_on_both_paths() {
+        // No `invariants.toml` → empty registry, whether or not config.toml exists.
+        let no_config = TempDir::new().unwrap();
+        assert!(JitConfig::load(no_config.path())
+            .unwrap()
+            .invariants
+            .invariants
+            .is_empty());
+
+        let with_config = TempDir::new().unwrap();
+        std::fs::write(
+            with_config.path().join("config.toml"),
+            "[type_hierarchy]\ntypes = { task = 1 }\n",
+        )
+        .unwrap();
+        assert!(JitConfig::load(with_config.path())
+            .unwrap()
+            .invariants
+            .invariants
+            .is_empty());
+    }
+
+    #[test]
+    fn test_load_invalid_invariant_fails_config_load_both_paths() {
+        // A malformed invariant entry fails config load with a descriptive,
+        // context-bearing error on BOTH the config-absent and config-present paths.
+        let bad = "[[invariants]]\nid = \"INV-01\"\nkind = \"advisory\"\n"; // missing statement
+
+        let no_config = TempDir::new().unwrap();
+        std::fs::write(no_config.path().join("invariants.toml"), bad).unwrap();
+        let err = JitConfig::load(no_config.path()).unwrap_err();
+        assert!(err.to_string().contains("invariants.toml"), "{err:#}");
+
+        let with_config = TempDir::new().unwrap();
+        std::fs::write(
+            with_config.path().join("config.toml"),
+            "[type_hierarchy]\ntypes = { task = 1 }\n",
+        )
+        .unwrap();
+        std::fs::write(with_config.path().join("invariants.toml"), bad).unwrap();
+        let err = JitConfig::load(with_config.path()).unwrap_err();
+        assert!(err.to_string().contains("invariants.toml"), "{err:#}");
     }
 
     #[test]
