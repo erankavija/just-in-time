@@ -4748,6 +4748,7 @@ fn run() -> Result<()> {
                                 "index_rebuilt": report.index_rebuilt,
                                 "expired_leases_evicted": report.expired_leases_evicted,
                                 "temp_files_removed": report.temp_files_removed,
+                                "warnings": report.warnings,
                             }),
                             "recover",
                         )
@@ -4762,6 +4763,9 @@ fn run() -> Result<()> {
                             report.expired_leases_evicted
                         );
                         println!("  • Temp files removed: {}", report.temp_files_removed);
+                        for warning in &report.warnings {
+                            eprintln!("Warning: {}", warning);
+                        }
                     }
                 }
                 Err(e) => {

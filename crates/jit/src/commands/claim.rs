@@ -3,9 +3,11 @@
 //! Provides CLI interface to the lease-based claim coordination system.
 
 use crate::config::ConfigLoader;
-use crate::storage::worktree_identity::load_or_create_worktree_identity;
+use crate::storage::worktree_identity::{
+    load_or_create_worktree_identity, load_or_create_worktree_identity_with_warnings,
+};
 use crate::storage::worktree_paths::WorktreePaths;
-use crate::storage::{ClaimCoordinator, FileLocker, IssueStore, Lease};
+use crate::storage::{ClaimCoordinator, FileLocker, IssueStore, Lease, StorageWarning};
 use anyhow::{Context, Result};
 use std::process::Command;
 use std::time::Duration;
@@ -528,6 +530,9 @@ pub struct RecoveryReport {
     pub expired_leases_evicted: usize,
     /// Number of orphaned temp files removed
     pub temp_files_removed: usize,
+    /// Non-fatal warnings observed during recovery, for the output layer to
+    /// render. Storage returns these instead of writing to stderr directly.
+    pub warnings: Vec<StorageWarning>,
 }
 
 /// Execute recovery routines to fix common issues.
@@ -550,9 +555,12 @@ pub fn execute_recover<S: IssueStore>(_storage: &S) -> Result<RecoveryReport> {
     // Get current branch for identity
     let branch = get_current_branch()?;
 
-    // Load worktree identity
-    let identity =
-        load_or_create_worktree_identity(&paths.local_jit, &paths.worktree_root, &branch)?;
+    // Load worktree identity (surfacing any relocation as a typed warning)
+    let (identity, identity_warnings) = load_or_create_worktree_identity_with_warnings(
+        &paths.local_jit,
+        &paths.worktree_root,
+        &branch,
+    )?;
 
     // Create claim coordinator
     let agent = "system:recovery".to_string();
@@ -561,6 +569,7 @@ pub fn execute_recover<S: IssueStore>(_storage: &S) -> Result<RecoveryReport> {
     coordinator.init()?;
 
     let mut report = RecoveryReport::default();
+    report.warnings.extend(identity_warnings);
 
     // 1. Clean up stale locks
     let lock_dir = paths.shared_jit.join("locks");
@@ -575,7 +584,9 @@ pub fn execute_recover<S: IssueStore>(_storage: &S) -> Result<RecoveryReport> {
             })
             .unwrap_or(0);
 
-        lock_cleanup::cleanup_stale_locks(&lock_dir)?;
+        report
+            .warnings
+            .extend(lock_cleanup::cleanup_stale_locks(&lock_dir)?);
 
         let locks_after = std::fs::read_dir(&lock_dir)
             .map(|entries| {
@@ -590,8 +601,12 @@ pub fn execute_recover<S: IssueStore>(_storage: &S) -> Result<RecoveryReport> {
     }
 
     // 2. Rebuild index if corrupted
-    if !coordinator.verify_index_consistency()? {
+    let (consistent, verify_warnings) = coordinator.verify_index_consistency()?;
+    report.warnings.extend(verify_warnings);
+    if !consistent {
+        report.warnings.push(StorageWarning::IndexRebuilt);
         let index = coordinator.rebuild_index_from_log()?;
+        report.warnings.extend(index.warnings());
         coordinator.write_index_atomic(&index)?;
         report.index_rebuilt = true;
     }
@@ -603,10 +618,14 @@ pub fn execute_recover<S: IssueStore>(_storage: &S) -> Result<RecoveryReport> {
     coordinator.write_index_atomic(&index)?;
     report.expired_leases_evicted = leases_before.saturating_sub(index.leases.len());
 
-    // 4. Clean up orphaned temp files (1 hour threshold)
+    // 4. Clean up orphaned temp files (1 hour threshold). Best-effort: a
+    // failure is surfaced as a warning rather than aborting recovery.
     let jit_data_dir = &paths.local_jit;
-    if let Ok(removed) = temp_cleanup::cleanup_orphaned_temp_files(jit_data_dir, 3600) {
-        report.temp_files_removed = removed;
+    match temp_cleanup::cleanup_orphaned_temp_files(jit_data_dir, 3600) {
+        Ok(removed) => report.temp_files_removed = removed,
+        Err(e) => report.warnings.push(StorageWarning::TempCleanupFailed {
+            reason: e.to_string(),
+        }),
     }
 
     Ok(report)
