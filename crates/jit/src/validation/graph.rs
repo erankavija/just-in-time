@@ -3724,9 +3724,10 @@ source-of-truth = "markdown-first"
     #[test]
     fn test_b121fd51_label_coverage_kind_equals_inline_acceptance() {
         // REQ-01 acceptance: a `label-coverage` rule with `kind = "requirement"`
-        // produces byte-identical finding messages to the equivalent inline
-        // `(criteria-section, marker, id-pattern)` rule, in BOTH the covered
-        // case (no findings) and the uncovered case (one finding per criterion).
+        // produces findings IDENTICAL field-for-field to the equivalent inline
+        // `(criteria-section, marker, id-pattern)` rule. `GraphFinding` is `Eq`, so
+        // the WHOLE finding vectors (issue_id, rule, severity, message) are
+        // compared, in BOTH the covered (empty) and uncovered cases.
         let kind_rule = rule_from_repo(
             "[[rules]]\nname = \"coverage\"\nwhen = { type = \"epic\" }\n\
              severity = \"error\"\nassert = { label-coverage = { \
@@ -3760,14 +3761,14 @@ source-of-truth = "markdown-first"
             kind_covered.is_empty(),
             "REQ-01 covered: kind= rule must produce no finding: {kind_covered:?}"
         );
+        // Full-vector equality (both empty) — identical field-for-field.
         assert_eq!(
-            kind_covered.len(),
-            inline_covered.len(),
-            "REQ-01 covered: kind= and inline finding counts must match"
+            kind_covered, inline_covered,
+            "REQ-01 covered: kind= and inline findings must be identical"
         );
 
-        // Uncovered: no satisfying child → one finding from each rule, messages
-        // identical.
+        // Uncovered: no satisfying child → one finding from each rule. Compare the
+        // full GraphFinding vectors (issue_id, rule, severity, message).
         let epic2 = epic_with_criteria(&["REQ-09"]);
         let uncovered = [epic2];
         let kind_uncovered = eval(&kind_rule, &uncovered);
@@ -3777,43 +3778,52 @@ source-of-truth = "markdown-first"
             1,
             "REQ-01 uncovered: kind= rule must fire one finding: {kind_uncovered:?}"
         );
+        // Full-vector equality — every field of every finding must match.
         assert_eq!(
-            kind_uncovered
-                .iter()
-                .map(|f| &f.finding.message)
-                .collect::<Vec<_>>(),
-            inline_uncovered
-                .iter()
-                .map(|f| &f.finding.message)
-                .collect::<Vec<_>>(),
-            "REQ-01: kind= and inline rules must produce identical finding messages"
+            kind_uncovered, inline_uncovered,
+            "REQ-01 uncovered: kind= and inline findings must be identical field-for-field"
         );
     }
 
     #[test]
     fn test_b121fd51_typed_rule_triple_equals_requirement_kind_expansion() {
         // REQ-02 acceptance: the `(section, marker, id_pattern)` triple a
-        // `criteria-to-check` rule consumes when authored with the INLINE form
-        // of the requirement kind's triple EQUALS the triple that
-        // `ItemKind::requirement_default().as_triple()` returns. This shows the
-        // two representations share one triple: the kind model and the typed
-        // rules are COMPATIBLE (same section + id_pattern vocabulary), not
+        // `criteria-to-check` rule consumes when authored with the INLINE form of
+        // the requirement kind's triple EQUALS the triple a CONFIG-DECLARED
+        // `requirement` kind expands to via `expand_kind_triple` over an explicit
+        // `[item_kinds]` registry (NOT the hardcoded default constructor). This
+        // shows the two representations share one triple: the kind model and the
+        // typed rules are COMPATIBLE (same section + marker + id_pattern), not
         // re-expressed (the typed rules are NOT given `kind=` syntax).
         //
         // The same assertion is then repeated for `criteria-label-match`.
-        //
-        // Note: the typed rules default their `marker` to `None` (no filter,
-        // widest scan), while `requirement_default` ships `marker = Some("[hard]")`.
-        // This is intentional: a `criteria-to-check` or `criteria-label-match`
-        // rule CAN be given the requirement kind's marker inline (as shown below),
-        // and the section + id_pattern defaults are identical. Compatibility is
-        // in the shared vocabulary of the triple, not in marker defaulting.
 
-        let req_kind = crate::domain::item::ItemKind::requirement_default().unwrap();
-        let (kind_section, kind_marker, kind_pattern) = req_kind.as_triple();
+        use crate::config::ItemKindConfig;
+        use crate::domain::item::expand_kind_triple;
+        use std::collections::HashMap;
 
-        // Build `criteria-to-check` with the inline triple from the requirement
-        // kind (section + marker + id-pattern all explicit) to assert they match.
+        // Declare `requirement` in a registry with its full six-tuple, exactly as
+        // a project's config.toml would, then EXPAND it to the consumed triple.
+        let mut registry: HashMap<String, ItemKindConfig> = HashMap::new();
+        registry.insert(
+            "requirement".to_string(),
+            ItemKindConfig {
+                section: Some("success_criteria".to_string()),
+                id_pattern: Some("[A-Z][A-Z0-9]*-[0-9]+".to_string()),
+                markers: Some(vec!["[hard]".to_string()]),
+                link_namespaces: Some(vec!["satisfies".to_string()]),
+                scope: Some("issue".to_string()),
+                source: None,
+                source_of_truth: None,
+            },
+        );
+        let declared = expand_kind_triple(Some(&registry), "requirement").unwrap();
+        let kind_section = declared.section.as_str();
+        let kind_marker = declared.marker.as_deref();
+        let kind_pattern = declared.id_pattern.as_str();
+
+        // Build `criteria-to-check` with the inline triple from the declared kind's
+        // expansion (section + marker + id-pattern all explicit) and assert match.
         let ctc = ctc_rule(&format!(
             "gate-prefix = \"verify:\", \
              criteria-section = \"{kind_section}\", \
@@ -3831,17 +3841,17 @@ source-of-truth = "markdown-first"
                 assert_eq!(
                     criteria_section.as_str(),
                     kind_section,
-                    "criteria-to-check criteria_section must equal requirement kind section"
+                    "criteria-to-check criteria_section must equal declared kind expansion section"
                 );
                 assert_eq!(
                     marker.as_deref(),
                     kind_marker,
-                    "criteria-to-check marker must equal requirement kind marker"
+                    "criteria-to-check marker must equal declared kind expansion marker"
                 );
                 assert_eq!(
                     id_pattern.as_str(),
                     kind_pattern,
-                    "criteria-to-check id_pattern must equal requirement kind id_pattern"
+                    "criteria-to-check id_pattern must equal declared kind expansion id_pattern"
                 );
             }
             other => panic!("expected CriteriaToCheck, got {other:?}"),
@@ -3865,17 +3875,17 @@ source-of-truth = "markdown-first"
                 assert_eq!(
                     criteria_section.as_str(),
                     kind_section,
-                    "criteria-label-match criteria_section must equal requirement kind section"
+                    "criteria-label-match criteria_section must equal declared kind expansion section"
                 );
                 assert_eq!(
                     marker.as_deref(),
                     kind_marker,
-                    "criteria-label-match marker must equal requirement kind marker"
+                    "criteria-label-match marker must equal declared kind expansion marker"
                 );
                 assert_eq!(
                     id_pattern.as_str(),
                     kind_pattern,
-                    "criteria-label-match id_pattern must equal requirement kind id_pattern"
+                    "criteria-label-match id_pattern must equal declared kind expansion id_pattern"
                 );
             }
             other => panic!("expected CriteriaLabelMatch, got {other:?}"),
