@@ -9,7 +9,8 @@
 
 use super::*;
 use crate::domain::item::{
-    index_items, resolve_item_kinds, split_qualified_id, AddressableItem, ItemKind,
+    index_items, index_project_items, resolve_item_kinds, split_qualified_id, AddressableItem,
+    ItemKind, Scope,
 };
 
 /// Result of a `jit item list` / `search` query.
@@ -22,14 +23,18 @@ pub struct ItemListResult {
 }
 
 /// Result of a `jit item show` / `resolve` query for one qualified id.
+///
+/// `issue_full_id` / `issue_title` are populated only for an issue-scoped item;
+/// for a project-scoped item (`@/<self-id>`) both are `None`, since no single
+/// issue owns it (REQ-01).
 #[derive(Debug, Serialize)]
 pub struct ItemShowResult {
     /// The resolved addressable item.
     pub item: AddressableItem,
-    /// Full id of the owning issue (the qualified id's scope is its short form).
-    pub issue_full_id: String,
-    /// Title of the owning issue, for human-readable output.
-    pub issue_title: String,
+    /// Full id of the owning issue, or `None` for a project-scoped item.
+    pub issue_full_id: Option<String>,
+    /// Title of the owning issue, or `None` for a project-scoped item.
+    pub issue_title: Option<String>,
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
@@ -72,6 +77,13 @@ impl<S: IssueStore> CommandExecutor<S> {
         issues.sort_by_key(|a| a.short_id());
 
         let mut items = Vec::new();
+        // Project-scope (`@`) items first, then issue-scope items in short-id
+        // order, so both substrates surface through one list (REQ-01).
+        items.extend(
+            self.project_items()?
+                .into_iter()
+                .filter(|i| kinds.iter().any(|k| k.name() == i.kind)),
+        );
         for issue in &issues {
             let parser = crate::document::content_parser_for(issue.content_format, repo_format)
                 .map_err(|err| {
@@ -123,13 +135,28 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(ItemListResult { items, count })
     }
 
-    /// Resolve a qualified id `<issue>/<self-id>` to its addressable item.
+    /// Index the project-scope (`@`) addressable items.
     ///
-    /// The scope segment is resolved through the SAME issue-id resolver the rest
-    /// of the CLI uses (full id, short id, or unique prefix), so `jit item show
-    /// 56ab/REQ-01` works just like `jit show 56ab`. An input without a `/` is a
-    /// usage error; an unresolvable scope or an unknown self-id is a descriptive
-    /// error rather than a silent miss (REQ-04).
+    /// Project-scoped kinds are registry-first (their source is a config table
+    /// wired in a later Group C issue); the seam is the executor's
+    /// [`with_project_items`](CommandExecutor::with_project_items) candidate list.
+    /// The candidates are run through the SAME [`index_project_items`] derivation
+    /// as issue scope, so per-scope uniqueness and qualified-id derivation are
+    /// identical across substrates (REQ-01, REQ-03, REQ-04).
+    fn project_items(&self) -> Result<Vec<AddressableItem>> {
+        index_project_items(self.project_item_source.clone())
+            .map_err(|err| anyhow!("indexing project-scope items failed: {err}"))
+    }
+
+    /// Resolve a qualified id `<scope>/<self-id>` to its addressable item.
+    ///
+    /// The scope is `@` for the project scope, or any issue reference (full id,
+    /// short id, or unique prefix) resolved through the SAME issue-id resolver the
+    /// rest of the CLI uses — so `jit item show 56ab/REQ-01` works just like `jit
+    /// show 56ab`, and `jit item show @/INV-01` resolves the project-scoped item
+    /// (REQ-01, REQ-02). An input without a `/` is a usage error; an unresolvable
+    /// scope or an unknown self-id is a descriptive error rather than a silent miss
+    /// (an unresolvable qualified id is reported, never dropped).
     ///
     /// # Examples
     ///
@@ -143,43 +170,66 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// # Ok::<(), anyhow::Error>(())
     /// ```
     pub fn show_item(&self, qualified: &str) -> Result<ItemShowResult> {
-        let (scope, self_id) = split_qualified_id(qualified).ok_or_else(|| {
-            anyhow!("'{qualified}' is not a qualified id; expected <issue>/<self-id>")
+        let (scope_segment, self_id) = split_qualified_id(qualified).ok_or_else(|| {
+            anyhow!("'{qualified}' is not a qualified id; expected <scope>/<self-id>")
         })?;
 
-        let full_id = self
-            .storage
-            .resolve_issue_id(scope)
-            .with_context(|| format!("cannot resolve issue scope '{scope}' in '{qualified}'"))?;
-        let issue = self.storage.load_issue(&full_id)?;
+        match Scope::parse(scope_segment) {
+            // Project scope: registry-first, no owning issue (REQ-01).
+            Scope::Project => {
+                let item = self
+                    .project_items()?
+                    .into_iter()
+                    .find(|i| i.self_id == self_id)
+                    .ok_or_else(|| {
+                        anyhow!(
+                            "project scope '@' declares no addressable item \
+                             with self-id '{self_id}'"
+                        )
+                    })?;
+                Ok(ItemShowResult {
+                    item,
+                    issue_full_id: None,
+                    issue_title: None,
+                })
+            }
+            // Issue scope: resolve the issue, index its description (REQ-02).
+            Scope::Issue(issue_ref) => {
+                let full_id = self.storage.resolve_issue_id(&issue_ref).with_context(|| {
+                    format!("cannot resolve issue scope '{issue_ref}' in '{qualified}'")
+                })?;
+                let issue = self.storage.load_issue(&full_id)?;
 
-        let kinds = self.item_kinds()?;
-        let repo_format = self.repo_content_format()?;
-        let parser = crate::document::content_parser_for(issue.content_format, repo_format)
-            .map_err(|err| {
-                anyhow!(
-                    "cannot parse description of issue {}: {err}",
-                    issue.short_id()
-                )
-            })?;
-        let items = index_items(&issue, &kinds, parser.as_ref())
-            .with_context(|| format!("indexing items of issue {} failed", issue.short_id()))?;
+                let kinds = self.item_kinds()?;
+                let repo_format = self.repo_content_format()?;
+                let parser = crate::document::content_parser_for(issue.content_format, repo_format)
+                    .map_err(|err| {
+                        anyhow!(
+                            "cannot parse description of issue {}: {err}",
+                            issue.short_id()
+                        )
+                    })?;
+                let items = index_items(&issue, &kinds, parser.as_ref()).with_context(|| {
+                    format!("indexing items of issue {} failed", issue.short_id())
+                })?;
 
-        let item = items
-            .into_iter()
-            .find(|i| i.self_id == self_id)
-            .ok_or_else(|| {
-                anyhow!(
-                    "issue {} declares no addressable item with self-id '{self_id}'",
-                    issue.short_id()
-                )
-            })?;
+                let item = items
+                    .into_iter()
+                    .find(|i| i.self_id == self_id)
+                    .ok_or_else(|| {
+                        anyhow!(
+                            "issue {} declares no addressable item with self-id '{self_id}'",
+                            issue.short_id()
+                        )
+                    })?;
 
-        Ok(ItemShowResult {
-            item,
-            issue_full_id: full_id,
-            issue_title: issue.title,
-        })
+                Ok(ItemShowResult {
+                    item,
+                    issue_full_id: Some(full_id),
+                    issue_title: Some(issue.title),
+                })
+            }
+        }
     }
 
     /// Resolve a generic node→item link label of the form
@@ -310,7 +360,86 @@ mod tests {
         let shown = exec.show_item(&qualified).unwrap();
         assert_eq!(shown.item.self_id, "REQ-01");
         assert_eq!(shown.item.qualified_id, qualified);
-        assert_eq!(shown.issue_title, "A");
+        assert_eq!(shown.issue_title.as_deref(), Some("A"));
+        // The owning issue id is the FULL id, resolved from the short-id scope.
+        assert!(shown.issue_full_id.as_deref().unwrap().starts_with(&short));
+    }
+
+    use crate::domain::item::RawScopeItem;
+
+    fn project_raw(kind: &str, self_id: &str, text: &str) -> RawScopeItem {
+        RawScopeItem {
+            kind: kind.to_string(),
+            self_id: self_id.to_string(),
+            text: text.to_string(),
+        }
+    }
+
+    #[test]
+    fn test_show_item_resolves_project_scope() {
+        // REQ-01: `@/<self-id>` resolves to the project-scoped item; no owning issue.
+        let exec = executor_with(vec![]).with_project_items(vec![project_raw(
+            "invariant",
+            "INV-01",
+            "all writes are atomic",
+        )]);
+        let shown = exec.show_item("@/INV-01").unwrap();
+        assert_eq!(shown.item.self_id, "INV-01");
+        assert_eq!(shown.item.qualified_id, "@/INV-01");
+        assert_eq!(shown.item.scope, "@");
+        assert_eq!(shown.issue_full_id, None);
+        assert_eq!(shown.issue_title, None);
+    }
+
+    #[test]
+    fn test_show_item_project_scope_missing_self_id_errors() {
+        // An unresolvable project-scope id is reported, never silently dropped.
+        let exec =
+            executor_with(vec![]).with_project_items(vec![project_raw("invariant", "INV-01", "x")]);
+        let err = exec.show_item("@/INV-99").unwrap_err();
+        assert!(err.to_string().contains("project scope"));
+        assert!(err.to_string().contains("no addressable item"));
+    }
+
+    #[test]
+    fn test_show_item_same_self_id_distinct_scopes() {
+        // REQ-04: the same self-id under an issue scope and the project scope are
+        // two distinct items, each resolved by its own qualified id.
+        let a = issue_with_criteria("A", "## Success Criteria\n\n- [hard] REQ-01: issue one\n");
+        let short = a.short_id();
+        let exec = executor_with(vec![a]).with_project_items(vec![project_raw(
+            "requirement",
+            "REQ-01",
+            "project one",
+        )]);
+
+        let from_issue = exec.show_item(&format!("{short}/REQ-01")).unwrap();
+        let from_project = exec.show_item("@/REQ-01").unwrap();
+        assert!(from_issue.item.text.contains("issue one"));
+        assert_eq!(from_project.item.text, "project one");
+        assert_ne!(from_issue.item.qualified_id, from_project.item.qualified_id);
+    }
+
+    #[test]
+    fn test_list_items_includes_project_scope() {
+        // REQ-01: project-scoped items surface in the cross-repo list alongside
+        // issue-scoped ones (filtered to configured kinds).
+        let a = issue_with_criteria("A", "## Success Criteria\n\n- [hard] REQ-01: a\n");
+        let exec = executor_with(vec![a]).with_project_items(vec![project_raw(
+            "requirement",
+            "REQ-99",
+            "project req",
+        )]);
+        let result = exec.list_items(None).unwrap();
+        let qids: Vec<&str> = result
+            .items
+            .iter()
+            .map(|i| i.qualified_id.as_str())
+            .collect();
+        assert!(qids.contains(&"@/REQ-99"));
+        assert!(qids
+            .iter()
+            .any(|q| q.ends_with("/REQ-01") && !q.starts_with('@')));
     }
 
     #[test]

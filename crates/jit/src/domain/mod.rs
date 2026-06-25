@@ -26,8 +26,8 @@ pub use projection::{project, ProjectedSection, Projection};
 
 // Re-export the addressable-item model.
 pub use item::{
-    index_items, qualified_id, resolve_item_kinds, split_qualified_id, AddressableItem, ItemError,
-    ItemKind,
+    derive_scope_items, index_items, index_project_items, qualified_id, resolve_item_kinds,
+    split_qualified_id, AddressableItem, ItemError, ItemKind, RawScopeItem, Scope,
 };
 
 // Re-export domain operations from sibling modules so that

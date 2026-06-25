@@ -326,16 +326,17 @@ pub enum ItemCommands {
         json: bool,
     },
 
-    /// Show / resolve a single item by its qualified id `<issue>/<self-id>`
+    /// Show / resolve a single item by its qualified id `<scope>/<self-id>`
     ///
-    /// The issue scope accepts a full id, short id, or unique prefix, just like
-    /// `jit show`.
+    /// The scope is `@` for project scope, or an issue reference (full id, short
+    /// id, or unique prefix) just like `jit show`.
     ///
     /// Examples:
     ///   jit item show 56ab0224/REQ-01
+    ///   jit item show @/INV-01
     ///   jit item show 56ab0224/REQ-01 --json
     Show {
-        /// Qualified id of the item, `<issue>/<self-id>`
+        /// Qualified id of the item, `<scope>/<self-id>` (scope = issue or `@`)
         qualified_id: String,
 
         /// Output as JSON
@@ -348,7 +349,7 @@ pub enum ItemCommands {
     /// Provided as a distinct verb for orchestrators that think in terms of
     /// "resolve this qualified id"; behaves identically to `jit item show`.
     Resolve {
-        /// Qualified id of the item, `<issue>/<self-id>`
+        /// Qualified id of the item, `<scope>/<self-id>` (scope = issue or `@`)
         qualified_id: String,
 
         /// Output as JSON

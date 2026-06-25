@@ -2,9 +2,16 @@
 //!
 //! An **addressable item** is a structured list entry in a declared section of an
 //! issue description that carries a *self-id* matched by an id-pattern. Its
-//! **qualified id** `<issue-id>/<self-id>` is globally unique and is *derived*
-//! from existing data (the issue's short id plus the parsed self-id) — nothing is
+//! **qualified id** `<scope>/<self-id>` is globally unique and is *derived* from
+//! existing data (the resolved scope plus the parsed self-id) — nothing is
 //! persisted twice (REQ-02, REQ-03).
+//!
+//! A **scope** ([`Scope`]) is the first segment of a qualified id. It is either an
+//! issue short-id ([`Scope::Issue`]) or the project sentinel `@`
+//! ([`Scope::Project`], for items not tied to any single issue). Self-id
+//! uniqueness is enforced *per scope*: the same self-id may exist under two
+//! different scopes without conflict, but a self-id repeated within one scope is a
+//! [`ItemError::DuplicateSelfId`].
 //!
 //! An **item kind** ([`ItemKind`]) is the config-declared projection
 //! `(section, id-pattern, marker(s), link-namespace(s))` that says which entries
@@ -14,10 +21,13 @@
 //! the exact triple the `label-coverage` rule already consumes, so the existing
 //! coverage machinery is demonstrably compatible with the model (REQ-05).
 //!
-//! Indexing ([`index_items`]) is a pure function of the issue, the kinds, and a
-//! [`ContentParser`]: markdown stays the single source of truth and the item
-//! index is recomputed on demand. A list entry without a matching self-id is
-//! plain prose and incurs no addressing requirement (REQ-06).
+//! Indexing is pure and substrate-specific but shares one derivation core
+//! ([`derive_scope_items`], which enforces per-scope uniqueness and mints
+//! qualified ids): [`index_items`] projects an issue's markdown (markdown is the
+//! single source of truth, recomputed on demand), while [`index_project_items`]
+//! projects registry-supplied project-scope (`@`) candidates. A list entry
+//! without a matching self-id is plain prose and incurs no addressing requirement
+//! (REQ-06).
 
 use crate::config::ItemKindConfig;
 use crate::document::ContentParser;
@@ -48,6 +58,101 @@ pub const DEFAULT_ITEM_LINK_NAMESPACE: &str = "satisfies";
 /// four-tuple), keeping the engine domain-agnostic (REQ-01).
 pub const REQUIREMENT_KIND_NAME: &str = "requirement";
 
+/// The scope sentinel that addresses project-level items not tied to any single
+/// issue. The first segment of a qualified id equal to this string denotes
+/// [`Scope::Project`] (REQ-01).
+pub const PROJECT_SCOPE_SENTINEL: &str = "@";
+
+/// The scope half of a qualified id `<scope>/<self-id>`: the substrate an
+/// addressable item belongs to (REQ-01).
+///
+/// A scope is EITHER one issue (addressed by its short-id) or the whole project
+/// (the `@` sentinel, for items such as invariants that no single issue owns).
+/// Self-id uniqueness is enforced *per scope* (REQ-04), so the same self-id may
+/// appear under two distinct scopes without collision.
+///
+/// The qualified id is a pure projection: [`Scope::prefix`] renders the first
+/// segment and nothing about the scope is persisted separately (REQ-05).
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::item::Scope;
+///
+/// // The project sentinel parses to the project scope.
+/// assert_eq!(Scope::parse("@"), Scope::Project);
+/// assert_eq!(Scope::Project.prefix(), "@");
+///
+/// // Anything else is an issue scope carrying the (unresolved) short-id form.
+/// let issue = Scope::parse("56ab0224");
+/// assert_eq!(issue, Scope::Issue("56ab0224".to_string()));
+/// assert_eq!(issue.prefix(), "56ab0224");
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Scope {
+    /// An issue scope, carrying the issue's short-id (the qualified-id prefix).
+    Issue(String),
+    /// The project scope, rendered with the [`PROJECT_SCOPE_SENTINEL`] (`@`).
+    Project,
+}
+
+impl Scope {
+    /// Parse a qualified id's scope segment into a [`Scope`].
+    ///
+    /// The [`PROJECT_SCOPE_SENTINEL`] (`@`) yields [`Scope::Project`]; every other
+    /// segment is taken as an issue scope verbatim (resolution of a short-id /
+    /// unique prefix to a full id is a storage concern handled by the caller, not
+    /// this pure parser).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::item::Scope;
+    ///
+    /// assert_eq!(Scope::parse("@"), Scope::Project);
+    /// assert_eq!(Scope::parse("56ab0224"), Scope::Issue("56ab0224".to_string()));
+    /// ```
+    pub fn parse(segment: &str) -> Self {
+        if segment == PROJECT_SCOPE_SENTINEL {
+            Scope::Project
+        } else {
+            Scope::Issue(segment.to_string())
+        }
+    }
+
+    /// The qualified-id prefix this scope renders to (`@` for the project, the
+    /// issue short-id otherwise).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::item::Scope;
+    ///
+    /// assert_eq!(Scope::Project.prefix(), "@");
+    /// assert_eq!(Scope::Issue("56ab0224".to_string()).prefix(), "56ab0224");
+    /// ```
+    pub fn prefix(&self) -> &str {
+        match self {
+            Scope::Project => PROJECT_SCOPE_SENTINEL,
+            Scope::Issue(short_id) => short_id,
+        }
+    }
+
+    /// Whether this is the project scope (`@`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::item::Scope;
+    ///
+    /// assert!(Scope::Project.is_project());
+    /// assert!(!Scope::Issue("56ab0224".to_string()).is_project());
+    /// ```
+    pub fn is_project(&self) -> bool {
+        matches!(self, Scope::Project)
+    }
+}
+
 /// Errors raised while resolving item kinds or indexing items.
 #[derive(Debug, Error)]
 pub enum ItemError {
@@ -61,15 +166,16 @@ pub enum ItemError {
         /// The underlying regex compilation error.
         source: regex::Error,
     },
-    /// Two addressable items in one issue share a self-id, so the qualified id
-    /// `<issue-id>/<self-id>` would not be unique within the issue (REQ-02).
+    /// Two addressable items in one scope share a self-id, so the qualified id
+    /// `<scope>/<self-id>` would not be unique within that scope (REQ-03). The
+    /// same self-id under a *different* scope is fine (REQ-04).
     #[error(
-        "issue {issue} declares self-id '{self_id}' more than once for kind '{kind}'; \
-         self-ids must be unique within an issue"
+        "scope {scope} declares self-id '{self_id}' more than once for kind '{kind}'; \
+         self-ids must be unique within a scope"
     )]
     DuplicateSelfId {
-        /// Short id of the issue whose items collide.
-        issue: String,
+        /// The scope whose items collide (issue short-id or `@` for project).
+        scope: String,
         /// The duplicated self-id.
         self_id: String,
         /// The kind under which the collision occurred.
@@ -255,27 +361,34 @@ impl ItemKind {
     }
 }
 
-/// Compute an addressable item's qualified id `<issue-id>/<self-id>`.
+/// Compute an addressable item's qualified id `<scope>/<self-id>`.
 ///
-/// A pure projection over the issue's short id and the parsed self-id; nothing is
-/// persisted (REQ-02). The first segment is whatever short-id form the caller
-/// passes (use [`Issue::short_id`](crate::domain::Issue::short_id)).
+/// A pure projection over the scope prefix and the parsed self-id; nothing is
+/// persisted (REQ-05). The first segment is whatever scope prefix the caller
+/// passes — an issue short-id (use
+/// [`Issue::short_id`](crate::domain::Issue::short_id)) or [`Scope::prefix`] for
+/// the project sentinel `@`.
 ///
 /// # Examples
 ///
 /// ```
-/// use jit::domain::item::qualified_id;
+/// use jit::domain::item::{qualified_id, Scope};
 ///
 /// assert_eq!(qualified_id("56ab0224", "REQ-01"), "56ab0224/REQ-01");
+/// // Project scope renders with the `@` sentinel.
+/// assert_eq!(qualified_id(Scope::Project.prefix(), "INV-01"), "@/INV-01");
 /// ```
-pub fn qualified_id(issue_short_id: &str, self_id: &str) -> String {
-    format!("{issue_short_id}/{self_id}")
+pub fn qualified_id(scope_prefix: &str, self_id: &str) -> String {
+    format!("{scope_prefix}/{self_id}")
 }
 
 /// Split a qualified id `<scope>/<self-id>` into its two segments.
 ///
+/// The scope is everything before the FIRST `/`; the self-id is the rest (so a
+/// self-id may itself contain slashes). The scope may be an issue short-id or the
+/// project sentinel `@` — parse it into a [`Scope`] with [`Scope::parse`].
 /// Returns `None` when the input carries no `/` separator (it is not a qualified
-/// id). Only the FIRST `/` splits, so a self-id may itself contain slashes.
+/// id).
 ///
 /// # Examples
 ///
@@ -283,29 +396,117 @@ pub fn qualified_id(issue_short_id: &str, self_id: &str) -> String {
 /// use jit::domain::item::split_qualified_id;
 ///
 /// assert_eq!(split_qualified_id("56ab0224/REQ-01"), Some(("56ab0224", "REQ-01")));
+/// // The project scope splits the same way.
+/// assert_eq!(split_qualified_id("@/INV-01"), Some(("@", "INV-01")));
 /// assert_eq!(split_qualified_id("REQ-01"), None);
 /// ```
 pub fn split_qualified_id(qualified: &str) -> Option<(&str, &str)> {
     qualified.split_once('/')
 }
 
-/// One addressable item projected from an issue description.
+/// One addressable item projected from a scope's source.
 ///
 /// Carries the *derived* qualified id alongside the source self-id, the owning
-/// issue's short id, the kind name, and the raw item text. Nothing here is stored
-/// on the issue — it is recomputed by [`index_items`] (REQ-03).
+/// scope prefix (an issue short-id or `@`), the kind name, and the raw item text.
+/// Nothing here is stored — it is recomputed on demand by the indexers (REQ-05).
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct AddressableItem {
     /// The kind this item belongs to (display name).
     pub kind: String,
-    /// Globally-unique qualified id `<issue-id>/<self-id>` (derived).
+    /// Globally-unique qualified id `<scope>/<self-id>` (derived).
     pub qualified_id: String,
-    /// The human-authored self-id, unique within its issue.
+    /// The human-authored self-id, unique within its scope.
     pub self_id: String,
-    /// Short id of the issue this item was projected from.
-    pub issue_id: String,
+    /// Scope prefix this item was projected from: an issue short-id, or `@` for
+    /// the project scope.
+    pub scope: String,
     /// The raw text of the source list entry.
     pub text: String,
+}
+
+/// A candidate addressable item extracted from a scope's source, before per-scope
+/// uniqueness has been enforced and the qualified id derived.
+///
+/// This is the single shape every substrate (issue-scope markdown, project-scope
+/// registry) funnels into [`derive_scope_items`], so the dedup + qualified-id
+/// derivation lives in exactly one place (REQ-03, REQ-04, REQ-05).
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::item::RawScopeItem;
+///
+/// let raw = RawScopeItem {
+///     kind: "invariant".to_string(),
+///     self_id: "INV-01".to_string(),
+///     text: "all writes are atomic".to_string(),
+/// };
+/// assert_eq!(raw.self_id, "INV-01");
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RawScopeItem {
+    /// The kind this candidate belongs to (display name).
+    pub kind: String,
+    /// The human-authored self-id.
+    pub self_id: String,
+    /// The raw source text of the item.
+    pub text: String,
+}
+
+/// Enforce per-scope self-id uniqueness over raw candidates and derive their
+/// qualified ids `<scope>/<self-id>` (REQ-03, REQ-04, REQ-05).
+///
+/// This is the one code path that turns extracted candidates into addressable
+/// items, shared by [`index_items`] (issue scope) and [`index_project_items`]
+/// (project scope). Uniqueness is keyed on the self-id alone (the kind is not part
+/// of the qualified id), so two kinds minting the same self-id in one scope is a
+/// [`ItemError::DuplicateSelfId`] naming the kind that first claimed it. The same
+/// self-id under a *different* scope is fine because each call is scoped to one
+/// [`Scope`] (REQ-04).
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::item::{derive_scope_items, RawScopeItem, Scope};
+///
+/// let raw = vec![RawScopeItem {
+///     kind: "invariant".to_string(),
+///     self_id: "INV-01".to_string(),
+///     text: "atomic writes".to_string(),
+/// }];
+/// let items = derive_scope_items(&Scope::Project, raw).unwrap();
+/// assert_eq!(items[0].qualified_id, "@/INV-01");
+/// assert_eq!(items[0].scope, "@");
+/// ```
+pub fn derive_scope_items(
+    scope: &Scope,
+    raw: Vec<RawScopeItem>,
+) -> Result<Vec<AddressableItem>, ItemError> {
+    let prefix = scope.prefix();
+    let mut out = Vec::with_capacity(raw.len());
+    // Maps each claimed self-id to the kind that first claimed it, for a precise
+    // collision message. Scoped to this single scope, so the same self-id under a
+    // different scope never collides here (REQ-04).
+    let mut seen: HashMap<String, String> = HashMap::new();
+    for candidate in raw {
+        if let Some(prior_kind) = seen.insert(candidate.self_id.clone(), candidate.kind.clone()) {
+            return Err(ItemError::DuplicateSelfId {
+                scope: prefix.to_string(),
+                self_id: candidate.self_id,
+                // Name the kind that FIRST claimed the self-id so a cross-kind
+                // collision points at the original owner.
+                kind: prior_kind,
+            });
+        }
+        out.push(AddressableItem {
+            qualified_id: qualified_id(prefix, &candidate.self_id),
+            scope: prefix.to_string(),
+            kind: candidate.kind,
+            self_id: candidate.self_id,
+            text: candidate.text,
+        });
+    }
+    Ok(out)
 }
 
 /// Index the addressable items of a single issue across all given kinds.
@@ -313,9 +514,9 @@ pub struct AddressableItem {
 /// A pure projection: parses the issue description with `parser`, and for each
 /// kind scans its declared section's list entries, keeping those that match the
 /// kind's markers and yield a self-id under its id-pattern. The qualified id is
-/// derived as `<issue-short-id>/<self-id>`.
+/// derived as `<issue-short-id>/<self-id>` via the shared [`derive_scope_items`].
 ///
-/// Self-id uniqueness is enforced WITHIN a kind for the issue: a repeated self-id
+/// Self-id uniqueness is enforced PER SCOPE (here, the issue): a repeated self-id
 /// is an [`ItemError::DuplicateSelfId`]. A list entry with no self-id match is
 /// plain prose and is skipped, never an error (REQ-06).
 ///
@@ -341,49 +542,57 @@ pub fn index_items(
     kinds: &[ItemKind],
     parser: &dyn ContentParser,
 ) -> Result<Vec<AddressableItem>, ItemError> {
-    let short_id = issue.short_id();
     let projection = project(issue).with_sections(&issue.description, parser);
     let sections = projection.sections.unwrap_or_default();
 
-    // Self-id uniqueness is enforced across ALL kinds within the issue, not just
-    // within one kind: the qualified id `<issue>/<self-id>` excludes the kind, so
-    // two kinds minting the same self-id would yield colliding qualified ids and
-    // ambiguous resolution. Hoisting `seen` out of the kind loop makes a
-    // cross-kind self-id collision a DuplicateSelfId error too (REQ-02). It maps
-    // the self-id to the kind that first claimed it, for a precise message.
-    let mut out = Vec::new();
-    let mut seen: HashMap<String, String> = HashMap::new();
-    for kind in kinds {
-        let Some(section) = sections.get(kind.section()) else {
-            continue;
-        };
-        for text in &section.items {
-            if !kind.marker_matches(text) {
-                continue;
-            }
-            // No self-id match means plain prose: skip, never error (REQ-06).
-            let Some(self_id) = kind.id_pattern.find(text).map(|m| m.as_str().to_string()) else {
-                continue;
-            };
-            if let Some(prior_kind) = seen.insert(self_id.clone(), kind.name().to_string()) {
-                return Err(ItemError::DuplicateSelfId {
-                    issue: short_id.clone(),
+    let raw: Vec<RawScopeItem> = kinds
+        .iter()
+        .filter_map(|kind| sections.get(kind.section()).map(|section| (kind, section)))
+        .flat_map(|(kind, section)| {
+            section.items.iter().filter_map(move |text| {
+                if !kind.marker_matches(text) {
+                    return None;
+                }
+                // No self-id match means plain prose: skip, never error (REQ-06).
+                let self_id = kind.id_pattern.find(text).map(|m| m.as_str().to_string())?;
+                Some(RawScopeItem {
+                    kind: kind.name().to_string(),
                     self_id,
-                    // Name the kind that FIRST claimed the self-id so a cross-kind
-                    // collision points at the original owner.
-                    kind: prior_kind,
-                });
-            }
-            out.push(AddressableItem {
-                kind: kind.name().to_string(),
-                qualified_id: qualified_id(&short_id, &self_id),
-                self_id,
-                issue_id: short_id.clone(),
-                text: text.clone(),
-            });
-        }
-    }
-    Ok(out)
+                    text: text.clone(),
+                })
+            })
+        })
+        .collect();
+
+    derive_scope_items(&Scope::Issue(issue.short_id()), raw)
+}
+
+/// Index the addressable items of the project scope (`@`) from registry-supplied
+/// candidates (REQ-01).
+///
+/// Project-scoped kinds are registry-first rather than markdown-first: their
+/// source is a config table (e.g. `.jit/invariants.toml`, built in a later Group C
+/// issue), not an issue description. This function takes the already-extracted
+/// candidates and runs them through the SAME [`derive_scope_items`] path used for
+/// issue scope, so qualified-id derivation and per-scope uniqueness (REQ-03,
+/// REQ-04, REQ-05) are identical across substrates. Each item's qualified id is
+/// `@/<self-id>` and resolution of `@/<self-id>` finds it.
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::item::{index_project_items, RawScopeItem};
+///
+/// let raw = vec![RawScopeItem {
+///     kind: "invariant".to_string(),
+///     self_id: "INV-01".to_string(),
+///     text: "all writes are atomic".to_string(),
+/// }];
+/// let items = index_project_items(raw).unwrap();
+/// assert_eq!(items[0].qualified_id, "@/INV-01");
+/// ```
+pub fn index_project_items(raw: Vec<RawScopeItem>) -> Result<Vec<AddressableItem>, ItemError> {
+    derive_scope_items(&Scope::Project, raw)
 }
 
 /// Resolve the effective set of item kinds from an optional config registry.
@@ -611,5 +820,93 @@ mod tests {
         assert_eq!(kinds.len(), 2);
         assert_eq!(kinds[0].name(), "decision");
         assert_eq!(kinds[1].name(), "requirement");
+    }
+
+    fn raw(kind: &str, self_id: &str) -> RawScopeItem {
+        RawScopeItem {
+            kind: kind.to_string(),
+            self_id: self_id.to_string(),
+            text: format!("{self_id} text"),
+        }
+    }
+
+    #[test]
+    fn test_scope_parse_and_prefix() {
+        // REQ-01: `@` is the project scope sentinel; anything else is an issue scope.
+        assert_eq!(Scope::parse("@"), Scope::Project);
+        assert!(Scope::parse("@").is_project());
+        assert_eq!(Scope::Project.prefix(), "@");
+
+        let issue = Scope::parse("56ab0224");
+        assert_eq!(issue, Scope::Issue("56ab0224".to_string()));
+        assert!(!issue.is_project());
+        assert_eq!(issue.prefix(), "56ab0224");
+    }
+
+    #[test]
+    fn test_index_project_items_derives_at_scope() {
+        // REQ-01: project-scoped items resolve under the `@` prefix.
+        let items = index_project_items(vec![raw("invariant", "INV-01")]).unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].qualified_id, "@/INV-01");
+        assert_eq!(items[0].scope, "@");
+        assert_eq!(items[0].self_id, "INV-01");
+    }
+
+    #[test]
+    fn test_derive_scope_items_duplicate_within_scope_is_error() {
+        // REQ-03: a self-id repeated within ONE scope is a duplicate, not silently
+        // resolved to one.
+        let err = derive_scope_items(
+            &Scope::Project,
+            vec![raw("invariant", "INV-01"), raw("invariant", "INV-01")],
+        )
+        .unwrap_err();
+        match err {
+            ItemError::DuplicateSelfId { scope, self_id, .. } => {
+                assert_eq!(scope, "@");
+                assert_eq!(self_id, "INV-01");
+            }
+            other => panic!("expected DuplicateSelfId, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_derive_scope_items_cross_kind_duplicate_within_scope_is_error() {
+        // REQ-03: the qualified id omits the kind, so two kinds minting the same
+        // self-id in one scope still collide; the error names the FIRST claimer.
+        let err = derive_scope_items(
+            &Scope::Project,
+            vec![raw("invariant", "X-1"), raw("decision", "X-1")],
+        )
+        .unwrap_err();
+        match err {
+            ItemError::DuplicateSelfId { kind, self_id, .. } => {
+                assert_eq!(self_id, "X-1");
+                assert_eq!(kind, "invariant");
+            }
+            other => panic!("expected DuplicateSelfId, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_same_self_id_distinct_across_scopes() {
+        // REQ-04: the SAME self-id under two different scopes does not conflict and
+        // yields two distinct qualified ids.
+        let issue = Issue::new(
+            "T".to_string(),
+            "## Success Criteria\n\n- [hard] REQ-01: issue one\n".to_string(),
+        );
+        let issue_items = index_items(&issue, &[req_kind()], &MarkdownContentParser).unwrap();
+        let project_items = index_project_items(vec![raw("requirement", "REQ-01")]).unwrap();
+
+        assert_eq!(issue_items.len(), 1);
+        assert_eq!(project_items.len(), 1);
+        // Distinct qualified ids: issue-scope prefix vs `@`.
+        assert_ne!(issue_items[0].qualified_id, project_items[0].qualified_id);
+        assert_eq!(issue_items[0].self_id, project_items[0].self_id);
+        assert_eq!(project_items[0].qualified_id, "@/REQ-01");
+        assert!(issue_items[0].qualified_id.ends_with("/REQ-01"));
+        assert!(!issue_items[0].qualified_id.starts_with('@'));
     }
 }

@@ -401,10 +401,15 @@ fn print_item_show(result: &jit::commands::ItemShowResult, json: bool, quiet: bo
         output_ctx.print_data(format!("Qualified id: {}", result.item.qualified_id))?;
         output_ctx.print_data(format!("Kind:         {}", result.item.kind))?;
         output_ctx.print_data(format!("Self id:      {}", result.item.self_id))?;
-        output_ctx.print_data(format!(
-            "Issue:        {} | {}",
-            result.issue_full_id, result.issue_title
-        ))?;
+        match (&result.issue_full_id, &result.issue_title) {
+            (Some(full_id), Some(title)) => {
+                output_ctx.print_data(format!("Issue:        {full_id} | {title}"))?;
+            }
+            // A project-scoped item (`@/<self-id>`) has no owning issue.
+            _ => {
+                output_ctx.print_data("Scope:        @ (project)".to_string())?;
+            }
+        }
         output_ctx.print_data(format!("Text:         {}", result.item.text))?;
     }
     Ok(())

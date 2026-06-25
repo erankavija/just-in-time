@@ -281,3 +281,40 @@ fn test_item_command_failure_emits_json() {
         .expect("issue show <qualified> --json failure must emit valid JSON");
     assert!(json.get("error").is_some());
 }
+
+#[test]
+fn test_item_show_project_scope_parses_and_reports() {
+    // REQ-01: the `@` project scope is a live resolution path through the CLI.
+    // No project-scope item source exists yet (it lands in a later Group C
+    // issue), so `@/<self-id>` resolves to a descriptive "project scope"
+    // not-found error rather than being misread as an issue scope or crashing.
+    let temp = setup_test_repo();
+    create_issue(
+        temp.path(),
+        "Foundational",
+        "## Success Criteria\n\n- [hard] REQ-01: a\n",
+    );
+
+    let output = Command::new(jit_binary())
+        .args(["item", "show", "@/INV-01", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        !output.status.success(),
+        "no project-scope source yet: @/INV-01 must not resolve"
+    );
+    // --json failure still emits a JSON error object on stdout.
+    let json: Value = serde_json::from_slice(&output.stdout)
+        .expect("--json failure must emit valid JSON on stdout");
+    let msg = json["error"]["message"].as_str().unwrap_or_default();
+    assert!(
+        msg.contains("project scope"),
+        "error must name the project scope, got: {json}"
+    );
+    // Crucially NOT treated as an issue scope: no "resolve issue scope" message.
+    assert!(
+        !msg.contains("resolve issue scope"),
+        "@ must route to the project scope, not the issue resolver: {json}"
+    );
+}
