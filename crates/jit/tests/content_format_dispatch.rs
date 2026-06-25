@@ -177,7 +177,7 @@ fn test_html_repo_default_uses_html_parser_in_production() {
 #[test]
 fn test_html_graph_label_coverage_uses_html_parser_in_production() {
     use jit::type_hierarchy::HierarchyConfig;
-    use jit::validation::graph::evaluate_graph;
+    use jit::validation::graph::{evaluate_graph, DriftInputs};
 
     let rule = RuleSet::from_toml_str(
         "[[rules]]\nname = \"coverage\"\nwhen = { type = \"epic\" }\n\
@@ -203,6 +203,7 @@ fn test_html_graph_label_coverage_uses_html_parser_in_production() {
         ContentFormat::Markdown,
         chrono::Utc::now(),
         &std::collections::HashMap::new(),
+        &DriftInputs::none(),
     );
     assert_eq!(
         findings.len(),

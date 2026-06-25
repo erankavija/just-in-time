@@ -52,10 +52,123 @@ use crate::type_hierarchy::{
 };
 use std::collections::HashMap;
 
+use crate::validation::drift::enforcement_drift;
 use crate::validation::engine::Finding;
+use crate::validation::invariants::Invariant;
 use crate::validation::rules::{
     Assertion, Rule, Scope, Selector, Severity, StatePredicate, TypeHierarchyKind,
 };
+
+/// Repo-wide registries an `enforcement-drift` graph rule reads, injected at the
+/// validate / gate-checker boundary so the graph engine stays pure.
+///
+/// The invariant registry, the loadable rule names, and the known gate keys are
+/// resolved by the caller (they are not derivable from the issue slice the rest
+/// of the engine reads) and handed in here. Every non-drift evaluation passes
+/// [`DriftInputs::none`], which carries empty registries and produces no drift
+/// finding — so the parameter is inert unless an `enforcement-drift` rule is
+/// actually present.
+///
+/// # Examples
+///
+/// ```
+/// use jit::validation::graph::DriftInputs;
+///
+/// // An empty context never produces a drift finding.
+/// let inputs = DriftInputs::none();
+/// assert!(inputs.invariants().is_empty());
+/// ```
+#[derive(Debug, Clone, Default)]
+pub struct DriftInputs<'a> {
+    invariants: &'a [Invariant],
+    rule_names: BTreeSet<&'a str>,
+    gate_keys: BTreeSet<&'a str>,
+}
+
+impl<'a> DriftInputs<'a> {
+    /// An empty drift context (no invariants, rules, or gates).
+    ///
+    /// Passed by every caller that does not evaluate an `enforcement-drift` rule;
+    /// the drift evaluator returns no findings for it.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::validation::graph::DriftInputs;
+    ///
+    /// assert!(DriftInputs::none().rule_names().is_empty());
+    /// ```
+    pub fn none() -> Self {
+        Self::default()
+    }
+
+    /// Build a drift context from the invariant registry plus the loadable rule
+    /// names and known gate keys.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::validation::graph::DriftInputs;
+    /// use jit::validation::invariants::InvariantRegistry;
+    /// use std::collections::BTreeSet;
+    ///
+    /// let reg = InvariantRegistry::empty();
+    /// let rules: BTreeSet<&str> = ["dag-no-cycles"].into_iter().collect();
+    /// let gates: BTreeSet<&str> = BTreeSet::new();
+    /// let inputs = DriftInputs::new(&reg.invariants, rules, gates);
+    /// assert!(inputs.rule_names().contains("dag-no-cycles"));
+    /// ```
+    pub fn new(
+        invariants: &'a [Invariant],
+        rule_names: BTreeSet<&'a str>,
+        gate_keys: BTreeSet<&'a str>,
+    ) -> Self {
+        Self {
+            invariants,
+            rule_names,
+            gate_keys,
+        }
+    }
+
+    /// The injected invariant registry slice.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::validation::graph::DriftInputs;
+    ///
+    /// assert!(DriftInputs::none().invariants().is_empty());
+    /// ```
+    pub fn invariants(&self) -> &[Invariant] {
+        self.invariants
+    }
+
+    /// The injected set of loadable rule names.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::validation::graph::DriftInputs;
+    ///
+    /// assert!(DriftInputs::none().rule_names().is_empty());
+    /// ```
+    pub fn rule_names(&self) -> &BTreeSet<&'a str> {
+        &self.rule_names
+    }
+
+    /// The injected set of known gate keys.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::validation::graph::DriftInputs;
+    ///
+    /// assert!(DriftInputs::none().gate_keys().is_empty());
+    /// ```
+    pub fn gate_keys(&self) -> &BTreeSet<&'a str> {
+        &self.gate_keys
+    }
+}
 
 /// Default label namespace whose values are criterion ids a child claims to
 /// satisfy (e.g. `satisfies:REQ-01`).
@@ -142,7 +255,7 @@ pub enum ChildLink {
 /// ```
 /// use jit::domain::{ContentFormat, Issue};
 /// use jit::type_hierarchy::HierarchyConfig;
-/// use jit::validation::graph::{evaluate_graph, GraphFinding};
+/// use jit::validation::graph::{evaluate_graph, DriftInputs, GraphFinding};
 /// use jit::validation::rules::RuleSet;
 /// use std::path::Path;
 ///
@@ -166,6 +279,7 @@ pub enum ChildLink {
 ///     ContentFormat::Markdown,
 ///     chrono::Utc::now(),
 ///     &std::collections::HashMap::new(),
+///     &DriftInputs::none(),
 /// );
 /// assert_eq!(findings.len(), 1);
 /// // The finding is attributed to the offending issue, not parsed from text.
@@ -287,7 +401,7 @@ impl ChildLink {
 /// ```
 /// use jit::domain::Issue;
 /// use jit::type_hierarchy::HierarchyConfig;
-/// use jit::validation::graph::evaluate_graph;
+/// use jit::validation::graph::{evaluate_graph, DriftInputs};
 /// use jit::validation::rules::RuleSet;
 /// use std::path::Path;
 ///
@@ -312,6 +426,7 @@ impl ChildLink {
 ///     jit::domain::ContentFormat::Markdown,
 ///     chrono::Utc::now(),
 ///     &std::collections::HashMap::new(),
+///     &DriftInputs::none(),
 /// );
 /// assert_eq!(findings.len(), 1);
 /// assert_eq!(findings[0].finding.rule, "task-needs-design-dep");
@@ -351,6 +466,7 @@ pub fn evaluate_graph(
     repo_default_format: ContentFormat,
     now: DateTime<Utc>,
     plan_content: &HashMap<String, String>,
+    drift: &DriftInputs<'_>,
 ) -> Vec<GraphFinding> {
     rules
         .iter()
@@ -363,6 +479,7 @@ pub fn evaluate_graph(
                 repo_default_format,
                 now,
                 plan_content,
+                drift,
             )
         })
         .collect()
@@ -376,6 +493,7 @@ fn evaluate_one(
     repo_default_format: ContentFormat,
     now: DateTime<Utc>,
     plan_content: &HashMap<String, String>,
+    drift: &DriftInputs<'_>,
 ) -> Vec<GraphFinding> {
     match &rule.assert {
         Assertion::LabelCoverage { config } => {
@@ -425,10 +543,33 @@ fn evaluate_one(
         Assertion::LabelUniqueness { namespace } => {
             evaluate_label_uniqueness(rule, namespace, issues)
         }
+        Assertion::EnforcementDrift => evaluate_enforcement_drift(rule, drift),
         // Non-graph kinds are never dispatched here (filtered by scope), but be
         // exhaustive and total rather than panic.
         _ => Vec::new(),
     }
+}
+
+/// Evaluate an `enforcement-drift` rule against the injected drift registries.
+///
+/// Delegates to the pure
+/// [`enforcement_drift`](crate::validation::drift::enforcement_drift) core and
+/// wraps each [`DriftFinding`](crate::validation::drift::DriftFinding) as an
+/// UNATTRIBUTED [`GraphFinding`] (drift pertains to the project's declarations,
+/// not a single issue), carrying the rule's severity. The drift message is
+/// direction-specific (declared-but-unenforced vs enforced-but-undeclared) so
+/// each finding stands alone.
+fn evaluate_enforcement_drift(rule: &Rule, drift: &DriftInputs<'_>) -> Vec<GraphFinding> {
+    enforcement_drift(drift.invariants(), drift.rule_names(), drift.gate_keys())
+        .into_iter()
+        .map(|f| {
+            GraphFinding::unattributed(Finding {
+                rule: rule.name.clone(),
+                severity: rule.severity,
+                message: f.message(),
+            })
+        })
+        .collect()
 }
 
 /// Evaluate a `label-uniqueness` rule.
@@ -1732,6 +1873,7 @@ source-of-truth = "markdown-first"
                 ContentFormat::Markdown,
                 fixed_now(),
                 &HashMap::new(),
+                &DriftInputs::none(),
             )
         };
         let kind_findings = eval(&kind_rule);
@@ -1750,6 +1892,7 @@ source-of-truth = "markdown-first"
                 ContentFormat::Markdown,
                 fixed_now(),
                 &HashMap::new(),
+                &DriftInputs::none(),
             )
         };
         let kind2 = eval2(&kind_rule);
@@ -1805,6 +1948,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert!(
             findings.is_empty(),
@@ -1829,6 +1973,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert!(findings.is_empty(), "covered criterion: {findings:?}");
     }
@@ -1853,6 +1998,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert!(
             findings.is_empty(),
@@ -1879,6 +2025,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert_eq!(
             findings.len(),
@@ -1904,6 +2051,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         // REQ-02 is uncovered.
         assert_eq!(findings.len(), 1);
@@ -1928,6 +2076,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert_eq!(findings.len(), 1, "wrong-state child does not cover");
     }
@@ -1950,6 +2099,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert!(
             findings.is_empty(),
@@ -1972,6 +2122,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert!(findings.is_empty(), "any link covers regardless of edges");
     }
@@ -1988,6 +2139,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert_eq!(findings.len(), 1);
         assert!(findings[0].finding.message.contains("config error"));
@@ -2024,6 +2176,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert!(
             findings.is_empty(),
@@ -2049,6 +2202,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert_eq!(
             findings.len(),
@@ -2077,6 +2231,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert!(
             findings.is_empty(),
@@ -2109,6 +2264,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert_eq!(
             findings.len(),
@@ -2138,6 +2294,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert!(
             findings.is_empty(),
@@ -2157,6 +2314,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert_eq!(findings.len(), 1);
         assert!(findings[0].finding.message.contains("config error"));
@@ -2194,6 +2352,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert!(
             findings.is_empty(),
@@ -2226,6 +2385,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert_eq!(
             findings.len(),
@@ -2261,6 +2421,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert!(
             findings.is_empty(),
@@ -2286,6 +2447,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert_eq!(findings.len(), 1);
         assert!(findings[0].finding.message.contains("config error"));
@@ -2320,6 +2482,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         // Container criteria ARE evaluated (REQ-01 uncovered), not a config error.
         assert_eq!(
@@ -2358,6 +2521,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert_eq!(
             findings.len(),
@@ -2393,6 +2557,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert_eq!(findings.len(), 1, "ambiguous prefix: {findings:?}");
         assert!(findings[0].finding.message.contains("config error"));
@@ -2435,6 +2600,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert_eq!(findings.len(), 1, "exact short-id collision: {findings:?}");
         assert!(findings[0].finding.message.contains("config error"));
@@ -2466,6 +2632,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert!(findings.is_empty(), "resolved reference: {findings:?}");
     }
@@ -2483,6 +2650,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert_eq!(findings.len(), 1);
         assert!(findings[0].finding.message.contains("REQ-99"));
@@ -2503,6 +2671,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert_eq!(findings.len(), 1, "linked scope: unlinked source dangles");
 
@@ -2517,6 +2686,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert!(findings.is_empty(), "linked edge resolves: {findings:?}");
     }
@@ -2532,6 +2702,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert_eq!(findings.len(), 1);
         assert!(findings[0].finding.message.contains("config error"));
@@ -2561,6 +2732,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert!(findings.is_empty(), "task depends on design: {findings:?}");
     }
@@ -2578,6 +2750,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert_eq!(findings.len(), 1);
         assert!(findings[0].finding.message.contains("depend"));
@@ -2602,6 +2775,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert_eq!(findings.len(), 1, "direct-only must not see transitive dep");
 
@@ -2614,6 +2788,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert!(
             findings.is_empty(),
@@ -2632,6 +2807,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert_eq!(findings.len(), 1);
         assert!(findings[0].finding.message.contains("config error"));
@@ -2678,6 +2854,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert!(findings.is_empty(), "fresh gate must pass: {findings:?}");
     }
@@ -2696,6 +2873,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert_eq!(findings.len(), 1);
         assert_eq!(findings[0].issue_id.as_deref(), Some(id.as_str()));
@@ -2721,6 +2899,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert_eq!(findings.len(), 1);
         assert_eq!(
@@ -2744,6 +2923,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         findings.sort_by(|a, b| a.finding.message.cmp(&b.finding.message));
         assert_eq!(
@@ -2770,6 +2950,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert_eq!(findings.len(), 1);
         assert_eq!(
@@ -2791,6 +2972,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert_eq!(findings.len(), 1);
         assert_eq!(
@@ -2812,6 +2994,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         let b = evaluate_graph(
             &rules,
@@ -2820,6 +3003,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert_eq!(a, b);
     }
@@ -2840,6 +3024,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert_eq!(findings.len(), 1);
         assert_eq!(
@@ -2862,6 +3047,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert!(
             findings.is_empty(),
@@ -2883,6 +3069,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert_eq!(findings.len(), 1);
         assert_eq!(
@@ -2904,6 +3091,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert!(
             findings.is_empty(),
@@ -2927,6 +3115,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert!(
             findings.is_empty(),
@@ -2955,6 +3144,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert!(findings.is_empty(), "local + off rules produce nothing");
     }
@@ -2999,6 +3189,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert!(
             findings.is_empty(),
@@ -3020,6 +3211,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert!(
             findings.is_empty(),
@@ -3043,6 +3235,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert!(
             findings.is_empty(),
@@ -3065,6 +3258,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert_eq!(
             findings.len(),
@@ -3088,6 +3282,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert_eq!(findings.len(), 1, "one unmapped criterion: {findings:?}");
         assert_eq!(findings[0].issue_id.as_deref(), Some(id.as_str()));
@@ -3123,6 +3318,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert_eq!(
             findings.len(),
@@ -3154,6 +3350,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert_eq!(findings.len(), 1);
         let msg = &findings[0].finding.message;
@@ -3180,6 +3377,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert_eq!(findings.len(), 1);
         let msg = &findings[0].finding.message;
@@ -3234,6 +3432,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert_eq!(
             findings.len(),
@@ -3262,6 +3461,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert_eq!(findings.len(), 1, "orphan leaf must fire: {findings:?}");
         assert_eq!(findings[0].finding.rule, "default:orphan-leaf");
@@ -3309,6 +3509,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         // REQ-77 is stray; REQ-01 matches.
         assert_eq!(
@@ -3356,6 +3557,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert!(
             findings.is_empty(),
@@ -3379,6 +3581,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert_eq!(
             findings.len(),
@@ -3412,6 +3615,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert_eq!(
             findings.len(),
@@ -3437,6 +3641,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert_eq!(findings.len(), 1, "stray id must be reported: {findings:?}");
         let msg = &findings[0].finding.message;
@@ -3461,6 +3666,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert!(
             findings.is_empty(),
@@ -3492,6 +3698,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert_eq!(
             findings.len(),
@@ -3530,6 +3737,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert_eq!(findings.len(), 1, "one collision: {findings:?}");
         let msg = &findings[0].finding.message;
@@ -3558,6 +3766,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert!(
             findings.is_empty(),
@@ -3586,6 +3795,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert!(
             findings.is_empty(),
@@ -3612,6 +3822,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         assert_eq!(findings.len(), 1);
         let msg = &findings[0].finding.message;
@@ -3678,6 +3889,7 @@ source-of-truth = "markdown-first"
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
+            &DriftInputs::none(),
         );
         let elapsed = started.elapsed();
         eprintln!(
@@ -3746,6 +3958,7 @@ source-of-truth = "markdown-first"
                 ContentFormat::Markdown,
                 fixed_now(),
                 &HashMap::new(),
+                &DriftInputs::none(),
             )
         };
 
@@ -3890,5 +4103,106 @@ source-of-truth = "markdown-first"
             }
             other => panic!("expected CriteriaLabelMatch, got {other:?}"),
         }
+    }
+
+    // --- enforcement-drift Assertion (graph dispatch) ----------------------
+
+    #[test]
+    fn test_enforcement_drift_rule_emits_both_directions() {
+        use crate::validation::invariants::InvariantRegistry;
+        let rule = rule_from(
+            "[[rules]]\nname = \"drift\"\nseverity = \"error\"\n\
+             assert = { enforcement-drift = {} }\n",
+        );
+        // One invariant binds to a missing rule; one real rule is unclaimed.
+        let reg = InvariantRegistry::from_toml_str(
+            "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
+             enforced-by = \"ghost\"\n",
+        )
+        .unwrap();
+        let rule_names: BTreeSet<&str> = ["dag-no-cycles"].into_iter().collect();
+        let gate_keys: BTreeSet<&str> = BTreeSet::new();
+        let drift = DriftInputs::new(&reg.invariants, rule_names, gate_keys);
+
+        let findings = evaluate_graph(
+            &[&rule],
+            &[],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+            &HashMap::new(),
+            &drift,
+        );
+        // Two unattributed findings: the dangling binding and the unclaimed rule.
+        assert_eq!(findings.len(), 2, "{findings:?}");
+        assert!(findings.iter().all(|f| f.issue_id.is_none()));
+        assert!(findings.iter().all(|f| f.finding.rule == "drift"));
+        assert!(findings
+            .iter()
+            .any(|f| f.finding.message.contains("declared-but-unenforced")
+                && f.finding.message.contains("ghost")));
+        assert!(findings
+            .iter()
+            .any(|f| f.finding.message.contains("enforced-but-undeclared")
+                && f.finding.message.contains("dag-no-cycles")));
+    }
+
+    #[test]
+    fn test_enforcement_drift_clean_when_consistent() {
+        use crate::validation::invariants::InvariantRegistry;
+        let rule = rule_from(
+            "[[rules]]\nname = \"drift\"\nseverity = \"error\"\n\
+             assert = { enforcement-drift = {} }\n",
+        );
+        let reg = InvariantRegistry::from_toml_str(
+            "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
+             enforced-by = \"only-rule\"\n",
+        )
+        .unwrap();
+        let rule_names: BTreeSet<&str> = ["only-rule"].into_iter().collect();
+        let gate_keys: BTreeSet<&str> = BTreeSet::new();
+        let drift = DriftInputs::new(&reg.invariants, rule_names, gate_keys);
+        let findings = evaluate_graph(
+            &[&rule],
+            &[],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+            &HashMap::new(),
+            &drift,
+        );
+        assert!(findings.is_empty(), "{findings:?}");
+    }
+
+    #[test]
+    fn test_enforcement_drift_inert_with_empty_context() {
+        // The drift rule fires no findings when the injected context is empty
+        // (the live `jit validate` path when no drift rule reads real registries).
+        let rule = rule_from(
+            "[[rules]]\nname = \"drift\"\nseverity = \"error\"\n\
+             assert = { enforcement-drift = {} }\n",
+        );
+        let findings = evaluate_graph(
+            &[&rule],
+            &[],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+            &HashMap::new(),
+            &DriftInputs::none(),
+        );
+        assert!(findings.is_empty());
+    }
+
+    #[test]
+    fn test_enforcement_drift_assert_takes_no_config() {
+        // A stray key in the drift assert is a typed config error at load.
+        let err = RuleSet::from_toml_str(
+            "[[rules]]\nname = \"drift\"\n\
+             assert = { enforcement-drift = { foo = 1 } }\n",
+            Path::new("/nonexistent"),
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("enforcement-drift"), "{err}");
     }
 }

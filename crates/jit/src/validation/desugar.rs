@@ -83,6 +83,9 @@ pub fn desugar(assertion: &Assertion) -> Option<Value> {
         | Assertion::CriteriaLabelMatch { .. }
         | Assertion::CriteriaToCheck { .. } => None,
         Assertion::LabelUniqueness { .. } => None,
+        // Graph-scope, evaluated by the graph engine against injected registries;
+        // it has no per-issue JSON Schema form.
+        Assertion::EnforcementDrift => None,
     }
 }
 

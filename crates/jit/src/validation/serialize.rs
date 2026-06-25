@@ -439,6 +439,8 @@ fn render_assertion(
                 toml_basic_string(namespace)
             )
         }
+        // The drift kind carries no config: round-trip it as an empty table.
+        Assertion::EnforcementDrift => "{ enforcement-drift = {} }".to_string(),
     }
 }
 
@@ -720,6 +722,20 @@ severity = "error"
 assert = { dependency-shape = { target = { type = "design" }, mode = "must", transitive = true } }
 "#;
         let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        assert_round_trips(&set);
+    }
+
+    #[test]
+    fn test_round_trip_enforcement_drift() {
+        // The config-less enforcement-drift kind round-trips as an empty table.
+        let toml = r#"
+[[rules]]
+name = "drift"
+severity = "error"
+assert = { enforcement-drift = {} }
+"#;
+        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        assert!(matches!(set.rules[0].assert, Assertion::EnforcementDrift));
         assert_round_trips(&set);
     }
 

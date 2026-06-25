@@ -28,7 +28,7 @@
 use std::path::{Path, PathBuf};
 
 use jit::domain::{ContentFormat, Issue, State};
-use jit::validation::graph::{evaluate_graph, GraphFinding};
+use jit::validation::graph::{evaluate_graph, DriftInputs, GraphFinding};
 use jit::validation::rules::{Rule, RuleSet, Scope};
 
 /// Absolute path to a `docs/examples/<name>` directory, resolved from the crate
@@ -72,6 +72,7 @@ fn issue_graph_findings(rules: &[&Rule], issues: &[Issue]) -> Vec<GraphFinding> 
         ContentFormat::Markdown,
         fixed_now(),
         &std::collections::HashMap::new(),
+        &DriftInputs::none(),
     );
     assert!(
         findings.iter().all(|f| !f.is_config_error()),

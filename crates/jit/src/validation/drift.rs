@@ -250,8 +250,10 @@ mod tests {
 
     #[test]
     fn test_declared_but_unenforced_reports_dangling_binding() {
-        let r = reg("[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
-                     enforced-by = \"ghost-rule\"\n");
+        let r = reg(
+            "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
+                     enforced-by = \"ghost-rule\"\n",
+        );
         let rules: BTreeSet<&str> = BTreeSet::new();
         let gates: BTreeSet<&str> = BTreeSet::new();
         let findings = enforcement_drift(&r.invariants, &rules, &gates);
@@ -268,8 +270,10 @@ mod tests {
 
     #[test]
     fn test_binding_to_real_rule_is_not_drift() {
-        let r = reg("[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
-                     enforced-by = \"dag-no-cycles\"\n");
+        let r = reg(
+            "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
+                     enforced-by = \"dag-no-cycles\"\n",
+        );
         let rules: BTreeSet<&str> = ["dag-no-cycles"].into_iter().collect();
         let gates: BTreeSet<&str> = BTreeSet::new();
         let findings = enforcement_drift(&r.invariants, &rules, &gates);
@@ -280,8 +284,10 @@ mod tests {
 
     #[test]
     fn test_binding_to_real_gate_is_not_drift() {
-        let r = reg("[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
-                     enforced-by = \"code-review\"\n");
+        let r = reg(
+            "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
+                     enforced-by = \"code-review\"\n",
+        );
         let rules: BTreeSet<&str> = BTreeSet::new();
         let gates: BTreeSet<&str> = ["code-review"].into_iter().collect();
         let findings = enforcement_drift(&r.invariants, &rules, &gates);
@@ -291,8 +297,10 @@ mod tests {
     #[test]
     fn test_enforced_but_undeclared_reports_unclaimed_rule() {
         // One invariant claims rule-a; rule-b and gate-x are unclaimed.
-        let r = reg("[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
-                     enforced-by = \"rule-a\"\n");
+        let r = reg(
+            "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
+                     enforced-by = \"rule-a\"\n",
+        );
         let rules: BTreeSet<&str> = ["rule-a", "rule-b"].into_iter().collect();
         let gates: BTreeSet<&str> = ["gate-x"].into_iter().collect();
         let findings = enforcement_drift(&r.invariants, &rules, &gates);
@@ -302,7 +310,11 @@ mod tests {
             .map(|f| f.subject.as_str())
             .collect();
         // rule-b and gate-x are unclaimed; rule-a is claimed.
-        assert_eq!(undeclared, vec!["gate-x", "rule-b"], "sorted, claimed excluded");
+        assert_eq!(
+            undeclared,
+            vec!["gate-x", "rule-b"],
+            "sorted, claimed excluded"
+        );
     }
 
     #[test]

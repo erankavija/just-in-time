@@ -663,6 +663,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         // honors a container whose criteria live in an external plan file too.
         let plan_content = self.resolve_plan_content(&slice)?;
 
+        // Transition enforcement filters out repo-wide-at-transition rules
+        // (enforcement-drift among them), so the drift context is never read here.
         let findings = evaluate_graph(
             &rules,
             &slice,
@@ -670,6 +672,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             repo_format,
             chrono::Utc::now(),
             &plan_content,
+            &crate::validation::graph::DriftInputs::none(),
         );
 
         // Which selected rules enforce (block on an attributed error finding).

@@ -507,6 +507,18 @@ impl<S: IssueStore> CommandExecutor<S> {
         // content; the engine itself reads only the injected map (stays pure).
         let plan_content = self.resolve_plan_content(issues)?;
 
+        // Resolve the drift registries at the boundary (rule names, gate keys,
+        // invariants) so an `enforcement-drift` graph rule — if one is authored —
+        // reads them through the pure engine. With no such rule declared (the live
+        // default), this context is inert.
+        let gate_registry = self.storage.load_gate_registry()?;
+        let rule_names: std::collections::BTreeSet<&str> =
+            ruleset.rules.iter().map(|r| r.name.as_str()).collect();
+        let gate_keys: std::collections::BTreeSet<&str> =
+            gate_registry.gates.keys().map(|k| k.as_str()).collect();
+        let invariants = &self.cached_config()?.invariants.invariants;
+        let drift = crate::validation::graph::DriftInputs::new(invariants, rule_names, gate_keys);
+
         // Inject the wall-clock instant at the boundary so `gate-recency` rules
         // are deterministic and the graph engine stays pure (CC-5b).
         Ok(crate::validation::graph::evaluate_graph(
@@ -516,6 +528,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             repo_format,
             chrono::Utc::now(),
             &plan_content,
+            &drift,
         ))
     }
 
@@ -878,6 +891,9 @@ impl<S: IssueStore> CommandExecutor<S> {
             // Resolve external plan docs for the in-scope issues so a container
             // whose criteria live in an external file validates against the FILE.
             let plan_content = self.resolve_plan_content(&slice)?;
+            // The `--scope` path filters out repo-wide-at-transition rules
+            // (enforcement-drift among them), so the drift context is never read
+            // here; pass the inert empty context.
             let graph_findings = crate::validation::graph::evaluate_graph(
                 &graph_rules,
                 &slice,
@@ -885,6 +901,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 repo_format,
                 chrono::Utc::now(),
                 &plan_content,
+                &crate::validation::graph::DriftInputs::none(),
             );
             findings.extend(
                 graph_findings
