@@ -21,6 +21,15 @@ pub struct JitConfig {
     pub documentation: Option<DocumentationConfig>,
     /// Label namespace registry (optional - replaces labels.json).
     pub namespaces: Option<HashMap<String, NamespaceConfig>>,
+    /// Addressable item-kind registry (optional).
+    ///
+    /// Each entry declares one kind as a `(section, id-pattern, marker(s),
+    /// link-namespace(s))` projection over issue descriptions, mirroring the
+    /// `[namespaces.*]` registry precedent. The engine never hardcodes a kind
+    /// NAME: a kind is purely the four-tuple it expands to, so `requirement`,
+    /// `decision`, `risk`, etc. are all just configuration. See
+    /// [`ItemKindConfig`].
+    pub item_kinds: Option<HashMap<String, ItemKindConfig>>,
     /// Worktree and parallel work configuration (optional).
     pub worktree: Option<WorktreeConfig>,
     /// Coordination settings for leases and agents (optional).
@@ -180,6 +189,61 @@ pub struct NamespaceConfig {
     pub unique: bool,
     /// Example labels (optional, for documentation).
     pub examples: Option<Vec<String>>,
+}
+
+/// One addressable item-kind declaration from `[item_kinds.<name>]`.
+///
+/// A kind is a config-declared projection over issue descriptions, parallel to
+/// [`NamespaceConfig`]: it names the `section` whose list items are scanned, the
+/// `id_pattern` regex that extracts a self-id from an item, the optional
+/// `markers` an item must begin with to qualify, and the `link_namespaces` that
+/// reference items of this kind by qualified id (e.g. `satisfies:`). No kind
+/// NAME is interpreted by engine logic — `requirement`, `decision`, `risk`, and
+/// any later kind are distinguished solely by these fields, keeping the engine
+/// domain-agnostic.
+///
+/// Every field is optional so a kind can be declared minimally and inherit the
+/// repo defaults applied by
+/// [`ItemKind::from_config`](crate::domain::item::ItemKind::from_config) (the
+/// success-criteria section, the repo id pattern, no marker, the `satisfies`
+/// namespace) — the same defaults the `label-coverage` rule uses.
+///
+/// # Examples
+///
+/// ```
+/// use jit::config::JitConfig;
+///
+/// let config: JitConfig = toml::from_str(
+///     r#"
+/// [item_kinds.requirement]
+/// section = "success_criteria"
+/// id-pattern = "REQ-\\d+"
+/// markers = ["[hard]"]
+/// link-namespaces = ["satisfies"]
+/// "#,
+/// )
+/// .unwrap();
+/// let kinds = config.item_kinds.unwrap();
+/// let req = &kinds["requirement"];
+/// assert_eq!(req.section.as_deref(), Some("success_criteria"));
+/// assert_eq!(req.markers, Some(vec!["[hard]".to_string()]));
+/// ```
+#[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
+pub struct ItemKindConfig {
+    /// Section slug whose list items hold this kind's addressable items
+    /// (e.g. `"success_criteria"`). Absent inherits the repo default.
+    pub section: Option<String>,
+    /// Regex extracting an item's self-id from its text (e.g. `"REQ-\\d+"`).
+    /// Absent inherits the repo default id pattern.
+    #[serde(rename = "id-pattern")]
+    pub id_pattern: Option<String>,
+    /// Markers an item's text must begin with to qualify (e.g. `["[hard]"]`).
+    /// Absent or empty means every matching item qualifies.
+    pub markers: Option<Vec<String>>,
+    /// Link-label namespaces that reference items of this kind by qualified id
+    /// (e.g. `["satisfies"]`). Absent inherits the repo default namespace.
+    #[serde(rename = "link-namespaces")]
+    pub link_namespaces: Option<Vec<String>>,
 }
 
 /// Worktree and parallel work configuration.
@@ -437,6 +501,7 @@ impl JitConfig {
                 validation: None,
                 documentation: None,
                 namespaces: None,
+                item_kinds: None,
                 worktree: None,
                 coordination: None,
                 global_operations: None,
@@ -1113,6 +1178,51 @@ unique = false
 
         let component_ns = &namespaces["component"];
         assert!(component_ns.examples.is_none());
+    }
+
+    #[test]
+    fn test_parse_item_kinds_from_toml() {
+        // The `[item_kinds.*]` registry parses as a name -> four-tuple map,
+        // mirroring `[namespaces.*]`. `requirement` is expressible as one entry.
+        let config_toml = r#"
+[item_kinds.requirement]
+section = "success_criteria"
+id-pattern = "REQ-\\d+"
+markers = ["[hard]"]
+link-namespaces = ["satisfies"]
+
+[item_kinds.decision]
+section = "decisions"
+id-pattern = "D-\\d+"
+"#;
+        let config: JitConfig = toml::from_str(config_toml).unwrap();
+        let kinds = config.item_kinds.expect("item_kinds present");
+        assert_eq!(kinds.len(), 2);
+
+        let req = &kinds["requirement"];
+        assert_eq!(req.section.as_deref(), Some("success_criteria"));
+        assert_eq!(req.id_pattern.as_deref(), Some("REQ-\\d+"));
+        assert_eq!(req.markers, Some(vec!["[hard]".to_string()]));
+        assert_eq!(req.link_namespaces, Some(vec!["satisfies".to_string()]));
+
+        // A minimally-declared kind leaves the unset fields None so the domain
+        // layer can apply repo defaults.
+        let decision = &kinds["decision"];
+        assert_eq!(decision.section.as_deref(), Some("decisions"));
+        assert!(decision.markers.is_none());
+        assert!(decision.link_namespaces.is_none());
+    }
+
+    #[test]
+    fn test_item_kinds_absent_is_none() {
+        // A config with no `[item_kinds]` table leaves the registry None; the
+        // domain layer supplies the built-in `requirement` default in that case.
+        let config_toml = r#"
+[type_hierarchy]
+types = { task = 1 }
+"#;
+        let config: JitConfig = toml::from_str(config_toml).unwrap();
+        assert!(config.item_kinds.is_none());
     }
 
     #[test]
