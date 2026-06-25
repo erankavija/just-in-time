@@ -1,61 +1,147 @@
 {
   "epic_id": "25064508-d563-4073-a970-296607a01adc",
   "epic_short_id": "25064508",
-  "current_wave": 1,
+  "current_wave": 2,
   "waves": [
     {
       "wave_number": 1,
       "issues": [
-        {"id": "56ab0224", "short_id": "56ab0224", "title": "Addressable structured items in descriptions, with qualified ids", "classification": "implementation", "status": "pending"}
+        {
+          "id": "56ab0224",
+          "short_id": "56ab0224",
+          "title": "Addressable structured items in descriptions, with qualified ids",
+          "classification": "implementation",
+          "status": "done"
+        }
       ]
     },
     {
       "wave_number": 2,
       "issues": [
-        {"id": "1e1ea81d", "short_id": "1e1ea81d", "title": "Extend the item-kind registry to the full six-tuple", "classification": "implementation", "status": "pending"},
-        {"id": "61b17603", "short_id": "61b17603", "title": "Widen qualified ids to scoped addressing with project scope", "classification": "implementation", "status": "pending"}
+        {
+          "id": "1e1ea81d",
+          "short_id": "1e1ea81d",
+          "title": "Extend the item-kind registry to the full six-tuple",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "61b17603",
+          "short_id": "61b17603",
+          "title": "Widen qualified ids to scoped addressing with project scope",
+          "classification": "implementation",
+          "status": "pending"
+        }
       ]
     },
     {
       "wave_number": 3,
       "issues": [
-        {"id": "b121fd51", "short_id": "b121fd51", "title": "Show coverage rules compatible over the kind model", "classification": "implementation", "status": "pending"},
-        {"id": "21558ace", "short_id": "21558ace", "title": "Add the invariants.toml schema and config-time loader", "classification": "implementation", "status": "pending"},
-        {"id": "b629686b", "short_id": "b629686b", "title": "Add the decision item kind", "classification": "implementation", "status": "pending"},
-        {"id": "be3eb6ca", "short_id": "be3eb6ca", "title": "Add the risk item kind", "classification": "implementation", "status": "pending"}
+        {
+          "id": "b121fd51",
+          "short_id": "b121fd51",
+          "title": "Show coverage rules compatible over the kind model",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "21558ace",
+          "short_id": "21558ace",
+          "title": "Add the invariants.toml schema and config-time loader",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "b629686b",
+          "short_id": "b629686b",
+          "title": "Add the decision item kind",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "be3eb6ca",
+          "short_id": "be3eb6ca",
+          "title": "Add the risk item kind",
+          "classification": "implementation",
+          "status": "pending"
+        }
       ]
     },
     {
       "wave_number": 4,
       "issues": [
-        {"id": "93480b00", "short_id": "93480b00", "title": "Index and query invariants as a registry-first kind", "classification": "implementation", "status": "pending"},
-        {"id": "205472c4", "short_id": "205472c4", "title": "Add the decision and risk item kinds (story rollup)", "classification": "implementation", "status": "pending"}
+        {
+          "id": "93480b00",
+          "short_id": "93480b00",
+          "title": "Index and query invariants as a registry-first kind",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "205472c4",
+          "short_id": "205472c4",
+          "title": "Add the decision and risk item kinds (story rollup)",
+          "classification": "implementation",
+          "status": "pending"
+        }
       ]
     },
     {
       "wave_number": 5,
       "issues": [
-        {"id": "69bd8cd5", "short_id": "69bd8cd5", "title": "Add the invariant registry and registry-first read path (story rollup)", "classification": "implementation", "status": "pending"}
+        {
+          "id": "69bd8cd5",
+          "short_id": "69bd8cd5",
+          "title": "Add the invariant registry and registry-first read path (story rollup)",
+          "classification": "implementation",
+          "status": "pending"
+        }
       ]
     },
     {
       "wave_number": 6,
       "issues": [
-        {"id": "0d593d90", "short_id": "0d593d90", "title": "Project invariants into a configurable doc target", "classification": "implementation", "status": "pending"},
-        {"id": "b9966826", "short_id": "b9966826", "title": "Resolve node-to-item links by qualified id across kinds", "classification": "implementation", "status": "pending"},
-        {"id": "72cdf315", "short_id": "72cdf315", "title": "Demonstrate cross-substrate generality across all four kinds", "classification": "implementation", "status": "pending"}
+        {
+          "id": "0d593d90",
+          "short_id": "0d593d90",
+          "title": "Project invariants into a configurable doc target",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "b9966826",
+          "short_id": "b9966826",
+          "title": "Resolve node-to-item links by qualified id across kinds",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "72cdf315",
+          "short_id": "72cdf315",
+          "title": "Demonstrate cross-substrate generality across all four kinds",
+          "classification": "implementation",
+          "status": "pending"
+        }
       ]
     },
     {
       "wave_number": 7,
       "issues": [
-        {"id": "52ad3b1f", "short_id": "52ad3b1f", "title": "Add the bidirectional enforcement-drift check and the invariant CLI", "classification": "implementation", "status": "pending"}
+        {
+          "id": "52ad3b1f",
+          "short_id": "52ad3b1f",
+          "title": "Add the bidirectional enforcement-drift check and the invariant CLI",
+          "classification": "implementation",
+          "status": "pending"
+        }
       ]
     }
   ],
   "created_during_execution": [],
   "escalations": [],
-  "rework_counts": {},
+  "rework_counts": {
+    "56ab0224": 2
+  },
   "started_at": "2026-06-25T00:00:00Z",
   "notes": "Bracket complete: P=0d753ba5 (done), B=5f5735c3 (done). plan-review/coverage-preview/breakdown-review all passed. Driving impl interior. Issues serialized within waves due to heavy crates/jit file overlap; worktrees only for file-disjoint pairs."
 }
