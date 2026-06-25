@@ -2,7 +2,7 @@
   "id": "205472c4-edc1-46f5-874f-507aa582e653",
   "title": "Add the decision and risk item kinds",
   "description": "Add `decision` and `risk` as markdown-first item kinds, configured and indexed alongside `requirement`, so that decisions and risks authored in issue descriptions become addressable, queryable items. Their link namespaces (`per:` for decisions, `mitigates:`/`resolves:` for risks) reference items by qualified id. The markdown description remains the sole source of truth: items are parsed and indexed from descriptions with no duplicated structured store. Indexing reuses the generic triple-driven parse path the existing `requirement` kind already uses.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit item list --kind decision` returns decision items parsed from issue descriptions.\n- [hard] REQ-02: `jit item list --kind risk` returns risk items parsed from issue descriptions.\n- [hard] REQ-03: A `per:<qualified-id>` label resolves to the addressed decision item.\n- [hard] REQ-04: A `mitigates:<qualified-id>` (and `resolves:<qualified-id>`) label resolves to the addressed risk item.\n- [hard] REQ-05: The markdown description is the only source for decision and risk items; no parallel structured store duplicates them.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "high",
   "assignee": null,
   "dependencies": [
@@ -24,5 +24,5 @@
     "story:decision-risk-kinds"
   ],
   "created_at": "2026-06-24T22:44:37.686555299+00:00",
-  "updated_at": "2026-06-25T05:17:31.556738175+00:00"
+  "updated_at": "2026-06-25T18:12:44.047602692+00:00"
 }
