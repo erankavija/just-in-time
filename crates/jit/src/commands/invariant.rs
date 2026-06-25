@@ -152,10 +152,12 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// [`effective_rules`](crate::commands::CommandExecutor::effective_rules)),
     /// and the known gate keys (from the gate registry) — and delegates to the
     /// pure [`enforcement_drift`](crate::validation::drift::enforcement_drift)
-    /// core. This computes the SAME drift the opt-in `enforcement-drift` graph
-    /// rule does, but on demand and without requiring a rule to be declared in
-    /// `rules.toml`. A genuine `rules.toml` load failure surfaces as an `Err`
-    /// rather than silently reporting no drift.
+    /// core. This computes the SAME drift the built-in `jit validate` pass
+    /// ([`enforcement_drift_findings`](crate::commands::CommandExecutor::enforcement_drift_findings))
+    /// reports, but ALWAYS reports BOTH directions and exits non-zero on ANY drift
+    /// (whereas the validate pass treats enforced-but-undeclared as advisory). A
+    /// genuine `rules.toml` load failure surfaces as an `Err` rather than silently
+    /// reporting no drift.
     ///
     /// # Examples
     ///

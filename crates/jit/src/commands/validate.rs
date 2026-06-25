@@ -20,6 +20,21 @@ use anyhow::Context;
 /// ```
 pub const DANGLING_LINK_RULE: &str = "dangling-item-link";
 
+/// Rule name carried by every finding the built-in enforcement-drift pass emits
+/// (REQ-01/REQ-02). Like [`DANGLING_LINK_RULE`], it is not a `.jit/rules.toml`
+/// rule: the pass runs as part of every validate path, gated only on the
+/// presence of declared invariants, so the name is a stable constant for
+/// grouping and rendering.
+///
+/// # Examples
+///
+/// ```
+/// use jit::commands::ENFORCEMENT_DRIFT_RULE;
+///
+/// assert_eq!(ENFORCEMENT_DRIFT_RULE, "enforcement-drift");
+/// ```
+pub const ENFORCEMENT_DRIFT_RULE: &str = "enforcement-drift";
+
 impl<S: IssueStore> CommandExecutor<S> {
     /// Validate with optional fix mode.
     ///
@@ -210,6 +225,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         // link in a configured link-namespace whose qualified id cannot be
         // resolved is a finding, surfaced here so `jit validate` fails on it.
         graph_findings.extend(self.dangling_link_findings(&issues)?);
+        // Built-in enforcement-drift pass (REQ-01/REQ-02): gated on declared
+        // invariants, so a repo without `.jit/invariants.toml` is unaffected.
+        graph_findings.extend(self.enforcement_drift_findings()?);
         if let Some(message) = graph_findings_error_message(&graph_findings) {
             return Err(anyhow!(message));
         }
@@ -299,6 +317,86 @@ impl<S: IssueStore> CommandExecutor<S> {
                 }
             }
         }
+        Ok(findings)
+    }
+
+    /// Built-in validate pass: report bidirectional enforcement drift between the
+    /// invariant registry and the declared rules/gates (REQ-01/REQ-02).
+    ///
+    /// This runs as part of every validate path — NOT behind an opt-in
+    /// `.jit/rules.toml` rule — mirroring
+    /// [`dangling_link_findings`](Self::dangling_link_findings). It is gated only
+    /// on the presence of declared invariants: when `.jit/invariants.toml` is
+    /// absent or empty the pass returns no findings (graceful degradation), so a
+    /// repository that declares no invariants — including the live repo — is
+    /// totally unaffected and `jit validate` surfaces nothing new.
+    ///
+    /// When invariants ARE declared, both directions are reported as unattributed
+    /// [`GraphFinding`]s (drift pertains to the project's declarations, not a
+    /// single issue) via the pure
+    /// [`enforcement_drift`](crate::validation::drift::enforcement_drift) core:
+    ///
+    /// - **declared-but-unenforced** — an invariant whose `enforced-by` names a
+    ///   missing/unloadable rule or gate — is
+    ///   [`Severity::Error`](crate::validation::rules::Severity::Error), so it
+    ///   FAILS `jit validate` (the broken binding is a real defect).
+    /// - **enforced-but-undeclared** — a rule or gate no invariant claims — is
+    ///   [`Severity::Warn`](crate::validation::rules::Severity::Warn): reported as
+    ///   a finding (REQ-02) but advisory, so adopting invariants does not hard-fail
+    ///   a repo for every rule/gate it has not yet claimed.
+    ///
+    /// The rule name on every finding is [`ENFORCEMENT_DRIFT_RULE`]. The inputs
+    /// (rule names, gate keys, invariants) are resolved at this boundary; the
+    /// drift computation itself is pure. A genuine `rules.toml` load failure
+    /// surfaces as an `Err` rather than silently reporting no drift.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use jit::commands::CommandExecutor;
+    /// use jit::storage::JsonFileStorage;
+    ///
+    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
+    /// let findings = executor.enforcement_drift_findings().unwrap();
+    /// println!("{} enforcement-drift finding(s)", findings.len());
+    /// ```
+    pub fn enforcement_drift_findings(
+        &self,
+    ) -> Result<Vec<crate::validation::graph::GraphFinding>> {
+        use crate::validation::drift::{enforcement_drift, DriftDirection};
+        use crate::validation::engine::Finding;
+        use crate::validation::graph::GraphFinding;
+        use crate::validation::rules::Severity;
+        use std::collections::BTreeSet;
+
+        let config = self.cached_config()?;
+        let invariants = &config.invariants.invariants;
+        // Gated on declared invariants: a repo with none sees no drift findings.
+        if invariants.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let ruleset = self.effective_rules()?;
+        let gate_registry = self.storage.load_gate_registry()?;
+        let rule_names: BTreeSet<&str> = ruleset.rules.iter().map(|r| r.name.as_str()).collect();
+        let gate_keys: BTreeSet<&str> = gate_registry.gates.keys().map(|k| k.as_str()).collect();
+
+        let findings = enforcement_drift(invariants, &rule_names, &gate_keys)
+            .into_iter()
+            .map(|f| {
+                let severity = match f.direction {
+                    // A broken binding is a real defect -> fails validate.
+                    DriftDirection::DeclaredButUnenforced => Severity::Error,
+                    // An unclaimed rule/gate is advisory -> reported, not fatal.
+                    DriftDirection::EnforcedButUndeclared => Severity::Warn,
+                };
+                GraphFinding::unattributed(Finding {
+                    rule: ENFORCEMENT_DRIFT_RULE.to_string(),
+                    severity,
+                    message: f.message(),
+                })
+            })
+            .collect();
         Ok(findings)
     }
 
@@ -507,18 +605,6 @@ impl<S: IssueStore> CommandExecutor<S> {
         // content; the engine itself reads only the injected map (stays pure).
         let plan_content = self.resolve_plan_content(issues)?;
 
-        // Resolve the drift registries at the boundary (rule names, gate keys,
-        // invariants) so an `enforcement-drift` graph rule — if one is authored —
-        // reads them through the pure engine. With no such rule declared (the live
-        // default), this context is inert.
-        let gate_registry = self.storage.load_gate_registry()?;
-        let rule_names: std::collections::BTreeSet<&str> =
-            ruleset.rules.iter().map(|r| r.name.as_str()).collect();
-        let gate_keys: std::collections::BTreeSet<&str> =
-            gate_registry.gates.keys().map(|k| k.as_str()).collect();
-        let invariants = &self.cached_config()?.invariants.invariants;
-        let drift = crate::validation::graph::DriftInputs::new(invariants, rule_names, gate_keys);
-
         // Inject the wall-clock instant at the boundary so `gate-recency` rules
         // are deterministic and the graph engine stays pure (CC-5b).
         Ok(crate::validation::graph::evaluate_graph(
@@ -528,7 +614,6 @@ impl<S: IssueStore> CommandExecutor<S> {
             repo_format,
             chrono::Utc::now(),
             &plan_content,
-            &drift,
         ))
     }
 
@@ -722,6 +807,10 @@ impl<S: IssueStore> CommandExecutor<S> {
                 // attributed to issues, so per-issue filtering below keeps only
                 // this issue's dangling links.
                 graph_findings.extend(self.dangling_link_findings(&issues)?);
+                // The enforcement-drift pass is intentionally NOT folded into the
+                // single-issue report: drift is project-scoped (unattributed), not
+                // a property of one issue. It surfaces in the whole-repo report
+                // (the `None` arm below) and gates `validate_silent` / cargo-ci.
                 findings.extend(graph_findings.iter().filter_map(|gf| {
                     let pertains = gf.issue_id.as_deref() == Some(issue.id.as_str())
                         || (gf.is_config_error() && applicable_rules.contains(&gf.finding.rule));
@@ -748,6 +837,10 @@ impl<S: IssueStore> CommandExecutor<S> {
                 // Built-in dangling-item-link pass (REQ-08 clause i, REQ-03):
                 // every dangling link surfaces in the whole-repo report.
                 graph_findings.extend(self.dangling_link_findings(&issues)?);
+                // Built-in enforcement-drift pass (REQ-01/REQ-02): project-scoped
+                // (unattributed) drift surfaces in the whole-repo report. Gated on
+                // declared invariants, so a repo without any is unaffected.
+                graph_findings.extend(self.enforcement_drift_findings()?);
                 findings.extend(
                     graph_findings
                         .iter()
@@ -891,9 +984,6 @@ impl<S: IssueStore> CommandExecutor<S> {
             // Resolve external plan docs for the in-scope issues so a container
             // whose criteria live in an external file validates against the FILE.
             let plan_content = self.resolve_plan_content(&slice)?;
-            // The `--scope` path filters out repo-wide-at-transition rules
-            // (enforcement-drift among them), so the drift context is never read
-            // here; pass the inert empty context.
             let graph_findings = crate::validation::graph::evaluate_graph(
                 &graph_rules,
                 &slice,
@@ -901,7 +991,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                 repo_format,
                 chrono::Utc::now(),
                 &plan_content,
-                &crate::validation::graph::DriftInputs::none(),
             );
             findings.extend(
                 graph_findings
@@ -915,6 +1004,15 @@ impl<S: IssueStore> CommandExecutor<S> {
         // `--scope` gate exactly like a ruleset error-severity finding.
         findings.extend(
             self.dangling_link_findings(&slice)?
+                .iter()
+                .map(|gf| ReportedFinding::new(gf.issue_id.clone(), &gf.finding)),
+        );
+
+        // Built-in enforcement-drift pass (REQ-01/REQ-02): a project-scoped,
+        // declaration-consistency check the scope gate also enforces. Gated on
+        // declared invariants, so a repo without any is unaffected.
+        findings.extend(
+            self.enforcement_drift_findings()?
                 .iter()
                 .map(|gf| ReportedFinding::new(gf.issue_id.clone(), &gf.finding)),
         );

@@ -695,26 +695,6 @@ pub enum Assertion {
         /// issues (e.g. `"req"`).
         namespace: String,
     },
-    /// Bidirectional enforcement-drift check between the invariant registry and
-    /// the declared rules/gates (declaration consistency, NOT execution). Graph
-    /// scope, repo-wide.
-    ///
-    /// This kind carries no config: it reads the invariant registry, the loadable
-    /// rule names, and the known gate keys that the graph evaluator injects at the
-    /// boundary (see
-    /// [`evaluate_graph`](crate::validation::graph::evaluate_graph)), and emits one
-    /// unattributed finding per drift in either direction via
-    /// [`enforcement_drift`](crate::validation::drift::enforcement_drift). It is
-    /// OPT-IN: no built-in default rule declares it, so a repo that does not author
-    /// an `enforcement-drift` rule never sees drift findings from `jit validate`
-    /// (the `jit invariant check` command computes the same drift directly).
-    ///
-    /// # Config shape in `rules.toml`
-    ///
-    /// ```toml
-    /// assert = { enforcement-drift = {} }
-    /// ```
-    EnforcementDrift,
 }
 
 /// The legacy type-hierarchy warning expressed by an
@@ -769,7 +749,6 @@ impl Assertion {
             | Assertion::CriteriaLabelMatch { .. }
             | Assertion::LabelUniqueness { .. } => Scope::Graph,
             Assertion::CriteriaToCheck { .. } => Scope::Graph,
-            Assertion::EnforcementDrift => Scope::Graph,
             _ => Scope::Local,
         }
     }
@@ -821,10 +800,6 @@ impl Assertion {
             }
             // Type-hierarchy checks reason over the whole set's relations.
             Assertion::TypeHierarchy { .. } => true,
-            // Enforcement-drift reads the whole invariant/rule/gate registries,
-            // so it is a repo-wide validate-only concern (never a neighborhood
-            // slice at transition time).
-            Assertion::EnforcementDrift => true,
             // The remaining graph kinds are per-issue / neighborhood-local.
             // `CriteriaLabelMatch` only needs the issue's own body projection
             // and labels, so it is safe at transition time.
@@ -1070,8 +1045,6 @@ struct RawAssert {
     criteria_to_check: Option<RawCriteriaToCheck>,
     #[serde(default, rename = "label-uniqueness")]
     label_uniqueness: Option<RawLabelUniqueness>,
-    #[serde(default, rename = "enforcement-drift")]
-    enforcement_drift: Option<toml::value::Table>,
 }
 
 /// The `gate-recency` assert payload: a max age plus an optional gate filter.
@@ -1397,8 +1370,7 @@ impl RawAssert {
             || self.type_hierarchy.is_some()
             || self.criteria_label_match.is_some()
             || self.criteria_to_check.is_some()
-            || self.label_uniqueness.is_some()
-            || self.enforcement_drift.is_some();
+            || self.label_uniqueness.is_some();
         let raw_schema_present = self.json_schema.is_some();
 
         // Shorthand XOR file-schema: combining them in one rule is a config
@@ -1429,7 +1401,6 @@ impl RawAssert {
             self.criteria_label_match.is_some(),
             self.criteria_to_check.is_some(),
             self.label_uniqueness.is_some(),
-            self.enforcement_drift.is_some(),
         ]
         .into_iter()
         .filter(|present| *present)
@@ -1573,19 +1544,6 @@ impl RawAssert {
             return Ok(Assertion::LabelUniqueness {
                 namespace: lu.namespace,
             });
-        }
-        if let Some(table) = self.enforcement_drift {
-            // The drift kind carries no config; a stray key is a typo, surfaced
-            // at load rather than silently ignored.
-            if let Some(key) = table.keys().next() {
-                return Err(RuleConfigError::InvalidAssertion {
-                    rule: rule.to_string(),
-                    message: format!(
-                        "enforcement-drift takes no configuration keys, found '{key}'"
-                    ),
-                });
-            }
-            return Ok(Assertion::EnforcementDrift);
         }
 
         // Unreachable: total == 1 guarantees one branch above matched.

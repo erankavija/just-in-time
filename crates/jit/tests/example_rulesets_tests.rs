@@ -16,7 +16,7 @@
 use std::path::{Path, PathBuf};
 
 use jit::domain::{ContentFormat, DocumentReference, Issue, State};
-use jit::validation::graph::{evaluate_graph, DriftInputs, GraphFinding};
+use jit::validation::graph::{evaluate_graph, GraphFinding};
 use jit::validation::local::evaluate_local;
 use jit::validation::rules::{Rule, RuleSet, Scope};
 
@@ -73,7 +73,6 @@ fn issue_graph_findings_at(
         ContentFormat::Markdown,
         now,
         &std::collections::HashMap::new(),
-        &DriftInputs::none(),
     );
     assert!(
         findings.iter().all(|f| !f.is_config_error()),
