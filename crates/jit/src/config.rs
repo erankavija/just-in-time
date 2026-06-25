@@ -478,13 +478,57 @@ pub enum SourceOfTruth {
 /// A separate jit-owned file under `.jit/` so the default behavior never touches
 /// existing project docs (decision D3). This is the SOLE place the default
 /// filename lives: the projection engine reads the resolved target from config
-/// and contains no documentation-filename literal.
+/// and contains no documentation-filename literal. It is the value
+/// [`InvariantProjectionConfig::target`] resolves to when no `target` is set.
+///
+/// # Examples
+///
+/// ```
+/// use jit::config::{InvariantProjectionConfig, DEFAULT_INVARIANT_PROJECTION_TARGET};
+///
+/// assert_eq!(DEFAULT_INVARIANT_PROJECTION_TARGET, ".jit/invariants.md");
+/// // The default config resolves its target to this const.
+/// assert_eq!(
+///     InvariantProjectionConfig::default().target(),
+///     DEFAULT_INVARIANT_PROJECTION_TARGET
+/// );
+/// ```
 pub const DEFAULT_INVARIANT_PROJECTION_TARGET: &str = ".jit/invariants.md";
 
 /// The default begin marker delimiting the invariant region in `region` mode.
+///
+/// Used by [`InvariantProjectionConfig::region_begin`] when no `region-begin` is
+/// configured.
+///
+/// # Examples
+///
+/// ```
+/// use jit::config::{InvariantProjectionConfig, DEFAULT_INVARIANT_REGION_BEGIN};
+///
+/// assert_eq!(DEFAULT_INVARIANT_REGION_BEGIN, "<!-- jit:invariants:begin -->");
+/// assert_eq!(
+///     InvariantProjectionConfig::default().region_begin(),
+///     DEFAULT_INVARIANT_REGION_BEGIN
+/// );
+/// ```
 pub const DEFAULT_INVARIANT_REGION_BEGIN: &str = "<!-- jit:invariants:begin -->";
 
 /// The default end marker delimiting the invariant region in `region` mode.
+///
+/// Used by [`InvariantProjectionConfig::region_end`] when no `region-end` is
+/// configured.
+///
+/// # Examples
+///
+/// ```
+/// use jit::config::{InvariantProjectionConfig, DEFAULT_INVARIANT_REGION_END};
+///
+/// assert_eq!(DEFAULT_INVARIANT_REGION_END, "<!-- jit:invariants:end -->");
+/// assert_eq!(
+///     InvariantProjectionConfig::default().region_end(),
+///     DEFAULT_INVARIANT_REGION_END
+/// );
+/// ```
 pub const DEFAULT_INVARIANT_REGION_END: &str = "<!-- jit:invariants:end -->";
 
 /// Where and how the invariant registry projects into human-readable docs.

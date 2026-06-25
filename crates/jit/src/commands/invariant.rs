@@ -16,6 +16,28 @@ use crate::config::InvariantProjectionConfig;
 use crate::validation::projection::project_invariants;
 
 /// Result of a `jit invariant render` projection.
+///
+/// Returned by [`CommandExecutor::render_invariants`] and serialized as the
+/// `--json` payload: the repo-relative `target` that was written, the `mode` used
+/// (`separate-file`|`region`), and the `count` of invariants rendered.
+///
+/// # Examples
+///
+/// ```
+/// use jit::commands::InvariantRenderResult;
+///
+/// // The fields mirror the rendered projection (here built by hand to show the
+/// // serialized shape).
+/// let result = InvariantRenderResult {
+///     target: ".jit/invariants.md".to_string(),
+///     mode: "separate-file".to_string(),
+///     count: 2,
+/// };
+/// let json = serde_json::to_value(&result).unwrap();
+/// assert_eq!(json["target"], ".jit/invariants.md");
+/// assert_eq!(json["mode"], "separate-file");
+/// assert_eq!(json["count"], 2);
+/// ```
 #[derive(Debug, Serialize)]
 pub struct InvariantRenderResult {
     /// The repo-relative documentation target that was written (from config).
