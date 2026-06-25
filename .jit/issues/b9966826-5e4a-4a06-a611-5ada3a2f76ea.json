@@ -2,7 +2,7 @@
   "id": "b9966826-5e4a-4a06-a611-5ada3a2f76ea",
   "title": "Resolve node-to-item links by qualified id across kinds",
   "description": "Make node-to-item link labels resolve to their addressed item by qualified id, across all four kinds. A label in each shipped namespace (`satisfies:`, `per:`, `mitigates:`/`resolves:`, `enforces:`) on a node resolves to the item it addresses, whether that item is a `requirement`, `decision`, `risk`, or `invariant`. An unresolvable qualified id is reported as a finding rather than silently dropped, so dangling links surface during validation.\n\n## Success Criteria\n\n- [hard] REQ-01: For each shipped namespace (`satisfies:`, `per:`, `mitigates:`/`resolves:`, `enforces:`), a label of the form `<ns>:<scope>/<self-id>` resolves to the addressed item of the corresponding kind.\n- [hard] REQ-02: Link resolution works across all four kinds: `requirement`, `decision`, `risk`, and `invariant`.\n- [hard] REQ-03: An unresolvable qualified id is reported as a finding, not silently dropped.\n- [hard] REQ-04: The behavior is covered by `cargo test`.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -22,5 +22,5 @@
     "satisfies:REQ-08"
   ],
   "created_at": "2026-06-24T22:44:37.791124789+00:00",
-  "updated_at": "2026-06-25T05:12:01.192539587+00:00"
+  "updated_at": "2026-06-25T19:54:19.096465589+00:00"
 }

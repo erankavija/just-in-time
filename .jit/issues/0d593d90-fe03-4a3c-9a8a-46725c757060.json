@@ -2,7 +2,7 @@
   "id": "0d593d90-fe03-4a3c-9a8a-46725c757060",
   "title": "Project invariants into a configurable doc target",
   "description": "Render the invariant registry into a configurable documentation target so the declared invariants stay reflected in human-readable docs. Two modes are supported: a delimited region within an existing file, and a separate jit-owned file. The shipped default targets a separate jit-owned file so the default behavior never touches existing docs. The target path comes only from config; the invariant-projection code path contains no documentation-filename literal.\n\nRegion mode byte-preserves all content outside the delimiters; separate-file mode writes atomically. Writes go through a shared atomic writer extracted as a public `write_file_atomic` from the currently-private `write_atomic` (`crates/jit/src/validation/serialize.rs:180`); the extraction updates its single existing caller in the same change. (The grep for hardcoded filenames is scoped to the new projection path, since unrelated pre-existing literals exist at `crates/jit/src/document/link_validator.rs:188` and `crates/jit/src/commands/snapshot.rs:562`.)\n\n## Success Criteria\n\n- [hard] REQ-01: In region mode, only the delimited region is rewritten and content outside the delimiters is byte-preserved.\n- [hard] REQ-02: In separate-file mode, the target file is written atomically.\n- [hard] REQ-03: The shipped default config targets a separate jit-owned file.\n- [hard] REQ-04: The invariant-projection code path contains no documentation-filename literal; the target path is read only from config (grep scoped to that path).\n- [hard] REQ-05: Projection writes go through the shared atomic writer; the extracted `write_file_atomic`'s single prior caller is updated and remains green under `cargo test`.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -21,5 +21,5 @@
     "satisfies:REQ-06"
   ],
   "created_at": "2026-06-24T22:44:37.750326607+00:00",
-  "updated_at": "2026-06-25T05:12:01.162934229+00:00"
+  "updated_at": "2026-06-25T19:54:19.016385546+00:00"
 }

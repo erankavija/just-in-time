@@ -1,7 +1,7 @@
 {
   "epic_id": "25064508-d563-4073-a970-296607a01adc",
   "epic_short_id": "25064508",
-  "current_wave": 5,
+  "current_wave": 6,
   "waves": [
     {
       "wave_number": 1,
@@ -94,7 +94,7 @@
           "short_id": "69bd8cd5",
           "title": "Add the invariant registry and registry-first read path (story rollup)",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
