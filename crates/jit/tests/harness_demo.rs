@@ -298,22 +298,28 @@ fn test_harness_item_kind_compatible_with_label_coverage() {
     assert_eq!(marker, Some("[hard]"));
     assert_eq!(pattern, "[A-Z][A-Z0-9]*-[0-9]+");
 
-    // The link namespace references the SAME self-id the item model addresses:
-    // a child's `satisfies:REQ-01` label points at the container's addressed
-    // item, whose qualified id resolves through the item commands.
+    // REQ-05: a generic link label `<ns>:<issue>/<self-id>` (here the
+    // requirement kind's `satisfies` namespace) resolves to the addressed item
+    // via its qualified id — not merely the legacy unqualified `satisfies:REQ-01`.
     let h = TestHarness::new();
     let container = h.create_issue_with_desc(
         "Container",
         "## Success Criteria\n\n- [hard] REQ-01: covered\n",
     );
-    let child = h.create_issue("Child");
-    h.executor
-        .add_label(&child, "satisfies:REQ-01")
-        .expect("child satisfies REQ-01");
-
     let short: String = container.chars().take(8).collect();
-    let item = h.executor.show_item(&format!("{short}/REQ-01")).unwrap();
-    assert_eq!(item.item.self_id, "REQ-01");
+    let qualified_label = format!("satisfies:{short}/REQ-01");
+    let resolved = h
+        .executor
+        .resolve_link_label(&qualified_label)
+        .unwrap()
+        .expect("qualified satisfies: reference resolves to the addressed item");
+    assert_eq!(resolved.item.self_id, "REQ-01");
+    assert_eq!(resolved.item.qualified_id, format!("{short}/REQ-01"));
+
+    // An unresolvable qualified reference is reported, not silently dropped.
+    let bad = format!("satisfies:{short}/REQ-99");
+    assert!(h.executor.resolve_link_label(&bad).is_err());
+
     // The default link namespace of the requirement kind is `satisfies`.
     assert_eq!(kind.link_namespaces(), &["satisfies".to_string()]);
 }

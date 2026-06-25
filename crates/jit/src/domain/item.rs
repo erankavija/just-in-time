@@ -345,12 +345,18 @@ pub fn index_items(
     let projection = project(issue).with_sections(&issue.description, parser);
     let sections = projection.sections.unwrap_or_default();
 
+    // Self-id uniqueness is enforced across ALL kinds within the issue, not just
+    // within one kind: the qualified id `<issue>/<self-id>` excludes the kind, so
+    // two kinds minting the same self-id would yield colliding qualified ids and
+    // ambiguous resolution. Hoisting `seen` out of the kind loop makes a
+    // cross-kind self-id collision a DuplicateSelfId error too (REQ-02). It maps
+    // the self-id to the kind that first claimed it, for a precise message.
     let mut out = Vec::new();
+    let mut seen: HashMap<String, String> = HashMap::new();
     for kind in kinds {
         let Some(section) = sections.get(kind.section()) else {
             continue;
         };
-        let mut seen: HashMap<String, ()> = HashMap::new();
         for text in &section.items {
             if !kind.marker_matches(text) {
                 continue;
@@ -359,11 +365,13 @@ pub fn index_items(
             let Some(self_id) = kind.id_pattern.find(text).map(|m| m.as_str().to_string()) else {
                 continue;
             };
-            if seen.insert(self_id.clone(), ()).is_some() {
+            if let Some(prior_kind) = seen.insert(self_id.clone(), kind.name().to_string()) {
                 return Err(ItemError::DuplicateSelfId {
                     issue: short_id.clone(),
                     self_id,
-                    kind: kind.name().to_string(),
+                    // Name the kind that FIRST claimed the self-id so a cross-kind
+                    // collision points at the original owner.
+                    kind: prior_kind,
                 });
             }
             out.push(AddressableItem {
@@ -491,6 +499,39 @@ mod tests {
         );
         let err = index_items(&issue, &[req_kind()], &MarkdownContentParser).unwrap_err();
         assert!(matches!(err, ItemError::DuplicateSelfId { .. }));
+    }
+
+    #[test]
+    fn test_index_items_cross_kind_self_id_collision_is_error() {
+        // REQ-02: two DIFFERENT kinds minting the same self-id would yield the
+        // same qualified id <issue>/REQ-01 (kind is not part of the qualified id),
+        // so uniqueness is enforced across ALL kinds within the issue.
+        let other = ItemKind::from_config(
+            "decision",
+            &ItemKindConfig {
+                // Read the SAME section so both kinds see REQ-01.
+                section: Some(DEFAULT_ITEM_SECTION.to_string()),
+                id_pattern: Some("REQ-\\d+".to_string()),
+                markers: None,
+                link_namespaces: None,
+            },
+        )
+        .unwrap();
+        let issue = Issue::new(
+            "T".to_string(),
+            "## Success Criteria\n\n- [hard] REQ-01: a\n".to_string(),
+        );
+        // The marker-gated requirement kind claims REQ-01 first; the unmarked
+        // `decision` kind then re-claims it from the same line → collision.
+        let err = index_items(&issue, &[req_kind(), other], &MarkdownContentParser).unwrap_err();
+        match err {
+            ItemError::DuplicateSelfId { self_id, kind, .. } => {
+                assert_eq!(self_id, "REQ-01");
+                // The error names the kind that FIRST claimed the self-id.
+                assert_eq!(kind, "requirement");
+            }
+            other => panic!("expected DuplicateSelfId, got {other:?}"),
+        }
     }
 
     #[test]

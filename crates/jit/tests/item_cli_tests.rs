@@ -207,3 +207,77 @@ fn test_item_custom_kind_from_config() {
     assert_eq!(json["items"][0]["kind"].as_str().unwrap(), "decision");
     assert_eq!(json["items"][0]["self_id"].as_str().unwrap(), "D-1");
 }
+
+#[test]
+fn test_issue_show_resolves_qualified_item_id() {
+    // Finding 3: `jit issue show <issue>/<self-id>` resolves the addressed item
+    // through the existing show dispatch.
+    let temp = setup_test_repo();
+    let short = create_issue(
+        temp.path(),
+        "Foundational",
+        "## Success Criteria\n\n- [hard] REQ-01: atomic writes\n",
+    );
+    let qualified = format!("{short}/REQ-01");
+
+    let output = Command::new(jit_binary())
+        .args(["issue", "show", &qualified, "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "issue show <qualified> failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["item"]["self_id"].as_str().unwrap(), "REQ-01");
+    assert_eq!(json["item"]["qualified_id"].as_str().unwrap(), qualified);
+
+    // Human (non-JSON) path also renders the addressed item.
+    let output = Command::new(jit_binary())
+        .args(["issue", "show", &qualified])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Self id:") && stdout.contains("REQ-01"));
+}
+
+#[test]
+fn test_item_command_failure_emits_json() {
+    // Finding 4: an item command FAILURE with --json must emit a JSON object on
+    // stdout, not a plain `Error: ...` line.
+    let temp = setup_test_repo();
+    let short = create_issue(
+        temp.path(),
+        "Foundational",
+        "## Success Criteria\n\n- [hard] REQ-01: a\n",
+    );
+
+    let output = Command::new(jit_binary())
+        .args(["item", "show", &format!("{short}/REQ-99"), "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(!output.status.success(), "unknown self-id should fail");
+    // stdout must be valid JSON carrying an error object.
+    let json: Value = serde_json::from_slice(&output.stdout)
+        .expect("--json failure must emit valid JSON on stdout");
+    assert!(
+        json.get("error").is_some(),
+        "JSON error object expected, got: {json}"
+    );
+
+    // The qualified-id path through `jit issue show` also emits JSON on failure.
+    let output = Command::new(jit_binary())
+        .args(["issue", "show", &format!("{short}/REQ-99"), "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    let json: Value = serde_json::from_slice(&output.stdout)
+        .expect("issue show <qualified> --json failure must emit valid JSON");
+    assert!(json.get("error").is_some());
+}

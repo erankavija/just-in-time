@@ -181,6 +181,65 @@ impl<S: IssueStore> CommandExecutor<S> {
             issue_title: issue.title,
         })
     }
+
+    /// Resolve a generic node→item link label of the form
+    /// `<namespace>:<issue>/<self-id>` to its addressed item (REQ-05).
+    ///
+    /// The namespace must be a `link-namespace` of some configured item kind
+    /// (e.g. the `requirement` kind's `satisfies`), so an arbitrary label is not
+    /// mistaken for an item reference. The value after the namespace must be a
+    /// qualified id `<issue>/<self-id>`; it is resolved through the SAME
+    /// [`show_item`](Self::show_item) path, so an unresolvable qualified id is
+    /// reported as an error rather than silently dropped.
+    ///
+    /// Returns `Ok(None)` when the label's namespace is not a registered link
+    /// namespace OR when the value is unqualified (the legacy `satisfies:REQ-01`
+    /// shape) — those are not generic qualified references and the caller may
+    /// handle them by the existing unqualified rules. A namespace that DOES match
+    /// but whose qualified id cannot be resolved is an `Err`.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use jit::commands::CommandExecutor;
+    /// use jit::storage::JsonFileStorage;
+    ///
+    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
+    /// // A qualified `satisfies:` reference resolves to the addressed item.
+    /// if let Some(resolved) = executor.resolve_link_label("satisfies:56ab0224/REQ-01")? {
+    ///     assert_eq!(resolved.item.self_id, "REQ-01");
+    /// }
+    /// # Ok::<(), anyhow::Error>(())
+    /// ```
+    pub fn resolve_link_label(&self, label: &str) -> Result<Option<ItemShowResult>> {
+        let Some((namespace, value)) = label.split_once(':') else {
+            return Ok(None);
+        };
+
+        // The namespace must belong to some kind's link-namespaces, else this is
+        // not an item reference at all.
+        let is_link_namespace = self
+            .item_kinds()?
+            .iter()
+            .any(|kind| kind.link_namespaces().iter().any(|ns| ns == namespace));
+        if !is_link_namespace {
+            return Ok(None);
+        }
+
+        // A generic qualified reference carries `<issue>/<self-id>`; the legacy
+        // unqualified `satisfies:REQ-01` shape has no scope and is left to the
+        // existing rules.
+        if split_qualified_id(value).is_none() {
+            return Ok(None);
+        }
+
+        // A registered link namespace with a qualified value MUST resolve; an
+        // unresolvable qualified id is an error, never a silent drop (REQ-05).
+        let resolved = self.show_item(value).with_context(|| {
+            format!("link label '{label}' references an unresolvable qualified item id")
+        })?;
+        Ok(Some(resolved))
+    }
 }
 
 #[cfg(test)]
@@ -268,5 +327,50 @@ mod tests {
         let exec = executor_with(vec![]);
         let err = exec.show_item("REQ-01").unwrap_err();
         assert!(err.to_string().contains("not a qualified id"));
+    }
+
+    #[test]
+    fn test_resolve_link_label_qualified_satisfies() {
+        // REQ-05: a generic link label `satisfies:<issue>/<self-id>` resolves to
+        // the addressed item via the qualified id.
+        let a = issue_with_criteria("A", "## Success Criteria\n\n- [hard] REQ-01: a one\n");
+        let short = a.short_id();
+        let exec = executor_with(vec![a]);
+
+        let label = format!("satisfies:{short}/REQ-01");
+        let resolved = exec.resolve_link_label(&label).unwrap().expect("resolves");
+        assert_eq!(resolved.item.self_id, "REQ-01");
+        assert_eq!(resolved.item.qualified_id, format!("{short}/REQ-01"));
+    }
+
+    #[test]
+    fn test_resolve_link_label_unresolvable_qualified_is_error() {
+        // A registered link namespace with a qualified-but-unresolvable id must
+        // be reported, not silently dropped.
+        let a = issue_with_criteria("A", "## Success Criteria\n\n- [hard] REQ-01: a\n");
+        let short = a.short_id();
+        let exec = executor_with(vec![a]);
+        let err = exec
+            .resolve_link_label(&format!("satisfies:{short}/REQ-99"))
+            .unwrap_err();
+        assert!(err.to_string().contains("unresolvable qualified item id"));
+    }
+
+    #[test]
+    fn test_resolve_link_label_unqualified_and_unknown_ns_are_none() {
+        let a = issue_with_criteria("A", "## Success Criteria\n\n- [hard] REQ-01: a\n");
+        let exec = executor_with(vec![a]);
+        // Legacy unqualified shape: not a generic qualified reference.
+        assert!(exec
+            .resolve_link_label("satisfies:REQ-01")
+            .unwrap()
+            .is_none());
+        // A namespace that is not a kind link-namespace is not an item reference.
+        assert!(exec
+            .resolve_link_label("type:epic/REQ-01")
+            .unwrap()
+            .is_none());
+        // A label with no `:` is not a reference.
+        assert!(exec.resolve_link_label("nope").unwrap().is_none());
     }
 }

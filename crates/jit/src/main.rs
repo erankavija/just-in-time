@@ -388,6 +388,28 @@ fn build_issue_show_response<S: IssueStore>(
     ))
 }
 
+/// Render a single resolved addressable item as a JSON envelope or a short block.
+///
+/// Shared by `jit item show/resolve` and the `jit issue show <issue>/<self-id>`
+/// qualified-id path so both render an addressed item identically.
+fn print_item_show(result: &jit::commands::ItemShowResult, json: bool, quiet: bool) -> Result<()> {
+    let output_ctx = OutputContext::new(quiet, json);
+    if json {
+        let output = JsonOutput::success(result, "item show");
+        println!("{}", output.to_json_string()?);
+    } else {
+        output_ctx.print_data(format!("Qualified id: {}", result.item.qualified_id))?;
+        output_ctx.print_data(format!("Kind:         {}", result.item.kind))?;
+        output_ctx.print_data(format!("Self id:      {}", result.item.self_id))?;
+        output_ctx.print_data(format!(
+            "Issue:        {} | {}",
+            result.issue_full_id, result.issue_title
+        ))?;
+        output_ctx.print_data(format!("Text:         {}", result.item.text))?;
+    }
+    Ok(())
+}
+
 /// Dispatch the `jit item` subcommands.
 ///
 /// A thin delegation over the [`CommandExecutor`] item methods: it selects the
@@ -398,7 +420,36 @@ fn run_item<S: IssueStore>(
     command: ItemCommands,
     quiet: bool,
 ) -> Result<()> {
-    use jit::commands::{ItemListResult, ItemShowResult};
+    // The `--json` flag is per-subcommand; extract it up front so a FAILURE can
+    // also honor the machine-readable contract (finding 4): when --json is set,
+    // an error is rendered as a JSON object and the process exits with the
+    // error's code, rather than the top-level plain `Error: ...`.
+    let json = match &command {
+        ItemCommands::List { json, .. }
+        | ItemCommands::Search { json, .. }
+        | ItemCommands::Show { json, .. }
+        | ItemCommands::Resolve { json, .. } => *json,
+    };
+
+    let result = run_item_inner(executor, command, quiet);
+    if let Err(e) = result {
+        handle_json_error!(
+            json,
+            e,
+            jit::output::JsonError::new("ITEM_COMMAND_FAILED", e.to_string(), "item")
+        );
+    }
+    Ok(())
+}
+
+/// Inner dispatch for `jit item`; errors are converted to JSON by
+/// [`run_item`] when `--json` is set.
+fn run_item_inner<S: IssueStore>(
+    executor: &CommandExecutor<S>,
+    command: ItemCommands,
+    quiet: bool,
+) -> Result<()> {
+    use jit::commands::ItemListResult;
 
     // Render an item list either as a JSON envelope or one line per item.
     fn print_list(result: &ItemListResult, json: bool, quiet: bool) -> Result<()> {
@@ -420,25 +471,6 @@ fn run_item<S: IssueStore>(
         Ok(())
     }
 
-    // Render a single resolved item as a JSON envelope or a short block.
-    fn print_show(result: &ItemShowResult, json: bool, quiet: bool) -> Result<()> {
-        let output_ctx = OutputContext::new(quiet, json);
-        if json {
-            let output = JsonOutput::success(result, "item show");
-            println!("{}", output.to_json_string()?);
-        } else {
-            output_ctx.print_data(format!("Qualified id: {}", result.item.qualified_id))?;
-            output_ctx.print_data(format!("Kind:         {}", result.item.kind))?;
-            output_ctx.print_data(format!("Self id:      {}", result.item.self_id))?;
-            output_ctx.print_data(format!(
-                "Issue:        {} | {}",
-                result.issue_full_id, result.issue_title
-            ))?;
-            output_ctx.print_data(format!("Text:         {}", result.item.text))?;
-        }
-        Ok(())
-    }
-
     match command {
         ItemCommands::List { kind, json } => {
             let result = executor.list_items(kind.as_deref())?;
@@ -451,7 +483,7 @@ fn run_item<S: IssueStore>(
         ItemCommands::Show { qualified_id, json }
         | ItemCommands::Resolve { qualified_id, json } => {
             let result = executor.show_item(&qualified_id)?;
-            print_show(&result, json, quiet)?;
+            print_item_show(&result, json, quiet)?;
         }
     }
     Ok(())
@@ -960,6 +992,33 @@ fn run() -> Result<()> {
 
                     // Single id (guaranteed by clap `required = true`).
                     let id = ids[0].clone();
+
+                    // A `<issue>/<self-id>` argument addresses an item, not an
+                    // issue (issue ids never contain '/'). Resolve and render the
+                    // addressed item through the same item resolver as
+                    // `jit item show`, honoring --json (REQ-04 / concept).
+                    if !projecting && !summary && id.contains('/') {
+                        match executor.show_item(&id) {
+                            Ok(result) => {
+                                print_item_show(&result, json, quiet)?;
+                                return Ok(());
+                            }
+                            Err(e) => {
+                                // `handle_json_error!` either prints the JSON error
+                                // and exits, or returns `Err` (non-JSON path).
+                                handle_json_error!(
+                                    json,
+                                    e,
+                                    jit::output::JsonError::new(
+                                        "ITEM_NOT_FOUND",
+                                        e.to_string(),
+                                        "issue show",
+                                    )
+                                );
+                            }
+                        }
+                    }
+
                     match executor.show_issue(&id) {
                         Ok(issue) => {
                             // Field projection: print the named field(s) and return.
