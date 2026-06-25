@@ -1,0 +1,22 @@
+{
+  "id": "b22c041e-8281-45ea-8cab-88edf1c23fb8",
+  "title": "Type the gate stage/mode cluster (GateStage/GateMode enums)",
+  "description": "Eliminate the stringly-typed `GateStage`/`GateMode` handling (report highest-leverage fixes #1 and #2, plus the `gate_execution` nit).\n\n## Sites\n- `domain/types.rs` — add `impl FromStr` (typed error) and `Display`/`as_str` for `GateStage` and `GateMode`, mirroring the existing `State`/`Priority`/`ContentFormat` impls.\n- `output.rs:1222-1244` — type `GateDefinition.stage`/`.mode` as `GateStage`/`GateMode` instead of `String`; derive `JsonSchema` on `GateMode` (`GateStage` already has it). Deletes the `format!(\"{:?}\", …).to_lowercase()` conversion.\n- `commands/gate.rs:608-617` and `main.rs:1886-1906` — parse via `FromStr`.\n- `main.rs:2755-2762` and `main.rs:2814-2821` — remove the duplicated enum→string match arms.\n- `gate_execution.rs:52-59` — set `JIT_STAGE` via `stage.as_str()`/`Display`, not the inline match (second source of truth vs serde).\n- CLI gate stage/mode args use `#[arg(value_enum)]` so clap rejects bad input at parse time.\n\n## Success Criteria\n- [ ] `GateStage` and `GateMode` implement `FromStr` (typed `thiserror`) and `Display`/`as_str`; no `format!(\"{:?}\", …).to_lowercase()` remains for either type anywhere.\n- [ ] `GateDefinition.stage` and `.mode` are typed `GateStage`/`GateMode`; `GateMode` derives `JsonSchema`.\n- [ ] CLI stage/mode arguments use `value_enum`; an invalid value is rejected at parse time, not deeper in the call stack.\n- [ ] `gate_execution.rs` sets `JIT_STAGE` through the shared `as_str()`/`Display` with no independent string mapping.\n- [ ] `--json` gate output serialization is unchanged (snake_case); `cargo-ci` and `code-review` gates pass.",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:code-smell-cleanup"
+  ],
+  "created_at": "2026-06-25T21:41:24.320193670+00:00",
+  "updated_at": "2026-06-25T21:41:24.321573010+00:00"
+}

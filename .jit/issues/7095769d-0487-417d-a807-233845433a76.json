@@ -1,0 +1,40 @@
+{
+  "id": "7095769d-0487-417d-a807-233845433a76",
+  "title": "Code-smell cleanup: eliminate cross-boundary leaks and stringly-typed code",
+  "description": "Eliminate the code smells surfaced by the `jit-smell-hunt` multi-agent audit (39 agents, adversarially verified): **5 cross-boundary leaks** and **19 stringly-typed / missed-type-safety** sites, plus the low-severity nits. The two recurring anti-patterns are (1) closed-set domain concepts encoded as `String` (missing `FromStr`/`ValueEnum`, `to_lowercase()` dispatch, `Debug`-formatted map keys) and (2) storage-internal paths/filenames hardcoded into the command and output layers, bypassing the `IssueStore`/storage boundary.\n\nThe quality bar is high: every fix must *remove* a stringly-typed hazard or restore a layer boundary with a concrete type/newtype/trait-method, not merely paper over it. Nits are in scope — we are not deferring the low-severity findings.\n\nThe full audit, ranked fixes, and per-finding file:line evidence are in the linked report (`Smell-Hunt Report`).\n\n## Scope\n\nResolve all 27 confirmed findings, organized into the child fix-clusters wired under this epic. Each child is independently reviewable and carries `cargo-ci` + `code-review` gates.\n\nBoundary leaks:\n- Route storage-internal paths/IO (lease index, worktree id, gate-run result path, validation rule writes) back through the storage layer.\n- Replace storage-layer `eprintln!` diagnostics with typed warnings propagated to the output layer.\n\nStringly-typed / missed type safety:\n- `GateStage`/`GateMode` enums with `FromStr`/`Display`; typed `GateDefinition` fields.\n- `by_state` maps keyed by `State` instead of `String`.\n- Typed `thiserror` variants + downcast for error classification (replaces `error_msg.contains(...)`).\n- Worktree and item-kind config enums (`WorktreeMode`, `EnforcementMode`, kind scope).\n- Shared `type:` namespace helper replacing ad-hoc `starts_with(\"type:\")`/`strip_prefix`.\n- Typed query-engine conditions, filter fields, and state predicate (fixes the `state:notastate` fail-open bug).\n- Typed scope/format/blocked-reason enums (`BlockingReason`, `DocumentScope`, `GraphExportFormat`).\n- Typed validation finding kinds and severities.\n- Domain newtype nits: timestamps as `DateTime<Utc>`, `Assignee` newtype, `group_labels` via `parse_label`.\n\n## Success Criteria\n\n- [ ] Every confirmed finding in the linked report is resolved or explicitly rejected with recorded justification — none silently dropped.\n- [ ] All child fix-cluster tasks are `done` with both `cargo-ci` and `code-review` gates passing.\n- [ ] No new stringly-typed dispatch is introduced: closed-set domain concepts are represented by enums/newtypes with `FromStr`/`ValueEnum`, not raw `String` + `to_lowercase()`/`== \"literal\"` matching.\n- [ ] No command, output, or domain code constructs `.jit/` paths or filenames directly or performs file IO that belongs to the storage layer; such access goes through `IssueStore`/storage methods.\n- [ ] The `query_engine` no longer fails open on invalid `state:`/`priority:` filter values (invalid tokens are a parse error, not a silent no-match).\n- [ ] `cargo clippy --workspace --all-targets` is warning-free and `cargo fmt --all -- --check` passes across the whole change.\n- [ ] No behavioral regression: serialized JSON for `--json` outputs remains valid and field-compatible where the report notes byte-identical or snake_case-compatible serialization is required.",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "99908d7b-e777-44c4-90f1-33ca3e87b0d6",
+    "2355c5ea-cdaf-4874-b123-b7964fa33436",
+    "b9a28509-ec8e-4d1a-93cc-10ef055f16a1",
+    "397d98df-342e-48a0-9b2b-c7d0d1bf6ae0",
+    "d0edc072-4fbe-4f52-b05a-8b389239e6b7",
+    "bf0034e1-dc29-4dcd-bb4a-d64dd96fed8b",
+    "6e7f54a7-b3be-46ac-8bec-7fc1040b73f8",
+    "b22c041e-8281-45ea-8cab-88edf1c23fb8",
+    "e3e6d47d-4262-4451-a343-9b6c07a3a3c0",
+    "44450437-d807-4e33-bf10-3a3eb9af29ad",
+    "70ca9e3a-2856-47e4-b5e0-7d94e7373a2c"
+  ],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [
+    {
+      "path": "dev/active/7095769d-smell-hunt-report.md",
+      "commit": null,
+      "label": "Smell-Hunt Report",
+      "doc_type": "design",
+      "format": "markdown"
+    }
+  ],
+  "labels": [
+    "type:epic",
+    "epic:code-smell-cleanup",
+    "milestone:v1.0"
+  ],
+  "created_at": "2026-06-25T21:39:11.551989374+00:00",
+  "updated_at": "2026-06-25T21:41:24.685306374+00:00"
+}

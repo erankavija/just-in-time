@@ -2,9 +2,9 @@
   "id": "72cdf315-7440-41cb-976b-ecea19b794bd",
   "title": "Demonstrate cross-substrate generality across all four kinds",
   "description": "Demonstrate that all four item kinds (`requirement`, `decision`, `risk` issue-scoped and markdown-first; `invariant` project-scoped and registry-first) are indexed and queryable through the same generic operations, proving the engine serves both substrates through one code path rather than parallel implementations. This is the explicit generality assertion that guards against one substrate's defaults leaking into the other.\n\n## Success Criteria\n\n- [hard] REQ-01: A single test enumerates all four kinds (`requirement`, `decision`, `risk`, `invariant`) through `jit item list`, `jit item show`, and `jit item search`.\n- [hard] REQ-02: The test asserts both substrates (issue-scope markdown-first and project-scope registry-first) resolve through one shared code path.\n- [hard] REQ-03: The test passes under `cargo test`.",
-  "state": "ready",
+  "state": "done",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [
     "205472c4-edc1-46f5-874f-507aa582e653",
     "69bd8cd5-2646-457a-a413-ced3b1873dd9"
@@ -13,7 +13,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-25T21:40:39.331000978Z"
+    },
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-25T21:39:43.510539978Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -22,5 +33,5 @@
     "satisfies:REQ-04"
   ],
   "created_at": "2026-06-24T22:44:37.729500391+00:00",
-  "updated_at": "2026-06-25T19:54:19.066619690+00:00"
+  "updated_at": "2026-06-25T21:43:00.059561871+00:00"
 }

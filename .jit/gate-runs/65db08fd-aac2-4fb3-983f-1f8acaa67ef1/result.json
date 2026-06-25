@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "65db08fd-aac2-4fb3-983f-1f8acaa67ef1",
+  "gate_key": "cargo-ci",
+  "stage": "postcheck",
+  "issue_id": "72cdf315-7440-41cb-976b-ecea19b794bd",
+  "commit": "9dade2bb685a1de41c31f3980e868995ab17219f",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-06-25T21:37:52.885306828Z",
+  "completed_at": "2026-06-25T21:39:19.070806846Z",
+  "duration_ms": 86185,
+  "exit_code": 1,
+  "stdout": "--- test failures ---\ntest storage::heartbeat::tests::test_background_thread_updates_heartbeat ... FAILED\ntest result: FAILED. 1159 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 29.82s\n---- storage::heartbeat::tests::test_background_thread_updates_heartbeat stdout ----\n\nthread 'storage::heartbeat::tests::test_background_thread_updates_heartbeat' (1523852) panicked at crates/jit/src/storage/heartbeat.rs:578:9:\nassertion failed: !heartbeat.is_stale()\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n\n",
+  "stderr": "",
+  "command": "./scripts/cargo-ci.sh",
+  "by": "auto:executor",
+  "message": null
+}

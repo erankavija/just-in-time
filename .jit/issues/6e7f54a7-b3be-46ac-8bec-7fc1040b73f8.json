@@ -1,0 +1,22 @@
+{
+  "id": "6e7f54a7-b3be-46ac-8bec-7fc1040b73f8",
+  "title": "Typed scope/format/blocked-reason enums",
+  "description": "Introduce typed scope/format/blocked-reason enums (report stringly findings).\n\n## Sites\n- `main.rs:3394-3406` + `domain/queries.rs` — `query_blocked` formats `\"dependency:…\"`/`\"gate:…\"` strings that the CLI re-parses via `splitn(2,':')` with a silent `_ => Dependency` fallback. Return `Vec<(Issue, Vec<BlockingReason>)>` with a `BlockingReason { Dependency{…}, Gate{…} }` enum from `domain/queries.rs`; the CLI maps to its `BlockedReason` without splitting.\n- `commands/document.rs:753-776` (`check_document_links`) — `scope == \"all\"` / `strip_prefix(\"issue:\")` inline protocol. Introduce `DocumentScope { All, Issue(String) }` with `FromStr`, parse at the CLI call site, then match — mirroring the existing `SnapshotScope` pattern (`snapshot.rs:140-183`).\n- `commands/graph.rs:172-185` (`export_graph(format: &str)`) — `format.to_lowercase()` match over dot/mermaid/json. Add a `GraphExportFormat` enum (clap `ValueEnum`) consumed directly so clap rejects bad input at parse time.\n\n## Success Criteria\n- [ ] `query_blocked` returns a typed `BlockingReason` enum from the domain; the CLI consumes it without re-parsing formatted strings, and the silent `_ => Dependency` fallback is gone.\n- [ ] Document link-check scope is a `DocumentScope` enum with `FromStr` (mirroring `SnapshotScope`); no inline `== \"all\"`/`strip_prefix(\"issue:\")` remains.\n- [ ] Graph export format is a `GraphExportFormat` `ValueEnum`; an invalid format is rejected by clap at parse time, not via `to_lowercase()` matching.\n- [ ] `cargo-ci` and `code-review` pass; CLI output and accepted inputs are unchanged for valid values.",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:code-smell-cleanup"
+  ],
+  "created_at": "2026-06-25T21:41:24.593334088+00:00",
+  "updated_at": "2026-06-25T21:41:24.594777158+00:00"
+}

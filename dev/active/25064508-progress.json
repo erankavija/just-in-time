@@ -1,7 +1,7 @@
 {
   "epic_id": "25064508-d563-4073-a970-296607a01adc",
   "epic_short_id": "25064508",
-  "current_wave": 6,
+  "current_wave": 7,
   "waves": [
     {
       "wave_number": 1,
@@ -120,7 +120,7 @@
           "short_id": "72cdf315",
           "title": "Demonstrate cross-substrate generality across all four kinds",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },

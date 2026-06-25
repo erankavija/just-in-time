@@ -1,0 +1,22 @@
+{
+  "id": "397d98df-342e-48a0-9b2b-c7d0d1bf6ae0",
+  "title": "Key by_state count maps by the State enum",
+  "description": "Key the `by_state` count maps by the `State` enum instead of `String` (report highest-leverage fix #3). Also removes the latent `Debug`-vs-serde divergence (`\"inprogress\"` vs `\"in_progress\"`).\n\n## Sites\n- `output.rs:727-733` — `DependencySummary.by_state` → `HashMap<State, usize>`.\n- `snapshot.rs:56` — `IssuesInfo.states` → `HashMap<State, usize>`.\n- Producers: `commands/graph.rs:200-222` and `snapshot.rs:274` → `entry(node.state)`.\n- Consumer: `main.rs:2672` → `.get(&State::Done)`.\n\n`State` is `Copy + Eq + Hash + Serialize(snake_case)`, so JSON stays valid.\n\n## Success Criteria\n- [ ] `DependencySummary.by_state` and `IssuesInfo.states` are keyed by `State`, not `String`.\n- [ ] Producers insert with the `State` value directly; no `format!(\"{:?}\", state)` or `.to_string()` key construction remains.\n- [ ] The `main.rs` consumer reads `State::Done` via the typed key.\n- [ ] `--json` output for these maps serializes with the canonical snake_case state names (no `\"inprogress\"` regression); `cargo-ci` and `code-review` pass.",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:code-smell-cleanup"
+  ],
+  "created_at": "2026-06-25T21:41:24.352760139+00:00",
+  "updated_at": "2026-06-25T21:41:24.354209409+00:00"
+}
