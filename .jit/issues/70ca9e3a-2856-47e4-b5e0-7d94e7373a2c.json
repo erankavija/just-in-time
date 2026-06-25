@@ -2,9 +2,9 @@
   "id": "70ca9e3a-2856-47e4-b5e0-7d94e7373a2c",
   "title": "Type the worktree and item-kind config enums",
   "description": "Type the worktree and item-kind config enums (report highest-leverage fix #5). Fixes a real TOML-vs-env case-sensitivity divergence.\n\n## Sites\n- `config.rs:741-795` — `WorktreeConfig.mode`/`enforce_leases` → `WorktreeMode`/`EnforcementMode` enums with `Deserialize` + `FromStr`. Collapses four duplicated dispatch tables, including the `EffectiveConfig` env-var branches at `config.rs:1183-1193` and `1226-1235`.\n- `config.rs:322-323` — `ItemKindConfig.scope` → a `KindScopeConfig` enum, mirroring the sibling `SourceOfTruth` field, so bad tokens fail at parse time.\n\n## Success Criteria\n- [ ] `WorktreeConfig.mode` and `.enforce_leases` are typed enums (`WorktreeMode`, `EnforcementMode`) with `Deserialize` + `FromStr`; the duplicated string dispatch tables (incl. env-var branches) are collapsed to a single typed parse.\n- [ ] TOML and environment-variable parsing of these values share one case-handling path (the previous case-sensitivity divergence is gone and covered by a test).\n- [ ] `ItemKindConfig.scope` is a typed enum mirroring `SourceOfTruth`; an unknown scope token is a parse/deserialize error, not a silent fallback.\n- [ ] `cargo-ci` and `code-review` pass; existing valid config files continue to load unchanged.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [],
   "gates_required": [
     "cargo-ci",
@@ -18,5 +18,5 @@
     "epic:code-smell-cleanup"
   ],
   "created_at": "2026-06-25T21:41:24.423740289+00:00",
-  "updated_at": "2026-06-25T21:41:24.425372200+00:00"
+  "updated_at": "2026-06-25T21:59:16.209601180+00:00"
 }
