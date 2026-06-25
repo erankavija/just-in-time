@@ -39,7 +39,8 @@ pub struct ItemShowResult {
 
 impl<S: IssueStore> CommandExecutor<S> {
     /// Resolve the effective item kinds from the cached `[item_kinds]` registry,
-    /// falling back to the built-in `requirement` kind when none is declared.
+    /// falling back to the built-in default kinds (`requirement`, `decision`, ...)
+    /// when none is declared.
     fn item_kinds(&self) -> Result<Vec<ItemKind>> {
         let config = self.cached_config()?;
         resolve_item_kinds(config.item_kinds.as_ref())

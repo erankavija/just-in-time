@@ -157,8 +157,9 @@ pub enum Commands {
     ///
     /// Items are structured lines in issue descriptions (e.g. requirements) that
     /// carry a self-id and are addressable by a qualified id `<issue>/<self-id>`.
-    /// Kinds are declared in `[item_kinds]` config; `requirement` is the built-in
-    /// default. Markdown stays the source of truth — the index is a projection.
+    /// Kinds are declared in `[item_kinds]` config; with no such table the
+    /// built-in default kinds (`requirement`, `decision`, ...) apply. Markdown
+    /// stays the source of truth — the index is a projection.
     #[command(subcommand)]
     Item(ItemCommands),
 
