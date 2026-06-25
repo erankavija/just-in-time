@@ -34,13 +34,41 @@ fn get_current_branch() -> Result<String> {
 /// Execute `jit claim acquire` command.
 ///
 /// Acquires an exclusive lease on an issue for the specified agent.
+///
+/// # Returns
+///
+/// The acquired lease id paired with any non-fatal [`StorageWarning`]s observed
+/// while loading the worktree identity (e.g. a relocation). The caller's output
+/// layer decides how to render the warnings; this function never writes to
+/// stderr itself.
+///
+/// # Errors
+///
+/// Returns an error if the issue cannot be resolved or loaded, or if the lease
+/// cannot be acquired (e.g. it is already held by another agent).
+///
+/// # Examples
+///
+/// ```no_run
+/// use jit::commands::claim::execute_claim_acquire;
+/// use jit::storage::JsonFileStorage;
+///
+/// let storage = JsonFileStorage::new(".jit");
+/// let (lease_id, warnings) =
+///     execute_claim_acquire(&storage, "abc123", 600, None, None)?;
+/// for warning in &warnings {
+///     eprintln!("Warning: {}", warning); // rendering is the caller's choice
+/// }
+/// println!("acquired lease {}", lease_id);
+/// # Ok::<(), anyhow::Error>(())
+/// ```
 pub fn execute_claim_acquire<S: IssueStore>(
     storage: &S,
     issue_id: &str,
     ttl_secs: u64,
     agent_id: Option<&str>,
     reason: Option<&str>,
-) -> Result<String> {
+) -> Result<(String, Vec<StorageWarning>)> {
     use crate::agent_config::resolve_agent_id;
 
     // Resolve short ID to full ID
@@ -58,9 +86,12 @@ pub fn execute_claim_acquire<S: IssueStore>(
     // Get current branch
     let branch = get_current_branch()?;
 
-    // Load or generate worktree identity
-    let identity =
-        load_or_create_worktree_identity(&paths.local_jit, &paths.worktree_root, &branch)?;
+    // Load or generate worktree identity, surfacing relocation as a warning
+    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(
+        &paths.local_jit,
+        &paths.worktree_root,
+        &branch,
+    )?;
 
     // Resolve agent ID using proper priority: CLI flag > JIT_AGENT_ID > ~/.config/jit/agent.toml > error
     let agent = resolve_agent_id(agent_id.map(|s| s.to_string()))?;
@@ -102,13 +133,35 @@ pub fn execute_claim_acquire<S: IssueStore>(
         storage.save_issue(issue)?;
     }
 
-    Ok(lease.lease_id)
+    Ok((lease.lease_id, warnings))
 }
 
 /// Execute `jit claim heartbeat` command.
 ///
 /// Sends a heartbeat for an indefinite lease to prevent staleness.
-pub fn execute_claim_heartbeat(lease_id: &str) -> Result<()> {
+///
+/// # Returns
+///
+/// Any non-fatal [`StorageWarning`]s observed while loading the worktree
+/// identity (e.g. a relocation), for the caller's output layer to render.
+///
+/// # Errors
+///
+/// Returns an error if worktree context cannot be detected or the heartbeat
+/// cannot be recorded (e.g. the lease does not exist).
+///
+/// # Examples
+///
+/// ```no_run
+/// use jit::commands::claim::execute_claim_heartbeat;
+///
+/// let warnings = execute_claim_heartbeat("lease-uuid")?;
+/// for warning in &warnings {
+///     eprintln!("Warning: {}", warning); // rendering is the caller's choice
+/// }
+/// # Ok::<(), anyhow::Error>(())
+/// ```
+pub fn execute_claim_heartbeat(lease_id: &str) -> Result<Vec<StorageWarning>> {
     use crate::agent_config::resolve_agent_id;
 
     // Detect worktree context
@@ -118,9 +171,12 @@ pub fn execute_claim_heartbeat(lease_id: &str) -> Result<()> {
     // Get current branch for identity
     let branch = get_current_branch()?;
 
-    // Load worktree identity
-    let identity =
-        load_or_create_worktree_identity(&paths.local_jit, &paths.worktree_root, &branch)?;
+    // Load worktree identity, surfacing relocation as a warning
+    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(
+        &paths.local_jit,
+        &paths.worktree_root,
+        &branch,
+    )?;
 
     // Resolve agent ID
     let agent = resolve_agent_id(None)?;
@@ -132,7 +188,7 @@ pub fn execute_claim_heartbeat(lease_id: &str) -> Result<()> {
     // Send heartbeat
     coordinator.heartbeat(lease_id)?;
 
-    Ok(())
+    Ok(warnings)
 }
 
 /// Details of a lease released via `jit claim release <issue-id>`.
@@ -238,13 +294,13 @@ fn resolve_release_actor() -> Result<String> {
 ///
 /// let storage = JsonFileStorage::new(".jit");
 /// // Release whatever lease is active on issue `abc123`, regardless of owner.
-/// let released = execute_claim_release_by_issue(&storage, "abc123").unwrap();
+/// let (released, _warnings) = execute_claim_release_by_issue(&storage, "abc123").unwrap();
 /// println!("released {} on {} by {}", released.lease_id, released.issue_id, released.actor);
 /// ```
 pub fn execute_claim_release_by_issue<S: IssueStore>(
     storage: &S,
     issue_id: &str,
-) -> Result<ReleasedLeaseInfo> {
+) -> Result<(ReleasedLeaseInfo, Vec<StorageWarning>)> {
     // Resolve short ID to full ID (errors if the issue does not exist).
     let full_id = storage
         .resolve_issue_id(issue_id)
@@ -257,9 +313,12 @@ pub fn execute_claim_release_by_issue<S: IssueStore>(
     // Get current branch for identity
     let branch = get_current_branch()?;
 
-    // Load worktree identity
-    let identity =
-        load_or_create_worktree_identity(&paths.local_jit, &paths.worktree_root, &branch)?;
+    // Load worktree identity, surfacing relocation as a warning
+    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(
+        &paths.local_jit,
+        &paths.worktree_root,
+        &branch,
+    )?;
 
     // Resolve the acting identity for the audit trail BEFORE evicting anything,
     // so a release never happens without an attributable actor. This is
@@ -308,10 +367,11 @@ pub fn execute_claim_release_by_issue<S: IssueStore>(
         })
         .collect::<Result<Vec<_>>>()?;
 
-    released
+    let info = released
         .into_iter()
         .next_back()
-        .ok_or_else(|| anyhow::anyhow!("{}", crate::errors::no_active_lease(&full_id)))
+        .ok_or_else(|| anyhow::anyhow!("{}", crate::errors::no_active_lease(&full_id)))?;
+    Ok((info, warnings))
 }
 
 /// Renews an existing lease, extending its expiry time.

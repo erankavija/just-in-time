@@ -4731,7 +4731,7 @@ fn run() -> Result<()> {
         }
         Commands::Recover { json } => {
             use jit::commands::claim::execute_recover;
-            use jit::output::JsonOutput;
+            use jit::output::{JsonOutput, OutputContext};
             use serde_json::json;
 
             match execute_recover(&storage) {
@@ -4763,8 +4763,9 @@ fn run() -> Result<()> {
                             report.expired_leases_evicted
                         );
                         println!("  • Temp files removed: {}", report.temp_files_removed);
+                        let output_ctx = OutputContext::new(quiet, json);
                         for warning in &report.warnings {
-                            eprintln!("Warning: {}", warning);
+                            output_ctx.print_warning(warning)?;
                         }
                     }
                 }
@@ -5058,7 +5059,7 @@ fn run() -> Result<()> {
                 json,
             } => {
                 use jit::commands::claim::execute_claim_acquire;
-                use jit::output::{JsonError, JsonOutput};
+                use jit::output::{JsonError, JsonOutput, OutputContext};
 
                 match execute_claim_acquire(
                     &storage,
@@ -5067,12 +5068,13 @@ fn run() -> Result<()> {
                     agent_id.as_deref(),
                     reason.as_deref(),
                 ) {
-                    Ok(lease_id) => {
+                    Ok((lease_id, warnings)) => {
                         if json {
                             let response = serde_json::json!({
                                 "lease_id": lease_id,
                                 "issue_id": issue_id,
                                 "ttl_secs": ttl,
+                                "warnings": warnings,
                                 "message": format!("Acquired lease {} on issue {}", lease_id, issue_id),
                             });
                             let output = JsonOutput::success(response, "claim acquire");
@@ -5081,6 +5083,10 @@ fn run() -> Result<()> {
                             println!("✓ Acquired lease: {}", lease_id);
                             println!("  Issue: {}", issue_id);
                             println!("  TTL: {} seconds", ttl);
+                            let output_ctx = OutputContext::new(quiet, json);
+                            for warning in &warnings {
+                                output_ctx.print_warning(warning)?;
+                            }
                         }
                     }
                     Err(e) => {
@@ -5100,16 +5106,17 @@ fn run() -> Result<()> {
             }
             ClaimCommands::Release { issue_id, json } => {
                 use jit::commands::claim::execute_claim_release_by_issue;
-                use jit::output::{JsonError, JsonOutput};
+                use jit::output::{JsonError, JsonOutput, OutputContext};
 
                 match execute_claim_release_by_issue(&storage, &issue_id) {
-                    Ok(released) => {
+                    Ok((released, warnings)) => {
                         if json {
                             let response = serde_json::json!({
                                 "lease_id": released.lease_id,
                                 "issue_id": released.issue_id,
                                 "previous_owner": released.previous_owner,
                                 "actor": released.actor,
+                                "warnings": warnings,
                                 "message": format!(
                                     "Released lease {} on issue {} (was held by {}) by {}",
                                     released.lease_id,
@@ -5125,6 +5132,10 @@ fn run() -> Result<()> {
                             println!("  Issue: {}", released.issue_id);
                             println!("  Previous owner: {}", released.previous_owner);
                             println!("  Released by: {}", released.actor);
+                            let output_ctx = OutputContext::new(quiet, json);
+                            for warning in &warnings {
+                                output_ctx.print_warning(warning)?;
+                            }
                         }
                     }
                     Err(e) => {
@@ -5182,19 +5193,24 @@ fn run() -> Result<()> {
             }
             ClaimCommands::Heartbeat { lease_id, json } => {
                 use jit::commands::claim::execute_claim_heartbeat;
-                use jit::output::{JsonError, JsonOutput};
+                use jit::output::{JsonError, JsonOutput, OutputContext};
 
                 match execute_claim_heartbeat(&lease_id) {
-                    Ok(()) => {
+                    Ok(warnings) => {
                         if json {
                             let response = serde_json::json!({
                                 "lease_id": lease_id,
+                                "warnings": warnings,
                                 "message": format!("Heartbeat sent for lease {}", lease_id),
                             });
                             let output = JsonOutput::success(response, "claim heartbeat");
                             println!("{}", output.to_json_string()?);
                         } else {
                             println!("✓ Heartbeat sent: {}", lease_id);
+                            let output_ctx = OutputContext::new(quiet, json);
+                            for warning in &warnings {
+                                output_ctx.print_warning(warning)?;
+                            }
                         }
                     }
                     Err(e) => {
@@ -5405,10 +5421,10 @@ fn run() -> Result<()> {
         Commands::Worktree(worktree_cmd) => match worktree_cmd {
             jit::cli::WorktreeCommands::Info { json } => {
                 use jit::commands::worktree::execute_worktree_info;
-                use jit::output::{JsonError, JsonOutput};
+                use jit::output::{JsonError, JsonOutput, OutputContext};
 
                 match execute_worktree_info() {
-                    Ok(info) => {
+                    Ok((info, warnings)) => {
                         if json {
                             let response = serde_json::json!({
                                 "worktree_id": info.worktree_id,
@@ -5416,6 +5432,7 @@ fn run() -> Result<()> {
                                 "root_path": info.root_path,
                                 "is_main_worktree": info.is_main_worktree,
                                 "common_dir": info.common_dir,
+                                "warnings": warnings,
                             });
                             let output = JsonOutput::success(response, "worktree info")
                                 .with_message(format!(
@@ -5437,6 +5454,10 @@ fn run() -> Result<()> {
                                 }
                             );
                             println!("  Common dir: {}", info.common_dir);
+                            let output_ctx = OutputContext::new(quiet, json);
+                            for warning in &warnings {
+                                output_ctx.print_warning(warning)?;
+                            }
                         }
                     }
                     Err(e) => {
