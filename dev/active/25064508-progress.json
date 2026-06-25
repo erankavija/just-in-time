@@ -75,7 +75,7 @@
           "short_id": "93480b00",
           "title": "Index and query invariants as a registry-first kind",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "205472c4",
@@ -143,7 +143,8 @@
     "56ab0224": 2,
     "1e1ea81d": 1,
     "b629686b": 2,
-    "b121fd51": 1
+    "b121fd51": 1,
+    "93480b00": 2
   },
   "started_at": "2026-06-25T00:00:00Z",
   "notes": "Bracket complete: P=0d753ba5 (done), B=5f5735c3 (done). plan-review/coverage-preview/breakdown-review all passed. Driving impl interior. Issues serialized within waves due to heavy crates/jit file overlap; worktrees only for file-disjoint pairs.",
