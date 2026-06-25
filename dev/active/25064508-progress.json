@@ -132,7 +132,7 @@
           "short_id": "52ad3b1f",
           "title": "Add the bidirectional enforcement-drift check and the invariant CLI",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         }
       ]
     }
@@ -145,7 +145,8 @@
     "b629686b": 2,
     "b121fd51": 1,
     "93480b00": 2,
-    "0d593d90": 3
+    "0d593d90": 3,
+    "52ad3b1f": 2
   },
   "started_at": "2026-06-25T00:00:00Z",
   "notes": "Bracket complete: P=0d753ba5 (done), B=5f5735c3 (done). plan-review/coverage-preview/breakdown-review all passed. Driving impl interior. Issues serialized within waves due to heavy crates/jit file overlap; worktrees only for file-disjoint pairs.",
@@ -161,5 +162,8 @@
   ],
   "discovered": [
     "Default repo namespace-registry rule does not include the item link namespaces (satisfies/per/mitigates/resolves/enforces), so such labels also trigger default:namespace-registry validation errors. Pre-existing, separate from item-links; candidate follow-up."
+  ],
+  "post_completion_tasks": [
+    "Build a showcase/user-guide slideset via /presentation-toolkit covering the structured-knowledge feature (item kinds, qualified ids, jit item CLI, invariants registry/projection/drift) and link it to epic 25064508 (user request 2026-06-26)."
   ]
 }
