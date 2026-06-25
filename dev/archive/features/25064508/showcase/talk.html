@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<title>Structured project knowledge in jit</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;0,700;1,400&family=Source+Code+Pro:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+
+<link rel="stylesheet" id="theme" href="themes/rust.css">
+<link rel="stylesheet" href="base.css">
+</head>
+<body>
+<div class="reveal"><div class="slides">
+
+<!-- ── TITLE ───────────────────────────────────────────────────────────── -->
+<section class="title">
+  <h1>Structured Project Knowledge in jit</h1>
+  <p class="tagline">Addressable items, qualified ids, and projected invariants</p>
+  <p>Showcase &amp; user guide &nbsp;·&nbsp; epic <code>25064508</code> &nbsp;·&nbsp; 2026-06</p>
+  <p class="caption">Requirements were one configuration. Now the model is generic.</p>
+</section>
+
+<!-- ── AGENDA ──────────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Outline <span class="num">· 2 / 17</span></span>
+  <h2>What this adds</h2>
+  <ol>
+    <li>The problem with requirements as bespoke text</li>
+    <li>The model: addressable items &amp; qualified ids</li>
+    <li>Item kinds as a six-tuple; the four shipped kinds</li>
+    <li>The CLI: <code>jit item</code> and <code>jit invariant</code></li>
+    <li>Links, dangling-link detection, and enforcement drift</li>
+    <li>Design principles &amp; how to adopt it</li>
+  </ol>
+</section>
+
+<!-- ── PROBLEM ─────────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Motivation <span class="num">· 3 / 17</span></span>
+  <h2>Before: a requirement was just prose</h2>
+  <ul>
+    <li><strong>Regex-parsed.</strong> A line in <code>## Success Criteria</code> matched by a hard-coded pattern — "requirement" was wired into the engine.</li>
+    <li><strong>Locally scoped.</strong> <code>REQ-01</code> was only unambiguous inside one container's subtree — not addressable across the repo.</li>
+    <li><strong>Discoverable only by validating.</strong> You found requirements by running the coverage gate, not by querying them.</li>
+  </ul>
+  <div class="note">The validation engine was already generic over <code>(section, marker, id-pattern)</code>. This epic <em>names</em> that latent pattern instead of inventing new surface.</div>
+</section>
+
+<!-- ── THE MODEL ───────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Model <span class="num">· 4 / 17</span></span>
+  <h2>Addressable items &amp; qualified ids</h2>
+  <div class="def">
+    An <strong>addressable item</strong> is a structured line in a declared section
+    carrying a self-id. Its <strong>qualified id</strong> is
+    <code>&lt;scope&gt;/&lt;self-id&gt;</code> — globally unique, <em>derived, never stored</em>.
+  </div>
+  <ul>
+    <li><code>scope</code> = an issue short-id, or <code>@</code> for project scope.</li>
+    <li>Issue-scoped: <code>c2a50aec/REQ-01</code> &nbsp;·&nbsp; project-scoped: <code>@/INV-01</code>.</li>
+    <li>The same self-id may exist under two scopes without collision.</li>
+  </ul>
+</section>
+
+<!-- ── ITEM KIND SIX-TUPLE ─────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Model <span class="num">· 5 / 17</span></span>
+  <h2>An item kind is a six-tuple</h2>
+  <div class="item-decl">(section, id-pattern, marker(s), link-namespace(s), scope, source-of-truth)</div>
+<pre><code class="language-toml" data-trim>[item_kinds.requirement]
+section         = "success_criteria"
+id-pattern      = "[A-Z][A-Z0-9]*-[0-9]+"
+markers         = ["[hard]"]
+link-namespaces = ["satisfies"]
+scope           = "issue"
+source-of-truth = "markdown-first"</code></pre>
+  <div class="note">No kind name is hard-coded in engine logic — the engine reads the tuple, never a label. Kinds are config; the four shipped kinds are built-in defaults.</div>
+</section>
+
+<!-- ── FOUR KINDS (table) ──────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Model <span class="num">· 6 / 17</span></span>
+  <h2>Four kinds, two substrates</h2>
+  <table>
+    <thead><tr><th>kind</th><th>scope</th><th>source-of-truth</th><th>link namespaces</th></tr></thead>
+    <tbody>
+      <tr><td>requirement</td><td>issue</td><td>markdown-first</td><td><code>satisfies:</code></td></tr>
+      <tr><td>decision</td><td>issue</td><td>markdown-first</td><td><code>per:</code></td></tr>
+      <tr><td>risk</td><td>issue</td><td>markdown-first</td><td><code>mitigates:</code> / <code>resolves:</code></td></tr>
+      <tr><td>invariant</td><td><code>@</code> project</td><td>registry-first</td><td><code>enforces:</code></td></tr>
+    </tbody>
+  </table>
+  <div class="note">One engine serves both substrates: issue-scope items parsed from descriptions; project-scope invariants read from a registry. Proven by a single cross-substrate test.</div>
+</section>
+
+<!-- ── CLI: jit item ───────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">CLI <span class="num">· 7 / 17</span></span>
+  <h2>Querying items: <code>jit item</code></h2>
+  <div class="item-decl">jit item list | show | resolve | search&nbsp;&nbsp;[--kind &lt;name&gt;] [--json]</div>
+  <ul>
+    <li><code>list</code> — index every item across the repo (filter with <code>--kind</code>).</li>
+    <li><code>show</code> / <code>resolve</code> — resolve one item by qualified id.</li>
+    <li><code>search</code> — match on self-id or text.</li>
+  </ul>
+  <div class="note">Every subcommand supports <code>--json</code> — and failures emit a JSON error object too, honouring the machine-readable contract for agents.</div>
+</section>
+
+<!-- ── CLI: real list output ───────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">CLI <span class="num">· 8 / 17</span></span>
+  <h2>One list, all four kinds</h2>
+<pre><code class="language-text" data-trim>$ jit item list
+@/INV-01         [invariant]    All state changes are logged to events.jsonl.
+@/INV-02         [invariant]    Dependency edges stay acyclic.
+c2a50aec/D-01    [decision]     markdown is the source of truth.
+c2a50aec/REQ-01  [requirement]  [hard] REQ-01: items are addressable.
+c2a50aec/RISK-01 [risk]         index could drift from text.</code></pre>
+  <div class="note">Project-scope (<code>@</code>) and issue-scope (<code>&lt;short-id&gt;</code>) items surface through the same command — markdown-first and registry-first, one code path.</div>
+</section>
+
+<!-- ── CLI: show --json ────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">CLI <span class="num">· 9 / 17</span></span>
+  <h2>Resolve by qualified id</h2>
+<pre><code class="language-text" data-trim>$ jit item show c2a50aec/D-01
+Qualified id: c2a50aec/D-01
+Kind:         decision
+Self id:      D-01
+Issue:        c2a50aec-... | Demo epic
+Text:         markdown is the source of truth.</code></pre>
+<pre><code class="language-text" data-trim>$ jit item show @/INV-01 --json
+{ "item": { "kind": "invariant", "qualified_id": "@/INV-01",
+            "scope": "@", "self_id": "INV-01" }, ... }</code></pre>
+</section>
+
+<!-- ── INVARIANT REGISTRY ──────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Invariants <span class="num">· 10 / 17</span></span>
+  <h2>The invariant registry</h2>
+  <p>Project-scoped invariants are <strong>registry-first</strong>: declared in <code>.jit/invariants.toml</code>, loaded at config time (even when no <code>config.toml</code> exists).</p>
+<pre><code class="language-toml" data-trim>[[invariants]]
+id          = "INV-01"
+statement   = "All state changes are logged to events.jsonl."
+kind        = "enforced"          # or "advisory"
+enforced-by = "event-logging"     # optional: a rule or gate key</code></pre>
+  <div class="note">The registry is authoritative — there is <em>no</em> markdown index for invariants. The <code>invariant</code> kind is reserved as project-scoped + registry-first.</div>
+</section>
+
+<!-- ── DOC PROJECTION ──────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Invariants <span class="num">· 11 / 17</span></span>
+  <h2>Projecting invariants into docs</h2>
+  <div class="item-decl">jit invariant render [--json]&nbsp;&nbsp;→ writes the configured target</div>
+<pre><code class="language-text" data-trim>$ jit invariant render
+Rendered 2 invariant(s) to .jit/invariants.md (separate-file mode)
+
+## Project invariants
+- **INV-01** [enforced] (enforced-by: `event-logging`): All state changes ...
+- **INV-02** [advisory]: Dependency edges stay acyclic.</code></pre>
+  <div class="note">Two config-driven modes: a <strong>separate jit-owned file</strong> (default — never touches existing docs), or a <strong>delimited region</strong> of an existing file (byte-preserved outside the markers). No doc filename is hard-coded.</div>
+</section>
+
+<!-- ── LINKS ───────────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Links <span class="num">· 12 / 17</span></span>
+  <h2>Links resolve by qualified id</h2>
+  <p>A node carries a link label in a kind's namespace; it resolves to the addressed item across all four kinds:</p>
+  <div class="item-decl">satisfies:&lt;scope&gt;/REQ-01 · per:&lt;scope&gt;/D-01 · mitigates:&lt;scope&gt;/RISK-01 · enforces:@/INV-01</div>
+  <ul>
+    <li>Existing <code>label-coverage</code> / <code>criteria-to-check</code> rules consume the same triple a kind expands to — shown compatible, not rewritten.</li>
+    <li>A label may be the legacy bare <code>satisfies:REQ-01</code> or the qualified <code>satisfies:&lt;scope&gt;/REQ-01</code>; both credit coverage.</li>
+  </ul>
+</section>
+
+<!-- ── DANGLING LINKS ──────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Links <span class="num">· 13 / 17</span></span>
+  <h2>Dangling links surface in validate</h2>
+  <p>An unresolvable qualified id is <strong>reported as a finding</strong>, not silently dropped — so broken links fail <code>jit validate</code>.</p>
+<pre><code class="language-text" data-trim>$ jit validate
+✗ dangling-item-link: node 'a1b2c3d4' references 'satisfies:eed6750c/REQ-9'
+  which resolves to no addressable item</code></pre>
+  <div class="note">The check derives link namespaces from the declared kinds — no kind name is hard-coded in the engine. It is a built-in pass, like coverage.</div>
+</section>
+
+<!-- ── ENFORCEMENT DRIFT ───────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Invariants <span class="num">· 14 / 17</span></span>
+  <h2>Bidirectional enforcement drift</h2>
+  <div class="item-decl">jit invariant check [--json]&nbsp;&nbsp;exits non-zero on any drift</div>
+<pre><code class="language-text" data-trim>$ jit invariant check
+❌ [declared-but-unenforced] invariant 'INV-01' is enforced-by
+   'event-logging', which is neither a loadable rule nor a known gate
+❌ [enforced-but-undeclared] rule/gate 'default:orphan-leaf'
+   is claimed by no invariant's enforced-by</code></pre>
+  <div class="note">Declaration-consistency, both directions. It runs in <code>jit validate</code> automatically when a registry is present, and stays dormant otherwise — so repos without invariants are unaffected.</div>
+</section>
+
+<!-- ── PRINCIPLES ──────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Principles <span class="num">· 15 / 17</span></span>
+  <h2>Three principles hold throughout</h2>
+  <div class="three-col">
+    <div><h3>Single source of truth</h3><p>Per-kind direction: markdown authoritative for issue kinds; registry authoritative for invariants. The index is a pure projection — never a hand-maintained duplicate.</p></div>
+    <div><h3>Domain-agnostic, opt-in</h3><p>Kinds are config-declared; no kind name lives in engine logic. The model fits any domain, not just software.</p></div>
+    <div><h3>Graceful degradation</h3><p>A line with no self-id is plain prose. You pay for addressing only where you want it.</p></div>
+  </div>
+</section>
+
+<!-- ── ADOPT ───────────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Adopt <span class="num">· 16 / 17</span></span>
+  <h2>Adopting it in your repo</h2>
+  <ul>
+    <li><strong>Nothing required.</strong> The four kinds ship as built-in defaults — author <code>## Decisions</code> / <code>## Risks</code> sections and they index automatically.</li>
+    <li><strong>Declare invariants</strong> in <code>.jit/invariants.toml</code>; run <code>jit invariant render</code> to mirror them into docs.</li>
+    <li><strong>Tune kinds</strong> only if you need to — an explicit <code>[item_kinds.X]</code> declares the full six-tuple.</li>
+    <li><strong>Query anytime</strong> with <code>jit item list/show/search --json</code>; wire links and let <code>jit validate</code> catch drift.</li>
+  </ul>
+</section>
+
+<!-- ── SUMMARY ─────────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Wrap-up <span class="num">· 17 / 17</span></span>
+  <h2>Summary</h2>
+  <ul>
+    <li>Structured knowledge is now <strong>first-class, addressable, searchable, and projectable</strong>.</li>
+    <li>Qualified ids <code>&lt;scope&gt;/&lt;self-id&gt;</code> address requirements, decisions, risks, and invariants through one generic engine.</li>
+    <li>Invariants live in a registry, project into docs, and drift is checked both ways.</li>
+    <li>Requirements were one configuration — the model is general.</li>
+  </ul>
+</section>
+
+<!-- ── CLOSING ─────────────────────────────────────────────────────────── -->
+<section class="title">
+  <h1>Structured knowledge, by construction</h1>
+  <p class="tagline"><code>jit item</code> · <code>jit invariant</code> · <code>jit validate</code></p>
+  <p>epic <code>25064508</code> — 14 issues, 7 waves, all gates green</p>
+</section>
+
+</div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script>
+  window.__deckReady = false;
+  window.__mathReady = false;
+
+  function initDeck() {
+    if (window.renderMathInElement) {
+      renderMathInElement(document.body, {
+        delimiters: [
+          { left: "\\[", right: "\\]", display: true },
+          { left: "\\(", right: "\\)", display: false },
+        ],
+        throwOnError: false,
+      });
+    }
+    window.__mathReady = true;
+
+    Reveal.initialize({
+      width: 1280,
+      height: 720,
+      margin: 0.04,
+      minScale: 0.4,
+      maxScale: 1.2,
+      hash: true,
+      center: false,
+      slideNumber: 'c/t',
+      transition: 'none',
+      backgroundTransition: 'none',
+      plugins: [ RevealHighlight ],
+    }).then(function () {
+      Promise.resolve(document.fonts ? document.fonts.ready : null)
+        .finally(function () { window.__deckReady = true; });
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', function () {
+      setTimeout(initDeck, 0);
+    });
+  } else {
+    setTimeout(initDeck, 0);
+  }
+</script>
+</body>
+</html>
