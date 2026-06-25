@@ -8,9 +8,10 @@
 //! CLAUDE.md "Separation of Concerns").
 
 use super::*;
+use crate::config::SourceOfTruth;
 use crate::domain::item::{
     index_items, index_project_sources, resolve_item_kinds, split_qualified_id, AddressableItem,
-    ItemKind, ProjectSource, Scope,
+    ItemKind, ProjectSource, RawScopeItem, Scope,
 };
 
 /// Result of a `jit item list` / `search` query.
@@ -153,43 +154,65 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(ItemListResult { items, count })
     }
 
-    /// Index the project-scope (`@`) addressable items from config-declared
-    /// sources.
+    /// Index the project-scope (`@`) addressable items, routing each kind by its
+    /// `source-of-truth` so both authoring substrates surface through one path.
     ///
-    /// For every configured kind with `scope = "project"`, its `source` file
-    /// (a repository-local path) is read through the storage boundary
-    /// ([`IssueStore::read_repo_file`](crate::storage::IssueStore::read_repo_file))
-    /// and scanned the SAME way an issue description is, then all candidates are
-    /// deduped once through [`index_project_sources`] (REQ-01). The source path
-    /// comes ONLY from config — no filename is hardcoded here — and this command
-    /// does NO direct filesystem I/O: path-safety (repository-local enforcement)
-    /// and reading both live in storage. An absent source file contributes no
-    /// items (storage returns `Ok(None)`), never an error; a source that is present
-    /// but unreadable, or a path that escapes the repo, IS reported.
+    /// For every configured kind with `scope = "project"`:
+    /// - **markdown-first**: its `source` file (a repository-local path) is read
+    ///   through the storage boundary
+    ///   ([`IssueStore::read_repo_file`](crate::storage::IssueStore::read_repo_file))
+    ///   and scanned the SAME way an issue description is. The source path comes
+    ///   ONLY from config — no filename is hardcoded — and this command does NO
+    ///   direct filesystem I/O: path-safety (repository-local enforcement) and
+    ///   reading both live in storage. An absent source file contributes no items
+    ///   (storage returns `Ok(None)`), never an error; a source that is present but
+    ///   unreadable, or a path that escapes the repo, IS reported.
+    /// - **registry-first** (e.g. `invariant`): items are projected directly from
+    ///   the loaded invariant registry ([`JitConfig::invariants`](crate::config::JitConfig)),
+    ///   which is the AUTHORITATIVE source — NO markdown index is read or produced
+    ///   for them (REQ-02). Each registry entry's `id` is its self-id, so its
+    ///   qualified id is `@/<id>` (REQ-01).
+    ///
+    /// Both substrates' candidates are deduped once through the single
+    /// [`index_project_sources`] derivation, so per-scope uniqueness and
+    /// qualified-id derivation are identical across them.
     fn project_items(&self) -> Result<Vec<AddressableItem>> {
+        let config = self.cached_config()?;
         let mut sources = Vec::new();
+        let mut registry_items = Vec::new();
         for kind in self.item_kinds()? {
             if !kind.kind_scope().is_project() {
                 continue;
             }
-            // A project kind without a source is rejected at kind resolution
-            // (MissingProjectSource), so `source()` is Some here; treat a None
-            // defensively as no items rather than panicking.
-            let Some(source_rel) = kind.source() else {
-                continue;
-            };
-            // Read via the storage boundary: absent -> None (graceful, REQ-01),
-            // invalid/escaping path or unreadable file -> typed error.
-            let markdown = self.storage.read_repo_file(source_rel).with_context(|| {
-                format!(
-                    "cannot read project-scope source '{source_rel}' for item kind '{}'",
-                    kind.name()
-                )
-            })?;
-            let Some(markdown) = markdown else {
-                continue;
-            };
-            sources.push(ProjectSource { kind, markdown });
+            match kind.source_of_truth() {
+                // Registry-first: project items come ONLY from the loaded registry,
+                // never from a markdown source file. The invariant registry is the
+                // authoritative source (REQ-02).
+                SourceOfTruth::RegistryFirst => {
+                    registry_items.extend(invariant_raw_items(kind.name(), config));
+                }
+                // Markdown-first: read and scan the config-declared source file.
+                SourceOfTruth::MarkdownFirst => {
+                    // A markdown-first project kind without a source is rejected at
+                    // kind resolution (MissingProjectSource), so `source()` is Some
+                    // here; treat a None defensively as no items rather than panicking.
+                    let Some(source_rel) = kind.source() else {
+                        continue;
+                    };
+                    // Read via the storage boundary: absent -> None (graceful,
+                    // REQ-01), invalid/escaping path or unreadable file -> typed error.
+                    let markdown = self.storage.read_repo_file(source_rel).with_context(|| {
+                        format!(
+                            "cannot read project-scope source '{source_rel}' for item kind '{}'",
+                            kind.name()
+                        )
+                    })?;
+                    let Some(markdown) = markdown else {
+                        continue;
+                    };
+                    sources.push(ProjectSource { kind, markdown });
+                }
+            }
         }
 
         let repo_format = self.repo_content_format()?;
@@ -197,7 +220,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // default); reuse the same parser selection as issue descriptions.
         let parser = crate::document::content_parser_for(None, repo_format)
             .map_err(|err| anyhow!("cannot parse project-scope source: {err}"))?;
-        index_project_sources(&sources, parser.as_ref())
+        index_project_sources(&sources, registry_items, parser.as_ref())
             .map_err(|err| anyhow!("indexing project-scope items failed: {err}"))
     }
 
@@ -344,6 +367,28 @@ impl<S: IssueStore> CommandExecutor<S> {
         })?;
         Ok(Some(resolved))
     }
+}
+
+/// Project the loaded invariant registry into raw project-scope candidates for the
+/// registry-first `invariant` kind.
+///
+/// A pure projection over [`JitConfig::invariants`](crate::config::JitConfig): each
+/// [`Invariant`](crate::validation::invariants::Invariant) becomes a
+/// [`RawScopeItem`] whose `self_id` is the entry's `id` (so its qualified id is
+/// `@/<id>`) and whose `text` is the entry's `statement`. The registry is the
+/// authoritative source — nothing is parsed from any markdown section (REQ-02).
+/// `kind_name` tags each candidate so the derived item reports the right kind.
+fn invariant_raw_items(kind_name: &str, config: &JitConfig) -> Vec<RawScopeItem> {
+    config
+        .invariants
+        .invariants
+        .iter()
+        .map(|inv| RawScopeItem {
+            kind: kind_name.to_string(),
+            self_id: inv.id.clone(),
+            text: inv.statement.clone(),
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -595,6 +640,120 @@ mod tests {
             msg.contains("absolute paths are not permitted"),
             "expected absolute-path rejection, got: {msg}"
         );
+    }
+
+    /// Build an executor whose synthetic `.jit` root carries an
+    /// `invariants.toml` with `invariants_toml` and NO `config.toml`, exercising
+    /// the default-repo, registry-first invariant path (the built-in `invariant`
+    /// kind is active because no `[item_kinds]` table replaces the defaults).
+    fn registry_exec(
+        invariants_toml: &str,
+        issues: Vec<Issue>,
+    ) -> CommandExecutor<InMemoryStorage> {
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+        std::fs::create_dir_all(storage.root()).unwrap();
+        std::fs::write(storage.root().join("invariants.toml"), invariants_toml).unwrap();
+        for issue in issues {
+            storage.save_issue(issue).unwrap();
+        }
+        CommandExecutor::new(storage)
+    }
+
+    const TWO_INVARIANTS: &str = "\
+[[invariants]]
+id = \"INV-01\"
+statement = \"Every dependency edge stays acyclic.\"
+kind = \"enforced\"
+enforced-by = \"dag-no-cycles\"
+
+[[invariants]]
+id = \"INV-02\"
+statement = \"Issues prefer functional style.\"
+kind = \"advisory\"
+";
+
+    #[test]
+    fn test_list_items_kind_invariant_returns_registry_entry() {
+        // REQ-01: in a default repo with a `.jit/invariants.toml` (no config.toml),
+        // `jit item list --kind invariant` returns each loaded invariant addressed
+        // as `@/<self-id>`.
+        let exec = registry_exec(TWO_INVARIANTS, vec![]);
+        let result = exec.list_items(Some("invariant")).unwrap();
+        assert_eq!(result.count, 2);
+        let qids: Vec<&str> = result
+            .items
+            .iter()
+            .map(|i| i.qualified_id.as_str())
+            .collect();
+        assert!(qids.contains(&"@/INV-01"));
+        assert!(qids.contains(&"@/INV-02"));
+        // The self-id is the invariant's id; the statement is its text; the kind is
+        // `invariant`; the scope is `@`.
+        let first = result.items.iter().find(|i| i.self_id == "INV-01").unwrap();
+        assert_eq!(first.kind, "invariant");
+        assert_eq!(first.scope, "@");
+        assert_eq!(first.text, "Every dependency edge stays acyclic.");
+    }
+
+    #[test]
+    fn test_show_item_resolves_invariant_by_qualified_id() {
+        // REQ-01: the generic resolver returns an invariant by its `@/<self-id>`.
+        let exec = registry_exec(TWO_INVARIANTS, vec![]);
+        let shown = exec.show_item("@/INV-02").unwrap();
+        assert_eq!(shown.item.self_id, "INV-02");
+        assert_eq!(shown.item.qualified_id, "@/INV-02");
+        assert_eq!(shown.item.kind, "invariant");
+        assert_eq!(shown.item.scope, "@");
+        // No owning issue for a project-scope item.
+        assert_eq!(shown.issue_full_id, None);
+        assert_eq!(shown.issue_title, None);
+    }
+
+    #[test]
+    fn test_search_items_finds_invariant_by_statement() {
+        // The generic search path reaches registry-first invariants too.
+        let exec = registry_exec(TWO_INVARIANTS, vec![]);
+        let hits = exec.search_items("acyclic", Some("invariant")).unwrap();
+        assert_eq!(hits.count, 1);
+        assert_eq!(hits.items[0].qualified_id, "@/INV-01");
+    }
+
+    #[test]
+    fn test_invariant_registry_is_authoritative_no_markdown_index() {
+        // REQ-02: the registry is the authoritative source for invariants and NO
+        // markdown index is produced for them. An issue description containing an
+        // `INV-`-looking line is NOT projected as an invariant item — invariants
+        // come ONLY from `.jit/invariants.toml`.
+        let issue = Issue::new(
+            "A".to_string(),
+            "## Success Criteria\n\n- [hard] INV-99: a markdown line that LOOKS like an invariant\n"
+                .to_string(),
+        );
+        let exec = registry_exec(TWO_INVARIANTS, vec![issue]);
+
+        let invariants = exec.list_items(Some("invariant")).unwrap();
+        let qids: Vec<&str> = invariants
+            .items
+            .iter()
+            .map(|i| i.qualified_id.as_str())
+            .collect();
+        // Only the two registry entries are invariants; the issue's INV-99 line is
+        // NOT among them (no markdown index for invariants).
+        assert_eq!(invariants.count, 2);
+        assert!(qids.contains(&"@/INV-01"));
+        assert!(qids.contains(&"@/INV-02"));
+        assert!(!qids.iter().any(|q| q.ends_with("/INV-99")));
+        assert!(!qids.iter().any(|q| q.contains("INV-99")));
+    }
+
+    #[test]
+    fn test_list_items_without_invariants_file_has_no_invariants() {
+        // Registry-first: with no `.jit/invariants.toml`, the invariant kind yields
+        // no items (graceful), and nothing is read from any markdown source.
+        let issue = issue_with_criteria("A", "## Success Criteria\n\n- [hard] REQ-01: a\n");
+        let exec = executor_with(vec![issue]);
+        assert_eq!(exec.list_items(Some("invariant")).unwrap().count, 0);
     }
 
     #[test]

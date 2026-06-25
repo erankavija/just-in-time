@@ -2,9 +2,9 @@
   "id": "93480b00-6322-48ac-8d66-36ab6c6dc8be",
   "title": "Index and query invariants as a registry-first kind",
   "description": "Index the loaded invariants as a project-scoped, registry-first item kind and make them queryable through the generic item operations, addressed as `@/<self-id>`. The registry is the authoritative source; no markdown index is produced for invariants. This uses the loaded invariant registry as its input.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit item list --kind invariant` returns a loaded invariant, addressed as `@/<self-id>`.\n- [hard] REQ-02: The registry is the authoritative source for invariants; no markdown index is produced for them.\n- [hard] REQ-03: The behavior is covered by `cargo test`.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [
     "21558ace-c777-4368-981a-eef21d618d98"
   ],
@@ -14,7 +14,15 @@
   ],
   "gates_status": {},
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "dev/active/93480b00-invariant-registry-first-kind.md",
+      "commit": null,
+      "label": "registry-first invariant kind: source-of-truth routing in project_items",
+      "doc_type": "design",
+      "format": "markdown"
+    }
+  ],
   "labels": [
     "type:task",
     "epic:structured-knowledge",
@@ -22,5 +30,5 @@
     "satisfies:REQ-04"
   ],
   "created_at": "2026-06-24T22:48:19.051005372+00:00",
-  "updated_at": "2026-06-25T17:12:30.494192486+00:00"
+  "updated_at": "2026-06-25T18:47:29.579263097+00:00"
 }
