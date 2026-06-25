@@ -38,6 +38,12 @@ pub struct InMemoryStorage {
     gate_runs: Arc<Mutex<HashMap<String, crate::domain::GateRunResult>>>,
     /// Unique root path for parallel test isolation
     root_path: std::path::PathBuf,
+    /// In-memory repository file map keyed by repo-relative path.
+    ///
+    /// Backs [`IssueStore::read_repo_file`](crate::storage::IssueStore::read_repo_file)
+    /// so command/domain tests can exercise project-scope sources (and any other
+    /// config-declared file) with NO real filesystem, per CLAUDE.md "testability".
+    repo_files: Arc<Mutex<HashMap<String, String>>>,
 }
 
 impl InMemoryStorage {
@@ -54,7 +60,32 @@ impl InMemoryStorage {
             events: Arc::new(Mutex::new(Vec::new())),
             gate_runs: Arc::new(Mutex::new(HashMap::new())),
             root_path,
+            repo_files: Arc::new(Mutex::new(HashMap::new())),
         }
+    }
+
+    /// Seed an in-memory repository file at `rel_path` with `content`.
+    ///
+    /// Mirrors the issue/gate seeding pattern: a test setter so command and domain
+    /// tests can stage a config-declared file (e.g. a project-scope item source)
+    /// and have [`IssueStore::read_repo_file`](crate::storage::IssueStore::read_repo_file)
+    /// return it, without touching disk.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::storage::{InMemoryStorage, IssueStore};
+    ///
+    /// let storage = InMemoryStorage::new();
+    /// storage.add_repo_file("project-items.md", "## Success Criteria\n\n- INV-01: x\n");
+    /// assert!(storage.read_repo_file("project-items.md").unwrap().is_some());
+    /// assert!(storage.read_repo_file("absent.md").unwrap().is_none());
+    /// ```
+    pub fn add_repo_file(&self, rel_path: &str, content: &str) {
+        self.repo_files
+            .lock()
+            .unwrap()
+            .insert(rel_path.to_string(), content.to_string());
     }
 }
 
@@ -248,6 +279,17 @@ impl IssueStore for InMemoryStorage {
         ))
     }
 
+    fn read_repo_file(
+        &self,
+        rel_path: &str,
+    ) -> Result<Option<String>, crate::storage::PathReadError> {
+        // Enforce the SAME repo-relative path contract as JsonFileStorage (reject
+        // empty, absolute, or `..`-bearing paths) via the shared validator, then
+        // serve from the in-memory file map: present -> Some, absent -> None.
+        crate::storage::validate_repo_relative_path(rel_path)?;
+        Ok(self.repo_files.lock().unwrap().get(rel_path).cloned())
+    }
+
     fn read_path_bytes(
         &self,
         path: &str,
@@ -305,6 +347,35 @@ mod tests {
         let storage = InMemoryStorage::new();
         storage.init().unwrap();
         storage.init().unwrap(); // Should be idempotent
+    }
+
+    #[test]
+    fn test_read_repo_file_present_absent_and_path_safety() {
+        let storage = InMemoryStorage::new();
+        // Present -> Some(content).
+        storage.add_repo_file("project-items.md", "hello");
+        assert_eq!(
+            storage
+                .read_repo_file("project-items.md")
+                .unwrap()
+                .as_deref(),
+            Some("hello")
+        );
+        // Absent -> None (graceful).
+        assert!(storage.read_repo_file("missing.md").unwrap().is_none());
+        // Path-safety: empty, absolute, and `..`-traversal are typed InvalidPath.
+        assert!(matches!(
+            storage.read_repo_file(""),
+            Err(crate::storage::PathReadError::InvalidPath(_))
+        ));
+        assert!(matches!(
+            storage.read_repo_file("/etc/passwd"),
+            Err(crate::storage::PathReadError::InvalidPath(_))
+        ));
+        assert!(matches!(
+            storage.read_repo_file("../escape.md"),
+            Err(crate::storage::PathReadError::InvalidPath(_))
+        ));
     }
 
     #[test]

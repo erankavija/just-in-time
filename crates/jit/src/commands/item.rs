@@ -156,19 +156,16 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// sources.
     ///
     /// For every configured kind with `scope = "project"`, its `source` file
-    /// (a repository-local markdown path, relative to the repo root) is read and
-    /// scanned the SAME way an issue description is, then all candidates are deduped
-    /// once through [`index_project_sources`] (REQ-01). The source path comes ONLY
-    /// from config — no filename is hardcoded here. A missing or absent source file
-    /// contributes no items (graceful), never an error; a source that is present
-    /// but unreadable IS reported, so a misconfigured repo is not silently empty.
+    /// (a repository-local path) is read through the storage boundary
+    /// ([`IssueStore::read_repo_file`](crate::storage::IssueStore::read_repo_file))
+    /// and scanned the SAME way an issue description is, then all candidates are
+    /// deduped once through [`index_project_sources`] (REQ-01). The source path
+    /// comes ONLY from config — no filename is hardcoded here — and this command
+    /// does NO direct filesystem I/O: path-safety (repository-local enforcement)
+    /// and reading both live in storage. An absent source file contributes no
+    /// items (storage returns `Ok(None)`), never an error; a source that is present
+    /// but unreadable, or a path that escapes the repo, IS reported.
     fn project_items(&self) -> Result<Vec<AddressableItem>> {
-        let repo_root = self
-            .storage
-            .root()
-            .parent()
-            .ok_or_else(|| anyhow!("invalid storage path: no repository root above .jit"))?;
-
         let mut sources = Vec::new();
         for kind in self.item_kinds()? {
             if !kind.kind_scope().is_project() {
@@ -180,17 +177,17 @@ impl<S: IssueStore> CommandExecutor<S> {
             let Some(source_rel) = kind.source() else {
                 continue;
             };
-            let full_path = repo_root.join(source_rel);
-            // Absent file -> no project items for this kind (graceful, REQ-01).
-            if !full_path.exists() {
-                continue;
-            }
-            let markdown = std::fs::read_to_string(&full_path).with_context(|| {
+            // Read via the storage boundary: absent -> None (graceful, REQ-01),
+            // invalid/escaping path or unreadable file -> typed error.
+            let markdown = self.storage.read_repo_file(source_rel).with_context(|| {
                 format!(
                     "cannot read project-scope source '{source_rel}' for item kind '{}'",
                     kind.name()
                 )
             })?;
+            let Some(markdown) = markdown else {
+                continue;
+            };
             sources.push(ProjectSource { kind, markdown });
         }
 
@@ -421,42 +418,45 @@ mod tests {
         assert!(shown.issue_full_id.as_deref().unwrap().starts_with(&short));
     }
 
-    use crate::storage::JsonFileStorage;
-    use tempfile::TempDir;
-
-    /// Build a real file-backed executor in a temp repo that declares a
-    /// project-scope `invariant` kind sourced from `project-items.md`, with the
-    /// given markdown written to that source file (when `source_md` is `Some`).
-    ///
-    /// Returns the temp dir (kept alive by the caller) and the executor. This
-    /// exercises the SAME config-driven `CommandExecutor::new` path the real CLI
-    /// uses — there is no test-only injection seam.
-    fn project_repo(source_md: Option<&str>) -> (TempDir, CommandExecutor<JsonFileStorage>) {
-        let temp = TempDir::new().unwrap();
-        let jit_dir = temp.path().join(".jit");
-        let storage = JsonFileStorage::new(&jit_dir);
+    /// Build an [`InMemoryStorage`] executor that declares a project-scope
+    /// `invariant` kind sourced from `project-items.md`, seeding the source through
+    /// the in-memory repo-file map (NO real source file). `config.toml` is written
+    /// to the synthetic root (the established `InMemoryStorage` config pattern, the
+    /// only on-disk file config loading requires). `extra_config` is appended to
+    /// the `[item_kinds]` block; `source_md` (when `Some`) seeds the source.
+    fn project_exec(
+        source_md: Option<&str>,
+        extra_config: &str,
+        issues: Vec<Issue>,
+    ) -> CommandExecutor<InMemoryStorage> {
+        let storage = InMemoryStorage::new();
         storage.init().unwrap();
-        std::fs::write(
-            jit_dir.join("config.toml"),
+        std::fs::create_dir_all(storage.root()).unwrap();
+        let config = format!(
             "[item_kinds.invariant]\n\
              scope = \"project\"\n\
              source = \"project-items.md\"\n\
-             id-pattern = \"INV-[0-9]+\"\n",
-        )
-        .unwrap();
+             id-pattern = \"INV-[0-9]+\"\n{extra_config}"
+        );
+        std::fs::write(storage.root().join("config.toml"), config).unwrap();
         if let Some(md) = source_md {
-            std::fs::write(temp.path().join("project-items.md"), md).unwrap();
+            storage.add_repo_file("project-items.md", md);
         }
-        (temp, CommandExecutor::new(storage))
+        for issue in issues {
+            storage.save_issue(issue).unwrap();
+        }
+        CommandExecutor::new(storage)
     }
 
     #[test]
     fn test_show_item_resolves_project_scope() {
-        // REQ-01: `@/<self-id>` resolves through the REAL config-driven path
-        // (CommandExecutor::new + a config-declared source file), no test seam.
-        let (_temp, exec) = project_repo(Some(
-            "## Success Criteria\n\n- INV-01: all writes are atomic\n",
-        ));
+        // REQ-01: `@/<self-id>` resolves through the config-driven path with the
+        // source served by the storage boundary (in-memory repo-file map, no fs).
+        let exec = project_exec(
+            Some("## Success Criteria\n\n- INV-01: all writes are atomic\n"),
+            "",
+            vec![],
+        );
         let shown = exec.show_item("@/INV-01").unwrap();
         assert_eq!(shown.item.self_id, "INV-01");
         assert_eq!(shown.item.qualified_id, "@/INV-01");
@@ -469,7 +469,7 @@ mod tests {
     #[test]
     fn test_show_item_project_scope_missing_self_id_errors() {
         // An unresolvable project-scope id is reported, never silently dropped.
-        let (_temp, exec) = project_repo(Some("## Success Criteria\n\n- INV-01: x\n"));
+        let exec = project_exec(Some("## Success Criteria\n\n- INV-01: x\n"), "", vec![]);
         let err = exec.show_item("@/INV-99").unwrap_err();
         assert!(err.to_string().contains("project scope"));
         assert!(err.to_string().contains("no addressable item"));
@@ -477,9 +477,10 @@ mod tests {
 
     #[test]
     fn test_show_item_project_scope_absent_source_is_graceful() {
-        // REQ-01 (degradation): with no source file present, `@/<id>` resolves to a
-        // descriptive not-found error, not a panic and not an issue-resolver error.
-        let (_temp, exec) = project_repo(None);
+        // REQ-01 (degradation): with no source seeded, `read_repo_file` returns
+        // None and `@/<id>` resolves to a descriptive not-found error (not a panic,
+        // not the issue resolver).
+        let exec = project_exec(None, "", vec![]);
         let err = exec.show_item("@/INV-01").unwrap_err();
         let msg = err.to_string();
         assert!(msg.contains("project scope"));
@@ -490,28 +491,19 @@ mod tests {
     fn test_show_item_same_self_id_distinct_scopes() {
         // REQ-04: the same self-id under an issue scope and the project scope are
         // two distinct items, each resolved by its own qualified id.
-        let (temp, exec) = project_repo(Some("## Success Criteria\n\n- INV-01: project one\n"));
         let issue = Issue::new(
             "A".to_string(),
             "## Success Criteria\n\n- [hard] INV-01: issue one\n".to_string(),
         );
         let short = issue.short_id();
-        exec.storage().save_issue(issue).unwrap();
-        // The issue-scope `requirement` kind must also see INV-* ids, so declare it
-        // alongside the project kind in the same config.
-        std::fs::write(
-            temp.path().join(".jit").join("config.toml"),
-            "[item_kinds.requirement]\n\
+        // The issue-scope `requirement` kind must also see INV-* ids.
+        let exec = project_exec(
+            Some("## Success Criteria\n\n- INV-01: project one\n"),
+            "\n[item_kinds.requirement]\n\
              markers = [\"[hard]\"]\n\
-             id-pattern = \"INV-[0-9]+\"\n\n\
-             [item_kinds.invariant]\n\
-             scope = \"project\"\n\
-             source = \"project-items.md\"\n\
              id-pattern = \"INV-[0-9]+\"\n",
-        )
-        .unwrap();
-        // A fresh executor picks up the rewritten config (config is cached).
-        let exec = CommandExecutor::new(JsonFileStorage::new(temp.path().join(".jit")));
+            vec![issue],
+        );
 
         let from_issue = exec.show_item(&format!("{short}/INV-01")).unwrap();
         let from_project = exec.show_item("@/INV-01").unwrap();
@@ -524,7 +516,11 @@ mod tests {
     fn test_list_items_includes_project_scope() {
         // REQ-01: project-scoped items surface in the cross-repo list alongside
         // issue-scoped ones.
-        let (_temp, exec) = project_repo(Some("## Success Criteria\n\n- INV-01: project inv\n"));
+        let exec = project_exec(
+            Some("## Success Criteria\n\n- INV-01: project inv\n"),
+            "",
+            vec![],
+        );
         let result = exec.list_items(None).unwrap();
         let qids: Vec<&str> = result
             .items
@@ -532,6 +528,56 @@ mod tests {
             .map(|i| i.qualified_id.as_str())
             .collect();
         assert!(qids.contains(&"@/INV-01"));
+    }
+
+    #[test]
+    fn test_project_items_rejects_path_traversal_source() {
+        // Path-safety: a `..`-traversal source path is rejected by the storage
+        // boundary, so `@/<id>` resolution surfaces a typed InvalidPath error
+        // rather than reading a file outside the repository.
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+        std::fs::create_dir_all(storage.root()).unwrap();
+        std::fs::write(
+            storage.root().join("config.toml"),
+            "[item_kinds.invariant]\n\
+             scope = \"project\"\n\
+             source = \"../escape.md\"\n\
+             id-pattern = \"INV-[0-9]+\"\n",
+        )
+        .unwrap();
+        let exec = CommandExecutor::new(storage);
+        let err = exec.show_item("@/INV-01").unwrap_err();
+        // The typed InvalidPath cause is in the error chain (alternate Display
+        // renders the full anyhow context chain).
+        let msg = format!("{err:#}");
+        assert!(
+            msg.contains("'..' segment not permitted"),
+            "expected traversal rejection, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_project_items_rejects_absolute_source() {
+        // Path-safety: an absolute source path is rejected by the storage boundary.
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+        std::fs::create_dir_all(storage.root()).unwrap();
+        std::fs::write(
+            storage.root().join("config.toml"),
+            "[item_kinds.invariant]\n\
+             scope = \"project\"\n\
+             source = \"/etc/passwd\"\n\
+             id-pattern = \"INV-[0-9]+\"\n",
+        )
+        .unwrap();
+        let exec = CommandExecutor::new(storage);
+        let err = exec.show_item("@/INV-01").unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(
+            msg.contains("absolute paths are not permitted"),
+            "expected absolute-path rejection, got: {msg}"
+        );
     }
 
     #[test]

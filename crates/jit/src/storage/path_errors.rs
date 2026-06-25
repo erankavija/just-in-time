@@ -52,3 +52,49 @@ impl From<std::io::Error> for PathReadError {
         }
     }
 }
+
+/// Validate that `path` is a safe repo-relative input before any I/O.
+///
+/// The single shape-level path check shared by every storage backend, so that
+/// `IssueStore::read_repo_file` (and `read_path_bytes`) reject the same inputs
+/// regardless of backend. Rejects:
+/// - empty paths (`""`),
+/// - absolute paths (a leading `/`) — callers must pass a repo-relative path,
+/// - any `..` segment used for traversal (e.g. `../etc/passwd`, `a/../b`, `foo/..`).
+///
+/// Dots *inside* a segment (e.g. `foo..bar.txt`) are allowed: they are legitimate
+/// filenames that cannot traverse upward.
+///
+/// # Examples
+///
+/// ```
+/// use jit::storage::{validate_repo_relative_path, PathReadError};
+///
+/// assert!(validate_repo_relative_path("docs/spec.md").is_ok());
+/// assert!(matches!(
+///     validate_repo_relative_path("/etc/passwd"),
+///     Err(PathReadError::InvalidPath(_))
+/// ));
+/// assert!(matches!(
+///     validate_repo_relative_path("../secret"),
+///     Err(PathReadError::InvalidPath(_))
+/// ));
+/// ```
+pub fn validate_repo_relative_path(path: &str) -> Result<(), PathReadError> {
+    if path.is_empty() {
+        return Err(PathReadError::InvalidPath(
+            "path must not be empty".to_string(),
+        ));
+    }
+    if path.starts_with('/') {
+        return Err(PathReadError::InvalidPath(format!(
+            "absolute paths are not permitted: {path}"
+        )));
+    }
+    if path.split('/').any(|segment| segment == "..") {
+        return Err(PathReadError::InvalidPath(format!(
+            "'..' segment not permitted: {path}"
+        )));
+    }
+    Ok(())
+}

@@ -739,6 +739,21 @@ impl IssueStore for JsonFileStorage {
         &self.root
     }
 
+    fn read_repo_file(
+        &self,
+        rel_path: &str,
+    ) -> Result<Option<String>, crate::storage::PathReadError> {
+        use crate::storage::PathReadError;
+        // Reuse the validated, repo-root-relative working-tree read so the
+        // path-safety and containment checks live in ONE place. An absent file is
+        // mapped to `Ok(None)` (graceful); every other failure is propagated typed.
+        match self.read_path_text(rel_path, None) {
+            Ok((content, _label)) => Ok(Some(content)),
+            Err(PathReadError::NotFound(_)) => Ok(None),
+            Err(other) => Err(other),
+        }
+    }
+
     fn list_gate_presets(&self) -> Result<Vec<crate::gate_presets::PresetInfo>> {
         let manager = crate::gate_presets::PresetManager::new(self.root.clone())?;
         Ok(manager.list_presets())
@@ -862,40 +877,11 @@ impl IssueStore for JsonFileStorage {
     }
 }
 
-/// Validate that `path` is a safe repo-relative input before any I/O.
-///
-/// Rejects:
-/// - empty paths (`""`)
-/// - absolute paths (leading `/`) — every caller must pass a repo-relative path
-/// - any `..` segment used for traversal (e.g. `../etc/passwd`, `a/../b`, `foo/..`)
-///
-/// Allows dots *inside* a segment (e.g. `foo..bar.txt`) because those are
-/// legitimate filenames and cannot traverse upward.
-///
-/// Returned as `PathReadError::InvalidPath` so route handlers can map to 400.
+/// Thin local alias for the shared
+/// [`validate_repo_relative_path`](crate::storage::validate_repo_relative_path),
+/// kept so the existing call sites in this module read unchanged.
 fn validate_repo_relative_input(path: &str) -> Result<(), crate::storage::PathReadError> {
-    use crate::storage::PathReadError;
-
-    if path.is_empty() {
-        return Err(PathReadError::InvalidPath(
-            "path must not be empty".to_string(),
-        ));
-    }
-    if path.starts_with('/') {
-        return Err(PathReadError::InvalidPath(format!(
-            "absolute paths are not permitted: {}",
-            path
-        )));
-    }
-    for segment in path.split('/') {
-        if segment == ".." {
-            return Err(PathReadError::InvalidPath(format!(
-                "'..' segment not permitted: {}",
-                path
-            )));
-        }
-    }
-    Ok(())
+    crate::storage::validate_repo_relative_path(path)
 }
 
 #[cfg(test)]
@@ -920,6 +906,41 @@ mod tests {
         assert!(storage.root.join(ISSUES_DIR).exists());
         assert!(storage.root.join(INDEX_FILE).exists());
         assert!(storage.root.join(GATES_FILE).exists());
+    }
+
+    #[test]
+    fn test_read_repo_file_present_absent_and_path_safety() {
+        // Repo root is the parent of the .jit dir, so create storage at temp/.jit.
+        let temp = TempDir::new().unwrap();
+        let storage = JsonFileStorage::new(temp.path().join(".jit"));
+        storage.init().unwrap();
+
+        // Absent -> None (graceful).
+        assert!(storage
+            .read_repo_file("project-items.md")
+            .unwrap()
+            .is_none());
+
+        // Present -> Some(content).
+        std::fs::write(temp.path().join("project-items.md"), "hello").unwrap();
+        assert_eq!(
+            storage
+                .read_repo_file("project-items.md")
+                .unwrap()
+                .as_deref(),
+            Some("hello")
+        );
+
+        // Path-safety: absolute and `..`-traversal are typed InvalidPath, never a
+        // read outside the repository.
+        assert!(matches!(
+            storage.read_repo_file("/etc/passwd"),
+            Err(crate::storage::PathReadError::InvalidPath(_))
+        ));
+        assert!(matches!(
+            storage.read_repo_file("../escape.md"),
+            Err(crate::storage::PathReadError::InvalidPath(_))
+        ));
     }
 
     #[test]

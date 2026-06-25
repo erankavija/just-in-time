@@ -28,7 +28,7 @@ pub mod worktree_paths;
 pub use claim_coordinator::{ClaimCoordinator, Lease};
 pub use json::JsonFileStorage;
 pub use lock::FileLocker;
-pub use path_errors::PathReadError;
+pub use path_errors::{validate_repo_relative_path, PathReadError};
 
 #[allow(unused_imports)] // Public API used only in tests, not in binary
 pub use memory::InMemoryStorage;
@@ -227,6 +227,44 @@ pub trait IssueStore: Clone {
     /// For file-based storage, this is the .jit directory.
     /// For in-memory storage, this returns a temporary path.
     fn root(&self) -> &std::path::Path;
+
+    /// Read a repository-local text file by its path relative to the repository
+    /// root (the parent of the `.jit` directory).
+    ///
+    /// This is the storage-owned entry point for command/domain code that needs to
+    /// read a config-declared file (e.g. a project-scope item source) WITHOUT
+    /// reaching into the filesystem directly — the layer boundary in CLAUDE.md
+    /// ("storage owns ALL persistence"). The path is enforced repository-local:
+    /// an absolute path or any `..` traversal is rejected with the typed
+    /// [`PathReadError::InvalidPath`] before any I/O.
+    ///
+    /// Returns:
+    /// - `Ok(None)` when the file is **absent** (a graceful "no content" so callers
+    ///   like the project-scope indexer contribute no items rather than erroring),
+    /// - `Ok(Some(content))` when the file is present and readable,
+    /// - `Err` when the path is invalid, escapes the repo root, or the file is
+    ///   present but unreadable.
+    ///
+    /// # Errors
+    ///
+    /// - [`PathReadError::InvalidPath`] for an empty, absolute, or `..`-bearing
+    ///   path.
+    /// - [`PathReadError::OutsideRepoRoot`] when the resolved path escapes the repo
+    ///   root (e.g. via a symlink).
+    /// - [`PathReadError::Other`] for any other read failure.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use jit::storage::{IssueStore, JsonFileStorage};
+    ///
+    /// let store = JsonFileStorage::new(".jit");
+    /// match store.read_repo_file("project-items.md").unwrap() {
+    ///     Some(text) => println!("{} bytes", text.len()),
+    ///     None => println!("no project-items.md present"),
+    /// }
+    /// ```
+    fn read_repo_file(&self, rel_path: &str) -> Result<Option<String>, PathReadError>;
 
     /// List all available gate presets (builtin and custom).
     ///
