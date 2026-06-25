@@ -408,7 +408,7 @@ impl IssueStore for JsonFileStorage {
 
     fn save_issue(&self, mut issue: Issue) -> Result<()> {
         // Update the updated_at timestamp (storage responsibility)
-        issue.updated_at = chrono::Utc::now().to_rfc3339();
+        issue.updated_at = chrono::Utc::now();
 
         let issue_path = self.issue_path(&issue.id);
         let index_lock_path = self.root.join(".index.lock");

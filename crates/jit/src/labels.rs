@@ -183,26 +183,13 @@ pub fn label_matches(label: &str, pattern: &str) -> bool {
 /// assert!(validate_assignee_format("").is_err());
 /// ```
 pub fn validate_assignee_format(assignee: &str) -> Result<()> {
-    if assignee.is_empty() {
-        return Err(anyhow!("Assignee cannot be empty"));
-    }
-
-    if !assignee.contains(':') {
-        return Err(anyhow!(
-            "Assignee must be in format 'type:identifier' (e.g., 'agent:copilot', 'user:alice'). Got: '{}'",
-            assignee
-        ));
-    }
-
-    let parts: Vec<&str> = assignee.splitn(2, ':').collect();
-    if parts.len() != 2 || parts[0].is_empty() || parts[1].is_empty() {
-        return Err(anyhow!(
-            "Assignee must be in format 'type:identifier' with non-empty type and identifier. Got: '{}'",
-            assignee
-        ));
-    }
-
-    Ok(())
+    // Single source of truth for the `{type}:{identifier}` split lives in
+    // `Assignee::from_str`; this is the thin `anyhow`-returning adapter for
+    // callers that only need to validate (not retain) the parsed value.
+    assignee
+        .parse::<crate::domain::Assignee>()
+        .map(|_| ())
+        .map_err(|e| anyhow!(e.to_string()))
 }
 
 #[cfg(test)]

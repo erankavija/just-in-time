@@ -142,7 +142,7 @@ async fn get_graph<S: IssueStore>(
             label: issue.title.clone(),
             state: issue.state,
             priority: issue.priority,
-            assignee: issue.assignee.clone(),
+            assignee: issue.assignee.as_ref().map(|a| a.to_string()),
             labels: issue.labels.clone(),
             blocked: issue.is_blocked(&issue_map),
         })

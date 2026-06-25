@@ -74,7 +74,11 @@ impl<S: IssueStore> CommandExecutor<S> {
                 }
             }
             if let Some(ref assignee) = assignee_filter {
-                if issue.assignee.as_ref() != Some(assignee) {
+                if !issue
+                    .assignee
+                    .as_ref()
+                    .is_some_and(|a| a == assignee.as_str())
+                {
                     return false;
                 }
             }

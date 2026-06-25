@@ -4,7 +4,7 @@
 //! Uses query filter engine to select issues and applies operations atomically per-issue.
 
 use super::*;
-use crate::domain::{Issue, Priority, State};
+use crate::domain::{Assignee, Issue, Priority, State};
 use crate::query_engine::QueryFilter;
 use serde::Serialize;
 
@@ -321,10 +321,13 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
-        // Apply assignee change
+        // Apply assignee change. The format was already checked in
+        // `validate_update`; parsing here routes the value through the one
+        // `Assignee` path so the stored field is never a raw string.
         if let Some(ref assignee) = operations.assignee {
-            if updated.assignee.as_ref() != Some(assignee) {
-                updated.assignee = Some(assignee.clone());
+            let assignee: crate::domain::Assignee = assignee.parse()?;
+            if updated.assignee.as_ref() != Some(&assignee) {
+                updated.assignee = Some(assignee);
                 modified_fields.push("assignee".to_string());
             }
         } else if operations.unassign && updated.assignee.is_some() {
@@ -438,18 +441,19 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         // Assignee change
+        let current_assignee = issue.assignee.as_ref().map(Assignee::to_string);
         if let Some(ref assignee) = operations.assignee {
-            if issue.assignee.as_ref() != Some(assignee) {
+            if current_assignee.as_deref() != Some(assignee.as_str()) {
                 changes.push(format!(
                     "assignee: {} → {}",
-                    issue.assignee.as_deref().unwrap_or("none"),
+                    current_assignee.as_deref().unwrap_or("none"),
                     assignee
                 ));
             }
         } else if operations.unassign && issue.assignee.is_some() {
             changes.push(format!(
                 "assignee: {} → none",
-                issue.assignee.as_deref().unwrap_or("none")
+                current_assignee.as_deref().unwrap_or("none")
             ));
         }
 
@@ -488,7 +492,9 @@ impl<S: IssueStore> CommandExecutor<S> {
             updated.labels.retain(|l| l != label);
         }
         if let Some(ref assignee) = operations.assignee {
-            updated.assignee = Some(assignee.clone());
+            // Projection only feeds label/state rules; a malformed assignee here
+            // (rejected later by `validate_update`) is simply dropped.
+            updated.assignee = assignee.parse().ok();
         } else if operations.unassign {
             updated.assignee = None;
         }
@@ -583,8 +589,8 @@ mod tests {
             documents: vec![],
             labels: labels.iter().map(|s| s.to_string()).collect(),
             content_format: None,
-            created_at: "2024-01-01T00:00:00Z".to_string(),
-            updated_at: "2024-01-01T00:00:00Z".to_string(),
+            created_at: "2024-01-01T00:00:00Z".parse().unwrap(),
+            updated_at: "2024-01-01T00:00:00Z".parse().unwrap(),
         }
     }
 
@@ -981,7 +987,7 @@ mod tests {
 
         // Verify assignee set correctly
         let updated = executor.get_issue("1").unwrap();
-        assert_eq!(updated.assignee, Some("agent:copilot".to_string()));
+        assert_eq!(updated.assignee, Some("agent:copilot".parse().unwrap()));
     }
 
     #[test]

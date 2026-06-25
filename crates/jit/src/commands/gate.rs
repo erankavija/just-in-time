@@ -360,6 +360,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         by: Option<String>,
         force: bool,
     ) -> Result<GatePassOutcome> {
+        // Validate the actor through the one `Assignee` path before it is stored
+        // on the gate state.
+        let by = by
+            .map(|s| s.parse::<crate::domain::Assignee>())
+            .transpose()?;
         let full_id = self.storage.resolve_issue_id(issue_id)?;
 
         // Collect warnings instead of printing
@@ -433,7 +438,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         self.storage.save_issue(issue)?;
 
         // Log event
-        let event = Event::new_gate_passed(issue_id, gate_key, by);
+        let event = Event::new_gate_passed(issue_id, gate_key, by.map(|a| a.to_string()));
         self.storage.append_event(&event)?;
 
         // Check if Gated issue can now transition to Done
@@ -534,6 +539,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         gate_key: String,
         by: Option<String>,
     ) -> Result<Vec<String>> {
+        // Validate the actor through the one `Assignee` path before it is stored
+        // on the gate state.
+        let by = by
+            .map(|s| s.parse::<crate::domain::Assignee>())
+            .transpose()?;
         let full_id = self.storage.resolve_issue_id(issue_id)?;
 
         // Collect warnings instead of printing
@@ -575,7 +585,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         self.storage.save_issue(issue)?;
 
         // Log event
-        let event = Event::new_gate_failed(issue_id, gate_key, by);
+        let event = Event::new_gate_failed(issue_id, gate_key, by.map(|a| a.to_string()));
         self.storage.append_event(&event)?;
 
         Ok(warnings)

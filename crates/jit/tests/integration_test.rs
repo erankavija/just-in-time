@@ -509,7 +509,7 @@ fn test_gates() {
 
     // Pass gate
     let output = Command::new(jit)
-        .args(["gate", "pass", &id, "tests", "-b", "ci"])
+        .args(["gate", "pass", &id, "tests", "-b", "ci:bot"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -546,7 +546,7 @@ fn test_assignment_workflow() {
 
     // Assign issue
     Command::new(jit)
-        .args(["issue", "assign", &id, "alice"])
+        .args(["issue", "assign", &id, "human:alice"])
         .current_dir(temp.path())
         .output()
         .unwrap();

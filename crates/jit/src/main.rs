@@ -1500,7 +1500,10 @@ fn run() -> Result<()> {
                         let msg = format!(
                             "Assigned issue {} to {}",
                             issue.short_id(),
-                            issue.assignee.as_deref().unwrap_or("unknown")
+                            issue
+                                .assignee
+                                .as_ref()
+                                .map_or_else(|| "unknown".to_string(), |a| a.to_string())
                         );
                         let output = JsonOutput::success(issue, "issue assign").with_message(msg);
                         println!("{}", output.to_json_string()?);
@@ -1530,7 +1533,10 @@ fn run() -> Result<()> {
                             let msg = format!(
                                 "Assigned issue {} to {} (assign-only)",
                                 issue.short_id(),
-                                issue.assignee.as_deref().unwrap_or("unknown")
+                                issue
+                                    .assignee
+                                    .as_ref()
+                                    .map_or_else(|| "unknown".to_string(), |a| a.to_string())
                             );
                             let output =
                                 JsonOutput::success(issue, "issue claim").with_message(msg);

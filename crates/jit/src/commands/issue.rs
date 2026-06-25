@@ -108,7 +108,11 @@ impl<S: IssueStore> CommandExecutor<S> {
                     }
                 }
                 if let Some(ref assignee) = assignee_filter {
-                    if issue.assignee.as_ref() != Some(assignee) {
+                    if !issue
+                        .assignee
+                        .as_ref()
+                        .is_some_and(|a| a == assignee.as_str())
+                    {
                         return false;
                     }
                 }
@@ -560,9 +564,12 @@ impl<S: IssueStore> CommandExecutor<S> {
             warnings.push(warning);
         }
 
+        // Validate through the one `Assignee` path so `assign` cannot persist a
+        // raw, malformed assignee (this command previously skipped validation).
+        let assignee: crate::domain::Assignee = assignee.parse()?;
         let mut issue = self.storage.load_issue(&full_id)?;
         // No-op if already assigned to the same assignee: don't bump updated_at.
-        if issue.assignee.as_deref() == Some(assignee.as_str()) {
+        if issue.assignee.as_ref() == Some(&assignee) {
             return Ok(warnings);
         }
         issue.assignee = Some(assignee);
@@ -622,9 +629,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         // If we get here, prechecks passed (or issue wasn't Ready)
-        // Now assign the issue
+        // Now assign the issue, validating through the one `Assignee` path.
         let mut issue = self.storage.load_issue(&full_id)?;
-        issue.assignee = Some(assignee.clone());
+        issue.assignee = Some(assignee.parse::<crate::domain::Assignee>()?);
 
         let issue_id = issue.id.clone();
         self.storage.save_issue(issue)?;
@@ -682,7 +689,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Log release event (after any state-change event the chokepoint emitted).
         let event = Event::new_issue_released(
             full_id.clone(),
-            old_assignee.unwrap_or_default(),
+            old_assignee.map(|a| a.to_string()).unwrap_or_default(),
             reason.to_string(),
         );
         self.storage.append_event(&event)?;
@@ -1013,7 +1020,7 @@ enforce_leases = "off"
         // Verify issue transitioned to InProgress and is assigned
         let issue = executor.storage.load_issue(&issue_id).unwrap();
         assert_eq!(issue.state, State::InProgress);
-        assert_eq!(issue.assignee, Some("agent:test".to_string()));
+        assert_eq!(issue.assignee, Some("agent:test".parse().unwrap()));
     }
 
     #[test]

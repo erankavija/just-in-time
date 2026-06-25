@@ -2834,7 +2834,7 @@ source-of-truth = "markdown-first"
             gate.to_string(),
             GateState {
                 status: GateStatus::Passed,
-                updated_by: Some("ci:x".to_string()),
+                updated_by: Some("ci:x".parse().unwrap()),
                 updated_at: fixed_now() - chrono::Duration::hours(hours_ago),
             },
         );

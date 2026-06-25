@@ -101,7 +101,11 @@ impl<S: IssueStore> CommandExecutor<S> {
                     GateRunStatus::Failed | GateRunStatus::Error => GateStatus::Failed,
                     _ => GateStatus::Pending,
                 },
-                updated_by: result.by.clone(),
+                updated_by: result
+                    .by
+                    .as_deref()
+                    .map(str::parse::<crate::domain::Assignee>)
+                    .transpose()?,
                 updated_at: result.started_at,
             },
         );

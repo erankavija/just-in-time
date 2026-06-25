@@ -913,7 +913,7 @@ mod fresh_evidence {
             "code-review".to_string(),
             GateState {
                 status: GateStatus::Passed,
-                updated_by: Some("agent:reviewer".to_string()),
+                updated_by: Some("agent:reviewer".parse().unwrap()),
                 updated_at: fixed_now() - Duration::hours(hours_ago),
             },
         );

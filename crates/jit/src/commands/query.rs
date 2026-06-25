@@ -108,7 +108,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             issues.retain(|i| i.state == state);
         }
         if let Some(assignee) = assignee_filter {
-            issues.retain(|i| i.assignee.as_deref() == Some(assignee));
+            issues.retain(|i| i.assignee.as_ref().is_some_and(|a| a == assignee));
         }
         if let Some(priority) = priority_filter {
             issues.retain(|i| i.priority == priority);

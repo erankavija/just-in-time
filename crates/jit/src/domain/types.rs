@@ -156,13 +156,210 @@ pub enum GateStatus {
     Failed,
 }
 
+/// A parsed assignee in the documented `{kind}:{identifier}` form.
+///
+/// Issues and gate states identify the responsible agent or person with a
+/// `kind:identifier` string (e.g. `agent:copilot`, `human:alice`,
+/// `ci:github-actions`). This newtype is the single place that format is parsed
+/// and validated: every value stored in [`Issue::assignee`] or
+/// [`GateState::updated_by`] is built through [`Assignee::from_str`] (directly or
+/// via deserialization), so a raw, unvalidated string can never reach storage.
+///
+/// The fields are private; construct an `Assignee` by parsing (`str::parse` /
+/// [`FromStr`]) and read the parts via [`Assignee::kind`] /
+/// [`Assignee::identifier`]. It serializes transparently as the
+/// `kind:identifier` string (through [`Display`] / [`FromStr`]), so on-disk
+/// issue JSON is unchanged.
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::Assignee;
+/// use std::str::FromStr;
+///
+/// let a = Assignee::from_str("agent:copilot").unwrap();
+/// assert_eq!(a.kind(), "agent");
+/// assert_eq!(a.identifier(), "copilot");
+/// assert_eq!(a.to_string(), "agent:copilot");
+///
+/// // Only the first colon splits, so identifiers may contain colons.
+/// let a: Assignee = "ci:job:42".parse().unwrap();
+/// assert_eq!(a.identifier(), "job:42");
+///
+/// // Malformed values are rejected.
+/// assert!(Assignee::from_str("nocolon").is_err());
+/// assert!(Assignee::from_str(":missing-kind").is_err());
+/// assert!(Assignee::from_str("missing-id:").is_err());
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Assignee {
+    kind: String,
+    identifier: String,
+}
+
+impl Assignee {
+    /// The kind segment before the first colon (e.g. `agent` in `agent:copilot`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let a: jit::domain::Assignee = "agent:copilot".parse().unwrap();
+    /// assert_eq!(a.kind(), "agent");
+    /// ```
+    pub fn kind(&self) -> &str {
+        &self.kind
+    }
+
+    /// The identifier segment after the first colon (e.g. `copilot`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let a: jit::domain::Assignee = "agent:copilot".parse().unwrap();
+    /// assert_eq!(a.identifier(), "copilot");
+    /// ```
+    pub fn identifier(&self) -> &str {
+        &self.identifier
+    }
+}
+
+/// Error returned when a string cannot be parsed as an [`Assignee`].
+///
+/// Distinguishes the failure modes so callers (e.g. agent-identity validation)
+/// can map them to their own user-facing messages while reusing the one parse
+/// path.
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::{Assignee, AssigneeParseError};
+/// use std::str::FromStr;
+///
+/// assert_eq!(Assignee::from_str(""), Err(AssigneeParseError::Empty));
+/// assert!(matches!(
+///     Assignee::from_str("nocolon"),
+///     Err(AssigneeParseError::MissingSeparator(_))
+/// ));
+/// assert!(matches!(
+///     Assignee::from_str(":id"),
+///     Err(AssigneeParseError::EmptyKind(_))
+/// ));
+/// assert!(matches!(
+///     Assignee::from_str("kind:"),
+///     Err(AssigneeParseError::EmptyIdentifier(_))
+/// ));
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum AssigneeParseError {
+    /// The input was empty.
+    #[error("Assignee cannot be empty")]
+    Empty,
+    /// The input had no `:` separating kind from identifier.
+    #[error(
+        "Assignee must be in format 'type:identifier' (e.g. 'agent:copilot', 'human:alice'); got '{0}'"
+    )]
+    MissingSeparator(String),
+    /// The kind segment (before the colon) was empty.
+    #[error(
+        "Assignee kind cannot be empty; expected 'type:identifier' (e.g. 'agent:copilot'); got '{0}'"
+    )]
+    EmptyKind(String),
+    /// The identifier segment (after the colon) was empty.
+    #[error(
+        "Assignee identifier cannot be empty; expected 'type:identifier' (e.g. 'agent:copilot'); got '{0}'"
+    )]
+    EmptyIdentifier(String),
+}
+
+impl FromStr for Assignee {
+    type Err = AssigneeParseError;
+
+    /// Parse a `kind:identifier` assignee, splitting on the first colon only.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::Assignee;
+    /// use std::str::FromStr;
+    ///
+    /// let a = Assignee::from_str("human:alice").unwrap();
+    /// assert_eq!((a.kind(), a.identifier()), ("human", "alice"));
+    /// assert!(Assignee::from_str("alice").is_err());
+    /// ```
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.is_empty() {
+            return Err(AssigneeParseError::Empty);
+        }
+        let (kind, identifier) = s
+            .split_once(':')
+            .ok_or_else(|| AssigneeParseError::MissingSeparator(s.to_string()))?;
+        if kind.is_empty() {
+            return Err(AssigneeParseError::EmptyKind(s.to_string()));
+        }
+        if identifier.is_empty() {
+            return Err(AssigneeParseError::EmptyIdentifier(s.to_string()));
+        }
+        Ok(Assignee {
+            kind: kind.to_string(),
+            identifier: identifier.to_string(),
+        })
+    }
+}
+
+impl std::fmt::Display for Assignee {
+    /// Render as the canonical `kind:identifier` string.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::Assignee;
+    ///
+    /// let a: Assignee = "ci:github-actions".parse().unwrap();
+    /// assert_eq!(a.to_string(), "ci:github-actions");
+    /// ```
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}:{}", self.kind, self.identifier)
+    }
+}
+
+/// Compare an [`Assignee`] against a raw `kind:identifier` string without
+/// allocating, so filter predicates can match a parsed assignee to user input.
+impl PartialEq<str> for Assignee {
+    fn eq(&self, other: &str) -> bool {
+        match other.split_once(':') {
+            Some((kind, identifier)) => self.kind == kind && self.identifier == identifier,
+            None => false,
+        }
+    }
+}
+
+impl Serialize for Assignee {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.collect_str(self)
+    }
+}
+
+impl<'de> Deserialize<'de> for Assignee {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = String::deserialize(deserializer)?;
+        raw.parse().map_err(serde::de::Error::custom)
+    }
+}
+
 /// State of a quality gate for a specific issue
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct GateState {
     /// Current status of the gate
     pub status: GateStatus,
     /// Who updated the gate status (e.g., "human:alice", "ci:github-actions")
-    pub updated_by: Option<String>,
+    #[schemars(with = "Option<String>")]
+    pub updated_by: Option<Assignee>,
     /// When the gate was last updated
     pub updated_at: DateTime<Utc>,
 }
@@ -181,7 +378,8 @@ pub struct Issue {
     /// Priority level
     pub priority: Priority,
     /// Assigned agent or person (format: "type:identifier")
-    pub assignee: Option<String>,
+    #[schemars(with = "Option<String>")]
+    pub assignee: Option<Assignee>,
     /// IDs of issues that must be done first
     pub dependencies: Vec<String>,
     /// Gate keys that must pass before ready/done
@@ -201,16 +399,16 @@ pub struct Issue {
     /// rewritten (skipped on serialize when absent).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub content_format: Option<ContentFormat>,
-    /// RFC 3339 timestamp when issue was created
-    pub created_at: String,
-    /// RFC 3339 timestamp when issue was last updated
-    pub updated_at: String,
+    /// When the issue was created (serialized as an RFC 3339 timestamp)
+    pub created_at: DateTime<Utc>,
+    /// When the issue was last updated (serialized as an RFC 3339 timestamp)
+    pub updated_at: DateTime<Utc>,
 }
 
 impl Issue {
     /// Create a new issue with default values
     pub fn new(title: String, description: String) -> Self {
-        let now = chrono::Utc::now().to_rfc3339();
+        let now = Utc::now();
         Self {
             id: Uuid::new_v4().to_string(),
             title,
@@ -225,7 +423,7 @@ impl Issue {
             documents: Vec::new(),
             labels: Vec::new(),
             content_format: None,
-            created_at: now.clone(),
+            created_at: now,
             updated_at: now,
         }
     }
@@ -241,7 +439,7 @@ impl Issue {
     /// Create a new issue with labels
     #[cfg(test)]
     pub fn new_with_labels(title: String, description: String, labels: Vec<String>) -> Self {
-        let now = chrono::Utc::now().to_rfc3339();
+        let now = Utc::now();
         Self {
             id: Uuid::new_v4().to_string(),
             title,
@@ -256,7 +454,7 @@ impl Issue {
             documents: Vec::new(),
             labels,
             content_format: None,
-            created_at: now.clone(),
+            created_at: now,
             updated_at: now,
         }
     }
@@ -359,7 +557,7 @@ impl From<&Issue> for MinimalIssue {
             title: issue.title.clone(),
             state: issue.state,
             priority: issue.priority,
-            assignee: issue.assignee.clone(),
+            assignee: issue.assignee.as_ref().map(Assignee::to_string),
             labels: issue.labels.clone(),
         }
     }
@@ -434,7 +632,7 @@ impl From<(&Issue, Vec<String>)> for MinimalBlockedIssue {
             title: issue.title.clone(),
             state: issue.state,
             priority: issue.priority,
-            assignee: issue.assignee.clone(),
+            assignee: issue.assignee.as_ref().map(Assignee::to_string),
             labels: issue.labels.clone(),
             blocked_reasons,
         }
@@ -1302,7 +1500,7 @@ mod tests {
             "review".to_string(),
             GateState {
                 status: GateStatus::Failed,
-                updated_by: Some("human:reviewer".to_string()),
+                updated_by: Some("human:reviewer".parse().unwrap()),
                 updated_at: Utc::now(),
             },
         );
@@ -1323,7 +1521,7 @@ mod tests {
             "review".to_string(),
             GateState {
                 status: GateStatus::Passed,
-                updated_by: Some("human:reviewer".to_string()),
+                updated_by: Some("human:reviewer".parse().unwrap()),
                 updated_at: Utc::now(),
             },
         );
@@ -1437,7 +1635,7 @@ mod tests {
             "review".to_string(),
             GateState {
                 status: GateStatus::Passed,
-                updated_by: Some("human:reviewer".to_string()),
+                updated_by: Some("human:reviewer".parse().unwrap()),
                 updated_at: Utc::now(),
             },
         );
@@ -1471,7 +1669,7 @@ mod tests {
             "review".to_string(),
             GateState {
                 status: GateStatus::Failed,
-                updated_by: Some("ci:tests".to_string()),
+                updated_by: Some("ci:tests".parse().unwrap()),
                 updated_at: Utc::now(),
             },
         );
@@ -1824,6 +2022,140 @@ mod tests {
             let priority: Priority = "high".parse().unwrap();
             assert_eq!(priority, Priority::High);
         }
+    }
+
+    mod assignee_tests {
+        use super::*;
+        use std::str::FromStr;
+
+        #[test]
+        fn test_assignee_from_str_accepts_valid() {
+            let a = Assignee::from_str("agent:copilot").unwrap();
+            assert_eq!(a.kind(), "agent");
+            assert_eq!(a.identifier(), "copilot");
+        }
+
+        #[test]
+        fn test_assignee_from_str_splits_on_first_colon_only() {
+            let a = Assignee::from_str("ci:job:42").unwrap();
+            assert_eq!(a.kind(), "ci");
+            assert_eq!(a.identifier(), "job:42");
+        }
+
+        #[test]
+        fn test_assignee_from_str_rejects_empty() {
+            assert_eq!(Assignee::from_str(""), Err(AssigneeParseError::Empty));
+        }
+
+        #[test]
+        fn test_assignee_from_str_rejects_missing_separator() {
+            assert!(matches!(
+                Assignee::from_str("nocolon"),
+                Err(AssigneeParseError::MissingSeparator(_))
+            ));
+        }
+
+        #[test]
+        fn test_assignee_from_str_rejects_empty_parts() {
+            assert!(matches!(
+                Assignee::from_str(":identifier"),
+                Err(AssigneeParseError::EmptyKind(_))
+            ));
+            assert!(matches!(
+                Assignee::from_str("kind:"),
+                Err(AssigneeParseError::EmptyIdentifier(_))
+            ));
+        }
+
+        #[test]
+        fn test_assignee_display_round_trips_through_from_str() {
+            for raw in [
+                "agent:copilot",
+                "human:alice",
+                "ci:github-actions",
+                "ci:job:42",
+            ] {
+                let parsed = Assignee::from_str(raw).unwrap();
+                assert_eq!(parsed.to_string(), raw);
+                assert_eq!(Assignee::from_str(&parsed.to_string()).unwrap(), parsed);
+            }
+        }
+
+        #[test]
+        fn test_assignee_partial_eq_str() {
+            let a = Assignee::from_str("agent:copilot").unwrap();
+            assert!(a == *"agent:copilot");
+            assert!(a != *"agent:other");
+            assert!(a != *"nocolon");
+        }
+
+        #[test]
+        fn test_assignee_serializes_as_plain_string() {
+            let a = Assignee::from_str("human:alice").unwrap();
+            assert_eq!(serde_json::to_string(&a).unwrap(), "\"human:alice\"");
+        }
+
+        #[test]
+        fn test_assignee_deserializes_from_string_round_trip() {
+            let a: Assignee = serde_json::from_str("\"ci:github-actions\"").unwrap();
+            assert_eq!(a, Assignee::from_str("ci:github-actions").unwrap());
+        }
+
+        #[test]
+        fn test_assignee_deserialize_rejects_malformed_string() {
+            assert!(serde_json::from_str::<Assignee>("\"nocolon\"").is_err());
+        }
+
+        #[test]
+        fn test_issue_assignee_serializes_unchanged() {
+            let mut issue = Issue::new("Test".to_string(), "Desc".to_string());
+            issue.assignee = Some(Assignee::from_str("agent:copilot").unwrap());
+
+            let json = serde_json::to_string(&issue).unwrap();
+            assert!(json.contains("\"assignee\":\"agent:copilot\""));
+
+            let deserialized: Issue = serde_json::from_str(&json).unwrap();
+            assert_eq!(deserialized.assignee, issue.assignee);
+        }
+    }
+
+    #[test]
+    fn test_issue_timestamps_serialize_as_rfc3339() {
+        let issue = Issue::new("Test".to_string(), "Desc".to_string());
+
+        let value: serde_json::Value =
+            serde_json::from_str(&serde_json::to_string(&issue).unwrap()).unwrap();
+        let created = value["created_at"].as_str().unwrap();
+
+        // chrono's default serde emits RFC 3339, parseable back to the same instant.
+        let reparsed = DateTime::parse_from_rfc3339(created).unwrap();
+        assert_eq!(reparsed.with_timezone(&Utc), issue.created_at);
+    }
+
+    #[test]
+    fn test_issue_loads_legacy_offset_timestamp() {
+        // Issue files predating the DateTime migration store `+00:00` offsets
+        // rather than chrono's `Z`; both are RFC 3339 and must still load.
+        let json = r#"{
+            "id": "11111111-2222-3333-4444-555555555555",
+            "title": "Legacy",
+            "description": "Body",
+            "state": "backlog",
+            "priority": "normal",
+            "assignee": "agent:copilot",
+            "dependencies": [],
+            "gates_required": [],
+            "gates_status": {},
+            "context": {},
+            "documents": [],
+            "labels": [],
+            "created_at": "2026-06-22T21:59:04.464226946+00:00",
+            "updated_at": "2026-06-22T21:59:04.464226946+00:00"
+        }"#;
+
+        let issue: Issue = serde_json::from_str(json).unwrap();
+        assert_eq!(issue.assignee.unwrap().to_string(), "agent:copilot");
+        assert_eq!(issue.created_at.timezone(), Utc);
     }
 }
 
