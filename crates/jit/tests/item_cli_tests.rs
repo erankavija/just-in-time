@@ -85,9 +85,21 @@ fn test_item_list_kind_filter() {
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(json["count"].as_u64().unwrap(), 1);
 
-    // An unknown kind yields an empty result (not an error).
+    // `decision` is now a shipped built-in kind, so it is recognized; this issue
+    // has no `## Decisions` section, so the recognized kind yields 0 items (not an
+    // error). (Decision indexing is covered in decision_kind_tests.rs.)
     let output = Command::new(jit_binary())
         .args(["item", "list", "--kind", "decision", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["count"].as_u64().unwrap(), 0);
+
+    // A genuinely unknown kind name also yields an empty result (not an error).
+    let output = Command::new(jit_binary())
+        .args(["item", "list", "--kind", "nonexistent", "--json"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -177,17 +189,17 @@ fn test_item_search_by_text() {
 #[test]
 fn test_item_custom_kind_from_config() {
     let temp = setup_test_repo();
-    // Declare a domain-agnostic custom kind in config; the engine indexes it
-    // purely from its tuple, never from its name (REQ-01). An explicit
-    // declaration sets all six required fields.
+    // Declare a domain-agnostic custom kind in config (a name JIT does NOT ship as
+    // a built-in); the engine indexes it purely from its tuple, never from its
+    // name (REQ-01). An explicit declaration sets all six required fields.
     let config_path = temp.path().join(".jit").join("config.toml");
     let mut config = std::fs::read_to_string(&config_path).unwrap_or_default();
     config.push_str(
-        "\n[item_kinds.decision]\n\
-         section = \"decisions\"\n\
-         id-pattern = \"D-\\\\d+\"\n\
+        "\n[item_kinds.adr]\n\
+         section = \"records\"\n\
+         id-pattern = \"ADR-[0-9]+\"\n\
          markers = []\n\
-         link-namespaces = [\"per\"]\n\
+         link-namespaces = [\"records\"]\n\
          scope = \"issue\"\n\
          source-of-truth = \"markdown-first\"\n",
     );
@@ -195,12 +207,12 @@ fn test_item_custom_kind_from_config() {
 
     create_issue(
         temp.path(),
-        "With decisions",
-        "## Decisions\n\n- D-1: use json storage\n- D-2: atomic writes\n",
+        "With records",
+        "## Records\n\n- ADR-1: use json storage\n- ADR-2: atomic writes\n",
     );
 
     let output = Command::new(jit_binary())
-        .args(["item", "list", "--kind", "decision", "--json"])
+        .args(["item", "list", "--kind", "adr", "--json"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -211,8 +223,8 @@ fn test_item_custom_kind_from_config() {
     );
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(json["count"].as_u64().unwrap(), 2);
-    assert_eq!(json["items"][0]["kind"].as_str().unwrap(), "decision");
-    assert_eq!(json["items"][0]["self_id"].as_str().unwrap(), "D-1");
+    assert_eq!(json["items"][0]["kind"].as_str().unwrap(), "adr");
+    assert_eq!(json["items"][0]["self_id"].as_str().unwrap(), "ADR-1");
 }
 
 #[test]

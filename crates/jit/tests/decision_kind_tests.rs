@@ -1,35 +1,36 @@
-//! Integration tests for the markdown-first `decision` item kind (issue
-//! `b629686b`).
+//! Integration tests for the SHIPPED, built-in markdown-first `decision` item
+//! kind (issue `b629686b`).
 //!
-//! A `decision` is a config-declared item kind: decisions authored as list
-//! entries under a `decisions` section of an issue description become
-//! addressable, queryable items, indexed through the SAME generic triple-driven
-//! parse path the built-in `requirement` kind uses. No engine code special-cases
-//! the kind — it is purely the six-tuple `[item_kinds.decision]` config below.
+//! JIT ships `decision` as a built-in default item kind (alongside
+//! `requirement`), so a default-initialized repo — with NO custom `[item_kinds]`
+//! config — indexes decisions authored as list entries under a `## Decisions`
+//! section of an issue description. Decisions become addressable, queryable items
+//! through the SAME generic triple-driven parse path `requirement` uses; no engine
+//! code special-cases the kind (its tuple lives in the domain layer's
+//! `builtin_default_kinds`).
 //!
-//! The fixture declared throughout these tests is:
+//! The built-in `decision` tuple is:
 //!
-//! ```toml
-//! [item_kinds.decision]
-//! section = "decisions"          # decisions are authored under a `## Decisions` heading
-//! id-pattern = "D-[0-9]+"        # self-ids read D-1, D-2, ... (e.g. D-01)
-//! markers = []                   # decisions need no marker; every matching line qualifies
-//! link-namespaces = ["per"]      # a `per:<issue>/D-01` label references a decision
-//! scope = "issue"                # decisions live in issue descriptions
-//! source-of-truth = "markdown-first"
+//! ```text
+//! section          = "decisions"          # authored under a `## Decisions` heading
+//! id-pattern       = "D-[0-9]+"           # self-ids read D-1, D-2, ... (e.g. D-01)
+//! markers          = []                   # no marker; every matching line qualifies
+//! link-namespaces  = ["per"]             # a `per:<issue>/D-01` label references a decision
+//! scope            = "issue"              # decisions live in issue descriptions
+//! source-of-truth  = "markdown-first"
 //! ```
 //!
-//! Coverage of the issue's `[hard]` success criteria:
-//! - REQ-01: [`test_item_list_kind_decision_returns_parsed_decisions`] runs the
-//!   real `jit` binary so `jit item list --kind decision` returns decision items
-//!   parsed from issue descriptions.
-//! - REQ-02: [`test_per_label_resolves_decision`] proves a
-//!   `per:<issue>/D-01` label resolves to the addressed decision item through the
-//!   existing generic [`resolve_link_label`] resolver (the `per` namespace belongs
-//!   to the declared `decision` kind, so no resolver change is needed).
-//! - REQ-03: [`test_markdown_is_sole_source_for_decisions`] proves the markdown
-//!   description is the only source — editing it changes the index and no parallel
-//!   structured store is written under `.jit/`.
+//! Coverage of the issue's `[hard]` success criteria, all against a DEFAULT repo:
+//! - REQ-01: [`test_default_repo_item_list_kind_decision_returns_decisions`] runs
+//!   the real `jit` binary so `jit item list --kind decision` returns decisions
+//!   parsed from an issue description, with NO custom config.
+//! - REQ-02: [`test_default_repo_per_label_resolves_decision`] proves a
+//!   `per:<issue>/D-01` label resolves to the addressed decision through the
+//!   existing generic `resolve_link_label` (the `per` namespace is recognized
+//!   because the built-in `decision` kind ships it).
+//! - REQ-03: [`test_default_repo_markdown_is_sole_source_for_decisions`] proves
+//!   the markdown description is the only source — editing it changes the index and
+//!   no parallel structured store is written under `.jit/`.
 //! - REQ-04: every test below runs under `cargo test`.
 
 use jit::commands::CommandExecutor;
@@ -40,33 +41,11 @@ use std::path::Path;
 use std::process::Command;
 use tempfile::TempDir;
 
-/// The `[item_kinds.decision]` TOML fixture under test: the six-tuple declaring a
-/// markdown-first, issue-scoped `decision` kind whose self-ids match `D-[0-9]+`
-/// and whose link namespace is `per`.
-const DECISION_KIND_CONFIG: &str = "\n[item_kinds.decision]\n\
-     section = \"decisions\"\n\
-     id-pattern = \"D-[0-9]+\"\n\
-     markers = []\n\
-     link-namespaces = [\"per\"]\n\
-     scope = \"issue\"\n\
-     source-of-truth = \"markdown-first\"\n";
-
-/// The built-in `requirement` kind, re-declared explicitly so a fixture that
-/// declares `[item_kinds.decision]` keeps the requirement default too (an explicit
-/// `[item_kinds]` table REPLACES the implicit default).
-const REQUIREMENT_KIND_CONFIG: &str = "\n[item_kinds.requirement]\n\
-     section = \"success_criteria\"\n\
-     id-pattern = \"[A-Z][A-Z0-9]*-[0-9]+\"\n\
-     markers = [\"[hard]\"]\n\
-     link-namespaces = [\"satisfies\"]\n\
-     scope = \"issue\"\n\
-     source-of-truth = \"markdown-first\"\n";
-
 fn jit_binary() -> &'static str {
     env!("CARGO_BIN_EXE_jit")
 }
 
-/// `jit init` a fresh repo in a tempdir.
+/// `jit init` a fresh, DEFAULT repo in a tempdir (no custom `[item_kinds]`).
 fn setup_test_repo() -> TempDir {
     let temp = TempDir::new().unwrap();
     let output = Command::new(jit_binary())
@@ -76,15 +55,6 @@ fn setup_test_repo() -> TempDir {
         .expect("Failed to run jit init");
     assert!(output.status.success(), "jit init failed");
     temp
-}
-
-/// Append the `decision` kind declaration to a repo's `.jit/config.toml`,
-/// preserving whatever `jit init` wrote.
-fn declare_decision_kind(repo: &Path) {
-    let config_path = repo.join(".jit").join("config.toml");
-    let mut config = std::fs::read_to_string(&config_path).unwrap_or_default();
-    config.push_str(DECISION_KIND_CONFIG);
-    std::fs::write(&config_path, config).unwrap();
 }
 
 /// Create an issue with `body` through the real CLI and return its 8-char short id.
@@ -105,11 +75,11 @@ fn create_issue(repo: &Path, title: &str, body: &str) -> String {
 }
 
 #[test]
-fn test_item_list_kind_decision_returns_parsed_decisions() {
-    // REQ-01: `jit item list --kind decision` returns decision items parsed from
-    // an issue description — exercised through the actual binary.
+fn test_default_repo_item_list_kind_decision_returns_decisions() {
+    // REQ-01: in a DEFAULT-initialized repo (no custom config), `jit item list
+    // --kind decision` returns decision items parsed from an issue's `## Decisions`
+    // section — exercised through the actual binary.
     let temp = setup_test_repo();
-    declare_decision_kind(temp.path());
     let short = create_issue(
         temp.path(),
         "Architecture",
@@ -142,11 +112,10 @@ fn test_item_list_kind_decision_returns_parsed_decisions() {
 }
 
 #[test]
-fn test_item_show_resolves_decision_by_qualified_id() {
-    // REQ-01: a decision item resolves by its derived qualified id through the
-    // real `jit item show` binary.
+fn test_default_repo_item_show_resolves_decision_by_qualified_id() {
+    // REQ-01: a decision resolves by its derived qualified id through the real
+    // `jit item show` binary, in a default repo.
     let temp = setup_test_repo();
-    declare_decision_kind(temp.path());
     let short = create_issue(
         temp.path(),
         "Architecture",
@@ -174,15 +143,14 @@ fn test_item_show_resolves_decision_by_qualified_id() {
         .contains("json storage"));
 }
 
-/// Build a [`JsonFileStorage`]-backed executor in `repo` whose `.jit/config.toml`
-/// declares BOTH the `requirement` and `decision` kinds, then seed `issues`.
+/// Build a [`JsonFileStorage`]-backed executor over a DEFAULT `.jit` repo (no
+/// custom `[item_kinds]` config), seed `issues`, and return it paired with the
+/// seeded issues' short ids in insertion order.
 ///
-/// A real on-disk config is required so the executor's cached config registers
-/// `per` as the `decision` kind's link namespace (the in-memory storage path used
-/// elsewhere would not load a `config.toml`). Returns the executor; the caller
-/// keeps the `TempDir` alive for the test's duration. Returns the executor paired
-/// with the short ids of the seeded issues in insertion order.
-fn executor_with_decisions(
+/// With no config, the executor resolves the BUILT-IN default kind set, which
+/// ships `decision` (and therefore the `per` link namespace) — so this proves the
+/// shipped behavior, not a test-only override.
+fn default_executor_with(
     repo: &Path,
     issues: Vec<(&str, &str)>,
 ) -> (CommandExecutor<JsonFileStorage>, Vec<String>) {
@@ -190,8 +158,6 @@ fn executor_with_decisions(
     std::fs::create_dir_all(&jit_dir).unwrap();
     let storage = JsonFileStorage::new(&jit_dir);
     storage.init().unwrap();
-    let config = format!("{REQUIREMENT_KIND_CONFIG}{DECISION_KIND_CONFIG}");
-    std::fs::write(jit_dir.join("config.toml"), config).unwrap();
     let mut shorts = Vec::new();
     for (title, body) in issues {
         let issue = Issue::new(title.to_string(), body.to_string());
@@ -202,13 +168,13 @@ fn executor_with_decisions(
 }
 
 #[test]
-fn test_per_label_resolves_decision() {
+fn test_default_repo_per_label_resolves_decision() {
     // REQ-02: a `per:<issue>/D-01` label resolves to the addressed decision item
-    // through the existing generic `resolve_link_label` — the `per` namespace is
-    // recognized solely because the declared `decision` kind lists it, with NO
-    // resolver change.
+    // through the existing generic `resolve_link_label`, with NO custom config —
+    // the `per` namespace is recognized because the BUILT-IN `decision` kind ships
+    // it.
     let temp = TempDir::new().unwrap();
-    let (exec, shorts) = executor_with_decisions(
+    let (exec, shorts) = default_executor_with(
         temp.path(),
         vec![("Architecture", "## Decisions\n\n- D-01: use json storage\n")],
     );
@@ -231,13 +197,12 @@ fn test_per_label_resolves_decision() {
 }
 
 #[test]
-fn test_markdown_is_sole_source_for_decisions() {
+fn test_default_repo_markdown_is_sole_source_for_decisions() {
     // REQ-03: the markdown description is the ONLY source for decision items. The
     // index is a pure projection — there is no parallel structured store — so
     // editing the description (and nothing else) changes what `jit item list`
     // returns, and no decision store file is written under `.jit/`.
     let temp = setup_test_repo();
-    declare_decision_kind(temp.path());
     let short = create_issue(
         temp.path(),
         "Architecture",
@@ -266,8 +231,9 @@ fn test_markdown_is_sole_source_for_decisions() {
             continue;
         }
         let name = path.file_name().unwrap().to_string_lossy().to_string();
-        // The issue file legitimately holds the markdown (the single source); any
-        // OTHER top-level `.jit` file must not duplicate the decision id.
+        // Any TOP-LEVEL `.jit` file (config/registry/event log) must not duplicate
+        // the decision id; the issue's markdown (under `issues/`) is the sole
+        // source and is checked separately below.
         if name.ends_with(".json") || name.ends_with(".jsonl") || name.ends_with(".toml") {
             let contents = std::fs::read_to_string(&path).unwrap();
             assert!(
@@ -277,18 +243,13 @@ fn test_markdown_is_sole_source_for_decisions() {
             );
         }
     }
-    // The decision DOES live in the issue's description (the sole source).
-    let issue_json =
-        std::fs::read_to_string(jit_dir.join("issues").join(format!("{short}-0000.json")));
-    // The issue filename uses the full id, not the short id, so glob the dir.
-    let mut found_in_issue = issue_json.map(|c| c.contains("D-01")).unwrap_or(false);
-    if !found_in_issue {
-        for entry in std::fs::read_dir(jit_dir.join("issues")).unwrap() {
-            let contents = std::fs::read_to_string(entry.unwrap().path()).unwrap();
-            if contents.contains(short.as_str()) && contents.contains("D-01") {
-                found_in_issue = true;
-                break;
-            }
+    // The decision DOES live in the owning issue's description (the sole source).
+    let mut found_in_issue = false;
+    for entry in std::fs::read_dir(jit_dir.join("issues")).unwrap() {
+        let contents = std::fs::read_to_string(entry.unwrap().path()).unwrap();
+        if contents.contains(short.as_str()) && contents.contains("D-01") {
+            found_in_issue = true;
+            break;
         }
     }
     assert!(

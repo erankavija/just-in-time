@@ -17,8 +17,9 @@
 //! `(section, id-pattern, marker(s), link-namespace(s))` that says which entries
 //! are addressable and how. `requirement` is just one kind; the model is generic
 //! and no kind NAME is interpreted by this module — only the four-tuple is
-//! (REQ-01). The built-in default [`ItemKind::requirement_default`] reproduces
-//! the exact triple the `label-coverage` rule already consumes, so the existing
+//! (REQ-01). The built-in defaults ([`builtin_default_kinds`]) ship `requirement`
+//! and `decision` markdown-first; [`ItemKind::requirement_default`] reproduces the
+//! exact triple the `label-coverage` rule already consumes, so the existing
 //! coverage machinery is demonstrably compatible with the model (REQ-05).
 //!
 //! Indexing is pure and substrate-specific but shares one derivation core
@@ -57,6 +58,28 @@ pub const DEFAULT_ITEM_LINK_NAMESPACE: &str = "satisfies";
 /// never branched on in indexing logic (the kind is fully described by its
 /// four-tuple), keeping the engine domain-agnostic (REQ-01).
 pub const REQUIREMENT_KIND_NAME: &str = "requirement";
+
+/// The conventional NAME of the built-in `decision` kind.
+///
+/// Like [`REQUIREMENT_KIND_NAME`], this only LABELS the default kind for display
+/// and `--kind` filtering; indexing never branches on it (the kind is fully
+/// described by its tuple), keeping the engine domain-agnostic (REQ-01).
+pub const DECISION_KIND_NAME: &str = "decision";
+
+/// Default section slug the built-in `decision` kind authors its items under
+/// (`## Decisions`). Decisions live in issue descriptions, markdown-first.
+pub const DECISION_KIND_SECTION: &str = "decisions";
+
+/// Default self-id pattern for the built-in `decision` kind (`D-1`, `D-02`, ...).
+///
+/// Narrower than [`DEFAULT_ITEM_ID_PATTERN`] so an unmarked decisions list does
+/// not accidentally claim arbitrary `XXX-NN` ids; decision self-ids are the `D-NN`
+/// shape.
+pub const DECISION_KIND_ID_PATTERN: &str = "D-[0-9]+";
+
+/// Default link-label namespace referencing the built-in `decision` kind: a
+/// `per:<issue>/D-01` label on a node points at the addressed decision.
+pub const DECISION_KIND_LINK_NAMESPACE: &str = "per";
 
 /// The scope sentinel that addresses project-level items not tied to any single
 /// issue. The first segment of a qualified id equal to this string denotes
@@ -431,6 +454,43 @@ impl ItemKind {
                 id_pattern: Some(DEFAULT_ITEM_ID_PATTERN.to_string()),
                 markers: Some(vec!["[hard]".to_string()]),
                 link_namespaces: Some(vec![DEFAULT_ITEM_LINK_NAMESPACE.to_string()]),
+                ..Default::default()
+            },
+        )
+    }
+
+    /// Build the built-in `decision` kind.
+    ///
+    /// A markdown-first, issue-scoped kind: decisions are authored as list entries
+    /// under a `## Decisions` section of an issue description and indexed through
+    /// the SAME generic parse path as `requirement`, with NO marker (every matching
+    /// line qualifies). Its tuple is `(decisions, D-[0-9]+, <no marker>, per)`. A
+    /// `per:<issue>/D-01` label references a decision by its qualified id. Shipped
+    /// as a built-in default (alongside `requirement`) via
+    /// [`builtin_default_kinds`], so `jit item list --kind decision` works in a
+    /// default-initialized repo with no `[item_kinds]` config.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::item::ItemKind;
+    ///
+    /// let decision = ItemKind::decision_default().unwrap();
+    /// assert_eq!(decision.name(), "decision");
+    /// assert_eq!(decision.section(), "decisions");
+    /// // No marker: every D-NN line in the section qualifies.
+    /// assert!(decision.markers().is_empty());
+    /// assert_eq!(decision.link_namespaces(), &["per".to_string()]);
+    /// ```
+    pub fn decision_default() -> Result<Self, ItemError> {
+        Self::from_config(
+            DECISION_KIND_NAME,
+            &ItemKindConfig {
+                section: Some(DECISION_KIND_SECTION.to_string()),
+                id_pattern: Some(DECISION_KIND_ID_PATTERN.to_string()),
+                // No marker: a decisions list needs no `[hard]`-style gate.
+                markers: Some(vec![]),
+                link_namespaces: Some(vec![DECISION_KIND_LINK_NAMESPACE.to_string()]),
                 ..Default::default()
             },
         )
@@ -857,13 +917,46 @@ pub fn index_project_sources(
     derive_scope_items(&Scope::Project, raw)
 }
 
+/// The built-in item kinds a repo has when it declares no `[item_kinds]` table.
+///
+/// These are the kinds JIT ships out of the box, each authored markdown-first in
+/// issue descriptions: `requirement` (`## Success Criteria`) and `decision`
+/// (`## Decisions`). Returned in name order for deterministic output. A project's
+/// explicit `[item_kinds]` table REPLACES this set (see [`resolve_item_kinds`]).
+///
+/// This is the single extension point for shipping further built-in kinds:
+/// appending a `*_default()` constructor here makes the new kind available in
+/// every default-initialized repo with no further wiring.
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::item::builtin_default_kinds;
+///
+/// let kinds = builtin_default_kinds().unwrap();
+/// let names: Vec<&str> = kinds.iter().map(|k| k.name()).collect();
+/// // Shipped built-ins, in name order.
+/// assert_eq!(names, vec!["decision", "requirement"]);
+/// ```
+pub fn builtin_default_kinds() -> Result<Vec<ItemKind>, ItemError> {
+    // Keep in name order so the default set matches the registry path's ordering.
+    let mut kinds = vec![
+        ItemKind::requirement_default()?,
+        ItemKind::decision_default()?,
+    ];
+    kinds.sort_by(|a, b| a.name().cmp(b.name()));
+    Ok(kinds)
+}
+
 /// Resolve the effective set of item kinds from an optional config registry.
 ///
-/// When the registry is `None` (no `[item_kinds]` table), the single built-in
-/// `requirement` kind is returned, so a repo that declares nothing still has the
-/// requirement model. When the registry is present it is used verbatim (each
-/// entry resolved through [`ItemKind::from_config`]); the caller opts in to every
-/// kind it wants, including re-declaring `requirement` with non-default fields.
+/// When the registry is `None` (no `[item_kinds]` table), the built-in default
+/// kinds ([`builtin_default_kinds`] — `requirement` and `decision`) are returned,
+/// so a repo that declares nothing still ships those models. When the registry is
+/// present it is used verbatim (each entry resolved through
+/// [`ItemKind::from_config`]); the caller opts in to every kind it wants,
+/// including re-declaring `requirement` with non-default fields. An explicit table
+/// REPLACES the defaults.
 ///
 /// Kinds are returned in name order for deterministic output.
 ///
@@ -872,16 +965,16 @@ pub fn index_project_sources(
 /// ```
 /// use jit::domain::item::resolve_item_kinds;
 ///
-/// // No registry -> the built-in requirement kind only.
+/// // No registry -> the built-in default kinds, in name order.
 /// let kinds = resolve_item_kinds(None).unwrap();
-/// assert_eq!(kinds.len(), 1);
-/// assert_eq!(kinds[0].name(), "requirement");
+/// let names: Vec<&str> = kinds.iter().map(|k| k.name()).collect();
+/// assert_eq!(names, vec!["decision", "requirement"]);
 /// ```
 pub fn resolve_item_kinds(
     registry: Option<&HashMap<String, ItemKindConfig>>,
 ) -> Result<Vec<ItemKind>, ItemError> {
     match registry {
-        None => Ok(vec![ItemKind::requirement_default()?]),
+        None => builtin_default_kinds(),
         Some(map) => {
             let mut names: Vec<&String> = map.keys().collect();
             names.sort();
@@ -1147,9 +1240,55 @@ mod tests {
 
     #[test]
     fn test_resolve_item_kinds_default_when_absent() {
+        // With no registry, the built-in default set ships requirement AND
+        // decision, in name order.
         let kinds = resolve_item_kinds(None).unwrap();
-        assert_eq!(kinds.len(), 1);
-        assert_eq!(kinds[0].name(), "requirement");
+        let names: Vec<&str> = kinds.iter().map(ItemKind::name).collect();
+        assert_eq!(names, vec!["decision", "requirement"]);
+    }
+
+    #[test]
+    fn test_decision_default_tuple() {
+        // The built-in decision kind: section `decisions`, D-NN ids, no marker,
+        // `per` link namespace, issue-scoped, markdown-first.
+        let decision = ItemKind::decision_default().unwrap();
+        assert_eq!(decision.name(), "decision");
+        assert_eq!(decision.section(), "decisions");
+        assert!(decision.markers().is_empty());
+        assert_eq!(decision.link_namespaces(), &["per".to_string()]);
+        assert_eq!(decision.kind_scope(), KindScope::Issue);
+        let (section, marker, pattern) = decision.as_triple();
+        assert_eq!(section, "decisions");
+        assert_eq!(marker, None);
+        assert_eq!(pattern, "D-[0-9]+");
+    }
+
+    #[test]
+    fn test_builtin_default_kinds_includes_decision() {
+        let names: Vec<String> = builtin_default_kinds()
+            .unwrap()
+            .iter()
+            .map(|k| k.name().to_string())
+            .collect();
+        assert!(names.contains(&"requirement".to_string()));
+        assert!(names.contains(&"decision".to_string()));
+    }
+
+    #[test]
+    fn test_index_items_projects_decisions_by_default() {
+        // The default kind set indexes a `## Decisions` section's D-NN lines with
+        // no extra config (the shipped product behavior).
+        let issue = Issue::new(
+            "T".to_string(),
+            "## Decisions\n\n- D-01: use json\n- D-02: atomic writes\n".to_string(),
+        );
+        let kinds = builtin_default_kinds().unwrap();
+        let items = index_items(&issue, &kinds, &MarkdownContentParser).unwrap();
+        let decisions: Vec<&AddressableItem> =
+            items.iter().filter(|i| i.kind == "decision").collect();
+        assert_eq!(decisions.len(), 2);
+        assert_eq!(decisions[0].self_id, "D-01");
+        assert!(decisions[0].qualified_id.ends_with("/D-01"));
     }
 
     #[test]
