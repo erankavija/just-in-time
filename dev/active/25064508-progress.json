@@ -106,7 +106,7 @@
           "short_id": "0d593d90",
           "title": "Project invariants into a configurable doc target",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "b9966826",
@@ -144,14 +144,19 @@
     "1e1ea81d": 1,
     "b629686b": 2,
     "b121fd51": 1,
-    "93480b00": 2
+    "93480b00": 2,
+    "0d593d90": 3
   },
   "started_at": "2026-06-25T00:00:00Z",
   "notes": "Bracket complete: P=0d753ba5 (done), B=5f5735c3 (done). plan-review/coverage-preview/breakdown-review all passed. Driving impl interior. Issues serialized within waves due to heavy crates/jit file overlap; worktrees only for file-disjoint pairs.",
   "decisions": [
-    "decision/risk/invariant ship as BUILT-IN DEFAULT kinds (domain-layer, like requirement_default), not fixture-only; engine logic stays name-free (REQ-05). Applies to b629686b, be3eb6ca, 93480b00."
+    "decision/risk/invariant ship as BUILT-IN DEFAULT kinds (domain-layer, like requirement_default), not fixture-only; engine logic stays name-free (REQ-05). Applies to b629686b, be3eb6ca, 93480b00.",
+    "jit invariant render CLI lands in 0d593d90 (projection must be production-reachable per reviewer); 52ad3b1f keeps jit invariant check + drift (REQ-07) and verifies render exists for REQ-09."
   ],
   "notes_flaky": [
     "storage::heartbeat::tests::test_background_thread_updates_heartbeat is flaky under gate-run load (timing); pre-existing, not epic-related. Re-run cargo-ci to clear."
+  ],
+  "notes_escalation_boundary": [
+    "0d593d90 reached 3 reworks: substantive work done by round 2; round-3 finding is a trivial # Examples doc gap (lead under-relayed round-2 Documentation note). Judged not escalation-worthy (not ambiguous/too-hard/systemic); did one final doc pass instead."
   ]
 }
