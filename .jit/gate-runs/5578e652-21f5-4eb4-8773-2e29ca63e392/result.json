@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "5578e652-21f5-4eb4-8773-2e29ca63e392",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "21558ace-c777-4368-981a-eef21d618d98",
+  "commit": "f460eac1beeb8295b87575b7092821176819546b",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-06-25T17:10:28.389622752Z",
+  "completed_at": "2026-06-25T17:11:54.371124261Z",
+  "duration_ms": 85981,
+  "exit_code": 0,
+  "stdout": "## Acceptance Criteria\n\n**Pass.** `crates/jit/src/validation/invariants.rs:127-136` models entries with `id`, required `statement`, required typed `kind`, and optional `enforced-by`. `InvariantKind` only accepts `enforced` / `advisory` via serde at `crates/jit/src/validation/invariants.rs:92-100`.\n\n**Pass.** `JitConfig::load` loads invariants on both paths: config-absent at `crates/jit/src/config.rs:746-772`, and config-present at `crates/jit/src/config.rs:806-810`.\n\n**Pass.** Invalid entries fail with typed errors: `InvariantConfigError` is a `thiserror` enum at `crates/jit/src/validation/invariants.rs:43-68`, with TOML/schema errors and duplicate-id errors covered.\n\n**Pass.** Loader coverage exists in `crates/jit/src/validation/invariants.rs:252-368`, and config-time integration coverage exists in `crates/jit/src/config.rs:1311-1402`.\n\n## Architecture and Separation of Concerns\n\n**Pass.** The implementation follows the issue’s requested precedent: `InvariantRegistry::load` mirrors `RuleSet::load` (`crates/jit/src/validation/rules.rs:903-913`) and is wired only through config loading. No command or CLI layer logic was added.\n\n## Functional Paradigm\n\n**Pass.** Parsing is expression-oriented and serde-driven. Duplicate detection uses `iter().find(...)` with a `HashSet` at `crates/jit/src/validation/invariants.rs:235-240`, matching the existing rules loader style.\n\n## Correctness and Invariants\n\n**Pass.** Missing files return an empty registry at `crates/jit/src/validation/invariants.rs:198-209`. Duplicate invariant ids are rejected at `crates/jit/src/validation/invariants.rs:237-240`, preserving unique `@/<self-id>` addressing for later indexing.\n\n## Safety\n\n**Pass.** No unsafe code or PID-handling code is introduced.\n\n## Testing\n\n**Pass.** The provided issue gate shows `cargo-ci` passed at `2026-06-25T17:07:17Z`, so I did not run the cargo test suite. I did run `./scripts/jit-validate.sh`; it passed.\n\n## Error Handling\n\n**Pass.** Errors are typed in `InvariantConfigError`, include context for I/O paths and duplicate ids, and serde parse errors preserve missing-field / bad-kind detail. Config loading adds path-bearing context at `crates/jit/src/config.rs:770-771` and `crates/jit/src/config.rs:809-810`.\n\n## CLI Contract\n\n**Pass / N/A.** No CLI command surface changed.\n\n## Documentation\n\n**Pass.** New public APIs include doc comments and examples: `InvariantConfigError` (`crates/jit/src/validation/invariants.rs:22-42`), `InvariantKind` (`:70-91`), `Invariant` (`:102-125`), `InvariantRegistry` (`:139-153`), and its public methods (`:168-245`).\n\n## Prior Review Feedback\n\n**Pass.** `run_history` is empty, so there are no prior findings to verify for this issue.\n\n## JIT Issue Management\n\n**Pass.** `./scripts/jit-validate.sh` passes. The listed dependencies are complete and gated: `61b17603` is `done` with `cargo-ci` and `code-review` passed, and `1e1ea81d` is also `done` with both gates passed.\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

@@ -49,7 +49,7 @@
           "short_id": "21558ace",
           "title": "Add the invariants.toml schema and config-time loader",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "b629686b",
