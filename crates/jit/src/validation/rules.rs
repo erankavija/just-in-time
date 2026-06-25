@@ -23,6 +23,7 @@ use std::path::{Path, PathBuf};
 use serde::Deserialize;
 use thiserror::Error;
 
+use crate::config::JitConfig;
 use crate::domain::Issue;
 use crate::labels as label_utils;
 
@@ -1258,6 +1259,91 @@ impl RawRule {
     }
 }
 
+/// Expand the optional `kind =` sugar in a `label-coverage` assert table.
+///
+/// When the table carries a `kind = "<name>"` key, the named kind is looked up in
+/// the repo's `[item_kinds]` registry (`<jit_root>/config.toml`) and expanded to
+/// its `(section, marker, id-pattern)` triple, which is written into the table as
+/// the `criteria-section` / `marker` / `id-pattern` keys; the `kind` key is then
+/// removed. The result is byte-for-byte the table an equivalent INLINE rule would
+/// carry, so the engine evaluates the triple and never sees a kind NAME (REQ-02,
+/// REQ-05). A table WITHOUT a `kind` key is left untouched, so existing
+/// inline-triple rules evaluate unchanged (REQ-03).
+///
+/// Errors:
+/// - a `kind` key that is not a string,
+/// - mixing `kind` with any inline triple key (`criteria-section` / `marker` /
+///   `id-pattern`) — the sugar REPLACES the triple, so a mix is ambiguous,
+/// - a `kind` naming an item kind absent from `[item_kinds]` (a typed
+///   [`ItemError::UnknownKind`], surfaced as an `InvalidAssertion`).
+///
+/// This is the ONLY place a kind name is read; it lives in the config layer, not
+/// the engine. The expansion itself reuses the single pure resolver
+/// [`expand_kind_triple`](crate::domain::item::expand_kind_triple).
+fn expand_kind_sugar(
+    rule: &str,
+    config: &mut toml::value::Table,
+    jit_root: &Path,
+) -> Result<(), RuleConfigError> {
+    let Some(kind_value) = config.get("kind") else {
+        // No sugar: leave inline-triple rules exactly as authored (REQ-03).
+        return Ok(());
+    };
+    let kind_name = match kind_value {
+        toml::Value::String(s) => s.clone(),
+        _ => {
+            return Err(RuleConfigError::InvalidAssertion {
+                rule: rule.to_string(),
+                message: "label-coverage key 'kind' must be a string".to_string(),
+            });
+        }
+    };
+    // The sugar replaces the inline triple; mixing the two is ambiguous.
+    for inline_key in ["criteria-section", "marker", "id-pattern"] {
+        if config.contains_key(inline_key) {
+            return Err(RuleConfigError::InvalidAssertion {
+                rule: rule.to_string(),
+                message: format!(
+                    "label-coverage cannot combine 'kind' with the inline triple key \
+                     '{inline_key}'; use one or the other"
+                ),
+            });
+        }
+    }
+
+    // Resolve the kind through the shared pure resolver against the repo's
+    // `[item_kinds]` registry. An undeclared kind is a typed config error.
+    let registry = JitConfig::load(jit_root)
+        .map_err(|e| RuleConfigError::InvalidAssertion {
+            rule: rule.to_string(),
+            message: format!("failed to load [item_kinds] registry for 'kind' expansion: {e:#}"),
+        })?
+        .item_kinds;
+    let triple =
+        crate::domain::item::expand_kind_triple(registry.as_ref(), &kind_name).map_err(|e| {
+            RuleConfigError::InvalidAssertion {
+                rule: rule.to_string(),
+                message: e.to_string(),
+            }
+        })?;
+
+    // Splice the triple in as the inline keys, then drop the `kind` key so the
+    // engine sees a plain inline-triple table.
+    config.insert(
+        "criteria-section".to_string(),
+        toml::Value::String(triple.section),
+    );
+    if let Some(marker) = triple.marker {
+        config.insert("marker".to_string(), toml::Value::String(marker));
+    }
+    config.insert(
+        "id-pattern".to_string(),
+        toml::Value::String(triple.id_pattern),
+    );
+    config.remove("kind");
+    Ok(())
+}
+
 impl RawAssert {
     fn into_assertion(self, rule: &str, jit_root: &Path) -> Result<Assertion, RuleConfigError> {
         // Collect which kinds were provided, partitioned into shorthand vs raw.
@@ -1355,7 +1441,13 @@ impl RawAssert {
         if let Some(cmd) = self.checker_command {
             return Ok(Assertion::CheckerCommand(cmd));
         }
-        if let Some(config) = self.label_coverage {
+        if let Some(mut config) = self.label_coverage {
+            // `kind =` sugar (additive, free-form-table rules only): when present,
+            // expand the named kind's `(section, marker, id-pattern)` triple into
+            // the table BEFORE evaluation, so the engine consumes the triple and
+            // never sees a kind NAME (REQ-05). Inline-triple rules carry no `kind`
+            // key and are left untouched (REQ-03).
+            expand_kind_sugar(rule, &mut config, jit_root)?;
             // Validate `child-state` at load so a typo'd state (which would
             // otherwise silently never match any child, producing spurious
             // "criterion not satisfied" findings) is caught immediately.
@@ -2586,5 +2678,175 @@ assert = { label-uniqueness = { namespace = "req", scope = "all" } }
             set.rules[0].assert.is_repo_wide_at_transition(),
             "label-uniqueness must be skipped at transition time"
         );
+    }
+
+    // --- label-coverage `kind =` sugar (REQ-02, REQ-03) --------------------
+
+    /// Build a repo root with a `config.toml` declaring a `requirement` item kind
+    /// whose triple matches the `label-coverage` defaults, then load the single
+    /// rule authored in `rule_toml` from it.
+    fn rule_from_repo(rule_toml: &str) -> Rule {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("config.toml"),
+            r#"
+[item_kinds.requirement]
+section = "success_criteria"
+id-pattern = "[A-Z][A-Z0-9]*-[0-9]+"
+markers = ["[hard]"]
+link-namespaces = ["satisfies"]
+scope = "issue"
+source-of-truth = "markdown-first"
+"#,
+        )
+        .unwrap();
+        let set = RuleSet::from_toml_str(rule_toml, dir.path()).unwrap();
+        set.rules.into_iter().next().unwrap()
+    }
+
+    /// Extract the resolved `label-coverage` config table from a rule.
+    fn coverage_config(rule: &Rule) -> &toml::value::Table {
+        match &rule.assert {
+            Assertion::LabelCoverage { config } => config,
+            other => panic!("expected LabelCoverage, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_label_coverage_kind_sugar_expands_to_inline_triple() {
+        // REQ-02: a `kind = "requirement"` rule lowers to exactly the table an
+        // equivalent inline `(section, marker, id-pattern)` rule carries.
+        let sugared = rule_from_repo(
+            r#"
+[[rules]]
+name = "coverage"
+when = { type = "epic" }
+assert = { label-coverage = { kind = "requirement", child-state = "done" } }
+"#,
+        );
+        let inline = rule_from_repo(
+            r#"
+[[rules]]
+name = "coverage"
+when = { type = "epic" }
+assert = { label-coverage = { criteria-section = "success_criteria", marker = "[hard]", id-pattern = "[A-Z][A-Z0-9]*-[0-9]+", child-state = "done" } }
+"#,
+        );
+        // The `kind` key is gone and the triple is spliced in identically.
+        assert!(!coverage_config(&sugared).contains_key("kind"));
+        assert_eq!(coverage_config(&sugared), coverage_config(&inline));
+    }
+
+    #[test]
+    fn test_label_coverage_inline_rule_unchanged_with_extra_unknown_key() {
+        // REQ-03: an inline-triple rule carries no `kind` key and is left
+        // byte-for-byte as authored, including any unrecognized extra key that
+        // round-trips through the free-form table untouched.
+        let inline = rule_from_repo(
+            r#"
+[[rules]]
+name = "coverage"
+when = { type = "epic" }
+assert = { label-coverage = { criteria-section = "success_criteria", marker = "[hard]", future-key = "ignored" } }
+"#,
+        );
+        let cfg = coverage_config(&inline);
+        assert_eq!(
+            cfg.get("criteria-section"),
+            Some(&toml::Value::String("success_criteria".to_string()))
+        );
+        // The unrecognized key round-trips unchanged (REQ-03).
+        assert_eq!(
+            cfg.get("future-key"),
+            Some(&toml::Value::String("ignored".to_string()))
+        );
+        assert!(!cfg.contains_key("kind"));
+    }
+
+    #[test]
+    fn test_label_coverage_kind_sugar_unknown_kind_is_error() {
+        // The constraint: an undeclared `kind` is a typed config error.
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("config.toml"),
+            "[item_kinds.requirement]\nsection = \"success_criteria\"\n",
+        )
+        .unwrap();
+        let err = RuleSet::from_toml_str(
+            r#"
+[[rules]]
+name = "coverage"
+when = { type = "epic" }
+assert = { label-coverage = { kind = "decision" } }
+"#,
+            dir.path(),
+        )
+        .unwrap_err();
+        match err {
+            RuleConfigError::InvalidAssertion { rule, message } => {
+                assert_eq!(rule, "coverage");
+                assert!(
+                    message.contains("decision") && message.contains("[item_kinds]"),
+                    "unknown-kind error must name the kind and registry: {message}"
+                );
+            }
+            other => panic!("expected InvalidAssertion, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_label_coverage_kind_sugar_no_registry_is_error() {
+        // A `kind` reference with no `[item_kinds]` at all is unknown, not a silent
+        // pass.
+        let err = RuleSet::from_toml_str(
+            r#"
+[[rules]]
+name = "coverage"
+when = { type = "epic" }
+assert = { label-coverage = { kind = "requirement" } }
+"#,
+            Path::new("/nonexistent"),
+        )
+        .unwrap_err();
+        assert!(matches!(err, RuleConfigError::InvalidAssertion { .. }));
+    }
+
+    #[test]
+    fn test_label_coverage_kind_sugar_rejects_mixing_with_inline_key() {
+        // Mixing `kind` with an inline triple key is ambiguous and rejected.
+        let err = RuleSet::from_toml_str(
+            r#"
+[[rules]]
+name = "coverage"
+when = { type = "epic" }
+assert = { label-coverage = { kind = "requirement", marker = "[hard]" } }
+"#,
+            Path::new("/nonexistent"),
+        )
+        .unwrap_err();
+        match err {
+            RuleConfigError::InvalidAssertion { message, .. } => {
+                assert!(
+                    message.contains("kind") && message.contains("marker"),
+                    "mixing error must name both keys: {message}"
+                );
+            }
+            other => panic!("expected InvalidAssertion, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_label_coverage_kind_sugar_must_be_string() {
+        let err = RuleSet::from_toml_str(
+            r#"
+[[rules]]
+name = "coverage"
+when = { type = "epic" }
+assert = { label-coverage = { kind = 42 } }
+"#,
+            Path::new("/nonexistent"),
+        )
+        .unwrap_err();
+        assert!(matches!(err, RuleConfigError::InvalidAssertion { .. }));
     }
 }

@@ -1684,6 +1684,135 @@ mod tests {
         epic
     }
 
+    /// Load a single rule from `rule_toml` against a repo root whose `config.toml`
+    /// declares a `requirement` item kind matching the coverage defaults, so a
+    /// `kind = "requirement"` rule can expand.
+    fn rule_from_repo(rule_toml: &str) -> Rule {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("config.toml"),
+            r#"
+[item_kinds.requirement]
+section = "success_criteria"
+id-pattern = "[A-Z][A-Z0-9]*-[0-9]+"
+markers = ["[hard]"]
+link-namespaces = ["satisfies"]
+scope = "issue"
+source-of-truth = "markdown-first"
+"#,
+        )
+        .unwrap();
+        let set = RuleSet::from_toml_str(rule_toml, dir.path()).unwrap();
+        set.rules.into_iter().next().unwrap()
+    }
+
+    #[test]
+    fn test_label_coverage_kind_sugar_evaluates_like_inline() {
+        // REQ-02: a `kind = "requirement"` rule produces IDENTICAL findings to the
+        // equivalent inline-triple rule across both covered and uncovered cases.
+        let kind_rule = rule_from_repo(
+            "[[rules]]\nname = \"coverage\"\nwhen = { type = \"epic\" }\n\
+             severity = \"error\"\nassert = { label-coverage = { \
+             kind = \"requirement\", child-state = \"done\" } }\n",
+        );
+        let inline_rule = coverage_rule("child-state = \"done\"");
+
+        // Covered case: a done child satisfies the criterion.
+        let epic = epic_with_criteria(&["REQ-01"]);
+        let mut child = issue("child", &["satisfies:REQ-01"]);
+        child.dependencies = vec![epic.id.clone()];
+        child.state = State::Done;
+        let issues = [epic, child];
+
+        let eval = |rule: &Rule| {
+            evaluate_graph(
+                &[rule],
+                &issues,
+                &HierarchyConfig::default(),
+                ContentFormat::Markdown,
+                fixed_now(),
+                &HashMap::new(),
+            )
+        };
+        let kind_findings = eval(&kind_rule);
+        let inline_findings = eval(&inline_rule);
+        assert!(kind_findings.is_empty(), "covered: {kind_findings:?}");
+        assert_eq!(kind_findings.len(), inline_findings.len());
+
+        // Uncovered case: no satisfying child -> both fire one finding on the epic.
+        let epic2 = epic_with_criteria(&["REQ-09"]);
+        let issues2 = [epic2];
+        let eval2 = |rule: &Rule| {
+            evaluate_graph(
+                &[rule],
+                &issues2,
+                &HierarchyConfig::default(),
+                ContentFormat::Markdown,
+                fixed_now(),
+                &HashMap::new(),
+            )
+        };
+        let kind2 = eval2(&kind_rule);
+        let inline2 = eval2(&inline_rule);
+        assert_eq!(kind2.len(), 1, "uncovered fires: {kind2:?}");
+        assert_eq!(
+            kind2.iter().map(|f| &f.finding.message).collect::<Vec<_>>(),
+            inline2
+                .iter()
+                .map(|f| &f.finding.message)
+                .collect::<Vec<_>>(),
+            "kind= and inline produce identical findings"
+        );
+    }
+
+    #[test]
+    fn test_label_coverage_cross_scope_same_self_id_credits_container_bare_label() {
+        // REQ-06: a container `<C>/REQ-01` and a task-scope `<T>/REQ-01` share the
+        // self-id REQ-01 but resolve to DISTINCT qualified ids (different scope
+        // prefixes); the bracket coverage gate still credits the container's BARE
+        // `satisfies:REQ-01` label against the container's criterion, so the
+        // same-named task-scope id neither shadows it nor alters coverage.
+        let rule = coverage_rule("child-link = \"dependencies\"");
+        let mut container = epic_with_criteria(&["REQ-01"]);
+        // The impl task ALSO has a REQ-01 in its OWN description (task scope) and
+        // credits the container's criterion with a BARE satisfies label.
+        let mut impl_node = Issue::new(
+            "impl".to_string(),
+            "## Success Criteria\n\n- [hard] REQ-01: the task's own criterion\n".to_string(),
+        );
+        impl_node.labels = vec!["type:task".to_string(), "satisfies:REQ-01".to_string()];
+        container.dependencies = vec![impl_node.id.clone()];
+
+        // The two qualified ids are distinct by scope even though the self-id is
+        // shared, so neither shadows the other in any index.
+        let parser = crate::document::MarkdownContentParser;
+        let kinds = vec![crate::domain::item::ItemKind::requirement_default().unwrap()];
+        let container_items =
+            crate::domain::item::index_items(&container, &kinds, &parser).unwrap();
+        let task_items = crate::domain::item::index_items(&impl_node, &kinds, &parser).unwrap();
+        assert_eq!(container_items.len(), 1);
+        assert_eq!(task_items.len(), 1);
+        assert_ne!(
+            container_items[0].qualified_id, task_items[0].qualified_id,
+            "same self-id under different scopes must be distinct qualified ids"
+        );
+
+        // Coverage still credits the container's bare label.
+        let findings = evaluate_graph(
+            &[&rule],
+            &[container, impl_node],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+            &HashMap::new(),
+        );
+        assert!(
+            findings.is_empty(),
+            "bare satisfies:REQ-01 must still credit the container criterion despite a \
+             same-named task-scope id: {findings:?}"
+        );
+    }
+
     #[test]
     fn test_label_coverage_satisfied_by_child() {
         let rule = coverage_rule("child-state = \"done\"");

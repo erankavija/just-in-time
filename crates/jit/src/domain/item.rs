@@ -296,6 +296,17 @@ pub enum ItemError {
         /// The offending kind name.
         kind: String,
     },
+    /// A reference (e.g. a rule's `kind =` key) names a kind not declared in the
+    /// `[item_kinds]` registry, so it cannot be expanded to a triple. Surfaced as
+    /// a typed error rather than a silent pass.
+    #[error(
+        "item kind '{kind}' is not declared in [item_kinds]; \
+         declare it or reference an existing kind"
+    )]
+    UnknownKind {
+        /// The undeclared kind name that was referenced.
+        kind: String,
+    },
 }
 
 /// A resolved item-kind projection: the `(section, id-pattern, markers,
@@ -882,6 +893,91 @@ pub fn resolve_item_kinds(
     }
 }
 
+/// The `(section, marker, id-pattern)` triple a named kind expands to, as owned
+/// strings ready to splice into a free-form rule config.
+///
+/// This is the SAME triple [`ItemKind::as_triple`] exposes (the engine's
+/// `criterion_ids` / `label-coverage` machinery consumes exactly these three
+/// keys), captured here as owned values so a config layer can rewrite a rule's
+/// assert table without holding a borrow. `marker` is `None` when the kind
+/// declares no marker.
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::item::KindTriple;
+///
+/// let triple = KindTriple {
+///     section: "success_criteria".to_string(),
+///     marker: Some("[hard]".to_string()),
+///     id_pattern: "REQ-\\d+".to_string(),
+/// };
+/// assert_eq!(triple.marker.as_deref(), Some("[hard]"));
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KindTriple {
+    /// Section slug whose list items hold the kind's items.
+    pub section: String,
+    /// The kind's first marker, or `None` when it declares none.
+    pub marker: Option<String>,
+    /// Regex extracting a self-id from an item's text.
+    pub id_pattern: String,
+}
+
+/// Expand a named kind from the config registry into its `(section, marker,
+/// id-pattern)` [`KindTriple`].
+///
+/// This is the ONE kind→triple resolver shared by every config layer that offers
+/// `kind =` sugar: it resolves the kind through [`ItemKind::from_config`] (so
+/// repo defaults and id-pattern validation are applied identically to indexing)
+/// and returns the same triple [`ItemKind::as_triple`] exposes. The engine then
+/// consumes the triple and never sees the kind NAME, keeping it domain-agnostic
+/// (REQ-05). A name absent from `registry` is an [`ItemError::UnknownKind`]; a
+/// `None` registry has no declared kinds, so any name is unknown.
+///
+/// # Examples
+///
+/// ```
+/// use std::collections::HashMap;
+/// use jit::config::ItemKindConfig;
+/// use jit::domain::item::{expand_kind_triple, ItemError};
+///
+/// let mut registry = HashMap::new();
+/// registry.insert(
+///     "requirement".to_string(),
+///     ItemKindConfig {
+///         section: Some("success_criteria".to_string()),
+///         markers: Some(vec!["[hard]".to_string()]),
+///         id_pattern: Some("REQ-\\d+".to_string()),
+///         ..Default::default()
+///     },
+/// );
+/// let triple = expand_kind_triple(Some(&registry), "requirement").unwrap();
+/// assert_eq!(triple.section, "success_criteria");
+/// assert_eq!(triple.marker.as_deref(), Some("[hard]"));
+///
+/// // An undeclared name is a typed error, not a silent pass.
+/// let err = expand_kind_triple(Some(&registry), "bogus").unwrap_err();
+/// assert!(matches!(err, ItemError::UnknownKind { .. }));
+/// ```
+pub fn expand_kind_triple(
+    registry: Option<&HashMap<String, ItemKindConfig>>,
+    name: &str,
+) -> Result<KindTriple, ItemError> {
+    let config = registry
+        .and_then(|map| map.get(name))
+        .ok_or_else(|| ItemError::UnknownKind {
+            kind: name.to_string(),
+        })?;
+    let kind = ItemKind::from_config(name, config)?;
+    let (section, marker, id_pattern) = kind.as_triple();
+    Ok(KindTriple {
+        section: section.to_string(),
+        marker: marker.map(str::to_string),
+        id_pattern: id_pattern.to_string(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1075,6 +1171,66 @@ mod tests {
         assert_eq!(kinds.len(), 2);
         assert_eq!(kinds[0].name(), "decision");
         assert_eq!(kinds[1].name(), "requirement");
+    }
+
+    #[test]
+    fn test_expand_kind_triple_matches_as_triple() {
+        // REQ-02: expanding a named kind yields the SAME triple as_triple exposes,
+        // so the `kind=` sugar and the inline form resolve identically.
+        let mut registry = HashMap::new();
+        registry.insert(
+            "requirement".to_string(),
+            ItemKindConfig {
+                section: Some("success_criteria".to_string()),
+                markers: Some(vec!["[hard]".to_string()]),
+                id_pattern: Some("REQ-\\d+".to_string()),
+                ..Default::default()
+            },
+        );
+        let triple = expand_kind_triple(Some(&registry), "requirement").unwrap();
+        let kind = ItemKind::from_config("requirement", &registry["requirement"]).unwrap();
+        let (section, marker, pattern) = kind.as_triple();
+        assert_eq!(triple.section, section);
+        assert_eq!(triple.marker.as_deref(), marker);
+        assert_eq!(triple.id_pattern, pattern);
+    }
+
+    #[test]
+    fn test_expand_kind_triple_applies_defaults() {
+        // A minimally-declared kind expands with the repo defaults applied.
+        let mut registry = HashMap::new();
+        registry.insert("requirement".to_string(), ItemKindConfig::default());
+        let triple = expand_kind_triple(Some(&registry), "requirement").unwrap();
+        assert_eq!(triple.section, DEFAULT_ITEM_SECTION);
+        assert_eq!(triple.id_pattern, DEFAULT_ITEM_ID_PATTERN);
+        // No markers declared -> no marker in the triple.
+        assert_eq!(triple.marker, None);
+    }
+
+    #[test]
+    fn test_expand_kind_triple_unknown_is_error() {
+        // The constraint: an undeclared kind reference is a typed error.
+        let registry: HashMap<String, ItemKindConfig> = HashMap::new();
+        let err = expand_kind_triple(Some(&registry), "requirement").unwrap_err();
+        assert!(matches!(err, ItemError::UnknownKind { ref kind } if kind == "requirement"));
+
+        // A None registry likewise has no declared kinds.
+        let err = expand_kind_triple(None, "requirement").unwrap_err();
+        assert!(matches!(err, ItemError::UnknownKind { .. }));
+    }
+
+    #[test]
+    fn test_expand_kind_triple_propagates_invalid_pattern() {
+        let mut registry = HashMap::new();
+        registry.insert(
+            "broken".to_string(),
+            ItemKindConfig {
+                id_pattern: Some("REQ-(".to_string()),
+                ..Default::default()
+            },
+        );
+        let err = expand_kind_triple(Some(&registry), "broken").unwrap_err();
+        assert!(matches!(err, ItemError::InvalidIdPattern { .. }));
     }
 
     fn raw(kind: &str, self_id: &str) -> RawScopeItem {

@@ -23,10 +23,11 @@ pub struct JitConfig {
     pub namespaces: Option<HashMap<String, NamespaceConfig>>,
     /// Addressable item-kind registry (optional).
     ///
-    /// Each entry declares one kind as a `(section, id-pattern, marker(s),
-    /// link-namespace(s))` projection over issue descriptions, mirroring the
+    /// Each entry declares one kind as the six-tuple `(section, id-pattern,
+    /// marker(s), link-namespace(s), scope, source-of-truth)` projection over a
+    /// substrate (issue descriptions or a registry/markdown source), mirroring the
     /// `[namespaces.*]` registry precedent. The engine never hardcodes a kind
-    /// NAME: a kind is purely the four-tuple it expands to, so `requirement`,
+    /// NAME: a kind is purely the tuple it expands to, so `requirement`,
     /// `decision`, `risk`, etc. are all just configuration. See
     /// [`ItemKindConfig`].
     pub item_kinds: Option<HashMap<String, ItemKindConfig>>,
@@ -249,6 +250,30 @@ pub struct NamespaceConfig {
 /// assert_eq!(inv.scope.as_deref(), Some("project"));
 /// assert_eq!(inv.source.as_deref(), Some("project-items.md"));
 /// ```
+///
+/// The sixth field, `source-of-truth`, records the authoring DIRECTION for the
+/// kind (which substrate is canonical). It is a typed [`SourceOfTruth`] distinct
+/// from the `source` PATH above: a `markdown-first` kind is authored in prose and
+/// indexed from it; a `registry-first` kind is authored in a structured registry
+/// file. Absent defaults to [`SourceOfTruth::MarkdownFirst`] (the requirement
+/// default), resolved via [`ItemKindConfig::source_of_truth`].
+///
+/// ```
+/// use jit::config::{JitConfig, SourceOfTruth};
+///
+/// let config: JitConfig = toml::from_str(
+///     r#"
+/// [item_kinds.invariant]
+/// scope = "project"
+/// source = "invariants.toml"
+/// source-of-truth = "registry-first"
+/// "#,
+/// )
+/// .unwrap();
+/// let inv = &config.item_kinds.unwrap()["invariant"];
+/// assert_eq!(inv.source_of_truth, Some(SourceOfTruth::RegistryFirst));
+/// assert_eq!(inv.source_of_truth(), SourceOfTruth::RegistryFirst);
+/// ```
 #[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
 pub struct ItemKindConfig {
     /// Section slug whose list items hold this kind's addressable items
@@ -276,6 +301,84 @@ pub struct ItemKindConfig {
     /// engine logic. Ignored for issue-scoped kinds; an absent or missing file
     /// yields no project items (graceful), not an error.
     pub source: Option<String>,
+    /// The kind's authoring DIRECTION (which substrate is canonical), distinct
+    /// from the `source` PATH above. Absent defaults to
+    /// [`SourceOfTruth::MarkdownFirst`]; resolve with
+    /// [`ItemKindConfig::source_of_truth`].
+    #[serde(rename = "source-of-truth")]
+    pub source_of_truth: Option<SourceOfTruth>,
+}
+
+impl ItemKindConfig {
+    /// Resolve the kind's [`SourceOfTruth`], defaulting to
+    /// [`SourceOfTruth::MarkdownFirst`] when the `source-of-truth` field is unset.
+    ///
+    /// The default matches the requirement kind, which is authored in issue
+    /// descriptions (markdown) and indexed from them.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::config::{ItemKindConfig, SourceOfTruth};
+    ///
+    /// // An unset field resolves to markdown-first.
+    /// assert_eq!(
+    ///     ItemKindConfig::default().source_of_truth(),
+    ///     SourceOfTruth::MarkdownFirst
+    /// );
+    /// let registry = ItemKindConfig {
+    ///     source_of_truth: Some(SourceOfTruth::RegistryFirst),
+    ///     ..Default::default()
+    /// };
+    /// assert_eq!(registry.source_of_truth(), SourceOfTruth::RegistryFirst);
+    /// ```
+    pub fn source_of_truth(&self) -> SourceOfTruth {
+        self.source_of_truth.unwrap_or_default()
+    }
+}
+
+/// The authoring DIRECTION of an item kind: which substrate is the canonical
+/// source for its items.
+///
+/// This is the sixth field of the item-kind six-tuple `(section, id-pattern,
+/// marker(s), link-namespace(s), scope, source-of-truth)`. It is DISTINCT from
+/// the [`ItemKindConfig::source`] file PATH: `source-of-truth` is a direction,
+/// `source` is a location. A `markdown-first` kind (the requirement default) is
+/// authored in prose and indexed from it; a `registry-first` kind is authored in
+/// a structured registry file and projected from it.
+///
+/// Deserialized from the kebab-case tokens `"markdown-first"` / `"registry-first"`
+/// via serde rename; an unrecognized value is a descriptive parse error rather
+/// than a silent default.
+///
+/// # Examples
+///
+/// ```
+/// use jit::config::{ItemKindConfig, SourceOfTruth};
+///
+/// // The default direction is markdown-first.
+/// assert_eq!(SourceOfTruth::default(), SourceOfTruth::MarkdownFirst);
+///
+/// // Parsed from its kebab-case token inside an item-kind declaration.
+/// let cfg: ItemKindConfig =
+///     toml::from_str("source-of-truth = \"registry-first\"").unwrap();
+/// assert_eq!(cfg.source_of_truth, Some(SourceOfTruth::RegistryFirst));
+///
+/// // An invalid token is a descriptive error, not a silent default.
+/// let err = toml::from_str::<ItemKindConfig>("source-of-truth = \"both\"")
+///     .unwrap_err();
+/// assert!(err.to_string().contains("markdown-first"));
+/// ```
+#[derive(Debug, Clone, Copy, Deserialize, Default, PartialEq, Eq)]
+pub enum SourceOfTruth {
+    /// Items are authored in markdown prose (issue descriptions or a markdown
+    /// source file) and indexed from it. The requirement-kind default.
+    #[default]
+    #[serde(rename = "markdown-first")]
+    MarkdownFirst,
+    /// Items are authored in a structured registry file and projected from it.
+    #[serde(rename = "registry-first")]
+    RegistryFirst,
 }
 
 /// Worktree and parallel work configuration.
@@ -1214,7 +1317,7 @@ unique = false
 
     #[test]
     fn test_parse_item_kinds_from_toml() {
-        // The `[item_kinds.*]` registry parses as a name -> four-tuple map,
+        // The `[item_kinds.*]` registry parses as a name -> six-tuple map,
         // mirroring `[namespaces.*]`. `requirement` is expressible as one entry.
         let config_toml = r#"
 [item_kinds.requirement]
@@ -1243,6 +1346,67 @@ id-pattern = "D-\\d+"
         assert_eq!(decision.section.as_deref(), Some("decisions"));
         assert!(decision.markers.is_none());
         assert!(decision.link_namespaces.is_none());
+    }
+
+    #[test]
+    fn test_item_kinds_source_of_truth_defaults_markdown_first() {
+        // REQ-01: a kind that omits `source-of-truth` leaves the field None and
+        // resolves to the markdown-first default (the requirement direction).
+        let config_toml = r#"
+[item_kinds.requirement]
+section = "success_criteria"
+"#;
+        let config: JitConfig = toml::from_str(config_toml).unwrap();
+        let req = &config.item_kinds.unwrap()["requirement"];
+        assert_eq!(req.source_of_truth, None);
+        assert_eq!(req.source_of_truth(), SourceOfTruth::MarkdownFirst);
+    }
+
+    #[test]
+    fn test_item_kinds_source_of_truth_parses_both_directions() {
+        // REQ-01: both typed directions parse from their kebab-case tokens and are
+        // DISTINCT from the `source` file path field.
+        let config_toml = r#"
+[item_kinds.requirement]
+source-of-truth = "markdown-first"
+
+[item_kinds.invariant]
+scope = "project"
+source = "invariants.toml"
+source-of-truth = "registry-first"
+"#;
+        let config: JitConfig = toml::from_str(config_toml).unwrap();
+        let kinds = config.item_kinds.unwrap();
+
+        let req = &kinds["requirement"];
+        assert_eq!(req.source_of_truth, Some(SourceOfTruth::MarkdownFirst));
+        assert_eq!(req.source_of_truth(), SourceOfTruth::MarkdownFirst);
+
+        let inv = &kinds["invariant"];
+        assert_eq!(inv.source_of_truth, Some(SourceOfTruth::RegistryFirst));
+        assert_eq!(inv.source_of_truth(), SourceOfTruth::RegistryFirst);
+        // The direction is independent of the `source` PATH.
+        assert_eq!(inv.source.as_deref(), Some("invariants.toml"));
+    }
+
+    #[test]
+    fn test_item_kinds_source_of_truth_invalid_value_is_error() {
+        // REQ-01: an unrecognized direction is a descriptive parse error, not a
+        // silent default.
+        let config_toml = r#"
+[item_kinds.requirement]
+source-of-truth = "both"
+"#;
+        let err = toml::from_str::<JitConfig>(config_toml).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("markdown-first"),
+            "error mentions valid token: {msg}"
+        );
+        assert!(
+            msg.contains("registry-first"),
+            "error mentions valid token: {msg}"
+        );
     }
 
     #[test]
