@@ -822,6 +822,14 @@ impl IssueStore for FailingSaveStorage {
         self.inner.read_repo_file(rel_path)
     }
 
+    fn write_repo_file(
+        &self,
+        rel_path: &str,
+        content: &str,
+    ) -> Result<(), jit::storage::PathReadError> {
+        self.inner.write_repo_file(rel_path, content)
+    }
+
     fn list_gate_presets(&self) -> anyhow::Result<Vec<jit::gate_presets::PresetInfo>> {
         self.inner.list_gate_presets()
     }

@@ -290,6 +290,23 @@ impl IssueStore for InMemoryStorage {
         Ok(self.repo_files.lock().unwrap().get(rel_path).cloned())
     }
 
+    fn write_repo_file(
+        &self,
+        rel_path: &str,
+        content: &str,
+    ) -> Result<(), crate::storage::PathReadError> {
+        // Enforce the SAME repo-relative path contract as JsonFileStorage (reject
+        // empty, absolute, or `..`-bearing paths) via the shared validator, then
+        // store into the in-memory file map. A subsequent `read_repo_file` for the
+        // same path returns the written content.
+        crate::storage::validate_repo_relative_path(rel_path)?;
+        self.repo_files
+            .lock()
+            .unwrap()
+            .insert(rel_path.to_string(), content.to_string());
+        Ok(())
+    }
+
     fn read_path_bytes(
         &self,
         path: &str,

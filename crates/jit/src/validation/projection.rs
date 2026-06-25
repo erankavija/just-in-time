@@ -22,7 +22,6 @@
 use crate::config::{InvariantProjectionConfig, ProjectionMode};
 use crate::storage::{IssueStore, PathReadError};
 use crate::validation::invariants::{InvariantKind, InvariantRegistry};
-use std::path::Path;
 use thiserror::Error;
 
 /// Errors raised while projecting the invariant registry into its doc target.
@@ -83,13 +82,15 @@ pub enum ProjectionError {
         source: PathReadError,
     },
 
-    /// Writing the rendered projection to disk failed.
+    /// Writing the rendered projection failed (an invalid/escaping path is
+    /// rejected as [`PathReadError::InvalidPath`] before any write; an I/O
+    /// failure surfaces as [`PathReadError::Other`]).
     #[error("failed to write invariant projection target '{path}': {source}")]
     Write {
         /// The configured target path.
         path: String,
-        /// The underlying write error.
-        source: anyhow::Error,
+        /// The underlying typed write error.
+        source: PathReadError,
     },
 }
 
@@ -209,11 +210,13 @@ pub fn splice_region(
 ///
 /// The orchestrator (the only function here that performs I/O) reads the target
 /// path, mode, and delimiters ONLY from `config` — this module contains no
-/// documentation-filename literal (REQ-04). `repo_root` is the repository root
-/// (the parent of `.jit`) against which the config-relative target is resolved
-/// for writing; `store` supplies the path-safe [`read_repo_file`] used by region
-/// mode. Both modes write through the shared atomic writer
-/// [`write_file_atomic`](crate::validation::serialize::write_file_atomic).
+/// documentation-filename literal (REQ-04). ALL persistence goes through the
+/// storage boundary: region mode reads the existing target via
+/// [`read_repo_file`] and both modes write via [`write_repo_file`], which
+/// path-validates the config-driven target (rejecting absolute/`..`-escaping
+/// paths) and writes atomically through the shared
+/// [`write_file_atomic`](crate::validation::serialize::write_file_atomic) (REQ-05).
+/// No direct filesystem access happens here.
 ///
 /// - **separate-file**: render → atomic write of the whole file.
 /// - **region**: read the existing target, splice the rendered block between the
@@ -224,6 +227,7 @@ pub fn splice_region(
 /// Returns the repo-relative path that was written.
 ///
 /// [`read_repo_file`]: crate::storage::IssueStore::read_repo_file
+/// [`write_repo_file`]: crate::storage::IssueStore::write_repo_file
 ///
 /// # Examples
 ///
@@ -232,18 +236,16 @@ pub fn splice_region(
 /// use jit::storage::JsonFileStorage;
 /// use jit::validation::invariants::InvariantRegistry;
 /// use jit::validation::projection::project_invariants;
-/// use std::path::Path;
 ///
 /// let store = JsonFileStorage::new(".jit");
 /// let cfg = InvariantProjectionConfig::default();
 /// let reg = InvariantRegistry::empty();
 /// // Writes the rendered registry to the configured (default jit-owned) target.
-/// let written = project_invariants(&store, Path::new("."), &cfg, &reg).unwrap();
+/// let written = project_invariants(&store, &cfg, &reg).unwrap();
 /// println!("projected invariants to {written}");
 /// ```
 pub fn project_invariants<S: IssueStore>(
     store: &S,
-    repo_root: &Path,
     config: &InvariantProjectionConfig,
     registry: &InvariantRegistry,
 ) -> Result<String, ProjectionError> {
@@ -271,13 +273,15 @@ pub fn project_invariants<S: IssueStore>(
         }
     };
 
-    let abs_target = repo_root.join(target);
-    crate::validation::serialize::write_file_atomic(&abs_target, &content).map_err(|source| {
-        ProjectionError::Write {
+    // Persist through the storage boundary: it path-validates the config-driven
+    // target (rejecting an absolute or `..`-escaping path) BEFORE writing, and
+    // writes atomically via the shared writer.
+    store
+        .write_repo_file(target, &content)
+        .map_err(|source| ProjectionError::Write {
             path: target.to_string(),
             source,
-        }
-    })?;
+        })?;
     Ok(target.to_string())
 }
 
@@ -390,16 +394,21 @@ kind = "advisory"
             target: Some("docs/invariants.md".to_string()),
             ..Default::default()
         };
-        // The repo root is the parent of `.jit`.
-        std::fs::create_dir_all(dir.path().join("docs")).unwrap();
-        let written = project_invariants(&store, dir.path(), &cfg, &registry_with_two()).unwrap();
+        // The write goes through storage, which creates intermediate dirs (the
+        // repo root is the parent of `.jit`).
+        let written = project_invariants(&store, &cfg, &registry_with_two()).unwrap();
         assert_eq!(written, "docs/invariants.md");
 
         let on_disk = std::fs::read_to_string(dir.path().join("docs/invariants.md")).unwrap();
         assert!(on_disk.contains("INV-01"));
         assert!(on_disk.contains("INV-02"));
-        // No leftover temp file (atomic temp+rename).
-        assert!(!dir.path().join("docs/invariants.tmp").exists());
+        // No leftover temp file (atomic temp+rename leaves only the target).
+        let leftovers: Vec<_> = std::fs::read_dir(dir.path().join("docs"))
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().extension().and_then(|x| x.to_str()) == Some("tmp"))
+            .collect();
+        assert!(leftovers.is_empty(), "no .tmp temp file should remain");
     }
 
     #[test]
@@ -422,7 +431,7 @@ kind = "advisory"
             region_begin: Some(begin.to_string()),
             region_end: Some(end.to_string()),
         };
-        project_invariants(&store, dir.path(), &cfg, &registry_with_two()).unwrap();
+        project_invariants(&store, &cfg, &registry_with_two()).unwrap();
 
         let updated = std::fs::read_to_string(dir.path().join("GUIDE.md")).unwrap();
         // Surrounding bytes preserved exactly.
@@ -445,8 +454,40 @@ kind = "advisory"
             target: Some("MISSING.md".to_string()),
             ..Default::default()
         };
-        let err = project_invariants(&store, dir.path(), &cfg, &registry_with_two()).unwrap_err();
+        let err = project_invariants(&store, &cfg, &registry_with_two()).unwrap_err();
         assert!(matches!(err, ProjectionError::TargetNotFound { .. }));
+    }
+
+    #[test]
+    fn test_project_separate_file_rejects_escaping_target() {
+        // A separate-file target that escapes the repo (absolute or `..`) is
+        // rejected by the storage path validator BEFORE any write — nothing is
+        // written outside the repo.
+        let dir = tempfile::tempdir().unwrap();
+        let jit_root = dir.path().join(".jit");
+        std::fs::create_dir_all(&jit_root).unwrap();
+        let store = JsonFileStorage::new(&jit_root);
+
+        for bad in ["../escape.md", "/tmp/jit-escape.md"] {
+            let cfg = InvariantProjectionConfig {
+                mode: Some(ProjectionMode::SeparateFile),
+                target: Some(bad.to_string()),
+                ..Default::default()
+            };
+            let err = project_invariants(&store, &cfg, &registry_with_two()).unwrap_err();
+            assert!(
+                matches!(
+                    err,
+                    ProjectionError::Write {
+                        source: PathReadError::InvalidPath(_),
+                        ..
+                    }
+                ),
+                "escaping target {bad} must be rejected with InvalidPath, got {err:?}"
+            );
+        }
+        // Nothing leaked outside the repo.
+        assert!(!dir.path().join("../escape.md").exists());
     }
 
     #[test]

@@ -266,6 +266,43 @@ pub trait IssueStore: Clone {
     /// ```
     fn read_repo_file(&self, rel_path: &str) -> Result<Option<String>, PathReadError>;
 
+    /// Write a repository-local text file by its path relative to the repository
+    /// root (the parent of the `.jit` directory), atomically.
+    ///
+    /// The storage-owned write counterpart of [`read_repo_file`](Self::read_repo_file):
+    /// command/domain code that needs to materialize a config-declared file (e.g.
+    /// the invariant projection target) goes through this boundary rather than
+    /// touching the filesystem directly (the CLAUDE.md "storage owns ALL
+    /// persistence" boundary). The path is enforced repository-local — an absolute
+    /// path or any `..` traversal is rejected with the typed
+    /// [`PathReadError::InvalidPath`] BEFORE any I/O — so a configured target can
+    /// never escape the repo. The write is atomic (temp file in the target's
+    /// directory + rename) so a reader never observes a partial file. Intermediate
+    /// directories under the repo root are created as needed.
+    ///
+    /// # Errors
+    ///
+    /// - [`PathReadError::InvalidPath`] for an empty, absolute, or `..`-bearing
+    ///   path.
+    /// - [`PathReadError::Other`] for any I/O failure while creating directories or
+    ///   writing the file.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use jit::storage::{IssueStore, JsonFileStorage, PathReadError};
+    ///
+    /// let store = JsonFileStorage::new(".jit");
+    /// store.write_repo_file("docs/invariants.md", "## Invariants\n").unwrap();
+    ///
+    /// // An escaping path is rejected before any write.
+    /// assert!(matches!(
+    ///     store.write_repo_file("../escape.md", "x"),
+    ///     Err(PathReadError::InvalidPath(_))
+    /// ));
+    /// ```
+    fn write_repo_file(&self, rel_path: &str, content: &str) -> Result<(), PathReadError>;
+
     /// List all available gate presets (builtin and custom).
     ///
     /// # Errors

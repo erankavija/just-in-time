@@ -754,6 +754,39 @@ impl IssueStore for JsonFileStorage {
         }
     }
 
+    fn write_repo_file(
+        &self,
+        rel_path: &str,
+        content: &str,
+    ) -> Result<(), crate::storage::PathReadError> {
+        use crate::storage::PathReadError;
+        // Reuse the ONE shared path validator so the write path rejects exactly
+        // the same inputs as the read path (empty, absolute, `..`-escaping) before
+        // any I/O — a configured target can never escape the repo.
+        validate_repo_relative_input(rel_path)?;
+
+        // Resolve repo root (parent of `.jit`) and join the validated relative
+        // path. The `..`-rejection above guarantees the join stays under the root.
+        let repo_root = self
+            .root
+            .parent()
+            .ok_or_else(|| PathReadError::Other(anyhow!("Invalid storage path")))?;
+        let target = repo_root.join(rel_path);
+
+        // Create intermediate directories under the repo root as needed so a
+        // config-declared nested target (e.g. `docs/reference/x.md`) materializes.
+        if let Some(parent) = target.parent() {
+            fs::create_dir_all(parent).map_err(|e| {
+                PathReadError::Other(anyhow!("creating {}: {}", parent.display(), e))
+            })?;
+        }
+
+        // Write through the SHARED atomic writer (temp file in the target's
+        // directory + rename), preserving the atomic-write invariant (REQ-05).
+        crate::validation::serialize::write_file_atomic(&target, content)
+            .map_err(PathReadError::Other)
+    }
+
     fn list_gate_presets(&self) -> Result<Vec<crate::gate_presets::PresetInfo>> {
         let manager = crate::gate_presets::PresetManager::new(self.root.clone())?;
         Ok(manager.list_presets())
@@ -941,6 +974,47 @@ mod tests {
             storage.read_repo_file("../escape.md"),
             Err(crate::storage::PathReadError::InvalidPath(_))
         ));
+    }
+
+    #[test]
+    fn test_write_repo_file_atomic_creates_dirs_and_rejects_escaping() {
+        use crate::storage::PathReadError;
+        let temp = TempDir::new().unwrap();
+        let storage = JsonFileStorage::new(temp.path().join(".jit"));
+        storage.init().unwrap();
+
+        // A nested target is written atomically, creating intermediate dirs; a
+        // round-trip read returns the same content.
+        storage
+            .write_repo_file("docs/reference/inv.md", "## Invariants\n")
+            .unwrap();
+        assert_eq!(
+            std::fs::read_to_string(temp.path().join("docs/reference/inv.md")).unwrap(),
+            "## Invariants\n"
+        );
+        assert_eq!(
+            storage.read_repo_file("docs/reference/inv.md").unwrap(),
+            Some("## Invariants\n".to_string())
+        );
+        // No leftover temp file in the target directory (atomic temp+rename).
+        let leftovers: Vec<_> = std::fs::read_dir(temp.path().join("docs/reference"))
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().extension().and_then(|x| x.to_str()) == Some("tmp"))
+            .collect();
+        assert!(leftovers.is_empty(), "no .tmp temp file should remain");
+
+        // Path-safety: an absolute or `..`-escaping target is rejected with the
+        // typed error BEFORE any write — nothing leaks outside the repo.
+        assert!(matches!(
+            storage.write_repo_file("/tmp/jit-escape.md", "x"),
+            Err(PathReadError::InvalidPath(_))
+        ));
+        assert!(matches!(
+            storage.write_repo_file("../escape.md", "x"),
+            Err(PathReadError::InvalidPath(_))
+        ));
+        assert!(!temp.path().join("../escape.md").exists());
     }
 
     #[test]
