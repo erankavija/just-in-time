@@ -31,6 +31,16 @@ pub struct JitConfig {
     /// `decision`, `risk`, etc. are all just configuration. See
     /// [`ItemKindConfig`].
     pub item_kinds: Option<HashMap<String, ItemKindConfig>>,
+    /// Documentation target the invariant registry projects into (optional).
+    ///
+    /// When the `[invariant_projection]` table is ABSENT, the projection engine
+    /// falls back to [`InvariantProjectionConfig::default`], which targets a
+    /// separate jit-owned file ([`DEFAULT_INVARIANT_PROJECTION_TARGET`]) in
+    /// separate-file mode, so the default never touches existing docs. The target
+    /// path lives ONLY here in the config layer; the projection engine reads it
+    /// from config and never hardcodes a documentation filename. See
+    /// [`InvariantProjectionConfig`].
+    pub invariant_projection: Option<InvariantProjectionConfig>,
     /// Worktree and parallel work configuration (optional).
     pub worktree: Option<WorktreeConfig>,
     /// Coordination settings for leases and agents (optional).
@@ -463,6 +473,187 @@ pub enum SourceOfTruth {
     RegistryFirst,
 }
 
+/// The shipped DEFAULT documentation target for invariant projection.
+///
+/// A separate jit-owned file under `.jit/` so the default behavior never touches
+/// existing project docs (decision D3). This is the SOLE place the default
+/// filename lives: the projection engine reads the resolved target from config
+/// and contains no documentation-filename literal.
+pub const DEFAULT_INVARIANT_PROJECTION_TARGET: &str = ".jit/invariants.md";
+
+/// The default begin marker delimiting the invariant region in `region` mode.
+pub const DEFAULT_INVARIANT_REGION_BEGIN: &str = "<!-- jit:invariants:begin -->";
+
+/// The default end marker delimiting the invariant region in `region` mode.
+pub const DEFAULT_INVARIANT_REGION_END: &str = "<!-- jit:invariants:end -->";
+
+/// Where and how the invariant registry projects into human-readable docs.
+///
+/// Mirrors the `[item_kinds]` / `[namespaces.*]` registry precedent: an optional
+/// `[invariant_projection]` table on [`JitConfig`]. When the table is ABSENT, the
+/// engine uses [`InvariantProjectionConfig::default`] — separate-file mode
+/// targeting [`DEFAULT_INVARIANT_PROJECTION_TARGET`] — so the default never
+/// touches existing docs (decision D3). The `target` path and region delimiters
+/// are config-driven; the projection engine hardcodes no documentation filename.
+///
+/// # Examples
+///
+/// ```
+/// use jit::config::{
+///     InvariantProjectionConfig, ProjectionMode, DEFAULT_INVARIANT_PROJECTION_TARGET,
+/// };
+///
+/// // The default targets a separate jit-owned file.
+/// let default = InvariantProjectionConfig::default();
+/// assert_eq!(default.mode(), ProjectionMode::SeparateFile);
+/// assert_eq!(default.target(), DEFAULT_INVARIANT_PROJECTION_TARGET);
+///
+/// // Region mode is opt-in via the `[invariant_projection]` table.
+/// let cfg: InvariantProjectionConfig = toml::from_str(
+///     r#"
+/// mode = "region"
+/// target = "docs/invariants.md"
+/// region-begin = "<!-- INV START -->"
+/// region-end = "<!-- INV END -->"
+/// "#,
+/// )
+/// .unwrap();
+/// assert_eq!(cfg.mode(), ProjectionMode::Region);
+/// assert_eq!(cfg.target(), "docs/invariants.md");
+/// assert_eq!(cfg.region_begin(), "<!-- INV START -->");
+/// ```
+///
+/// All fields are `Option`s defaulting to `None`: a `None` accessor resolves to
+/// its config-layer const default, so [`InvariantProjectionConfig::default`] (an
+/// absent `[invariant_projection]` table) is separate-file mode targeting the
+/// jit-owned file.
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq, Default)]
+pub struct InvariantProjectionConfig {
+    /// Projection mode: a separate jit-owned file or a delimited region within an
+    /// existing file. Defaults to [`ProjectionMode::SeparateFile`] when unset.
+    #[serde(default)]
+    pub mode: Option<ProjectionMode>,
+    /// Repo-relative path of the documentation target. Defaults to
+    /// [`DEFAULT_INVARIANT_PROJECTION_TARGET`] when unset.
+    #[serde(default)]
+    pub target: Option<String>,
+    /// Begin marker delimiting the rewritten region in `region` mode. Defaults to
+    /// [`DEFAULT_INVARIANT_REGION_BEGIN`] when unset.
+    #[serde(default, rename = "region-begin")]
+    pub region_begin: Option<String>,
+    /// End marker delimiting the rewritten region in `region` mode. Defaults to
+    /// [`DEFAULT_INVARIANT_REGION_END`] when unset.
+    #[serde(default, rename = "region-end")]
+    pub region_end: Option<String>,
+}
+
+impl InvariantProjectionConfig {
+    /// The resolved projection mode (defaulting to [`ProjectionMode::SeparateFile`]).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::config::{InvariantProjectionConfig, ProjectionMode};
+    ///
+    /// assert_eq!(
+    ///     InvariantProjectionConfig::default().mode(),
+    ///     ProjectionMode::SeparateFile
+    /// );
+    /// ```
+    pub fn mode(&self) -> ProjectionMode {
+        self.mode.unwrap_or_default()
+    }
+
+    /// The resolved repo-relative target path (defaulting to the jit-owned file).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::config::{InvariantProjectionConfig, DEFAULT_INVARIANT_PROJECTION_TARGET};
+    ///
+    /// assert_eq!(
+    ///     InvariantProjectionConfig::default().target(),
+    ///     DEFAULT_INVARIANT_PROJECTION_TARGET
+    /// );
+    /// ```
+    pub fn target(&self) -> &str {
+        self.target
+            .as_deref()
+            .unwrap_or(DEFAULT_INVARIANT_PROJECTION_TARGET)
+    }
+
+    /// The resolved begin marker for `region` mode (defaulting to the const).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::config::{InvariantProjectionConfig, DEFAULT_INVARIANT_REGION_BEGIN};
+    ///
+    /// assert_eq!(
+    ///     InvariantProjectionConfig::default().region_begin(),
+    ///     DEFAULT_INVARIANT_REGION_BEGIN
+    /// );
+    /// ```
+    pub fn region_begin(&self) -> &str {
+        self.region_begin
+            .as_deref()
+            .unwrap_or(DEFAULT_INVARIANT_REGION_BEGIN)
+    }
+
+    /// The resolved end marker for `region` mode (defaulting to the const).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::config::{InvariantProjectionConfig, DEFAULT_INVARIANT_REGION_END};
+    ///
+    /// assert_eq!(
+    ///     InvariantProjectionConfig::default().region_end(),
+    ///     DEFAULT_INVARIANT_REGION_END
+    /// );
+    /// ```
+    pub fn region_end(&self) -> &str {
+        self.region_end
+            .as_deref()
+            .unwrap_or(DEFAULT_INVARIANT_REGION_END)
+    }
+}
+
+/// How the invariant registry is projected into its documentation target.
+///
+/// Deserialized from the kebab-case tokens `"separate-file"` / `"region"` via
+/// serde rename; an unrecognized value is a descriptive parse error rather than a
+/// silent default. The shipped default (no `[invariant_projection]` table) is
+/// [`ProjectionMode::SeparateFile`].
+///
+/// # Examples
+///
+/// ```
+/// use jit::config::{InvariantProjectionConfig, ProjectionMode};
+///
+/// // The default mode is separate-file.
+/// assert_eq!(ProjectionMode::default(), ProjectionMode::SeparateFile);
+///
+/// // Parsed from its kebab-case token inside the projection table.
+/// let cfg: InvariantProjectionConfig = toml::from_str("mode = \"region\"").unwrap();
+/// assert_eq!(cfg.mode, Some(ProjectionMode::Region));
+///
+/// // An invalid token is a descriptive error, not a silent default.
+/// let err = toml::from_str::<InvariantProjectionConfig>("mode = \"inline\"").unwrap_err();
+/// assert!(err.to_string().contains("separate-file"));
+/// ```
+#[derive(Debug, Clone, Copy, Deserialize, Default, PartialEq, Eq)]
+pub enum ProjectionMode {
+    /// Write the rendered invariants to a separate jit-owned file (the default).
+    #[default]
+    #[serde(rename = "separate-file")]
+    SeparateFile,
+    /// Replace only a delimited region within an existing file, byte-preserving
+    /// everything outside the delimiters.
+    #[serde(rename = "region")]
+    Region,
+}
+
 /// An error validating an explicitly-declared `[item_kinds.X]` table.
 ///
 /// Raised by [`JitConfig::validate_item_kinds`] (and thus [`JitConfig::load`])
@@ -757,6 +948,7 @@ impl JitConfig {
                 documentation: None,
                 namespaces: None,
                 item_kinds: None,
+                invariant_projection: None,
                 worktree: None,
                 coordination: None,
                 global_operations: None,
