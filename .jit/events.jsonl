@@ -3753,3 +3753,5 @@
 {"type":"issue_state_changed","id":"8ab9c479-78e1-44ce-bbb6-5df56452c328","issue_id":"52ad3b1f-1048-489a-8595-f04ec846b8b9","timestamp":"2026-06-25T23:38:10.197991667Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"85108e41-d60f-414c-987b-82f8ae73ad99","issue_id":"52ad3b1f-1048-489a-8595-f04ec846b8b9","timestamp":"2026-06-25T23:38:10.198021187Z"}
 {"type":"issue_state_changed","id":"986d2601-b07f-4191-b9c1-2e2adcc9f904","issue_id":"25064508-d563-4073-a970-296607a01adc","timestamp":"2026-06-25T23:38:10.247924531Z","from":"backlog","to":"ready"}
+{"type":"issue_state_changed","id":"e66d6b89-71a3-4bce-9fef-1d0f5e935c64","issue_id":"25064508-d563-4073-a970-296607a01adc","timestamp":"2026-06-25T23:42:38.300137881Z","from":"ready","to":"done"}
+{"type":"issue_completed","id":"f2de0e65-784c-416e-9182-3f0870ea2ddc","issue_id":"25064508-d563-4073-a970-296607a01adc","timestamp":"2026-06-25T23:42:38.300163971Z"}
