@@ -11,13 +11,17 @@ use std::sync::OnceLock;
 /// Regex for valid label format: `namespace:value`
 ///
 /// - namespace: `[a-z][a-z0-9-]*` (lowercase, alphanumeric, hyphens)
-/// - value: `[a-zA-Z0-9][a-zA-Z0-9._-]*` (alphanumeric, dots, hyphens, underscores)
+/// - value: `[a-zA-Z0-9][a-zA-Z0-9._/-]*` (alphanumeric, dots, hyphens,
+///   underscores, and `/`). The `/` admits a QUALIFIED link reference value
+///   `<issue>/<self-id>` (e.g. `satisfies:56ab0224/REQ-01`) so generic
+///   node→item links can be authored as labels (REQ-05). The unqualified value
+///   form is unchanged.
 /// - separator: exactly one colon `':'`
 static LABEL_REGEX: OnceLock<Regex> = OnceLock::new();
 
 fn label_regex() -> &'static Regex {
     LABEL_REGEX.get_or_init(|| {
-        Regex::new(r"^[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9._-]*$")
+        Regex::new(r"^[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9._/-]*$")
             .expect("Label regex should compile")
     })
 }
@@ -218,6 +222,8 @@ mod tests {
         assert!(validate_label("ns:val_with_underscore").is_ok());
         assert!(validate_label("ns:val.with.dots").is_ok());
         assert!(validate_label("ns:MixedCase").is_ok());
+        // Qualified link-reference value `<issue>/<self-id>` (REQ-05).
+        assert!(validate_label("satisfies:56ab0224/REQ-01").is_ok());
     }
 
     #[test]

@@ -47,7 +47,12 @@ use crate::validation::rules::{
 
 /// The canonical `namespace:value` label format, mirroring the regex the legacy
 /// `validate_labels` enforced unconditionally via `labels::validate_label`.
-const CANONICAL_LABEL_REGEX: &str = r"^[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9._-]*$";
+///
+/// The value class includes `/` so a QUALIFIED link reference value
+/// `<issue>/<self-id>` (e.g. `satisfies:56ab0224/REQ-01`) is a valid label,
+/// letting generic node→item links be authored as labels (REQ-05). Kept in sync
+/// with [`labels::label_regex`](crate::labels).
+const CANONICAL_LABEL_REGEX: &str = r"^[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9._/-]*$";
 
 /// Build the FIXED built-in default [`RuleSet`] from a repo's namespace registry
 /// + type hierarchy (MF1).
