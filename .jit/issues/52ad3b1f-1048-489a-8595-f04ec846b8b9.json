@@ -2,9 +2,9 @@
   "id": "52ad3b1f-1048-489a-8595-f04ec846b8b9",
   "title": "Add the bidirectional enforcement-drift check and the invariant CLI",
   "description": "Add a bidirectional enforcement-drift check and the `jit invariant` CLI surface. Drift is checked as declaration-consistency (not execution): in one direction, an invariant whose `enforced-by` names a missing or unloadable rule or gate; in the other, a rule or gate that no invariant claims. `jit invariant render` projects the registry and `jit invariant check` runs the drift check, each supporting `--json`; `jit invariant check` exits non-zero when drift is found.\n\nThe declaration-consistency framing follows from the confirmed fact that `Assertion::CheckerCommand` / `enforced-by` bindings are never executed: the local write path skips them (`crates/jit/src/validation/local.rs:288`) and validate has no execution site. A new `Assertion` variant is dispatched at `crates/jit/src/validation/graph.rs:355`; a new `commands/invariant.rs` is registered in `commands/mod.rs` with a thin `main.rs` dispatch arm. This task also corrects the stale docstring at `crates/jit/src/validation/local.rs:300` (which wrongly claims `checker-command` runs during validation).\n\n## Success Criteria\n\n- [hard] REQ-01: Validate reports a declared-but-unenforced invariant (its `enforced-by` names a missing or unloadable rule/gate) as a finding.\n- [hard] REQ-02: Validate reports an enforced-but-undeclared rule/gate (claimed by no invariant) as a finding.\n- [hard] REQ-03: Both drift directions have explicit tests under `cargo test`.\n- [hard] REQ-04: Running `jit invariant render` invokes the configured invariant projection and writes or updates the configured documentation target.\n- [hard] REQ-05: `jit invariant render` and `jit invariant check` each support `--json`.\n- [hard] REQ-06: `jit invariant check` exits non-zero when drift is present.\n- [hard] REQ-07: The stale docstring at `validation/local.rs:300` is corrected to reflect that `checker-command` is not executed during validation.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [
     "0d593d90-fe03-4a3c-9a8a-46725c757060"
   ],
@@ -22,5 +22,5 @@
     "satisfies:REQ-09"
   ],
   "created_at": "2026-06-24T22:44:37.771419523+00:00",
-  "updated_at": "2026-06-25T21:11:23.660250167+00:00"
+  "updated_at": "2026-06-25T21:43:45.420172299+00:00"
 }
