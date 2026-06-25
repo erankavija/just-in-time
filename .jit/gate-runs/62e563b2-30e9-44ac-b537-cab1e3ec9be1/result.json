@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "62e563b2-30e9-44ac-b537-cab1e3ec9be1",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "205472c4-edc1-46f5-874f-507aa582e653",
+  "commit": "e71637aa2a4dba9a7643e23f0975079dd6cdfe91",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-06-25T19:38:12.083580354Z",
+  "completed_at": "2026-06-25T19:39:26.791150758Z",
+  "duration_ms": 74707,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nNo blocking findings.\n\n- REQ-01/REQ-02 are covered by `jit item list --kind decision/risk --json` in `crates/jit/tests/decision_risk_story_tests.rs:123` and backed by built-in defaults in `crates/jit/src/domain/item.rs:574` and `crates/jit/src/domain/item.rs:620`.\n- REQ-03/REQ-04 are satisfied by namespace declarations at `crates/jit/src/domain/item.rs:82` and `crates/jit/src/domain/item.rs:104`, with generic resolution in `crates/jit/src/commands/item.rs:356`.\n- REQ-05 is satisfied by on-demand projection through `list_items` and `index_items` at `crates/jit/src/commands/item.rs:84` and tested by edit-and-relist behavior in `crates/jit/tests/decision_risk_story_tests.rs:278`.\n\n**Prior Review Feedback**\n\n`run_history` is empty, so there are no prior review findings to verify.\n\n**Architecture And Separation Of Concerns**\n\nNo boundary violations found. Domain owns item kind definitions and pure indexing in `crates/jit/src/domain/item.rs`; commands orchestrate config/storage/domain in `crates/jit/src/commands/item.rs`; CLI tests exercise user-facing behavior via the binary.\n\n**Functional Paradigm**\n\nNo blocking issue. The implementation uses iterator pipelines for kind filtering and namespace checks, with imperative accumulation limited to command orchestration and deterministic output assembly.\n\n**Correctness And Invariants**\n\nNo blocking issue. The change does not introduce new writes or PID handling. State-changing behavior remains behind existing issue commands/storage. Link resolution rejects registered namespaces with unresolvable qualified IDs instead of silently dropping them at `crates/jit/src/commands/item.rs:378`.\n\n**Safety**\n\nNo unsafe code found in the reviewed paths. Existing `#![deny(unsafe_code)]` policy is not weakened.\n\n**Testing**\n\nAccepted based on provided gate evidence. The cargo-ci gate passed for commit `e71637aa2a4dba9a7643e23f0975079dd6cdfe91` with `fmt`, `clippy`, and `2442 passed, 0 failed, 12 ignored`. I did not rerun tests, per instruction.\n\n**Error Handling**\n\nNo blocking issue. Fallible resolution paths return `Result` with context, for example parse/index context in `crates/jit/src/commands/item.rs:107` and link resolution context in `crates/jit/src/commands/item.rs:380`.\n\n**CLI Contract**\n\nNo blocking issue. The reviewed acceptance tests use `--json` for `jit item list` at `crates/jit/tests/decision_risk_story_tests.rs:134` and `crates/jit/tests/decision_risk_story_tests.rs:165`.\n\n**Documentation**\n\nNo blocking issue. The new public item-kind constructors include doc comments and `# Examples` at `crates/jit/src/domain/item.rs:551` and `crates/jit/src/domain/item.rs:588`.\n\n**Jit Issue Management**\n\nPrerequisites listed in the issue are both `done`. The supplied `cargo-ci` gate passed. I did not run `./scripts/jit-validate.sh`; no failed validation evidence was provided.\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
