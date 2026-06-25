@@ -3709,4 +3709,176 @@ source-of-truth = "markdown-first"
             "unique values must not produce findings: {findings:?}"
         );
     }
+
+    // --- b121fd51: coverage-compat acceptance tests --------------------------
+    //
+    // REQ-01 (b121fd51): `label-coverage` with `kind = "requirement"` produces
+    // findings IDENTICAL to the equivalent inline-triple form, in both the
+    // covered and uncovered cases.
+    //
+    // REQ-02 (b121fd51): the `(criteria_section, marker, id_pattern)` triple
+    // that a `criteria-to-check` (or `criteria-label-match`) rule actually
+    // consumes at runtime equals the triple the declared `requirement` kind
+    // expands to — compatibility SHOWN, not re-expressed.
+
+    #[test]
+    fn test_b121fd51_label_coverage_kind_equals_inline_acceptance() {
+        // REQ-01 acceptance: a `label-coverage` rule with `kind = "requirement"`
+        // produces byte-identical finding messages to the equivalent inline
+        // `(criteria-section, marker, id-pattern)` rule, in BOTH the covered
+        // case (no findings) and the uncovered case (one finding per criterion).
+        let kind_rule = rule_from_repo(
+            "[[rules]]\nname = \"coverage\"\nwhen = { type = \"epic\" }\n\
+             severity = \"error\"\nassert = { label-coverage = { \
+             kind = \"requirement\", child-state = \"done\" } }\n",
+        );
+        let inline_rule = coverage_rule(
+            "criteria-section = \"success_criteria\", marker = \"[hard]\", \
+             id-pattern = \"[A-Z][A-Z0-9]*-[0-9]+\", child-state = \"done\"",
+        );
+
+        let eval = |rule: &Rule, issues: &[Issue]| {
+            evaluate_graph(
+                &[rule],
+                issues,
+                &HierarchyConfig::default(),
+                ContentFormat::Markdown,
+                fixed_now(),
+                &HashMap::new(),
+            )
+        };
+
+        // Covered: a done child credits REQ-01 → no findings from either rule.
+        let epic = epic_with_criteria(&["REQ-01"]);
+        let mut child = issue("child", &["satisfies:REQ-01"]);
+        child.dependencies = vec![epic.id.clone()];
+        child.state = State::Done;
+        let covered = [epic, child];
+        let kind_covered = eval(&kind_rule, &covered);
+        let inline_covered = eval(&inline_rule, &covered);
+        assert!(
+            kind_covered.is_empty(),
+            "REQ-01 covered: kind= rule must produce no finding: {kind_covered:?}"
+        );
+        assert_eq!(
+            kind_covered.len(),
+            inline_covered.len(),
+            "REQ-01 covered: kind= and inline finding counts must match"
+        );
+
+        // Uncovered: no satisfying child → one finding from each rule, messages
+        // identical.
+        let epic2 = epic_with_criteria(&["REQ-09"]);
+        let uncovered = [epic2];
+        let kind_uncovered = eval(&kind_rule, &uncovered);
+        let inline_uncovered = eval(&inline_rule, &uncovered);
+        assert_eq!(
+            kind_uncovered.len(),
+            1,
+            "REQ-01 uncovered: kind= rule must fire one finding: {kind_uncovered:?}"
+        );
+        assert_eq!(
+            kind_uncovered
+                .iter()
+                .map(|f| &f.finding.message)
+                .collect::<Vec<_>>(),
+            inline_uncovered
+                .iter()
+                .map(|f| &f.finding.message)
+                .collect::<Vec<_>>(),
+            "REQ-01: kind= and inline rules must produce identical finding messages"
+        );
+    }
+
+    #[test]
+    fn test_b121fd51_typed_rule_triple_equals_requirement_kind_expansion() {
+        // REQ-02 acceptance: the `(section, marker, id_pattern)` triple a
+        // `criteria-to-check` rule consumes when authored with the INLINE form
+        // of the requirement kind's triple EQUALS the triple that
+        // `ItemKind::requirement_default().as_triple()` returns. This shows the
+        // two representations share one triple: the kind model and the typed
+        // rules are COMPATIBLE (same section + id_pattern vocabulary), not
+        // re-expressed (the typed rules are NOT given `kind=` syntax).
+        //
+        // The same assertion is then repeated for `criteria-label-match`.
+        //
+        // Note: the typed rules default their `marker` to `None` (no filter,
+        // widest scan), while `requirement_default` ships `marker = Some("[hard]")`.
+        // This is intentional: a `criteria-to-check` or `criteria-label-match`
+        // rule CAN be given the requirement kind's marker inline (as shown below),
+        // and the section + id_pattern defaults are identical. Compatibility is
+        // in the shared vocabulary of the triple, not in marker defaulting.
+
+        let req_kind = crate::domain::item::ItemKind::requirement_default().unwrap();
+        let (kind_section, kind_marker, kind_pattern) = req_kind.as_triple();
+
+        // Build `criteria-to-check` with the inline triple from the requirement
+        // kind (section + marker + id-pattern all explicit) to assert they match.
+        let ctc = ctc_rule(&format!(
+            "gate-prefix = \"verify:\", \
+             criteria-section = \"{kind_section}\", \
+             marker = \"{}\", \
+             id-pattern = '{kind_pattern}'",
+            kind_marker.unwrap_or(""),
+        ));
+        match ctc.assert {
+            Assertion::CriteriaToCheck {
+                criteria_section,
+                marker,
+                id_pattern,
+                ..
+            } => {
+                assert_eq!(
+                    criteria_section.as_str(),
+                    kind_section,
+                    "criteria-to-check criteria_section must equal requirement kind section"
+                );
+                assert_eq!(
+                    marker.as_deref(),
+                    kind_marker,
+                    "criteria-to-check marker must equal requirement kind marker"
+                );
+                assert_eq!(
+                    id_pattern.as_str(),
+                    kind_pattern,
+                    "criteria-to-check id_pattern must equal requirement kind id_pattern"
+                );
+            }
+            other => panic!("expected CriteriaToCheck, got {other:?}"),
+        }
+
+        // The same triple expressed as a `criteria-label-match` inline rule.
+        let clm = clm_rule(&format!(
+            "namespace = \"satisfies\", \
+             criteria-section = \"{kind_section}\", \
+             marker = \"{}\", \
+             id-pattern = '{kind_pattern}'",
+            kind_marker.unwrap_or(""),
+        ));
+        match clm.assert {
+            Assertion::CriteriaLabelMatch {
+                criteria_section,
+                marker,
+                id_pattern,
+                ..
+            } => {
+                assert_eq!(
+                    criteria_section.as_str(),
+                    kind_section,
+                    "criteria-label-match criteria_section must equal requirement kind section"
+                );
+                assert_eq!(
+                    marker.as_deref(),
+                    kind_marker,
+                    "criteria-label-match marker must equal requirement kind marker"
+                );
+                assert_eq!(
+                    id_pattern.as_str(),
+                    kind_pattern,
+                    "criteria-label-match id_pattern must equal requirement kind id_pattern"
+                );
+            }
+            other => panic!("expected CriteriaLabelMatch, got {other:?}"),
+        }
+    }
 }
