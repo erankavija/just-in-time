@@ -1,7 +1,7 @@
 {
   "id": "b121fd51-1a96-4943-80d1-95bedb068425",
   "title": "Show coverage rules compatible over the kind model",
-  "description": "Demonstrate that the existing coverage rules are compatible with the kind model without rewriting any live rule. Show that `label-coverage` evaluates identically whether its triple is expressed inline or referenced via a `kind=` key, and that the typed `criteria-to-check`/`criteria-label-match` rules consume the same `(section, marker, id-pattern)` triple a declared kind expands to (compatibility shown, not re-expressed), preserving the planning-bracket semantics they back. No live rule is modified.\n\n## Success Criteria\n\n- [hard] A `label-coverage` rule with `kind = \"requirement\"` produces findings identical to its inline `(section, marker, id-pattern)` form.\n- [hard] A test asserts the inline triple of a `criteria-to-check` (or `criteria-label-match`) rule equals the declared kind's expansion.\n- [hard] No live rule under `.jit/` or `docs/examples/` is modified.\n- [hard] The compatibility assertions pass under `cargo test`.",
+  "description": "Demonstrate that the existing coverage rules are compatible with the kind model without rewriting any live rule. Show that `label-coverage` evaluates identically whether its triple is expressed inline or referenced via a `kind=` key, and that the typed `criteria-to-check`/`criteria-label-match` rules consume the same `(section, marker, id-pattern)` triple a declared kind expands to (compatibility shown, not re-expressed), preserving the planning-bracket semantics they back. No live rule is modified.\n\n## Success Criteria\n\n- [hard] REQ-01: A `label-coverage` rule with `kind = \"requirement\"` produces findings identical to its inline `(section, marker, id-pattern)` form.\n- [hard] REQ-02: A test asserts the inline triple of a `criteria-to-check` (or `criteria-label-match`) rule equals the declared kind's expansion.\n- [hard] REQ-03: No live rule under `.jit/` or `docs/examples/` is modified.\n- [hard] REQ-04: The compatibility assertions pass under `cargo test`.",
   "state": "backlog",
   "priority": "normal",
   "assignee": null,
@@ -21,5 +21,5 @@
     "satisfies:REQ-08"
   ],
   "created_at": "2026-06-24T22:44:37.812991565+00:00",
-  "updated_at": "2026-06-24T22:45:09.175083748+00:00"
+  "updated_at": "2026-06-25T05:12:01.207131822+00:00"
 }
