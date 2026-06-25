@@ -124,7 +124,7 @@ pub fn scaffold_default_rules(
     let set = crate::validation::defaults::default_ruleset(namespaces);
     let serialized = serialize_ruleset(&set);
     write_schema_files(jit_root, &serialized.schema_files)?;
-    write_atomic(&jit_root.join("rules.toml"), &serialized.rules_toml)
+    write_file_atomic(&jit_root.join("rules.toml"), &serialized.rules_toml)
 }
 
 /// Regenerate the ONE write-path schema file that depends on `[type_hierarchy]`:
@@ -159,7 +159,7 @@ pub fn regenerate_type_hierarchy_schema(
     std::fs::create_dir_all(&schemas_dir)
         .with_context(|| format!("creating {}", schemas_dir.display()))?;
     let schema = crate::validation::defaults::type_hierarchy_known_schema(namespaces);
-    write_atomic(&target, &pretty_schema(&schema))?;
+    write_file_atomic(&target, &pretty_schema(&schema))?;
     Ok(true)
 }
 
@@ -172,13 +172,29 @@ fn write_schema_files(jit_root: &Path, files: &[SchemaFile]) -> Result<()> {
     std::fs::create_dir_all(&schemas_dir)
         .with_context(|| format!("creating {}", schemas_dir.display()))?;
     for file in files {
-        write_atomic(&schemas_dir.join(&file.name), &file.content)?;
+        write_file_atomic(&schemas_dir.join(&file.name), &file.content)?;
     }
     Ok(())
 }
 
 /// Write `content` to `path` atomically (temp file + rename).
-fn write_atomic(path: &Path, content: &str) -> Result<()> {
+///
+/// The write goes to a sibling temp file (`path` with a `.tmp` extension) and is
+/// then renamed onto `path`, so a reader never observes a partially written file
+/// (the JIT "atomic file writes" invariant). The parent directory must already
+/// exist; the rename is atomic only within a single filesystem.
+///
+/// # Examples
+///
+/// ```
+/// use jit::validation::serialize::write_file_atomic;
+///
+/// let dir = tempfile::tempdir().unwrap();
+/// let path = dir.path().join("out.txt");
+/// write_file_atomic(&path, "hello").unwrap();
+/// assert_eq!(std::fs::read_to_string(&path).unwrap(), "hello");
+/// ```
+pub fn write_file_atomic(path: &Path, content: &str) -> Result<()> {
     let tmp = path.with_extension("tmp");
     std::fs::write(&tmp, content).with_context(|| format!("writing {}", tmp.display()))?;
     std::fs::rename(&tmp, path)
