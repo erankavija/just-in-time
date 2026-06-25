@@ -69,7 +69,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let repo_format = self.repo_content_format()?;
         let mut issues = self.storage.list_issues()?;
         // Deterministic output: order by short id, then the index's own order.
-        issues.sort_by(|a, b| a.short_id().cmp(&b.short_id()));
+        issues.sort_by_key(|a| a.short_id());
 
         let mut items = Vec::new();
         for issue in &issues {
@@ -80,9 +80,8 @@ impl<S: IssueStore> CommandExecutor<S> {
                         issue.short_id()
                     )
                 })?;
-            let indexed = index_items(issue, &kinds, parser.as_ref()).with_context(|| {
-                format!("indexing items of issue {} failed", issue.short_id())
-            })?;
+            let indexed = index_items(issue, &kinds, parser.as_ref())
+                .with_context(|| format!("indexing items of issue {} failed", issue.short_id()))?;
             items.extend(indexed);
         }
         let count = items.len();
@@ -214,7 +213,11 @@ mod tests {
         let result = exec.list_items(None).unwrap();
         assert_eq!(result.count, 3);
         // Qualified ids disambiguate the two REQ-01s by their issue scope.
-        let qids: Vec<&str> = result.items.iter().map(|i| i.qualified_id.as_str()).collect();
+        let qids: Vec<&str> = result
+            .items
+            .iter()
+            .map(|i| i.qualified_id.as_str())
+            .collect();
         assert!(qids.iter().filter(|q| q.ends_with("/REQ-01")).count() == 2);
     }
 

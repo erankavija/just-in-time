@@ -153,6 +153,15 @@ pub enum Commands {
     #[command(subcommand)]
     Hooks(HooksCommands),
 
+    /// Addressable structured item commands
+    ///
+    /// Items are structured lines in issue descriptions (e.g. requirements) that
+    /// carry a self-id and are addressable by a qualified id `<issue>/<self-id>`.
+    /// Kinds are declared in `[item_kinds]` config; `requirement` is the built-in
+    /// default. Markdown stays the source of truth — the index is a projection.
+    #[command(subcommand)]
+    Item(ItemCommands),
+
     /// Search issues and documents
     Search {
         /// Search query string
@@ -291,6 +300,76 @@ pub enum Commands {
         /// Directory containing built web UI static files (auto-detected if omitted)
         #[arg(long)]
         web_dir: Option<String>,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+/// Addressable structured item subcommands.
+#[derive(Subcommand)]
+pub enum ItemCommands {
+    /// List addressable items across the repository
+    ///
+    /// Examples:
+    ///   jit item list                       # All items, every kind
+    ///   jit item list --kind requirement    # Only requirement items
+    ///   jit item list --json                # Machine-readable
+    List {
+        /// Filter to one item kind by name (e.g. "requirement")
+        #[arg(long)]
+        kind: Option<String>,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Show / resolve a single item by its qualified id `<issue>/<self-id>`
+    ///
+    /// The issue scope accepts a full id, short id, or unique prefix, just like
+    /// `jit show`.
+    ///
+    /// Examples:
+    ///   jit item show 56ab0224/REQ-01
+    ///   jit item show 56ab0224/REQ-01 --json
+    Show {
+        /// Qualified id of the item, `<issue>/<self-id>`
+        qualified_id: String,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Resolve a qualified id to its item (alias of `show`)
+    ///
+    /// Provided as a distinct verb for orchestrators that think in terms of
+    /// "resolve this qualified id"; behaves identically to `jit item show`.
+    Resolve {
+        /// Qualified id of the item, `<issue>/<self-id>`
+        qualified_id: String,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Search items by self-id or text
+    ///
+    /// Examples:
+    ///   jit item search atomic
+    ///   jit item search "" --kind requirement   # Empty query: filter by kind
+    Search {
+        /// Search query (matches self-id, qualified id, and item text). Empty
+        /// matches all, so `--kind` can be used alone.
+        #[arg(default_value = "")]
+        query: String,
+
+        /// Filter to one item kind by name
+        #[arg(long)]
+        kind: Option<String>,
 
         /// Output as JSON
         #[arg(long)]

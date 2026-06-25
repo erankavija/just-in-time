@@ -449,7 +449,10 @@ mod tests {
         assert_eq!(items.len(), 2);
         assert_eq!(items[0].self_id, "REQ-01");
         assert_eq!(items[0].kind, "requirement");
-        assert_eq!(items[0].qualified_id, qualified_id(&issue.short_id(), "REQ-01"));
+        assert_eq!(
+            items[0].qualified_id,
+            qualified_id(&issue.short_id(), "REQ-01")
+        );
         assert_eq!(items[1].self_id, "REQ-02");
     }
 

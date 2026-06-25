@@ -262,3 +262,58 @@ fn test_harness_scales_with_many_issues() {
     let ready = h.executor.query_ready().unwrap();
     assert_eq!(ready.len(), 100); // All auto-transitioned to Ready
 }
+
+// ========== Addressable Item Model (jit:56ab0224) ==========
+
+#[test]
+fn test_harness_item_list_and_resolve() {
+    let h = TestHarness::new();
+    let id = h.create_issue_with_desc(
+        "Foundational",
+        "## Success Criteria\n\n- [hard] REQ-01: first\n- [hard] REQ-02: second\n",
+    );
+    let short: String = id.chars().take(8).collect();
+
+    // Items are indexed across the repo and addressed by qualified id.
+    let listed = h.executor.list_items(None).unwrap();
+    assert_eq!(listed.count, 2);
+
+    // The qualified id resolves through the same issue-id resolver.
+    let shown = h.executor.show_item(&format!("{short}/REQ-01")).unwrap();
+    assert_eq!(shown.item.self_id, "REQ-01");
+    assert_eq!(shown.item.qualified_id, format!("{short}/REQ-01"));
+}
+
+#[test]
+fn test_harness_item_kind_compatible_with_label_coverage() {
+    use jit::domain::item::ItemKind;
+
+    // REQ-05: the built-in requirement kind expands to exactly the
+    // (section, marker, id-pattern) triple the label-coverage rule consumes by
+    // default, so the coverage machinery is compatible with the item model
+    // without rewriting any rule.
+    let kind = ItemKind::requirement_default().unwrap();
+    let (section, marker, pattern) = kind.as_triple();
+    assert_eq!(section, "success_criteria");
+    assert_eq!(marker, Some("[hard]"));
+    assert_eq!(pattern, "[A-Z][A-Z0-9]*-[0-9]+");
+
+    // The link namespace references the SAME self-id the item model addresses:
+    // a child's `satisfies:REQ-01` label points at the container's addressed
+    // item, whose qualified id resolves through the item commands.
+    let h = TestHarness::new();
+    let container = h.create_issue_with_desc(
+        "Container",
+        "## Success Criteria\n\n- [hard] REQ-01: covered\n",
+    );
+    let child = h.create_issue("Child");
+    h.executor
+        .add_label(&child, "satisfies:REQ-01")
+        .expect("child satisfies REQ-01");
+
+    let short: String = container.chars().take(8).collect();
+    let item = h.executor.show_item(&format!("{short}/REQ-01")).unwrap();
+    assert_eq!(item.item.self_id, "REQ-01");
+    // The default link namespace of the requirement kind is `satisfies`.
+    assert_eq!(kind.link_namespaces(), &["satisfies".to_string()]);
+}

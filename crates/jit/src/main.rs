@@ -20,7 +20,7 @@ use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 use jit::cli::{
     ClaimCommands, Cli, Commands, DepCommands, DocCommands, EventCommands, GateCommands,
-    GraphCommands, IssueCommands, RegistryCommands,
+    GraphCommands, IssueCommands, ItemCommands, RegistryCommands,
 };
 use jit::commands::CommandExecutor;
 use jit::domain::{GateRunResult, Priority, State};
@@ -386,6 +386,75 @@ fn build_issue_show_response<S: IssueStore>(
         enriched_deps,
         &gate_runs,
     ))
+}
+
+/// Dispatch the `jit item` subcommands.
+///
+/// A thin delegation over the [`CommandExecutor`] item methods: it selects the
+/// list/search/show executor call, then renders the result as JSON or as
+/// human-readable lines.
+fn run_item<S: IssueStore>(
+    executor: &CommandExecutor<S>,
+    command: ItemCommands,
+    quiet: bool,
+) -> Result<()> {
+    use jit::commands::{ItemListResult, ItemShowResult};
+
+    // Render an item list either as a JSON envelope or one line per item.
+    fn print_list(result: &ItemListResult, json: bool, quiet: bool) -> Result<()> {
+        let output_ctx = OutputContext::new(quiet, json);
+        if json {
+            let msg = format!("Found {} item(s)", result.count);
+            let output = JsonOutput::success(result, "item list").with_message(msg);
+            println!("{}", output.to_json_string()?);
+        } else if result.items.is_empty() {
+            let _ = output_ctx.print_info("No addressable items found");
+        } else {
+            for item in &result.items {
+                output_ctx.print_data(format!(
+                    "{}  [{}]  {}",
+                    item.qualified_id, item.kind, item.text
+                ))?;
+            }
+        }
+        Ok(())
+    }
+
+    // Render a single resolved item as a JSON envelope or a short block.
+    fn print_show(result: &ItemShowResult, json: bool, quiet: bool) -> Result<()> {
+        let output_ctx = OutputContext::new(quiet, json);
+        if json {
+            let output = JsonOutput::success(result, "item show");
+            println!("{}", output.to_json_string()?);
+        } else {
+            output_ctx.print_data(format!("Qualified id: {}", result.item.qualified_id))?;
+            output_ctx.print_data(format!("Kind:         {}", result.item.kind))?;
+            output_ctx.print_data(format!("Self id:      {}", result.item.self_id))?;
+            output_ctx.print_data(format!(
+                "Issue:        {} | {}",
+                result.issue_full_id, result.issue_title
+            ))?;
+            output_ctx.print_data(format!("Text:         {}", result.item.text))?;
+        }
+        Ok(())
+    }
+
+    match command {
+        ItemCommands::List { kind, json } => {
+            let result = executor.list_items(kind.as_deref())?;
+            print_list(&result, json, quiet)?;
+        }
+        ItemCommands::Search { query, kind, json } => {
+            let result = executor.search_items(&query, kind.as_deref())?;
+            print_list(&result, json, quiet)?;
+        }
+        ItemCommands::Show { qualified_id, json }
+        | ItemCommands::Resolve { qualified_id, json } => {
+            let result = executor.show_item(&qualified_id)?;
+            print_show(&result, json, quiet)?;
+        }
+    }
+    Ok(())
 }
 
 /// Run the `query all` listing, shared by `jit query all` and `jit issue list`.
@@ -3979,6 +4048,9 @@ fn run() -> Result<()> {
                 }
             }
         },
+        Commands::Item(item_cmd) => {
+            run_item(&executor, item_cmd, quiet)?;
+        }
         Commands::Search {
             query,
             regex,
