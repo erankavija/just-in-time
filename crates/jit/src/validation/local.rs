@@ -235,8 +235,9 @@ impl LocalEvaluation {
 /// `sections` only if a matching rule needs body content, then validates the
 /// projection against each rule's JSON Schema via a locally-constructed
 /// [`SchemaEngine`]. Shorthand kinds are desugared; the
-/// [`Assertion::CheckerCommand`] escape hatch is not yet evaluated here and
-/// produces no findings (deferred, not a regression).
+/// [`Assertion::CheckerCommand`] escape hatch is NEVER executed by jit (here or
+/// during `jit validate`; Decision D5), so a matching rule produces only a
+/// non-blocking warning that the command does not run.
 ///
 /// # Errors
 ///
@@ -285,11 +286,12 @@ pub fn evaluate_local(
 
     let mut findings = Vec::new();
 
-    // A `checker-command` is the escape hatch (DR §4.3) and is NOT evaluated on
-    // the write path (it runs in `jit validate`). The loader already rejects
-    // `enforce=true` on a checker-command, so these are always non-blocking;
-    // surface a non-blocking warning so a matching rule is not a SILENT no-op —
-    // the user is told it was skipped here.
+    // A `checker-command` is the escape hatch (DR §4.3) and is NEVER executed by
+    // jit: the write path skips it here AND `jit validate` has no execution site
+    // for it (Decision D5 / Risk R3). The loader already rejects `enforce=true` on
+    // a checker-command, so these are always non-blocking; surface a non-blocking
+    // warning so a matching rule is not a SILENT no-op — the user is told the
+    // command does not run.
     for rule in &local_rules {
         if matches!(rule.assert, Assertion::CheckerCommand(_)) {
             findings.push(EnforcedFinding {
@@ -297,8 +299,9 @@ pub fn evaluate_local(
                     rule: rule.name.clone(),
                     severity: Severity::Warn,
                     message: format!(
-                        "rule '{}' uses checker-command, which is not evaluated on the write \
-                         path; run `jit validate` to apply it",
+                        "rule '{}' uses checker-command, which jit does not execute (neither on \
+                         the write path nor during `jit validate`); its `enforced-by` binding is \
+                         a declaration only — use `jit invariant check` for enforcement-drift",
                         rule.name
                     ),
                 },

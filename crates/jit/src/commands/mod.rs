@@ -60,7 +60,7 @@ pub use bulk_update::{BulkUpdatePreview, BulkUpdateResult, UpdateOperations};
 pub use gate::{
     GateNotRequiredError, GatePassAllEntry, GatePassFailed, GatePassOutcome, PassAllOutcome,
 };
-pub use invariant::InvariantRenderResult;
+pub use invariant::{InvariantCheckResult, InvariantRenderResult};
 pub use item::{ItemListResult, ItemShowResult};
 pub use template::TemplateApplyResult;
 pub use validate::DANGLING_LINK_RULE;

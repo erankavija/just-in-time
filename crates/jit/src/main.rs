@@ -496,11 +496,12 @@ fn run_item_inner<S: IssueStore>(
 
 /// Run `jit invariant <subcommand>`.
 ///
-/// A thin delegation over the [`CommandExecutor`] invariant methods: it renders
-/// the project-invariant registry into its configured documentation target and
-/// reports the written target. On `--json` a failure is rendered as a JSON error
-/// object (honoring the machine-readable contract) rather than the top-level
-/// plain `Error: ...`.
+/// A thin delegation over the [`CommandExecutor`] invariant methods: `render`
+/// projects the registry into its configured documentation target and reports the
+/// written target; `check` runs the bidirectional enforcement-drift check and
+/// exits non-zero (via [`run_invariant_inner`]) when any drift is present. On
+/// `--json` a failure is rendered as a JSON error object (honoring the
+/// machine-readable contract) rather than the top-level plain `Error: ...`.
 fn run_invariant<S: IssueStore>(
     executor: &CommandExecutor<S>,
     command: InvariantCommands,
@@ -508,6 +509,7 @@ fn run_invariant<S: IssueStore>(
 ) -> Result<()> {
     let json = match &command {
         InvariantCommands::Render { json } => *json,
+        InvariantCommands::Check { json } => *json,
     };
 
     let result = run_invariant_inner(executor, command, quiet);
@@ -544,6 +546,37 @@ fn run_invariant_inner<S: IssueStore>(
                     "Rendered {} invariant(s) to {} ({} mode)",
                     result.count, result.target, result.mode
                 ))?;
+            }
+        }
+        InvariantCommands::Check { json } => {
+            let result = executor.check_invariants()?;
+            let exit_nonzero = result.has_drift();
+            let output_ctx = OutputContext::new(quiet, json);
+            if json {
+                let msg = if exit_nonzero {
+                    format!("Enforcement drift: {} finding(s)", result.count)
+                } else {
+                    "No enforcement drift".to_string()
+                };
+                let output = JsonOutput::success(&result, "invariant check").with_message(msg);
+                println!("{}", output.to_json_string()?);
+            } else if result.findings.is_empty() {
+                output_ctx.print_data("✓ No enforcement drift".to_string())?;
+            } else {
+                for finding in &result.findings {
+                    println!(
+                        "❌ [{}] {}",
+                        finding.direction.as_token(),
+                        finding.message()
+                    );
+                }
+                eprintln!("Enforcement drift: {} finding(s)", result.count);
+            }
+            // Exit non-zero (4) when any drift is present, matching the project's
+            // validation-failed convention. Done AFTER emitting output so `--json`
+            // still prints a valid payload.
+            if exit_nonzero {
+                std::process::exit(jit::ExitCode::ValidationFailed.code());
             }
         }
     }

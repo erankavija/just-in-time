@@ -391,8 +391,9 @@ pub enum ItemCommands {
 /// Project-invariant subcommands.
 ///
 /// `render` projects the loaded `.jit/invariants.toml` registry into the
-/// `[invariant_projection]` target (the drift `check` verb is added by a sibling
-/// issue). The target path/mode/delimiters come only from config.
+/// `[invariant_projection]` target. `check` runs the bidirectional
+/// enforcement-drift check between the registry and the declared rules/gates.
+/// The target path/mode/delimiters come only from config.
 #[derive(Subcommand)]
 pub enum InvariantCommands {
     /// Render the invariant registry into its configured documentation target
@@ -406,6 +407,22 @@ pub enum InvariantCommands {
     ///   jit invariant render          # Write the configured target
     ///   jit invariant render --json   # Machine-readable result
     Render {
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+    /// Check enforcement drift between invariants and declared rules/gates
+    ///
+    /// Reports two drift directions: an invariant whose `enforced-by` names a
+    /// missing/unloadable rule or gate (declared-but-unenforced), and a rule or
+    /// gate that no invariant claims (enforced-but-undeclared). This is a
+    /// declaration-consistency check (bindings are never executed). Exits
+    /// non-zero when any drift is present.
+    ///
+    /// Examples:
+    ///   jit invariant check           # Human-readable drift report
+    ///   jit invariant check --json    # Machine-readable result
+    Check {
         /// Output as JSON
         #[arg(long)]
         json: bool,
