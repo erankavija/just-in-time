@@ -52,8 +52,8 @@ pub struct RepoInfo {
 pub struct IssuesInfo {
     /// Total number of issues
     pub count: usize,
-    /// Count of issues by state
-    pub states: std::collections::HashMap<String, usize>,
+    /// Count of issues by state (keys are canonical snake_case state names)
+    pub states: std::collections::HashMap<crate::domain::State, usize>,
     /// List of issue file paths relative to snapshot root
     pub files: Vec<String>,
 }

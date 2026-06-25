@@ -2669,7 +2669,7 @@ fn run() -> Result<()> {
                         // Print summary first
                         let summary = jit::commands::graph::compute_dependency_summary(&tree);
                         if summary.total > 0 {
-                            let done_count = summary.by_state.get("done").unwrap_or(&0);
+                            let done_count = summary.by_state.get(&State::Done).unwrap_or(&0);
                             println!("  Summary: {}/{} complete", done_count, summary.total);
                             println!();
                         }
