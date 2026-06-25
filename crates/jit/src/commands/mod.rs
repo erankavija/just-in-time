@@ -20,6 +20,8 @@
 //! - `document`: Document reference operations
 //! - `events`: Event log operations
 //! - `search`: Issue search operations
+//! - `item`: Addressable-item queries (`jit item list/show/search`) over the pure
+//!   item model
 
 pub mod batch_create;
 mod breakdown;
@@ -34,6 +36,7 @@ mod gate_cli_tests;
 pub mod graph;
 pub mod hooks;
 mod issue;
+pub mod item;
 mod labels;
 pub mod plan_doc;
 mod query;
@@ -56,6 +59,7 @@ pub use bulk_update::{BulkUpdatePreview, BulkUpdateResult, UpdateOperations};
 pub use gate::{
     GateNotRequiredError, GatePassAllEntry, GatePassFailed, GatePassOutcome, PassAllOutcome,
 };
+pub use item::{ItemListResult, ItemShowResult};
 pub use template::TemplateApplyResult;
 
 // Re-export WorktreeIdentity for init return type
