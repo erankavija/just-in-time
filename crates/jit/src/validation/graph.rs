@@ -67,6 +67,34 @@ const DEFAULT_CRITERIA_SECTION: &str = "success_criteria";
 /// Default regex extracting a criterion id from an item's text (e.g. `REQ-01`).
 const DEFAULT_ID_PATTERN: &str = "[A-Z][A-Z0-9]*-[0-9]+";
 
+/// Whether a link `label` credits criterion `id` for the scope `scope_short_id`,
+/// accepting BOTH the legacy unqualified form and the qualified form (REQ-05).
+///
+/// The single matcher used by `label-coverage` and `criteria-to-check` so the
+/// qualified-vs-unqualified comparison logic exists in exactly one place:
+///
+/// - **Unqualified** `<namespace>:<id>` — credited iff the value equals `id`.
+///   This is the pre-existing behavior, kept exactly so every existing label
+///   keeps crediting as before (backward compatible).
+/// - **Qualified** `<namespace>:<scope>/<self-id>` — credited iff the self-id
+///   part (after the `/`) equals `id` AND `scope` matches `scope_short_id`. The
+///   scope is the criteria-owning issue's short id, so a qualified label pointing
+///   at a DIFFERENT scope does not spuriously credit coverage.
+///
+/// `scope_short_id` is the short id of the issue that owns the criterion (the
+/// container for `label-coverage`, the issue itself for `criteria-to-check`).
+fn label_credits_id(label: &str, namespace: &str, id: &str, scope_short_id: &str) -> bool {
+    let Some(value) = label.strip_prefix(&format!("{namespace}:")) else {
+        return false;
+    };
+    match crate::domain::item::split_qualified_id(value) {
+        // Qualified `<scope>/<self-id>`: scope must match and self-id must equal id.
+        Some((scope, self_id)) => scope == scope_short_id && self_id == id,
+        // Unqualified `<id>`: legacy exact match.
+        None => value == id,
+    }
+}
+
 /// Prefix every `config-error` finding message carries, so a [`GraphFinding`]
 /// can be recognized as a config error structurally.
 const CONFIG_ERROR_PREFIX: &str = "config error: ";
@@ -663,17 +691,20 @@ fn evaluate_label_coverage(
         }
     };
 
-    // A child satisfies criterion `id` if it carries `satisfies-ns:id` and (when
-    // configured) is in `child-state`.
+    // A child satisfies criterion `id` if it carries the `satisfies-ns` label for
+    // `id` — either the legacy unqualified `satisfies-ns:id` OR the qualified
+    // `satisfies-ns:<container-short-id>/id` (REQ-05) — and (when configured) is
+    // in `child-state`. `container_short_id` is the criteria-owning container's
+    // short id, threaded in so the qualified form's scope can be checked.
     let state_matcher = child_state.map(|s| Selector {
         state: Some(StatePredicate::Single(s.to_string())),
         ..Selector::default()
     });
-    let satisfied_id = |child: &Issue, id: &str| -> bool {
+    let satisfied_id = |child: &Issue, id: &str, container_short_id: &str| -> bool {
         let claims = child
             .labels
             .iter()
-            .any(|l| l == &format!("{satisfies_ns}:{id}"));
+            .any(|l| label_credits_id(l, satisfies_ns, id, container_short_id));
         let state_ok = state_matcher.as_ref().is_none_or(|sel| sel.matches(child));
         claims && state_ok
     };
@@ -741,9 +772,16 @@ fn evaluate_label_coverage(
             };
             let candidates: Vec<&Issue> =
                 children_of(container, issues, child_link, &exclude_types);
+            // The qualified `satisfies:` form is scoped to the criteria-owning
+            // container's short id.
+            let container_short = container.short_id();
             criteria
                 .into_iter()
-                .filter(move |id| !candidates.iter().any(|child| satisfied_id(child, id)))
+                .filter(move |id| {
+                    !candidates
+                        .iter()
+                        .any(|child| satisfied_id(child, id, &container_short))
+                })
                 .map(move |id| {
                     issue_finding(
                         rule,
@@ -1358,10 +1396,16 @@ fn criterion_is_checked(
         })
         .unwrap_or(false);
 
+    // The criterion lives on `issue` itself, so a qualified `<ns>:<scope>/<id>`
+    // label is credited only when its scope equals this issue's own short id
+    // (REQ-05); the legacy unqualified `<ns>:<id>` still credits unchanged.
     let label_checked = check_namespace
         .map(|ns| {
-            let label = format!("{ns}:{id}");
-            issue.labels.iter().any(|l| l == &label)
+            let scope = issue.short_id();
+            issue
+                .labels
+                .iter()
+                .any(|l| label_credits_id(l, ns, id, &scope))
         })
         .unwrap_or(false);
 
@@ -1572,6 +1616,52 @@ mod tests {
         Utc.with_ymd_and_hms(2026, 6, 10, 12, 0, 0).unwrap()
     }
 
+    // --- label_credits_id (shared qualified/unqualified matcher) -----------
+
+    #[test]
+    fn test_label_credits_id_unqualified_and_qualified() {
+        // Legacy unqualified form.
+        assert!(label_credits_id(
+            "satisfies:REQ-01",
+            "satisfies",
+            "REQ-01",
+            "abc12345"
+        ));
+        // Qualified form with matching scope.
+        assert!(label_credits_id(
+            "satisfies:abc12345/REQ-01",
+            "satisfies",
+            "REQ-01",
+            "abc12345"
+        ));
+        // Qualified form, scope mismatch → not credited.
+        assert!(!label_credits_id(
+            "satisfies:deadbeef/REQ-01",
+            "satisfies",
+            "REQ-01",
+            "abc12345"
+        ));
+        // Wrong namespace, wrong self-id, and non-namespaced labels are rejected.
+        assert!(!label_credits_id(
+            "other:REQ-01",
+            "satisfies",
+            "REQ-01",
+            "abc12345"
+        ));
+        assert!(!label_credits_id(
+            "satisfies:REQ-02",
+            "satisfies",
+            "REQ-01",
+            "abc12345"
+        ));
+        assert!(!label_credits_id(
+            "plainlabel",
+            "satisfies",
+            "REQ-01",
+            "abc12345"
+        ));
+    }
+
     // --- label-coverage ----------------------------------------------------
 
     fn coverage_rule(extra: &str) -> Rule {
@@ -1612,6 +1702,61 @@ mod tests {
             &HashMap::new(),
         );
         assert!(findings.is_empty(), "covered criterion: {findings:?}");
+    }
+
+    #[test]
+    fn test_label_coverage_satisfied_by_qualified_label() {
+        // REQ-05: a child carrying the QUALIFIED `satisfies:<container-short>/REQ-01`
+        // credits criterion REQ-01 just like the unqualified form, so the engine
+        // (not only the command helper) honors qualified link references.
+        let rule = coverage_rule("child-state = \"done\"");
+        let epic = epic_with_criteria(&["REQ-01"]);
+        let qualified = format!("satisfies:{}/REQ-01", epic.short_id());
+        let mut child = issue("child", &[&qualified]);
+        child.dependencies = vec![epic.id.clone()];
+        child.state = State::Done;
+
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[epic, child],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+            &HashMap::new(),
+        );
+        assert!(
+            findings.is_empty(),
+            "qualified satisfies label must cover the criterion: {findings:?}"
+        );
+    }
+
+    #[test]
+    fn test_label_coverage_qualified_label_wrong_scope_is_uncovered() {
+        // A qualified label whose scope does NOT match the criteria-owning
+        // container must not spuriously credit coverage.
+        let rule = coverage_rule("child-state = \"done\"");
+        let epic = epic_with_criteria(&["REQ-01"]);
+        // Scope points at an unrelated issue id, not this epic.
+        let mut child = issue("child", &["satisfies:deadbeef/REQ-01"]);
+        child.dependencies = vec![epic.id.clone()];
+        child.state = State::Done;
+
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[epic, child],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+            &HashMap::new(),
+        );
+        assert_eq!(
+            findings.len(),
+            1,
+            "wrong-scope qualified label must not cover: {findings:?}"
+        );
+        assert!(findings[0].finding.message.contains("REQ-01"));
     }
 
     #[test]
@@ -2751,6 +2896,53 @@ mod tests {
             findings.is_empty(),
             "label-mapped criterion must produce no finding: {findings:?}"
         );
+    }
+
+    #[test]
+    fn test_criteria_to_check_qualified_label_mapped_id_passes() {
+        // REQ-05: a QUALIFIED `<ns>:<own-short-id>/REQ-01` label on the issue that
+        // owns the criterion credits it, alongside the unqualified form.
+        let rule = ctc_rule("check-namespace = \"checks\"");
+        let mut epic = epic_with_sc(&["REQ-01: do the thing"]);
+        let qualified = format!("checks:{}/REQ-01", epic.short_id());
+        epic.labels.push(qualified);
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[epic],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+            &HashMap::new(),
+        );
+        assert!(
+            findings.is_empty(),
+            "qualified label-mapped criterion must produce no finding: {findings:?}"
+        );
+    }
+
+    #[test]
+    fn test_criteria_to_check_qualified_label_wrong_scope_reports_finding() {
+        // A qualified check label scoped to a DIFFERENT issue must not credit the
+        // criterion on this issue (no spurious pass).
+        let rule = ctc_rule("check-namespace = \"checks\"");
+        let mut epic = epic_with_sc(&["REQ-01: do the thing"]);
+        epic.labels.push("checks:deadbeef/REQ-01".to_string());
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[epic],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+            &HashMap::new(),
+        );
+        assert_eq!(
+            findings.len(),
+            1,
+            "wrong-scope qualified check label must not credit: {findings:?}"
+        );
+        assert!(findings[0].finding.message.contains("REQ-01"));
     }
 
     #[test]
