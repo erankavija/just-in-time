@@ -2,9 +2,9 @@
   "id": "1e1ea81d-e583-4a1a-9e50-db9ea8eddef5",
   "title": "Extend the item-kind registry to the full six-tuple",
   "description": "Extend the `[item_kinds]` config registry so each kind declares the full six-tuple `(section, id-pattern, marker(s), link-namespace(s), scope, source-of-truth)`, generalizing the registry from the issue-scope subset. A free-form-table rule (such as `label-coverage`) may carry an optional `kind=` key that expands to the declared kind's `(section, marker, id-pattern)` triple, while the inline-triple form stays valid as an anonymous kind. No kind name is hardcoded in engine logic; the engine reads the triple, not a kind label.\n\nThe `kind=` sugar is additive and scoped to free-form-table rules only: `label-coverage`'s assert is an `Option<toml::value::Table>` (`crates/jit/src/validation/rules.rs:1032`) that round-trips an unrecognized key untouched. The typed `criteria-to-check`/`criteria-label-match` rules use `#[serde(deny_unknown_fields)]` (`rules.rs:1146`) and are deliberately NOT given `kind=` syntax; their compatibility is shown separately, not re-expressed.\n\n## Success Criteria\n\n- [hard] REQ-01: Each kind in `[item_kinds]` declares all six fields: section, id-pattern, marker(s), link-namespace(s), scope, and source-of-truth.\n- [hard] REQ-02: A `label-coverage` rule carrying `kind = \"requirement\"` evaluates identically to the equivalent inline `(section, marker, id-pattern)` form (asserted by `cargo test`).\n- [hard] REQ-03: Existing inline-triple `label-coverage` rules continue to evaluate unchanged (the extra `kind=` key round-trips without altering them).\n- [hard] REQ-04: The typed `criteria-to-check`/`criteria-label-match` rules are not given `kind=` syntax and remain unchanged.\n- [hard] REQ-05: A grep scoped to engine logic finds no kind-name string literal.\n- [hard] REQ-06: Two items sharing the same self-id under different scopes (e.g. the container's `25064508/REQ-01` and a task's `<short-id>/REQ-01`) each resolve distinctly by their qualified id, neither shadowing the other in the index; and the bracket coverage gate still credits the container's bare `satisfies:REQ-NN` labels against the container's criteria, so a same-named task-scope id does not break or alter coverage (asserted by `cargo test`).",
-  "state": "ready",
+  "state": "done",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [
     "56ab0224-fd6e-4929-a61e-ffb1a3104496"
   ],
@@ -12,14 +12,33 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-25T16:52:47.248954837Z"
+    },
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-25T16:51:46.433262618Z"
+    }
+  },
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "dev/active/1e1ea81d-item-kind-six-tuple.md",
+      "commit": null,
+      "label": "epic:structured-knowledge",
+      "doc_type": "design",
+      "format": "markdown"
+    }
+  ],
   "labels": [
     "type:task",
     "epic:structured-knowledge",
     "satisfies:REQ-02"
   ],
   "created_at": "2026-06-24T22:44:37.664239873+00:00",
-  "updated_at": "2026-06-25T13:58:44.639526844+00:00"
+  "updated_at": "2026-06-25T16:55:05.838880208+00:00"
 }

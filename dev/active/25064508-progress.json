@@ -1,7 +1,7 @@
 {
   "epic_id": "25064508-d563-4073-a970-296607a01adc",
   "epic_short_id": "25064508",
-  "current_wave": 2,
+  "current_wave": 3,
   "waves": [
     {
       "wave_number": 1,
@@ -23,7 +23,7 @@
           "short_id": "1e1ea81d",
           "title": "Extend the item-kind registry to the full six-tuple",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "61b17603",
@@ -140,7 +140,8 @@
   "created_during_execution": [],
   "escalations": [],
   "rework_counts": {
-    "56ab0224": 2
+    "56ab0224": 2,
+    "1e1ea81d": 1
   },
   "started_at": "2026-06-25T00:00:00Z",
   "notes": "Bracket complete: P=0d753ba5 (done), B=5f5735c3 (done). plan-review/coverage-preview/breakdown-review all passed. Driving impl interior. Issues serialized within waves due to heavy crates/jit file overlap; worktrees only for file-disjoint pairs."

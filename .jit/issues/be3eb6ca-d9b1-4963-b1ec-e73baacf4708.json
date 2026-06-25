@@ -2,7 +2,7 @@
   "id": "be3eb6ca-d9b1-4963-b1ec-e73baacf4708",
   "title": "Add the risk item kind",
   "description": "Add `risk` as a markdown-first item kind so risks authored in issue descriptions become addressable, queryable items. Configure the kind in `[item_kinds]` (its section, id-pattern, marker, and the `mitigates:`/`resolves:` link namespaces) and index risks from descriptions via the generic triple-driven parse path the `requirement` kind already uses. The markdown description stays the sole source of truth, with no duplicated structured store. Builds on scoped-id addressing and the six-tuple kind registry.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit item list --kind risk` returns risk items parsed from issue descriptions.\n- [hard] REQ-02: A `mitigates:<qualified-id>` label and a `resolves:<qualified-id>` label each resolve to the addressed risk item.\n- [hard] REQ-03: The markdown description is the only source for risk items; no parallel structured store duplicates them.\n- [hard] REQ-04: The behavior is covered by `cargo test`.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -23,5 +23,5 @@
     "satisfies:REQ-04"
   ],
   "created_at": "2026-06-24T22:48:19.007985560+00:00",
-  "updated_at": "2026-06-25T05:12:01.236405480+00:00"
+  "updated_at": "2026-06-25T16:55:06.001535525+00:00"
 }

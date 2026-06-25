@@ -2,7 +2,7 @@
   "id": "21558ace-c777-4368-981a-eef21d618d98",
   "title": "Add the invariants.toml schema and config-time loader",
   "description": "Add `.jit/invariants.toml` as a registry-first source: a declarative registry whose entries each carry a `statement`, a `kind` of `enforced` or `advisory`, and an optional `enforced-by` binding to a rule or gate. Add a new `invariants.rs` module mirroring `RuleSet::load` (`crates/jit/src/validation/rules.rs:902`) and load the registry at config time on BOTH return paths of `JitConfig::load` (`crates/jit/src/config.rs:432-451` and `:474`), so invariants load even when no `config.toml` is present.\n\n## Success Criteria\n\n- [hard] REQ-01: An entry declaring `statement`, `kind` (`enforced`|`advisory`), and optional `enforced-by` is loaded at config time.\n- [hard] REQ-02: Invariants load on both config-load return paths, including when `config.toml` is absent.\n- [hard] REQ-03: An invalid invariant entry fails config load with a typed, descriptive error.\n- [hard] REQ-04: The loader is covered by `cargo test`.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -24,5 +24,5 @@
     "satisfies:REQ-05"
   ],
   "created_at": "2026-06-24T22:48:19.029250166+00:00",
-  "updated_at": "2026-06-25T05:12:01.251164254+00:00"
+  "updated_at": "2026-06-25T16:55:05.887253532+00:00"
 }
