@@ -273,7 +273,7 @@ pub struct NamespaceConfig {
 /// `source` path and its items come only from `.jit/invariants.toml`:
 ///
 /// ```
-/// use jit::config::JitConfig;
+/// use jit::config::{JitConfig, KindScopeConfig};
 ///
 /// let config: JitConfig = toml::from_str(
 ///     r#"
@@ -289,7 +289,7 @@ pub struct NamespaceConfig {
 /// )
 /// .unwrap();
 /// let gloss = &config.item_kinds.unwrap()["glossary"];
-/// assert_eq!(gloss.scope.as_deref(), Some("project"));
+/// assert_eq!(gloss.scope, Some(KindScopeConfig::Project));
 /// assert_eq!(gloss.source.as_deref(), Some("project-items.md"));
 /// assert!(gloss.missing_required_fields().is_empty());
 /// ```
@@ -316,11 +316,13 @@ pub struct ItemKindConfig {
     /// (e.g. `["satisfies"]`). Required in an explicit declaration.
     #[serde(rename = "link-namespaces")]
     pub link_namespaces: Option<Vec<String>>,
-    /// Addressing scope: `"issue"` for items projected from issue descriptions
-    /// (qualified id `<issue>/<self-id>`), or `"project"` for items projected from
-    /// a repository-local `source` file (qualified id `@/<self-id>`). Required in
-    /// an explicit declaration.
-    pub scope: Option<String>,
+    /// Addressing scope: [`KindScopeConfig::Issue`] for items projected from issue
+    /// descriptions (qualified id `<issue>/<self-id>`), or
+    /// [`KindScopeConfig::Project`] for items projected from a repository-local
+    /// `source` file (qualified id `@/<self-id>`). Required in an explicit
+    /// declaration; an unrecognised token is a TOML parse error, not a silent
+    /// fallback.
+    pub scope: Option<KindScopeConfig>,
     /// For a `scope = "project"` kind, the repository-local markdown file
     /// (relative to the repo root) whose declared `section` is scanned for this
     /// kind's items. The path comes ONLY from config — no filename is hardcoded in
@@ -360,7 +362,7 @@ impl ItemKindConfig {
     /// # Examples
     ///
     /// ```
-    /// use jit::config::{ItemKindConfig, SourceOfTruth};
+    /// use jit::config::{ItemKindConfig, KindScopeConfig, SourceOfTruth};
     ///
     /// // A bare default is missing every required field.
     /// assert_eq!(
@@ -381,7 +383,7 @@ impl ItemKindConfig {
     ///     id_pattern: Some("REQ-\\d+".to_string()),
     ///     markers: Some(vec!["[hard]".to_string()]),
     ///     link_namespaces: Some(vec!["satisfies".to_string()]),
-    ///     scope: Some("issue".to_string()),
+    ///     scope: Some(KindScopeConfig::Issue),
     ///     source_of_truth: Some(SourceOfTruth::MarkdownFirst),
     ///     source: None,
     /// };
@@ -426,6 +428,86 @@ impl ItemKindConfig {
     /// ```
     pub fn source_of_truth(&self) -> SourceOfTruth {
         self.source_of_truth.unwrap_or_default()
+    }
+}
+
+/// Parse error for [`KindScopeConfig`].
+///
+/// Returned by [`KindScopeConfig::from_str`] and (via serde) by TOML
+/// deserialization when the `scope` value is not one of the recognised tokens.
+///
+/// # Examples
+///
+/// ```
+/// use jit::config::KindScopeConfig;
+/// let err = "global".parse::<KindScopeConfig>().unwrap_err();
+/// assert!(err.to_string().contains("global"));
+/// ```
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum KindScopeConfigError {
+    /// The value is not one of `"issue"` or `"project"`.
+    #[error("invalid scope '{value}'; expected 'issue' or 'project'")]
+    Invalid {
+        /// The unrecognised value.
+        value: String,
+    },
+}
+
+/// Addressing scope of an item kind: `"issue"` or `"project"`.
+///
+/// This is the fifth field of the item-kind six-tuple `(section, id-pattern,
+/// markers, link-namespaces, scope, source-of-truth)`. It mirrors
+/// [`KindScope`](crate::domain::item::KindScope) from the domain layer but
+/// lives in the config layer so unrecognised tokens fail at TOML parse time
+/// rather than at projection time.
+///
+/// Parsed (case-insensitively) from the tokens `"issue"` / `"project"` by both
+/// TOML deserialization and [`KindScopeConfig::from_str`]; an unknown token is a
+/// descriptive error, not a silent fallback.
+///
+/// # Examples
+///
+/// ```
+/// use jit::config::{ItemKindConfig, KindScopeConfig};
+///
+/// // Parsed from its token inside an item-kind declaration.
+/// let cfg: ItemKindConfig = toml::from_str("scope = \"project\"").unwrap();
+/// assert_eq!(cfg.scope, Some(KindScopeConfig::Project));
+///
+/// // FromStr also works (case-insensitive).
+/// assert_eq!("ISSUE".parse::<KindScopeConfig>().unwrap(), KindScopeConfig::Issue);
+///
+/// // An invalid token is a descriptive error, not a silent default.
+/// let err = toml::from_str::<ItemKindConfig>("scope = \"global\"").unwrap_err();
+/// assert!(err.to_string().contains("global"));
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KindScopeConfig {
+    /// Items are projected from issue descriptions (`<issue>/<self-id>`).
+    Issue,
+    /// Items are projected from a config-declared source file (`@/<self-id>`).
+    Project,
+}
+
+impl std::str::FromStr for KindScopeConfig {
+    type Err = KindScopeConfigError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "issue" => Ok(KindScopeConfig::Issue),
+            "project" => Ok(KindScopeConfig::Project),
+            _ => Err(KindScopeConfigError::Invalid {
+                value: s.to_string(),
+            }),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for KindScopeConfig {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(d)?;
+        s.parse::<KindScopeConfig>()
+            .map_err(serde::de::Error::custom)
     }
 }
 
@@ -736,16 +818,77 @@ pub enum ItemKindConfigError {
     },
 }
 
+/// Parse error for [`WorktreeMode`].
+///
+/// Returned by [`WorktreeMode::from_str`] and (via serde) by TOML /
+/// environment-variable deserialization when the value is not one of the
+/// recognised tokens.
+///
+/// # Examples
+///
+/// ```
+/// use jit::config::WorktreeMode;
+/// let err = "bogus".parse::<WorktreeMode>().unwrap_err();
+/// assert!(err.to_string().contains("bogus"));
+/// ```
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum WorktreeModeError {
+    /// The value is not one of `"auto"`, `"on"`, or `"off"`.
+    #[error("invalid worktree mode '{value}'; expected 'auto', 'on', or 'off'")]
+    Invalid {
+        /// The unrecognised value.
+        value: String,
+    },
+}
+
+/// Parse error for [`EnforcementMode`].
+///
+/// Returned by [`EnforcementMode::from_str`] and (via serde) by TOML /
+/// environment-variable deserialization when the value is not one of the
+/// recognised tokens.
+///
+/// # Examples
+///
+/// ```
+/// use jit::config::EnforcementMode;
+/// let err = "bogus".parse::<EnforcementMode>().unwrap_err();
+/// assert!(err.to_string().contains("bogus"));
+/// ```
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum EnforcementModeError {
+    /// The value is not one of `"strict"`, `"warn"`, or `"off"`.
+    #[error("invalid enforcement mode '{value}'; expected 'strict', 'warn', or 'off'")]
+    Invalid {
+        /// The unrecognised value.
+        value: String,
+    },
+}
+
 /// Worktree and parallel work configuration.
 #[derive(Debug, Clone, Deserialize)]
 pub struct WorktreeConfig {
-    /// Worktree mode: "auto", "on", or "off" (default: "auto").
-    pub mode: Option<String>,
-    /// Lease enforcement mode: "strict", "warn", or "off" (default: "strict").
-    pub enforce_leases: Option<String>,
+    /// Worktree mode (default: [`WorktreeMode::Auto`]).
+    pub mode: Option<WorktreeMode>,
+    /// Lease enforcement mode (default: [`EnforcementMode::Strict`]).
+    pub enforce_leases: Option<EnforcementMode>,
 }
 
 /// Worktree detection mode.
+///
+/// Parsed (case-insensitively) from the tokens `"auto"` / `"on"` / `"off"` by
+/// both TOML configuration (`[worktree] mode = ...`) and the
+/// `JIT_WORKTREE_MODE` environment variable, so the two sources share one
+/// case-handling rule.
+///
+/// # Examples
+///
+/// ```
+/// use jit::config::WorktreeMode;
+///
+/// assert_eq!("auto".parse::<WorktreeMode>().unwrap(), WorktreeMode::Auto);
+/// assert_eq!("ON".parse::<WorktreeMode>().unwrap(), WorktreeMode::On);
+/// assert!("bogus".parse::<WorktreeMode>().is_err());
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WorktreeMode {
     /// Detect git worktree and enable automatically (default).
@@ -756,7 +899,44 @@ pub enum WorktreeMode {
     Off,
 }
 
+impl std::str::FromStr for WorktreeMode {
+    type Err = WorktreeModeError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "auto" => Ok(WorktreeMode::Auto),
+            "on" => Ok(WorktreeMode::On),
+            "off" => Ok(WorktreeMode::Off),
+            _ => Err(WorktreeModeError::Invalid {
+                value: s.to_string(),
+            }),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for WorktreeMode {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(d)?;
+        s.parse::<WorktreeMode>().map_err(serde::de::Error::custom)
+    }
+}
+
 /// Enforcement mode for lease requirements.
+///
+/// Parsed (case-insensitively) from the tokens `"strict"` / `"warn"` / `"off"` by
+/// both TOML configuration (`[worktree] enforce_leases = ...`) and the
+/// `JIT_ENFORCE_LEASES` environment variable, so the two sources share one
+/// case-handling rule.
+///
+/// # Examples
+///
+/// ```
+/// use jit::config::EnforcementMode;
+///
+/// assert_eq!("strict".parse::<EnforcementMode>().unwrap(), EnforcementMode::Strict);
+/// assert_eq!("WARN".parse::<EnforcementMode>().unwrap(), EnforcementMode::Warn);
+/// assert!("bogus".parse::<EnforcementMode>().is_err());
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EnforcementMode {
     /// Block operations without active lease (production-safe default).
@@ -767,31 +947,72 @@ pub enum EnforcementMode {
     Off,
 }
 
-impl WorktreeConfig {
-    /// Get the worktree mode, defaulting to Auto if not specified.
-    pub fn worktree_mode(&self) -> Result<WorktreeMode> {
-        match self.mode.as_deref() {
-            None | Some("auto") => Ok(WorktreeMode::Auto),
-            Some("on") => Ok(WorktreeMode::On),
-            Some("off") => Ok(WorktreeMode::Off),
-            Some(invalid) => anyhow::bail!(
-                "Invalid worktree mode: '{}'. Valid options: 'auto', 'on', 'off'",
-                invalid
-            ),
+impl std::str::FromStr for EnforcementMode {
+    type Err = EnforcementModeError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "strict" => Ok(EnforcementMode::Strict),
+            "warn" => Ok(EnforcementMode::Warn),
+            "off" => Ok(EnforcementMode::Off),
+            _ => Err(EnforcementModeError::Invalid {
+                value: s.to_string(),
+            }),
         }
     }
+}
 
-    /// Get the enforcement mode, defaulting to Strict if not specified.
-    pub fn enforcement_mode(&self) -> Result<EnforcementMode> {
-        match self.enforce_leases.as_deref() {
-            None | Some("strict") => Ok(EnforcementMode::Strict),
-            Some("warn") => Ok(EnforcementMode::Warn),
-            Some("off") => Ok(EnforcementMode::Off),
-            Some(invalid) => anyhow::bail!(
-                "Invalid enforce_leases mode: '{}'. Valid options: 'strict', 'warn', 'off'",
-                invalid
-            ),
-        }
+impl<'de> serde::Deserialize<'de> for EnforcementMode {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(d)?;
+        s.parse::<EnforcementMode>()
+            .map_err(serde::de::Error::custom)
+    }
+}
+
+impl WorktreeConfig {
+    /// Get the worktree mode, defaulting to [`WorktreeMode::Auto`] when unset.
+    ///
+    /// The field is typed — invalid tokens are rejected at TOML parse time, so
+    /// this method is infallible.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::config::{WorktreeConfig, WorktreeMode};
+    ///
+    /// // An absent field defaults to Auto.
+    /// let wt: WorktreeConfig = toml::from_str("").unwrap();
+    /// assert_eq!(wt.worktree_mode(), WorktreeMode::Auto);
+    ///
+    /// // An explicit value is returned as-is.
+    /// let wt: WorktreeConfig = toml::from_str("mode = \"on\"").unwrap();
+    /// assert_eq!(wt.worktree_mode(), WorktreeMode::On);
+    /// ```
+    pub fn worktree_mode(&self) -> WorktreeMode {
+        self.mode.unwrap_or(WorktreeMode::Auto)
+    }
+
+    /// Get the enforcement mode, defaulting to [`EnforcementMode::Strict`] when unset.
+    ///
+    /// The field is typed — invalid tokens are rejected at TOML parse time, so
+    /// this method is infallible.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::config::{WorktreeConfig, EnforcementMode};
+    ///
+    /// // An absent field defaults to Strict.
+    /// let wt: WorktreeConfig = toml::from_str("").unwrap();
+    /// assert_eq!(wt.enforcement_mode(), EnforcementMode::Strict);
+    ///
+    /// // An explicit value is returned as-is.
+    /// let wt: WorktreeConfig = toml::from_str("enforce_leases = \"warn\"").unwrap();
+    /// assert_eq!(wt.enforcement_mode(), EnforcementMode::Warn);
+    /// ```
+    pub fn enforcement_mode(&self) -> EnforcementMode {
+        self.enforce_leases.unwrap_or(EnforcementMode::Strict)
     }
 }
 
@@ -1178,39 +1399,37 @@ pub struct EffectiveConfig {
 impl EffectiveConfig {
     /// Get the effective worktree mode.
     /// Priority: env var > repo > user > system > default
+    ///
+    /// Both the env-var and TOML paths share the same [`WorktreeMode::from_str`]
+    /// implementation (case-insensitive), so the two sources handle case
+    /// identically.
     pub fn worktree_mode(&self) -> Result<WorktreeMode> {
-        // Check env var first (highest priority)
+        // Check env var first (highest priority). Uses the same FromStr as TOML.
         if let Ok(val) = std::env::var("JIT_WORKTREE_MODE") {
-            return match val.to_lowercase().as_str() {
-                "auto" => Ok(WorktreeMode::Auto),
-                "on" => Ok(WorktreeMode::On),
-                "off" => Ok(WorktreeMode::Off),
-                invalid => anyhow::bail!(
-                    "Invalid JIT_WORKTREE_MODE: '{}'. Valid options: 'auto', 'on', 'off'",
-                    invalid
-                ),
-            };
+            return val
+                .parse::<WorktreeMode>()
+                .map_err(|e| anyhow::anyhow!("invalid JIT_WORKTREE_MODE: {e}"));
         }
 
         // Check repo first, then user, then system
         if let Some(ref cfg) = self.repo_config {
             if let Some(ref wt) = cfg.worktree {
                 if wt.mode.is_some() {
-                    return wt.worktree_mode();
+                    return Ok(wt.worktree_mode());
                 }
             }
         }
         if let Some(ref cfg) = self.user_config {
             if let Some(ref wt) = cfg.worktree {
                 if wt.mode.is_some() {
-                    return wt.worktree_mode();
+                    return Ok(wt.worktree_mode());
                 }
             }
         }
         if let Some(ref cfg) = self.system_config {
             if let Some(ref wt) = cfg.worktree {
                 if wt.mode.is_some() {
-                    return wt.worktree_mode();
+                    return Ok(wt.worktree_mode());
                 }
             }
         }
@@ -1220,38 +1439,36 @@ impl EffectiveConfig {
 
     /// Get the effective enforcement mode.
     /// Priority: env var > repo > user > system > default
+    ///
+    /// Both the env-var and TOML paths share the same
+    /// [`EnforcementMode::from_str`] implementation (case-insensitive), so the
+    /// two sources handle case identically.
     pub fn enforcement_mode(&self) -> Result<EnforcementMode> {
-        // Check env var first (highest priority)
+        // Check env var first (highest priority). Uses the same FromStr as TOML.
         if let Ok(val) = std::env::var("JIT_ENFORCE_LEASES") {
-            return match val.to_lowercase().as_str() {
-                "strict" => Ok(EnforcementMode::Strict),
-                "warn" => Ok(EnforcementMode::Warn),
-                "off" => Ok(EnforcementMode::Off),
-                invalid => anyhow::bail!(
-                    "Invalid JIT_ENFORCE_LEASES: '{}'. Valid options: 'strict', 'warn', 'off'",
-                    invalid
-                ),
-            };
+            return val
+                .parse::<EnforcementMode>()
+                .map_err(|e| anyhow::anyhow!("invalid JIT_ENFORCE_LEASES: {e}"));
         }
 
         if let Some(ref cfg) = self.repo_config {
             if let Some(ref wt) = cfg.worktree {
                 if wt.enforce_leases.is_some() {
-                    return wt.enforcement_mode();
+                    return Ok(wt.enforcement_mode());
                 }
             }
         }
         if let Some(ref cfg) = self.user_config {
             if let Some(ref wt) = cfg.worktree {
                 if wt.enforce_leases.is_some() {
-                    return wt.enforcement_mode();
+                    return Ok(wt.enforcement_mode());
                 }
             }
         }
         if let Some(ref cfg) = self.system_config {
             if let Some(ref wt) = cfg.worktree {
                 if wt.enforce_leases.is_some() {
-                    return wt.enforcement_mode();
+                    return Ok(wt.enforcement_mode());
                 }
             }
         }
@@ -1878,7 +2095,7 @@ source-of-truth = "markdown-first"
         assert_eq!(req.id_pattern.as_deref(), Some("REQ-\\d+"));
         assert_eq!(req.markers, Some(vec!["[hard]".to_string()]));
         assert_eq!(req.link_namespaces, Some(vec!["satisfies".to_string()]));
-        assert_eq!(req.scope.as_deref(), Some("issue"));
+        assert_eq!(req.scope, Some(KindScopeConfig::Issue));
         assert_eq!(req.source_of_truth, Some(SourceOfTruth::MarkdownFirst));
         assert!(req.missing_required_fields().is_empty());
 
@@ -2029,6 +2246,109 @@ types = { task = 1 }
     }
 
     #[test]
+    fn test_kind_scope_config_parses_both_tokens() {
+        // The typed KindScopeConfig field deserializes both valid tokens.
+        let issue: ItemKindConfig = toml::from_str("scope = \"issue\"").unwrap();
+        assert_eq!(issue.scope, Some(KindScopeConfig::Issue));
+
+        let project: ItemKindConfig = toml::from_str("scope = \"project\"").unwrap();
+        assert_eq!(project.scope, Some(KindScopeConfig::Project));
+    }
+
+    #[test]
+    fn test_kind_scope_config_invalid_token_is_parse_error() {
+        // REQ: an unrecognised scope token is a TOML parse/deserialize error,
+        // not a silent fallback to issue scope.
+        let err =
+            toml::from_str::<JitConfig>("[item_kinds.thing]\nscope = \"global\"\n").unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("global"),
+            "error must mention the bad token: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_kind_scope_config_from_str_case_insensitive() {
+        // FromStr normalises case so "ISSUE" and "PROJECT" are accepted.
+        assert_eq!(
+            "ISSUE".parse::<KindScopeConfig>().unwrap(),
+            KindScopeConfig::Issue
+        );
+        assert_eq!(
+            "Project".parse::<KindScopeConfig>().unwrap(),
+            KindScopeConfig::Project
+        );
+        assert!("unknown".parse::<KindScopeConfig>().is_err());
+    }
+
+    #[test]
+    fn test_worktree_mode_and_enforcement_mode_from_str_case_insensitive() {
+        // Both WorktreeMode and EnforcementMode accept mixed-case input via
+        // FromStr, so TOML and env-var paths share one case-handling rule.
+        assert_eq!("AUTO".parse::<WorktreeMode>().unwrap(), WorktreeMode::Auto);
+        assert_eq!("On".parse::<WorktreeMode>().unwrap(), WorktreeMode::On);
+        assert_eq!("OFF".parse::<WorktreeMode>().unwrap(), WorktreeMode::Off);
+
+        assert_eq!(
+            "STRICT".parse::<EnforcementMode>().unwrap(),
+            EnforcementMode::Strict
+        );
+        assert_eq!(
+            "Warn".parse::<EnforcementMode>().unwrap(),
+            EnforcementMode::Warn
+        );
+        assert_eq!(
+            "OFF".parse::<EnforcementMode>().unwrap(),
+            EnforcementMode::Off
+        );
+    }
+
+    #[test]
+    fn test_worktree_mode_case_sensitivity_divergence_is_gone() {
+        // Previously the TOML path (WorktreeConfig::worktree_mode) only
+        // accepted exact lowercase, while the env-var path normalised with
+        // to_lowercase() first.  Now both go through the same FromStr, so a
+        // mixed-case env-var produces the same value as the lowercase TOML form.
+        let _guard = env_lock();
+
+        // Uppercase env var parsed via EffectiveConfig (env-var path).
+        std::env::set_var("JIT_WORKTREE_MODE", "AUTO");
+        let via_env = ConfigLoader::new().build().worktree_mode().unwrap();
+        std::env::remove_var("JIT_WORKTREE_MODE");
+
+        // Lowercase TOML form parsed directly (TOML path).
+        let toml_cfg: JitConfig = toml::from_str("[worktree]\nmode = \"auto\"\n").unwrap();
+        let via_toml = toml_cfg.worktree.unwrap().worktree_mode();
+
+        assert_eq!(
+            via_env, via_toml,
+            "TOML and env-var must resolve identically"
+        );
+        assert_eq!(via_env, WorktreeMode::Auto);
+    }
+
+    #[test]
+    fn test_enforcement_mode_case_sensitivity_divergence_is_gone() {
+        // Same divergence test for EnforcementMode / JIT_ENFORCE_LEASES.
+        let _guard = env_lock();
+
+        std::env::set_var("JIT_ENFORCE_LEASES", "WARN");
+        let via_env = ConfigLoader::new().build().enforcement_mode().unwrap();
+        std::env::remove_var("JIT_ENFORCE_LEASES");
+
+        let toml_cfg: JitConfig =
+            toml::from_str("[worktree]\nenforce_leases = \"warn\"\n").unwrap();
+        let via_toml = toml_cfg.worktree.unwrap().enforcement_mode();
+
+        assert_eq!(
+            via_env, via_toml,
+            "TOML and env-var must resolve identically"
+        );
+        assert_eq!(via_env, EnforcementMode::Warn);
+    }
+
+    #[test]
     fn test_parse_full_schema_v2_config() {
         let config_toml = r#"
 [version]
@@ -2088,10 +2408,8 @@ unique = false
 "#;
         let config: JitConfig = toml::from_str(config_toml).unwrap();
         let worktree = config.worktree.unwrap();
-        assert_eq!(
-            worktree.enforcement_mode().unwrap(),
-            EnforcementMode::Strict
-        );
+        // enforcement_mode() is now infallible — the field is typed.
+        assert_eq!(worktree.enforcement_mode(), EnforcementMode::Strict);
     }
 
     #[test]
@@ -2102,10 +2420,7 @@ enforce_leases = "strict"
 "#;
         let config: JitConfig = toml::from_str(config_toml).unwrap();
         let worktree = config.worktree.unwrap();
-        assert_eq!(
-            worktree.enforcement_mode().unwrap(),
-            EnforcementMode::Strict
-        );
+        assert_eq!(worktree.enforcement_mode(), EnforcementMode::Strict);
     }
 
     #[test]
@@ -2116,7 +2431,7 @@ enforce_leases = "warn"
 "#;
         let config: JitConfig = toml::from_str(config_toml).unwrap();
         let worktree = config.worktree.unwrap();
-        assert_eq!(worktree.enforcement_mode().unwrap(), EnforcementMode::Warn);
+        assert_eq!(worktree.enforcement_mode(), EnforcementMode::Warn);
     }
 
     #[test]
@@ -2127,22 +2442,22 @@ enforce_leases = "off"
 "#;
         let config: JitConfig = toml::from_str(config_toml).unwrap();
         let worktree = config.worktree.unwrap();
-        assert_eq!(worktree.enforcement_mode().unwrap(), EnforcementMode::Off);
+        assert_eq!(worktree.enforcement_mode(), EnforcementMode::Off);
     }
 
     #[test]
     fn test_enforcement_mode_invalid() {
+        // Invalid tokens are now caught at TOML parse time, not at method call time.
         let config_toml = r#"
 [worktree]
 enforce_leases = "maybe"
 "#;
-        let config: JitConfig = toml::from_str(config_toml).unwrap();
-        let worktree = config.worktree.unwrap();
-        let result = worktree.enforcement_mode();
-        assert!(result.is_err());
-        let err_msg = result.unwrap_err().to_string();
-        assert!(err_msg.contains("Invalid enforce_leases mode"));
-        assert!(err_msg.contains("maybe"));
+        let err = toml::from_str::<JitConfig>(config_toml).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("maybe"),
+            "error must mention the bad value: {msg}"
+        );
     }
 
     #[test]
@@ -2167,7 +2482,8 @@ mode = "auto"
 "#;
         let config: JitConfig = toml::from_str(config_toml).unwrap();
         let worktree = config.worktree.unwrap();
-        assert_eq!(worktree.worktree_mode().unwrap(), WorktreeMode::Auto);
+        // worktree_mode() is now infallible — the field is typed.
+        assert_eq!(worktree.worktree_mode(), WorktreeMode::Auto);
     }
 
     #[test]
@@ -2178,7 +2494,7 @@ mode = "on"
 "#;
         let config: JitConfig = toml::from_str(config_toml).unwrap();
         let worktree = config.worktree.unwrap();
-        assert_eq!(worktree.worktree_mode().unwrap(), WorktreeMode::On);
+        assert_eq!(worktree.worktree_mode(), WorktreeMode::On);
     }
 
     #[test]
@@ -2189,7 +2505,7 @@ mode = "off"
 "#;
         let config: JitConfig = toml::from_str(config_toml).unwrap();
         let worktree = config.worktree.unwrap();
-        assert_eq!(worktree.worktree_mode().unwrap(), WorktreeMode::Off);
+        assert_eq!(worktree.worktree_mode(), WorktreeMode::Off);
     }
 
     #[test]
@@ -2200,23 +2516,22 @@ enforce_leases = "strict"
 "#;
         let config: JitConfig = toml::from_str(config_toml).unwrap();
         let worktree = config.worktree.unwrap();
-        assert_eq!(worktree.worktree_mode().unwrap(), WorktreeMode::Auto);
+        assert_eq!(worktree.worktree_mode(), WorktreeMode::Auto);
     }
 
     #[test]
     fn test_worktree_mode_invalid() {
+        // Invalid tokens are now caught at TOML parse time, not at method call time.
         let config_toml = r#"
 [worktree]
 mode = "maybe"
 "#;
-        let config: JitConfig = toml::from_str(config_toml).unwrap();
-        let worktree = config.worktree.unwrap();
-        let result = worktree.worktree_mode();
-        assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Invalid worktree mode"));
+        let err = toml::from_str::<JitConfig>(config_toml).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("maybe"),
+            "error must mention the bad value: {msg}"
+        );
     }
 
     #[test]
@@ -2349,13 +2664,10 @@ use_unified_envelope = true
         assert!(config.locks.is_some());
         assert!(config.events.is_some());
 
-        // Verify worktree
+        // Verify worktree — both methods are infallible since fields are typed.
         let worktree = config.worktree.unwrap();
-        assert_eq!(worktree.worktree_mode().unwrap(), WorktreeMode::Auto);
-        assert_eq!(
-            worktree.enforcement_mode().unwrap(),
-            EnforcementMode::Strict
-        );
+        assert_eq!(worktree.worktree_mode(), WorktreeMode::Auto);
+        assert_eq!(worktree.enforcement_mode(), EnforcementMode::Strict);
 
         // Verify coordination
         let coord = config.coordination.unwrap();

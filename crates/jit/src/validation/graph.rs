@@ -4011,7 +4011,7 @@ source-of-truth = "markdown-first"
         //
         // The same assertion is then repeated for `criteria-label-match`.
 
-        use crate::config::ItemKindConfig;
+        use crate::config::{ItemKindConfig, KindScopeConfig};
         use crate::domain::item::expand_kind_triple;
         use std::collections::HashMap;
 
@@ -4025,7 +4025,7 @@ source-of-truth = "markdown-first"
                 id_pattern: Some("[A-Z][A-Z0-9]*-[0-9]+".to_string()),
                 markers: Some(vec!["[hard]".to_string()]),
                 link_namespaces: Some(vec!["satisfies".to_string()]),
-                scope: Some("issue".to_string()),
+                scope: Some(KindScopeConfig::Issue),
                 source: None,
                 source_of_truth: None,
             },
