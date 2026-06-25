@@ -56,7 +56,7 @@
           "short_id": "b629686b",
           "title": "Add the decision item kind",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "be3eb6ca",
@@ -141,8 +141,12 @@
   "escalations": [],
   "rework_counts": {
     "56ab0224": 2,
-    "1e1ea81d": 1
+    "1e1ea81d": 1,
+    "b629686b": 2
   },
   "started_at": "2026-06-25T00:00:00Z",
-  "notes": "Bracket complete: P=0d753ba5 (done), B=5f5735c3 (done). plan-review/coverage-preview/breakdown-review all passed. Driving impl interior. Issues serialized within waves due to heavy crates/jit file overlap; worktrees only for file-disjoint pairs."
+  "notes": "Bracket complete: P=0d753ba5 (done), B=5f5735c3 (done). plan-review/coverage-preview/breakdown-review all passed. Driving impl interior. Issues serialized within waves due to heavy crates/jit file overlap; worktrees only for file-disjoint pairs.",
+  "decisions": [
+    "decision/risk/invariant ship as BUILT-IN DEFAULT kinds (domain-layer, like requirement_default), not fixture-only; engine logic stays name-free (REQ-05). Applies to b629686b, be3eb6ca, 93480b00."
+  ]
 }
