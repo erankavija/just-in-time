@@ -273,17 +273,23 @@ pub trait IssueStore: Clone {
     /// command/domain code that needs to materialize a config-declared file (e.g.
     /// the invariant projection target) goes through this boundary rather than
     /// touching the filesystem directly (the CLAUDE.md "storage owns ALL
-    /// persistence" boundary). The path is enforced repository-local — an absolute
-    /// path or any `..` traversal is rejected with the typed
-    /// [`PathReadError::InvalidPath`] BEFORE any I/O — so a configured target can
-    /// never escape the repo. The write is atomic (temp file in the target's
-    /// directory + rename) so a reader never observes a partial file. Intermediate
-    /// directories under the repo root are created as needed.
+    /// persistence" boundary). The path is enforced repository-local so a
+    /// configured target can never escape the repo, with the SAME two-layer check
+    /// as [`read_repo_file`](Self::read_repo_file): a shape check (an absolute path
+    /// or any `..` traversal is rejected with [`PathReadError::InvalidPath`] BEFORE
+    /// any I/O) AND, for file-backed storage, a canonicalize+containment check that
+    /// rejects a symlinked directory segment resolving outside the repo with
+    /// [`PathReadError::OutsideRepoRoot`] — directories are created only after the
+    /// target is confirmed within the repo. The write is atomic (temp file in the
+    /// target's directory + rename) so a reader never observes a partial file.
+    /// Intermediate directories under the repo root are created as needed.
     ///
     /// # Errors
     ///
     /// - [`PathReadError::InvalidPath`] for an empty, absolute, or `..`-bearing
     ///   path.
+    /// - [`PathReadError::OutsideRepoRoot`] when a directory segment is a symlink
+    ///   resolving outside the repository root.
     /// - [`PathReadError::Other`] for any I/O failure while creating directories or
     ///   writing the file.
     ///

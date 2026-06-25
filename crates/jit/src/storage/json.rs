@@ -761,25 +761,45 @@ impl IssueStore for JsonFileStorage {
     ) -> Result<(), crate::storage::PathReadError> {
         use crate::storage::PathReadError;
         // Reuse the ONE shared path validator so the write path rejects exactly
-        // the same inputs as the read path (empty, absolute, `..`-escaping) before
-        // any I/O — a configured target can never escape the repo.
+        // the same shape-level inputs as the read path (empty, absolute,
+        // `..`-escaping) before any I/O.
         validate_repo_relative_input(rel_path)?;
 
         // Resolve repo root (parent of `.jit`) and join the validated relative
-        // path. The `..`-rejection above guarantees the join stays under the root.
+        // path. Shape validation alone is not enough: a symlinked directory
+        // segment could still resolve OUTSIDE the repo, so mirror the read path's
+        // canonicalize+containment check below before creating dirs or writing.
         let repo_root = self
             .root
             .parent()
             .ok_or_else(|| PathReadError::Other(anyhow!("Invalid storage path")))?;
         let target = repo_root.join(rel_path);
+        let parent = target
+            .parent()
+            .ok_or_else(|| PathReadError::Other(anyhow!("target has no parent: {rel_path}")))?;
 
-        // Create intermediate directories under the repo root as needed so a
-        // config-declared nested target (e.g. `docs/reference/x.md`) materializes.
-        if let Some(parent) = target.parent() {
-            fs::create_dir_all(parent).map_err(|e| {
-                PathReadError::Other(anyhow!("creating {}: {}", parent.display(), e))
+        // The target file (and possibly some parent dirs) may not exist yet, so
+        // canonicalization must walk up to the DEEPEST EXISTING ancestor of the
+        // parent and verify IT is contained in the repo. This rejects a symlink
+        // anywhere along the existing prefix (e.g. `docs -> /external`) WITHOUT
+        // first creating directories outside the repo.
+        let mut existing_ancestor = parent;
+        while !existing_ancestor.exists() {
+            existing_ancestor = existing_ancestor.parent().ok_or_else(|| {
+                PathReadError::Other(anyhow!("no existing ancestor for {rel_path}"))
             })?;
         }
+        assert_canonical_contained(existing_ancestor, repo_root, rel_path)?;
+
+        // Create intermediate directories — now known to be rooted within the
+        // repo — so a config-declared nested target (e.g. `docs/reference/x.md`)
+        // materializes.
+        fs::create_dir_all(parent)
+            .map_err(|e| PathReadError::Other(anyhow!("creating {}: {}", parent.display(), e)))?;
+
+        // Re-verify containment of the now-existing parent: this catches the case
+        // where the deepest missing segment was itself a symlink escaping the repo.
+        assert_canonical_contained(parent, repo_root, rel_path)?;
 
         // Write through the SHARED atomic writer (temp file in the target's
         // directory + rename), preserving the atomic-write invariant (REQ-05).
@@ -869,33 +889,19 @@ impl IssueStore for JsonFileStorage {
             let short_hash = format!("{:.7}", commit.id());
             Ok((blob.content().to_vec(), short_hash))
         } else {
-            // Working-tree read.  Canonicalize both the joined path and the
-            // repo root, then verify containment.  This catches symlinks that
-            // point outside the repo root (e.g. `docs/secret -> /etc/passwd`).
+            // Working-tree read.  Canonicalize the joined path and the repo root,
+            // then verify containment via the shared helper.  This catches
+            // symlinks that point outside the repo root (e.g.
+            // `docs/secret -> /etc/passwd`).
             let joined = repo_root.join(path);
-            let canonical_joined = match std::fs::canonicalize(&joined) {
-                Ok(p) => p,
-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                    return Err(PathReadError::NotFound(path.to_string()));
+            assert_canonical_contained(&joined, repo_root, path)?;
+            let canonical_joined = std::fs::canonicalize(&joined).map_err(|e| {
+                if e.kind() == std::io::ErrorKind::NotFound {
+                    PathReadError::NotFound(path.to_string())
+                } else {
+                    PathReadError::Other(anyhow!("Failed to canonicalize {}: {}", path, e))
                 }
-                Err(e) => {
-                    return Err(PathReadError::Other(anyhow!(
-                        "Failed to canonicalize {}: {}",
-                        path,
-                        e
-                    )));
-                }
-            };
-            let canonical_root = std::fs::canonicalize(repo_root).map_err(|e| {
-                PathReadError::Other(anyhow!(
-                    "Failed to canonicalize repo root {}: {}",
-                    repo_root.display(),
-                    e
-                ))
             })?;
-            if !canonical_joined.starts_with(&canonical_root) {
-                return Err(PathReadError::OutsideRepoRoot(path.to_string()));
-            }
 
             fs::read(&canonical_joined)
                 .map(|bytes| (bytes, "working-tree".to_string()))
@@ -915,6 +921,45 @@ impl IssueStore for JsonFileStorage {
 /// kept so the existing call sites in this module read unchanged.
 fn validate_repo_relative_input(path: &str) -> Result<(), crate::storage::PathReadError> {
     crate::storage::validate_repo_relative_path(path)
+}
+
+/// Assert that `candidate` (an existing path) resolves WITHIN `repo_root`,
+/// rejecting symlink escapes.
+///
+/// The single canonicalize-then-`starts_with` containment idiom shared by the
+/// read and write paths: it canonicalizes both `candidate` and `repo_root`
+/// (following symlinks) and verifies the resolved candidate is a descendant of
+/// the resolved root. `candidate` must already exist (the caller resolves a
+/// possibly-not-yet-created target to an existing ancestor first); `rel_for_error`
+/// is the original repo-relative path used in the typed error messages.
+fn assert_canonical_contained(
+    candidate: &Path,
+    repo_root: &Path,
+    rel_for_error: &str,
+) -> Result<(), crate::storage::PathReadError> {
+    use crate::storage::PathReadError;
+    let canonical_candidate = std::fs::canonicalize(candidate).map_err(|e| {
+        if e.kind() == std::io::ErrorKind::NotFound {
+            PathReadError::NotFound(rel_for_error.to_string())
+        } else {
+            PathReadError::Other(anyhow!(
+                "Failed to canonicalize {}: {}",
+                candidate.display(),
+                e
+            ))
+        }
+    })?;
+    let canonical_root = std::fs::canonicalize(repo_root).map_err(|e| {
+        PathReadError::Other(anyhow!(
+            "Failed to canonicalize repo root {}: {}",
+            repo_root.display(),
+            e
+        ))
+    })?;
+    if !canonical_candidate.starts_with(&canonical_root) {
+        return Err(PathReadError::OutsideRepoRoot(rel_for_error.to_string()));
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -1015,6 +1060,32 @@ mod tests {
             Err(PathReadError::InvalidPath(_))
         ));
         assert!(!temp.path().join("../escape.md").exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_write_repo_file_rejects_symlinked_parent_escape() {
+        use crate::storage::PathReadError;
+        // A shape-valid relative target whose PARENT directory is a symlink
+        // pointing OUTSIDE the repo must be rejected (mirrors the read path's
+        // containment check) — nothing is written into the external directory.
+        let repo = TempDir::new().unwrap();
+        let outside = TempDir::new().unwrap();
+        let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        storage.init().unwrap();
+
+        // `repo/docs -> outside/` (an existing symlinked directory segment).
+        std::os::unix::fs::symlink(outside.path(), repo.path().join("docs")).unwrap();
+
+        let err = storage
+            .write_repo_file("docs/invariants.md", "leak")
+            .unwrap_err();
+        assert!(
+            matches!(err, PathReadError::OutsideRepoRoot(_)),
+            "symlink-escaping parent must be OutsideRepoRoot, got {err:?}"
+        );
+        // Nothing was written through the symlink into the external directory.
+        assert!(!outside.path().join("invariants.md").exists());
     }
 
     #[test]
