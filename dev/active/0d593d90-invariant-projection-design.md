@@ -27,21 +27,38 @@ Issue: 0d593d90 — Project invariants into a configurable doc target.
   — PURE; replaces only the bytes between the delimiters and byte-preserves the
   prefix (through `begin`) and suffix (from `end`) verbatim (REQ-01). Missing/
   out-of-order delimiters are typed errors, never a silent clobber.
-- `project_invariants(store, repo_root, config, registry) -> Result<String, ProjectionError>`
-  — the only I/O function. separate-file: render → `write_file_atomic` (REQ-02).
-  region: `read_repo_file` (path-safe) → `splice_region` → `write_file_atomic`.
+- `project_invariants(store, config, registry) -> Result<String, ProjectionError>`
+  — the only I/O function, and all of it goes through the storage boundary.
+  separate-file: render → `store.write_repo_file` (REQ-02). region:
+  `store.read_repo_file` (path-safe) → `splice_region` → `store.write_repo_file`.
+  No direct `std::fs` / `repo_root.join` in projection.
 
-## Shared atomic writer (REQ-05)
+## Storage write boundary (Finding 2)
+
+Persistence goes through `IssueStore::write_repo_file(rel_path, content)`, the
+write counterpart of `read_repo_file`: it path-validates the config-driven target
+with the shared `validate_repo_relative_path` (rejecting absolute/`..`-escaping
+paths with the typed `PathReadError::InvalidPath`) BEFORE any write, then writes
+atomically. Implemented in `JsonFileStorage` (creates intermediate dirs, uses the
+shared `write_file_atomic` internally) and `InMemoryStorage`. A configured target
+can never escape the repo.
+
+## Shared atomic writer (REQ-05 + Finding 3)
 
 Extracted `pub fn write_file_atomic` from the private `write_atomic`
 (serialize.rs), with `# Examples`; all existing callers updated in the same
-change. Projection writes reuse it — no duplicated atomic-write logic.
+change. Projection writes reuse it (behind `write_repo_file`) — no duplicated
+atomic-write logic. The temp filename is unique per process and per call (process
+id + monotonic counter) so concurrent writers to the same target never collide.
 
-## CLI is out of scope
+## CLI (`jit invariant render`)
 
-This issue delivers the engine as a public, ergonomic function. The
-`jit invariant render` CLI that calls `project_invariants` is issue 52ad3b1f
-(Wave 7).
+`jit invariant render [--json]` (cli.rs `InvariantCommands`, main.rs
+`run_invariant`, `commands/invariant.rs` `render_invariants`) loads the registry +
+`[invariant_projection]` config and calls `project_invariants`, reading the target
+only from config. `--json` failures emit a JSON error object. CLI integration
+tests cover separate-file default + region byte-preservation through the real
+binary. The sibling issue 52ad3b1f adds `jit invariant check` + drift.
 
 ## Example config
 
