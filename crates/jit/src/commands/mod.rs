@@ -63,6 +63,7 @@ pub use gate::{
 pub use invariant::InvariantRenderResult;
 pub use item::{ItemListResult, ItemShowResult};
 pub use template::TemplateApplyResult;
+pub use validate::DANGLING_LINK_RULE;
 
 // Re-export WorktreeIdentity for init return type
 pub use crate::storage::worktree_identity::WorktreeIdentity;

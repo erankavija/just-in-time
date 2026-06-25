@@ -7,6 +7,19 @@ use crate::type_hierarchy::{
 };
 use anyhow::Context;
 
+/// Rule name carried by every finding the built-in dangling-item-link pass emits
+/// (REQ-08 clause i, REQ-03). It is not a `.jit/rules.toml` rule; the pass runs
+/// unconditionally, so the name is a stable constant for grouping and rendering.
+///
+/// # Examples
+///
+/// ```
+/// use jit::commands::DANGLING_LINK_RULE;
+///
+/// assert_eq!(DANGLING_LINK_RULE, "dangling-item-link");
+/// ```
+pub const DANGLING_LINK_RULE: &str = "dangling-item-link";
+
 impl<S: IssueStore> CommandExecutor<S> {
     /// Validate with optional fix mode.
     ///
@@ -192,12 +205,101 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Cross-issue graph rules. An `error`-severity violation (including a
         // `config-error`, since the rule could not be applied) fails validation;
         // `warn`/`off` findings never fail here.
-        let graph_findings = self.evaluate_graph_rules(&issues)?;
+        let mut graph_findings = self.evaluate_graph_rules(&issues)?;
+        // Built-in dangling-item-link pass (REQ-08 clause i, REQ-03): a node→item
+        // link in a configured link-namespace whose qualified id cannot be
+        // resolved is a finding, surfaced here so `jit validate` fails on it.
+        graph_findings.extend(self.dangling_link_findings(&issues)?);
         if let Some(message) = graph_findings_error_message(&graph_findings) {
             return Err(anyhow!(message));
         }
 
         Ok(())
+    }
+
+    /// Built-in validate pass: report every node→item link label whose qualified
+    /// id cannot be resolved as a finding, rather than silently dropping it
+    /// (REQ-08 clause i, REQ-03).
+    ///
+    /// For each issue, every label is inspected. A label is a candidate link
+    /// reference when its namespace is a `link-namespace` of SOME configured item
+    /// kind (the set is derived generically from
+    /// [`ItemKind::link_namespaces`](crate::domain::item::ItemKind::link_namespaces),
+    /// never a hardcoded list of names) AND its value is a qualified id
+    /// `<scope>/<self-id>`. Each candidate is resolved through the SINGLE generic
+    /// resolver [`resolve_link_label`](crate::commands::CommandExecutor::resolve_link_label),
+    /// so resolution logic is not forked. A candidate that fails to resolve yields
+    /// one [`GraphFinding`] attributed to the owning issue, naming the dangling
+    /// qualified id; a resolvable candidate (and a legacy unqualified label, and a
+    /// non-link namespace) yields nothing.
+    ///
+    /// The finding severity is [`Severity::Error`](crate::validation::rules::Severity::Error)
+    /// so a dangling link fails `jit validate`. The rule name is the constant
+    /// [`DANGLING_LINK_RULE`]. This pass touches no `.jit/` ruleset: it runs
+    /// unconditionally as part of the validate path.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use jit::commands::CommandExecutor;
+    /// use jit::storage::{IssueStore, JsonFileStorage};
+    ///
+    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
+    /// let issues = executor.storage().list_issues().unwrap();
+    /// let findings = executor.dangling_link_findings(&issues).unwrap();
+    /// println!("{} dangling item-link(s)", findings.len());
+    /// ```
+    pub fn dangling_link_findings(
+        &self,
+        issues: &[Issue],
+    ) -> Result<Vec<crate::validation::graph::GraphFinding>> {
+        use crate::validation::engine::Finding;
+        use crate::validation::graph::GraphFinding;
+        use crate::validation::rules::Severity;
+        use std::collections::BTreeSet;
+
+        // Derive the link-namespace set generically from the configured kinds — no
+        // kind-name literal, just the namespaces each kind declares.
+        let link_namespaces: BTreeSet<String> = self
+            .item_kinds()?
+            .iter()
+            .flat_map(|kind| kind.link_namespaces().iter().cloned())
+            .collect();
+
+        let mut findings = Vec::new();
+        for issue in issues {
+            for label in &issue.labels {
+                let Some((namespace, value)) = label.split_once(':') else {
+                    continue;
+                };
+                // Only labels in a declared link-namespace whose value is a
+                // qualified id are link references; everything else (legacy
+                // unqualified labels, non-link namespaces) is left alone.
+                if !link_namespaces.contains(namespace) {
+                    continue;
+                }
+                if crate::domain::item::split_qualified_id(value).is_none() {
+                    continue;
+                }
+                // Resolve through the single generic resolver; an `Err` means the
+                // qualified id is dangling and is reported as a finding.
+                if self.resolve_link_label(label).is_err() {
+                    findings.push(GraphFinding::for_issue(
+                        issue.id.clone(),
+                        Finding {
+                            rule: DANGLING_LINK_RULE.to_string(),
+                            severity: Severity::Error,
+                            message: format!(
+                                "issue {} has a dangling item link '{label}': \
+                                 the qualified id '{value}' resolves to no addressable item",
+                                issue.short_id()
+                            ),
+                        },
+                    ));
+                }
+            }
+        }
+        Ok(findings)
     }
 
     /// Evaluate the EFFECTIVE local rules for every issue and, if any produces an
@@ -602,7 +704,11 @@ impl<S: IssueStore> CommandExecutor<S> {
                     .into_iter()
                     .map(|r| r.name.clone())
                     .collect();
-                let graph_findings = self.evaluate_graph_rules(&issues)?;
+                let mut graph_findings = self.evaluate_graph_rules(&issues)?;
+                // Built-in dangling-item-link pass (REQ-08 clause i, REQ-03):
+                // attributed to issues, so per-issue filtering below keeps only
+                // this issue's dangling links.
+                graph_findings.extend(self.dangling_link_findings(&issues)?);
                 findings.extend(graph_findings.iter().filter_map(|gf| {
                     let pertains = gf.issue_id.as_deref() == Some(issue.id.as_str())
                         || (gf.is_config_error() && applicable_rules.contains(&gf.finding.rule));
@@ -625,7 +731,10 @@ impl<S: IssueStore> CommandExecutor<S> {
                 // Graph rules across the store; every finding is reported,
                 // carrying its structured issue attribution (None for config
                 // errors).
-                let graph_findings = self.evaluate_graph_rules(&issues)?;
+                let mut graph_findings = self.evaluate_graph_rules(&issues)?;
+                // Built-in dangling-item-link pass (REQ-08 clause i, REQ-03):
+                // every dangling link surfaces in the whole-repo report.
+                graph_findings.extend(self.dangling_link_findings(&issues)?);
                 findings.extend(
                     graph_findings
                         .iter()
@@ -783,6 +892,15 @@ impl<S: IssueStore> CommandExecutor<S> {
                     .map(|gf| ReportedFinding::new(gf.issue_id.clone(), &gf.finding)),
             );
         }
+
+        // Built-in dangling-item-link pass over the in-slice issues (REQ-08
+        // clause i, REQ-03): a dangling link on a bracket-subtree node fails the
+        // `--scope` gate exactly like a ruleset error-severity finding.
+        findings.extend(
+            self.dangling_link_findings(&slice)?
+                .iter()
+                .map(|gf| ReportedFinding::new(gf.issue_id.clone(), &gf.finding)),
+        );
 
         Ok(RuleReport { findings })
     }
@@ -1676,5 +1794,193 @@ mod tests {
         assert_eq!(format_duration(Duration::seconds(90000)), "1 day");
         assert_eq!(format_duration(Duration::seconds(172800)), "2 days");
         assert_eq!(format_duration(Duration::seconds(604800)), "7 days");
+    }
+
+    // --- dangling-item-link pass (REQ-08 clause i, REQ-03) --------------------
+
+    use crate::domain::Issue;
+    use crate::storage::{InMemoryStorage, IssueStore};
+
+    const REGISTRY_TOML: &str = "\
+[[invariants]]
+id = \"INV-01\"
+statement = \"Every dependency edge stays acyclic.\"
+kind = \"enforced\"
+";
+
+    /// Build an executor over an in-memory `.jit` carrying a `.jit/invariants.toml`
+    /// (so the registry-first `invariant` kind resolves `enforces:@/<id>`), seeded
+    /// with `issues`. Default item kinds are active (no `[item_kinds]` table).
+    fn dangling_exec(issues: Vec<Issue>) -> CommandExecutor<InMemoryStorage> {
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+        std::fs::create_dir_all(storage.root()).unwrap();
+        std::fs::write(storage.root().join("invariants.toml"), REGISTRY_TOML).unwrap();
+        for issue in issues {
+            storage.save_issue(issue).unwrap();
+        }
+        CommandExecutor::new(storage)
+    }
+
+    /// Like [`dangling_exec`] but writes a `config.toml` registering the link
+    /// namespaces used by these tests (`satisfies`/`enforces`) so the default
+    /// `namespace-registry` local rule does not fire on the synthetic labels —
+    /// isolating the dangling-item-link pass as the validation failure.
+    fn dangling_exec_with_namespaces(issues: Vec<Issue>) -> CommandExecutor<InMemoryStorage> {
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+        std::fs::create_dir_all(storage.root()).unwrap();
+        std::fs::write(storage.root().join("invariants.toml"), REGISTRY_TOML).unwrap();
+        std::fs::write(
+            storage.root().join("config.toml"),
+            "[namespaces.type]\ndescription = \"issue type\"\nunique = true\n\
+             [namespaces.satisfies]\ndescription = \"satisfied item\"\nunique = false\n\
+             [namespaces.enforces]\ndescription = \"enforced invariant\"\nunique = false\n",
+        )
+        .unwrap();
+        for issue in issues {
+            storage.save_issue(issue).unwrap();
+        }
+        CommandExecutor::new(storage)
+    }
+
+    fn issue_with_labels(title: &str, body: &str, labels: &[&str]) -> Issue {
+        let mut issue = Issue::new(title.to_string(), body.to_string());
+        issue.labels = labels.iter().map(|s| s.to_string()).collect();
+        issue
+    }
+
+    #[test]
+    fn test_dangling_link_findings_reports_unresolvable_qualified_id() {
+        // REQ-03: a node carrying `satisfies:<scope>/BOGUS` (a registered link
+        // namespace, qualified, but unresolvable) yields one error-severity
+        // finding naming the node and the dangling qualified id.
+        let target = issue_with_labels(
+            "target",
+            "## Success Criteria\n\n- [hard] REQ-01: real one\n",
+            &[],
+        );
+        let short = target.short_id();
+        let node = issue_with_labels("node", "", &[&format!("satisfies:{short}/BOGUS")]);
+        let node_id = node.id.clone();
+        let exec = dangling_exec(vec![target, node]);
+
+        let issues = exec.storage().list_issues().unwrap();
+        let findings = exec.dangling_link_findings(&issues).unwrap();
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].issue_id.as_deref(), Some(node_id.as_str()));
+        assert_eq!(findings[0].finding.rule, DANGLING_LINK_RULE);
+        assert_eq!(
+            findings[0].finding.severity,
+            crate::validation::rules::Severity::Error
+        );
+        assert!(findings[0].finding.message.contains("BOGUS"));
+        assert!(findings[0].finding.message.contains("dangling item link"));
+    }
+
+    #[test]
+    fn test_dangling_link_findings_resolvable_link_no_finding() {
+        // A resolvable qualified link produces no finding, across all four kinds:
+        // requirement/decision/risk (issue-scope) and invariant (project-scope).
+        let target = issue_with_labels(
+            "target",
+            "## Success Criteria\n\n- [hard] REQ-01: a\n\n\
+             ## Decisions\n\n- D-01: a\n\n\
+             ## Risks\n\n- RISK-01: a\n",
+            &[],
+        );
+        let short = target.short_id();
+        let node = issue_with_labels(
+            "node",
+            "",
+            &[
+                &format!("satisfies:{short}/REQ-01"),
+                &format!("per:{short}/D-01"),
+                &format!("mitigates:{short}/RISK-01"),
+                "enforces:@/INV-01",
+            ],
+        );
+        let exec = dangling_exec(vec![target, node]);
+
+        let issues = exec.storage().list_issues().unwrap();
+        let findings = exec.dangling_link_findings(&issues).unwrap();
+        assert!(
+            findings.is_empty(),
+            "resolvable links must produce no finding, got: {findings:?}"
+        );
+    }
+
+    #[test]
+    fn test_dangling_link_findings_unqualified_and_non_link_ns_ignored() {
+        // A legacy unqualified label (`satisfies:REQ-01`) and a non-link namespace
+        // (`type:task`) are NOT link references and produce no finding.
+        let node = issue_with_labels("node", "", &["satisfies:REQ-01", "type:task", "epic:foo"]);
+        let exec = dangling_exec(vec![node]);
+        let issues = exec.storage().list_issues().unwrap();
+        assert!(exec.dangling_link_findings(&issues).unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_dangling_invariant_link_reports_finding() {
+        // REQ-03 for the project-scope invariant kind: `enforces:@/BOGUS` is a
+        // registered link namespace with a qualified-but-unresolvable id.
+        let node = issue_with_labels("node", "", &["enforces:@/INV-99"]);
+        let exec = dangling_exec(vec![node]);
+        let issues = exec.storage().list_issues().unwrap();
+        let findings = exec.dangling_link_findings(&issues).unwrap();
+        assert_eq!(findings.len(), 1);
+        assert!(findings[0].finding.message.contains("INV-99"));
+    }
+
+    #[test]
+    fn test_validate_silent_fails_on_dangling_link() {
+        // REQ-03 via the validate PATH: a dangling link makes `validate_silent`
+        // (the gate / `jit validate` core) return an error mentioning the rule.
+        let target =
+            issue_with_labels("target", "## Success Criteria\n\n- [hard] REQ-01: a\n", &[]);
+        let short = target.short_id();
+        let node = issue_with_labels("node", "", &[&format!("satisfies:{short}/BOGUS")]);
+        // Wire a dependency so the two issues are not isolated nodes (which would
+        // fail integrity before the rule pass).
+        let mut node = node;
+        node.dependencies = vec![target.id.clone()];
+        // Register the `satisfies` namespace so the dangling-link pass — not the
+        // namespace-registry local rule — is the validation failure.
+        let exec = dangling_exec_with_namespaces(vec![target, node]);
+
+        std::env::set_var("JIT_TEST_MODE", "1");
+        let err = exec.validate_silent().unwrap_err();
+        std::env::remove_var("JIT_TEST_MODE");
+        let msg = err.to_string();
+        assert!(
+            msg.contains(DANGLING_LINK_RULE) && msg.contains("BOGUS"),
+            "expected dangling-link rule failure, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_run_rules_whole_repo_surfaces_dangling_link() {
+        // REQ-03 via the structured report `jit validate [--json]` consumes:
+        // `run_rules(None)` reports the dangling link as an error finding (which
+        // serializes for `--json`).
+        let target =
+            issue_with_labels("target", "## Success Criteria\n\n- [hard] REQ-01: a\n", &[]);
+        let short = target.short_id();
+        let mut node = issue_with_labels("node", "", &[&format!("satisfies:{short}/BOGUS")]);
+        node.dependencies = vec![target.id.clone()];
+        let exec = dangling_exec(vec![target, node]);
+
+        let report = exec.run_rules(None).unwrap();
+        assert!(report.has_errors());
+        let dangling: Vec<_> = report
+            .findings
+            .iter()
+            .filter(|f| f.rule == DANGLING_LINK_RULE)
+            .collect();
+        assert_eq!(dangling.len(), 1);
+        assert!(dangling[0].message.contains("BOGUS"));
+        // The finding serializes (used by `jit validate --json`).
+        let value = serde_json::to_value(&report.findings).unwrap();
+        assert!(value.to_string().contains(DANGLING_LINK_RULE));
     }
 }

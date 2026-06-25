@@ -564,3 +564,139 @@ fn test_registry_first_issue_scoped_invariant_rejected_through_real_cli() {
         "error must name both reserved requirements, got: {json}"
     );
 }
+
+/// Append a `config.toml` namespace registration so a link-namespace label
+/// (`satisfies`, `enforces`) passes the default namespace-registry check, leaving
+/// the dangling-item-link finding as the only validation error under test.
+fn register_link_namespaces(dir: &std::path::Path) {
+    let config_path = dir.join(".jit").join("config.toml");
+    let mut config = std::fs::read_to_string(&config_path).unwrap();
+    config.push_str(
+        "\n[namespaces.satisfies]\ndescription = \"Satisfied item.\"\nunique = false\n\
+         [namespaces.enforces]\ndescription = \"Enforced invariant.\"\nunique = false\n",
+    );
+    std::fs::write(config_path, config).unwrap();
+}
+
+#[test]
+fn test_validate_reports_dangling_item_link() {
+    // REQ-03 end-to-end via the real `jit validate` binary: a node carrying a
+    // qualified-but-unresolvable link (`satisfies:<scope>/BOGUS`) surfaces a
+    // `dangling-item-link` error finding, NOT silently dropped, and fails
+    // validation (non-zero exit).
+    let temp = setup_test_repo();
+    register_link_namespaces(temp.path());
+
+    let target = create_issue(
+        temp.path(),
+        "target",
+        "## Success Criteria\n\n- [hard] REQ-01: real\n",
+    );
+    // A node that links to a non-existent self-id in the target's scope.
+    let node = Command::new(jit_binary())
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "node",
+            "-d",
+            "node body",
+            "-l",
+            &format!("satisfies:{target}/BOGUS"),
+            "--json",
+        ])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let node_json: Value = serde_json::from_slice(&node.stdout).unwrap();
+    let node_short: String = node_json["id"].as_str().unwrap().chars().take(8).collect();
+    // Connect the two so neither is an isolated node (an integrity error that
+    // would abort before the rule report is built).
+    Command::new(jit_binary())
+        .args(["dep", "add", &node_short, &target])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    let output = Command::new(jit_binary())
+        .args(["validate", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    // A dangling link is an error-severity finding -> non-zero exit.
+    assert!(
+        !output.status.success(),
+        "validate must fail on a dangling item link"
+    );
+    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    let findings = json["rule_findings"]
+        .as_array()
+        .expect("rule_findings array");
+    let dangling: Vec<&Value> = findings
+        .iter()
+        .filter(|f| f["rule"].as_str() == Some("dangling-item-link"))
+        .collect();
+    assert_eq!(
+        dangling.len(),
+        1,
+        "exactly one dangling-item-link finding expected, got: {json}"
+    );
+    let msg = dangling[0]["message"].as_str().unwrap();
+    assert!(
+        msg.contains("BOGUS"),
+        "finding names the dangling id: {msg}"
+    );
+    assert_eq!(dangling[0]["severity"].as_str(), Some("error"));
+}
+
+#[test]
+fn test_validate_no_finding_for_resolvable_item_link() {
+    // A resolvable qualified link produces NO dangling-item-link finding.
+    let temp = setup_test_repo();
+    register_link_namespaces(temp.path());
+
+    let target = create_issue(
+        temp.path(),
+        "target",
+        "## Success Criteria\n\n- [hard] REQ-01: real\n",
+    );
+    let node = Command::new(jit_binary())
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "node",
+            "-d",
+            "node body",
+            "-l",
+            &format!("satisfies:{target}/REQ-01"),
+            "--json",
+        ])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let node_json: Value = serde_json::from_slice(&node.stdout).unwrap();
+    let node_short: String = node_json["id"].as_str().unwrap().chars().take(8).collect();
+    Command::new(jit_binary())
+        .args(["dep", "add", &node_short, &target])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    let output = Command::new(jit_binary())
+        .args(["validate", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    let findings = json["rule_findings"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    assert!(
+        !findings
+            .iter()
+            .any(|f| f["rule"].as_str() == Some("dangling-item-link")),
+        "a resolvable link must yield no dangling-item-link finding: {json}"
+    );
+}

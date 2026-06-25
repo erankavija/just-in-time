@@ -42,7 +42,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Resolve the effective item kinds from the cached `[item_kinds]` registry,
     /// falling back to the built-in default kinds (`requirement`, `decision`, ...)
     /// when none is declared.
-    fn item_kinds(&self) -> Result<Vec<ItemKind>> {
+    pub(crate) fn item_kinds(&self) -> Result<Vec<ItemKind>> {
         let config = self.cached_config()?;
         resolve_item_kinds(config.item_kinds.as_ref())
             .map_err(|err| anyhow!("invalid [item_kinds] configuration: {err}"))
@@ -926,6 +926,62 @@ kind = \"advisory\"
             .resolve_link_label(&format!("satisfies:{short}/REQ-99"))
             .unwrap_err();
         assert!(err.to_string().contains("unresolvable qualified item id"));
+    }
+
+    #[test]
+    fn test_resolve_link_label_across_all_four_kinds() {
+        // REQ-01/REQ-02: for EACH shipped namespace a `<ns>:<scope>/<self-id>`
+        // label resolves to the addressed item of the corresponding kind, across
+        // all four kinds — requirement/decision/risk (issue-scope, markdown-first)
+        // and invariant (project-scope, registry-first). The default kinds are
+        // active (no `[item_kinds]` table), and a `.jit/invariants.toml` is loaded.
+        let issue = Issue::new(
+            "A".to_string(),
+            "## Success Criteria\n\n- [hard] REQ-01: atomic writes\n\n\
+             ## Decisions\n\n- D-01: use json storage\n\n\
+             ## Risks\n\n- RISK-01: lock contention\n"
+                .to_string(),
+        );
+        let short = issue.short_id();
+        let exec = registry_exec(TWO_INVARIANTS, vec![issue]);
+
+        // requirement / `satisfies:` -> the requirement item.
+        let req = exec
+            .resolve_link_label(&format!("satisfies:{short}/REQ-01"))
+            .unwrap()
+            .expect("satisfies resolves");
+        assert_eq!(req.item.kind, "requirement");
+        assert_eq!(req.item.qualified_id, format!("{short}/REQ-01"));
+
+        // decision / `per:` -> the decision item.
+        let dec = exec
+            .resolve_link_label(&format!("per:{short}/D-01"))
+            .unwrap()
+            .expect("per resolves");
+        assert_eq!(dec.item.kind, "decision");
+        assert_eq!(dec.item.qualified_id, format!("{short}/D-01"));
+
+        // risk / `mitigates:` and `resolves:` -> the risk item (both namespaces).
+        let mit = exec
+            .resolve_link_label(&format!("mitigates:{short}/RISK-01"))
+            .unwrap()
+            .expect("mitigates resolves");
+        assert_eq!(mit.item.kind, "risk");
+        assert_eq!(mit.item.qualified_id, format!("{short}/RISK-01"));
+        let res = exec
+            .resolve_link_label(&format!("resolves:{short}/RISK-01"))
+            .unwrap()
+            .expect("resolves resolves");
+        assert_eq!(res.item.kind, "risk");
+
+        // invariant / `enforces:@/<id>` -> the registry-first invariant item.
+        let inv = exec
+            .resolve_link_label("enforces:@/INV-01")
+            .unwrap()
+            .expect("enforces resolves");
+        assert_eq!(inv.item.kind, "invariant");
+        assert_eq!(inv.item.qualified_id, "@/INV-01");
+        assert_eq!(inv.item.scope, "@");
     }
 
     #[test]
