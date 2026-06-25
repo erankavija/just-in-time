@@ -27,6 +27,7 @@ pub mod engine;
 pub mod graph;
 pub mod invariants;
 pub mod local;
+pub mod projection;
 pub mod report;
 pub mod rules;
 pub mod serialize;
