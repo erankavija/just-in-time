@@ -14,7 +14,15 @@
   ],
   "gates_status": {},
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "dev/active/56ab0224-item-model-design.md",
+      "commit": null,
+      "label": "Addressable item model: issue-scope design (56ab0224)",
+      "doc_type": "design",
+      "format": "markdown"
+    }
+  ],
   "labels": [
     "type:task",
     "milestone:v1.0",
@@ -27,5 +35,5 @@
     "satisfies:REQ-10"
   ],
   "created_at": "2026-06-20T19:25:16.025902975+00:00",
-  "updated_at": "2026-06-25T12:56:12.320861027+00:00"
+  "updated_at": "2026-06-25T13:15:28.725208277+00:00"
 }
