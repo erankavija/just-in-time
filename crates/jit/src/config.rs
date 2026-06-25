@@ -254,31 +254,34 @@ pub struct NamespaceConfig {
 /// ```
 ///
 /// A kind may instead be **project-scoped**, addressing items not tied to any
-/// single issue (qualified id `@/<self-id>`). Such a kind sets `scope = "project"`
-/// and a `source` file (a repository-local path, relative to the repo root) whose
-/// markdown is scanned the SAME way an issue description is. It still declares all
-/// six required fields (the optional `source` PATH is in addition):
+/// single issue (qualified id `@/<self-id>`). A *markdown-first* project kind sets
+/// `scope = "project"` and a `source` file (a repository-local path, relative to
+/// the repo root) whose markdown is scanned the SAME way an issue description is. It
+/// still declares all six required fields (the optional `source` PATH is in
+/// addition). The example uses `glossary` (a non-reserved name); the built-in
+/// `invariant` kind is reserved as project-scoped AND registry-first, so it has no
+/// `source` path and its items come only from `.jit/invariants.toml`:
 ///
 /// ```
 /// use jit::config::JitConfig;
 ///
 /// let config: JitConfig = toml::from_str(
 ///     r#"
-/// [item_kinds.invariant]
-/// section = "invariants"
-/// id-pattern = "INV-\\d+"
+/// [item_kinds.glossary]
+/// section = "glossary"
+/// id-pattern = "GLOSS-\\d+"
 /// markers = []
-/// link-namespaces = ["upholds"]
+/// link-namespaces = ["defines"]
 /// scope = "project"
 /// source = "project-items.md"
-/// source-of-truth = "registry-first"
+/// source-of-truth = "markdown-first"
 /// "#,
 /// )
 /// .unwrap();
-/// let inv = &config.item_kinds.unwrap()["invariant"];
-/// assert_eq!(inv.scope.as_deref(), Some("project"));
-/// assert_eq!(inv.source.as_deref(), Some("project-items.md"));
-/// assert!(inv.missing_required_fields().is_empty());
+/// let gloss = &config.item_kinds.unwrap()["glossary"];
+/// assert_eq!(gloss.scope.as_deref(), Some("project"));
+/// assert_eq!(gloss.source.as_deref(), Some("project-items.md"));
+/// assert!(gloss.missing_required_fields().is_empty());
 /// ```
 ///
 /// The sixth field, `source-of-truth`, records the authoring DIRECTION for the
@@ -1716,15 +1719,19 @@ link-namespaces = ["satisfies"]
 scope = "issue"
 source-of-truth = "markdown-first"
 
-[item_kinds.invariant]
-section = "invariants"
-id-pattern = "INV-\\d+"
+[item_kinds.policy]
+section = "policies"
+id-pattern = "POL-\\d+"
 markers = []
 link-namespaces = ["upholds"]
 scope = "project"
-source = "invariants.toml"
+source = "policies.toml"
 source-of-truth = "registry-first"
 "#;
+        // Uses a non-reserved name `policy` for the registry-first example: the
+        // direction (`source-of-truth`) is independent of the `source` PATH field.
+        // (The built-in `invariant` kind is itself reserved as project + registry-
+        // first with NO source path; this test only exercises the typed parse.)
         let config: JitConfig = toml::from_str(config_toml).unwrap();
         config
             .validate_item_kinds()
@@ -1735,11 +1742,11 @@ source-of-truth = "registry-first"
         assert_eq!(req.source_of_truth, Some(SourceOfTruth::MarkdownFirst));
         assert_eq!(req.source_of_truth(), SourceOfTruth::MarkdownFirst);
 
-        let inv = &kinds["invariant"];
-        assert_eq!(inv.source_of_truth, Some(SourceOfTruth::RegistryFirst));
-        assert_eq!(inv.source_of_truth(), SourceOfTruth::RegistryFirst);
+        let pol = &kinds["policy"];
+        assert_eq!(pol.source_of_truth, Some(SourceOfTruth::RegistryFirst));
+        assert_eq!(pol.source_of_truth(), SourceOfTruth::RegistryFirst);
         // The direction is independent of the `source` PATH.
-        assert_eq!(inv.source.as_deref(), Some("invariants.toml"));
+        assert_eq!(pol.source.as_deref(), Some("policies.toml"));
     }
 
     #[test]

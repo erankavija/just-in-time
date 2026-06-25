@@ -371,16 +371,21 @@ pub enum ItemError {
         kind: String,
     },
     /// A config declares the reserved `invariant` kind name with a non-registry-first
-    /// `source-of-truth`. The `invariant` kind is reserved as registry-first
-    /// (projected from `.jit/invariants.toml`); it must NEVER be sourced from a
-    /// markdown file, so a markdown-first declaration is rejected rather than
-    /// silently producing a markdown index for invariants.
+    /// A config declares the reserved `invariant` kind name without BOTH
+    /// `scope = "project"` and `source-of-truth = "registry-first"`. The `invariant`
+    /// kind is reserved as a project-scoped, registry-first kind (projected from
+    /// `.jit/invariants.toml`); it must NEVER be sourced from a markdown file NOR
+    /// parsed from issue descriptions, so any other declaration is rejected rather
+    /// than silently producing a markdown index for invariants. Requiring
+    /// project-scope closes the `registry-first` + `scope = "issue"` path that would
+    /// otherwise run the invariant kind through the issue-description parser.
     #[error(
-        "item kind '{INVARIANT_KIND_NAME}' must be registry-first \
-         (source-of-truth = \"registry-first\"); it is reserved as the \
-         registry-backed invariant kind and cannot be sourced from markdown"
+        "item kind '{INVARIANT_KIND_NAME}' must be project-scoped and registry-first \
+         (scope = \"project\", source-of-truth = \"registry-first\"); it is reserved \
+         as the registry-backed invariant kind and cannot be sourced from markdown \
+         nor parsed from issue descriptions"
     )]
-    InvariantMustBeRegistryFirst,
+    InvariantMustBeProjectRegistryFirst,
     /// A registry-first project kind names no known registry source. The only
     /// registered registry source is the invariant registry, bound to the
     /// `invariant` kind; any OTHER registry-first project kind has nothing to
@@ -476,12 +481,17 @@ impl ItemKind {
             .unwrap_or_else(|| vec![DEFAULT_ITEM_LINK_NAMESPACE.to_string()]);
         let kind_scope = KindScope::parse_for(name, config.scope.as_deref())?;
         let source_of_truth = config.source_of_truth();
-        // The `invariant` kind name is RESERVED as registry-first: its items come
-        // only from the invariant registry, never a markdown source. Reject any
-        // declaration of `invariant` that is not registry-first so a markdown index
-        // for invariants is impossible (REQ-02).
-        if name == INVARIANT_KIND_NAME && source_of_truth != SourceOfTruth::RegistryFirst {
-            return Err(ItemError::InvariantMustBeRegistryFirst);
+        // The `invariant` kind name is RESERVED as a project-scoped, registry-first
+        // kind: its items come only from the invariant registry, never a markdown
+        // source NOR an issue description. Reject any declaration of `invariant`
+        // that is not BOTH `scope = "project"` AND registry-first, so a markdown
+        // index for invariants is impossible (REQ-02). Requiring project scope
+        // closes the `registry-first` + `scope = "issue"` path that would otherwise
+        // pass through `issue_item_kinds()` and parse invariants from descriptions.
+        if name == INVARIANT_KIND_NAME
+            && !(kind_scope.is_project() && source_of_truth == SourceOfTruth::RegistryFirst)
+        {
+            return Err(ItemError::InvariantMustBeProjectRegistryFirst);
         }
         // A MARKDOWN-FIRST project-scope kind without a source cannot be indexed;
         // reject at resolution so a misconfigured kind surfaces a typed error, not a
@@ -1555,50 +1565,89 @@ mod tests {
     }
 
     #[test]
-    fn test_invariant_kind_name_reserved_as_registry_first() {
-        // Finding 1: a config declaring `invariant` as markdown-first is rejected —
-        // the invariant kind is reserved as registry-first and must never be sourced
-        // from markdown (REQ-02).
-        let md_first = ItemKindConfig {
+    fn test_invariant_kind_name_reserved_as_project_registry_first() {
+        // The `invariant` name is reserved as a project-scoped, registry-first kind:
+        // it must NEVER be sourced from markdown nor parsed from issue descriptions,
+        // so any declaration that is not BOTH project + registry-first is rejected
+        // (REQ-02). Helper builds a config with the given scope/source-of-truth.
+        let cfg = |scope: &str, sot: Option<SourceOfTruth>, source: Option<&str>| ItemKindConfig {
             section: Some(DEFAULT_ITEM_SECTION.to_string()),
             id_pattern: Some("INV-[0-9]+".to_string()),
             markers: Some(vec![]),
             link_namespaces: Some(vec!["enforces".to_string()]),
-            scope: Some(KindScope::PROJECT_TOKEN.to_string()),
-            source: Some("project-items.md".to_string()),
-            source_of_truth: Some(SourceOfTruth::MarkdownFirst),
+            scope: Some(scope.to_string()),
+            source: source.map(str::to_string),
+            source_of_truth: sot,
         };
-        let err = ItemKind::from_config(INVARIANT_KIND_NAME, &md_first).unwrap_err();
-        assert!(matches!(err, ItemError::InvariantMustBeRegistryFirst));
-        assert!(err.to_string().contains("registry-first"));
 
-        // An UNSET source-of-truth defaults to markdown-first, so it is likewise
-        // rejected for the reserved name.
-        let default_sot = ItemKindConfig {
-            section: Some(DEFAULT_ITEM_SECTION.to_string()),
-            id_pattern: Some("INV-[0-9]+".to_string()),
-            markers: Some(vec![]),
-            link_namespaces: Some(vec!["enforces".to_string()]),
-            scope: Some(KindScope::PROJECT_TOKEN.to_string()),
-            source: Some("project-items.md".to_string()),
-            source_of_truth: None,
-        };
+        // 1. project + markdown-first → rejected.
+        let err = ItemKind::from_config(
+            INVARIANT_KIND_NAME,
+            &cfg(
+                KindScope::PROJECT_TOKEN,
+                Some(SourceOfTruth::MarkdownFirst),
+                Some("project-items.md"),
+            ),
+        )
+        .unwrap_err();
         assert!(matches!(
-            ItemKind::from_config(INVARIANT_KIND_NAME, &default_sot).unwrap_err(),
-            ItemError::InvariantMustBeRegistryFirst
+            err,
+            ItemError::InvariantMustBeProjectRegistryFirst
+        ));
+        // The message names BOTH requirements.
+        let msg = err.to_string();
+        assert!(msg.contains("project-scoped") && msg.contains("registry-first"));
+
+        // 2. project + UNSET source-of-truth (defaults to markdown-first) → rejected.
+        assert!(matches!(
+            ItemKind::from_config(
+                INVARIANT_KIND_NAME,
+                &cfg(KindScope::PROJECT_TOKEN, None, Some("project-items.md")),
+            )
+            .unwrap_err(),
+            ItemError::InvariantMustBeProjectRegistryFirst
         ));
 
-        // The registry-first declaration of `invariant` is accepted.
-        let registry_first = ItemKindConfig {
-            section: Some(DEFAULT_ITEM_SECTION.to_string()),
-            id_pattern: Some("INV-[0-9]+".to_string()),
-            markers: Some(vec![]),
-            link_namespaces: Some(vec!["enforces".to_string()]),
-            scope: Some(KindScope::PROJECT_TOKEN.to_string()),
-            source: None,
-            source_of_truth: Some(SourceOfTruth::RegistryFirst),
-        };
-        let ok = ItemKind::from_config(INVARIANT_KIND_NAME, &registry_first).unwrap();
+        // 3. registry-first BUT issue-scoped → rejected (closes the markdown-parse
+        //    path through `issue_item_kinds()`).
+        assert!(matches!(
+            ItemKind::from_config(
+                INVARIANT_KIND_NAME,
+                &cfg(
+                    KindScope::ISSUE_TOKEN,
+                    Some(SourceOfTruth::RegistryFirst),
+                    None
+                ),
+            )
+            .unwrap_err(),
+            ItemError::InvariantMustBeProjectRegistryFirst
+        ));
+
+        // 4. issue + markdown-first → rejected.
+        assert!(matches!(
+            ItemKind::from_config(
+                INVARIANT_KIND_NAME,
+                &cfg(
+                    KindScope::ISSUE_TOKEN,
+                    Some(SourceOfTruth::MarkdownFirst),
+                    None
+                ),
+            )
+            .unwrap_err(),
+            ItemError::InvariantMustBeProjectRegistryFirst
+        ));
+
+        // 5. project + registry-first → ACCEPTED (regression: the valid form works).
+        let ok = ItemKind::from_config(
+            INVARIANT_KIND_NAME,
+            &cfg(
+                KindScope::PROJECT_TOKEN,
+                Some(SourceOfTruth::RegistryFirst),
+                None,
+            ),
+        )
+        .unwrap();
+        assert_eq!(ok.kind_scope(), KindScope::Project);
         assert_eq!(ok.source_of_truth(), SourceOfTruth::RegistryFirst);
     }
 

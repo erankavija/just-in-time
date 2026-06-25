@@ -46,14 +46,17 @@ appears in `crates/jit/src/validation/`.
 
 ## Rework (code-review attempt 1)
 
-### Finding 1 — `invariant` reserved as registry-first
+### Finding 1 — `invariant` reserved as project-scoped AND registry-first
 
-The `invariant` kind name is RESERVED as registry-first in
-`ItemKind::from_config`: declaring `[item_kinds.invariant]` with any
-`source-of-truth` other than `registry-first` (including the unset default,
-`markdown-first`) is rejected with the typed `ItemError::InvariantMustBeRegistryFirst`.
-This makes markdown-indexing of invariants impossible — invariants can ONLY come
-from `.jit/invariants.toml` (REQ-02).
+The `invariant` kind name is RESERVED in `ItemKind::from_config`: declaring
+`[item_kinds.invariant]` is rejected with the typed
+`ItemError::InvariantMustBeProjectRegistryFirst` UNLESS it is BOTH
+`scope = "project"` AND `source-of-truth = "registry-first"`. This rejects:
+markdown-first (the unset default is markdown-first); registry-first but
+issue-scoped (which would otherwise pass through `issue_item_kinds()` and parse
+invariants from issue descriptions); and any other combination. Both
+markdown-index routes for invariants are thus impossible — invariants can ONLY come
+from `.jit/invariants.toml` (REQ-02). The error message names both requirements.
 
 ### Finding 2 — explicit registry binding in `project_items`
 

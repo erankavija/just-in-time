@@ -523,7 +523,44 @@ fn test_markdown_first_invariant_config_rejected_through_real_cli() {
         .expect("--json failure must emit valid JSON on stdout");
     let msg = json["error"]["message"].as_str().unwrap_or_default();
     assert!(
-        msg.contains("must be registry-first"),
-        "error must explain the reserved registry-first rule, got: {json}"
+        msg.contains("project-scoped") && msg.contains("registry-first"),
+        "error must name both reserved requirements, got: {json}"
+    );
+}
+
+#[test]
+fn test_registry_first_issue_scoped_invariant_rejected_through_real_cli() {
+    // REQ-02 (final hole): the SHIPPED CLI rejects an `[item_kinds.invariant]`
+    // declared registry-first BUT issue-scoped — invariant is reserved as project +
+    // registry-first, so it can never be parsed from issue descriptions.
+    let temp = setup_test_repo();
+    let config_path = temp.path().join(".jit").join("config.toml");
+    let mut config = std::fs::read_to_string(&config_path).unwrap_or_default();
+    config.push_str(
+        "\n[item_kinds.invariant]\n\
+         section = \"success_criteria\"\n\
+         id-pattern = \"INV-[0-9]+\"\n\
+         markers = []\n\
+         link-namespaces = [\"enforces\"]\n\
+         scope = \"issue\"\n\
+         source-of-truth = \"registry-first\"\n",
+    );
+    std::fs::write(&config_path, config).unwrap();
+
+    let output = Command::new(jit_binary())
+        .args(["item", "list", "--kind", "invariant", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        !output.status.success(),
+        "registry-first issue-scoped invariant must be rejected"
+    );
+    let json: Value = serde_json::from_slice(&output.stdout)
+        .expect("--json failure must emit valid JSON on stdout");
+    let msg = json["error"]["message"].as_str().unwrap_or_default();
+    assert!(
+        msg.contains("project-scoped") && msg.contains("registry-first"),
+        "error must name both reserved requirements, got: {json}"
     );
 }

@@ -823,8 +823,37 @@ kind = \"advisory\"
         let err = exec.list_items(Some("invariant")).unwrap_err();
         let msg = format!("{err:#}");
         assert!(
-            msg.contains("must be registry-first"),
-            "expected reserved-name rejection, got: {msg}"
+            msg.contains("project-scoped") && msg.contains("registry-first"),
+            "expected reserved-name rejection naming both requirements, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_registry_first_issue_scoped_invariant_config_is_rejected() {
+        // REQ-02 (final hole): `[item_kinds.invariant]` declared registry-first BUT
+        // issue-scoped is rejected. Otherwise the kind would pass through
+        // `issue_item_kinds()` and parse invariants from issue descriptions — a
+        // markdown index for invariants by another route.
+        let exec = config_exec(
+            "[item_kinds.invariant]\n\
+             section = \"success_criteria\"\n\
+             id-pattern = \"INV-[0-9]+\"\n\
+             markers = []\n\
+             link-namespaces = [\"enforces\"]\n\
+             scope = \"issue\"\n\
+             source-of-truth = \"registry-first\"\n",
+            Some(TWO_INVARIANTS),
+            // An issue carrying an INV- line: it must NEVER become an invariant item.
+            vec![issue_with_criteria(
+                "A",
+                "## Success Criteria\n\n- INV-99: looks like an invariant\n",
+            )],
+        );
+        let err = exec.list_items(Some("invariant")).unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(
+            msg.contains("project-scoped") && msg.contains("registry-first"),
+            "expected reserved-name rejection naming both requirements, got: {msg}"
         );
     }
 
