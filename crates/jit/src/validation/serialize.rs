@@ -38,6 +38,7 @@ use crate::validation::rules::{Assertion, Rule, RuleSet, Selector, TypeHierarchy
 use anyhow::{Context, Result};
 use std::collections::HashSet;
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 /// A `rules.toml` body together with the schema files it references.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -179,10 +180,14 @@ fn write_schema_files(jit_root: &Path, files: &[SchemaFile]) -> Result<()> {
 
 /// Write `content` to `path` atomically (temp file + rename).
 ///
-/// The write goes to a sibling temp file (`path` with a `.tmp` extension) and is
-/// then renamed onto `path`, so a reader never observes a partially written file
-/// (the JIT "atomic file writes" invariant). The parent directory must already
-/// exist; the rename is atomic only within a single filesystem.
+/// The write goes to a temp file in the SAME directory as `path` and is then
+/// renamed onto `path`, so a reader never observes a partially written file (the
+/// JIT "atomic file writes" invariant). The temp filename is UNIQUE per process
+/// and per call — it embeds the OS process id and a process-local monotonic
+/// counter — so concurrent writers targeting the same path never collide on a
+/// shared temp file before the rename. The parent directory must already exist;
+/// the rename is atomic only within a single filesystem (the temp file stays in
+/// the target's directory to guarantee that).
 ///
 /// # Examples
 ///
@@ -195,7 +200,21 @@ fn write_schema_files(jit_root: &Path, files: &[SchemaFile]) -> Result<()> {
 /// assert_eq!(std::fs::read_to_string(&path).unwrap(), "hello");
 /// ```
 pub fn write_file_atomic(path: &Path, content: &str) -> Result<()> {
-    let tmp = path.with_extension("tmp");
+    // Per-process monotonic counter so two calls within the same process get
+    // distinct temp names even at the same instant; combined with the process id
+    // it is unique across concurrent writers to the same target.
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    let seq = COUNTER.fetch_add(1, Ordering::Relaxed);
+
+    let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("write");
+    let tmp_name = format!(".{file_name}.{}.{seq}.tmp", std::process::id());
+    // Keep the temp file in the SAME directory as the target so the rename is a
+    // same-filesystem (atomic) operation.
+    let tmp = match path.parent() {
+        Some(dir) => dir.join(tmp_name),
+        None => Path::new(&tmp_name).to_path_buf(),
+    };
+
     std::fs::write(&tmp, content).with_context(|| format!("writing {}", tmp.display()))?;
     std::fs::rename(&tmp, path)
         .with_context(|| format!("renaming {} -> {}", tmp.display(), path.display()))?;
