@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "f2b6b0a1-08f0-4b95-afc0-7627fc5e156c",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "b121fd51-1a96-4943-80d1-95bedb068425",
+  "commit": "2ca9ff9e5087f5bed703fec3eae3fe6ceea28c75",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-06-25T18:23:05.396121951Z",
+  "completed_at": "2026-06-25T18:24:46.311715273Z",
+  "duration_ms": 100915,
+  "exit_code": 1,
+  "stdout": "**Acceptance Criteria**\n\nBlocking findings:\n\n- [crates/jit/src/validation/graph.rs:3812](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/validation/graph.rs:3812): REQ-02 is not strictly met. The test compares `criteria-to-check` / `criteria-label-match` inline triples against `ItemKind::requirement_default().as_triple()`, not against a kind expanded from a declared `[item_kinds]` registry entry. The hard criterion asks for equality to the declared kind’s expansion, so this should use `expand_kind_triple(Some(&registry), \"requirement\")` or an equivalent `RuleSet`/config-declared path.\n- [crates/jit/src/validation/graph.rs:3780](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/validation/graph.rs:3780): REQ-01 is under-asserted. The test compares only finding messages for the uncovered case, and only counts for the covered case. `GraphFinding` derives `PartialEq/Eq`, so the acceptance test should compare the full vectors (`issue_id`, rule, severity, message) to demonstrate “findings identical”.\n\nREQ-03 is met for the reviewed commit: `git show --name-only HEAD` only lists `crates/jit/src/validation/graph.rs`; no live rule under `.jit/` or `docs/examples/` was modified.\n\nREQ-04 has passing evidence from the provided `cargo-ci` gate.\n\n**Architecture And Separation**\n\nNo architecture boundary violation found in the patch. The change is test-only inside validation graph tests and does not add storage, command, CLI, or output coupling.\n\n**Functional Paradigm**\n\nNo blocking functional-style issue found. The added code is test setup/assertion code, where local mutation for fixtures is acceptable.\n\n**Correctness And Invariants**\n\nNo production invariant code was changed. Atomic writes, event logging, gate transition semantics, assignee/label formats, PID safety, and unsafe-code policy are not affected by this patch.\n\n**Safety**\n\nNo unsafe code added.\n\n**Testing**\n\nThe added tests are named with the required `test_...` pattern and are in a `#[cfg(test)]` module. However, the acceptance coverage is insufficient for REQ-01 and REQ-02 for the reasons above.\n\nPer instruction, I did not run cargo tests because the issue has a succeeded `cargo-ci` gate. I did run `./scripts/jit-validate.sh`; it passed.\n\n**Error Handling**\n\nNo production fallible paths were added. `unwrap()` / `panic!()` additions are in tests only.\n\n**CLI Contract**\n\nNo CLI command was changed.\n\n**Documentation**\n\nNo public API was added or changed.\n\n**Prior Review Feedback**\n\n`run_history` is empty, so there was no prior review feedback to verify.\n\n**Jit Issue Management**\n\nThe dependency listed in the issue context, `1e1ea81d`, is marked `done`. `./scripts/jit-validate.sh` passed.\n\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 4950 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.137.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f0005-7ae5-7442-8685-b61fc7ec5385\n--------\nuser\n--- 4937 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

@@ -1,7 +1,7 @@
 {
   "epic_id": "25064508-d563-4073-a970-296607a01adc",
   "epic_short_id": "25064508",
-  "current_wave": 3,
+  "current_wave": 4,
   "waves": [
     {
       "wave_number": 1,
@@ -42,7 +42,7 @@
           "short_id": "b121fd51",
           "title": "Show coverage rules compatible over the kind model",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "21558ace",
@@ -142,11 +142,15 @@
   "rework_counts": {
     "56ab0224": 2,
     "1e1ea81d": 1,
-    "b629686b": 2
+    "b629686b": 2,
+    "b121fd51": 1
   },
   "started_at": "2026-06-25T00:00:00Z",
   "notes": "Bracket complete: P=0d753ba5 (done), B=5f5735c3 (done). plan-review/coverage-preview/breakdown-review all passed. Driving impl interior. Issues serialized within waves due to heavy crates/jit file overlap; worktrees only for file-disjoint pairs.",
   "decisions": [
     "decision/risk/invariant ship as BUILT-IN DEFAULT kinds (domain-layer, like requirement_default), not fixture-only; engine logic stays name-free (REQ-05). Applies to b629686b, be3eb6ca, 93480b00."
+  ],
+  "notes_flaky": [
+    "storage::heartbeat::tests::test_background_thread_updates_heartbeat is flaky under gate-run load (timing); pre-existing, not epic-related. Re-run cargo-ci to clear."
   ]
 }
