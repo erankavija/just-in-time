@@ -178,11 +178,18 @@ fn test_item_search_by_text() {
 fn test_item_custom_kind_from_config() {
     let temp = setup_test_repo();
     // Declare a domain-agnostic custom kind in config; the engine indexes it
-    // purely from its four-tuple, never from its name (REQ-01).
+    // purely from its tuple, never from its name (REQ-01). An explicit
+    // declaration sets all six required fields.
     let config_path = temp.path().join(".jit").join("config.toml");
     let mut config = std::fs::read_to_string(&config_path).unwrap_or_default();
     config.push_str(
-        "\n[item_kinds.decision]\nsection = \"decisions\"\nid-pattern = \"D-\\\\d+\"\nlink-namespaces = [\"per\"]\n",
+        "\n[item_kinds.decision]\n\
+         section = \"decisions\"\n\
+         id-pattern = \"D-\\\\d+\"\n\
+         markers = []\n\
+         link-namespaces = [\"per\"]\n\
+         scope = \"issue\"\n\
+         source-of-truth = \"markdown-first\"\n",
     );
     std::fs::write(&config_path, config).unwrap();
 
@@ -290,9 +297,13 @@ fn configure_project_scope_kind(repo: &std::path::Path, source_md: Option<&str>)
     let mut config = std::fs::read_to_string(&config_path).unwrap_or_default();
     config.push_str(
         "\n[item_kinds.invariant]\n\
+         section = \"success_criteria\"\n\
+         id-pattern = \"INV-[0-9]+\"\n\
+         markers = []\n\
+         link-namespaces = [\"upholds\"]\n\
          scope = \"project\"\n\
          source = \"project-items.md\"\n\
-         id-pattern = \"INV-[0-9]+\"\n",
+         source-of-truth = \"markdown-first\"\n",
     );
     std::fs::write(&config_path, config).unwrap();
     if let Some(md) = source_md {

@@ -11,18 +11,34 @@ Design note for the Group A registry extension of epic 25064508.
    existing `source` PATH field. `ItemKindConfig::source_of_truth()` resolves the
    default. An invalid token is a descriptive serde parse error.
 
-2. **Pure kind→triple resolver** (`domain/item.rs`). `expand_kind_triple(registry,
+2. **Required-six validation for explicit declarations** (config layer). Each
+   field stays `Option` at the serde layer, but an EXPLICITLY-declared
+   `[item_kinds.X]` table must set all six (`section`, `id-pattern`, `markers`,
+   `link-namespaces`, `scope`, `source-of-truth`). `ItemKindConfig::
+   missing_required_fields()` reports absentees by authored key; `JitConfig::
+   validate_item_kinds()` (called from `JitConfig::load`) rejects a partial
+   declaration with the typed `ItemKindConfigError::MissingFields` naming the kind
+   and the missing keys. The IMPLICIT built-in `requirement` default (no
+   `[item_kinds]` table at all) is never validated, so graceful degradation is
+   preserved. The optional `source` PATH is NOT one of the six.
+
+3. **Pure kind→triple resolver** (`domain/item.rs`). `expand_kind_triple(registry,
    name) -> Result<KindTriple, ItemError>` resolves a named kind through the
    existing `ItemKind::from_config` + `ItemKind::as_triple` (one code path, repo
    defaults and id-pattern validation applied identically to indexing). An
    undeclared name is the new typed `ItemError::UnknownKind`.
 
-3. **`kind=` sugar for `label-coverage`** (`validation/rules.rs`). At rule-load
-   time (`expand_kind_sugar`), a `label-coverage` assert table carrying
-   `kind = "<name>"` has the kind's `(section, marker, id-pattern)` triple spliced
-   in as the `criteria-section` / `marker` / `id-pattern` keys and the `kind` key
-   removed. The engine (`validation/graph.rs`) then evaluates a plain inline-triple
-   table and never sees a kind NAME.
+4. **`kind=` sugar for `label-coverage`** (`validation/rules.rs`). Purely additive,
+   non-regressing (`expand_kind_sugar`):
+   - If the assert table carries ANY inline triple key (`criteria-section` /
+     `marker` / `id-pattern`), it is left EXACTLY as authored; a `kind` key, if
+     present, stays inert and ignored (precisely how an unrecognized key behaved
+     before this feature). An existing inline rule, with or without a stray
+     `kind`, evaluates unchanged.
+   - Only a kind-ONLY table (no inline triple key) expands: the named kind's
+     `(section, marker, id-pattern)` triple is spliced in as the inline keys and
+     the `kind` key removed. The engine (`validation/graph.rs`) then evaluates a
+     plain inline-triple table and never sees a kind NAME.
 
 ## Key design choices
 
@@ -33,26 +49,29 @@ Design note for the Group A registry extension of epic 25064508.
   `"requirement"`/`"decision"`/`"risk"`/`"invariant"` literal outside
   `#[cfg(test)]`.
 
-- **Additive and scoped to free-form tables.** Only `label-coverage` (whose assert
-  is `Option<toml::value::Table>`) gets the sugar. Inline-triple rules carry no
-  `kind` key and pass through `expand_kind_sugar` untouched (REQ-03); an
-  unrecognized extra key still round-trips. The typed `criteria-to-check` /
-  `criteria-label-match` rules keep `deny_unknown_fields` and get no `kind=`
-  (REQ-04).
-
-- **Mixing `kind` with an inline triple key is a config error** (ambiguous: the
-  sugar REPLACES the triple). Unknown kind / non-string `kind` are config errors,
-  never silent passes.
+- **Inline keys win; `kind` is inert when they are present.** This is the
+  non-regression guarantee: no existing inline rule changes behavior, even one
+  that already carried a stray `kind` key. Only a kind-ONLY table triggers
+  expansion. An unknown kind NAME used as the sole triple source is still a typed
+  error; an unknown `kind` next to inline keys is inert (never inspected).
 
 - **One resolver, no duplicated triple logic.** Both the config sugar and the
   domain layer go through `ItemKind::as_triple`.
 
+- **Typed rules untouched.** The `criteria-to-check` / `criteria-label-match`
+  rules keep `deny_unknown_fields` and get no `kind=` (REQ-04).
+
 ## REQ→evidence
 
-- REQ-01: six fields on `ItemKindConfig`; `SourceOfTruth` + `source_of_truth()`.
+- REQ-01: six fields on `ItemKindConfig`; `SourceOfTruth` + `source_of_truth()`;
+  explicit declarations require all six (`validate_item_kinds`,
+  `missing_required_fields`, `ItemKindConfigError::MissingFields`); implicit
+  default still degrades gracefully.
 - REQ-02: `expand_kind_triple` == `as_triple`; end-to-end eval test asserts a
-  `kind="requirement"` rule yields identical findings to the inline form.
-- REQ-03: inline rules untouched; extra-key round-trip test.
+  kind-only `kind="requirement"` rule yields identical findings to the inline
+  form.
+- REQ-03: inline rules untouched; extra-key round-trip; a stray inert `kind`
+  alongside inline keys evaluates identically to no-`kind`.
 - REQ-04: typed rules keep `deny_unknown_fields`, no `kind=`.
 - REQ-05: engine reads the triple; grep clean outside `#[cfg(test)]`.
 - REQ-06: cross-scope same-self-id resolves to distinct qualified ids; bare

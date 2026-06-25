@@ -434,9 +434,13 @@ mod tests {
         std::fs::create_dir_all(storage.root()).unwrap();
         let config = format!(
             "[item_kinds.invariant]\n\
+             section = \"success_criteria\"\n\
+             id-pattern = \"INV-[0-9]+\"\n\
+             markers = []\n\
+             link-namespaces = [\"upholds\"]\n\
              scope = \"project\"\n\
              source = \"project-items.md\"\n\
-             id-pattern = \"INV-[0-9]+\"\n{extra_config}"
+             source-of-truth = \"markdown-first\"\n{extra_config}"
         );
         std::fs::write(storage.root().join("config.toml"), config).unwrap();
         if let Some(md) = source_md {
@@ -500,8 +504,12 @@ mod tests {
         let exec = project_exec(
             Some("## Success Criteria\n\n- INV-01: project one\n"),
             "\n[item_kinds.requirement]\n\
+             section = \"success_criteria\"\n\
+             id-pattern = \"INV-[0-9]+\"\n\
              markers = [\"[hard]\"]\n\
-             id-pattern = \"INV-[0-9]+\"\n",
+             link-namespaces = [\"satisfies\"]\n\
+             scope = \"issue\"\n\
+             source-of-truth = \"markdown-first\"\n",
             vec![issue],
         );
 
@@ -541,9 +549,13 @@ mod tests {
         std::fs::write(
             storage.root().join("config.toml"),
             "[item_kinds.invariant]\n\
+             section = \"success_criteria\"\n\
+             id-pattern = \"INV-[0-9]+\"\n\
+             markers = []\n\
+             link-namespaces = [\"upholds\"]\n\
              scope = \"project\"\n\
              source = \"../escape.md\"\n\
-             id-pattern = \"INV-[0-9]+\"\n",
+             source-of-truth = \"markdown-first\"\n",
         )
         .unwrap();
         let exec = CommandExecutor::new(storage);
@@ -566,9 +578,13 @@ mod tests {
         std::fs::write(
             storage.root().join("config.toml"),
             "[item_kinds.invariant]\n\
+             section = \"success_criteria\"\n\
+             id-pattern = \"INV-[0-9]+\"\n\
+             markers = []\n\
+             link-namespaces = [\"upholds\"]\n\
              scope = \"project\"\n\
              source = \"/etc/passwd\"\n\
-             id-pattern = \"INV-[0-9]+\"\n",
+             source-of-truth = \"markdown-first\"\n",
         )
         .unwrap();
         let exec = CommandExecutor::new(storage);

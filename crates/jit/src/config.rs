@@ -196,20 +196,28 @@ pub struct NamespaceConfig {
 ///
 /// A kind is a config-declared projection over issue descriptions, parallel to
 /// [`NamespaceConfig`]: it names the `section` whose list items are scanned, the
-/// `id_pattern` regex that extracts a self-id from an item, the optional
-/// `markers` an item must begin with to qualify, and the `link_namespaces` that
-/// reference items of this kind by qualified id (e.g. `satisfies:`). No kind
-/// NAME is interpreted by engine logic — `requirement`, `decision`, `risk`, and
-/// any later kind are distinguished solely by these fields, keeping the engine
-/// domain-agnostic.
+/// `id_pattern` regex that extracts a self-id from an item, the `markers` an item
+/// must begin with to qualify, and the `link_namespaces` that reference items of
+/// this kind by qualified id (e.g. `satisfies:`). No kind NAME is interpreted by
+/// engine logic — `requirement`, `decision`, `risk`, and any later kind are
+/// distinguished solely by these fields, keeping the engine domain-agnostic.
 ///
-/// Every field is optional so a kind can be declared minimally and inherit the
-/// repo defaults applied by
-/// [`ItemKind::from_config`](crate::domain::item::ItemKind::from_config) (the
-/// success-criteria section, the repo id pattern, no marker, the `satisfies`
-/// namespace) — the same defaults the `label-coverage` rule uses.
+/// Each member of the six-tuple `(section, id-pattern, marker(s),
+/// link-namespace(s), scope, source-of-truth)` is modeled as `Option` at the
+/// serde layer, but an **explicitly-declared** `[item_kinds.X]` table MUST set
+/// all six: [`JitConfig::load`] validates this via
+/// [`ItemKindConfig::missing_required_fields`] and rejects a partial declaration
+/// with a descriptive [`ItemKindConfigError::MissingFields`]. The `Option`s
+/// survive only so the IMPLICIT built-in `requirement` default (used when no
+/// `[item_kinds]` table is declared at all) and direct struct construction in
+/// tests can still rely on per-field defaults applied by
+/// [`ItemKind::from_config`](crate::domain::item::ItemKind::from_config). The
+/// `source` PATH (project-scope source file) is NOT one of the six and stays
+/// optional.
 ///
 /// # Examples
+///
+/// A complete six-field issue-scope declaration:
 ///
 /// ```
 /// use jit::config::JitConfig;
@@ -221,6 +229,8 @@ pub struct NamespaceConfig {
 /// id-pattern = "REQ-\\d+"
 /// markers = ["[hard]"]
 /// link-namespaces = ["satisfies"]
+/// scope = "issue"
+/// source-of-truth = "markdown-first"
 /// "#,
 /// )
 /// .unwrap();
@@ -228,12 +238,15 @@ pub struct NamespaceConfig {
 /// let req = &kinds["requirement"];
 /// assert_eq!(req.section.as_deref(), Some("success_criteria"));
 /// assert_eq!(req.markers, Some(vec!["[hard]".to_string()]));
+/// // All six fields are set, so the declaration is complete.
+/// assert!(req.missing_required_fields().is_empty());
 /// ```
 ///
 /// A kind may instead be **project-scoped**, addressing items not tied to any
 /// single issue (qualified id `@/<self-id>`). Such a kind sets `scope = "project"`
 /// and a `source` file (a repository-local path, relative to the repo root) whose
-/// markdown is scanned the SAME way an issue description is:
+/// markdown is scanned the SAME way an issue description is. It still declares all
+/// six required fields (the optional `source` PATH is in addition):
 ///
 /// ```
 /// use jit::config::JitConfig;
@@ -241,75 +254,130 @@ pub struct NamespaceConfig {
 /// let config: JitConfig = toml::from_str(
 ///     r#"
 /// [item_kinds.invariant]
+/// section = "invariants"
+/// id-pattern = "INV-\\d+"
+/// markers = []
+/// link-namespaces = ["upholds"]
 /// scope = "project"
 /// source = "project-items.md"
+/// source-of-truth = "registry-first"
 /// "#,
 /// )
 /// .unwrap();
 /// let inv = &config.item_kinds.unwrap()["invariant"];
 /// assert_eq!(inv.scope.as_deref(), Some("project"));
 /// assert_eq!(inv.source.as_deref(), Some("project-items.md"));
+/// assert!(inv.missing_required_fields().is_empty());
 /// ```
 ///
 /// The sixth field, `source-of-truth`, records the authoring DIRECTION for the
 /// kind (which substrate is canonical). It is a typed [`SourceOfTruth`] distinct
 /// from the `source` PATH above: a `markdown-first` kind is authored in prose and
 /// indexed from it; a `registry-first` kind is authored in a structured registry
-/// file. Absent defaults to [`SourceOfTruth::MarkdownFirst`] (the requirement
-/// default), resolved via [`ItemKindConfig::source_of_truth`].
-///
-/// ```
-/// use jit::config::{JitConfig, SourceOfTruth};
-///
-/// let config: JitConfig = toml::from_str(
-///     r#"
-/// [item_kinds.invariant]
-/// scope = "project"
-/// source = "invariants.toml"
-/// source-of-truth = "registry-first"
-/// "#,
-/// )
-/// .unwrap();
-/// let inv = &config.item_kinds.unwrap()["invariant"];
-/// assert_eq!(inv.source_of_truth, Some(SourceOfTruth::RegistryFirst));
-/// assert_eq!(inv.source_of_truth(), SourceOfTruth::RegistryFirst);
-/// ```
+/// file. Resolve a present value with [`ItemKindConfig::source_of_truth`].
 #[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
 pub struct ItemKindConfig {
     /// Section slug whose list items hold this kind's addressable items
-    /// (e.g. `"success_criteria"`). Absent inherits the repo default.
+    /// (e.g. `"success_criteria"`). Required in an explicit declaration.
     pub section: Option<String>,
     /// Regex extracting an item's self-id from its text (e.g. `"REQ-\\d+"`).
-    /// Absent inherits the repo default id pattern.
+    /// Required in an explicit declaration.
     #[serde(rename = "id-pattern")]
     pub id_pattern: Option<String>,
     /// Markers an item's text must begin with to qualify (e.g. `["[hard]"]`).
-    /// Absent or empty means every matching item qualifies.
+    /// Required in an explicit declaration; an EMPTY list (`markers = []`) is a
+    /// valid, present value meaning "every matching item qualifies".
     pub markers: Option<Vec<String>>,
     /// Link-label namespaces that reference items of this kind by qualified id
-    /// (e.g. `["satisfies"]`). Absent inherits the repo default namespace.
+    /// (e.g. `["satisfies"]`). Required in an explicit declaration.
     #[serde(rename = "link-namespaces")]
     pub link_namespaces: Option<Vec<String>>,
-    /// Addressing scope: `"issue"` (default) for items projected from issue
-    /// descriptions (qualified id `<issue>/<self-id>`), or `"project"` for items
-    /// projected from a repository-local `source` file (qualified id
-    /// `@/<self-id>`). Absent inherits `"issue"`.
+    /// Addressing scope: `"issue"` for items projected from issue descriptions
+    /// (qualified id `<issue>/<self-id>`), or `"project"` for items projected from
+    /// a repository-local `source` file (qualified id `@/<self-id>`). Required in
+    /// an explicit declaration.
     pub scope: Option<String>,
     /// For a `scope = "project"` kind, the repository-local markdown file
     /// (relative to the repo root) whose declared `section` is scanned for this
     /// kind's items. The path comes ONLY from config — no filename is hardcoded in
     /// engine logic. Ignored for issue-scoped kinds; an absent or missing file
-    /// yields no project items (graceful), not an error.
+    /// yields no project items (graceful), not an error. NOT one of the six
+    /// required fields — it stays optional.
     pub source: Option<String>,
     /// The kind's authoring DIRECTION (which substrate is canonical), distinct
-    /// from the `source` PATH above. Absent defaults to
-    /// [`SourceOfTruth::MarkdownFirst`]; resolve with
-    /// [`ItemKindConfig::source_of_truth`].
+    /// from the `source` PATH above. Required in an explicit declaration; resolve
+    /// a present value with [`ItemKindConfig::source_of_truth`].
     #[serde(rename = "source-of-truth")]
     pub source_of_truth: Option<SourceOfTruth>,
 }
 
+/// The six required fields of an explicitly-declared item kind, in declaration
+/// order, paired with the TOML key authors write. Used by
+/// [`ItemKindConfig::missing_required_fields`] to report any absentees by their
+/// authored key (`source` is intentionally absent — it is not one of the six).
+const REQUIRED_ITEM_KIND_FIELDS: [&str; 6] = [
+    "section",
+    "id-pattern",
+    "markers",
+    "link-namespaces",
+    "scope",
+    "source-of-truth",
+];
+
 impl ItemKindConfig {
+    /// The authored TOML keys of the six required fields this declaration leaves
+    /// unset, in declaration order.
+    ///
+    /// An explicitly-declared `[item_kinds.X]` table must set all six; this
+    /// reports which (if any) are missing so [`JitConfig::load`] can name them in
+    /// a descriptive error. The optional `source` PATH is not checked. An empty
+    /// result means the declaration is complete.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::config::{ItemKindConfig, SourceOfTruth};
+    ///
+    /// // A bare default is missing every required field.
+    /// assert_eq!(
+    ///     ItemKindConfig::default().missing_required_fields(),
+    ///     vec![
+    ///         "section",
+    ///         "id-pattern",
+    ///         "markers",
+    ///         "link-namespaces",
+    ///         "scope",
+    ///         "source-of-truth",
+    ///     ]
+    /// );
+    ///
+    /// // A complete declaration reports nothing missing.
+    /// let complete = ItemKindConfig {
+    ///     section: Some("success_criteria".to_string()),
+    ///     id_pattern: Some("REQ-\\d+".to_string()),
+    ///     markers: Some(vec!["[hard]".to_string()]),
+    ///     link_namespaces: Some(vec!["satisfies".to_string()]),
+    ///     scope: Some("issue".to_string()),
+    ///     source_of_truth: Some(SourceOfTruth::MarkdownFirst),
+    ///     source: None,
+    /// };
+    /// assert!(complete.missing_required_fields().is_empty());
+    /// ```
+    pub fn missing_required_fields(&self) -> Vec<&'static str> {
+        let present = [
+            self.section.is_some(),
+            self.id_pattern.is_some(),
+            self.markers.is_some(),
+            self.link_namespaces.is_some(),
+            self.scope.is_some(),
+            self.source_of_truth.is_some(),
+        ];
+        REQUIRED_ITEM_KIND_FIELDS
+            .iter()
+            .zip(present)
+            .filter_map(|(key, present)| (!present).then_some(*key))
+            .collect()
+    }
     /// Resolve the kind's [`SourceOfTruth`], defaulting to
     /// [`SourceOfTruth::MarkdownFirst`] when the `source-of-truth` field is unset.
     ///
@@ -379,6 +447,43 @@ pub enum SourceOfTruth {
     /// Items are authored in a structured registry file and projected from it.
     #[serde(rename = "registry-first")]
     RegistryFirst,
+}
+
+/// An error validating an explicitly-declared `[item_kinds.X]` table.
+///
+/// Raised by [`JitConfig::validate_item_kinds`] (and thus [`JitConfig::load`])
+/// when a declared kind omits one or more of its six required fields. The
+/// implicit built-in `requirement` default (no `[item_kinds]` table at all) is
+/// never validated, so graceful degradation is preserved.
+///
+/// # Examples
+///
+/// ```
+/// use jit::config::JitConfig;
+///
+/// // A partial explicit declaration is rejected, naming the kind and the
+/// // missing fields.
+/// let err = toml::from_str::<JitConfig>("[item_kinds.requirement]\nsection = \"sc\"\n")
+///     .unwrap()
+///     .validate_item_kinds()
+///     .unwrap_err();
+/// assert!(err.to_string().contains("requirement"));
+/// assert!(err.to_string().contains("source-of-truth"));
+/// ```
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum ItemKindConfigError {
+    /// An explicitly-declared kind omits one or more required six-tuple fields.
+    #[error(
+        "[item_kinds.{kind}] is missing required field(s): {missing}; \
+         an explicitly-declared item kind must set all six of \
+         section, id-pattern, markers, link-namespaces, scope, source-of-truth"
+    )]
+    MissingFields {
+        /// The offending kind name.
+        kind: String,
+        /// Comma-separated authored keys of the missing fields.
+        missing: String,
+    },
 }
 
 /// Worktree and parallel work configuration.
@@ -674,7 +779,72 @@ impl JitConfig {
         config.templates = crate::templates::TemplateRegistry::load(jit_root, &hierarchy_types)
             .context("invalid .jit/templates.toml")?;
 
+        // Every EXPLICITLY-declared `[item_kinds.X]` table must set all six
+        // required fields; reject a partial declaration with a descriptive error
+        // rather than silently filling defaults (the implicit built-in default,
+        // which has no table, is never reached here).
+        config
+            .validate_item_kinds()
+            .context("invalid [item_kinds] in .jit/config.toml")?;
+
         Ok(config)
+    }
+
+    /// Validate every explicitly-declared `[item_kinds.X]` table, requiring all
+    /// six fields (`section`, `id-pattern`, `markers`, `link-namespaces`, `scope`,
+    /// `source-of-truth`) on each.
+    ///
+    /// Called by [`JitConfig::load`]. A `None` registry (no `[item_kinds]` table
+    /// at all) is the IMPLICIT built-in path and validates trivially, so graceful
+    /// degradation via the requirement default is preserved. Kinds are checked in
+    /// name order so the first error is deterministic. The optional `source` PATH
+    /// is not one of the six and is not required.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::config::JitConfig;
+    ///
+    /// // No `[item_kinds]` table -> nothing to validate (implicit default).
+    /// let empty: JitConfig = toml::from_str("").unwrap();
+    /// assert!(empty.validate_item_kinds().is_ok());
+    ///
+    /// // A complete declaration passes.
+    /// let ok: JitConfig = toml::from_str(
+    ///     r#"
+    /// [item_kinds.requirement]
+    /// section = "success_criteria"
+    /// id-pattern = "REQ-\\d+"
+    /// markers = ["[hard]"]
+    /// link-namespaces = ["satisfies"]
+    /// scope = "issue"
+    /// source-of-truth = "markdown-first"
+    /// "#,
+    /// )
+    /// .unwrap();
+    /// assert!(ok.validate_item_kinds().is_ok());
+    ///
+    /// // A partial declaration is rejected.
+    /// let bad: JitConfig =
+    ///     toml::from_str("[item_kinds.decision]\nsection = \"decisions\"\n").unwrap();
+    /// assert!(bad.validate_item_kinds().is_err());
+    /// ```
+    pub fn validate_item_kinds(&self) -> std::result::Result<(), ItemKindConfigError> {
+        let Some(registry) = &self.item_kinds else {
+            return Ok(());
+        };
+        let mut names: Vec<&String> = registry.keys().collect();
+        names.sort();
+        for name in names {
+            let missing = registry[name].missing_required_fields();
+            if !missing.is_empty() {
+                return Err(ItemKindConfigError::MissingFields {
+                    kind: name.clone(),
+                    missing: missing.join(", "),
+                });
+            }
+        }
+        Ok(())
     }
 }
 
@@ -1318,20 +1488,30 @@ unique = false
     #[test]
     fn test_parse_item_kinds_from_toml() {
         // The `[item_kinds.*]` registry parses as a name -> six-tuple map,
-        // mirroring `[namespaces.*]`. `requirement` is expressible as one entry.
+        // mirroring `[namespaces.*]`. An explicit declaration sets all six fields.
         let config_toml = r#"
 [item_kinds.requirement]
 section = "success_criteria"
 id-pattern = "REQ-\\d+"
 markers = ["[hard]"]
 link-namespaces = ["satisfies"]
+scope = "issue"
+source-of-truth = "markdown-first"
 
 [item_kinds.decision]
 section = "decisions"
 id-pattern = "D-\\d+"
+markers = []
+link-namespaces = ["per"]
+scope = "issue"
+source-of-truth = "markdown-first"
 "#;
         let config: JitConfig = toml::from_str(config_toml).unwrap();
-        let kinds = config.item_kinds.expect("item_kinds present");
+        // A complete registry validates.
+        config
+            .validate_item_kinds()
+            .expect("complete kinds validate");
+        let kinds = config.item_kinds.as_ref().expect("item_kinds present");
         assert_eq!(kinds.len(), 2);
 
         let req = &kinds["requirement"];
@@ -1339,43 +1519,96 @@ id-pattern = "D-\\d+"
         assert_eq!(req.id_pattern.as_deref(), Some("REQ-\\d+"));
         assert_eq!(req.markers, Some(vec!["[hard]".to_string()]));
         assert_eq!(req.link_namespaces, Some(vec!["satisfies".to_string()]));
+        assert_eq!(req.scope.as_deref(), Some("issue"));
+        assert_eq!(req.source_of_truth, Some(SourceOfTruth::MarkdownFirst));
+        assert!(req.missing_required_fields().is_empty());
 
-        // A minimally-declared kind leaves the unset fields None so the domain
-        // layer can apply repo defaults.
+        // An empty `markers = []` is a PRESENT value (not missing).
         let decision = &kinds["decision"];
-        assert_eq!(decision.section.as_deref(), Some("decisions"));
-        assert!(decision.markers.is_none());
-        assert!(decision.link_namespaces.is_none());
+        assert_eq!(decision.markers, Some(vec![]));
+        assert!(decision.missing_required_fields().is_empty());
     }
 
     #[test]
-    fn test_item_kinds_source_of_truth_defaults_markdown_first() {
-        // REQ-01: a kind that omits `source-of-truth` leaves the field None and
-        // resolves to the markdown-first default (the requirement direction).
+    fn test_item_kinds_explicit_partial_declaration_is_rejected() {
+        // REQ-01: an explicitly-declared kind missing any of the six required
+        // fields is rejected by validation, naming the kind and the missing keys.
         let config_toml = r#"
 [item_kinds.requirement]
 section = "success_criteria"
 "#;
         let config: JitConfig = toml::from_str(config_toml).unwrap();
-        let req = &config.item_kinds.unwrap()["requirement"];
-        assert_eq!(req.source_of_truth, None);
-        assert_eq!(req.source_of_truth(), SourceOfTruth::MarkdownFirst);
+        let err = config
+            .validate_item_kinds()
+            .expect_err("partial declaration must be rejected");
+        match err {
+            ItemKindConfigError::MissingFields { kind, missing } => {
+                assert_eq!(kind, "requirement");
+                // Every absent required field is named; `section` (present) is not.
+                for field in [
+                    "id-pattern",
+                    "markers",
+                    "link-namespaces",
+                    "scope",
+                    "source-of-truth",
+                ] {
+                    assert!(
+                        missing.contains(field),
+                        "missing must name '{field}': {missing}"
+                    );
+                }
+                assert!(
+                    !missing.contains("section"),
+                    "present field not reported: {missing}"
+                );
+            }
+        }
     }
 
     #[test]
-    fn test_item_kinds_source_of_truth_parses_both_directions() {
+    fn test_item_kinds_load_rejects_partial_declaration() {
+        // The required-six rule fires through the real `JitConfig::load` path.
+        let temp_dir = TempDir::new().unwrap();
+        std::fs::write(
+            temp_dir.path().join("config.toml"),
+            "[item_kinds.decision]\nsection = \"decisions\"\nid-pattern = \"D-\\\\d+\"\n",
+        )
+        .unwrap();
+        let err = JitConfig::load(temp_dir.path()).expect_err("load must reject partial kind");
+        let msg = format!("{err:#}");
+        assert!(msg.contains("decision"), "error names the kind: {msg}");
+        assert!(
+            msg.contains("markers"),
+            "error names a missing field: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_item_kinds_source_of_truth_resolves_both_directions() {
         // REQ-01: both typed directions parse from their kebab-case tokens and are
-        // DISTINCT from the `source` file path field.
+        // DISTINCT from the `source` file path field. Each kind declares all six.
         let config_toml = r#"
 [item_kinds.requirement]
+section = "success_criteria"
+id-pattern = "REQ-\\d+"
+markers = ["[hard]"]
+link-namespaces = ["satisfies"]
+scope = "issue"
 source-of-truth = "markdown-first"
 
 [item_kinds.invariant]
+section = "invariants"
+id-pattern = "INV-\\d+"
+markers = []
+link-namespaces = ["upholds"]
 scope = "project"
 source = "invariants.toml"
 source-of-truth = "registry-first"
 "#;
         let config: JitConfig = toml::from_str(config_toml).unwrap();
+        config
+            .validate_item_kinds()
+            .expect("complete kinds validate");
         let kinds = config.item_kinds.unwrap();
 
         let req = &kinds["requirement"];
@@ -1387,6 +1620,16 @@ source-of-truth = "registry-first"
         assert_eq!(inv.source_of_truth(), SourceOfTruth::RegistryFirst);
         // The direction is independent of the `source` PATH.
         assert_eq!(inv.source.as_deref(), Some("invariants.toml"));
+    }
+
+    #[test]
+    fn test_item_kinds_source_of_truth_defaults_when_unset() {
+        // `source_of_truth()` resolves to markdown-first when the field is unset
+        // (used by the implicit default and direct struct construction).
+        assert_eq!(
+            ItemKindConfig::default().source_of_truth(),
+            SourceOfTruth::MarkdownFirst
+        );
     }
 
     #[test]
