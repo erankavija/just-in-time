@@ -48,6 +48,24 @@ pub struct RepoInfo {
 }
 
 /// Information about issues in the snapshot
+///
+/// # Examples
+///
+/// ```
+/// use jit::snapshot::IssuesInfo;
+/// use jit::domain::State;
+/// use std::collections::HashMap;
+///
+/// let mut states = HashMap::new();
+/// states.insert(State::InProgress, 1usize);
+/// states.insert(State::Done, 3usize);
+/// let info = IssuesInfo { count: 4, states, files: vec![] };
+///
+/// // State keys serialize as canonical snake_case strings.
+/// let json = serde_json::to_string(&info).unwrap();
+/// assert!(json.contains("\"in_progress\""), "expected snake_case key in JSON");
+/// assert!(!json.contains("\"inprogress\""), "must not contain Debug-format key");
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IssuesInfo {
     /// Total number of issues
@@ -325,5 +343,40 @@ mod tests {
         let result = SnapshotFormat::parse("zip");
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("Invalid format"));
+    }
+
+    #[test]
+    fn test_issues_info_states_json_uses_snake_case_keys() {
+        // Regression guard: the state keys in IssuesInfo.states must serialize as
+        // canonical snake_case ("in_progress"), never as the Debug repr ("inprogress").
+        use crate::domain::State;
+        use std::collections::HashMap;
+
+        let mut states: HashMap<State, usize> = HashMap::new();
+        states.insert(State::InProgress, 2);
+        states.insert(State::Done, 1);
+        let info = IssuesInfo {
+            count: 3,
+            states,
+            files: vec![],
+        };
+
+        let json = serde_json::to_string(&info).expect("IssuesInfo serializes");
+
+        assert!(
+            json.contains("\"in_progress\""),
+            "expected snake_case key \"in_progress\" in JSON, got: {}",
+            json
+        );
+        assert!(
+            !json.contains("\"inprogress\""),
+            "must not contain Debug-format key \"inprogress\", got: {}",
+            json
+        );
+        assert!(
+            json.contains("\"done\""),
+            "expected key \"done\" in JSON, got: {}",
+            json
+        );
     }
 }
