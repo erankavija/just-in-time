@@ -179,6 +179,11 @@ pub struct GraphFinding {
     pub issue_id: Option<String>,
     /// The underlying engine finding (rule name, severity, message).
     pub finding: Finding,
+    /// Whether this finding represents a malformed rule configuration. Set only
+    /// by the module-internal `config_error()` constructor; never set by
+    /// `for_issue()` or `unattributed()`. Guards read this field directly rather
+    /// than scanning `finding.message` for a prefix.
+    is_config_error: bool,
 }
 
 impl GraphFinding {
@@ -200,10 +205,14 @@ impl GraphFinding {
         Self {
             issue_id: Some(issue_id.into()),
             finding,
+            is_config_error: false,
         }
     }
 
-    /// A finding not attributable to a single issue (e.g. a `config-error`).
+    /// A finding not attributable to a single issue (e.g. a repo-wide
+    /// `label-uniqueness` collision). This is NOT a config-error finding;
+    /// config errors are produced by the module-internal `config_error()`
+    /// constructor, which sets the typed `is_config_error` field.
     ///
     /// # Examples
     ///
@@ -212,23 +221,26 @@ impl GraphFinding {
     /// use jit::validation::graph::GraphFinding;
     /// use jit::validation::rules::Severity;
     ///
-    /// let f = Finding { rule: "r".into(), severity: Severity::Error, message: "config error: x".into() };
+    /// let f = Finding { rule: "r".into(), severity: Severity::Error, message: "collision".into() };
     /// let gf = GraphFinding::unattributed(f);
     /// assert!(gf.issue_id.is_none());
-    /// assert!(gf.is_config_error());
+    /// assert!(!gf.is_config_error());
     /// ```
     pub fn unattributed(finding: Finding) -> Self {
         Self {
             issue_id: None,
             finding,
+            is_config_error: false,
         }
     }
 
     /// Whether this finding is a `config-error` (a malformed rule config).
     ///
-    /// Config errors carry no issue id and are reported as `config error: …` by
-    /// the per-kind evaluators. They must surface for any per-issue view of a
-    /// rule that applies, never be silently dropped.
+    /// Config errors are produced by the module-internal `config_error()`
+    /// constructor, which sets the typed `is_config_error` field. Guards read
+    /// this field directly; the finding's message is never scanned for a prefix.
+    /// Config errors carry no issue id and must never be silently dropped from
+    /// any per-issue view of the rule that applies.
     ///
     /// # Examples
     ///
@@ -237,13 +249,15 @@ impl GraphFinding {
     /// use jit::validation::graph::GraphFinding;
     /// use jit::validation::rules::Severity;
     ///
-    /// let bad = Finding { rule: "r".into(), severity: Severity::Error, message: "config error: missing 'to'".into() };
-    /// assert!(GraphFinding::unattributed(bad).is_config_error());
+    /// // `for_issue` and `unattributed` always produce non-config-error findings.
     /// let ok = Finding { rule: "r".into(), severity: Severity::Error, message: "criterion uncovered".into() };
     /// assert!(!GraphFinding::for_issue("x", ok).is_config_error());
+    /// // The message prefix alone does NOT make this a config error.
+    /// let note = Finding { rule: "r".into(), severity: Severity::Error, message: "config error: x".into() };
+    /// assert!(!GraphFinding::unattributed(note).is_config_error());
     /// ```
     pub fn is_config_error(&self) -> bool {
-        self.finding.message.starts_with(CONFIG_ERROR_PREFIX)
+        self.is_config_error
     }
 }
 
@@ -511,11 +525,16 @@ fn issue_finding(rule: &Rule, issue_id: &str, message: String) -> GraphFinding {
 /// Build a `config-error` [`GraphFinding`]: a malformed/missing config key is
 /// always reported (never swallowed, never a panic), attributed to the rule (not
 /// a single issue, so `issue_id` is `None`).
+///
+/// This is the only constructor that sets `is_config_error: true` on the result;
+/// guards read that typed field rather than scanning `finding.message` for a
+/// prefix.
 fn config_error(rule: &Rule, message: impl Into<String>) -> GraphFinding {
-    GraphFinding::unattributed(finding(
-        rule,
-        format!("{CONFIG_ERROR_PREFIX}{}", message.into()),
-    ))
+    GraphFinding {
+        issue_id: None,
+        finding: finding(rule, format!("{CONFIG_ERROR_PREFIX}{}", message.into())),
+        is_config_error: true,
+    }
 }
 
 /// Read a required string key from a config table, or `Err(GraphFinding)`.
@@ -3890,5 +3909,75 @@ source-of-truth = "markdown-first"
             }
             other => panic!("expected CriteriaLabelMatch, got {other:?}"),
         }
+    }
+
+    // --- GraphFinding: typed is_config_error field ---------------------------
+
+    /// `for_issue()` always produces a non-config-error finding.
+    #[test]
+    fn test_graph_finding_for_issue_is_not_config_error() {
+        use crate::validation::engine::Finding;
+        let f = Finding {
+            rule: "r".into(),
+            severity: Severity::Error,
+            message: "criterion uncovered".into(),
+        };
+        let gf = GraphFinding::for_issue("abc123", f);
+        assert!(
+            !gf.is_config_error(),
+            "for_issue must not be a config error"
+        );
+    }
+
+    /// `unattributed()` always produces a non-config-error finding, even when
+    /// the message happens to carry the config-error prefix. The typed field
+    /// is the only source of truth.
+    #[test]
+    fn test_graph_finding_unattributed_is_not_config_error() {
+        use crate::validation::engine::Finding;
+        let f = Finding {
+            rule: "r".into(),
+            severity: Severity::Error,
+            // The prefix alone must NOT trigger the config-error flag.
+            message: format!("{CONFIG_ERROR_PREFIX}this is not actually from config_error()"),
+        };
+        let gf = GraphFinding::unattributed(f);
+        assert!(
+            !gf.is_config_error(),
+            "unattributed() must not set is_config_error even with the prefix in the message"
+        );
+    }
+
+    /// The `config_error()` constructor (exercised via `evaluate_graph` with a
+    /// malformed rule) produces a finding where `is_config_error()` returns
+    /// `true`. The typed field, not the message prefix, drives this.
+    #[test]
+    fn test_config_error_constructor_sets_typed_field() {
+        // A coverage rule with an unrecognized `child-link` forces `config_error()`.
+        let rule = coverage_rule("child-link = \"bogus\"");
+        let epic = epic_with_criteria(&["REQ-01"]);
+        let findings = evaluate_graph(
+            &[&rule],
+            &[epic],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+            &HashMap::new(),
+        );
+        assert_eq!(findings.len(), 1);
+        assert!(
+            findings[0].is_config_error(),
+            "malformed config must produce is_config_error() == true via the typed field"
+        );
+        // Verify the typed field is not just re-deriving from the message prefix.
+        assert!(
+            findings[0].finding.message.starts_with(CONFIG_ERROR_PREFIX),
+            "sanity: message still carries the prefix"
+        );
+        // The field must be true even if we stripped the prefix from the message.
+        assert!(
+            findings[0].is_config_error(),
+            "is_config_error reads the field, not the message"
+        );
     }
 }

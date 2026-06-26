@@ -4538,7 +4538,11 @@ fn run() -> Result<()> {
                         let status = if outcome.passed { "PASS" } else { "FAIL" };
                         println!(
                             "  [{}] {} ({}, {}) selector: {}",
-                            status, outcome.rule, outcome.scope, outcome.severity, outcome.selector
+                            status,
+                            outcome.rule,
+                            outcome.scope.token(),
+                            outcome.severity.token(),
+                            outcome.selector
                         );
                         for message in &outcome.messages {
                             println!("      - {}", message);
@@ -4556,7 +4560,11 @@ fn run() -> Result<()> {
                             .unwrap_or("selector did not match");
                         println!(
                             "  [SKIP] {} ({}, {}) selector: {} — {}",
-                            outcome.rule, outcome.scope, outcome.severity, outcome.selector, reason
+                            outcome.rule,
+                            outcome.scope.token(),
+                            outcome.severity.token(),
+                            outcome.selector,
+                            reason
                         );
                     }
                 }
