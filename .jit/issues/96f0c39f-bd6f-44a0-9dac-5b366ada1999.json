@@ -1,7 +1,7 @@
 {
   "id": "96f0c39f-bd6f-44a0-9dac-5b366ada1999",
   "title": "Project the registry into a region of CLAUDE.md",
-  "description": "Region projection already exists: `project_invariants` switches `ProjectionMode::{SeparateFile, Region}`; region mode uses `splice_region` (validation/projection.rs:167) to replace only bytes between begin/end markers, atomic write-back through storage, raising a typed `ProjectionError` (never clobbering) on missing/malformed markers. Config `InvariantProjectionConfig` owns target/mode/markers (config.rs:578/596/614).\n\nScope: insert begin/end region markers around the `### Domain Invariants` section of `CLAUDE.md` (line 123) and set `[invariant_projection]` `target=CLAUDE.md`, `mode=region`, reusing the existing region projection. No new engine code is strictly required. The rendered registry output replaces the hand-authored prose (intended dedup). The CLAUDE.md write goes through the storage-backed projection (`write_repo_file`), not `std::fs`.\n\n## Success Criteria\n- [hard] LR-06: With markers in place and `mode=region`, `target=CLAUDE.md`, projection replaces only the marked region from the registry; the `### Domain Invariants` section becomes a projection of the registry.\n- [hard] LR-06b: Malformed/missing markers raise a typed `ProjectionError` without clobbering the file.",
+  "description": "Region projection already exists: `project_invariants` switches `ProjectionMode::{SeparateFile, Region}`; region mode uses `splice_region` (validation/projection.rs:167) to replace only bytes between begin/end markers, atomic write-back through storage, raising a typed `ProjectionError` (never clobbering) on missing/malformed markers. Config `InvariantProjectionConfig` owns target/mode/markers (config.rs:578/596/614).\n\nScope: insert begin/end region markers around the `### Domain Invariants` section of `CLAUDE.md` (line 123) and set `[invariant_projection]` `target=CLAUDE.md`, `mode=region`, reusing the existing region projection. No new engine code is strictly required. The rendered registry output replaces the hand-authored prose (intended dedup). The CLAUDE.md write goes through the storage-backed projection (`write_repo_file`), not `std::fs`.\n\n## Success Criteria\n- [hard] REQ-01: With markers in place and `mode=region`, `target=CLAUDE.md`, projection replaces only the marked region from the registry; the `### Domain Invariants` section becomes a projection of the registry.\n- [hard] REQ-02: Malformed/missing markers raise a typed `ProjectionError` without clobbering the file.",
   "state": "backlog",
   "priority": "normal",
   "assignee": null,
@@ -22,5 +22,5 @@
     "satisfies:REQ-06"
   ],
   "created_at": "2026-06-26T20:51:42.232701269Z",
-  "updated_at": "2026-06-26T20:51:58.855701525Z"
+  "updated_at": "2026-06-26T21:10:31.769793892Z"
 }
