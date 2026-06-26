@@ -97,7 +97,7 @@ pub fn query_blocked(issues: &[Issue]) -> Vec<(Issue, Vec<String>)> {
 pub fn query_by_assignee(issues: &[Issue], assignee: &str) -> Vec<Issue> {
     issues
         .iter()
-        .filter(|i| i.assignee.as_deref() == Some(assignee))
+        .filter(|i| i.assignee.as_ref().is_some_and(|a| a == assignee))
         .cloned()
         .collect()
 }

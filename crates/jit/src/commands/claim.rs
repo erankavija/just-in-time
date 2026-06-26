@@ -124,9 +124,12 @@ pub fn execute_claim_acquire<S: IssueStore>(
         coord_config.max_indefinite_leases_per_repo(),
     )?;
 
-    // Also set the assignee on the issue for visibility
+    // Also set the assignee on the issue for visibility. Parsing through the one
+    // `Assignee` path keeps the stored value structurally valid; the agent id was
+    // already validated by `resolve_agent_id`, so this never fails in practice.
+    let agent: crate::domain::Assignee = agent.parse()?;
     let mut issue = storage.load_issue(&full_id)?;
-    if issue.assignee.is_none() || issue.assignee.as_ref() != Some(&agent) {
+    if issue.assignee.as_ref() != Some(&agent) {
         issue.assignee = Some(agent);
         storage.save_issue(issue)?;
     }

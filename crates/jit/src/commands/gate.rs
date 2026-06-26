@@ -360,6 +360,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         by: Option<String>,
         force: bool,
     ) -> Result<GatePassOutcome> {
+        // Validate the actor through the one `Assignee` path before it is stored
+        // on the gate state.
+        let by = by
+            .map(|s| s.parse::<crate::domain::Assignee>())
+            .transpose()?;
         let full_id = self.storage.resolve_issue_id(issue_id)?;
 
         // Collect warnings instead of printing
@@ -534,6 +539,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         gate_key: String,
         by: Option<String>,
     ) -> Result<Vec<String>> {
+        // Validate the actor through the one `Assignee` path before it is stored
+        // on the gate state.
+        let by = by
+            .map(|s| s.parse::<crate::domain::Assignee>())
+            .transpose()?;
         let full_id = self.storage.resolve_issue_id(issue_id)?;
 
         // Collect warnings instead of printing

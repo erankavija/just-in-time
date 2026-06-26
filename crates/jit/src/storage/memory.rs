@@ -104,7 +104,7 @@ impl IssueStore for InMemoryStorage {
 
     fn save_issue(&self, mut issue: Issue) -> Result<()> {
         // Update the updated_at timestamp (storage responsibility)
-        issue.updated_at = chrono::Utc::now().to_rfc3339();
+        issue.updated_at = chrono::Utc::now();
 
         self.issues.lock().unwrap().insert(issue.id.clone(), issue);
         Ok(())
@@ -586,7 +586,7 @@ mod tests {
         let mut issue = Issue::new("Complex".to_string(), "Test".to_string());
         issue.priority = Priority::Critical;
         issue.state = State::InProgress;
-        issue.assignee = Some("agent:test".to_string());
+        issue.assignee = Some("agent:test".parse().unwrap());
         issue.dependencies = vec!["dep1".to_string(), "dep2".to_string()];
         issue.gates_required = vec!["gate1".to_string()];
         issue.context.insert("key".to_string(), "value".to_string());
@@ -596,7 +596,7 @@ mod tests {
         let loaded = storage.load_issue(&issue.id).unwrap();
         assert_eq!(loaded.priority, Priority::Critical);
         assert_eq!(loaded.state, State::InProgress);
-        assert_eq!(loaded.assignee, Some("agent:test".to_string()));
+        assert_eq!(loaded.assignee, Some("agent:test".parse().unwrap()));
         assert_eq!(loaded.dependencies.len(), 2);
         assert_eq!(loaded.gates_required.len(), 1);
         assert_eq!(loaded.context.get("key").unwrap(), "value");

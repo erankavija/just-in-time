@@ -624,7 +624,7 @@ fn test_enforce_at_done_rule_blocks_gated_auto_done_path() {
         "tests".to_string(),
         GateState {
             status: GateStatus::Passed,
-            updated_by: Some("ci:test".to_string()),
+            updated_by: Some("ci:test".parse().unwrap()),
             updated_at: chrono::Utc::now(),
         },
     );
