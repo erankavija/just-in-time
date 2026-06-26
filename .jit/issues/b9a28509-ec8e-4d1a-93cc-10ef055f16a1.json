@@ -2,9 +2,9 @@
   "id": "b9a28509-ec8e-4d1a-93cc-10ef055f16a1",
   "title": "Typed error variants and downcast for error classification",
   "description": "Replace substring-scanning error classification with typed `thiserror` variants and downcasting (report highest-leverage fix #4 — the single largest stringly cluster, 5 sites).\n\n## Sites\n- `graph.rs:26-33` — `GraphError::CycleDetected`/`NodeNotFound` already exist and reach `main.rs` downcastable; reuse them.\n- `storage/memory.rs` — add `IssueNotFoundError`/`GateNotFoundError` typed errors at the `anyhow!` origins (and the matching `JsonFileStorage` paths).\n- `main.rs:74-104` (`error_to_exit_code`), `main.rs:173`, `main.rs:1298`, `main.rs:1737-1742`, `main.rs:2231-2236` — replace `error_msg.contains(...)` dispatch with `downcast_ref` against the typed variants.\n\n## Success Criteria\n- [ ] Issue-not-found, gate-not-found, and cycle-detected conditions are represented by typed error variants, surfaced via `anyhow` downcasting.\n- [ ] All five `error_msg.contains(...)` / substring-match classification sites in `main.rs` are replaced by `downcast_ref` checks; no control-flow decision is driven by matching against a human-readable error string.\n- [ ] Exit-code mapping (`error_to_exit_code`) is driven by typed errors and preserves the existing exit codes for each condition.\n- [ ] `cargo-ci` and `code-review` pass; error-message text shown to users is unchanged where it was already correct.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [],
   "gates_required": [
     "cargo-ci",
@@ -17,6 +17,6 @@
     "type:task",
     "epic:code-smell-cleanup"
   ],
-  "created_at": "2026-06-25T21:41:24.388515209+00:00",
-  "updated_at": "2026-06-25T21:41:24.389850080+00:00"
+  "created_at": "2026-06-25T21:41:24.388515209Z",
+  "updated_at": "2026-06-26T09:46:11.561684496Z"
 }
