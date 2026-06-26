@@ -265,6 +265,38 @@ pub fn load_or_create_worktree_identity_with_warnings(
     Ok((identity, warnings))
 }
 
+/// Read the stable worktree id recorded in `<worktree_root>/.jit/worktree.json`.
+///
+/// Read-only: unlike [`load_or_create_worktree_identity`] this never creates or
+/// rewrites the identity file. It owns the `.jit/worktree.json` layout and the
+/// deserialization into [`WorktreeIdentity`], so callers (e.g. lease validation
+/// scanning sibling worktrees) never construct that path or parse the file
+/// inline.
+///
+/// Returns `Ok(None)` when the file is absent (the worktree has no recorded
+/// identity yet), `Ok(Some(id))` when present and parseable, and an error only
+/// when the file exists but cannot be read or parsed.
+///
+/// # Examples
+///
+/// ```
+/// use jit::storage::worktree_identity::read_worktree_id;
+///
+/// let dir = tempfile::tempdir().unwrap();
+/// // No .jit/worktree.json present yet.
+/// assert!(read_worktree_id(dir.path()).unwrap().is_none());
+/// ```
+pub fn read_worktree_id(worktree_root: &Path) -> Result<Option<String>> {
+    let wt_file = worktree_root.join(".jit").join("worktree.json");
+    if !wt_file.exists() {
+        return Ok(None);
+    }
+    let content = fs::read_to_string(&wt_file).context("Failed to read worktree.json")?;
+    let identity: WorktreeIdentity =
+        serde_json::from_str(&content).context("Failed to parse worktree.json")?;
+    Ok(Some(identity.worktree_id))
+}
+
 /// Write worktree identity atomically using temp file + rename pattern.
 ///
 /// This ensures the file is never in a partially written state, even if

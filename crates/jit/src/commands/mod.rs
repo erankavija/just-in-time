@@ -944,17 +944,35 @@ impl<S: IssueStore> CommandExecutor<S> {
         let config = self.config_manager.load()?;
         let namespaces = self.config_manager.namespaces_from_config(&config);
 
-        if jit_root.join("rules.toml").exists() {
+        if crate::storage::ruleset_store::has_validation_ruleset(jit_root) {
             // `rules.toml` is the sole source when present, so we never clobber it.
             // But its `default:type-hierarchy-known` rule reads a BAKED schema file
             // that does NOT track `[type_hierarchy]` edits — re-init / apply must
             // refresh that one file from config so a newly-declared type stops
             // warning on the write path (R5). This is a no-op when the file is
             // already current (idempotent, atomic).
-            crate::validation::serialize::regenerate_type_hierarchy_schema(jit_root, &namespaces)?;
+            crate::storage::ruleset_store::write_baked_schema(
+                jit_root,
+                crate::validation::defaults::TYPE_HIERARCHY_SCHEMA_FILE,
+                &crate::validation::serialize::type_hierarchy_schema_content(&namespaces),
+            )?;
             return Ok(false);
         }
-        crate::validation::serialize::scaffold_default_rules(jit_root, &namespaces)?;
+
+        // Validation produces the content; storage performs the atomic writes.
+        let serialized = crate::validation::serialize::serialize_ruleset(
+            &crate::validation::defaults::default_ruleset(&namespaces),
+        );
+        let schema_files: Vec<(String, String)> = serialized
+            .schema_files
+            .into_iter()
+            .map(|file| (file.name, file.content))
+            .collect();
+        crate::storage::ruleset_store::write_validation_ruleset(
+            jit_root,
+            &serialized.rules_toml,
+            &schema_files,
+        )?;
         Ok(true)
     }
 
@@ -973,7 +991,12 @@ impl<S: IssueStore> CommandExecutor<S> {
         let jit_root = self.storage.root();
         let config = self.config_manager.load()?;
         let namespaces = self.config_manager.namespaces_from_config(&config);
-        crate::validation::serialize::regenerate_type_hierarchy_schema(jit_root, &namespaces)
+        // Validation builds the schema content; storage performs the atomic write.
+        crate::storage::ruleset_store::write_baked_schema(
+            jit_root,
+            crate::validation::defaults::TYPE_HIERARCHY_SCHEMA_FILE,
+            &crate::validation::serialize::type_hierarchy_schema_content(&namespaces),
+        )
     }
 
     /// Resolve the git control-plane dir (`<git-common-dir>/jit`) for the
@@ -1036,17 +1059,9 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         };
 
-        // Load claims index
-        let claims_index_path = paths.shared_jit.join("claims.index.json");
-        if !claims_index_path.exists() {
-            // No claims index - no active leases
-            return Ok(false);
-        }
-
-        let contents =
-            std::fs::read_to_string(&claims_index_path).context("Failed to read claims index")?;
-        let claims_index: ClaimsIndex =
-            serde_json::from_str(&contents).context("Failed to parse claims index")?;
+        // Load the active-lease index through storage (an absent index yields an
+        // empty one, i.e. no active leases).
+        let claims_index = ClaimsIndex::load(&paths)?;
 
         // Resolve current agent identity (or None for single-user mode)
         let current_agent = resolve_agent_id(None).ok();

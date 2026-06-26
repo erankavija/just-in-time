@@ -171,6 +171,53 @@ pub struct ClaimsIndex {
 }
 
 impl ClaimsIndex {
+    /// Load the active-lease index from the shared control plane described by
+    /// `paths`, returning an empty (well-formed) index when no
+    /// `claims.index.json` exists yet.
+    ///
+    /// This is the single read path for the claims index: it owns the
+    /// `claims.index.json` filename under the shared control plane plus the
+    /// read-and-deserialize, so command/validation callers never construct that
+    /// path or parse the file inline (they go through this method or
+    /// [`ClaimCoordinator::load_claims_index`], which delegates here). A missing
+    /// file is normal — no claims coordination has happened yet — and yields an
+    /// empty index rather than an error.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::storage::claim_coordinator::ClaimsIndex;
+    /// use jit::storage::worktree_paths::WorktreePaths;
+    ///
+    /// let dir = tempfile::tempdir().unwrap();
+    /// let paths = WorktreePaths {
+    ///     common_dir: dir.path().join(".git"),
+    ///     worktree_root: dir.path().to_path_buf(),
+    ///     local_jit: dir.path().join(".jit"),
+    ///     shared_jit: dir.path().to_path_buf(),
+    /// };
+    /// // No claims.index.json on disk yet: an empty index is returned.
+    /// let index = ClaimsIndex::load(&paths).unwrap();
+    /// assert!(index.leases.is_empty());
+    /// ```
+    pub fn load(paths: &WorktreePaths) -> Result<ClaimsIndex> {
+        let index_path = paths.shared_jit.join("claims.index.json");
+
+        if !index_path.exists() {
+            return Ok(ClaimsIndex {
+                schema_version: 1,
+                generated_at: Utc::now(),
+                last_seq: 0,
+                stale_threshold_secs: 3600, // 1 hour default
+                leases: Vec::new(),
+                sequence_gaps: Vec::new(),
+            });
+        }
+
+        let content = fs::read_to_string(&index_path).context("Failed to read claims index")?;
+        serde_json::from_str(&content).context("Failed to parse claims index")
+    }
+
     /// Non-fatal warnings derived from the index's diagnostic state.
     ///
     /// Currently this surfaces any sequence gaps detected while rebuilding the
@@ -586,21 +633,7 @@ impl ClaimCoordinator {
 
     /// Load claims index (or create empty if missing)
     pub fn load_claims_index(&self) -> Result<ClaimsIndex> {
-        let index_path = self.paths.shared_jit.join("claims.index.json");
-
-        if !index_path.exists() {
-            return Ok(ClaimsIndex {
-                schema_version: 1,
-                generated_at: Utc::now(),
-                last_seq: 0,
-                stale_threshold_secs: 3600, // 1 hour default
-                leases: Vec::new(),
-                sequence_gaps: Vec::new(),
-            });
-        }
-
-        let content = fs::read_to_string(&index_path).context("Failed to read claims index")?;
-        serde_json::from_str(&content).context("Failed to parse claims index")
+        ClaimsIndex::load(&self.paths)
     }
 
     /// Write claims index atomically (temp + rename)

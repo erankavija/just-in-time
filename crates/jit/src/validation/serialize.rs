@@ -4,9 +4,10 @@
 //! This is the inverse of the [`rules`](crate::validation::rules) loader: it
 //! renders an arbitrary in-memory [`RuleSet`] (typically the built-in
 //! [`default_ruleset`](crate::validation::defaults::default_ruleset)) into a
-//! complete, reloadable `rules.toml`. `jit init` uses it (via
-//! [`scaffold_default_rules`]) to materialize the fixed default ruleset so the
-//! file becomes the single operative source of truth.
+//! complete, reloadable `rules.toml`. This module produces CONTENT only and
+//! performs no I/O; `jit init` persists that content through the storage layer
+//! ([`write_validation_ruleset`](crate::storage::ruleset_store::write_validation_ruleset))
+//! so the file becomes the single operative source of truth.
 //!
 //! # Why a custom renderer (no `Serialize` derive)
 //!
@@ -35,10 +36,7 @@
 //! reference. The round-trip test compares field-wise, excluding those two.
 
 use crate::validation::rules::{Assertion, Rule, RuleSet, Selector, TypeHierarchyKind};
-use anyhow::{Context, Result};
 use std::collections::HashSet;
-use std::path::Path;
-use std::sync::atomic::{AtomicU64, Ordering};
 
 /// A `rules.toml` body together with the schema files it references.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -106,119 +104,37 @@ pub fn serialize_ruleset(set: &RuleSet) -> SerializedRuleSet {
     }
 }
 
-/// Scaffold the FIXED default `.jit/rules.toml` (+ referenced `.jit/schemas/
-/// *.json`) for `jit init`, derived from `namespaces` via
-/// [`default_ruleset`](crate::validation::defaults::default_ruleset).
+/// The pretty-printed JSON content of the baked `default:type-hierarchy-known`
+/// schema for `namespaces` — the write-path type enum that the
+/// `default:type-hierarchy-known` rule references.
 ///
-/// This is the ONLY place that materializes the default ruleset to disk (MF4):
-/// it runs from `jit init` under the existing write lock. The read path
-/// ([`effective_rules`](crate::commands::CommandExecutor::effective_rules)) builds
-/// the same defaults in memory and never writes.
-///
-/// Idempotent by design at the call site: `jit init` invokes this only when
-/// `rules.toml` is absent (a present file is the sole source and is left intact),
-/// so re-init is a no-op. Writes are atomic (temp + rename).
-pub fn scaffold_default_rules(
-    jit_root: &Path,
-    namespaces: &crate::domain::LabelNamespaces,
-) -> Result<()> {
-    let set = crate::validation::defaults::default_ruleset(namespaces);
-    let serialized = serialize_ruleset(&set);
-    write_schema_files(jit_root, &serialized.schema_files)?;
-    write_file_atomic(&jit_root.join("rules.toml"), &serialized.rules_toml)
-}
-
-/// Regenerate the ONE write-path schema file that depends on `[type_hierarchy]`:
-/// `.jit/schemas/default-type-hierarchy-known.json`, rebuilt from `namespaces`.
-///
-/// `.jit/rules.toml` is "the SOLE source when present", and its
-/// `default:type-hierarchy-known` rule reads this baked enum file rather than the
-/// config hierarchy. So adding a type to `[type_hierarchy].types` updates the
-/// domain/graph hierarchy but NOT this frozen schema, and the write path warns on
-/// the new type (R5). This regenerator eliminates that dual source: rebuilding the
-/// file from the SAME [`type_hierarchy_known_schema`] the in-memory default uses
-/// keeps the write-path rule in lock-step with config.
-///
-/// Idempotent: rewriting an already-current file produces identical bytes. Writes
-/// are atomic (temp + rename). It writes only when the rule's schema file already
-/// exists OR the `schemas/` dir exists — i.e. a repo that has been `jit init`ed —
-/// so it never resurrects a hand-deleted schema layout; a `rules.toml`-less repo
-/// builds the schema in memory and needs no on-disk file. Returns `true` when a
-/// file was written.
-pub fn regenerate_type_hierarchy_schema(
-    jit_root: &Path,
-    namespaces: &crate::domain::LabelNamespaces,
-) -> Result<bool> {
-    let schemas_dir = jit_root.join("schemas");
-    let target = schemas_dir.join(crate::validation::defaults::TYPE_HIERARCHY_SCHEMA_FILE);
-    // Only refresh a materialized layout: if neither the file nor its directory
-    // exists, the repo has no baked schemas (read path builds them in memory), so
-    // there is nothing to keep in sync.
-    if !target.exists() && !schemas_dir.exists() {
-        return Ok(false);
-    }
-    std::fs::create_dir_all(&schemas_dir)
-        .with_context(|| format!("creating {}", schemas_dir.display()))?;
-    let schema = crate::validation::defaults::type_hierarchy_known_schema(namespaces);
-    write_file_atomic(&target, &pretty_schema(&schema))?;
-    Ok(true)
-}
-
-/// Write schema files under `<jit_root>/schemas/`, creating the directory.
-fn write_schema_files(jit_root: &Path, files: &[SchemaFile]) -> Result<()> {
-    if files.is_empty() {
-        return Ok(());
-    }
-    let schemas_dir = jit_root.join("schemas");
-    std::fs::create_dir_all(&schemas_dir)
-        .with_context(|| format!("creating {}", schemas_dir.display()))?;
-    for file in files {
-        write_file_atomic(&schemas_dir.join(&file.name), &file.content)?;
-    }
-    Ok(())
-}
-
-/// Write `content` to `path` atomically (temp file + rename).
-///
-/// The write goes to a temp file in the SAME directory as `path` and is then
-/// renamed onto `path`, so a reader never observes a partially written file (the
-/// JIT "atomic file writes" invariant). The temp filename is UNIQUE per process
-/// and per call — it embeds the OS process id and a process-local monotonic
-/// counter — so concurrent writers targeting the same path never collide on a
-/// shared temp file before the rename. The parent directory must already exist;
-/// the rename is atomic only within a single filesystem (the temp file stays in
-/// the target's directory to guarantee that).
+/// Pure: performs no I/O. The storage layer
+/// ([`write_baked_schema`](crate::storage::ruleset_store::write_baked_schema))
+/// writes this verbatim to `schemas/<TYPE_HIERARCHY_SCHEMA_FILE>`. Building the
+/// content from the SAME [`type_hierarchy_known_schema`] the in-memory default
+/// uses keeps the materialized write-path rule in lock-step with config (R5).
 ///
 /// # Examples
 ///
 /// ```
-/// use jit::validation::serialize::write_file_atomic;
+/// use jit::domain::LabelNamespaces;
+/// use jit::validation::serialize::type_hierarchy_schema_content;
 ///
-/// let dir = tempfile::tempdir().unwrap();
-/// let path = dir.path().join("out.txt");
-/// write_file_atomic(&path, "hello").unwrap();
-/// assert_eq!(std::fs::read_to_string(&path).unwrap(), "hello");
+/// let ns = LabelNamespaces {
+///     schema_version: 2,
+///     namespaces: Default::default(),
+///     type_hierarchy: None,
+///     label_associations: None,
+///     strategic_types: None,
+/// };
+/// let content = type_hierarchy_schema_content(&ns);
+/// assert!(content.trim_start().starts_with('{'));
+/// assert!(content.ends_with('\n'));
 /// ```
-pub fn write_file_atomic(path: &Path, content: &str) -> Result<()> {
-    // Per-process monotonic counter so two calls within the same process get
-    // distinct temp names even at the same instant; combined with the process id
-    // it is unique across concurrent writers to the same target.
-    static COUNTER: AtomicU64 = AtomicU64::new(0);
-    let seq = COUNTER.fetch_add(1, Ordering::Relaxed);
-
-    let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("write");
-    let tmp_name = format!(".{file_name}.{}.{seq}.tmp", std::process::id());
-    // Keep the temp file in the SAME directory as the target so the rename is a
-    // same-filesystem (atomic) operation.
-    let tmp = match path.parent() {
-        Some(dir) => dir.join(tmp_name),
-        None => Path::new(&tmp_name).to_path_buf(),
-    };
-
-    std::fs::write(&tmp, content).with_context(|| format!("writing {}", tmp.display()))?;
-    std::fs::rename(&tmp, path)
-        .with_context(|| format!("renaming {} -> {}", tmp.display(), path.display()))?;
-    Ok(())
+pub fn type_hierarchy_schema_content(namespaces: &crate::domain::LabelNamespaces) -> String {
+    pretty_schema(&crate::validation::defaults::type_hierarchy_known_schema(
+        namespaces,
+    ))
 }
 
 /// Pick a schema-file stem for `rule_name` that is unique within `used_stems`,
@@ -861,114 +777,6 @@ assert = { json-schema = "schemas/second.json" }
         let first = serialize_ruleset(&set).rules_toml;
         let second = serialize_ruleset(&reloaded).rules_toml;
         assert_eq!(first, second, "serialization must be canonical/stable");
-    }
-
-    /// Build a registry carrying an explicit type hierarchy (so
-    /// `get_type_hierarchy` returns it rather than the default fallback).
-    fn registry_with_hierarchy(types: &[(&str, u8)]) -> LabelNamespaces {
-        let mut hierarchy = HashMap::new();
-        for (name, level) in types {
-            hierarchy.insert(name.to_string(), *level);
-        }
-        LabelNamespaces {
-            schema_version: 2,
-            namespaces: HashMap::new(),
-            type_hierarchy: Some(hierarchy),
-            label_associations: None,
-            strategic_types: None,
-        }
-    }
-
-    #[test]
-    fn test_regenerate_type_hierarchy_schema_writes_declared_types() {
-        // After `jit init`, the baked schema exists. Regenerating from a hierarchy
-        // that declares a NEW type must include that type in the enum.
-        let dir = tempfile::tempdir().unwrap();
-        let scaffold_reg = registry(vec![]);
-        scaffold_default_rules(dir.path(), &scaffold_reg).unwrap();
-        let target = dir
-            .path()
-            .join("schemas")
-            .join(crate::validation::defaults::TYPE_HIERARCHY_SCHEMA_FILE);
-        assert!(target.exists(), "scaffold writes the baked schema");
-
-        let reg = registry_with_hierarchy(&[("epic", 2), ("planning", 3), ("task", 4)]);
-        let wrote = regenerate_type_hierarchy_schema(dir.path(), &reg).unwrap();
-        assert!(wrote, "an existing baked layout is refreshed");
-
-        let content = std::fs::read_to_string(&target).unwrap();
-        let json: serde_json::Value = serde_json::from_str(&content).unwrap();
-        let enum_values = &json["properties"]["labels"]["properties"]["type"]["items"]["enum"];
-        let names: Vec<&str> = enum_values
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|v| v.as_str().unwrap())
-            .collect();
-        assert!(
-            names.contains(&"planning"),
-            "declared type present: {names:?}"
-        );
-        assert!(names.contains(&"epic"));
-        assert!(names.contains(&"task"));
-    }
-
-    #[test]
-    fn test_regenerate_type_hierarchy_schema_is_idempotent() {
-        let dir = tempfile::tempdir().unwrap();
-        scaffold_default_rules(dir.path(), &registry(vec![])).unwrap();
-        let reg = registry_with_hierarchy(&[("epic", 2), ("task", 4)]);
-        regenerate_type_hierarchy_schema(dir.path(), &reg).unwrap();
-        let target = dir
-            .path()
-            .join("schemas")
-            .join(crate::validation::defaults::TYPE_HIERARCHY_SCHEMA_FILE);
-        let first = std::fs::read_to_string(&target).unwrap();
-        regenerate_type_hierarchy_schema(dir.path(), &reg).unwrap();
-        let second = std::fs::read_to_string(&target).unwrap();
-        assert_eq!(first, second, "regeneration is byte-identical (idempotent)");
-    }
-
-    #[test]
-    fn test_regenerate_is_noop_without_baked_schemas() {
-        // A repo with no `schemas/` dir (read path builds rules in memory) has
-        // nothing to refresh: the regenerator is a no-op and creates no file.
-        let dir = tempfile::tempdir().unwrap();
-        let reg = registry_with_hierarchy(&[("epic", 2)]);
-        let wrote = regenerate_type_hierarchy_schema(dir.path(), &reg).unwrap();
-        assert!(!wrote, "no baked layout => no write");
-        assert!(!dir.path().join("schemas").exists());
-    }
-
-    #[test]
-    fn test_regenerated_schema_matches_scaffolded_default() {
-        // The regenerator and the `jit init` scaffold must produce the SAME baked
-        // type-hierarchy schema for the same hierarchy (one source, not two: R5).
-        let reg = registry_with_hierarchy(&[("epic", 2), ("planning", 3), ("task", 4)]);
-
-        let scaffold_dir = tempfile::tempdir().unwrap();
-        scaffold_default_rules(scaffold_dir.path(), &reg).unwrap();
-        let scaffolded = std::fs::read_to_string(
-            scaffold_dir
-                .path()
-                .join("schemas")
-                .join(crate::validation::defaults::TYPE_HIERARCHY_SCHEMA_FILE),
-        )
-        .unwrap();
-
-        let regen_dir = tempfile::tempdir().unwrap();
-        // Seed an empty-default baked layout, then regenerate from the same hierarchy.
-        scaffold_default_rules(regen_dir.path(), &registry(vec![])).unwrap();
-        regenerate_type_hierarchy_schema(regen_dir.path(), &reg).unwrap();
-        let regenerated = std::fs::read_to_string(
-            regen_dir
-                .path()
-                .join("schemas")
-                .join(crate::validation::defaults::TYPE_HIERARCHY_SCHEMA_FILE),
-        )
-        .unwrap();
-
-        assert_eq!(scaffolded, regenerated, "scaffold and regen must agree");
     }
 
     #[test]

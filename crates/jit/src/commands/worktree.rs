@@ -253,23 +253,9 @@ pub fn execute_worktree_list() -> Result<(Vec<WorktreeListEntry>, Vec<StorageWar
 
     let git_entries = parse_git_worktree_porcelain(&porcelain_output)?;
 
-    // Load claims index to count active claims per worktree
-    let claims_index_path = paths.shared_jit.join("claims.index.json");
-    let claims_index = if claims_index_path.exists() {
-        let contents =
-            std::fs::read_to_string(&claims_index_path).context("Failed to read claims index")?;
-        serde_json::from_str::<ClaimsIndex>(&contents).context("Failed to parse claims index")?
-    } else {
-        // No claims index file means no active claims
-        ClaimsIndex {
-            schema_version: 1,
-            generated_at: chrono::Utc::now(),
-            last_seq: 0,
-            stale_threshold_secs: 3600,
-            leases: vec![],
-            sequence_gaps: Vec::new(),
-        }
-    };
+    // Load the active-lease index through storage to count active claims per
+    // worktree (an absent index yields an empty one, i.e. no active claims).
+    let claims_index = ClaimsIndex::load(&paths)?;
 
     // Enrich git entries with JIT data, collecting any relocation warnings
     // observed while loading each worktree's identity.

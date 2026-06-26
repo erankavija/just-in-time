@@ -1702,17 +1702,9 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let paths = WorktreePaths::detect().context("Failed to detect worktree paths")?;
 
-        // Load claims index
-        let claims_index_path = paths.shared_jit.join("claims.index.json");
-        if !claims_index_path.exists() {
-            // No claims index means no leases - valid
-            return Ok(vec![]);
-        }
-
-        let contents =
-            std::fs::read_to_string(&claims_index_path).context("Failed to read claims index")?;
-        let index: ClaimsIndex =
-            serde_json::from_str(&contents).context("Failed to parse claims index")?;
+        // Load the active-lease index through storage (an absent index yields an
+        // empty one, so there are no leases to validate).
+        let index = ClaimsIndex::load(&paths)?;
 
         let mut invalid_leases = Vec::new();
         let now = Utc::now();
@@ -1946,17 +1938,14 @@ fn check_worktree_exists(worktree_id: &str) -> Result<bool> {
         .map(PathBuf::from)
         .collect::<Vec<_>>();
 
-    // Check each worktree for matching ID
+    // Check each worktree for matching ID. A missing or unreadable identity
+    // file is tolerated (skip it), matching the prior inline behavior.
     for worktree_path in worktree_paths {
-        let identity_path = worktree_path.join(".jit/worktree.json");
-        if let Ok(contents) = std::fs::read_to_string(&identity_path) {
-            // Parse just enough to get the worktree_id
-            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&contents) {
-                if let Some(id) = json.get("worktree_id").and_then(|v| v.as_str()) {
-                    if id == worktree_id {
-                        return Ok(true);
-                    }
-                }
+        if let Some(id) =
+            crate::storage::worktree_identity::read_worktree_id(&worktree_path).unwrap_or(None)
+        {
+            if id == worktree_id {
+                return Ok(true);
             }
         }
     }
@@ -1982,17 +1971,9 @@ pub fn validate_claims_index() -> Result<Vec<String>> {
 
     let paths = WorktreePaths::detect().context("Failed to detect worktree paths")?;
 
-    // Load claims index
-    let claims_index_path = paths.shared_jit.join("claims.index.json");
-    if !claims_index_path.exists() {
-        // No claims index - valid (no claims coordination active)
-        return Ok(vec![]);
-    }
-
-    let contents =
-        std::fs::read_to_string(&claims_index_path).context("Failed to read claims index")?;
-    let index: ClaimsIndex =
-        serde_json::from_str(&contents).context("Failed to parse claims index")?;
+    // Load the active-lease index through storage (an absent index yields an
+    // empty one, i.e. no claims coordination active).
+    let index = ClaimsIndex::load(&paths)?;
 
     let mut issues = Vec::new();
 

@@ -20,6 +20,8 @@ const ISSUES_DIR: &str = "issues";
 const INDEX_FILE: &str = "index.json";
 const GATES_FILE: &str = "gates.json";
 const EVENTS_FILE: &str = "events.jsonl";
+const GATE_RUNS_DIR: &str = "gate-runs";
+const GATE_RUN_RESULT_FILE: &str = "result.json";
 
 /// Index of all issues in the repository
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -96,6 +98,31 @@ impl JsonFileStorage {
 
     fn issue_path(&self, id: &str) -> PathBuf {
         self.root.join(ISSUES_DIR).join(format!("{}.json", id))
+    }
+
+    /// Filesystem path of the persisted result for gate run `run_id`
+    /// (`<root>/gate-runs/<run_id>/result.json`).
+    ///
+    /// This is the single source for a gate run's on-disk location: the storage
+    /// methods that save and load a run derive their path from it, and the CLI
+    /// uses it to tell the user where a run's full output lives, so the
+    /// `gate-runs/<run_id>/result.json` layout is never reconstructed outside the
+    /// storage layer.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::storage::JsonFileStorage;
+    ///
+    /// let storage = JsonFileStorage::new("/repo/.jit");
+    /// let path = storage.result_path("abc123");
+    /// assert!(path.ends_with("gate-runs/abc123/result.json"));
+    /// ```
+    pub fn result_path(&self, run_id: &str) -> PathBuf {
+        self.root
+            .join(GATE_RUNS_DIR)
+            .join(run_id)
+            .join(GATE_RUN_RESULT_FILE)
     }
 
     fn write_json<T: Serialize>(&self, path: &Path, data: &T) -> Result<()> {
@@ -653,16 +680,14 @@ impl IssueStore for JsonFileStorage {
     }
 
     fn save_gate_run_result(&self, result: &crate::domain::GateRunResult) -> Result<()> {
-        // Create gate-runs directory if it doesn't exist
-        let gate_runs_dir = self.root.join("gate-runs");
-        fs::create_dir_all(&gate_runs_dir).context("Failed to create gate-runs directory")?;
-
-        // Create directory for this run
-        let run_dir = gate_runs_dir.join(&result.run_id);
-        fs::create_dir_all(&run_dir).context("Failed to create run directory")?;
+        // Single source for the run's location; create its parent directory.
+        let result_path = self.result_path(&result.run_id);
+        let run_dir = result_path
+            .parent()
+            .context("gate run result path has no parent directory")?;
+        fs::create_dir_all(run_dir).context("Failed to create run directory")?;
 
         // Save result.json
-        let result_path = run_dir.join("result.json");
         let json =
             serde_json::to_string_pretty(result).context("Failed to serialize gate run result")?;
 
@@ -676,7 +701,7 @@ impl IssueStore for JsonFileStorage {
     }
 
     fn load_gate_run_result(&self, run_id: &str) -> Result<crate::domain::GateRunResult> {
-        let result_path = self.root.join("gate-runs").join(run_id).join("result.json");
+        let result_path = self.result_path(run_id);
 
         if !result_path.exists() {
             return Err(GateRunNotFoundError::new(run_id).into());
@@ -694,7 +719,7 @@ impl IssueStore for JsonFileStorage {
         &self,
         issue_id: &str,
     ) -> Result<Vec<crate::domain::GateRunResult>> {
-        let gate_runs_dir = self.root.join("gate-runs");
+        let gate_runs_dir = self.root.join(GATE_RUNS_DIR);
 
         if !gate_runs_dir.exists() {
             return Ok(Vec::new());
@@ -705,7 +730,7 @@ impl IssueStore for JsonFileStorage {
         for entry in fs::read_dir(&gate_runs_dir)? {
             let entry = entry?;
             if entry.file_type()?.is_dir() {
-                let result_path = entry.path().join("result.json");
+                let result_path = entry.path().join(GATE_RUN_RESULT_FILE);
                 if result_path.exists() {
                     let contents = fs::read_to_string(&result_path).with_context(|| {
                         format!(
@@ -799,7 +824,7 @@ impl IssueStore for JsonFileStorage {
 
         // Write through the SHARED atomic writer (temp file in the target's
         // directory + rename), preserving the atomic-write invariant (REQ-05).
-        crate::validation::serialize::write_file_atomic(&target, content)
+        crate::storage::atomic_write::write_file_atomic(&target, content)
             .map_err(PathReadError::Other)
     }
 

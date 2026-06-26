@@ -20,8 +20,9 @@
 //! - [`drift`] — the bidirectional enforcement-drift check (declaration
 //!   consistency between invariants and loadable rules/gates);
 //! - [`report`] — structured rule reports for `jit validate [--explain]`;
-//! - [`serialize`] — render a [`rules::RuleSet`] to `rules.toml` + schema files,
-//!   and the `jit init` scaffold writer ([`serialize::scaffold_default_rules`]).
+//! - [`serialize`] — render a [`rules::RuleSet`] to `rules.toml` + schema file
+//!   CONTENT (no I/O); the storage layer
+//!   ([`crate::storage::ruleset_store`]) persists it for `jit init`.
 
 pub mod defaults;
 pub mod desugar;

@@ -9,6 +9,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+pub mod atomic_write;
 pub mod claim_coordinator;
 pub mod claims_log;
 pub mod control_plane;
@@ -21,6 +22,7 @@ pub mod lock;
 pub mod lock_cleanup;
 pub mod memory;
 pub mod path_errors;
+pub mod ruleset_store;
 pub mod temp_cleanup;
 pub mod warnings;
 pub mod worktree_identity;
