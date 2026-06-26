@@ -3868,3 +3868,5 @@
 {"type":"issue_state_changed","id":"affee483-22c5-42f6-8cf9-dcce31095d53","issue_id":"7095769d-0487-417d-a807-233845433a76","timestamp":"2026-06-26T17:55:29.393353626Z","from":"ready","to":"in_progress"}
 {"type":"issue_state_changed","id":"4ae25b55-33b0-4e63-a650-3d0bc04decf3","issue_id":"7095769d-0487-417d-a807-233845433a76","timestamp":"2026-06-26T17:55:29.421106564Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"2abb1024-616a-4a2f-89c4-f30e443e5284","issue_id":"7095769d-0487-417d-a807-233845433a76","timestamp":"2026-06-26T17:55:29.421134054Z"}
+{"type":"issue_created","id":"7e36c83d-9b92-48f9-8c95-7b12a2c5e5f3","issue_id":"90a2dbfd-be54-46f2-b84a-b19382c6b0f2","timestamp":"2026-06-26T20:01:10.268220287Z","title":"Generalize addressable items to declarative kinds over markdown/toml sources","priority":"normal"}
+{"type":"issue_updated","id":"406e3584-3476-44d5-bdec-33ed259219cd","issue_id":"9db27a3a-86c5-4d79-9582-9ad68364ea36","timestamp":"2026-06-26T20:01:20.697164391Z","updated_by":"dependency-add","fields":["dependencies"]}

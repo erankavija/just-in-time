@@ -1,0 +1,49 @@
+# Project invariants for just-in-time, seeded from the "Domain Invariants"
+# section of CLAUDE.md. Each entry is a project-scoped addressable item at
+# `@/<id>`; link work to one with an `enforces:@/<id>` label.
+#
+# `kind`:
+#   enforced  — a rule/gate mechanically guards the property (named in enforced-by)
+#   advisory  — documented intent, not yet mechanically asserted
+#
+# Run `jit invariant check` to surface enforcement drift; `jit invariant render`
+# to project this registry back into its documentation target.
+
+[[invariants]]
+id = "INV-LABEL-FORMAT"
+statement = "Every label is namespace:value (namespace lowercase-kebab, value non-empty)."
+kind = "enforced"
+enforced-by = "default:label-format"
+
+[[invariants]]
+id = "INV-NAMESPACE-REGISTRY"
+statement = "Every label namespace is declared in the namespace registry."
+kind = "enforced"
+enforced-by = "default:namespace-registry"
+
+[[invariants]]
+id = "INV-DAG-ACYCLIC"
+statement = "Cycle detection runs before every dependency operation; the graph stays acyclic."
+kind = "enforced"
+enforced-by = "cargo-ci"
+
+[[invariants]]
+id = "INV-GATE-SEMANTICS"
+statement = "An issue cannot reach Ready or Done with pending or failed gates."
+kind = "enforced"
+enforced-by = "cargo-ci"
+
+[[invariants]]
+id = "INV-EVENT-LOG"
+statement = "Every state change appends an event to events.jsonl."
+kind = "advisory"
+
+[[invariants]]
+id = "INV-ATOMIC-WRITES"
+statement = "All file writes use the temp-file + atomic-rename pattern."
+kind = "advisory"
+
+[[invariants]]
+id = "INV-ASSIGNEE-FORMAT"
+statement = "Every assignee is {type}:{identifier} (e.g. agent:worker-1, human:alice)."
+kind = "advisory"
