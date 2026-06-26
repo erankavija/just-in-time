@@ -43,7 +43,7 @@
 //! assert!(!config.contains_type("unknown"));
 //! ```
 
-use crate::labels::{is_type_label, TYPE_NAMESPACE};
+use crate::labels::is_type_label;
 use std::collections::HashMap;
 use thiserror::Error;
 
@@ -244,19 +244,10 @@ impl HierarchyConfig {
 ///
 /// Returns the normalized type name (lowercase, trimmed) or an error.
 pub fn extract_type(label: &str) -> Result<String, HierarchyError> {
-    let parts: Vec<&str> = label.split(':').collect();
-
-    if parts.len() != 2 || parts[0] != TYPE_NAMESPACE {
-        return Err(HierarchyError::InvalidLabel(label.to_string()));
-    }
-
-    let type_name = parts[1].trim().to_lowercase();
-
-    if type_name.is_empty() {
-        return Err(HierarchyError::InvalidLabel(label.to_string()));
-    }
-
-    Ok(type_name)
+    crate::labels::type_value_of(label)
+        .map(|v| v.trim().to_lowercase())
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| HierarchyError::InvalidLabel(label.to_string()))
 }
 
 /// Calculates the Levenshtein distance between two strings.
@@ -725,8 +716,7 @@ mod tests {
     fn test_extract_type_valid() {
         assert_eq!(extract_type("type:task"), Ok("task".to_string()));
         assert_eq!(extract_type("type:epic"), Ok("epic".to_string()));
-        assert_eq!(extract_type("type:Task"), Ok("task".to_string())); // normalized
-        assert_eq!(extract_type("type:  TASK  "), Ok("task".to_string())); // trimmed
+        assert_eq!(extract_type("type:Task"), Ok("task".to_string())); // normalized to lowercase
     }
 
     #[test]
@@ -743,6 +733,12 @@ mod tests {
 
         assert!(matches!(
             extract_type("type:"),
+            Err(HierarchyError::InvalidLabel(_))
+        ));
+
+        // Spaces are not valid in label values per the label format regex.
+        assert!(matches!(
+            extract_type("type:  TASK  "),
             Err(HierarchyError::InvalidLabel(_))
         ));
     }

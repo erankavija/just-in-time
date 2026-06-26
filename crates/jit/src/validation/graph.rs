@@ -887,7 +887,7 @@ fn criterion_ids(
 /// when it carries `type:<name>` for any of them.
 fn type_is_excluded(issue: &Issue, excluded: &BTreeSet<String>) -> bool {
     !excluded.is_empty()
-        && values_in_namespace(issue, crate::labels::TYPE_NAMESPACE).any(|t| excluded.contains(t))
+        && crate::labels::type_label_values(&issue.labels).any(|t| excluded.contains(t))
 }
 
 /// The candidate child issues for a source under the given link semantics,

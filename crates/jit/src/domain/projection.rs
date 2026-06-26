@@ -190,9 +190,7 @@ fn collect_doc_types(issue: &Issue) -> Vec<String> {
 /// ```
 pub fn project(issue: &Issue) -> Projection {
     let labels = group_labels(&issue.labels);
-    let type_ = labels
-        .get(crate::labels::TYPE_NAMESPACE)
-        .and_then(|vs| vs.first().cloned());
+    let type_ = crate::labels::type_label_value(&issue.labels).map(str::to_string);
 
     Projection {
         type_,

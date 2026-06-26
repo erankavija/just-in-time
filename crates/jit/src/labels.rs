@@ -135,10 +135,40 @@ fn suggest_label_fix(label: &str) -> Option<String> {
 /// ```
 pub const TYPE_NAMESPACE: &str = "type";
 
+/// Extract the value of a single `type:*` label, borrowing from the original string.
+///
+/// This is the ONE primitive that owns the `type:` label encoding. All other
+/// type-label helpers build on it. Returns `None` when `label` is not a valid
+/// `type:*` label (wrong namespace, missing value, or invalid format).
+///
+/// Internally delegates to [`parse_label`] for format validation and namespace
+/// identification; `split_once` is used only to borrow the value portion of the
+/// original string without allocating.
+///
+/// # Examples
+///
+/// ```
+/// use jit::labels::type_value_of;
+///
+/// assert_eq!(type_value_of("type:task"), Some("task"));
+/// assert_eq!(type_value_of("type:epic"), Some("epic"));
+/// assert_eq!(type_value_of("priority:high"), None); // wrong namespace
+/// assert_eq!(type_value_of("type:"),         None); // missing value — invalid format
+/// assert_eq!(type_value_of("notacolon"),     None); // invalid label format
+/// ```
+pub fn type_value_of(label: &str) -> Option<&str> {
+    // parse_label is the canonical encoding primitive; split_once borrows the
+    // value from the original string without allocating.
+    let (ns, _) = parse_label(label).ok()?;
+    (ns == TYPE_NAMESPACE)
+        .then(|| label.split_once(':').map(|(_, v)| v))
+        .flatten()
+}
+
 /// Return `true` when `label` is a valid `type:*` label.
 ///
-/// Delegates to [`parse_label`] so the `namespace:value` encoding is owned by
-/// a single primitive. Returns `false` for invalid label formats.
+/// Convenience wrapper around [`type_value_of`]. Returns `false` for invalid
+/// label formats.
 ///
 /// # Examples
 ///
@@ -152,20 +182,16 @@ pub const TYPE_NAMESPACE: &str = "type";
 /// assert!(!is_type_label("notacolon"));     // invalid label format
 /// ```
 pub fn is_type_label(label: &str) -> bool {
-    parse_label(label)
-        .map(|(ns, _)| ns == TYPE_NAMESPACE)
-        .unwrap_or(false)
+    type_value_of(label).is_some()
 }
 
-/// Extract the value of the `type:` label from a label list, if present.
+/// Extract the value of the first `type:*` label from a label list.
 ///
 /// Returns a reference to the value part (after the colon) of the first
 /// `type:*` label found in `labels`, or `None` when no type label is present.
+/// Presence checks become `.is_some()`.
 ///
-/// Internally delegates to [`parse_label`] (the canonical `namespace:value`
-/// primitive) for namespace identification. The per-issue invariant is a
-/// single `type:*` label; this function returns the first match. Presence
-/// checks become `.is_some()`.
+/// Built on [`type_value_of`] — the single encoding primitive.
 ///
 /// # Examples
 ///
@@ -188,14 +214,35 @@ pub fn is_type_label(label: &str) -> bool {
 /// assert_eq!(type_label_value(&[]), None);
 /// ```
 pub fn type_label_value(labels: &[String]) -> Option<&str> {
-    labels.iter().find_map(|l| {
-        // parse_label is the canonical encoding primitive; split_once is used
-        // only to borrow the value from the original string without allocating.
-        let (ns, _) = parse_label(l).ok()?;
-        (ns == TYPE_NAMESPACE)
-            .then(|| l.split_once(':').map(|(_, v)| v))
-            .flatten()
-    })
+    labels.iter().find_map(|l| type_value_of(l))
+}
+
+/// Iterate over the values of ALL `type:*` labels in a label list.
+///
+/// Each yielded `&str` is the value portion of one `type:*` label. The
+/// per-issue invariant is a single `type:*` label, but this iterator handles
+/// the general case (e.g. exclusion checks over a heterogeneous set of issues).
+///
+/// Built on [`type_value_of`] — the single encoding primitive.
+///
+/// # Examples
+///
+/// ```
+/// use jit::labels::type_label_values;
+///
+/// let labels = vec![
+///     "type:task".to_string(),
+///     "priority:high".to_string(),
+///     "type:epic".to_string(),
+/// ];
+/// let values: Vec<&str> = type_label_values(&labels).collect();
+/// assert_eq!(values, vec!["task", "epic"]);
+///
+/// let empty: Vec<String> = vec![];
+/// assert_eq!(type_label_values(&empty).count(), 0);
+/// ```
+pub fn type_label_values(labels: &[String]) -> impl Iterator<Item = &str> {
+    labels.iter().filter_map(|l| type_value_of(l))
 }
 
 /// Check if a pattern matches any label in a collection
