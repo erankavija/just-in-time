@@ -1,7 +1,7 @@
 {
   "epic_id": "7095769d-0487-417d-a807-233845433a76",
   "epic_short_id": "7095769d",
-  "current_wave": 2,
+  "current_wave": 3,
   "model_policy": "Sonnet for mechanical/well-specified tasks, Opus for architectural/cross-cutting judgment",
   "external_parallel_work": "Another worker actively churns the validation/ + commands/{mod,validate} hot zone on main. Waves are ordered so my code touches files disjoint from that hot zone first; t5/t6/t8/t10 (which collide) are deferred to Wave 5 and re-checked then. main is dirty intermittently; integrate only during clean windows; never run destructive git ops on main while external work is uncommitted.",
   "operational_notes": [
@@ -58,7 +58,7 @@
           "title": "Type the gate stage/mode cluster (GateStage/GateMode enums)",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "re-gating: cargo-ci green; code-review re-run after worktree refreshed onto merged main (validate now passes)"
+          "status": "DONE (both gates green, merged to main, worktree removed)"
         }
       ]
     },
@@ -72,7 +72,7 @@
           "title": "Typed error variants and downcast for error classification",
           "classification": "implementation",
           "model": "opus",
-          "status": "pending"
+          "status": "dispatched (worktree agent-b9a28509, base 3f4458cd, Opus worker t3-error-class)"
         }
       ]
     },
