@@ -140,9 +140,6 @@ impl From<crate::document::Section> for ProjectedSection {
     }
 }
 
-/// The label namespace conventionally carrying an issue's primary type.
-const TYPE_NAMESPACE: &str = "type";
-
 /// Group labels by namespace, preserving per-namespace order.
 ///
 /// Each label is parsed with [`parse_label`](crate::labels::parse_label) into
@@ -194,7 +191,7 @@ fn collect_doc_types(issue: &Issue) -> Vec<String> {
 pub fn project(issue: &Issue) -> Projection {
     let labels = group_labels(&issue.labels);
     let type_ = labels
-        .get(TYPE_NAMESPACE)
+        .get(crate::labels::TYPE_NAMESPACE)
         .and_then(|vs| vs.first().cloned());
 
     Projection {

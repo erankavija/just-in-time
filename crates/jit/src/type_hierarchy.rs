@@ -43,7 +43,7 @@
 //! assert!(!config.contains_type("unknown"));
 //! ```
 
-use crate::labels::is_type_label;
+use crate::labels::{is_type_label, TYPE_NAMESPACE};
 use std::collections::HashMap;
 use thiserror::Error;
 
@@ -246,7 +246,7 @@ impl HierarchyConfig {
 pub fn extract_type(label: &str) -> Result<String, HierarchyError> {
     let parts: Vec<&str> = label.split(':').collect();
 
-    if parts.len() != 2 || parts[0] != "type" {
+    if parts.len() != 2 || parts[0] != TYPE_NAMESPACE {
         return Err(HierarchyError::InvalidLabel(label.to_string()));
     }
 

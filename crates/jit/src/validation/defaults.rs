@@ -204,7 +204,7 @@ pub const TYPE_HIERARCHY_SCHEMA_FILE: &str = "default-type-hierarchy-known.json"
 pub fn type_hierarchy_known_schema(namespaces: &LabelNamespaces) -> serde_json::Value {
     let mut hierarchy_types: Vec<String> = namespaces.get_type_hierarchy().into_keys().collect();
     hierarchy_types.sort(); // deterministic schema enum order
-    namespace_values_schema("type", &hierarchy_types)
+    namespace_values_schema(crate::labels::TYPE_NAMESPACE, &hierarchy_types)
 }
 
 /// Build the repo's [`HierarchyConfig`] from its label-namespace registry.
