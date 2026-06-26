@@ -497,4 +497,80 @@ kind = "advisory"
         assert_eq!(cfg.mode(), ProjectionMode::SeparateFile);
         assert_eq!(cfg.target(), ".jit/invariants.md");
     }
+
+    /// REQ-06: with region markers in place and `mode=region, target=CLAUDE.md`,
+    /// projection replaces ONLY the marked region from the registry.
+    ///
+    /// Uses an isolated temp repo so the assertion is stable across registry changes.
+    #[test]
+    fn test_project_region_into_claude_md_scenario() {
+        let dir = tempfile::tempdir().unwrap();
+        let jit_root = dir.path().join(".jit");
+        std::fs::create_dir_all(&jit_root).unwrap();
+        let store = JsonFileStorage::new(&jit_root);
+
+        // Simulate CLAUDE.md: hand-authored content wrapping a jit-managed region.
+        let begin = "<!-- jit:invariants:begin -->";
+        let end = "<!-- jit:invariants:end -->";
+        let preamble = "# CLAUDE.md\n\n### Domain Invariants\n\n";
+        let postamble = "\n\n## Commit Conventions\n\nRun cargo fmt.\n";
+        let original = format!("{preamble}{begin}\nstale hand-authored prose\n{end}{postamble}");
+        std::fs::write(dir.path().join("CLAUDE.md"), &original).unwrap();
+
+        let cfg = InvariantProjectionConfig {
+            mode: Some(ProjectionMode::Region),
+            target: Some("CLAUDE.md".to_string()),
+            region_begin: Some(begin.to_string()),
+            region_end: Some(end.to_string()),
+        };
+        let written = project_invariants(&store, &cfg, &registry_with_two()).unwrap();
+        assert_eq!(written, "CLAUDE.md");
+
+        let updated = std::fs::read_to_string(dir.path().join("CLAUDE.md")).unwrap();
+        // Bytes OUTSIDE the region are byte-identical (REQ-01).
+        assert!(updated.starts_with(&format!("{preamble}{begin}")));
+        assert!(updated.ends_with(&format!("{end}{postamble}")));
+        // Stale hand-authored prose was replaced.
+        assert!(!updated.contains("stale hand-authored prose"));
+        // Registry content is present in the region.
+        assert!(updated.contains("INV-01"));
+        assert!(updated.contains("INV-02"));
+        // Markers themselves survive.
+        assert!(updated.contains(begin));
+        assert!(updated.contains(end));
+    }
+
+    /// REQ-06: malformed/missing markers raise a typed `ProjectionError` WITHOUT
+    /// clobbering the file (the file must remain byte-identical after the error).
+    #[test]
+    fn test_project_region_malformed_markers_do_not_clobber_claude_md() {
+        let dir = tempfile::tempdir().unwrap();
+        let jit_root = dir.path().join(".jit");
+        std::fs::create_dir_all(&jit_root).unwrap();
+        let store = JsonFileStorage::new(&jit_root);
+
+        let original = "# CLAUDE.md\n\nNo markers here.\n\n## Commit Conventions\n";
+        std::fs::write(dir.path().join("CLAUDE.md"), original).unwrap();
+
+        let cfg = InvariantProjectionConfig {
+            mode: Some(ProjectionMode::Region),
+            target: Some("CLAUDE.md".to_string()),
+            region_begin: Some("<!-- jit:invariants:begin -->".to_string()),
+            region_end: Some("<!-- jit:invariants:end -->".to_string()),
+        };
+
+        // Missing begin marker is a typed error.
+        let err = project_invariants(&store, &cfg, &registry_with_two()).unwrap_err();
+        assert!(
+            matches!(err, ProjectionError::MissingBeginMarker { .. }),
+            "expected MissingBeginMarker, got {err:?}"
+        );
+
+        // File is byte-identical — no clobber.
+        let after = std::fs::read_to_string(dir.path().join("CLAUDE.md")).unwrap();
+        assert_eq!(
+            after, original,
+            "file must not be modified when markers are missing"
+        );
+    }
 }

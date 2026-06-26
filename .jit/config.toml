@@ -93,3 +93,11 @@ examples = ["brackets:2fbd2a82"]
 description = "Coverage credit: on an impl child, names a container [hard] criterion id it satisfies (read by the label-coverage gate)"
 unique = false
 examples = ["satisfies:REQ-01"]
+
+[invariant_projection]
+# Region mode: replace only the delimited region inside CLAUDE.md (REQ-06).
+# The markers <!-- jit:invariants:begin --> and <!-- jit:invariants:end --> wrap
+# the "### Domain Invariants" section; `jit invariant render` keeps everything
+# outside those markers byte-exact and writes atomically through storage.
+mode = "region"
+target = "CLAUDE.md"

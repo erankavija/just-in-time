@@ -122,12 +122,17 @@ New code should respect these boundaries. Prefer adding a domain function over e
 
 ### Domain Invariants
 
-- **DAG invariant** — Cycle detection before every dependency operation.
-- **Gate semantics** — Issues cannot transition to `Ready` or `Done` with pending/failed gates.
-- **Event logging** — All state changes must be logged to `events.jsonl`.
-- **Atomic file writes** — Always temp file + rename pattern to prevent corruption.
-- **Assignee format** — `{type}:{identifier}` (e.g., `agent:worker-1`, `human:alice`).
-- **Labels format** — `namespace:value` (e.g., `type:epic`, `priority:high`).
+<!-- jit:invariants:begin -->
+## Project invariants
+
+- **INV-LABEL-FORMAT** [enforced] (enforced-by: `default:label-format`): Every label is namespace:value (namespace lowercase-kebab, value non-empty).
+- **INV-NAMESPACE-REGISTRY** [enforced] (enforced-by: `default:namespace-registry`): Every label namespace is declared in the namespace registry.
+- **INV-DAG-ACYCLIC** [enforced] (enforced-by: `cargo-ci`): Cycle detection runs before every dependency operation; the graph stays acyclic.
+- **INV-GATE-SEMANTICS** [enforced] (enforced-by: `cargo-ci`): An issue cannot reach Ready or Done with pending or failed gates.
+- **INV-EVENT-LOG** [advisory]: Every state change appends an event to events.jsonl.
+- **INV-ATOMIC-WRITES** [advisory]: All file writes use the temp-file + atomic-rename pattern.
+- **INV-ASSIGNEE-FORMAT** [advisory]: Every assignee is {type}:{identifier} (e.g. agent:worker-1, human:alice).
+<!-- jit:invariants:end -->
 
 ## Commit Conventions
 
