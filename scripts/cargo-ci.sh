@@ -22,6 +22,26 @@ set -euo pipefail
 #   1 — one or more steps failed
 #   2 — environment problem: no real cargo available on PATH
 
+# Host-wide build serialization. Only one cargo-ci run executes the heavy
+# build/test steps at a time across the whole host. Concurrent gate runs (e.g.
+# several agent sessions each calling `jit gate pass ... cargo-ci`) otherwise
+# oversubscribe the CPU — every `cargo build` fans out to all cores, so K runs
+# demand K×nproc — and multiply peak RAM into swap, making the host and any
+# interactive shell laggy. Serializing also protects the load-sensitive
+# concurrency proptest (prop_concurrent_different_issues_succeed) from starving
+# its file-lock timeout under saturation. We re-exec the script under a blocking
+# flock so concurrent runs queue rather than fail; the lock is held for the
+# whole run and released when the process exits. CARGO_CI_LOCKED guards against
+# infinite re-exec; CARGO_CI_NO_LOCK=1 disables (e.g. an isolated CI container
+# that already owns the machine); CARGO_CI_BUILD_LOCK overrides the lock path.
+if [ -z "${CARGO_CI_NO_LOCK:-}" ] && [ -z "${CARGO_CI_LOCKED:-}" ]; then
+  BUILD_LOCK="${CARGO_CI_BUILD_LOCK:-${XDG_RUNTIME_DIR:-/tmp}/jit-cargo-ci.lock}"
+  if command -v flock >/dev/null 2>&1; then
+    exec env CARGO_CI_LOCKED=1 flock "$BUILD_LOCK" "$0" "$@"
+  fi
+  echo "cargo-ci: flock not found; running without host-wide build lock" >&2
+fi
+
 # Resolve the real cargo binary. Some local setups place a debugging shim at
 # ~/.cargo/bin/cargo that exits 0 for every invocation; without this guard each
 # cargo step below would silently succeed, recording a false-positive gate PASS.
@@ -133,11 +153,24 @@ run_step() {
   fi
 }
 
+# Deprioritize the build/test work so an interactive shell preempts it under
+# contention — this is what keeps the host responsive while the gate runs, not
+# just the serialization above. nice -n 19 = lowest CPU priority; ionice -c2 -n7
+# = best-effort lowest I/O priority (NOT the idle class -c3, which can be starved
+# indefinitely and would risk the timing-sensitive file-lock proptests). Both
+# are best-effort: a missing binary degrades gracefully to running normally.
+# CARGO_CI_NO_NICE=1 disables; CARGO_CI_NICE overrides the niceness.
+NICE_PREFIX=()
+if [ -z "${CARGO_CI_NO_NICE:-}" ]; then
+  command -v nice   >/dev/null 2>&1 && NICE_PREFIX+=(nice -n "${CARGO_CI_NICE:-19}")
+  command -v ionice >/dev/null 2>&1 && NICE_PREFIX+=(ionice -c2 -n7)
+fi
+
 # Run all steps (continue through failures so every problem is reported, unlike
 # a short-circuiting `&&` chain). Same checks the inline gate ran.
-run_step fmt    cargo fmt --all -- --check
-run_step clippy cargo clippy --workspace --all-targets -- -D warnings
-run_step test   cargo test --workspace
+run_step fmt    "${NICE_PREFIX[@]}" cargo fmt --all -- --check
+run_step clippy "${NICE_PREFIX[@]}" cargo clippy --workspace --all-targets -- -D warnings
+run_step test   "${NICE_PREFIX[@]}" cargo test --workspace
 
 echo "$summary"
 
