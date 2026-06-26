@@ -146,6 +146,50 @@ impl InvalidArgumentError {
     }
 }
 
+/// A lease-not-found failure, carrying the fully-rendered [`ActionableError`]
+/// message (causes + remediation) as plain text.
+///
+/// The lease lookups previously stringified an [`ActionableError`] into an
+/// `anyhow!("{}", ...)`, which the CLI could only classify by scanning for
+/// "not found". This typed wrapper preserves that rich message verbatim through
+/// `Display` while letting the CLI downcast to classify the failure as a
+/// not-found condition (exit code `3`).
+///
+/// # Examples
+///
+/// ```
+/// use jit::errors::{no_active_lease, LeaseNotFoundError};
+///
+/// let err = LeaseNotFoundError::new(&no_active_lease("abc12345"));
+/// // The rich remediation text is preserved verbatim.
+/// assert!(err.to_string().contains("abc12345"));
+/// assert!(err.to_string().contains("not found"));
+///
+/// // Downcastable through anyhow for exit-code classification.
+/// let any: anyhow::Error = err.into();
+/// assert!(any.downcast_ref::<LeaseNotFoundError>().is_some());
+/// ```
+#[derive(Debug, Clone, thiserror::Error)]
+#[error("{message}")]
+pub struct LeaseNotFoundError {
+    message: String,
+}
+
+impl LeaseNotFoundError {
+    /// Build a [`LeaseNotFoundError`] capturing the full rendered message of an
+    /// [`ActionableError`] (e.g. from [`no_active_lease`] or [`lease_not_found`]).
+    pub fn new(error: &ActionableError) -> Self {
+        Self {
+            message: error.to_string(),
+        }
+    }
+
+    /// The fully-rendered, user-facing lease-not-found message.
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+}
+
 /// A state-transition failure with structured blocker details.
 ///
 /// Command logic uses this error to report why an issue cannot move to the

@@ -89,13 +89,26 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
         };
     }
 
-    // A missing issue (from either storage backend) is a typed not-found
-    // condition; likewise a gate key absent from the registry.
+    // A missing storage-backed resource is a typed not-found condition (exit 3):
+    // an issue or gate key (either backend), a gate-run record, a gate preset, the
+    // repository itself, or a lease. Classified by downcast, not message text.
     if error
         .downcast_ref::<jit::storage::IssueNotFoundError>()
         .is_some()
         || error
             .downcast_ref::<jit::storage::GateNotFoundError>()
+            .is_some()
+        || error
+            .downcast_ref::<jit::storage::GateRunNotFoundError>()
+            .is_some()
+        || error
+            .downcast_ref::<jit::storage::PresetNotFoundError>()
+            .is_some()
+        || error
+            .downcast_ref::<jit::storage::RepositoryNotFoundError>()
+            .is_some()
+        || error
+            .downcast_ref::<jit::errors::LeaseNotFoundError>()
             .is_some()
     {
         return ExitCode::NotFound;
@@ -122,6 +135,20 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
             .is_some()
     {
         return ExitCode::InvalidArgument;
+    }
+
+    // Path-based storage errors are typed via PathReadError; classify by variant.
+    // A wrapped (`Other`) cause is re-classified by recursing on its inner error,
+    // so an io::Error or an InvalidArgumentError nested in PathReadError still
+    // reaches the right code.
+    if let Some(path_error) = error.downcast_ref::<jit::storage::PathReadError>() {
+        return match path_error {
+            jit::storage::PathReadError::NotFound(_)
+            | jit::storage::PathReadError::CommitNotFound(_) => ExitCode::NotFound,
+            jit::storage::PathReadError::InvalidPath(_) => ExitCode::InvalidArgument,
+            jit::storage::PathReadError::OutsideRepoRoot(_) => ExitCode::GenericError,
+            jit::storage::PathReadError::Other(inner) => error_to_exit_code(inner),
+        };
     }
 
     let error_msg = error.to_string().to_lowercase();
@@ -3155,11 +3182,9 @@ fn run() -> Result<()> {
                         println!("{}", output.to_json_string()?);
                     } else {
                         // Get repository root to check if assets exist
-                        let repo_root = executor
-                            .storage()
-                            .root()
-                            .parent()
-                            .ok_or_else(|| anyhow::anyhow!("Invalid storage path"))?;
+                        let repo_root = executor.storage().root().parent().ok_or_else(|| {
+                            jit::errors::InvalidArgumentError::new("Invalid storage path")
+                        })?;
 
                         output_ctx.print_data(format!(
                             "Assets for document {} (issue {}):",

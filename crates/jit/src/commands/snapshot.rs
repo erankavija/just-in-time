@@ -168,7 +168,7 @@ impl<S: IssueStore> SnapshotExporter<S> {
             .storage
             .root()
             .parent()
-            .ok_or_else(|| anyhow!("Invalid storage path"))?;
+            .ok_or_else(|| crate::errors::InvalidArgumentError::new("Invalid storage path"))?;
 
         let full_path = repo_root.join(path);
         let content =
@@ -210,7 +210,7 @@ impl<S: IssueStore> SnapshotExporter<S> {
             .storage
             .root()
             .parent()
-            .ok_or_else(|| anyhow!("Invalid storage path"))?;
+            .ok_or_else(|| crate::errors::InvalidArgumentError::new("Invalid storage path"))?;
 
         // Create new adapter registry for scanning
         let registry = AdapterRegistry::with_builtins();
@@ -329,7 +329,7 @@ impl<S: IssueStore> SnapshotExporter<S> {
             .storage
             .root()
             .parent()
-            .ok_or_else(|| anyhow!("Invalid storage path"))?;
+            .ok_or_else(|| crate::errors::InvalidArgumentError::new("Invalid storage path"))?;
 
         let path = repo_root
             .canonicalize()
@@ -661,7 +661,7 @@ This is a read-only export. Future versions may support:
             let path = entry.path();
             let name = path
                 .file_name()
-                .ok_or_else(|| anyhow!("Invalid file name"))?;
+                .ok_or_else(|| crate::errors::InvalidArgumentError::new("Invalid file name"))?;
 
             let archive_path = format!("{}/{}", base_name, name.to_string_lossy());
 

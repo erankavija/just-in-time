@@ -310,8 +310,12 @@ pub fn get_hierarchy_config<S: crate::storage::IssueStore>(
         let label_associations = namespaces.label_associations.unwrap_or_default();
 
         // Convert to HierarchyConfig
-        crate::type_hierarchy::HierarchyConfig::new(type_hierarchy, label_associations)
-            .map_err(|e| anyhow::anyhow!("Invalid hierarchy config: {}", e))
+        crate::type_hierarchy::HierarchyConfig::new(type_hierarchy, label_associations).map_err(
+            |e| {
+                crate::errors::InvalidArgumentError::new(format!("Invalid hierarchy config: {e}"))
+                    .into()
+            },
+        )
     } else {
         // Return default config
         Ok(crate::type_hierarchy::HierarchyConfig::default())

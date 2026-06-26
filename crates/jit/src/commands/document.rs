@@ -15,7 +15,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     ) -> Result<(DocumentAddResult, Vec<String>)> {
         use crate::document::{AdapterRegistry, AssetScanner};
         use crate::domain::DocumentReference;
-        use anyhow::anyhow;
         use std::path::Path;
 
         let mut warnings = Vec::new();
@@ -28,7 +27,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .storage
             .root()
             .parent()
-            .ok_or_else(|| anyhow!("Invalid storage path"))?;
+            .ok_or_else(|| crate::errors::InvalidArgumentError::new("Invalid storage path"))?;
 
         // Detect format and scan assets unless --skip-scan
         let (format, assets) = if skip_scan {
@@ -423,11 +422,11 @@ impl<S: IssueStore> CommandExecutor<S> {
             })?;
 
         // Get repository root (parent of .jit directory)
-        let repo_root = self
-            .storage
-            .root()
-            .parent()
-            .ok_or_else(|| PathReadError::Other(anyhow!("Invalid storage path")))?;
+        let repo_root = self.storage.root().parent().ok_or_else(|| {
+            PathReadError::Other(
+                crate::errors::InvalidArgumentError::new("Invalid storage path").into(),
+            )
+        })?;
 
         // Try to get history from git, return empty list if not available
         if let Ok(repo) = Repository::open(repo_root) {
@@ -474,11 +473,11 @@ impl<S: IssueStore> CommandExecutor<S> {
             })?;
 
         // Get repository root (parent of .jit directory)
-        let repo_root = self
-            .storage
-            .root()
-            .parent()
-            .ok_or_else(|| PathReadError::Other(anyhow!("Invalid storage path")))?;
+        let repo_root = self.storage.root().parent().ok_or_else(|| {
+            PathReadError::Other(
+                crate::errors::InvalidArgumentError::new("Invalid storage path").into(),
+            )
+        })?;
 
         // Try to get diff from git, return error message if not available
         if let Ok(repo) = Repository::open(repo_root) {
@@ -663,7 +662,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .storage
             .root()
             .parent()
-            .ok_or_else(|| anyhow!("Invalid storage path"))?;
+            .ok_or_else(|| crate::errors::InvalidArgumentError::new("Invalid storage path"))?;
 
         // Rescan if requested
         let assets = if rescan {
@@ -760,7 +759,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .storage
             .root()
             .parent()
-            .ok_or_else(|| anyhow!("Invalid storage path"))?;
+            .ok_or_else(|| crate::errors::InvalidArgumentError::new("Invalid storage path"))?;
 
         // Parse scope and get documents to check
         let issues = if scope == "all" {
@@ -1094,7 +1093,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .storage
             .root()
             .parent()
-            .ok_or_else(|| anyhow!("Invalid storage path"))?;
+            .ok_or_else(|| crate::errors::InvalidArgumentError::new("Invalid storage path"))?;
 
         let doc_path = Path::new(path);
 

@@ -79,37 +79,130 @@ impl IssueNotFoundError {
 
 /// Error raised when one or more gate keys are absent from the gate registry.
 ///
-/// Returned when `jit gate add` (and other registry-membership checks) targets a
-/// gate key that has not been defined. The CLI downcasts to this type to classify
-/// the failure as a not-found condition and to render a `GATE_NOT_FOUND` JSON
-/// error, rather than scanning the message text.
+/// Returned by the gate-registry membership checks (`jit gate add`, gate-check,
+/// template expansion). The CLI downcasts to this type to classify the failure as
+/// a not-found condition (exit code `3`) and to render a `GATE_NOT_FOUND` JSON
+/// error, rather than scanning the message text. The two variants preserve the
+/// two distinct phrasings the callers already produced.
 ///
 /// # Examples
 ///
 /// ```
 /// use jit::storage::GateNotFoundError;
 ///
-/// let err = GateNotFoundError::new(["lint", "tests"]);
-/// assert_eq!(err.to_string(), "Gates not found in registry: lint, tests");
-/// assert_eq!(err.keys().len(), 2);
+/// let batch = GateNotFoundError::new(["lint", "tests"]);
+/// assert_eq!(batch.to_string(), "Gates not found in registry: lint, tests");
+///
+/// let single = GateNotFoundError::single("lint");
+/// assert_eq!(single.to_string(), "Gate 'lint' not found in registry");
 /// ```
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
-#[error("Gates not found in registry: {}", .keys.join(", "))]
-pub struct GateNotFoundError {
-    keys: Vec<String>,
+pub enum GateNotFoundError {
+    /// One or more gate keys were missing (the batch `gate add` check).
+    #[error("Gates not found in registry: {}", .0.join(", "))]
+    Batch(Vec<String>),
+    /// A single gate-key lookup missed (gate-check / template expansion).
+    #[error("Gate '{0}' not found in registry")]
+    Single(String),
 }
 
 impl GateNotFoundError {
-    /// Build a [`GateNotFoundError`] from the missing gate keys.
+    /// Build a [`GateNotFoundError::Batch`] from the missing gate keys.
     pub fn new(keys: impl IntoIterator<Item = impl Into<String>>) -> Self {
-        Self {
-            keys: keys.into_iter().map(Into::into).collect(),
-        }
+        Self::Batch(keys.into_iter().map(Into::into).collect())
     }
 
-    /// The gate keys that were not found in the registry.
-    pub fn keys(&self) -> &[String] {
-        &self.keys
+    /// Build a [`GateNotFoundError::Single`] for one missing gate key.
+    pub fn single(key: impl Into<String>) -> Self {
+        Self::Single(key.into())
+    }
+}
+
+/// Error raised when a gate-run record cannot be found by its run id.
+///
+/// The CLI downcasts to this type to classify the failure as a not-found
+/// condition (exit code `3`). `Display` reproduces the previous `anyhow!`
+/// phrasing verbatim.
+///
+/// # Examples
+///
+/// ```
+/// use jit::storage::GateRunNotFoundError;
+///
+/// let err = GateRunNotFoundError::new("run-123");
+/// assert_eq!(err.to_string(), "Gate run 'run-123' not found");
+/// ```
+#[derive(Debug, Error, PartialEq, Eq, Clone)]
+#[error("Gate run '{run_id}' not found")]
+pub struct GateRunNotFoundError {
+    run_id: String,
+}
+
+impl GateRunNotFoundError {
+    /// Build a [`GateRunNotFoundError`] for the given run id.
+    pub fn new(run_id: impl Into<String>) -> Self {
+        Self {
+            run_id: run_id.into(),
+        }
+    }
+}
+
+/// Error raised when a gate preset cannot be found by name.
+///
+/// The CLI downcasts to this type to classify the failure as a not-found
+/// condition (exit code `3`). `Display` reproduces the previous `anyhow!`
+/// phrasing verbatim.
+///
+/// # Examples
+///
+/// ```
+/// use jit::storage::PresetNotFoundError;
+///
+/// let err = PresetNotFoundError::new("rust-ci");
+/// assert_eq!(err.to_string(), "Preset not found: rust-ci");
+/// ```
+#[derive(Debug, Error, PartialEq, Eq, Clone)]
+#[error("Preset not found: {name}")]
+pub struct PresetNotFoundError {
+    name: String,
+}
+
+impl PresetNotFoundError {
+    /// Build a [`PresetNotFoundError`] for the given preset name.
+    pub fn new(name: impl Into<String>) -> Self {
+        Self { name: name.into() }
+    }
+}
+
+/// Error raised when no `.jit` repository exists at the resolved data directory.
+///
+/// The CLI downcasts to this type to classify the failure as a not-found
+/// condition (exit code `3`). `Display` reproduces the previous `anyhow!`
+/// phrasing verbatim, including the multi-line initialization guidance.
+///
+/// # Examples
+///
+/// ```
+/// use jit::storage::RepositoryNotFoundError;
+///
+/// let err = RepositoryNotFoundError::new("/tmp/x/.jit");
+/// assert!(err.to_string().starts_with("JIT repository not found at '/tmp/x/.jit'"));
+/// assert!(err.to_string().contains("jit init"));
+/// ```
+#[derive(Debug, Error, PartialEq, Eq, Clone)]
+#[error(
+    "JIT repository not found at '{path}'\n\n\
+     Initialize a repository with: jit init\n\
+     Or set JIT_DATA_DIR environment variable to point to an existing repository."
+)]
+pub struct RepositoryNotFoundError {
+    path: String,
+}
+
+impl RepositoryNotFoundError {
+    /// Build a [`RepositoryNotFoundError`] for the given (missing) data-dir path.
+    pub fn new(path: impl Into<String>) -> Self {
+        Self { path: path.into() }
     }
 }
 
@@ -177,16 +270,45 @@ mod tests {
     }
 
     #[test]
-    fn test_gate_not_found_message_and_keys() {
-        let err = GateNotFoundError::new(["lint", "tests"]);
-        assert_eq!(err.to_string(), "Gates not found in registry: lint, tests");
-        assert_eq!(err.keys(), &["lint".to_string(), "tests".to_string()]);
+    fn test_gate_not_found_batch_and_single_messages() {
+        let batch = GateNotFoundError::new(["lint", "tests"]);
+        assert_eq!(
+            batch.to_string(),
+            "Gates not found in registry: lint, tests"
+        );
+        let single = GateNotFoundError::single("lint");
+        assert_eq!(single.to_string(), "Gate 'lint' not found in registry");
     }
 
     #[test]
     fn test_gate_not_found_downcasts_from_anyhow() {
-        let err: anyhow::Error = GateNotFoundError::new(["lint"]).into();
+        let err: anyhow::Error = GateNotFoundError::single("lint").into();
         assert!(err.downcast_ref::<GateNotFoundError>().is_some());
+    }
+
+    #[test]
+    fn test_gate_run_preset_repository_not_found_messages() {
+        assert_eq!(
+            GateRunNotFoundError::new("run-123").to_string(),
+            "Gate run 'run-123' not found"
+        );
+        assert_eq!(
+            PresetNotFoundError::new("rust-ci").to_string(),
+            "Preset not found: rust-ci"
+        );
+        let repo = RepositoryNotFoundError::new("/tmp/x/.jit");
+        assert!(repo.to_string().starts_with("JIT repository not found at"));
+        assert!(repo.to_string().contains("jit init"));
+    }
+
+    #[test]
+    fn test_new_not_found_errors_downcast_from_anyhow() {
+        let run: anyhow::Error = GateRunNotFoundError::new("r").into();
+        assert!(run.downcast_ref::<GateRunNotFoundError>().is_some());
+        let preset: anyhow::Error = PresetNotFoundError::new("p").into();
+        assert!(preset.downcast_ref::<PresetNotFoundError>().is_some());
+        let repo: anyhow::Error = RepositoryNotFoundError::new("d").into();
+        assert!(repo.downcast_ref::<RepositoryNotFoundError>().is_some());
     }
 
     #[test]

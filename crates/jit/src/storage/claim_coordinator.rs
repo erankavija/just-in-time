@@ -753,7 +753,9 @@ impl ClaimCoordinator {
             .leases
             .iter()
             .find(|l| l.lease_id == lease_id)
-            .ok_or_else(|| anyhow::anyhow!("{}", errors::lease_not_found(lease_id)))?;
+            .ok_or_else(|| {
+                crate::errors::LeaseNotFoundError::new(&errors::lease_not_found(lease_id))
+            })?;
 
         // 4. Verify ownership
         if lease.agent_id != self.agent_id {
@@ -821,7 +823,9 @@ impl ClaimCoordinator {
             .leases
             .iter()
             .find(|l| l.lease_id == lease_id)
-            .ok_or_else(|| anyhow::anyhow!("{}", errors::lease_not_found(lease_id)))?;
+            .ok_or_else(|| {
+                crate::errors::LeaseNotFoundError::new(&errors::lease_not_found(lease_id))
+            })?;
 
         // 4. Verify ownership
         if lease.agent_id != self.agent_id {
@@ -871,7 +875,9 @@ impl ClaimCoordinator {
 
         // 3. Verify lease exists
         if !index.leases.iter().any(|l| l.lease_id == lease_id) {
-            bail!("{}", errors::lease_not_found(lease_id));
+            return Err(
+                crate::errors::LeaseNotFoundError::new(&errors::lease_not_found(lease_id)).into(),
+            );
         }
 
         // 4. Log eviction

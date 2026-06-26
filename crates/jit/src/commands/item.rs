@@ -44,8 +44,12 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// when none is declared.
     pub(crate) fn item_kinds(&self) -> Result<Vec<ItemKind>> {
         let config = self.cached_config()?;
-        resolve_item_kinds(config.item_kinds.as_ref())
-            .map_err(|err| anyhow!("invalid [item_kinds] configuration: {err}"))
+        resolve_item_kinds(config.item_kinds.as_ref()).map_err(|err| {
+            crate::errors::InvalidArgumentError::new(format!(
+                "invalid [item_kinds] configuration: {err}"
+            ))
+            .into()
+        })
     }
 
     /// The issue-scope subset of the configured kinds.

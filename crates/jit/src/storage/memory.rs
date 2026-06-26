@@ -4,7 +4,9 @@
 //! test execution compared to JSON file I/O. Thread-safe for concurrent access.
 
 use crate::domain::{Event, Issue};
-use crate::storage::{GateRegistry, IssueNotFoundError, IssueStore};
+use crate::storage::{
+    GateRegistry, GateRunNotFoundError, IssueNotFoundError, IssueStore, PresetNotFoundError,
+};
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -228,7 +230,7 @@ impl IssueStore for InMemoryStorage {
             .unwrap()
             .get(run_id)
             .cloned()
-            .ok_or_else(|| anyhow!("Gate run '{}' not found", run_id))
+            .ok_or_else(|| GateRunNotFoundError::new(run_id).into())
     }
 
     fn list_gate_runs_for_issue(
@@ -266,7 +268,7 @@ impl IssueStore for InMemoryStorage {
         presets
             .get(name)
             .cloned()
-            .ok_or_else(|| anyhow!("Preset not found: {}", name))
+            .ok_or_else(|| PresetNotFoundError::new(name).into())
     }
 
     fn save_gate_preset(
