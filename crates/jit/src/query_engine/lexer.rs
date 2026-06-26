@@ -2,13 +2,60 @@
 //!
 //! Converts raw query strings into tokens for parsing.
 
-use anyhow::{anyhow, Result};
+use super::error::QueryParseError;
+use std::str::FromStr;
+
+type Result<T> = std::result::Result<T, QueryParseError>;
+
+/// The recognized field name on the left of a `field:value` filter.
+///
+/// The lexer parses the field portion into this closed set (via [`FromStr`]) so
+/// an unknown field is rejected at tokenization, and the parser's match over
+/// fields is exhaustive with no string fallback. `value` semantics differ per
+/// field and are resolved later: `State`/`Priority` parse into typed domain
+/// values, while `Label`/`Assignee` carry open free-form strings.
+///
+/// # Examples
+///
+/// ```
+/// use jit::query_engine::FilterField;
+/// use std::str::FromStr;
+///
+/// assert_eq!(FilterField::from_str("state").unwrap(), FilterField::State);
+/// assert_eq!(FilterField::from_str("assignee").unwrap(), FilterField::Assignee);
+/// assert!(FilterField::from_str("colour").is_err());
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FilterField {
+    /// `state:` — filter by lifecycle state (closed, typed value).
+    State,
+    /// `label:` — filter by label (open value, supports wildcards).
+    Label,
+    /// `priority:` — filter by priority (closed, typed value).
+    Priority,
+    /// `assignee:` — filter by assignee (open value).
+    Assignee,
+}
+
+impl FromStr for FilterField {
+    type Err = QueryParseError;
+
+    fn from_str(s: &str) -> Result<Self> {
+        match s {
+            "state" => Ok(FilterField::State),
+            "label" => Ok(FilterField::Label),
+            "priority" => Ok(FilterField::Priority),
+            "assignee" => Ok(FilterField::Assignee),
+            other => Err(QueryParseError::UnknownField(other.to_string())),
+        }
+    }
+}
 
 /// Token types in the query language
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Token {
     /// Filter condition: field:value (e.g., "state:ready", "label:epic:auth")
-    Filter { field: String, value: String },
+    Filter { field: FilterField, value: String },
     /// Boolean AND operator
     And,
     /// Boolean OR operator
@@ -87,27 +134,22 @@ impl<'a> Lexer<'a> {
     }
 
     fn parse_filter(&self, word: &str) -> Result<Option<Token>> {
-        if !word.contains(':') {
-            return Err(anyhow!(
-                "Invalid filter '{}': expected format 'field:value'",
-                word
-            ));
-        }
-
         // Split on first colon only (values can contain colons, like label:epic:auth)
-        let colon_pos = word.find(':').unwrap();
+        let Some(colon_pos) = word.find(':') else {
+            return Err(QueryParseError::MissingColon(word.to_string()));
+        };
         let field = &word[..colon_pos];
         let value = &word[colon_pos + 1..];
 
         if field.is_empty() {
-            return Err(anyhow!("Filter field cannot be empty: '{}'", word));
+            return Err(QueryParseError::EmptyField(word.to_string()));
         }
         if value.is_empty() {
-            return Err(anyhow!("Filter value cannot be empty: '{}'", word));
+            return Err(QueryParseError::EmptyValue(word.to_string()));
         }
 
         Ok(Some(Token::Filter {
-            field: field.to_string(),
+            field: field.parse()?,
             value: value.to_string(),
         }))
     }
@@ -124,10 +166,7 @@ impl<'a> Lexer<'a> {
         }
 
         if start == self.position {
-            return Err(anyhow!(
-                "Unexpected character at position {}",
-                self.position
-            ));
+            return Err(QueryParseError::UnexpectedChar(self.position));
         }
 
         Ok(self.input[start..self.position].to_string())
@@ -157,13 +196,33 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_filter_field_from_str_valid() {
+        assert_eq!(FilterField::from_str("state").unwrap(), FilterField::State);
+        assert_eq!(FilterField::from_str("label").unwrap(), FilterField::Label);
+        assert_eq!(
+            FilterField::from_str("priority").unwrap(),
+            FilterField::Priority
+        );
+        assert_eq!(
+            FilterField::from_str("assignee").unwrap(),
+            FilterField::Assignee
+        );
+    }
+
+    #[test]
+    fn test_filter_field_from_str_invalid() {
+        let err = FilterField::from_str("colour").unwrap_err();
+        assert_eq!(err, QueryParseError::UnknownField("colour".to_string()));
+    }
+
+    #[test]
     fn test_tokenize_simple_filter() {
         let tokens = Lexer::tokenize("state:ready").unwrap();
         assert_eq!(tokens.len(), 1);
         assert_eq!(
             tokens[0],
             Token::Filter {
-                field: "state".to_string(),
+                field: FilterField::State,
                 value: "ready".to_string()
             }
         );
@@ -176,9 +235,18 @@ mod tests {
         assert_eq!(
             tokens[0],
             Token::Filter {
-                field: "label".to_string(),
+                field: FilterField::Label,
                 value: "epic:auth".to_string()
             }
+        );
+    }
+
+    #[test]
+    fn test_tokenize_unknown_field_errors() {
+        let result = Lexer::tokenize("colour:blue");
+        assert_eq!(
+            result.unwrap_err(),
+            QueryParseError::UnknownField("colour".to_string())
         );
     }
 
@@ -189,7 +257,7 @@ mod tests {
         assert_eq!(
             tokens[0],
             Token::Filter {
-                field: "state".to_string(),
+                field: FilterField::State,
                 value: "ready".to_string()
             }
         );
@@ -197,7 +265,7 @@ mod tests {
         assert_eq!(
             tokens[2],
             Token::Filter {
-                field: "priority".to_string(),
+                field: FilterField::Priority,
                 value: "high".to_string()
             }
         );

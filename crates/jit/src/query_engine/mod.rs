@@ -25,18 +25,21 @@
 //! # }
 //! ```
 
+mod error;
 mod evaluator;
 mod lexer;
 mod parser;
 
+pub use error::QueryParseError;
 pub use evaluator::{QueryContext, QueryEvaluator};
-pub use lexer::{Lexer, Token};
+pub use lexer::{FilterField, Lexer, Token};
 pub use parser::{Parser, QueryCondition, QueryExpr};
 
 use crate::domain::Issue;
 use anyhow::Result;
 
 /// A compiled query filter ready for evaluation
+#[derive(Debug)]
 pub struct QueryFilter {
     expr: QueryExpr,
 }
@@ -116,6 +119,24 @@ mod tests {
     fn test_parse_complex_query() {
         let result = QueryFilter::parse("(state:ready OR state:done) AND priority:high");
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_parse_invalid_state_value_is_error_not_silent_no_match() {
+        // Regression for the `state:notastate` fail-open bug: an invalid state
+        // value must surface as a parse error instead of silently matching no
+        // issue. The error must name the offending value.
+        let err = QueryFilter::parse("state:notastate").unwrap_err();
+        assert!(
+            err.to_string().contains("notastate"),
+            "error should name the invalid value, got: {err}"
+        );
+    }
+
+    #[test]
+    fn test_parse_invalid_priority_value_is_error() {
+        let err = QueryFilter::parse("priority:nope").unwrap_err();
+        assert!(err.to_string().contains("nope"), "got: {err}");
     }
 
     #[test]

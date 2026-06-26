@@ -100,7 +100,7 @@
           "title": "Type query-engine conditions, filter fields, and state predicate",
           "classification": "implementation",
           "model": "opus",
-          "status": "dispatched 5a (worktree agent-44450437 base b673231e; opus t8-query-engine)"
+          "status": "DONE (both gates green first try on integrated worktree; merged clean; validate exit 0). Touched query_engine/* + validation/{rules,graph}.rs + commands/validate.rs + domain/types.rs(Ord on State). Integrated main(t10) before gating; auto-merged."
         },
         {
           "id": "e3e6d47d-4262-4451-a343-9b6c07a3a3c0",

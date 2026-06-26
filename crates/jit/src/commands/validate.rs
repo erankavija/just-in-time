@@ -871,7 +871,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     let not_authored_yet = matches!(
                         &e,
                         PlanDocError::Read { source, .. } if source.kind() == ErrorKind::NotFound
-                    ) && !planning.is_some_and(|p| p.state == State::Done);
+                    ) && planning.is_none_or(|p| p.state != State::Done);
                     if not_authored_yet {
                         continue;
                     }
@@ -2050,7 +2050,7 @@ mod tests {
         use crate::validation::rules::{Selector, StatePredicate};
         let sel = Selector {
             type_: Some("epic".to_string()),
-            state: Some(StatePredicate::Single("in_progress".to_string())),
+            state: Some(StatePredicate::single("in_progress")),
             ..Default::default()
         };
         assert_eq!(render_selector(&sel), "type=epic, state=in_progress");
@@ -2060,10 +2060,7 @@ mod tests {
     fn test_render_selector_state_list_joins_with_pipe() {
         use crate::validation::rules::{Selector, StatePredicate};
         let sel = Selector {
-            state: Some(StatePredicate::List(vec![
-                "ready".to_string(),
-                "in_progress".to_string(),
-            ])),
+            state: Some(StatePredicate::list(["ready", "in_progress"])),
             ..Default::default()
         };
         assert_eq!(render_selector(&sel), "state=ready|in_progress");

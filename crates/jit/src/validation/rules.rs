@@ -18,13 +18,14 @@
 //! evaluation are filled in by downstream tasks; assertion payloads are parsed
 //! and stored here without being evaluated.
 
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::config::JitConfig;
-use crate::domain::Issue;
+use crate::domain::{Issue, State};
 use crate::labels as label_utils;
 
 /// Errors that can occur while loading and parsing `.jit/rules.toml`.
@@ -311,7 +312,7 @@ impl Selector {
     /// use jit::domain::{Issue, State};
     ///
     /// let selector = Selector {
-    ///     state: Some(StatePredicate::Single("done".to_string())),
+    ///     state: Some(StatePredicate::single("done")),
     ///     ..Default::default()
     /// };
     /// let mut issue = Issue::new("t".to_string(), String::new());
@@ -421,6 +422,27 @@ const VALID_STATE_TOKENS: [&str; 7] = [
     "archived",
 ];
 
+/// Map an authored state token to its [`State`] using the predicate whitelist.
+///
+/// Comparison is case-insensitive (e.g. `"Done"` maps to [`State::Done`]). This
+/// is the inverse of [`state_token`] over exactly [`VALID_STATE_TOKENS`]; unlike
+/// [`State::from_str`](std::str::FromStr) it does NOT accept extra aliases such
+/// as `open` or `inprogress`, preserving the predicate's historical accepted
+/// set. An unrecognized token yields `None` (reported by
+/// [`StatePredicate::validate`]).
+fn token_to_state(token: &str) -> Option<State> {
+    match token.to_lowercase().as_str() {
+        "backlog" => Some(State::Backlog),
+        "ready" => Some(State::Ready),
+        "in_progress" => Some(State::InProgress),
+        "gated" => Some(State::Gated),
+        "done" => Some(State::Done),
+        "rejected" => Some(State::Rejected),
+        "archived" => Some(State::Archived),
+        _ => None,
+    }
+}
+
 /// A `when` state predicate: one or more lifecycle states a rule applies to.
 ///
 /// Authored in TOML as either a single string or a list of strings, both of
@@ -432,9 +454,12 @@ const VALID_STATE_TOKENS: [&str; 7] = [
 /// ```
 ///
 /// Matching is membership: [`StatePredicate::matches`] is true when the issue's
-/// state token is one of the predicate's tokens. The stored tokens are the
-/// authored strings (lowercased on comparison); they are validated against the
-/// seven valid tokens at config load via [`StatePredicate::validate`].
+/// state is one of the predicate's states. The authored tokens are parsed once,
+/// when the predicate is built, into a typed [`BTreeSet<State>`] (see
+/// [`token_to_state`]); `matches` is then a direct set lookup with no per-call
+/// string round-trip. The authored strings are retained for diagnostics and
+/// validated against the seven valid tokens at config load via
+/// [`StatePredicate::validate`].
 ///
 /// # Examples
 ///
@@ -457,29 +482,96 @@ const VALID_STATE_TOKENS: [&str; 7] = [
 /// assert!(!set.rules[0].when.matches(&issue));
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(from = "AuthoredStates")]
+pub struct StatePredicate {
+    /// Authored state tokens, in authored order, retained for diagnostics and
+    /// load-time validation.
+    authored: Vec<String>,
+    /// The recognized lifecycle states, parsed once from `authored` via the
+    /// predicate whitelist. Unrecognized tokens are omitted here and reported by
+    /// [`StatePredicate::validate`].
+    states: BTreeSet<State>,
+}
+
+/// Untagged deserialization shape for a `state` predicate: a single token or a
+/// list of tokens. Converted into [`StatePredicate`] (which parses the typed
+/// state set) via `#[serde(from = ...)]`.
+#[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
-pub enum StatePredicate {
-    /// A single authored state token (e.g. `"in_progress"`).
+enum AuthoredStates {
     Single(String),
-    /// A list of authored state tokens (e.g. `["ready", "in_progress"]`).
     List(Vec<String>),
 }
 
+impl From<AuthoredStates> for StatePredicate {
+    fn from(authored: AuthoredStates) -> Self {
+        let authored = match authored {
+            AuthoredStates::Single(s) => vec![s],
+            AuthoredStates::List(v) => v,
+        };
+        StatePredicate::from_tokens(authored)
+    }
+}
+
 impl StatePredicate {
+    /// Build a predicate from authored tokens, parsing the typed state set once.
+    ///
+    /// Tokens that name a valid lifecycle state populate the set; any
+    /// unrecognized tokens are retained in `authored` (for diagnostics) but
+    /// omitted from the set, where [`StatePredicate::validate`] reports them.
+    fn from_tokens(authored: Vec<String>) -> Self {
+        let states = authored.iter().filter_map(|t| token_to_state(t)).collect();
+        StatePredicate { authored, states }
+    }
+
+    /// Build a predicate from a single authored token.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::validation::rules::StatePredicate;
+    /// use jit::domain::State;
+    ///
+    /// let pred = StatePredicate::single("done");
+    /// assert!(pred.matches(State::Done));
+    /// assert!(!pred.matches(State::Ready));
+    /// ```
+    pub fn single(token: impl Into<String>) -> Self {
+        StatePredicate::from_tokens(vec![token.into()])
+    }
+
+    /// Build a predicate from a list of authored tokens.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::validation::rules::StatePredicate;
+    /// use jit::domain::State;
+    ///
+    /// let pred = StatePredicate::list(["ready", "in_progress"]);
+    /// assert!(pred.matches(State::Ready));
+    /// assert!(pred.matches(State::InProgress));
+    /// assert!(!pred.matches(State::Done));
+    /// ```
+    pub fn list<I, S>(tokens: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        StatePredicate::from_tokens(tokens.into_iter().map(Into::into).collect())
+    }
+
     /// The authored state tokens this predicate carries, in authored order.
     pub fn tokens(&self) -> &[String] {
-        match self {
-            StatePredicate::Single(s) => std::slice::from_ref(s),
-            StatePredicate::List(v) => v.as_slice(),
-        }
+        &self.authored
     }
 
     /// Returns whether the given lifecycle state is in this predicate's set.
     ///
-    /// Comparison is case-insensitive against the snake_case state tokens.
-    pub fn matches(&self, state: crate::domain::State) -> bool {
-        let needle = state_token(state);
-        self.tokens().iter().any(|t| t.to_lowercase() == needle)
+    /// A direct membership check against the pre-parsed [`BTreeSet<State>`]; no
+    /// per-call string conversion happens.
+    pub fn matches(&self, state: State) -> bool {
+        self.states.contains(&state)
     }
 
     /// Validate that this predicate is non-empty and every token names one of
@@ -493,15 +585,15 @@ impl StatePredicate {
     /// token (or the empty-list sentinel `"<empty list>"`) together with the
     /// owning rule and the list of valid tokens.
     fn validate(&self, rule: &str) -> Result<(), RuleConfigError> {
-        if self.tokens().is_empty() {
+        if self.authored.is_empty() {
             return Err(RuleConfigError::InvalidState {
                 rule: rule.to_string(),
                 value: "<empty list>".to_string(),
                 valid: VALID_STATE_TOKENS.join(", "),
             });
         }
-        for token in self.tokens() {
-            if !VALID_STATE_TOKENS.contains(&token.to_lowercase().as_str()) {
+        for token in &self.authored {
+            if token_to_state(token).is_none() {
                 return Err(RuleConfigError::InvalidState {
                     rule: rule.to_string(),
                     value: token.clone(),
@@ -1483,7 +1575,7 @@ impl RawAssert {
             // otherwise silently never match any child, producing spurious
             // "criterion not satisfied" findings) is caught immediately.
             if let Some(toml::Value::String(s)) = config.get("child-state") {
-                StatePredicate::Single(s.clone()).validate(rule)?;
+                StatePredicate::single(s.clone()).validate(rule)?;
             }
             return Ok(Assertion::LabelCoverage { config });
         }
@@ -1692,7 +1784,7 @@ mod tests {
     #[test]
     fn test_selector_state_matches_snake_case() {
         let sel = Selector {
-            state: Some(StatePredicate::Single("in_progress".to_string())),
+            state: Some(StatePredicate::single("in_progress")),
             ..Default::default()
         };
         assert!(sel.matches(&issue_with(&[], State::InProgress)));
@@ -1808,7 +1900,7 @@ assert = { require-section = { heading = "Plan" } }
 
     #[test]
     fn test_selector_state_empty_list_is_rejected_at_load() {
-        // `when = { state = [] }` deserializes to `StatePredicate::List(vec![])`.
+        // `when = { state = [] }` deserializes to a predicate with no tokens.
         // It must be rejected at load because it silently never matches any issue.
         let toml = r#"
 [[rules]]
@@ -1835,6 +1927,42 @@ assert = { require-section = { heading = "Plan" } }
             }
             other => panic!("expected InvalidState, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn test_state_predicate_matches_typed_set_equals_token_set() {
+        // The pre-parsed set membership must agree with the authored tokens for
+        // every lifecycle state (case-insensitively), preserving the prior
+        // round-trip behavior with no per-call string conversion.
+        let all = [
+            State::Backlog,
+            State::Ready,
+            State::InProgress,
+            State::Gated,
+            State::Done,
+            State::Rejected,
+            State::Archived,
+        ];
+        let pred = StatePredicate::list(["Ready", "in_progress", "DONE"]);
+        for state in all {
+            let want = matches!(state, State::Ready | State::InProgress | State::Done);
+            assert_eq!(pred.matches(state), want, "mismatch for {state:?}");
+        }
+    }
+
+    #[test]
+    fn test_token_to_state_whitelist_excludes_from_str_aliases() {
+        // Every canonical token round-trips through the predicate whitelist...
+        for token in VALID_STATE_TOKENS {
+            let state = token_to_state(token).expect("canonical token must map");
+            assert_eq!(state_token(state), token);
+        }
+        // ...and case-insensitively.
+        assert_eq!(token_to_state("Done"), Some(State::Done));
+        // But the extra `State::from_str` aliases are NOT accepted here.
+        assert_eq!(token_to_state("open"), None);
+        assert_eq!(token_to_state("inprogress"), None);
+        assert_eq!(token_to_state("notastate"), None);
     }
 
     #[test]
@@ -1899,7 +2027,7 @@ assert = { label-coverage = { child-state = "done" } }
     fn test_selector_is_and_across_dimensions() {
         let sel = Selector {
             type_: Some("epic".to_string()),
-            state: Some(StatePredicate::Single("ready".to_string())),
+            state: Some(StatePredicate::single("ready")),
             ..Default::default()
         };
         // Both dimensions satisfied.

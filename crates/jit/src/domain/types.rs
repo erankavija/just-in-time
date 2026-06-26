@@ -16,7 +16,13 @@ use uuid::Uuid;
 pub const SHORT_ID_LENGTH: usize = 8;
 
 /// Issue lifecycle state
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+///
+/// `PartialOrd`/`Ord` follow the declaration order, which is the lifecycle order
+/// (`Backlog < Ready < InProgress < Gated < Done < Rejected < Archived`); this
+/// lets states be stored in ordered collections such as `BTreeSet<State>`.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum State {
     /// Created but not actionable yet (blocked by dependencies or gates)
