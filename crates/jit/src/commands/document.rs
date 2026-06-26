@@ -767,8 +767,11 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     /// Check document links and assets for validity
-    pub fn check_document_links(&self, scope: &str) -> Result<crate::commands::LinkCheckResult> {
-        use crate::document::{AssetType, LinkValidationResult, LinkValidator};
+    pub fn check_document_links(
+        &self,
+        scope: &crate::document::DocumentScope,
+    ) -> Result<crate::commands::LinkCheckResult> {
+        use crate::document::{AssetType, DocumentScope, LinkValidationResult, LinkValidator};
         use std::path::PathBuf;
 
         // Get repository root
@@ -778,19 +781,14 @@ impl<S: IssueStore> CommandExecutor<S> {
             .parent()
             .ok_or_else(|| crate::errors::InvalidArgumentError::new("Invalid storage path"))?;
 
-        // Parse scope and get documents to check
-        let issues = if scope == "all" {
-            self.storage.list_issues()?
-        } else if let Some(issue_id) = scope.strip_prefix("issue:") {
-            let full_id = self.storage.resolve_issue_id(issue_id)?;
-            let issue = self.storage.load_issue(&full_id)?;
-            vec![issue]
-        } else {
-            return Err(crate::errors::InvalidArgumentError::new(format!(
-                "Invalid scope '{}'. Use 'all' or 'issue:ID'",
-                scope
-            ))
-            .into());
+        // Resolve the scope to the set of issues whose documents to check.
+        let issues = match scope {
+            DocumentScope::All => self.storage.list_issues()?,
+            DocumentScope::Issue(issue_id) => {
+                let full_id = self.storage.resolve_issue_id(issue_id)?;
+                let issue = self.storage.load_issue(&full_id)?;
+                vec![issue]
+            }
         };
 
         // Collect all documents to check

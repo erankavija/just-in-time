@@ -8,6 +8,7 @@ mod adapter;
 mod assets;
 mod link_validator;
 pub mod parser;
+mod scope;
 
 pub use adapter::{AdapterRegistry, DocFormatAdapter, HtmlAdapter, MarkdownAdapter};
 pub use assets::{Asset, AssetScanner, AssetType};
@@ -16,6 +17,7 @@ pub use parser::{
     content_parser_for, slugify_heading, ContentParser, ContentParserError, MarkdownContentParser,
     ParsedContent, Section,
 };
+pub use scope::{DocumentScope, DocumentScopeParseError};
 
 #[cfg(feature = "html")]
 pub use parser::HtmlContentParser;

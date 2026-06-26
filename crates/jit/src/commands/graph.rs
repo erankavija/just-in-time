@@ -4,6 +4,36 @@ use super::*;
 use crate::output::DependencyTreeNode;
 use std::collections::{HashMap, HashSet};
 
+/// Serialization format for `jit graph export`.
+///
+/// Deriving [`clap::ValueEnum`] lets clap reject an unknown format at parse time
+/// (with the accepted values listed), replacing the previous runtime
+/// `to_lowercase()` match. The value names are the lowercase variant names:
+/// `dot`, `mermaid`, `json`.
+///
+/// # Examples
+///
+/// ```
+/// use jit::commands::GraphExportFormat;
+/// use clap::ValueEnum;
+///
+/// assert_eq!(
+///     GraphExportFormat::from_str("mermaid", true).unwrap(),
+///     GraphExportFormat::Mermaid
+/// );
+/// // Unknown formats are rejected.
+/// assert!(GraphExportFormat::from_str("yaml", true).is_err());
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+pub enum GraphExportFormat {
+    /// Graphviz DOT format.
+    Dot,
+    /// Mermaid diagram format.
+    Mermaid,
+    /// JSON node/edge format.
+    Json,
+}
+
 impl<S: IssueStore> CommandExecutor<S> {
     /// Build a dependency tree with specified depth
     ///
@@ -169,20 +199,16 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(roots.into_iter().cloned().collect())
     }
 
-    pub fn export_graph(&self, format: &str) -> Result<String> {
+    pub fn export_graph(&self, format: GraphExportFormat) -> Result<String> {
         let issues = self.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
         let graph = DependencyGraph::new(&issue_refs);
 
-        match format.to_lowercase().as_str() {
-            "dot" => Ok(crate::visualization::export_dot(&graph)),
-            "mermaid" => Ok(crate::visualization::export_mermaid(&graph)),
-            "json" => Ok(crate::visualization::export_json(&graph)),
-            _ => Err(anyhow!(
-                "Unsupported format: {}. Use 'dot', 'mermaid', or 'json'",
-                format
-            )),
-        }
+        Ok(match format {
+            GraphExportFormat::Dot => crate::visualization::export_dot(&graph),
+            GraphExportFormat::Mermaid => crate::visualization::export_mermaid(&graph),
+            GraphExportFormat::Json => crate::visualization::export_json(&graph),
+        })
     }
 }
 

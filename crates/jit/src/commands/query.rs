@@ -11,7 +11,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(crate::domain::queries::query_ready(&issues))
     }
 
-    pub fn query_blocked(&self) -> Result<Vec<(Issue, Vec<String>)>> {
+    pub fn query_blocked(
+        &self,
+    ) -> Result<Vec<(Issue, Vec<crate::domain::queries::BlockingReason>)>> {
         let issues = self.storage.list_issues()?;
         Ok(crate::domain::queries::query_blocked(&issues))
     }
@@ -161,7 +163,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         &self,
         priority_filter: Option<Priority>,
         label_filter: Option<&str>,
-    ) -> Result<Vec<(Issue, Vec<String>)>> {
+    ) -> Result<Vec<(Issue, Vec<crate::domain::queries::BlockingReason>)>> {
         let mut blocked = self.query_blocked()?;
 
         // Apply additional filters

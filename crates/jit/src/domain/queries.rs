@@ -46,51 +46,110 @@ pub fn query_ready(issues: &[Issue]) -> Vec<Issue> {
         .collect()
 }
 
-/// Query blocked issues with reasons for being blocked.
+/// A typed reason explaining why an issue is blocked.
+///
+/// Produced by [`query_blocked`] in place of the previously hand-formatted
+/// strings: the CLI matches on these variants to build its presentation form
+/// without re-parsing text. The [`Display`](std::fmt::Display) implementation
+/// renders the canonical reason string (`dependency:<id> (<title>:<state>)` and
+/// `gate:<key> (<status>)`), so the human and `--json` output stay byte-identical
+/// to the original.
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::queries::BlockingReason;
+/// use jit::domain::{GateStatus, State};
+///
+/// let dep = BlockingReason::Dependency {
+///     id: "abc123".to_string(),
+///     title: "Build parser".to_string(),
+///     state: State::InProgress,
+/// };
+/// assert_eq!(dep.to_string(), "dependency:abc123 (Build parser:InProgress)");
+///
+/// let gate = BlockingReason::Gate {
+///     key: "cargo-ci".to_string(),
+///     status: GateStatus::Pending,
+/// };
+/// assert_eq!(gate.to_string(), "gate:cargo-ci (Pending)");
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BlockingReason {
+    /// An incomplete dependency: the issue waits on `id` (titled `title`),
+    /// which is in `state` (anything other than `Done`).
+    Dependency {
+        /// Id of the depended-on issue.
+        id: String,
+        /// Title of the depended-on issue.
+        title: String,
+        /// Current state of the depended-on issue.
+        state: State,
+    },
+    /// A required gate that is not yet `Passed`. `status` is the gate's current
+    /// status, defaulting to [`GateStatus::Pending`] when it has never been
+    /// evaluated.
+    Gate {
+        /// The required gate key.
+        key: String,
+        /// Current gate status.
+        status: GateStatus,
+    },
+}
+
+impl std::fmt::Display for BlockingReason {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BlockingReason::Dependency { id, title, state } => {
+                write!(f, "dependency:{} ({}:{:?})", id, title, state)
+            }
+            BlockingReason::Gate { key, status } => {
+                write!(f, "gate:{} ({:?})", key, status)
+            }
+        }
+    }
+}
+
+/// Query blocked issues with typed reasons for being blocked.
 ///
 /// Returns issues that have incomplete dependencies or unfulfilled gates,
-/// along with a list of reasons explaining why each issue is blocked.
-pub fn query_blocked(issues: &[Issue]) -> Vec<(Issue, Vec<String>)> {
+/// along with a list of [`BlockingReason`]s explaining why each issue is blocked.
+pub fn query_blocked(issues: &[Issue]) -> Vec<(Issue, Vec<BlockingReason>)> {
     let resolved = build_issue_map(issues);
 
-    let mut blocked = Vec::new();
+    issues
+        .iter()
+        .filter(|issue| issue.is_blocked(&resolved))
+        .map(|issue| {
+            // Incomplete dependencies (anything not yet Done).
+            let dep_reasons = issue.dependencies.iter().filter_map(|dep_id| {
+                resolved.get(dep_id).and_then(|dep| {
+                    (dep.state != State::Done).then(|| BlockingReason::Dependency {
+                        id: dep_id.clone(),
+                        title: dep.title.clone(),
+                        state: dep.state,
+                    })
+                })
+            });
 
-    for issue in issues {
-        if issue.is_blocked(&resolved) {
-            let mut reasons = Vec::new();
-
-            // Check dependencies
-            for dep_id in &issue.dependencies {
-                if let Some(dep) = resolved.get(dep_id) {
-                    if dep.state != State::Done {
-                        reasons.push(format!(
-                            "dependency:{} ({}:{:?})",
-                            dep_id, dep.title, dep.state
-                        ));
-                    }
-                }
-            }
-
-            // Check gates
-            for gate_key in &issue.gates_required {
+            // Required gates that have not passed (absent status reads as Pending).
+            let gate_reasons = issue.gates_required.iter().filter_map(|gate_key| {
                 let gate_state = issue.gates_status.get(gate_key);
                 let is_passed = gate_state
                     .map(|gs| gs.status == GateStatus::Passed)
                     .unwrap_or(false);
 
-                if !is_passed {
-                    let status_str = gate_state
-                        .map(|gs| format!("{:?}", gs.status))
-                        .unwrap_or_else(|| "Pending".to_string());
-                    reasons.push(format!("gate:{} ({})", gate_key, status_str));
-                }
-            }
+                (!is_passed).then(|| BlockingReason::Gate {
+                    key: gate_key.clone(),
+                    status: gate_state
+                        .map(|gs| gs.status)
+                        .unwrap_or(GateStatus::Pending),
+                })
+            });
 
-            blocked.push((issue.clone(), reasons));
-        }
-    }
-
-    blocked
+            (issue.clone(), dep_reasons.chain(gate_reasons).collect())
+        })
+        .collect()
 }
 
 /// Query issues by assignee.
@@ -427,6 +486,81 @@ mod tests {
         let ids = bracket_scope_ids("C0000000", &issues, Some("breakdown"));
         assert_eq!(ids.len(), 1);
         assert!(ids.contains("C0000000"));
+    }
+
+    #[test]
+    fn test_query_blocked_dependency_reason_is_typed() {
+        let mut dep = Issue::new("Upstream".to_string(), String::new());
+        dep.id = "dep1".to_string();
+        dep.state = State::InProgress;
+
+        let mut blocked = Issue::new("Downstream".to_string(), String::new());
+        blocked.id = "blocked1".to_string();
+        blocked.state = State::Backlog;
+        blocked.dependencies = vec!["dep1".to_string()];
+
+        let issues = vec![dep, blocked];
+        let result = query_blocked(&issues);
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(
+            result[0].1,
+            vec![BlockingReason::Dependency {
+                id: "dep1".to_string(),
+                title: "Upstream".to_string(),
+                state: State::InProgress,
+            }]
+        );
+        // Display matches the historical string format byte-for-byte.
+        assert_eq!(
+            result[0].1[0].to_string(),
+            "dependency:dep1 (Upstream:InProgress)"
+        );
+    }
+
+    #[test]
+    fn test_query_blocked_gate_reason_is_typed_and_defaults_pending() {
+        use crate::domain::{GateState, GateStatus};
+
+        // A Backlog issue with an unmet dependency keeps it blocked; a required
+        // gate with no recorded status contributes a Pending gate reason.
+        let mut dep = Issue::new("Upstream".to_string(), String::new());
+        dep.id = "dep1".to_string();
+        dep.state = State::InProgress;
+
+        let mut blocked = Issue::new("Downstream".to_string(), String::new());
+        blocked.id = "blocked1".to_string();
+        blocked.state = State::Backlog;
+        blocked.dependencies = vec!["dep1".to_string()];
+        blocked.gates_required = vec!["never-run".to_string(), "failed".to_string()];
+        blocked.gates_status.insert(
+            "failed".to_string(),
+            GateState {
+                status: GateStatus::Failed,
+                updated_by: None,
+                updated_at: chrono::Utc::now(),
+            },
+        );
+
+        let issues = vec![dep, blocked];
+        let result = query_blocked(&issues);
+
+        assert_eq!(result.len(), 1);
+        let reasons = &result[0].1;
+        assert!(reasons.contains(&BlockingReason::Gate {
+            key: "never-run".to_string(),
+            status: GateStatus::Pending,
+        }));
+        assert!(reasons.contains(&BlockingReason::Gate {
+            key: "failed".to_string(),
+            status: GateStatus::Failed,
+        }));
+        assert!(reasons
+            .iter()
+            .any(|r| r.to_string() == "gate:never-run (Pending)"));
+        assert!(reasons
+            .iter()
+            .any(|r| r.to_string() == "gate:failed (Failed)"));
     }
 
     #[test]

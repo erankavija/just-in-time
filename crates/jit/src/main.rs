@@ -144,6 +144,9 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
         || error
             .downcast_ref::<jit::domain::GateModeParseError>()
             .is_some()
+        || error
+            .downcast_ref::<jit::document::DocumentScopeParseError>()
+            .is_some()
         || error.downcast_ref::<std::string::FromUtf8Error>().is_some()
         || error.downcast_ref::<std::str::Utf8Error>().is_some()
     {
@@ -2901,7 +2904,7 @@ fn run() -> Result<()> {
             }
             GraphCommands::Export { format, output } => {
                 let output_ctx = OutputContext::new(quiet, false);
-                let graph_output = executor.export_graph(&format)?;
+                let graph_output = executor.export_graph(format)?;
 
                 if let Some(path) = output {
                     std::fs::write(&path, graph_output)?;
@@ -3330,9 +3333,12 @@ fn run() -> Result<()> {
                 }
             },
             DocCommands::CheckLinks { scope, json } => {
+                use jit::document::DocumentScope;
                 use jit::output::JsonOutput;
+                use std::str::FromStr;
 
                 let output_ctx = OutputContext::new(quiet, json);
+                let scope = DocumentScope::from_str(&scope)?;
                 let result = executor.check_document_links(&scope)?;
 
                 if json {
@@ -3527,22 +3533,24 @@ fn run() -> Result<()> {
 
                     let msg = format!("Found {} issue(s)", blocked.len());
                     let output = if full {
+                        use jit::domain::queries::BlockingReason;
                         use jit::output::{BlockedIssue, BlockedReason, BlockedReasonType};
                         let blocked_issues: Vec<BlockedIssue> = blocked
                             .iter()
                             .map(|(issue, reasons)| {
                                 let blocked_reasons = reasons
                                     .iter()
-                                    .map(|r| {
-                                        let parts: Vec<&str> = r.splitn(2, ':').collect();
-                                        let reason_type = match parts[0] {
-                                            "gate" => BlockedReasonType::Gate,
-                                            _ => BlockedReasonType::Dependency,
-                                        };
-                                        BlockedReason {
-                                            reason_type,
-                                            detail: parts.get(1).unwrap_or(&"").to_string(),
+                                    .map(|r| match r {
+                                        BlockingReason::Dependency { id, title, state } => {
+                                            BlockedReason {
+                                                reason_type: BlockedReasonType::Dependency,
+                                                detail: format!("{} ({}:{:?})", id, title, state),
+                                            }
                                         }
+                                        BlockingReason::Gate { key, status } => BlockedReason {
+                                            reason_type: BlockedReasonType::Gate,
+                                            detail: format!("{} ({:?})", key, status),
+                                        },
                                     })
                                     .collect();
                                 BlockedIssue {
@@ -3564,7 +3572,9 @@ fn run() -> Result<()> {
                         let minimal: Vec<MinimalBlockedIssue> = blocked
                             .iter()
                             .map(|(issue, reasons)| {
-                                MinimalBlockedIssue::from((issue, reasons.clone()))
+                                let reason_strings =
+                                    reasons.iter().map(ToString::to_string).collect();
+                                MinimalBlockedIssue::from((issue, reason_strings))
                             })
                             .collect();
 

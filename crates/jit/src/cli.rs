@@ -1373,8 +1373,8 @@ pub enum GraphCommands {
     /// Export dependency graph in various formats
     Export {
         /// Output format (dot, mermaid, json)
-        #[arg(short, long, default_value = "dot")]
-        format: String,
+        #[arg(short, long, value_enum, default_value_t = crate::commands::GraphExportFormat::Dot)]
+        format: crate::commands::GraphExportFormat,
 
         /// Output file (optional - prints to stdout if omitted)
         #[arg(short, long)]
