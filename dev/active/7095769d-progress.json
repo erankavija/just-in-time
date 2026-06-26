@@ -58,7 +58,7 @@
           "title": "Type the gate stage/mode cluster (GateStage/GateMode enums)",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "dispatched"
+          "status": "re-gating: cargo-ci green; code-review re-run after worktree refreshed onto merged main (validate now passes)"
         }
       ]
     },
@@ -152,7 +152,7 @@
     "issue": "f067678a (critical) \u2014 archival doc-reference integrity",
     "why": "Epic 25064508 archival left dangling doc refs; jit validate hard-fails; code-review gate requires validate to pass, so ALL my code-review gates are blocked until this lands.",
     "decisions": "doc-ref-canonical plan resolution (validate reads planning-node plan ref, not the dev/active template); per-doc archive auto-relinks + integrity-checks; dangling refs stay hard-errors (no leniency). Future redesign tracked in f16cfe8c.",
-    "status": "ESCALATED + resolved: user amended criterion to referential consistency; clobber bug fixed (ArchiveError::DestinationOccupied). Re-gating after commits b4168372+b8230dc8. cargo-ci flake (heartbeat) tolerated via bounded retry; code-review expected to pass now that criterion and code agree."
+    "status": "RESOLVED + MERGED. f067678a done, both gates green, merged to main (clean, no conflicts); repo-wide jit validate restored (exit 0); installed binary reinstalled from main. Criterion amended to referential consistency (user-approved); clobber data-loss fixed via typed ArchiveError::DestinationOccupied + test. BLOCKER CLEARED."
   },
-  "note_t1": "t1 (b22c041e) code verified correct + cargo-ci green; code-review blocked ONLY by the validate failure above. Re-gate after f067678a merges."
+  "note_t1": "t1 (b22c041e) code verified correct + cargo-ci green; code-review was blocked ONLY by the validate failure. After f067678a merged to main, refreshed the t1 worktree (merged main in, clean), validate now exits 0 there. Re-gating both gates fresh (task bujuhfbh2)."
 }
