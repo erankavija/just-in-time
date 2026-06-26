@@ -2,7 +2,7 @@
   "id": "e3e6d47d-4262-4451-a343-9b6c07a3a3c0",
   "title": "Shared type: label-namespace helper",
   "description": "Introduce a shared `type:` label-namespace helper and remove the ad-hoc prefix handling (report highest-leverage fix #6).\n\n## Sites\nPromote the already-correctly-shaped private helper at `breakdown.rs:602-609` into a shared `const TYPE_NAMESPACE` + `fn type_label_value(&[String]) -> Option<&str>` in `labels.rs`/`domain`, and reuse it across the 5 raw-string sites: `issue.rs:37`, `batch_create.rs:555`, `breakdown.rs:607/619/665`, `validate.rs:607,827` — replacing the raw `starts_with(\"type:\")`/`strip_prefix(\"type:\")` bypasses.\n\n## Success Criteria\n- [ ] A single shared helper (`type_label_value` over a `TYPE_NAMESPACE` const) is the only place that knows the `type:` label encoding.\n- [ ] All five identified sites call the helper; no `starts_with(\"type:\")` or `strip_prefix(\"type:\")` literal remains outside the helper.\n- [ ] Behavior is identical to today for all existing labels (covered by a test on the helper).\n- [ ] `cargo-ci` and `code-review` pass.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "normal",
   "assignee": "agent:claude",
   "dependencies": [],
@@ -11,15 +11,15 @@
     "code-review"
   ],
   "gates_status": {
-    "cargo-ci": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-26T16:56:33.159684902Z"
-    },
     "code-review": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-06-26T16:58:03.817071959Z"
+    },
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-26T16:56:33.159684902Z"
     }
   },
   "context": {},
@@ -29,5 +29,5 @@
     "epic:code-smell-cleanup"
   ],
   "created_at": "2026-06-25T21:41:24.456320209Z",
-  "updated_at": "2026-06-26T17:00:07.066696541Z"
+  "updated_at": "2026-06-26T17:02:53.865489503Z"
 }
