@@ -2,7 +2,7 @@
   "id": "f067678a-ff9c-454a-89d0-a410ec129f0b",
   "title": "Fix archival doc-reference integrity: auto-relink on archive + doc-ref-canonical plan resolution",
   "description": "Archival of epic 25064508 left the repository with dangling document references that make `jit validate` hard-fail, blocking all code-review gates (which require validate to pass). Discovered while driving the code-smell-cleanup epic; the archival UX is itself a quality defect.\n\nTwo distinct failure modes were observed:\n1. **Move-without-relink**: the planning node `0d753ba5`'s plan doc was moved to `dev/archive/features/25064508/plan.md`, but its doc reference (and validate's resolution) still point at the dead `dev/active/25064508-d563-4073-a970-296607a01adc-plan.md`. Validate resolves the plan-doc location from the global *template* `dev/active/{container.id}-plan.md`, not from the planning node's reference, a dual source of truth that drifts on archival.\n2. **Delete-while-referenced**: `dev/active/9ac9fdac-dogfood-25064508.md` was deleted by archival commit `380f40c2` but is still referenced (label \"Dogfood evidence\") by two done issues. It is recoverable from git history (created in `9c42f647`).\n\n## Scope\n\nThree parts, one worktree, gated and merged:\n\n1. **Repair the current dangling refs** so `jit validate` exits 0: re-link `0d753ba5`'s plan reference to the archived plan path, and restore the dogfood evidence file from git history into the archive (`dev/archive/features/25064508/`) and re-link the two referencing issues to it.\n2. **Archive auto-relink + integrity** (per-document `jit doc archive`): the archive operation must, with referential consistency (see Success Criteria for the precise guarantee), relocate the file AND update every issue doc-reference that points to it to the new archive path. If the target file is missing, or the destination path is already occupied, it must fail with a typed error and make NO changes (never leave or create a dangling reference, never overwrite an existing file).\n3. **Doc-ref-canonical plan resolution**: validate must resolve a breakable container's plan-doc location from the planning node's recorded plan doc-reference (the graph template provides only the creation-time default). A plan that is moved/archived and re-linked then keeps validate green with no leniency; a genuinely missing plan while the planning node is `done` still errors.\n\nThis touches `commands/validate.rs`, `commands/document.rs`, and `commands/plan_doc.rs`, areas another session (epic 52ad3b1f) is also editing; implement in an isolated worktree and merge carefully.\n\n## Success Criteria\n\n- [ ] `jit validate` exits 0 on the repository (no dangling document references); the two known dangling refs (25064508 plan, 9ac9fdac dogfood) are repaired with the files at their final archived paths.\n- [ ] `jit doc archive <path>` is reference-aware and **referentially consistent**. Literal all-or-nothing transactionality is out of scope: it is infeasible across the doc file plus N issue JSON files plus the append-only event log without a write-ahead journal (a journaled redesign is tracked in f16cfe8c). The operation relocates the file to the archive root AND re-links every issue doc-reference pointing at it to the new path. The guarantee is: no single failure ever leaves a dangling reference, loses a file, or overwrites an existing file. Under any single failure every reference resolves to a file that still exists (a failed rollback may leave a reported duplicate source+archive copy for manual cleanup, never a dangling reference). It fails with a typed `thiserror` error and makes no filesystem or `.jit` changes when the source file is missing, and likewise refuses (typed error, no changes) to archive onto an already-occupied destination path. Covered by tests: happy path re-links N references; missing-source path is a typed no-op error; event-append failure and partial-relink failure each leave no dangling reference; destination-conflict is a typed no-op error.\n- [ ] Validate resolves a breakable container's plan-doc location from the planning node's plan doc-reference, not the hardcoded `dev/active/{id}` template; the template is used only as the default at `jit apply plan` time. Covered by a test: a plan moved to a new path + re-linked keeps validate green; a missing plan with a `done` planning node still errors.\n- [ ] No reliance on lifecycle leniency: dangling references remain a hard validate error in all states (per project decision).\n- [ ] `cargo-ci` and `code-review` gates pass; existing bracket/validate tests still pass.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "critical",
   "assignee": "agent:claude",
   "dependencies": [],
@@ -14,12 +14,12 @@
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-06-26T09:16:18.090288720Z"
+      "updated_at": "2026-06-26T09:28:45.947528483Z"
     },
     "code-review": {
-      "status": "failed",
+      "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-06-26T09:19:32.699891848Z"
+      "updated_at": "2026-06-26T09:32:03.798292429Z"
     }
   },
   "context": {},
@@ -29,5 +29,5 @@
     "epic:code-smell-cleanup"
   ],
   "created_at": "2026-06-26T08:06:02.011785860Z",
-  "updated_at": "2026-06-26T09:25:45.550741651Z"
+  "updated_at": "2026-06-26T09:34:11.475833298Z"
 }
