@@ -3,7 +3,8 @@
 //! This module defines the fundamental data structures used throughout the system:
 //! issues, gates, events, and their associated states and priorities.
 
-use anyhow::{anyhow, Result};
+use crate::errors::InvalidArgumentError;
+use anyhow::Result;
 use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -64,7 +65,7 @@ impl FromStr for State {
             "done" => Ok(State::Done),
             "rejected" => Ok(State::Rejected),
             "archived" => Ok(State::Archived),
-            _ => Err(anyhow!("Invalid state: {}", s)),
+            _ => Err(InvalidArgumentError::new(format!("Invalid state: {s}")).into()),
         }
     }
 }
@@ -92,7 +93,7 @@ impl FromStr for Priority {
             "normal" => Ok(Priority::Normal),
             "high" => Ok(Priority::High),
             "critical" => Ok(Priority::Critical),
-            _ => Err(anyhow!("Invalid priority: {}", s)),
+            _ => Err(InvalidArgumentError::new(format!("Invalid priority: {s}")).into()),
         }
     }
 }
@@ -136,10 +137,10 @@ impl FromStr for ContentFormat {
             "markdown" | "md" => Ok(ContentFormat::Markdown),
             "html" => Ok(ContentFormat::Html),
             "xml" => Ok(ContentFormat::Xml),
-            _ => Err(anyhow!(
-                "Invalid content format: '{}' (expected markdown, html, or xml)",
-                s
-            )),
+            _ => Err(InvalidArgumentError::new(format!(
+                "Invalid content format: '{s}' (expected markdown, html, or xml)"
+            ))
+            .into()),
         }
     }
 }

@@ -101,13 +101,38 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
         return ExitCode::NotFound;
     }
 
+    // Defining a gate that already exists is a typed already-exists condition.
+    if error
+        .downcast_ref::<jit::storage::GateAlreadyExistsError>()
+        .is_some()
+    {
+        return ExitCode::AlreadyExists;
+    }
+
+    // Invalid-argument conditions are typed: the shared InvalidArgumentError plus
+    // the enum parse errors (gate stage/mode) all map to exit code 2 by downcast.
+    if error
+        .downcast_ref::<jit::errors::InvalidArgumentError>()
+        .is_some()
+        || error
+            .downcast_ref::<jit::domain::GateStageParseError>()
+            .is_some()
+        || error
+            .downcast_ref::<jit::domain::GateModeParseError>()
+            .is_some()
+    {
+        return ExitCode::InvalidArgument;
+    }
+
     let error_msg = error.to_string().to_lowercase();
 
-    // Residual message-based fallback for conditions that are not represented by
-    // a typed error. The three TYPED conditions (issue/gate-not-found, cycle) are
-    // classified above by downcast and never reach this block; the remaining
-    // string checks are a best-effort net for still-untyped producers
-    // (e.g. preset/gate-run not-found, invalid-argument, already-exists).
+    // Residual message-based fallback for conditions that are not YET represented
+    // by a typed error. The typed conditions above (issue/gate-not-found, cycle,
+    // gate-already-exists, invalid-argument, io) are classified by downcast and
+    // never reach this block. The remaining string checks are a best-effort net
+    // for still-untyped producers — chiefly the internal "Invalid storage/.jit
+    // path" guards (some nested inside PathReadError) and the config-parse cluster
+    // — pending their conversion to typed errors (jit:b9a28509 follow-up).
     if error_msg.contains("not found") || error_msg.contains("no such file") {
         ExitCode::NotFound
     } else if error_msg.contains("gate validation failed") || error_msg.contains("blocked by") {

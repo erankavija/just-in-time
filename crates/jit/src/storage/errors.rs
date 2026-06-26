@@ -113,6 +113,40 @@ impl GateNotFoundError {
     }
 }
 
+/// Error raised when defining a gate whose key already exists in the registry.
+///
+/// Returned by the gate-define path when the requested key is already present.
+/// The CLI downcasts to this type to classify the failure as an already-exists
+/// condition (exit code `6`) instead of scanning the message text. `Display`
+/// reproduces the previous `anyhow!` phrasing verbatim.
+///
+/// # Examples
+///
+/// ```
+/// use jit::storage::GateAlreadyExistsError;
+///
+/// let err = GateAlreadyExistsError::new("lint");
+/// assert_eq!(err.to_string(), "Gate 'lint' already exists");
+/// assert_eq!(err.key(), "lint");
+/// ```
+#[derive(Debug, Error, PartialEq, Eq, Clone)]
+#[error("Gate '{key}' already exists")]
+pub struct GateAlreadyExistsError {
+    key: String,
+}
+
+impl GateAlreadyExistsError {
+    /// Build a [`GateAlreadyExistsError`] for the given gate key.
+    pub fn new(key: impl Into<String>) -> Self {
+        Self { key: key.into() }
+    }
+
+    /// The gate key that already exists in the registry.
+    pub fn key(&self) -> &str {
+        &self.key
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -153,5 +187,18 @@ mod tests {
     fn test_gate_not_found_downcasts_from_anyhow() {
         let err: anyhow::Error = GateNotFoundError::new(["lint"]).into();
         assert!(err.downcast_ref::<GateNotFoundError>().is_some());
+    }
+
+    #[test]
+    fn test_gate_already_exists_message_and_accessor() {
+        let err = GateAlreadyExistsError::new("lint");
+        assert_eq!(err.to_string(), "Gate 'lint' already exists");
+        assert_eq!(err.key(), "lint");
+    }
+
+    #[test]
+    fn test_gate_already_exists_downcasts_from_anyhow() {
+        let err: anyhow::Error = GateAlreadyExistsError::new("lint").into();
+        assert!(err.downcast_ref::<GateAlreadyExistsError>().is_some());
     }
 }

@@ -608,7 +608,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let mut registry = self.storage.load_gate_registry()?;
 
         if registry.gates.contains_key(&key) {
-            return Err(anyhow!("Gate '{}' already exists", key));
+            return Err(crate::storage::GateAlreadyExistsError::new(key.as_str()).into());
         }
 
         registry.gates.insert(
@@ -654,7 +654,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let mut registry = self.storage.load_gate_registry()?;
 
         if registry.gates.contains_key(&key) {
-            return Err(anyhow!("Gate '{}' already exists", key));
+            return Err(crate::storage::GateAlreadyExistsError::new(key.as_str()).into());
         }
 
         // Validate: auto gates must have checker
