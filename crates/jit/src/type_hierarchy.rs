@@ -43,7 +43,7 @@
 //! assert!(!config.contains_type("unknown"));
 //! ```
 
-use crate::labels::TYPE_NAMESPACE;
+use crate::labels::is_type_label;
 use std::collections::HashMap;
 use thiserror::Error;
 
@@ -364,10 +364,7 @@ pub fn detect_validation_issues(
     let mut issues = Vec::new();
 
     // Check if issue has a type label
-    let type_label = labels.iter().find(|l| {
-        l.split_once(':')
-            .is_some_and(|(ns, _)| ns == TYPE_NAMESPACE)
-    });
+    let type_label = labels.iter().find(|l| is_type_label(l));
 
     if let Some(type_label) = type_label {
         match extract_type(type_label) {
@@ -429,10 +426,7 @@ pub fn validate_strategic_labels(
     let mut warnings = Vec::new();
 
     // Find type label
-    let type_label = issue.labels.iter().find(|l| {
-        l.split_once(':')
-            .is_some_and(|(ns, _)| ns == TYPE_NAMESPACE)
-    });
+    let type_label = issue.labels.iter().find(|l| is_type_label(l));
     let type_name = match type_label {
         Some(label) => match extract_type(label) {
             Ok(t) => t,
@@ -495,10 +489,7 @@ pub fn validate_orphans(
     let mut warnings = Vec::new();
 
     // Find type label
-    let type_label = issue.labels.iter().find(|l| {
-        l.split_once(':')
-            .is_some_and(|(ns, _)| ns == TYPE_NAMESPACE)
-    });
+    let type_label = issue.labels.iter().find(|l| is_type_label(l));
     let type_name = match type_label {
         Some(label) => match extract_type(label) {
             Ok(t) => t,
@@ -638,15 +629,7 @@ pub fn detect_membership_issues(
                     let found_types: Vec<String> = all_issues
                         .iter()
                         .filter(|i| i.id != issue.id && i.labels.contains(&label.clone()))
-                        .filter_map(|i| {
-                            i.labels
-                                .iter()
-                                .find(|l| {
-                                    l.split_once(':')
-                                        .is_some_and(|(ns, _)| ns == TYPE_NAMESPACE)
-                                })
-                                .cloned()
-                        })
+                        .filter_map(|i| i.labels.iter().find(|l| is_type_label(l)).cloned())
                         .collect();
 
                     issues.push(ValidationIssue::InvalidMembershipReference {

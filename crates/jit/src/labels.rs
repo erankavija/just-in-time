@@ -135,13 +135,37 @@ fn suggest_label_fix(label: &str) -> Option<String> {
 /// ```
 pub const TYPE_NAMESPACE: &str = "type";
 
+/// Return `true` when `label` is a valid `type:*` label.
+///
+/// Delegates to [`parse_label`] so the `namespace:value` encoding is owned by
+/// a single primitive. Returns `false` for invalid label formats.
+///
+/// # Examples
+///
+/// ```
+/// use jit::labels::is_type_label;
+///
+/// assert!(is_type_label("type:task"));
+/// assert!(is_type_label("type:epic"));
+/// assert!(!is_type_label("priority:high")); // wrong namespace
+/// assert!(!is_type_label("type:"));         // missing value — invalid format
+/// assert!(!is_type_label("notacolon"));     // invalid label format
+/// ```
+pub fn is_type_label(label: &str) -> bool {
+    parse_label(label)
+        .map(|(ns, _)| ns == TYPE_NAMESPACE)
+        .unwrap_or(false)
+}
+
 /// Extract the value of the `type:` label from a label list, if present.
 ///
 /// Returns a reference to the value part (after the colon) of the first
 /// `type:*` label found in `labels`, or `None` when no type label is present.
 ///
-/// The per-issue invariant is a single `type:*` label; this function returns
-/// the first match. Presence checks become `.is_some()`.
+/// Internally delegates to [`parse_label`] (the canonical `namespace:value`
+/// primitive) for namespace identification. The per-issue invariant is a
+/// single `type:*` label; this function returns the first match. Presence
+/// checks become `.is_some()`.
 ///
 /// # Examples
 ///
@@ -165,9 +189,12 @@ pub const TYPE_NAMESPACE: &str = "type";
 /// ```
 pub fn type_label_value(labels: &[String]) -> Option<&str> {
     labels.iter().find_map(|l| {
-        l.split_once(':')
-            .filter(|(ns, _)| *ns == TYPE_NAMESPACE)
-            .map(|(_, v)| v)
+        // parse_label is the canonical encoding primitive; split_once is used
+        // only to borrow the value from the original string without allocating.
+        let (ns, _) = parse_label(l).ok()?;
+        (ns == TYPE_NAMESPACE)
+            .then(|| l.split_once(':').map(|(_, v)| v))
+            .flatten()
     })
 }
 
@@ -374,6 +401,28 @@ mod tests {
     fn test_validate_assignee_format_invalid_empty_parts() {
         assert!(validate_assignee_format(":identifier").is_err());
         assert!(validate_assignee_format("type:").is_err());
+    }
+
+    // Tests for is_type_label
+    #[test]
+    fn test_is_type_label_true_for_type_labels() {
+        assert!(is_type_label("type:task"));
+        assert!(is_type_label("type:epic"));
+        assert!(is_type_label("type:story"));
+    }
+
+    #[test]
+    fn test_is_type_label_false_for_other_namespaces() {
+        assert!(!is_type_label("priority:high"));
+        assert!(!is_type_label("epic:auth"));
+        assert!(!is_type_label("milestone:v1.0"));
+    }
+
+    #[test]
+    fn test_is_type_label_false_for_invalid_labels() {
+        assert!(!is_type_label("type:")); // missing value
+        assert!(!is_type_label("notacolon"));
+        assert!(!is_type_label(""));
     }
 
     // Tests for TYPE_NAMESPACE and type_label_value
