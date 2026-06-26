@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "f5283fde-2dda-4a1a-aae9-48d67ff5a66a",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "397d98df-342e-48a0-9b2b-c7d0d1bf6ae0",
+  "commit": "8593595f619b4e55a281730290514597c6072cd8",
+  "branch": "worktree-agent-397d98df",
+  "status": "passed",
+  "started_at": "2026-06-26T00:12:46.615498604Z",
+  "completed_at": "2026-06-26T00:14:32.837239655Z",
+  "duration_ms": 106221,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nPass. `DependencySummary.by_state` is keyed by `HashMap<State, usize>` at `crates/jit/src/output.rs:745-749`, and `IssuesInfo.states` is keyed by `HashMap<crate::domain::State, usize>` at `crates/jit/src/snapshot.rs:69-75`.\n\nPass. Producers now insert enum values directly: `commands/graph.rs:221` uses `by_state.entry(node.state)`, and `commands/snapshot.rs:272-275` uses `states.entry(issue.state)`. I found no remaining string-key construction for these maps.\n\nPass. The `main.rs` graph deps text consumer reads with `summary.by_state.get(&State::Done)` at `crates/jit/src/main.rs:2670-2673`.\n\nPass. JSON serialization is covered for both paths: graph summary regression at `crates/jit/src/commands/graph.rs:277-302`, and snapshot `IssuesInfo.states` regression at `crates/jit/src/snapshot.rs:349-381`. `State` derives serde `snake_case` at `crates/jit/src/domain/types.rs:19-20`.\n\n**Prior Review Feedback**\n\nResolved. The prior failed review flagged missing snapshot serialization coverage and missing `IssuesInfo` public API examples. The follow-up commit adds `test_issues_info_states_json_uses_snake_case_keys` at `crates/jit/src/snapshot.rs:349-381` and an `# Examples` section for `IssuesInfo` at `crates/jit/src/snapshot.rs:50-68`.\n\n**Jit Issue Management**\n\nPass. The issue has no dependencies. `./scripts/jit-validate.sh` passed with repository validation OK.\n\n**Architecture And Separation Of Concerns**\n\nPass. The changed code stays within existing boundaries: domain enum typing is reused, command code computes summaries, output/snapshot structs carry response data, and CLI code only consumes the computed summary. No new file access was introduced outside storage by this change.\n\n**Functional Paradigm**\n\nPass. Existing accumulator-style recursion in `commands/graph.rs:213-224` remains, but the change is narrowly scoped to replacing string keys with typed enum keys. Snapshot counting at `commands/snapshot.rs:271-275` is similarly local command orchestration.\n\n**Correctness And Invariants**\n\nPass. No changes affect gate semantics, assignee or label validation, event logging, PID handling, or state transitions. No new write paths were introduced by this patch.\n\n**Safety**\n\nPass. `#![deny(unsafe_code)]` remains in `crates/jit/src/lib.rs:6` and `crates/jit/src/main.rs:14`; no unsafe code appears in the reviewed changes.\n\n**Testing**\n\nPass. I did not rerun cargo tests because the issue has a succeeded cargo-ci gate. Latest provided cargo-ci evidence for commit `8593595f619b4e55a281730290514597c6072cd8` shows `fmt`, `clippy`, and `test` passed with `2528 passed, 0 failed, 12 ignored`.\n\n**Error Handling**\n\nPass. The patch adds no new fallible production operations and no new `unwrap()`/`expect()` in library code outside tests and doc examples.\n\n**CLI Contract**\n\nPass. No command lost `--json` support. The relevant JSON output still flows through serde-backed response structs, now with typed `State` keys.\n\n**Documentation**\n\nPass. The changed public APIs include examples: `DependencySummary` at `crates/jit/src/output.rs:726-743` and `IssuesInfo` at `crates/jit/src/snapshot.rs:50-68`.\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
