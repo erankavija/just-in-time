@@ -1,7 +1,7 @@
 {
   "id": "241a0c03-7299-4ca0-a7f5-1f56cbdd02b2",
   "title": "Pin the config-declared markdown source path with an isolated integration test",
-  "description": "A project-scoped, markdown-first item kind is already indexable purely from `[item_kinds]` config naming an arbitrary `.md` source (`project_items` -> `storage.read_repo_file` -> `index_project_sources`, commands/item.rs:213-242). This task proves that contract so a future change cannot silently re-narrow it.\n\nScope: add a dedicated integration test that, in an ISOLATED temp repo, writes an `[item_kinds]` table declaring a markdown kind over an arbitrary `.md` file and asserts that kinds items index with their qualified ids. Do NOT modify this repo`s real `.jit/config.toml` (a present `[item_kinds]` table replaces the built-ins verbatim, resolve_item_kinds item.rs:1232-1242; the dogfood `definition` declaration is added elsewhere (this task is limited to an isolated integration test and leaves this repo's real config unchanged)). No production Rust change.\n\n## Success Criteria\n- [hard] REQ-01: A config-declared markdown kind naming an arbitrary `.md` source indexes its items with no Rust change and without modifying this repo's real `.jit/config.toml`, verified by an integration test that builds the config and source in an isolated repo.\n",
+  "description": "A project-scoped, markdown-first item kind is already indexable purely from `[item_kinds]` config naming an arbitrary `.md` source (`project_items` -> `storage.read_repo_file` -> `index_project_sources`, commands/item.rs:213-242). This task proves that contract so a future change cannot silently re-narrow it.\n\nScope: add a dedicated integration test that, in an ISOLATED temp repo, writes an `[item_kinds]` table declaring a markdown kind over an arbitrary `.md` file and asserts that kind's items index with their qualified ids. Do NOT modify this repo's real `.jit/config.toml`; this task is limited to an isolated integration test and leaves this repo's real config unchanged. No production Rust change.\n\n## Success Criteria\n- [hard] REQ-01: A config-declared markdown kind naming an arbitrary `.md` source indexes its items with no Rust change and without modifying this repo's real `.jit/config.toml`, verified by an integration test that builds the config and source in an isolated repo.\n",
   "state": "backlog",
   "priority": "high",
   "assignee": null,
@@ -22,5 +22,5 @@
     "satisfies:REQ-01"
   ],
   "created_at": "2026-06-26T20:50:48.276834082Z",
-  "updated_at": "2026-06-26T21:16:12.633896474Z"
+  "updated_at": "2026-06-26T21:17:45.600878902Z"
 }
