@@ -1,7 +1,7 @@
 {
   "epic_id": "90a2dbfd-be54-46f2-b84a-b19382c6b0f2",
   "epic_short_id": "90a2dbfd",
-  "current_wave": 1,
+  "current_wave": 2,
   "waves": [
     {
       "wave_number": 1,
@@ -36,7 +36,7 @@
           "title": "Project the registry into a region of CLAUDE.md",
           "classification": "implementation",
           "satisfies": "REQ-06",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
