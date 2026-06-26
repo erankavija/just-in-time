@@ -745,28 +745,44 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// node carries a `doc`, per
     /// [`GraphTemplate::plan_doc_location`](crate::templates::GraphTemplate::plan_doc_location)),
     /// this resolves the criteria-source content from disk via the
-    /// [`plan_doc`](crate::commands::plan_doc) resolver, keyed by issue id. Issues
-    /// whose template declares no `doc` (an inline plan) — or any issue when the
-    /// template registry is empty — are OMITTED, so the engine falls back to the
-    /// issue's own description for them (an empty map reproduces the legacy
-    /// behavior exactly).
+    /// [`plan_doc`](crate::commands::plan_doc) resolver, keyed by issue id.
     ///
-    /// `plan_doc_location` templates are REPO-ROOT-relative, so the base dir
+    /// The plan-doc location is **doc-ref-canonical**: it is read from the
+    /// bracket's planning node's
+    /// [`PLAN_DOC_LABEL`](crate::commands::plan_doc::PLAN_DOC_LABEL)-labeled
+    /// [`DocumentReference`](crate::domain::DocumentReference), NOT the
+    /// `dev/active/{id}` template path. The template's `plan_doc_location` is only
+    /// the creation-time DEFAULT (`jit apply plan` seeds the reference from it);
+    /// once recorded, the reference is the validation-time source of truth, so a
+    /// plan that is moved/archived and re-linked keeps validating from its new
+    /// location with no leniency. The planning node is found by
+    /// [`find_planning_node`] (the breakdown node's `brackets:<id>` label and its
+    /// planning-node dependency).
+    ///
+    /// An issue is OMITTED from the map — so the engine falls back to the issue's
+    /// own description (the inline plan) — when: its template declares no `doc`;
+    /// the template registry is empty; no bracket planning node exists yet; or the
+    /// planning node records no external plan reference. An empty map reproduces
+    /// the legacy inline behavior exactly.
+    ///
+    /// A recorded plan reference's `path` is REPO-ROOT-relative, so the base dir
     /// passed to [`load_plan_content`](crate::commands::plan_doc::load_plan_content)
     /// is the repo root (the PARENT of `.jit`), NOT `storage.root()` (which is
     /// the `.jit` directory). This is the ONLY place external plan files are read
     /// for validation; the pure engine never touches the filesystem.
     ///
-    /// A missing external plan file is gated on the bracket's **planning node
-    /// state**: while the planning node has not yet completed, the plan is
-    /// legitimately unauthored, so the container is simply OMITTED from the map
-    /// (the engine falls back to its description) and no error is raised — this is
+    /// A missing plan file (the recorded reference points at a path that does not
+    /// exist) is gated on the bracket's **planning node state**: while the planning
+    /// node has not yet completed, the plan is legitimately unauthored, so the
+    /// container is simply OMITTED from the map and no error is raised — this is
     /// what lets a freshly-applied bracket validate cleanly before its plan
     /// exists. Once the planning node is `done` the plan MUST exist (downstream
     /// coverage reads its criteria), so a still-missing file surfaces as a
     /// [`PlanDocError`](crate::commands::plan_doc::PlanDocError). Any OTHER read
     /// failure (unreadable file, parse error) always surfaces as an error,
-    /// regardless of planning state — never a silent pass.
+    /// regardless of planning state — never a silent pass. (A *dangling*
+    /// reference is independently a hard `jit validate` error via
+    /// `validate_document_references`, in every lifecycle state.)
     ///
     /// # Examples
     ///
@@ -796,9 +812,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         let breakable: std::collections::HashSet<String> =
             templates.breakable_types().into_iter().collect();
 
-        // External plan templates are REPO-ROOT-relative (e.g.
-        // `dev/active/{id}-plan.md`), so the base dir is the repo root — the
-        // PARENT of `.jit` — NOT `storage.root()` (which is the `.jit` dir
+        // Recorded plan-reference paths are REPO-ROOT-relative (e.g.
+        // `dev/archive/features/<id>/plan.md`), so the base dir is the repo root —
+        // the PARENT of `.jit` — NOT `storage.root()` (which is the `.jit` dir
         // itself). Mirror `add_document_reference`'s repo-root derivation; fall
         // back to `storage.root()` only if it has no parent (a defensive case
         // that does not arise for a real `.jit` directory).
@@ -806,18 +822,18 @@ impl<S: IssueStore> CommandExecutor<S> {
         let base_dir = storage_root.parent().unwrap_or(storage_root);
 
         // Id → issue over the WHOLE store (not just `issues`), for resolving a
-        // bracket's planning node when deciding whether a missing plan is "not
-        // authored yet" (skip) or "due" (error). The scoped-validation slice bounds
-        // out the bracket infrastructure (B/P), so the planning node must be looked
-        // up against the full graph for the gate to be consistent across scopes.
+        // bracket's planning node — both to read its plan reference and to decide
+        // whether a missing plan is "not authored yet" (skip) or "due" (error).
+        // The scoped-validation slice bounds out the bracket infrastructure (B/P),
+        // so the planning node must be looked up against the full graph for the
+        // gate to be consistent across scopes.
         let all_issues = self.storage.list_issues()?;
         let by_id: std::collections::HashMap<&str, &Issue> =
             all_issues.iter().map(|i| (i.id.as_str(), i)).collect();
 
         let mut out = std::collections::HashMap::new();
         for issue in issues {
-            // The issue's `type:` label selects its template; the template's
-            // planning-node `doc` is the per-issue plan-doc location.
+            // The issue's `type:` label selects its template.
             let Some(issue_type) = issue
                 .labels
                 .iter()
@@ -829,12 +845,25 @@ impl<S: IssueStore> CommandExecutor<S> {
             let Some(template) = templates.template_for_container(issue_type) else {
                 continue;
             };
-            // No `doc` (an inline plan): skip — the engine uses the description.
-            let Some(location) = template.plan_doc_location() else {
+            // No `doc` on the planning-node template (an inline plan): skip — the
+            // engine uses the description.
+            if template.plan_doc_location().is_none() {
+                continue;
+            }
+
+            // Doc-ref-canonical: the plan lives wherever the bracket's planning
+            // node's `plan` reference points, not the template path. With no
+            // planning node, or none carrying an external plan reference, the plan
+            // is inline — skip so the engine reads the container's description.
+            let planning = find_planning_node(issue, template, &by_id);
+            let Some(plan_path) = planning.and_then(planning_node_plan_path) else {
                 continue;
             };
 
-            match load_plan_content(issue, location, &issue.id, base_dir) {
+            // `load_plan_content` treats a concrete path (no `{id}` placeholder)
+            // verbatim, reusing the same boundary read + typed error as the
+            // template path did.
+            match load_plan_content(issue, &plan_path, &issue.id, base_dir) {
                 Ok(content) => {
                     out.insert(issue.id.clone(), content);
                 }
@@ -845,7 +874,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     let not_authored_yet = matches!(
                         &e,
                         PlanDocError::Read { source, .. } if source.kind() == ErrorKind::NotFound
-                    ) && !planning_node_done(issue, template, &by_id);
+                    ) && !planning.is_some_and(|p| p.state == State::Done);
                     if not_authored_yet {
                         continue;
                     }
@@ -1742,40 +1771,58 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 }
 
-/// Whether `container`'s bracket has a completed planning node.
+/// Find `container`'s bracket planning node `P`, if one has been applied.
 ///
 /// A breakable container is bracketed by a breakdown node `B` (carrying
 /// `brackets:<container-short-id>`) that depends on a planning node `P` of the
-/// template's planning type. The plan is `P`'s deliverable, so the plan document
-/// is only "due" once `P` is `done`. Returns `false` when no bracket has been
-/// applied (no `B` found) or its planning node is not yet `done` — in which case
-/// a missing plan file is the legitimate not-yet-authored state, not an error.
+/// template's planning type. This walks that relationship — the `brackets:` label
+/// on `B`, then `B`'s planning-typed dependency — and returns `P`, or `None` when
+/// no bracket has been applied (no matching `B`, or its planning dependency is
+/// absent). The lookup is over the WHOLE store (`by_id`) so it stays consistent
+/// when the caller's slice bounds out the bracket infrastructure.
 ///
 /// Domain-agnostic: the planning type is read from the container's template, not
 /// hardcoded.
-fn planning_node_done(
+fn find_planning_node<'a>(
     container: &Issue,
     template: &crate::templates::GraphTemplate,
-    by_id: &std::collections::HashMap<&str, &Issue>,
-) -> bool {
-    let Some(planning_type) = template.planning_type() else {
-        return false;
-    };
+    by_id: &std::collections::HashMap<&str, &'a Issue>,
+) -> Option<&'a Issue> {
+    let planning_type = template.planning_type()?;
     let bracket_label = format!("brackets:{}", container.short_id());
     let planning_type_label = format!("type:{planning_type}");
 
     // The breakdown node carries the `brackets:<container>` label and depends on
-    // the planning node; find it, then check that planning dependency's state.
+    // the planning node; find it, then return that planning dependency.
     by_id
         .values()
         .filter(|b| b.labels.contains(&bracket_label))
-        .any(|b| {
-            b.dependencies.iter().any(|dep_id| {
-                by_id.get(dep_id.as_str()).is_some_and(|p| {
-                    p.state == State::Done && p.labels.contains(&planning_type_label)
-                })
+        .find_map(|b| {
+            b.dependencies.iter().find_map(|dep_id| {
+                by_id
+                    .get(dep_id.as_str())
+                    .copied()
+                    .filter(|p| p.labels.contains(&planning_type_label))
             })
         })
+}
+
+/// The repo-root-relative path of `planning`'s recorded plan document, if it has
+/// one.
+///
+/// Reads the planning node's
+/// [`PLAN_DOC_LABEL`](crate::commands::plan_doc::PLAN_DOC_LABEL)-labeled
+/// [`DocumentReference`](crate::domain::DocumentReference) — the validation-time
+/// source of truth for the plan-doc location. Returns `None` when the node
+/// records no such reference (the plan is inline, in the container's body).
+fn planning_node_plan_path(planning: &Issue) -> Option<String> {
+    use crate::commands::plan_doc::PLAN_DOC_LABEL;
+
+    planning
+        .documents
+        .iter()
+        .find(|d| d.label.as_deref() == Some(PLAN_DOC_LABEL))
+        .map(|d| d.path.clone())
 }
 
 /// Build a human-readable error message from any `error`-severity graph-rule

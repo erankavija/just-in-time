@@ -140,6 +140,58 @@ pub struct ArchiveResult {
     pub dry_run: bool,
 }
 
+/// Error raised by per-document archival
+/// ([`archive_document`](CommandExecutor::archive_document)).
+///
+/// Archival is reference-aware and referentially consistent: it relocates the
+/// document to the archive root AND re-links every issue doc-reference that
+/// points at it. Both pre-flight rejections in this enum fire BEFORE any
+/// filesystem or `.jit` mutation, so the operation is a no-op that never leaves
+/// or creates a dangling reference and never overwrites an existing file:
+/// [`ArchiveError::SourceMissing`] when there is nothing to relocate, and
+/// [`ArchiveError::DestinationOccupied`] when the archive path is already taken
+/// (archiving onto it would clobber a file that another reference may resolve
+/// to).
+///
+/// # Examples
+///
+/// ```
+/// use jit::commands::ArchiveError;
+///
+/// let missing = ArchiveError::SourceMissing {
+///     path: "dev/active/missing.md".to_string(),
+/// };
+/// // The message names the offending path.
+/// assert!(missing.to_string().contains("dev/active/missing.md"));
+///
+/// let occupied = ArchiveError::DestinationOccupied {
+///     path: "dev/archive/features/x/plan.md".to_string(),
+/// };
+/// assert!(occupied.to_string().contains("dev/archive/features/x/plan.md"));
+/// ```
+#[derive(Debug, thiserror::Error)]
+pub enum ArchiveError {
+    /// The source document does not exist on disk, so there is nothing to
+    /// archive. Raised before any filesystem or `.jit` change, so the archive is
+    /// a no-op when it fires.
+    #[error("cannot archive: source document not found at {path}")]
+    SourceMissing {
+        /// The repo-relative path that was requested for archival.
+        path: String,
+    },
+
+    /// A file already exists at the computed archive destination. Archiving onto
+    /// it would overwrite that file (and a later rollback would then delete it),
+    /// so archival is rejected before any filesystem or `.jit` change. The
+    /// archive is a no-op when it fires; resolve the conflict (rename or remove
+    /// the existing archived file) and retry.
+    #[error("cannot archive: destination already exists at {path}")]
+    DestinationOccupied {
+        /// The repo-relative archive path that is already occupied.
+        path: String,
+    },
+}
+
 /// Document content display result
 #[derive(Debug, Serialize)]
 pub struct DocumentContentResult {

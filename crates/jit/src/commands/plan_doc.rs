@@ -52,6 +52,34 @@ use crate::domain::{project, ContentFormat, Issue, Projection};
 /// ```
 pub const INLINE_LOCATION: &str = "inline";
 
+/// The document-reference label that marks a planning node's plan document.
+///
+/// A planning node records WHERE its container's plan lives as a
+/// [`DocumentReference`](crate::domain::DocumentReference) carrying this label.
+/// That reference is the validation-time source of truth for the plan-doc
+/// location: `jit validate` reads the plan from this reference's `path`, so a
+/// plan that is moved/archived and re-linked keeps validating from its new
+/// location. The graph template's `plan_doc_location` is only the creation-time
+/// default used by `jit apply plan` when first writing this reference.
+///
+/// # Examples
+///
+/// ```
+/// use jit::commands::plan_doc::PLAN_DOC_LABEL;
+/// use jit::domain::DocumentReference;
+///
+/// let plan_ref = DocumentReference {
+///     path: "dev/archive/features/abc/plan.md".to_string(),
+///     commit: None,
+///     label: Some(PLAN_DOC_LABEL.to_string()),
+///     doc_type: None,
+///     format: None,
+///     assets: Vec::new(),
+/// };
+/// assert_eq!(plan_ref.label.as_deref(), Some("plan"));
+/// ```
+pub const PLAN_DOC_LABEL: &str = "plan";
+
 /// The `{id}` placeholder substituted with the container id in an external
 /// plan-doc location template.
 const ID_PLACEHOLDER: &str = "{id}";
