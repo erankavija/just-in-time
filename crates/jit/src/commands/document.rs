@@ -1008,26 +1008,36 @@ fn check_asset_in_git(repo: &Option<git2::Repository>, path: &std::path::Path) -
 impl<S: IssueStore> CommandExecutor<S> {
     /// Archive a document and its per-doc assets to a configured archive directory.
     ///
-    /// Archival is **reference-aware and consistency-preserving**: it relocates
-    /// the document (and its per-doc assets) to the archive root AND re-links
-    /// every issue doc-reference that points at the old path to the new archive
-    /// path (the relink is [`update_issue_metadata`](Self::update_issue_metadata)).
+    /// Archival is **reference-aware**: it relocates the document (and its
+    /// per-doc assets) to the archive root AND re-links every issue
+    /// doc-reference that points at the old path to the new archive path (the
+    /// relink is [`update_issue_metadata`](Self::update_issue_metadata)).
     ///
-    /// The guarantee is that **no mid-operation failure leaves a dangling
-    /// reference**. The move is committed in two stages so that at every failure
-    /// point every reference resolves to a file that exists:
+    /// The guarantee is **referential consistency**, not all-or-nothing
+    /// transactionality. True atomicity across the document file, the N issue
+    /// JSON files, and the append-only event log is not achievable, so this is
+    /// *not* a transaction that either fully commits or fully aborts. Instead the
+    /// invariant is: **no single failure leaves a dangling reference, and no file
+    /// is removed while any reference could still point at it.** Under any single
+    /// failure every reference still resolves to a file that exists, though a
+    /// failed rollback may leave a reported duplicate (both source and archive
+    /// copy) for manual cleanup.
+    ///
+    /// The move is committed in stages so the invariant holds at every failure
+    /// point:
     ///
     /// 1. The document and per-doc assets are **copied** to the destination; the
     ///    sources are left in place, so references still resolve to the source.
-    /// 2. References are re-linked and the archive event is appended. While this
-    ///    runs both source and destination exist, so no reference can dangle. If
-    ///    it fails, the re-linked references are restored to the source and the
-    ///    just-created destination copies are removed, returning to the
-    ///    pre-archive state.
-    /// 3. Only after the relink and event persist are the old sources removed,
-    ///    committing the move. A removal failure here is non-fatal: references
-    ///    already resolve to the destination, so a leftover source is reported as
-    ///    a warning rather than an error.
+    /// 2. References are re-linked, then the archive event is appended. Both
+    ///    source and destination exist throughout, so no reference can dangle. On
+    ///    failure, [`rollback_archive`](Self::rollback_archive) restores the
+    ///    references to the source and removes the destination copies **only
+    ///    after confirming no reference still points at them**; if that cannot be
+    ///    confirmed it keeps both files (a reported duplicate) and errors loudly.
+    /// 3. Only after both the relink and the event persist are the old sources
+    ///    removed, committing the move. A removal failure here is non-fatal:
+    ///    references already resolve to the destination, so a leftover source is
+    ///    reported as a warning rather than an error.
     ///
     /// If the source file is missing the archive is a **no-op**: archivability is
     /// checked up front, before any filesystem or `.jit` mutation, so a missing
@@ -1145,16 +1155,13 @@ impl<S: IssueStore> CommandExecutor<S> {
             return Err(e);
         }
 
-        // 9. Commit point: re-link references, then append the archive event.
-        //    Both source and destination exist throughout, so no failure here
-        //    can dangle a reference. On failure we roll back to the pre-archive
-        //    state (references restored to the source, destination copies
-        //    removed) before returning the error.
+        // 9. Commit the move: re-link references, then append the archive event.
+        //    Both source and destination exist throughout, so any failure here
+        //    is rolled back to a state where every reference resolves to an
+        //    existing file — the destination copies are removed only once the
+        //    rollback confirms no reference still points at them.
         let updated_issues = match self.update_issue_metadata(path, dest_str) {
-            Err(e) => {
-                self.remove_archive_copies(&moved);
-                return Err(e);
-            }
+            Err(e) => return Err(self.rollback_archive(e, path, dest_str, &moved)),
             Ok(updated) => {
                 let event = crate::domain::Event::new_document_archived(
                     path.to_string(),
@@ -1162,21 +1169,17 @@ impl<S: IssueStore> CommandExecutor<S> {
                     category.to_string(),
                     updated.len(),
                 );
-                if let Err(e) = self.storage.append_event(&event) {
-                    // Restore references to the still-present source, then drop
-                    // the destination copies so nothing dangles.
-                    let _ = self.update_issue_metadata(dest_str, path);
-                    self.remove_archive_copies(&moved);
-                    return Err(e);
+                match self.storage.append_event(&event) {
+                    Err(e) => return Err(self.rollback_archive(e, path, dest_str, &moved)),
+                    Ok(()) => updated,
                 }
-                updated
             }
         };
 
-        // 10. The relink and event are persisted; remove the old sources to
-        //     complete the move. A removal failure is non-fatal: references
-        //     already resolve to the existing destination, so a leftover source
-        //     is only a warning.
+        // 10. The relink and event have persisted; remove the old sources to
+        //     complete the move (the commit point). A removal failure is
+        //     non-fatal: references already resolve to the existing destination,
+        //     so a leftover source is only a warning.
         let warnings = self.remove_archived_sources(&moved);
 
         // Return result with warnings (instead of printing)
@@ -1301,50 +1304,99 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(active_issues)
     }
 
-    /// Update issue metadata to reflect new document path
+    /// Re-link every issue doc-reference from `old_path` to `new_path`,
+    /// returning the ids of the issues that were changed.
+    ///
+    /// This is a plain forward relink: a per-issue save failure is propagated
+    /// immediately, so a mid-batch failure can leave the references partially
+    /// moved. The archive transaction recovers from that with
+    /// [`rollback_archive`](Self::rollback_archive), which restores references
+    /// and confirms the result before any file is removed; this function does
+    /// not attempt its own rollback.
     fn update_issue_metadata(&self, old_path: &str, new_path: &str) -> Result<Vec<String>> {
         use anyhow::Context;
 
-        // Pair every issue that references `old_path` with the re-linked clone,
-        // keeping the original so a mid-batch failure can be undone.
-        let pending: Vec<(Issue, Issue)> = self
-            .storage
-            .list_issues()?
-            .into_iter()
-            .filter_map(|original| {
-                let mut relinked = original.clone();
-                let changed = relinked
-                    .documents
-                    .iter_mut()
-                    .filter(|doc| doc.path == old_path)
-                    .fold(false, |_, doc| {
-                        doc.path = new_path.to_string();
-                        true
-                    });
-                changed.then_some((original, relinked))
-            })
-            .collect();
-
-        // Save each re-linked issue. The relink is all-or-nothing: if a save
-        // fails, restore the references already moved (best effort) before
-        // returning, so callers never observe a partial relink.
-        let mut saved_originals: Vec<Issue> = Vec::new();
-        for (original, relinked) in &pending {
-            if let Err(e) = self.storage.save_issue(relinked.clone()) {
-                for restore in &saved_originals {
-                    let _ = self.storage.save_issue(restore.clone());
-                }
-                return Err(e).with_context(|| {
-                    format!("Failed to re-link issue {} during archive", relinked.id)
+        let mut updated = Vec::new();
+        for mut issue in self.storage.list_issues()? {
+            let changed = issue
+                .documents
+                .iter_mut()
+                .filter(|doc| doc.path == old_path)
+                .fold(false, |_, doc| {
+                    doc.path = new_path.to_string();
+                    true
                 });
+
+            if changed {
+                let id = issue.id.clone();
+                self.storage
+                    .save_issue(issue)
+                    .with_context(|| format!("Failed to re-link issue {id} during archive"))?;
+                updated.push(id);
             }
-            saved_originals.push(original.clone());
         }
 
-        Ok(pending
-            .into_iter()
-            .map(|(original, _)| original.id)
-            .collect())
+        Ok(updated)
+    }
+
+    /// Count the issues whose document references still point at `path`.
+    ///
+    /// Used by [`rollback_archive`](Self::rollback_archive) to confirm that no
+    /// reference points at a destination copy before that copy may be removed.
+    fn count_references_to(&self, path: &str) -> Result<usize> {
+        Ok(self
+            .storage
+            .list_issues()?
+            .iter()
+            .filter(|issue| issue.documents.iter().any(|doc| doc.path == path))
+            .count())
+    }
+
+    /// Roll an in-flight archive back to the pre-archive state after a relink or
+    /// event-append failure, preserving the referential-consistency invariant:
+    /// *never remove a file while any reference could still point at it.*
+    ///
+    /// Re-links any reference that points at `dest_str` back to the still-present
+    /// source, then removes the destination copies **only after confirming that
+    /// no reference points at `dest_str` any more**. If any reference may still
+    /// point at the destination (the restore failed, or the confirmation check
+    /// itself errored), both the source and the destination copies are kept, so
+    /// every reference resolves to an existing file (possibly a duplicate), and a
+    /// loud, contextful error is returned. The original `cause` is preserved as
+    /// the error source.
+    fn rollback_archive(
+        &self,
+        cause: anyhow::Error,
+        src_str: &str,
+        dest_str: &str,
+        moved: &[(std::path::PathBuf, std::path::PathBuf)],
+    ) -> anyhow::Error {
+        // Best effort: move any reference still at the destination back to the
+        // source. Whether this fully succeeds is decided by the count below, so
+        // its own error is folded into the diagnostic rather than trusted.
+        let restore = self.update_issue_metadata(dest_str, src_str);
+
+        match self.count_references_to(dest_str) {
+            Ok(0) => {
+                // Confirmed: nothing points at the destination, so removing the
+                // copies cannot dangle a reference.
+                self.remove_archive_copies(moved);
+                cause.context(format!(
+                    "archive aborted and rolled back: every reference restored to {src_str}"
+                ))
+            }
+            Ok(remaining) => cause.context(format!(
+                "archive aborted but rollback is incomplete: {remaining} reference(s) still \
+                 point at {dest_str}, so the archive copy was kept alongside the source — \
+                 every reference still resolves, but a duplicate at {dest_str} needs manual \
+                 cleanup (restore attempt: {restore:?})"
+            )),
+            Err(check_err) => cause.context(format!(
+                "archive aborted and the rollback could not be verified ({check_err:#}), so the \
+                 archive copy was kept alongside the source — every reference still resolves, \
+                 but a possible duplicate at {dest_str} needs manual cleanup"
+            )),
+        }
     }
 
     /// Scan document and classify assets as per-doc vs shared

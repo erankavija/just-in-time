@@ -216,3 +216,130 @@ fn test_archive_relink_failure_leaves_consistent_state() {
         "the destination copy is removed on rollback"
     );
 }
+
+/// Assert the referential-consistency invariant: every issue's recorded
+/// doc-reference resolves to a file that exists on disk (nothing dangles).
+fn assert_no_dangling_reference(
+    repo_root: &TempDir,
+    executor: &CommandExecutor<JsonFileStorage>,
+    ids: &[&String],
+) {
+    for id in ids {
+        let referenced = referenced_path(executor, id);
+        assert!(
+            repo_root.path().join(&referenced).exists(),
+            "issue {id} references {referenced}, which must resolve to an existing file"
+        );
+    }
+}
+
+#[test]
+fn test_archive_event_failure_after_relink_leaves_no_dangling_reference() {
+    // The references are re-linked successfully, then the archive event fails to
+    // persist. The rollback must restore every reference to the still-present
+    // source so nothing dangles. We force the event failure by replacing
+    // `.jit/events.jsonl` with a directory, which `append_event` cannot open for
+    // appending; the issue saves (relink + rollback) are unaffected.
+    let (repo_root, executor) = executor();
+
+    let src = "dev/active/spec.md";
+    std::fs::create_dir_all(repo_root.path().join("dev/active")).unwrap();
+    std::fs::write(repo_root.path().join(src), "# Spec\n\nProse only.\n").unwrap();
+
+    let a = seed_issue_referencing(&executor, "alpha", src);
+    let b = seed_issue_referencing(&executor, "beta", src);
+
+    // Make event persistence fail: a directory where the event log file belongs.
+    let events_path = repo_root.path().join(".jit/events.jsonl");
+    let _ = std::fs::remove_file(&events_path);
+    std::fs::create_dir(&events_path).unwrap();
+
+    let result = executor.archive_document(src, "design", false, false);
+
+    assert!(
+        result.is_err(),
+        "an event-append failure after relink must surface as an error"
+    );
+
+    // Invariant: every reference resolves to an existing file. The rollback
+    // restored both references to the source.
+    assert_no_dangling_reference(&repo_root, &executor, &[&a, &b]);
+    assert!(
+        repo_root.path().join(src).exists(),
+        "the source is left in place when the event append fails"
+    );
+    assert_eq!(
+        referenced_path(&executor, &a),
+        src,
+        "references are restored to the source on rollback"
+    );
+
+    // The destination copy was removed once the rollback confirmed no reference
+    // points at it.
+    assert!(
+        !repo_root
+            .path()
+            .join("dev/archive/features/spec.md")
+            .exists(),
+        "the destination copy is removed after a confirmed rollback"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn test_archive_partial_relink_failure_leaves_no_dangling_reference() {
+    // Three issues reference the document. The first relink succeeds, then a
+    // later one fails mid-batch. The rollback must leave every reference
+    // resolving to an existing file. We force the second issue's `save_issue` to
+    // fail by pre-occupying its atomic-write temp path (`{id}.json.tmp`) with a
+    // directory: reads of `{id}.json` still succeed (so the issue is relinked),
+    // but the temp-file write during save fails.
+    let (repo_root, executor) = executor();
+
+    let src = "dev/active/spec.md";
+    std::fs::create_dir_all(repo_root.path().join("dev/active")).unwrap();
+    std::fs::write(repo_root.path().join(src), "# Spec\n\nProse only.\n").unwrap();
+
+    // Seed order fixes the relink order (index push order), so `beta` is the
+    // second issue processed and the one we make fail.
+    let a = seed_issue_referencing(&executor, "alpha", src);
+    let b = seed_issue_referencing(&executor, "beta", src);
+    let c = seed_issue_referencing(&executor, "gamma", src);
+
+    // Block `beta`'s save: a directory at its atomic-write temp path.
+    let beta_tmp = repo_root.path().join(format!(".jit/issues/{b}.json.tmp"));
+    std::fs::create_dir(&beta_tmp).unwrap();
+
+    let result = executor.archive_document(src, "design", false, false);
+
+    // Remove the injected blocker so subsequent saves/reads are unaffected.
+    std::fs::remove_dir(&beta_tmp).unwrap();
+
+    assert!(
+        result.is_err(),
+        "a mid-batch relink failure must surface as an error"
+    );
+
+    // Invariant: every reference resolves to an existing file, regardless of how
+    // far the partial relink got. The rollback restored the already-relinked
+    // `alpha` to the source; `beta` and `gamma` were never moved.
+    assert_no_dangling_reference(&repo_root, &executor, &[&a, &b, &c]);
+    for id in [&a, &b, &c] {
+        assert_eq!(
+            referenced_path(&executor, id),
+            src,
+            "issue {id} is restored to / left at the source on rollback"
+        );
+    }
+    assert!(
+        repo_root.path().join(src).exists(),
+        "the source is left in place when the relink fails partway"
+    );
+    assert!(
+        !repo_root
+            .path()
+            .join("dev/archive/features/spec.md")
+            .exists(),
+        "the destination copy is removed after a confirmed rollback"
+    );
+}
