@@ -199,8 +199,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let container = self.storage.load_issue(&full_container_id)?;
 
         // Container type ∈ applies_to.
-        let container_type = type_label_value(&container.labels);
-        match container_type.as_deref() {
+        match label_utils::type_label_value(&container.labels) {
             Some(ty) if template.applies_to.iter().any(|a| a == ty) => {}
             Some(ty) => {
                 return Err(anyhow!(
@@ -306,7 +305,8 @@ impl<S: IssueStore> CommandExecutor<S> {
             if let Some(planning_type) = template.planning_type() {
                 let existing_planning = container.dependencies.iter().find_map(|dep_id| {
                     let dep = self.storage.load_issue(dep_id).ok()?;
-                    (type_label_value(&dep.labels).as_deref() == Some(planning_type)).then_some(dep)
+                    (label_utils::type_label_value(&dep.labels) == Some(planning_type))
+                        .then_some(dep)
                 });
                 if let Some(planning) = existing_planning {
                     return Err(anyhow!(
@@ -867,7 +867,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         };
         let bracket_label = format!("brackets:{}", container.short_id());
         let found = self.storage.list_issues()?.into_iter().find(|issue| {
-            type_label_value(&issue.labels).as_deref() == Some(&breakdown_node.type_name)
+            label_utils::type_label_value(&issue.labels) == Some(breakdown_node.type_name.as_str())
                 && issue.labels.iter().any(|l| l == &bracket_label)
         });
         Ok(found.map(|issue| issue.id))
@@ -877,7 +877,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     fn find_dep_by_type(&self, issue: &Issue, type_name: &str) -> Result<Option<String>> {
         for dep_id in &issue.dependencies {
             let dep = self.storage.load_issue(dep_id)?;
-            if type_label_value(&dep.labels).as_deref() == Some(type_name) {
+            if label_utils::type_label_value(&dep.labels) == Some(type_name) {
                 return Ok(Some(dep.id));
             }
         }
@@ -942,11 +942,7 @@ fn inherited_membership_labels(container: &Issue) -> Vec<String> {
     container
         .labels
         .iter()
-        .filter(|l| {
-            label_utils::parse_label(l)
-                .map(|(ns, _)| ns != "type")
-                .unwrap_or(true)
-        })
+        .filter(|l| !label_utils::is_type_label(l))
         .cloned()
         .collect()
 }
@@ -989,15 +985,6 @@ fn node_description(node: &TemplateNode, context: &InterpolationContext) -> Stri
     } else {
         interpolated
     }
-}
-
-/// Pull the `type:*` value out of a label list, if present (pure helper).
-fn type_label_value(labels: &[String]) -> Option<String> {
-    labels.iter().find_map(|l| {
-        label_utils::parse_label(l)
-            .ok()
-            .and_then(|(ns, v)| (ns == "type").then_some(v))
-    })
 }
 
 /// Fixed token-substitution context for template interpolation (PURE: no I/O).
@@ -1091,7 +1078,7 @@ mod tests {
             String::new(),
             vec!["type:epic".to_string(), "area:auth".to_string()],
         );
-        assert_eq!(type_label_value(&issue.labels).as_deref(), Some("epic"));
+        assert_eq!(label_utils::type_label_value(&issue.labels), Some("epic"));
     }
 
     #[test]
