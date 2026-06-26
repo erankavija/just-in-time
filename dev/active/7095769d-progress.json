@@ -20,7 +20,7 @@
           "title": "Key by_state count maps by the State enum",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "rework-1: code-review (IssuesInfo # Examples + snapshot snake_case test)"
+          "status": "DONE (both gates green, .jit committed on branch)"
         },
         {
           "id": "70ca9e3a-2856-47e4-b5e0-7d94e7373a2c",
@@ -28,7 +28,7 @@
           "title": "Type the worktree and item-kind config enums",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "gated-passed: cargo-ci + code-review GREEN; pending batch integration"
+          "status": "DONE (both gates green, .jit committed on branch)"
         },
         {
           "id": "d0edc072-4fbe-4f52-b05a-8b389239e6b7",
@@ -36,7 +36,7 @@
           "title": "Replace storage eprintln! diagnostics with typed warnings",
           "classification": "implementation",
           "model": "opus",
-          "status": "rework-1: code-review (surface WorktreeRelocated on claim/worktree cmd paths)"
+          "status": "rework-2: code-review (add TempCleanupFailed test + audit all StorageWarning variants)"
         },
         {
           "id": "bf0034e1-dc29-4dcd-bb4a-d64dd96fed8b",
@@ -44,7 +44,7 @@
           "title": "Domain newtype nits: timestamps, Assignee, group_labels",
           "classification": "implementation",
           "model": "opus",
-          "status": "rework-1: code-review (Assignee on event fields + constructors)"
+          "status": "DONE (both gates green, .jit committed on branch)"
         }
       ]
     },
@@ -133,7 +133,7 @@
   "escalations": [],
   "rework_counts": {
     "397d98df": 1,
-    "d0edc072": 1,
+    "d0edc072": 2,
     "bf0034e1": 1
   },
   "started_at": "2026-06-25T22:01:45Z"
