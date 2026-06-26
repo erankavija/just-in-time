@@ -1,0 +1,32 @@
+{
+  "epic_id": "90a2dbfd-be54-46f2-b84a-b19382c6b0f2",
+  "epic_short_id": "90a2dbfd",
+  "current_wave": 1,
+  "waves": [
+    {
+      "wave_number": 1,
+      "issues": [
+        {"id": "241a0c03-7299-4ca0-a7f5-1f56cbdd02b2", "short_id": "241a0c03", "title": "Pin the config-declared markdown source path with an isolated integration test", "classification": "implementation", "satisfies": "REQ-01", "status": "pending"},
+        {"id": "5ff3a6ae", "short_id": "5ff3a6ae", "title": "Generalize the registry seam to a config-declared toml source descriptor", "classification": "implementation", "satisfies": "REQ-02", "status": "pending"},
+        {"id": "73d98a98-1ab9-4a5b-9022-5e34298ec6d4", "short_id": "73d98a98", "title": "Drop the enforced-but-undeclared drift direction", "classification": "implementation", "satisfies": "REQ-05", "status": "pending"},
+        {"id": "96f0c39f-bd6f-44a0-9dac-5b366ada1999", "short_id": "96f0c39f", "title": "Project the registry into a region of CLAUDE.md", "classification": "implementation", "satisfies": "REQ-06", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 2,
+      "issues": [
+        {"id": "f6318259", "short_id": "f6318259", "title": "Retire the reserved invariant name and route registry selection through the source descriptor", "classification": "implementation", "satisfies": "REQ-03", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 3,
+      "issues": [
+        {"id": "fbe0a401-ac86-47f8-a87f-b0760d06283b", "short_id": "fbe0a401", "title": "Demote baked default kinds to a jit-init-authored item_kinds table", "classification": "implementation", "satisfies": "REQ-04", "status": "pending"}
+      ]
+    }
+  ],
+  "created_during_execution": [],
+  "escalations": [],
+  "rework_counts": {},
+  "started_at": "2026-06-27T00:00:00Z"
+}

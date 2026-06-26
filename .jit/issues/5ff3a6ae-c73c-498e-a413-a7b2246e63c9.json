@@ -2,9 +2,9 @@
   "id": "5ff3a6ae-c73c-498e-a413-a7b2246e63c9",
   "title": "Generalize the registry seam to a config-declared toml source descriptor",
   "description": "Today the registry-first (`.toml`) source path is wired to exactly one registry: `InvariantRegistry::load(.jit/invariants.toml)` (config.rs:1232/1271), selected by a hard `kind.name()==INVARIANT_KIND_NAME` guard (commands/item.rs:202); any other registry-first kind errors as `UnknownRegistrySource` (commands/item.rs:205-212). The `source` field is markdown-path-only `Option<String>` (config.rs:326-332).\n\nScope: extend the kind `source` to express a structured toml descriptor (toml path + table + self-id field + text field + link-namespace fields). A generic loader builds `RawScopeItem` rows from that descriptor and feeds them into `index_project_sources` (item.rs:1155-1169), superseding `invariant_raw_items`. Keep `InvariantRegistry` (validation/invariants.rs) as the typed/validated invariant loader. All toml IO goes through the storage boundary (`read_repo_file`), not `std::fs`. New public surfaces carry `# Examples`, typed thiserror errors.\n\n## Success Criteria\n- [hard] REQ-02: A non-invariant registry-first kind is backed by a custom `.toml` through the declared field mapping (self-id, text, link-namespace fields), verified by a test indexing that kind from the custom toml; the toml read goes through the storage boundary and the existing invariant indexing path still passes.\n",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [
     "10ce6962-8973-4357-b836-da8c0b3a6789"
   ],
@@ -22,5 +22,5 @@
     "epic:item-sources"
   ],
   "created_at": "2026-06-26T20:50:48.313082243Z",
-  "updated_at": "2026-06-26T21:21:00.714356665Z"
+  "updated_at": "2026-06-26T21:27:32.649078338Z"
 }
