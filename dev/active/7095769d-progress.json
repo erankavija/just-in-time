@@ -108,7 +108,7 @@
           "title": "Shared type: label-namespace helper",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "dispatched 5a (worktree agent-e3e6d47d base b673231e; sonnet t5-label-helper)"
+          "status": "rework R3 (USER-APPROVED past cap). 3x code-review FAIL on criterion-1 centralization; ESCALATED -> user chose Complete-centralization. Design: type_value_of primitive + type_label_values iterator in labels.rs; route extract_type/projection/graph through them. cargo-ci green throughout; only code-review criterion-1 blocking."
         },
         {
           "id": "99908d7b-e777-44c4-90f1-33ca3e87b0d6",
@@ -142,6 +142,17 @@
       "decision": "User chose: amend criterion to referential consistency (no dangling ref, no data loss, no-clobber). Full journaled atomicity stays tracked in f16cfe8c.",
       "resolution": "Amended f067678a success criterion (user-approved). Fixed finding 1 (data-loss clobber) with typed ArchiveError::DestinationOccupied + fail-fast pre-existence check + test. Commits b4168372 (code) + b8230dc8 (.jit) in worktree agent-f067678a.",
       "resolved_at": "2026-06-26"
+    },
+    {
+      "issue": "e3e6d47d",
+      "triggers": [
+        "5 rework cap 2/2",
+        "5a same-finding 3x",
+        "3/4 criterion-interpretation"
+      ],
+      "question": "Criterion 1 'shared type_label_value is the ONLY place that knows type: encoding' failed code-review 3x; reviewer wants extract_type/graph/projection to delegate EXTRACTION (not just the namespace const) to the helper, but they have different shapes (extract_type=strict parser+normalize+Result; graph=ALL values; projection=first).",
+      "decision": "User chose: Complete centralization (1 approved round past cap). Add type_value_of (single-label primitive) + type_label_values (iterator) in labels.rs; route extract_type/projection/graph through them; behavior byte-identical. No criterion amendment.",
+      "resolved_at": "2026-06-26"
     }
   ],
   "rework_counts": {
@@ -149,7 +160,8 @@
     "d0edc072": 2,
     "bf0034e1": 1,
     "f067678a": 2,
-    "b9a28509": 2
+    "b9a28509": 2,
+    "e3e6d47d": 3
   },
   "b9a28509_rework_r2": "AT CAP (2/2). R1 fixes verified (ripgrep typed, message-text audit, +3 latent regressions closed). Re-gate on 9b440259: cargo-ci green, code-review FAIL 1 new finding \u2014 gate.rs:869 create_gate_preset uses GENERIC NotFoundError (chosen in R1 to preserve the 'Gate not found in registry: {key}' text, which differs from GateNotFoundError::single's wording), violating criterion 1 (gate-not-found must be the DEDICATED typed variant). Flip side of the R1 message fix. R2: add a GateNotFoundError variant (InRegistry) whose Display is byte-identical to that text; use it; audit ALL generic-NotFoundError sites to use dedicated types where one exists. Next distinct finding -> ESCALATE (cap reached). NOTE: t3 amended a commit mid-gate once (d9a29d8e->9b440259, inert +5-line comment); told it to use new commits, not amend, during gates.",
   "b9a28509_rework_r1": "cargo-ci green; code-review FAIL (2 legit findings): (1) a 6th string-classification site at main.rs:4354 (search Err handler picks RIPGREP_NOT_FOUND vs SEARCH_FAILED via e.to_string().contains('not installed')) -> type at the rg-spawn origin via io::ErrorKind::NotFound; (2) message-text regression: GateNotFoundError::single Display 'Gate '{0}' not found in registry' != original 'Gate not found in registry: {gate_key}'. Sent rework demanding COMPLETE per-origin message-preservation audit (byte-identical Display to pre-refactor text at every typed origin) + full main.rs string-control-flow grep, to avoid round-by-round churn.",
