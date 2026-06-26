@@ -1943,32 +1943,9 @@ fn run() -> Result<()> {
                 priority,
                 json,
             } => {
-                use jit::domain::{GateChecker, GateMode, GateStage};
+                use jit::domain::GateChecker;
 
                 let output_ctx = OutputContext::new(quiet, json);
-
-                // Parse stage
-                let gate_stage = match stage.to_lowercase().as_str() {
-                    "precheck" => GateStage::Precheck,
-                    "postcheck" => GateStage::Postcheck,
-                    _ => {
-                        eprintln!(
-                            "Error: Invalid stage '{}'. Use 'precheck' or 'postcheck'",
-                            stage
-                        );
-                        std::process::exit(2);
-                    }
-                };
-
-                // Parse mode
-                let gate_mode = match mode.to_lowercase().as_str() {
-                    "manual" => GateMode::Manual,
-                    "auto" => GateMode::Auto,
-                    _ => {
-                        eprintln!("Error: Invalid mode '{}'. Use 'manual' or 'auto'", mode);
-                        std::process::exit(2);
-                    }
-                };
 
                 // Parse --env KEY=VALUE pairs into a HashMap
                 let env_map: std::collections::HashMap<String, String> = env
@@ -2004,8 +1981,8 @@ fn run() -> Result<()> {
                     key.clone(),
                     title.clone(),
                     description.clone(),
-                    gate_stage,
-                    gate_mode,
+                    stage,
+                    mode,
                     checker,
                     priority,
                 ) {
@@ -2538,17 +2515,12 @@ fn run() -> Result<()> {
                                 println!("Description: {}", preset.description);
                                 println!("\nGates:");
                                 for gate in &preset.gates {
-                                    let stage_str = match gate.stage {
-                                        jit::domain::GateStage::Precheck => "precheck",
-                                        jit::domain::GateStage::Postcheck => "postcheck",
-                                    };
-                                    let mode_str = match gate.mode {
-                                        jit::domain::GateMode::Manual => "manual",
-                                        jit::domain::GateMode::Auto => "auto",
-                                    };
                                     println!(
                                         "  {} - {} ({}:{})",
-                                        gate.key, gate.title, stage_str, mode_str
+                                        gate.key,
+                                        gate.title,
+                                        gate.stage.as_str(),
+                                        gate.mode.as_str()
                                     );
                                     if let Some(checker) = &gate.checker {
                                         match checker {
@@ -2809,24 +2781,8 @@ fn run() -> Result<()> {
                 if json {
                     use jit::output::{GateDefinition, JsonOutput, RegistryListResponse};
 
-                    let gate_defs: Vec<GateDefinition> = gates
-                        .iter()
-                        .map(|g| GateDefinition {
-                            key: g.key.clone(),
-                            title: g.title.clone(),
-                            description: g.description.clone(),
-                            auto: g.auto,
-                            example_integration: g.example_integration.clone(),
-                            stage: match g.stage {
-                                jit::domain::GateStage::Precheck => "precheck".to_string(),
-                                jit::domain::GateStage::Postcheck => "postcheck".to_string(),
-                            },
-                            mode: match g.mode {
-                                jit::domain::GateMode::Manual => "manual".to_string(),
-                                jit::domain::GateMode::Auto => "auto".to_string(),
-                            },
-                        })
-                        .collect();
+                    let gate_defs: Vec<GateDefinition> =
+                        gates.into_iter().map(GateDefinition::from).collect();
 
                     let response = RegistryListResponse {
                         count: gate_defs.len(),
@@ -2870,22 +2826,8 @@ fn run() -> Result<()> {
                 if json {
                     use jit::output::{GateDefinition, JsonOutput};
 
-                    let gate_def = GateDefinition {
-                        key: gate.key.clone(),
-                        title: gate.title.clone(),
-                        description: gate.description.clone(),
-                        auto: gate.auto,
-                        example_integration: gate.example_integration.clone(),
-                        stage: match gate.stage {
-                            jit::domain::GateStage::Precheck => "precheck".to_string(),
-                            jit::domain::GateStage::Postcheck => "postcheck".to_string(),
-                        },
-                        mode: match gate.mode {
-                            jit::domain::GateMode::Manual => "manual".to_string(),
-                            jit::domain::GateMode::Auto => "auto".to_string(),
-                        },
-                    };
-                    let msg = format!("Gate {}: {}", gate_def.key, gate_def.title);
+                    let msg = format!("Gate {}: {}", gate.key, gate.title);
+                    let gate_def = GateDefinition::from(gate);
                     let output = JsonOutput::success(gate_def, "registry show").with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else {
