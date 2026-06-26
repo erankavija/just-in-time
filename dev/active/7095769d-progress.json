@@ -145,8 +145,9 @@
     "d0edc072": 2,
     "bf0034e1": 1,
     "f067678a": 2,
-    "b9a28509": 1
+    "b9a28509": 2
   },
+  "b9a28509_rework_r2": "AT CAP (2/2). R1 fixes verified (ripgrep typed, message-text audit, +3 latent regressions closed). Re-gate on 9b440259: cargo-ci green, code-review FAIL 1 new finding — gate.rs:869 create_gate_preset uses GENERIC NotFoundError (chosen in R1 to preserve the 'Gate not found in registry: {key}' text, which differs from GateNotFoundError::single's wording), violating criterion 1 (gate-not-found must be the DEDICATED typed variant). Flip side of the R1 message fix. R2: add a GateNotFoundError variant (InRegistry) whose Display is byte-identical to that text; use it; audit ALL generic-NotFoundError sites to use dedicated types where one exists. Next distinct finding -> ESCALATE (cap reached). NOTE: t3 amended a commit mid-gate once (d9a29d8e->9b440259, inert +5-line comment); told it to use new commits, not amend, during gates.",
   "b9a28509_rework_r1": "cargo-ci green; code-review FAIL (2 legit findings): (1) a 6th string-classification site at main.rs:4354 (search Err handler picks RIPGREP_NOT_FOUND vs SEARCH_FAILED via e.to_string().contains('not installed')) -> type at the rg-spawn origin via io::ErrorKind::NotFound; (2) message-text regression: GateNotFoundError::single Display 'Gate '{0}' not found in registry' != original 'Gate not found in registry: {gate_key}'. Sent rework demanding COMPLETE per-origin message-preservation audit (byte-identical Display to pre-refactor text at every typed origin) + full main.rs string-control-flow grep, to avoid round-by-round churn.",
   "started_at": "2026-06-25T22:01:45Z",
   "wave1_completed": "All 4 issues DONE, both gates green, merged to main (commit de139bc7). t7 took 2 rework rounds (relocation propagation, then TempCleanupFailed test coverage).",
