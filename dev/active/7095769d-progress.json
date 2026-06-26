@@ -1,7 +1,7 @@
 {
   "epic_id": "7095769d-0487-417d-a807-233845433a76",
   "epic_short_id": "7095769d",
-  "current_wave": 4,
+  "current_wave": 5,
   "model_policy": "Sonnet for mechanical/well-specified tasks, Opus for architectural/cross-cutting judgment",
   "external_parallel_work": "Another worker actively churns the validation/ + commands/{mod,validate} hot zone on main. Waves are ordered so my code touches files disjoint from that hot zone first; t5/t6/t8/t10 (which collide) are deferred to Wave 5 and re-checked then. main is dirty intermittently; integrate only during clean windows; never run destructive git ops on main while external work is uncommitted.",
   "operational_notes": [
@@ -86,13 +86,13 @@
           "title": "Typed scope/format/blocked-reason enums",
           "classification": "implementation",
           "model": "opus",
-          "status": "dispatched (Wave 4; worktree agent-6e7f54a7 base 64403d7d; Opus worker t9-typed-enums; BlockingReason enum in domain/queries.rs + DocumentScope FromStr mirroring SnapshotScope + GraphExportFormat ValueEnum; commands/* may collide with external epic 52ad3b1f -> merge carefully)"
+          "status": "DONE (both gates green first try, no rework; merged to main clean; leak check clean; binary reinstalled)"
         }
       ]
     },
     {
       "wave_number": 5,
-      "note": "External hot-zone tasks. Dispatch after external validation/commands work lands; re-check collisions. t8/t5/t10 mutually disjoint can parallelize; t6 solo (collides with t5,t10 + main.rs).",
+      "note": "External hot-zone CLEARED: epic 52ad3b1f is DONE (its validation/commands churn landed on main; agent-d4188154 worktree has 0 commits vs main + clean tree). Re-checked collisions: t5/t8/t10 are FILE-DISJOINT (t5: labels.rs+commands/{issue,batch_create,breakdown,validate}; t8: query_engine/{parser,lexer}+validation/rules.rs; t10: validation/{graph,report}+commands/mod.rs) -> sub-wave 5a PARALLEL. t6 touches commands/{mod,validate}.rs (overlaps t5+t10) -> sub-wave 5b SOLO after 5a merges. Gate runs serialized (one worktree at a time) even though work is parallel.",
       "issues": [
         {
           "id": "44450437-d807-4e33-bf10-3a3eb9af29ad",
