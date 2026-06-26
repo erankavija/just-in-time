@@ -268,9 +268,10 @@ pub struct NamespaceConfig {
 /// `scope = "project"` and a `source` file (a repository-local path, relative to
 /// the repo root) whose markdown is scanned the SAME way an issue description is. It
 /// still declares all six required fields (the optional `source` PATH is in
-/// addition). The example uses `glossary` (a non-reserved name); the built-in
-/// `invariant` kind is reserved as project-scoped AND registry-first, so it has no
-/// `source` path and its items come only from `.jit/invariants.toml`:
+/// addition). The example uses `glossary`; the built-in `invariant` kind is an
+/// ordinary registry-first kind whose `source` is a toml descriptor pointing at
+/// `.jit/invariants.toml` (a markdown `source` path applies only to markdown-first
+/// kinds):
 ///
 /// ```
 /// use jit::config::{JitConfig, KindScopeConfig};
@@ -2358,10 +2359,10 @@ scope = "project"
 source = "policies.toml"
 source-of-truth = "registry-first"
 "#;
-        // Uses a non-reserved name `policy` for the registry-first example: the
-        // direction (`source-of-truth`) is independent of the `source` PATH field.
-        // (The built-in `invariant` kind is itself reserved as project + registry-
-        // first with NO source path; this test only exercises the typed parse.)
+        // Uses `policy` for the registry-first example: the direction
+        // (`source-of-truth`) is independent of the `source` field. (The built-in
+        // `invariant` kind is an ordinary registry-first kind too; this test only
+        // exercises the typed parse.)
         let config: JitConfig = toml::from_str(config_toml).unwrap();
         config
             .validate_item_kinds()

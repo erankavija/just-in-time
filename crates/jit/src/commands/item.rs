@@ -492,9 +492,8 @@ mod tests {
     /// appended to the `[item_kinds]` block; `source_md` (when `Some`) seeds the
     /// source.
     ///
-    /// Uses the non-reserved name `glossary` (not `invariant`, which is reserved as
-    /// a registry-first kind) to exercise generic markdown-first project-scope
-    /// sourcing.
+    /// Uses the name `glossary` to exercise the generic markdown-first
+    /// project-scope sourcing path.
     fn project_exec(
         source_md: Option<&str>,
         extra_config: &str,
@@ -672,8 +671,8 @@ mod tests {
     /// descriptor (`toml`/`table`/`id-field`/`text-field`/`link-fields`). The
     /// descriptor's toml file is served through the in-memory repo-file map (the
     /// storage boundary, NO real filesystem read); `policies_toml` (when `Some`)
-    /// seeds it. Uses the non-reserved name `policy` so the GENERIC toml-descriptor
-    /// path is exercised, distinct from the reserved `invariant` registry path.
+    /// seeds it. Uses `policy` to exercise the GENERIC toml-descriptor path, the
+    /// same path the built-in `invariant` kind now routes through.
     fn policy_exec(policies_toml: Option<&str>) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
         storage.init().unwrap();

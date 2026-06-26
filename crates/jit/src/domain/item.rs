@@ -816,8 +816,10 @@ impl ItemKind {
     }
 
     /// The structured TOML source descriptor a registry-first project kind reads
-    /// its items from, or `None` for any other kind (issue-scope, markdown-first,
-    /// or the registry-backed `invariant` kind, which carries no descriptor).
+    /// its items from, or `None` for an issue-scope or markdown-first kind. The
+    /// built-in `invariant` kind is an ordinary registry-first kind, so it returns
+    /// `Some(descriptor)` (its descriptor names `.jit/invariants.toml`) like any
+    /// other toml-source kind.
     ///
     /// When present, [`commands`](crate::commands) reads the descriptor's `toml`
     /// file through the storage boundary and projects each table entry into an
