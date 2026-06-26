@@ -3911,3 +3911,4 @@
 {"type":"issue_updated","id":"b6891459-4a3e-41ca-8701-50cee2115f13","issue_id":"90a2dbfd-be54-46f2-b84a-b19382c6b0f2","timestamp":"2026-06-26T20:51:58.939851849Z","updated_by":"dependency-add","fields":["dependencies"]}
 {"type":"issue_state_changed","id":"7ba62381-55ea-4242-8ad3-b1c70a2320d4","issue_id":"10ce6962-8973-4357-b836-da8c0b3a6789","timestamp":"2026-06-26T20:52:57.377365358Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"e8ee9b2a-ab55-452b-b537-1336f6c3b682","issue_id":"10ce6962-8973-4357-b836-da8c0b3a6789","timestamp":"2026-06-26T20:52:57.380205809Z","assignee":"agent:claude"}
+{"type":"gate_passed","id":"119ef8f9-28d2-42ad-9657-6938b9ee5cfb","issue_id":"10ce6962-8973-4357-b836-da8c0b3a6789","timestamp":"2026-06-26T20:53:11.138315925Z","gate_key":"coverage-preview","updated_by":"auto:executor"}

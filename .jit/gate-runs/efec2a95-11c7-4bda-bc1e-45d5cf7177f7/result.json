@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "efec2a95-11c7-4bda-bc1e-45d5cf7177f7",
+  "gate_key": "coverage-preview",
+  "stage": "postcheck",
+  "issue_id": "10ce6962-8973-4357-b836-da8c0b3a6789",
+  "commit": "eb5c79220b7222404e622ddafa2250ce8637c4ce",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-06-26T20:53:11.035241976Z",
+  "completed_at": "2026-06-26T20:53:11.137947515Z",
+  "duration_ms": 102,
+  "exit_code": 0,
+  "stdout": "⚠ [enforcement-drift] enforcement drift (enforced-but-undeclared): rule/gate 'bracket:coverage-preview' is claimed by no invariant's enforced-by\n⚠ [enforcement-drift] enforcement drift (enforced-but-undeclared): rule/gate 'breakdown-review' is claimed by no invariant's enforced-by\n⚠ [enforcement-drift] enforcement drift (enforced-but-undeclared): rule/gate 'cargo-ci-features' is claimed by no invariant's enforced-by\n⚠ [enforcement-drift] enforcement drift (enforced-but-undeclared): rule/gate 'clippy' is claimed by no invariant's enforced-by\n⚠ [enforcement-drift] enforcement drift (enforced-but-undeclared): rule/gate 'code-review' is claimed by no invariant's enforced-by\n⚠ [enforcement-drift] enforcement drift (enforced-but-undeclared): rule/gate 'coverage-preview' is claimed by no invariant's enforced-by\n⚠ [enforcement-drift] enforcement drift (enforced-but-undeclared): rule/gate 'default:namespace-unique:resolution' is claimed by no invariant's enforced-by\n⚠ [enforcement-drift] enforcement drift (enforced-but-undeclared): rule/gate 'default:namespace-unique:team' is claimed by no invariant's enforced-by\n⚠ [enforcement-drift] enforcement drift (enforced-but-undeclared): rule/gate 'default:namespace-unique:type' is claimed by no invariant's enforced-by\n⚠ [enforcement-drift] enforcement drift (enforced-but-undeclared): rule/gate 'default:orphan-leaf' is claimed by no invariant's enforced-by\n⚠ [enforcement-drift] enforcement drift (enforced-but-undeclared): rule/gate 'default:strategic-consistency' is claimed by no invariant's enforced-by\n⚠ [enforcement-drift] enforcement drift (enforced-but-undeclared): rule/gate 'default:type-hierarchy-known' is claimed by no invariant's enforced-by\n⚠ [enforcement-drift] enforcement drift (enforced-but-undeclared): rule/gate 'fmt' is claimed by no invariant's enforced-by\n⚠ [enforcement-drift] enforcement drift (enforced-but-undeclared): rule/gate 'jit-validate' is claimed by no invariant's enforced-by\n⚠ [enforcement-drift] enforcement drift (enforced-but-undeclared): rule/gate 'npm-ci' is claimed by no invariant's enforced-by\n⚠ [enforcement-drift] enforcement drift (enforced-but-undeclared): rule/gate 'plan-review' is claimed by no invariant's enforced-by\n⚠ [enforcement-drift] enforcement drift (enforced-but-undeclared): rule/gate 'tdd-reminder' is claimed by no invariant's enforced-by\n⚠ [enforcement-drift] enforcement drift (enforced-but-undeclared): rule/gate 'tests' is claimed by no invariant's enforced-by\n✓ Scope validation passed\n",
+  "stderr": "",
+  "command": "./scripts/coverage-preview.sh",
+  "by": "auto:executor",
+  "message": null
+}
