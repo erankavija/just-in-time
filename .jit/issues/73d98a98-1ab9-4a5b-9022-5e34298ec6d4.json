@@ -1,0 +1,26 @@
+{
+  "id": "73d98a98-1ab9-4a5b-9022-5e34298ec6d4",
+  "title": "Drop the enforced-but-undeclared drift direction",
+  "description": "Enforcement-drift currently reports two directions; the `enforced-but-undeclared` direction unions rule names and gate keys indiscriminately (drift.rs:352-359) and treats every rule and gate as something an invariant must claim. On the seed registry this produces ~18 findings (11 gate + 7 rule subjects), forcing `jit invariant check` to exit non-zero (has_drift in commands/invariant.rs). The owner decided this nag has no value.\n\nScope: remove the `enforced-but-undeclared` direction entirely from the drift computation (no rule or gate subject reported), leaving `declared-but-unenforced` (an invariants `enforced-by` resolving to nothing) as the SOLE error direction. Update `DriftFinding`/`DriftDirection` (drift.rs:51-127) if the variant is removed, the `commands/invariant.rs` reporting + `has_drift` exit path, and the affected drift unit tests. The seed`s declared-but-unenforced direction is already empty (all four bindings resolve), so check exits 0.\n\n## Success Criteria\n- [hard] LR-05: Enforcement-drift emits no enforced-but-undeclared finding for any subject (rule or gate); declared-but-unenforced is the only error direction.\n- [hard] LR-05b: `jit invariant check` exits 0 on the seed registry, and exits non-zero when an invariant names an unresolvable `enforced-by`.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "10ce6962-8973-4357-b836-da8c0b3a6789"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "milestone:v1.0",
+    "story:item-sources",
+    "satisfies:REQ-05"
+  ],
+  "created_at": "2026-06-26T20:51:42.211151483Z",
+  "updated_at": "2026-06-26T20:51:58.831629608Z"
+}

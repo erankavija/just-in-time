@@ -1,0 +1,26 @@
+{
+  "id": "f6318259-e3df-4d4e-b9bf-0d9bdaca06d1",
+  "title": "Retire the reserved invariant name and route registry selection through the source descriptor",
+  "description": "With a generic toml-source descriptor available (REQ-02), the `invariant`-name special cases become dead. Remove them so the item-kind engine hardcodes no domain concept.\n\nScope: delete the `name==INVARIANT_KIND_NAME` rejection in `from_config` (item.rs:496-500) and the `InvariantMustBeProjectRegistryFirst` variant (item.rs:382-388); remove the `name()==INVARIANT_KIND_NAME` routing guard and `UnknownRegistrySource` path (commands/item.rs:202,205-212). `invariant` resolves as ordinary config over its `.toml` source via the REQ-02 descriptor. No `\"invariant\"` literal is relocated into pure/engine code. Update all reserved-name tests (item.rs:1554-1659,1533-1543; commands/item.rs:804-890; tests/item_cli_tests.rs:497-564,308). Keep item.rs:1661-1675 (MissingProjectSource).\n\n## Success Criteria\n- [hard] LR-03: The reserved-name branch and InvariantMustBeProjectRegistryFirst / UnknownRegistrySource routing are removed; a tree-wide grep (incl. tests/fixtures/docs) finds no surviving reserved-name branch in the engine path.\n- [hard] LR-03b: Existing invariant indexing still works through the descriptor; no `\"invariant\"` literal lives in pure/engine code.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "5ff3a6ae-c73c-498e-a413-a7b2246e63c9"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "milestone:v1.0",
+    "story:item-sources",
+    "satisfies:REQ-03"
+  ],
+  "created_at": "2026-06-26T20:50:48.352599004Z",
+  "updated_at": "2026-06-26T20:51:58.718633216Z"
+}
