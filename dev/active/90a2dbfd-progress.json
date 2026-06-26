@@ -28,7 +28,7 @@
           "title": "Drop the enforced-but-undeclared drift direction",
           "classification": "implementation",
           "satisfies": "REQ-05",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "96f0c39f-bd6f-44a0-9dac-5b366ada1999",
