@@ -724,12 +724,29 @@ pub struct GraphDepsTreeResponse {
 }
 
 /// Summary statistics for dependencies
+///
+/// # Examples
+///
+/// ```
+/// use jit::output::DependencySummary;
+/// use jit::domain::State;
+/// use std::collections::HashMap;
+///
+/// let mut by_state = HashMap::new();
+/// by_state.insert(State::Done, 2usize);
+/// by_state.insert(State::Ready, 1usize);
+/// let summary = DependencySummary { total: 3, by_state };
+///
+/// // Keys serialize as snake_case JSON strings.
+/// let json = serde_json::to_string(&summary).unwrap();
+/// assert!(json.contains("\"done\":2") || json.contains("\"done\": 2"));
+/// ```
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct DependencySummary {
     /// Total number of unique dependencies
     pub total: usize,
-    /// Count by state
-    pub by_state: std::collections::HashMap<String, usize>,
+    /// Count by state (keys are canonical snake_case state names)
+    pub by_state: std::collections::HashMap<State, usize>,
 }
 
 /// Response for `graph roots` command

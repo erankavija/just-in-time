@@ -199,7 +199,7 @@ fn mark_shared_nodes(tree: &mut [DependencyTreeNode], seen_counts: &HashMap<Stri
 /// Compute summary statistics from a dependency tree
 pub fn compute_dependency_summary(tree: &[DependencyTreeNode]) -> crate::output::DependencySummary {
     let mut unique_ids = HashSet::new();
-    let mut by_state: HashMap<String, usize> = HashMap::new();
+    let mut by_state: HashMap<crate::domain::State, usize> = HashMap::new();
 
     collect_stats(tree, &mut unique_ids, &mut by_state);
 
@@ -213,14 +213,91 @@ pub fn compute_dependency_summary(tree: &[DependencyTreeNode]) -> crate::output:
 fn collect_stats(
     tree: &[DependencyTreeNode],
     unique_ids: &mut HashSet<String>,
-    by_state: &mut HashMap<String, usize>,
+    by_state: &mut HashMap<crate::domain::State, usize>,
 ) {
     for node in tree {
         if unique_ids.insert(node.id.clone()) {
             // Only count each unique ID once
-            let state_key = format!("{:?}", node.state).to_lowercase();
-            *by_state.entry(state_key).or_insert(0) += 1;
+            *by_state.entry(node.state).or_insert(0) += 1;
         }
         collect_stats(&node.children, unique_ids, by_state);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::{Priority, State};
+    use crate::output::DependencyTreeNode;
+
+    fn make_node(id: &str, state: State) -> DependencyTreeNode {
+        DependencyTreeNode {
+            id: id.to_string(),
+            short_id: id[..8.min(id.len())].to_string(),
+            title: format!("Node {}", id),
+            state,
+            priority: Priority::Normal,
+            level: 1,
+            shared: None,
+            children: vec![],
+        }
+    }
+
+    #[test]
+    fn test_compute_dependency_summary_keys_by_state_enum() {
+        let tree = vec![
+            make_node("id-done-1", State::Done),
+            make_node("id-done-2", State::Done),
+            make_node("id-in-progress", State::InProgress),
+        ];
+
+        let summary = compute_dependency_summary(&tree);
+
+        assert_eq!(summary.total, 3);
+        assert_eq!(summary.by_state.get(&State::Done), Some(&2));
+        assert_eq!(summary.by_state.get(&State::InProgress), Some(&1));
+        assert_eq!(summary.by_state.get(&State::Ready), None);
+    }
+
+    #[test]
+    fn test_compute_dependency_summary_deduplicates_shared_ids() {
+        // Same ID appearing as both a direct and nested dep should count once.
+        let mut child = make_node("shared-id", State::Done);
+        child.level = 2;
+        let mut parent = make_node("parent-id", State::InProgress);
+        parent.children = vec![child];
+        let tree = vec![make_node("shared-id", State::Done), parent];
+
+        let summary = compute_dependency_summary(&tree);
+
+        assert_eq!(summary.total, 2, "shared node should only be counted once");
+        assert_eq!(summary.by_state.get(&State::Done), Some(&1));
+    }
+
+    #[test]
+    fn test_dependency_summary_json_uses_snake_case_state_keys() {
+        // Regression guard: keys must be "in_progress" not "inprogress".
+        let tree = vec![
+            make_node("a", State::Done),
+            make_node("b", State::InProgress),
+        ];
+        let summary = compute_dependency_summary(&tree);
+        let json = serde_json::to_string(&summary).expect("summary serializes");
+
+        assert!(
+            json.contains("\"in_progress\""),
+            "expected snake_case key \"in_progress\" in JSON, got: {}",
+            json
+        );
+        assert!(
+            json.contains("\"done\""),
+            "expected key \"done\" in JSON, got: {}",
+            json
+        );
+        assert!(
+            !json.contains("\"inprogress\""),
+            "must not contain Debug-format key \"inprogress\", got: {}",
+            json
+        );
     }
 }

@@ -2,7 +2,7 @@
 
 use crate::commands::SnapshotExportResult;
 use crate::document::{AdapterRegistry, AssetScanner};
-use crate::domain::{DocumentReference, Issue};
+use crate::domain::{DocumentReference, Issue, State};
 use crate::snapshot::{
     compute_sha256, AssetSnapshot, DocumentSnapshot, IssuesInfo, MetadataInfo, RepoInfo,
     SnapshotFormat, SnapshotManifest, SnapshotScope, SourceInfo, SourceMode, VerificationInfo,
@@ -269,10 +269,9 @@ impl<S: IssueStore> SnapshotExporter<S> {
         let repo_info = self.get_repo_info(mode)?;
 
         // Count issues by state
-        let mut states = HashMap::new();
+        let mut states: HashMap<State, usize> = HashMap::new();
         for issue in issues {
-            let state_str = format!("{:?}", issue.state).to_lowercase();
-            *states.entry(state_str).or_insert(0) += 1;
+            *states.entry(issue.state).or_insert(0) += 1;
         }
 
         // Build issue file paths
