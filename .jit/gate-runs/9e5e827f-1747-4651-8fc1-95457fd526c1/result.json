@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "9e5e827f-1747-4651-8fc1-95457fd526c1",
+  "gate_key": "cargo-ci",
+  "stage": "postcheck",
+  "issue_id": "70ca9e3a-2856-47e4-b5e0-7d94e7373a2c",
+  "commit": "e36f12a32dd3a2956d7fe513bceefea4a0e2b097",
+  "branch": "worktree-agent-70ca9e3a",
+  "status": "passed",
+  "started_at": "2026-06-25T23:16:29.405925727Z",
+  "completed_at": "2026-06-25T23:19:29.990951513Z",
+  "duration_ms": 180585,
+  "exit_code": 0,
+  "stdout": "  ✓ fmt: ok\n  ✓ clippy: ok\n  ✓ test: 2536 passed, 0 failed, 12 ignored\n\n",
+  "stderr": "",
+  "command": "./scripts/cargo-ci.sh",
+  "by": "auto:executor",
+  "message": null
+}
