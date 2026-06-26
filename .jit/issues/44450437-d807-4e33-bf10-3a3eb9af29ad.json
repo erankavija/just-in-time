@@ -2,7 +2,7 @@
   "id": "44450437-d807-4e33-bf10-3a3eb9af29ad",
   "title": "Type query-engine conditions, filter fields, and state predicate",
   "description": "Type the query-engine conditions, filter fields, and state predicate (report stringly findings). Fixes the `state:notastate` fail-open bug.\n\n## Sites\n- `query_engine/parser.rs:24-29` — `QueryCondition::State`/`Priority` are raw `String`; the evaluator's `from_str().unwrap_or(false)` fails open (an invalid `state:notastate` silently matches nothing). Change the variants to `State(domain::State)`/`Priority(domain::Priority)` and parse in `parse_condition` with `map_err`. Leave `Label`/`Assignee` as `String` (open values).\n- `query_engine/parser.rs:129-136` + `lexer.rs` — `match field.as_str()` over state/label/priority/assignee literals validated nowhere structurally. Add a `FilterField` enum + `FromStr` parsed in the lexer; the parser match becomes exhaustive.\n- `validation/rules.rs:439-494` (`StatePredicate`) — stores `Vec<String>` for the closed `State` set; `matches()` round-trips `State→token→.to_lowercase()`. Parse tokens to `BTreeSet<State>` at `validate()` time (via the predicate's own whitelist, not `State::from_str` which accepts extra aliases); `matches()` becomes a `contains` check.\n\n## Success Criteria\n- [ ] An invalid `state:`/`priority:` filter value is a parse error (clear message), not a silent no-match; covered by a regression test.\n- [ ] `QueryCondition::State`/`Priority` hold typed `domain::State`/`Priority`; `Label`/`Assignee` remain `String`.\n- [ ] Filter field names are parsed into a `FilterField` enum in the lexer; the parser match over fields is exhaustive (no `_ =>` string fallback).\n- [ ] `StatePredicate` stores a typed `BTreeSet<State>` parsed once at validate time; `matches()` does no per-call string round-trip.\n- [ ] `cargo-ci` and `code-review` pass.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "high",
   "assignee": "agent:claude",
   "dependencies": [],
@@ -10,7 +10,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-26T14:51:49.071545258Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-26T14:55:48.358944699Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -18,5 +29,5 @@
     "epic:code-smell-cleanup"
   ],
   "created_at": "2026-06-25T21:41:24.559496078Z",
-  "updated_at": "2026-06-26T14:04:42.213523128Z"
+  "updated_at": "2026-06-26T15:00:32.589773048Z"
 }
