@@ -144,9 +144,12 @@ impl<S: IssueStore> SnapshotExporter<S> {
             .with_context(|| format!("Reference '{}' is not a commit", reference))?;
         let tree = commit.tree()?;
 
-        let entry = tree
-            .get_path(Path::new(path))
-            .with_context(|| format!("Path '{}' not found in commit {}", path, reference))?;
+        let entry = tree.get_path(Path::new(path)).map_err(|_| {
+            crate::errors::NotFoundError::new(format!(
+                "Path '{}' not found in commit {}",
+                path, reference
+            ))
+        })?;
         let blob = repo.find_blob(entry.id())?;
 
         let content = blob.content().to_vec();
@@ -616,10 +619,11 @@ This is a read-only export. Future versions may support:
     ) -> Result<()> {
         // Check if output path already exists
         if out_path.exists() {
-            return Err(anyhow!(
+            return Err(crate::errors::AlreadyExistsError::new(format!(
                 "Output path already exists: {}",
                 out_path.display()
-            ));
+            ))
+            .into());
         }
 
         // Atomic rename from temp to final destination
@@ -640,10 +644,11 @@ This is a read-only export. Future versions may support:
 
         // Check if output path already exists
         if out_path.exists() {
-            return Err(anyhow!(
+            return Err(crate::errors::AlreadyExistsError::new(format!(
                 "Output path already exists: {}",
                 out_path.display()
-            ));
+            ))
+            .into());
         }
 
         let tar_file = File::create(out_path)?;

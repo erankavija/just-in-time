@@ -523,13 +523,15 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let blocking = evaluation.blocking_rules();
         if !blocking.is_empty() && !force {
-            // Ordinary rejection: NOT logged (only --force bypasses are).
-            return Err(anyhow!(
-                "{}",
+            // Ordinary rejection: NOT logged (only --force bypasses are). Typed as a
+            // validation failure (exit 4) carrying the message verbatim, so the
+            // top-level handler classifies it by downcast rather than message text.
+            return Err(crate::errors::ValidationFailedError::new(
                 evaluation
                     .rejection_message()
-                    .unwrap_or_else(|| "blocked by validation rule(s)".to_string())
-            ));
+                    .unwrap_or_else(|| "blocked by validation rule(s)".to_string()),
+            )
+            .into());
         }
 
         let mut warnings = Vec::new();

@@ -699,7 +699,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         let mut registry = self.storage.load_gate_registry()?;
 
         if !registry.gates.contains_key(key) {
-            return Err(anyhow!("Gate '{}' not found", key));
+            return Err(
+                crate::errors::NotFoundError::new(format!("Gate '{}' not found", key)).into(),
+            );
         }
 
         registry.gates.remove(key);
@@ -709,11 +711,9 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     pub fn show_gate_definition(&self, key: &str) -> Result<Gate> {
         let registry = self.storage.load_gate_registry()?;
-        registry
-            .gates
-            .get(key)
-            .cloned()
-            .ok_or_else(|| anyhow!("Gate '{}' not found", key))
+        registry.gates.get(key).cloned().ok_or_else(|| {
+            crate::errors::NotFoundError::new(format!("Gate '{}' not found", key)).into()
+        })
     }
 
     // Preset management methods

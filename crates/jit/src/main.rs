@@ -51,6 +51,9 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
     if error
         .downcast_ref::<jit::errors::TransitionBlockedError>()
         .is_some()
+        || error
+            .downcast_ref::<jit::errors::ValidationFailedError>()
+            .is_some()
     {
         return ExitCode::ValidationFailed;
     }
@@ -110,20 +113,28 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
         || error
             .downcast_ref::<jit::errors::LeaseNotFoundError>()
             .is_some()
+        || error.downcast_ref::<jit::errors::NotFoundError>().is_some()
     {
         return ExitCode::NotFound;
     }
 
-    // Defining a gate that already exists is a typed already-exists condition.
+    // An already-exists condition is typed: the gate-registry case plus the shared
+    // AlreadyExistsError carrier (e.g. an occupied snapshot output path).
     if error
         .downcast_ref::<jit::storage::GateAlreadyExistsError>()
         .is_some()
+        || error
+            .downcast_ref::<jit::errors::AlreadyExistsError>()
+            .is_some()
     {
         return ExitCode::AlreadyExists;
     }
 
-    // Invalid-argument conditions are typed: the shared InvalidArgumentError plus
-    // the enum parse errors (gate stage/mode) all map to exit code 2 by downcast.
+    // Invalid-argument conditions are typed: the shared InvalidArgumentError, the
+    // enum parse errors (gate stage/mode), and a UTF-8 decode failure of
+    // subprocess/git output (`String::from_utf8` / `str::from_utf8`, possibly
+    // behind a `.context(...)` describing which output) all map to exit code 2 by
+    // downcast against their concrete types.
     if error
         .downcast_ref::<jit::errors::InvalidArgumentError>()
         .is_some()
@@ -133,6 +144,8 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
         || error
             .downcast_ref::<jit::domain::GateModeParseError>()
             .is_some()
+        || error.downcast_ref::<std::string::FromUtf8Error>().is_some()
+        || error.downcast_ref::<std::str::Utf8Error>().is_some()
     {
         return ExitCode::InvalidArgument;
     }
@@ -151,34 +164,40 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
         };
     }
 
-    let error_msg = error.to_string().to_lowercase();
-
-    // Residual message-based fallback for conditions that are not YET represented
-    // by a typed error. The typed conditions above (issue/gate-not-found, cycle,
-    // gate-already-exists, invalid-argument, io) are classified by downcast and
-    // never reach this block. The remaining string checks are a best-effort net
-    // for still-untyped producers — chiefly the internal "Invalid storage/.jit
-    // path" guards (some nested inside PathReadError) and the config-parse cluster
-    // — pending their conversion to typed errors (jit:b9a28509 follow-up).
-    if error_msg.contains("not found") || error_msg.contains("no such file") {
-        ExitCode::NotFound
-    } else if error_msg.contains("gate validation failed") || error_msg.contains("blocked by") {
-        // Gate blocking should return validation failed
-        ExitCode::ValidationFailed
-    } else if error_msg.contains("cycle") || error_msg.contains("invalid dependency") {
-        ExitCode::ValidationFailed
-    } else if error_msg.contains("already exists") {
-        ExitCode::AlreadyExists
-    } else if error_msg.contains("invalid") && !error_msg.contains("invalid dependency") {
-        ExitCode::InvalidArgument
-    } else if error_msg.contains("data")
-        && (error_msg.contains("failed to read") || error_msg.contains("io error"))
-    {
-        // File system errors related to data directory
-        ExitCode::ExternalError
-    } else {
-        ExitCode::GenericError
+    // Archive command errors are typed: a missing source document is a not-found
+    // condition (3); an occupied destination is already-exists (6).
+    if let Some(archive_error) = error.downcast_ref::<jit::commands::ArchiveError>() {
+        return match archive_error {
+            jit::commands::ArchiveError::SourceMissing { .. } => ExitCode::NotFound,
+            jit::commands::ArchiveError::DestinationOccupied { .. } => ExitCode::AlreadyExists,
+        };
     }
+
+    // A missing/unreadable plan document is a not-found condition (3); a missing
+    // content-parser cargo feature is a generic failure.
+    if let Some(plan_error) = error.downcast_ref::<jit::commands::plan_doc::PlanDocError>() {
+        return match plan_error {
+            jit::commands::plan_doc::PlanDocError::Read { .. } => ExitCode::NotFound,
+            jit::commands::plan_doc::PlanDocError::ContentParser(_) => ExitCode::GenericError,
+        };
+    }
+
+    // A template whose internal depends_on edges form a cycle is a validation
+    // failure (4); other template-config errors are generic.
+    if let Some(template_error) = error.downcast_ref::<jit::templates::TemplateConfigError>() {
+        return match template_error {
+            jit::templates::TemplateConfigError::CyclicDependsOn { .. } => {
+                ExitCode::ValidationFailed
+            }
+            _ => ExitCode::GenericError,
+        };
+    }
+
+    // No typed classifier matched: a genuinely-unknown error keeps the historical
+    // default exit code. Every condition the CLI deliberately distinguishes is
+    // classified by a typed downcast above; classification is never driven by
+    // matching against a human-readable error string.
+    ExitCode::GenericError
 }
 
 /// Render a failed `gate pass` / `gate pass-all` outcome and terminate appropriately.
@@ -1065,17 +1084,21 @@ fn run() -> Result<()> {
                         || priority.is_some()
                         || !labels.is_empty();
                     if query.is_none() && !has_filter {
-                        return Err(anyhow!(
-                            "invalid arguments: provide a search query or at least one filter (--label/--state/--assignee/--priority)"
-                        ));
+                        return Err(jit::errors::InvalidArgumentError::new(
+                            "invalid arguments: provide a search query or at least one filter (--label/--state/--assignee/--priority)",
+                        )
+                        .into());
                     }
 
                     // Reject malformed label filters up front with a clear,
                     // argument-classified error rather than silently matching
                     // nothing.
                     for label in &labels {
-                        jit::labels::validate_label(label)
-                            .with_context(|| format!("invalid --label filter '{label}'"))?;
+                        jit::labels::validate_label(label).map_err(|_| {
+                            jit::errors::InvalidArgumentError::new(format!(
+                                "invalid --label filter '{label}'"
+                            ))
+                        })?;
                     }
 
                     let state_filter = state.map(|s| State::from_str(&s)).transpose()?;
@@ -1139,10 +1162,11 @@ fn run() -> Result<()> {
                     // Projection targets a single issue: `--field`/`--fields`
                     // with multiple ids is ambiguous, so reject it.
                     if projecting && ids.len() > 1 {
-                        return Err(anyhow!(
+                        return Err(jit::errors::InvalidArgumentError::new(format!(
                             "invalid arguments: --field/--fields require exactly one issue id (got {})",
                             ids.len()
-                        ));
+                        ))
+                        .into());
                     }
 
                     // Multi-id: return a JSON array of full issue objects in
@@ -1218,19 +1242,19 @@ fn run() -> Result<()> {
                                 if let Some(name) = field {
                                     let rendered = jit::output::project_field(&value, &name)
                                         .ok_or_else(|| {
-                                            anyhow!(
+                                            jit::errors::InvalidArgumentError::new(format!(
                                                 "invalid field: unknown field '{}' for issue show",
                                                 name
-                                            )
+                                            ))
                                         })?;
                                     println!("{}", rendered);
                                 } else {
                                     let rendered = jit::output::project_fields(&value, &fields)
                                         .map_err(|unknown| {
-                                            anyhow!(
+                                            jit::errors::InvalidArgumentError::new(format!(
                                                 "invalid field: unknown field '{}' for issue show",
                                                 unknown.0
-                                            )
+                                            ))
                                         })?;
                                     println!("{}", rendered);
                                 }
@@ -4693,7 +4717,12 @@ fn run() -> Result<()> {
                 // the generic error path would lose the structured rule report
                 // (which includes graph-rule findings). The exit status is decided
                 // AFTER rendering, below.
-                let integrity_error = executor.validate_integrity_silent().err();
+                // Wrap any integrity violation in the typed ValidationFailedError
+                // (message preserved verbatim) so the top-level handler classifies
+                // it as a validation failure by downcast rather than by message text.
+                let integrity_error = executor.validate_integrity_silent().err().map(|e| {
+                    anyhow::Error::new(jit::errors::ValidationFailedError::new(e.to_string()))
+                });
                 let integrity_message = integrity_error.as_ref().map(|e| e.to_string());
 
                 // Run the declarative rules for every issue AND the cross-issue

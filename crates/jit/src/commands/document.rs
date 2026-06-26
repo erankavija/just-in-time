@@ -109,11 +109,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue.documents.retain(|doc| doc.path != path);
 
         if issue.documents.len() == original_len {
-            return Err(anyhow!(
+            return Err(crate::errors::NotFoundError::new(format!(
                 "Document reference {} not found in issue {}",
-                path,
-                full_id
-            ));
+                path, full_id
+            ))
+            .into());
         }
 
         self.storage.save_issue(issue)?;
@@ -139,7 +139,12 @@ impl<S: IssueStore> CommandExecutor<S> {
             .documents
             .iter()
             .find(|d| d.path == path)
-            .ok_or_else(|| anyhow!("Document reference {} not found in issue {}", path, full_id))?;
+            .ok_or_else(|| {
+                crate::errors::NotFoundError::new(format!(
+                    "Document reference {} not found in issue {}",
+                    path, full_id
+                ))
+            })?;
 
         // Determine which commit to view
         let reference = if let Some(at) = at_commit {
@@ -201,7 +206,12 @@ impl<S: IssueStore> CommandExecutor<S> {
             .documents
             .iter()
             .find(|d| d.path == path)
-            .ok_or_else(|| anyhow!("Document reference {} not found in issue {}", path, full_id))?;
+            .ok_or_else(|| {
+                crate::errors::NotFoundError::new(format!(
+                    "Document reference {} not found in issue {}",
+                    path, full_id
+                ))
+            })?;
 
         let repo = Repository::open(".").map_err(|e| anyhow!("Not a git repository: {}", e))?;
 
@@ -230,7 +240,12 @@ impl<S: IssueStore> CommandExecutor<S> {
             .documents
             .iter()
             .find(|d| d.path == path)
-            .ok_or_else(|| anyhow!("Document reference {} not found in issue {}", path, full_id))?;
+            .ok_or_else(|| {
+                crate::errors::NotFoundError::new(format!(
+                    "Document reference {} not found in issue {}",
+                    path, full_id
+                ))
+            })?;
 
         let repo = Repository::open(".").map_err(|e| anyhow!("Not a git repository: {}", e))?;
 
