@@ -32,7 +32,9 @@
 //! kinds, whose source path comes from config). A list entry without a matching
 //! self-id is plain prose and incurs no addressing requirement (REQ-06).
 
-use crate::config::{ItemKindConfig, KindScopeConfig, SourceOfTruth};
+use crate::config::{
+    ItemKindConfig, ItemKindSource, KindScopeConfig, SourceOfTruth, TomlSourceDescriptor,
+};
 use crate::document::ContentParser;
 use crate::domain::{project, Issue};
 use serde::Serialize;
@@ -399,6 +401,49 @@ pub enum ItemError {
         /// The registry-first kind name with no bound registry.
         kind: String,
     },
+    /// The `.toml` file backing a registry-first kind's source descriptor is not
+    /// valid TOML, so its entries cannot be projected.
+    #[error("item kind '{kind}' toml source '{path}' is not valid TOML: {source}")]
+    TomlSourceParse {
+        /// The kind whose descriptor names the file.
+        kind: String,
+        /// The repository-local path of the offending `.toml` file.
+        path: String,
+        /// The underlying TOML parse error (boxed to keep [`ItemError`] small).
+        source: Box<toml::de::Error>,
+    },
+    /// An entry of a registry-first kind's source table is missing a field the
+    /// descriptor maps (its `id-field` or `text-field`), so no self-id / text can
+    /// be projected for that entry.
+    #[error(
+        "item kind '{kind}' toml source table '{table}' has an entry missing required \
+         field '{field}'"
+    )]
+    TomlSourceMissingField {
+        /// The kind whose descriptor names the table.
+        kind: String,
+        /// The array-of-tables key being projected.
+        table: String,
+        /// The descriptor-mapped field absent from the entry.
+        field: String,
+    },
+    /// A descriptor-mapped field of a registry-first kind's source has an
+    /// unexpected TOML type (e.g. an `id-field` that is not a string, or a
+    /// `link-fields` value that is neither a string nor an array of strings).
+    #[error(
+        "item kind '{kind}' toml source table '{table}' field '{field}' has an \
+         unexpected type: expected {expected}"
+    )]
+    TomlSourceFieldType {
+        /// The kind whose descriptor names the table.
+        kind: String,
+        /// The array-of-tables key being projected.
+        table: String,
+        /// The mapped field with the wrong type.
+        field: String,
+        /// A short description of the type(s) the loader accepts.
+        expected: String,
+    },
 }
 
 /// A resolved item-kind projection: the `(section, id-pattern, markers,
@@ -430,7 +475,8 @@ pub struct ItemKind {
     markers: Vec<String>,
     link_namespaces: Vec<String>,
     kind_scope: KindScope,
-    source: Option<String>,
+    source_path: Option<String>,
+    toml_source: Option<TomlSourceDescriptor>,
     source_of_truth: SourceOfTruth,
 }
 
@@ -486,6 +532,14 @@ impl ItemKind {
             Some(KindScopeConfig::Project) => KindScope::Project,
         };
         let source_of_truth = config.source_of_truth();
+        // Split the polymorphic `source` into the markdown PATH and the structured
+        // toml DESCRIPTOR; at most one is ever set (the two shapes are mutually
+        // exclusive at parse time).
+        let (source_path, toml_source) = match &config.source {
+            Some(ItemKindSource::Path(path)) => (Some(path.clone()), None),
+            Some(ItemKindSource::Toml(descriptor)) => (None, Some(descriptor.clone())),
+            None => (None, None),
+        };
         // The `invariant` kind name is RESERVED as a project-scoped, registry-first
         // kind: its items come only from the invariant registry, never a markdown
         // source NOR an issue description. Reject any declaration of `invariant`
@@ -505,7 +559,7 @@ impl ItemKind {
         // it is exempt from this requirement.
         if kind_scope.is_project()
             && source_of_truth == SourceOfTruth::MarkdownFirst
-            && config.source.is_none()
+            && source_path.is_none()
         {
             return Err(ItemError::MissingProjectSource {
                 kind: name.to_string(),
@@ -519,7 +573,8 @@ impl ItemKind {
             markers,
             link_namespaces,
             kind_scope,
-            source: config.source.clone(),
+            source_path,
+            toml_source,
             source_of_truth,
         })
     }
@@ -736,8 +791,10 @@ impl ItemKind {
         self.kind_scope
     }
 
-    /// The repository-local source file a project-scope kind reads its items from,
-    /// or `None` for an issue-scope kind.
+    /// The repository-local MARKDOWN source file a project-scope, markdown-first
+    /// kind reads its items from, or `None` for an issue-scope kind or a
+    /// registry-first kind backed by a [`toml_source`](Self::toml_source)
+    /// descriptor.
     ///
     /// # Examples
     ///
@@ -748,7 +805,27 @@ impl ItemKind {
     /// assert_eq!(ItemKind::requirement_default().unwrap().source(), None);
     /// ```
     pub fn source(&self) -> Option<&str> {
-        self.source.as_deref()
+        self.source_path.as_deref()
+    }
+
+    /// The structured TOML source descriptor a registry-first project kind reads
+    /// its items from, or `None` for any other kind (issue-scope, markdown-first,
+    /// or the registry-backed `invariant` kind, which carries no descriptor).
+    ///
+    /// When present, [`commands`](crate::commands) reads the descriptor's `toml`
+    /// file through the storage boundary and projects each table entry into an
+    /// addressable item via [`load_toml_scope_items`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::item::ItemKind;
+    ///
+    /// // The built-in requirement kind has no toml source descriptor.
+    /// assert!(ItemKind::requirement_default().unwrap().toml_source().is_none());
+    /// ```
+    pub fn toml_source(&self) -> Option<&crate::config::TomlSourceDescriptor> {
+        self.toml_source.as_ref()
     }
 
     /// The kind's authoring DIRECTION (which substrate is canonical).
@@ -878,6 +955,12 @@ pub struct AddressableItem {
     pub scope: String,
     /// The raw text of the source list entry.
     pub text: String,
+    /// `<namespace>:<target>` link labels the item carries, projected from a
+    /// registry-first kind's `link-fields` mapping. Empty for markdown-sourced and
+    /// invariant items (links there are carried by the linking NODE, not the item),
+    /// in which case the field is omitted from serialized output.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub links: Vec<String>,
 }
 
 /// A candidate addressable item extracted from a scope's source, before per-scope
@@ -896,6 +979,7 @@ pub struct AddressableItem {
 ///     kind: "invariant".to_string(),
 ///     self_id: "INV-01".to_string(),
 ///     text: "all writes are atomic".to_string(),
+///     links: Vec::new(),
 /// };
 /// assert_eq!(raw.self_id, "INV-01");
 /// ```
@@ -907,6 +991,9 @@ pub struct RawScopeItem {
     pub self_id: String,
     /// The raw source text of the item.
     pub text: String,
+    /// `<namespace>:<target>` link labels carried by the item (empty for markdown
+    /// substrates; populated by a registry-first kind's `link-fields` mapping).
+    pub links: Vec<String>,
 }
 
 /// Enforce per-scope self-id uniqueness over raw candidates and derive their
@@ -929,6 +1016,7 @@ pub struct RawScopeItem {
 ///     kind: "invariant".to_string(),
 ///     self_id: "INV-01".to_string(),
 ///     text: "atomic writes".to_string(),
+///     links: Vec::new(),
 /// }];
 /// let items = derive_scope_items(&Scope::Project, raw).unwrap();
 /// assert_eq!(items[0].qualified_id, "@/INV-01");
@@ -960,6 +1048,7 @@ pub fn derive_scope_items(
             kind: candidate.kind,
             self_id: candidate.self_id,
             text: candidate.text,
+            links: candidate.links,
         });
     }
     Ok(out)
@@ -1031,6 +1120,9 @@ fn extract_raw_items(
                     kind: kind.name().to_string(),
                     self_id,
                     text: text.clone(),
+                    // Markdown items carry no item-side links: a markdown link lives
+                    // on the linking NODE's labels, not the addressed item.
+                    links: Vec::new(),
                 })
             })
         })
@@ -1146,6 +1238,7 @@ pub struct ProjectSource {
 ///     kind: "invariant".to_string(),
 ///     self_id: "INV-01".to_string(),
 ///     text: "every dependency edge stays acyclic".to_string(),
+///     links: Vec::new(),
 /// }];
 /// let items = index_project_sources(&sources, registry, &MarkdownContentParser).unwrap();
 /// let qids: Vec<&str> = items.iter().map(|i| i.qualified_id.as_str()).collect();
@@ -1166,6 +1259,167 @@ pub fn index_project_sources(
         .collect();
     raw.extend(registry_items);
     derive_scope_items(&Scope::Project, raw)
+}
+
+/// Project a registry-first kind's `.toml` source into raw scope candidates
+/// through its declared field mapping.
+///
+/// This is the generic analogue of the hard-wired invariant projection: it takes
+/// the already-read `toml_content` (the file I/O happens in the command layer
+/// through the storage boundary, so this stays a PURE function) and maps each
+/// entry of the descriptor's named array-of-tables into a [`RawScopeItem`]:
+/// `id-field` -> self-id (so the derived qualified id is `@/<self-id>`),
+/// `text-field` -> text, and each `link-fields` entry -> `<namespace>:<target>`
+/// link labels (the mapped field may be a single string or an array of strings).
+/// `kind_name` tags every candidate so the derived item reports the right kind.
+///
+/// Graceful vs. typed-error contract:
+/// - A missing `table` key yields NO items (an empty registry, like an absent
+///   file), never an error.
+/// - A malformed file is [`ItemError::TomlSourceParse`].
+/// - An entry missing the mapped `id-field` / `text-field` is
+///   [`ItemError::TomlSourceMissingField`]; a mapped field of an unexpected TOML
+///   type is [`ItemError::TomlSourceFieldType`].
+/// - An entry that simply lacks a mapped LINK field contributes no labels for it
+///   (graceful) — only the addressing fields are mandatory.
+///
+/// # Examples
+///
+/// ```
+/// use jit::config::TomlSourceDescriptor;
+/// use jit::domain::item::load_toml_scope_items;
+///
+/// let descriptor = TomlSourceDescriptor {
+///     toml: "policies.toml".into(),
+///     table: "policies".into(),
+///     id_field: "id".into(),
+///     text_field: "statement".into(),
+///     link_fields: [("enforces".to_string(), "enforced-by".to_string())]
+///         .into_iter()
+///         .collect(),
+/// };
+/// let content = "\
+/// [[policies]]\n\
+/// id = \"POL-01\"\n\
+/// statement = \"all writes are atomic\"\n\
+/// enforced-by = [\"cargo-ci\"]\n";
+/// let rows = load_toml_scope_items("policy", &descriptor, content).unwrap();
+/// assert_eq!(rows.len(), 1);
+/// assert_eq!(rows[0].self_id, "POL-01");
+/// assert_eq!(rows[0].links, vec!["enforces:cargo-ci".to_string()]);
+/// ```
+pub fn load_toml_scope_items(
+    kind_name: &str,
+    descriptor: &TomlSourceDescriptor,
+    toml_content: &str,
+) -> Result<Vec<RawScopeItem>, ItemError> {
+    let table: toml::Table =
+        toml::from_str(toml_content).map_err(|source| ItemError::TomlSourceParse {
+            kind: kind_name.to_string(),
+            path: descriptor.toml.clone(),
+            source: Box::new(source),
+        })?;
+    // A missing table is an empty registry (graceful), mirroring an absent file.
+    let Some(entries) = table.get(&descriptor.table) else {
+        return Ok(Vec::new());
+    };
+    let entries = entries
+        .as_array()
+        .ok_or_else(|| ItemError::TomlSourceFieldType {
+            kind: kind_name.to_string(),
+            table: descriptor.table.clone(),
+            field: descriptor.table.clone(),
+            expected: "an array of tables".to_string(),
+        })?;
+    entries
+        .iter()
+        .map(|entry| project_toml_entry(kind_name, descriptor, entry))
+        .collect()
+}
+
+/// Map one TOML table entry into a [`RawScopeItem`] through `descriptor`'s field
+/// mapping (the per-entry core of [`load_toml_scope_items`]).
+fn project_toml_entry(
+    kind_name: &str,
+    descriptor: &TomlSourceDescriptor,
+    entry: &toml::Value,
+) -> Result<RawScopeItem, ItemError> {
+    let self_id = required_toml_str(kind_name, descriptor, entry, &descriptor.id_field)?;
+    let text = required_toml_str(kind_name, descriptor, entry, &descriptor.text_field)?;
+    // Link fields iterate in namespace order (BTreeMap) for deterministic labels.
+    let links = descriptor
+        .link_fields
+        .iter()
+        .map(|(namespace, field)| toml_link_labels(kind_name, descriptor, entry, namespace, field))
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .flatten()
+        .collect();
+    Ok(RawScopeItem {
+        kind: kind_name.to_string(),
+        self_id,
+        text,
+        links,
+    })
+}
+
+/// Read a required string `field` from a TOML entry, or a typed error naming the
+/// missing field / wrong type.
+fn required_toml_str(
+    kind_name: &str,
+    descriptor: &TomlSourceDescriptor,
+    entry: &toml::Value,
+    field: &str,
+) -> Result<String, ItemError> {
+    let value = entry
+        .get(field)
+        .ok_or_else(|| ItemError::TomlSourceMissingField {
+            kind: kind_name.to_string(),
+            table: descriptor.table.clone(),
+            field: field.to_string(),
+        })?;
+    value
+        .as_str()
+        .map(str::to_string)
+        .ok_or_else(|| ItemError::TomlSourceFieldType {
+            kind: kind_name.to_string(),
+            table: descriptor.table.clone(),
+            field: field.to_string(),
+            expected: "a string".to_string(),
+        })
+}
+
+/// Project one mapped link `field` of a TOML entry into `<namespace>:<target>`
+/// labels (a single string or an array of strings); an absent field is graceful.
+fn toml_link_labels(
+    kind_name: &str,
+    descriptor: &TomlSourceDescriptor,
+    entry: &toml::Value,
+    namespace: &str,
+    field: &str,
+) -> Result<Vec<String>, ItemError> {
+    let field_type_err = || ItemError::TomlSourceFieldType {
+        kind: kind_name.to_string(),
+        table: descriptor.table.clone(),
+        field: field.to_string(),
+        expected: "a string or an array of strings".to_string(),
+    };
+    // An absent link field contributes no labels (graceful).
+    let Some(value) = entry.get(field) else {
+        return Ok(Vec::new());
+    };
+    let targets: Vec<&str> = match value {
+        toml::Value::String(single) => vec![single.as_str()],
+        toml::Value::Array(items) => items
+            .iter()
+            .map(|item| item.as_str().ok_or_else(field_type_err))
+            .collect::<Result<Vec<_>, _>>()?,
+        _ => return Err(field_type_err()),
+    };
+    Ok(targets
+        .into_iter()
+        .map(|target| format!("{namespace}:{target}"))
+        .collect())
 }
 
 /// The built-in item kinds a repo has when it declares no `[item_kinds]` table.
@@ -1582,7 +1836,7 @@ mod tests {
                 markers: Some(vec![]),
                 link_namespaces: Some(vec!["enforces".to_string()]),
                 scope: Some(scope),
-                source: source.map(str::to_string),
+                source: source.map(|s| ItemKindSource::Path(s.to_string())),
                 source_of_truth: sot,
             }
         };
@@ -1686,6 +1940,7 @@ mod tests {
             kind: "invariant".to_string(),
             self_id: "INV-01".to_string(),
             text: "atomic writes".to_string(),
+            links: Vec::new(),
         }];
         let items = index_project_sources(&sources, registry, &MarkdownContentParser).unwrap();
         let qids: Vec<&str> = items.iter().map(|i| i.qualified_id.as_str()).collect();
@@ -1705,9 +1960,99 @@ mod tests {
             kind: "invariant".to_string(),
             self_id: "INV-01".to_string(),
             text: "dup".to_string(),
+            links: Vec::new(),
         }];
         let err = index_project_sources(&sources, registry, &MarkdownContentParser).unwrap_err();
         assert!(matches!(err, ItemError::DuplicateSelfId { .. }));
+    }
+
+    fn policy_descriptor() -> TomlSourceDescriptor {
+        TomlSourceDescriptor {
+            toml: "policies.toml".to_string(),
+            table: "policies".to_string(),
+            id_field: "id".to_string(),
+            text_field: "statement".to_string(),
+            link_fields: [("enforces".to_string(), "enforced-by".to_string())]
+                .into_iter()
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn test_load_toml_scope_items_maps_fields_and_links() {
+        // REQ-02: id-field -> self-id, text-field -> text, and a string-array link
+        // field -> `<namespace>:<target>` labels; a single-string link field maps to
+        // one label.
+        let content = "\
+[[policies]]
+id = \"POL-01\"
+statement = \"all writes are atomic\"
+enforced-by = [\"cargo-ci\", \"jit-validate\"]
+
+[[policies]]
+id = \"POL-02\"
+statement = \"single enforcer\"
+enforced-by = \"tests\"
+";
+        let rows = load_toml_scope_items("policy", &policy_descriptor(), content).unwrap();
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].kind, "policy");
+        assert_eq!(rows[0].self_id, "POL-01");
+        assert_eq!(rows[0].text, "all writes are atomic");
+        assert_eq!(
+            rows[0].links,
+            vec!["enforces:cargo-ci", "enforces:jit-validate"]
+        );
+        // A single string link value yields exactly one label.
+        assert_eq!(rows[1].links, vec!["enforces:tests"]);
+    }
+
+    #[test]
+    fn test_load_toml_scope_items_absent_table_is_graceful() {
+        // A file with no matching table is an empty registry, never an error.
+        let rows =
+            load_toml_scope_items("policy", &policy_descriptor(), "[other]\nx = 1\n").unwrap();
+        assert!(rows.is_empty());
+    }
+
+    #[test]
+    fn test_load_toml_scope_items_absent_link_field_is_graceful() {
+        // An entry lacking the mapped link field contributes no labels (only the
+        // addressing fields are mandatory).
+        let content = "[[policies]]\nid = \"POL-03\"\nstatement = \"no enforcer\"\n";
+        let rows = load_toml_scope_items("policy", &policy_descriptor(), content).unwrap();
+        assert_eq!(rows.len(), 1);
+        assert!(rows[0].links.is_empty());
+    }
+
+    #[test]
+    fn test_load_toml_scope_items_missing_id_field_is_error() {
+        // A missing mapped id-field is a typed, descriptive error naming the field.
+        let content = "[[policies]]\nstatement = \"x\"\n";
+        let err = load_toml_scope_items("policy", &policy_descriptor(), content).unwrap_err();
+        assert!(matches!(
+            err,
+            ItemError::TomlSourceMissingField { ref field, .. } if field == "id"
+        ));
+    }
+
+    #[test]
+    fn test_load_toml_scope_items_wrong_link_type_is_error() {
+        // A link field that is neither a string nor an array of strings is a typed
+        // field-type error.
+        let content = "[[policies]]\nid = \"POL-04\"\nstatement = \"x\"\nenforced-by = 7\n";
+        let err = load_toml_scope_items("policy", &policy_descriptor(), content).unwrap_err();
+        assert!(matches!(
+            err,
+            ItemError::TomlSourceFieldType { ref field, .. } if field == "enforced-by"
+        ));
+    }
+
+    #[test]
+    fn test_load_toml_scope_items_malformed_toml_is_parse_error() {
+        let err =
+            load_toml_scope_items("policy", &policy_descriptor(), "not = = toml").unwrap_err();
+        assert!(matches!(err, ItemError::TomlSourceParse { .. }));
     }
 
     #[test]
@@ -1813,6 +2158,7 @@ mod tests {
             kind: kind.to_string(),
             self_id: self_id.to_string(),
             text: format!("{self_id} text"),
+            links: Vec::new(),
         }
     }
 

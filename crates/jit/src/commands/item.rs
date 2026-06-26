@@ -10,8 +10,9 @@
 use super::*;
 use crate::config::SourceOfTruth;
 use crate::domain::item::{
-    index_items, index_project_sources, resolve_item_kinds, split_qualified_id, AddressableItem,
-    ItemError, ItemKind, ProjectSource, RawScopeItem, Scope, INVARIANT_KIND_NAME,
+    index_items, index_project_sources, load_toml_scope_items, resolve_item_kinds,
+    split_qualified_id, AddressableItem, ItemError, ItemKind, ProjectSource, RawScopeItem, Scope,
+    INVARIANT_KIND_NAME,
 };
 
 /// Result of a `jit item list` / `search` query.
@@ -171,16 +172,24 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///   reading both live in storage. An absent source file contributes no items
     ///   (storage returns `Ok(None)`), never an error; a source that is present but
     ///   unreadable, or a path that escapes the repo, IS reported.
-    /// - **registry-first**: items are projected directly from a registered
+    /// - **registry-first**: items are projected directly from a structured
     ///   registry, NOT a markdown source — the registry is the AUTHORITATIVE source
-    ///   and NO markdown index is read or produced for them (REQ-02). Routing binds
-    ///   to an EXPLICIT registry by kind name: the only registered source is the
-    ///   invariant registry ([`JitConfig::invariants`](crate::config::JitConfig)),
-    ///   bound to the [`invariant`](crate::domain::item::INVARIANT_KIND_NAME) kind.
-    ///   Each invariant entry's `id` is its self-id, so its qualified id is `@/<id>`
-    ///   (REQ-01). Any OTHER registry-first project kind has no bound registry and
-    ///   is rejected with [`ItemError::UnknownRegistrySource`], never a silent
-    ///   projection of the invariant registry under the wrong kind name.
+    ///   and NO markdown index is read or produced for them (REQ-02). Two registry
+    ///   bindings are recognised, in order:
+    ///   1. The reserved [`invariant`](crate::domain::item::INVARIANT_KIND_NAME)
+    ///      kind is bound to the typed invariant registry
+    ///      ([`JitConfig::invariants`](crate::config::JitConfig)); each entry's `id`
+    ///      is its self-id, so its qualified id is `@/<id>` (REQ-01).
+    ///   2. ANY OTHER registry-first kind that declares a structured toml `source`
+    ///      descriptor ([`ItemKind::toml_source`]) is backed by that custom `.toml`:
+    ///      its file is read through the storage boundary and each entry projected
+    ///      through the descriptor's field mapping by
+    ///      [`load_toml_scope_items`] (REQ-02). An absent file contributes no items.
+    ///
+    ///   A registry-first kind that is neither the reserved invariant nor carries a
+    ///   toml descriptor has no bound source and is rejected with
+    ///   [`ItemError::UnknownRegistrySource`], never a silent projection of the
+    ///   invariant registry under the wrong kind name.
     ///
     /// Both substrates' candidates are deduped once through the single
     /// [`index_project_sources`] derivation, so per-scope uniqueness and
@@ -201,6 +210,36 @@ impl<S: IssueStore> CommandExecutor<S> {
                 // a typed error rather than a mislabeled invariant projection (REQ-02).
                 SourceOfTruth::RegistryFirst if kind.name() == INVARIANT_KIND_NAME => {
                     registry_items.extend(invariant_raw_items(kind.name(), config));
+                }
+                // A non-invariant registry-first kind backed by a config-declared
+                // toml source descriptor: read the named `.toml` through the storage
+                // boundary and project each entry through the descriptor's field
+                // mapping (REQ-02). An absent file contributes no items (graceful),
+                // mirroring the markdown-first path; a present-but-malformed file is
+                // a typed error.
+                SourceOfTruth::RegistryFirst if kind.toml_source().is_some() => {
+                    let descriptor = kind.toml_source().expect("guarded by match arm");
+                    let toml =
+                        self.storage
+                            .read_repo_file(&descriptor.toml)
+                            .with_context(|| {
+                                format!(
+                                    "cannot read toml source '{}' for item kind '{}'",
+                                    descriptor.toml,
+                                    kind.name()
+                                )
+                            })?;
+                    if let Some(toml) = toml {
+                        let rows = load_toml_scope_items(kind.name(), descriptor, &toml)
+                            .with_context(|| {
+                                format!(
+                                    "cannot project toml source '{}' for item kind '{}'",
+                                    descriptor.toml,
+                                    kind.name()
+                                )
+                            })?;
+                        registry_items.extend(rows);
+                    }
                 }
                 SourceOfTruth::RegistryFirst => {
                     return Err(anyhow!(ItemError::UnknownRegistrySource {
@@ -406,6 +445,10 @@ fn invariant_raw_items(kind_name: &str, config: &JitConfig) -> Vec<RawScopeItem>
             kind: kind_name.to_string(),
             self_id: inv.id.clone(),
             text: inv.statement.clone(),
+            // The typed invariant projection carries no item-side link labels here;
+            // an invariant's `enforced-by` binding is consumed by drift analysis,
+            // not surfaced as an addressable-item link.
+            links: Vec::new(),
         })
         .collect()
 }
@@ -664,6 +707,92 @@ mod tests {
             msg.contains("absolute paths are not permitted"),
             "expected absolute-path rejection, got: {msg}"
         );
+    }
+
+    /// Build an executor that declares a NON-invariant, registry-first project
+    /// kind `policy` backed by a custom `.toml` through a structured `source`
+    /// descriptor (`toml`/`table`/`id-field`/`text-field`/`link-fields`). The
+    /// descriptor's toml file is served through the in-memory repo-file map (the
+    /// storage boundary, NO real filesystem read); `policies_toml` (when `Some`)
+    /// seeds it. Uses the non-reserved name `policy` so the GENERIC toml-descriptor
+    /// path is exercised, distinct from the reserved `invariant` registry path.
+    fn policy_exec(policies_toml: Option<&str>) -> CommandExecutor<InMemoryStorage> {
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+        std::fs::create_dir_all(storage.root()).unwrap();
+        let config = "[item_kinds.policy]\n\
+             section = \"success_criteria\"\n\
+             id-pattern = \"POL-[0-9]+\"\n\
+             markers = []\n\
+             link-namespaces = [\"enforces\"]\n\
+             scope = \"project\"\n\
+             source = { toml = \"policies.toml\", table = \"policies\", \
+             id-field = \"id\", text-field = \"statement\", \
+             link-fields = { enforces = \"enforced-by\" } }\n\
+             source-of-truth = \"registry-first\"\n";
+        std::fs::write(storage.root().join("config.toml"), config).unwrap();
+        if let Some(toml) = policies_toml {
+            storage.add_repo_file("policies.toml", toml);
+        }
+        CommandExecutor::new(storage)
+    }
+
+    const TWO_POLICIES: &str = "\
+[[policies]]
+id = \"POL-01\"
+statement = \"All writes are atomic.\"
+enforced-by = [\"cargo-ci\", \"jit-validate\"]
+
+[[policies]]
+id = \"POL-02\"
+statement = \"Every dependency edge stays acyclic.\"
+";
+
+    #[test]
+    fn test_project_items_indexes_custom_toml_registry_kind() {
+        // REQ-02: a NON-invariant registry-first kind backed by a custom `.toml`
+        // through the declared field mapping indexes `@/<self-id>` items, with the
+        // toml read going through the storage boundary and link-fields surfacing as
+        // namespace-qualified link labels.
+        let exec = policy_exec(Some(TWO_POLICIES));
+
+        let first = exec.show_item("@/POL-01").unwrap();
+        assert_eq!(first.item.self_id, "POL-01");
+        assert_eq!(first.item.qualified_id, "@/POL-01");
+        assert_eq!(first.item.scope, "@");
+        assert_eq!(first.item.kind, "policy");
+        assert!(first.item.text.contains("atomic"));
+        // The `enforced-by` toml field maps to the `enforces` link namespace.
+        assert_eq!(
+            first.item.links,
+            vec![
+                "enforces:cargo-ci".to_string(),
+                "enforces:jit-validate".to_string()
+            ]
+        );
+        // No owning issue: a project-scope item.
+        assert_eq!(first.issue_full_id, None);
+
+        // An entry with no link field is graceful: it still indexes, with no labels.
+        let second = exec.show_item("@/POL-02").unwrap();
+        assert_eq!(second.item.self_id, "POL-02");
+        assert!(second.item.links.is_empty());
+
+        // Both surface in the cross-repo list under the `@` project scope.
+        let listed = exec.list_items(Some("policy")).unwrap();
+        assert_eq!(listed.count, 2);
+    }
+
+    #[test]
+    fn test_project_items_custom_toml_absent_file_is_graceful() {
+        // REQ-02 (degradation): with no descriptor toml seeded, the storage read
+        // returns None and `@/<id>` resolves to a descriptive not-found error,
+        // never a panic and never the issue resolver.
+        let exec = policy_exec(None);
+        let err = exec.show_item("@/POL-01").unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("project scope"), "got: {msg}");
+        assert!(!msg.contains("resolve issue scope"), "got: {msg}");
     }
 
     /// Build an executor whose synthetic `.jit` root carries an

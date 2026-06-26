@@ -290,7 +290,7 @@ pub struct NamespaceConfig {
 /// .unwrap();
 /// let gloss = &config.item_kinds.unwrap()["glossary"];
 /// assert_eq!(gloss.scope, Some(KindScopeConfig::Project));
-/// assert_eq!(gloss.source.as_deref(), Some("project-items.md"));
+/// assert_eq!(gloss.source.as_ref().and_then(|s| s.path()), Some("project-items.md"));
 /// assert!(gloss.missing_required_fields().is_empty());
 /// ```
 ///
@@ -323,13 +323,22 @@ pub struct ItemKindConfig {
     /// declaration; an unrecognised token is a TOML parse error, not a silent
     /// fallback.
     pub scope: Option<KindScopeConfig>,
-    /// For a `scope = "project"` kind, the repository-local markdown file
-    /// (relative to the repo root) whose declared `section` is scanned for this
-    /// kind's items. The path comes ONLY from config — no filename is hardcoded in
-    /// engine logic. Ignored for issue-scoped kinds; an absent or missing file
-    /// yields no project items (graceful), not an error. NOT one of the six
-    /// required fields — it stays optional.
-    pub source: Option<String>,
+    /// For a `scope = "project"` kind, where its items are sourced from. Two
+    /// shapes are accepted (resolved by [`ItemKindSource`]):
+    /// - a bare path STRING (`source = "glossary.md"`) for a markdown-first kind,
+    ///   naming the repository-local file whose declared `section` is scanned; or
+    /// - a structured TOML descriptor table
+    ///   (`source = { toml = "...", table = "...", id-field = "...", text-field =
+    ///   "...", link-fields = { ns = "field" } }`) for a registry-first kind,
+    ///   naming a `.toml` registry and the field mapping that projects each entry
+    ///   into an addressable item.
+    ///
+    /// Either way the location comes ONLY from config — no filename is hardcoded in
+    /// engine logic — and all I/O goes through the storage boundary. Ignored for
+    /// issue-scoped kinds; an absent or missing file yields no project items
+    /// (graceful), not an error. NOT one of the six required fields — it stays
+    /// optional.
+    pub source: Option<ItemKindSource>,
     /// The kind's authoring DIRECTION (which substrate is canonical), distinct
     /// from the `source` PATH above. Required in an explicit declaration; resolve
     /// a present value with [`ItemKindConfig::source_of_truth`].
@@ -429,6 +438,172 @@ impl ItemKindConfig {
     pub fn source_of_truth(&self) -> SourceOfTruth {
         self.source_of_truth.unwrap_or_default()
     }
+}
+
+/// Where a `scope = "project"` item kind reads its items from: either a bare
+/// markdown file PATH or a structured TOML [`TomlSourceDescriptor`].
+///
+/// This is the polymorphic value of [`ItemKindConfig::source`]. A bare string
+/// deserializes to [`ItemKindSource::Path`] (the markdown-first form: the named
+/// file's `section` is scanned), while a table deserializes to
+/// [`ItemKindSource::Toml`] (the registry-first form: each entry of the named
+/// `.toml` table is projected through a field mapping). The two shapes are
+/// distinguished at parse time — a string is never a descriptor and vice versa —
+/// so a malformed descriptor surfaces a descriptive TOML error rather than a
+/// silent fallback.
+///
+/// # Examples
+///
+/// ```
+/// use jit::config::{ItemKindConfig, ItemKindSource};
+///
+/// // A bare path string is the markdown-first form.
+/// let md: ItemKindConfig = toml::from_str(r#"source = "glossary.md""#).unwrap();
+/// assert_eq!(md.source, Some(ItemKindSource::Path("glossary.md".into())));
+/// assert_eq!(md.source.unwrap().path(), Some("glossary.md"));
+///
+/// // A table is the registry-first toml descriptor.
+/// let reg: ItemKindConfig = toml::from_str(
+///     r#"source = { toml = "policies.toml", table = "policies", id-field = "id", text-field = "statement" }"#,
+/// )
+/// .unwrap();
+/// let descriptor = reg.source.unwrap();
+/// assert_eq!(descriptor.path(), None);
+/// assert_eq!(descriptor.toml_descriptor().unwrap().table, "policies");
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ItemKindSource {
+    /// A bare repository-local file path (markdown-first): the file's `section` is
+    /// scanned the same way an issue description is.
+    Path(String),
+    /// A structured TOML registry descriptor (registry-first): the named table is
+    /// projected through a field mapping.
+    Toml(TomlSourceDescriptor),
+}
+
+impl ItemKindSource {
+    /// The bare markdown file path, or `None` when this is a TOML descriptor.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::config::ItemKindSource;
+    ///
+    /// assert_eq!(ItemKindSource::Path("x.md".into()).path(), Some("x.md"));
+    /// ```
+    pub fn path(&self) -> Option<&str> {
+        match self {
+            ItemKindSource::Path(p) => Some(p),
+            ItemKindSource::Toml(_) => None,
+        }
+    }
+
+    /// The structured TOML descriptor, or `None` when this is a bare path.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::config::ItemKindSource;
+    ///
+    /// assert!(ItemKindSource::Path("x.md".into()).toml_descriptor().is_none());
+    /// ```
+    pub fn toml_descriptor(&self) -> Option<&TomlSourceDescriptor> {
+        match self {
+            ItemKindSource::Toml(d) => Some(d),
+            ItemKindSource::Path(_) => None,
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for ItemKindSource {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        // A bare string is the markdown path form; a table is the toml descriptor.
+        // A Visitor (rather than `#[serde(untagged)]`) keeps this robust under the
+        // TOML deserializer, which buffers untagged enums poorly.
+        struct SourceVisitor;
+        impl<'de> serde::de::Visitor<'de> for SourceVisitor {
+            type Value = ItemKindSource;
+
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str(
+                    "a markdown file path string, or a toml source descriptor table \
+                     { toml, table, id-field, text-field, link-fields }",
+                )
+            }
+
+            fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {
+                Ok(ItemKindSource::Path(v.to_string()))
+            }
+
+            fn visit_string<E: serde::de::Error>(self, v: String) -> Result<Self::Value, E> {
+                Ok(ItemKindSource::Path(v))
+            }
+
+            fn visit_map<A: serde::de::MapAccess<'de>>(
+                self,
+                map: A,
+            ) -> Result<Self::Value, A::Error> {
+                let descriptor = TomlSourceDescriptor::deserialize(
+                    serde::de::value::MapAccessDeserializer::new(map),
+                )?;
+                Ok(ItemKindSource::Toml(descriptor))
+            }
+        }
+        deserializer.deserialize_any(SourceVisitor)
+    }
+}
+
+/// The field mapping that projects a `.toml` registry table into addressable
+/// items for a registry-first project kind.
+///
+/// Each entry of the named `table` (an array-of-tables) becomes one addressable
+/// item: `id-field` supplies its self-id (so its qualified id is `@/<self-id>`),
+/// `text-field` supplies its display text, and each `link-fields` entry maps a
+/// toml field holding link targets to the link NAMESPACE those targets are
+/// labelled under. A `link-fields` value may be a single string or an array of
+/// strings; an absent link field on an entry contributes no labels (graceful).
+///
+/// This is the generic analogue of the typed invariant registry: it carries only
+/// the addressing mapping (id/text/links), leaving any kind-specific TYPED
+/// validation (e.g. an invariant's `enforced`/`advisory` discriminant) to a
+/// dedicated loader.
+///
+/// # Examples
+///
+/// ```
+/// use jit::config::ItemKindConfig;
+///
+/// let cfg: ItemKindConfig = toml::from_str(
+///     r#"source = { toml = "policies.toml", table = "policies", id-field = "id", text-field = "statement", link-fields = { enforces = "enforced-by" } }"#,
+/// )
+/// .unwrap();
+/// let descriptor = cfg.source.unwrap().toml_descriptor().cloned().unwrap();
+/// assert_eq!(descriptor.toml, "policies.toml");
+/// assert_eq!(descriptor.table, "policies");
+/// assert_eq!(descriptor.id_field, "id");
+/// assert_eq!(descriptor.text_field, "statement");
+/// assert_eq!(descriptor.link_fields.get("enforces").map(String::as_str), Some("enforced-by"));
+/// ```
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct TomlSourceDescriptor {
+    /// Repository-local path to the `.toml` registry file (read through storage).
+    pub toml: String,
+    /// The array-of-tables key whose entries are projected (e.g. `"policies"`).
+    pub table: String,
+    /// The entry field supplying each item's self-id (e.g. `"id"`).
+    #[serde(rename = "id-field")]
+    pub id_field: String,
+    /// The entry field supplying each item's display text (e.g. `"statement"`).
+    #[serde(rename = "text-field")]
+    pub text_field: String,
+    /// Map of link NAMESPACE to the entry field holding its targets. Each mapped
+    /// field's string (or string-array) values become `<namespace>:<target>`
+    /// labels. Optional; defaults to no link fields. A [`BTreeMap`] keeps label
+    /// ordering deterministic across runs.
+    ///
+    /// [`BTreeMap`]: std::collections::BTreeMap
+    #[serde(rename = "link-fields", default)]
+    pub link_fields: std::collections::BTreeMap<String, String>,
 }
 
 /// Parse error for [`KindScopeConfig`].
@@ -2201,7 +2376,10 @@ source-of-truth = "registry-first"
         assert_eq!(pol.source_of_truth, Some(SourceOfTruth::RegistryFirst));
         assert_eq!(pol.source_of_truth(), SourceOfTruth::RegistryFirst);
         // The direction is independent of the `source` PATH.
-        assert_eq!(pol.source.as_deref(), Some("policies.toml"));
+        assert_eq!(
+            pol.source.as_ref().and_then(|s| s.path()),
+            Some("policies.toml")
+        );
     }
 
     #[test]
