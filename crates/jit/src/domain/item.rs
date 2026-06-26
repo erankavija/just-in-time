@@ -123,6 +123,25 @@ pub const INVARIANT_KIND_NAME: &str = "invariant";
 /// `enforces:@/INV-01` label on a node points at the addressed invariant.
 pub const INVARIANT_KIND_LINK_NAMESPACE: &str = "enforces";
 
+/// Repository-local path of the toml registry backing the built-in `invariant`
+/// kind, read through the storage boundary by the generic registry-first path.
+///
+/// One of the four descriptor fields [`ItemKind::invariant_default`] maps the
+/// invariant registry through; they describe a baked default kind (REQ-04 will
+/// delete the bakery), NOT a routing branch — projection never compares against
+/// them.
+const INVARIANT_REGISTRY_PATH: &str = ".jit/invariants.toml";
+
+/// The array-of-tables key projected from [`INVARIANT_REGISTRY_PATH`] (each
+/// `[[invariants]]` entry becomes one `@/<id>` item).
+const INVARIANT_REGISTRY_TABLE: &str = "invariants";
+
+/// The invariant-entry field supplying each item's self-id.
+const INVARIANT_REGISTRY_ID_FIELD: &str = "id";
+
+/// The invariant-entry field supplying each item's display text.
+const INVARIANT_REGISTRY_TEXT_FIELD: &str = "statement";
+
 /// The scope sentinel that addresses project-level items not tied to any single
 /// issue. The first segment of a qualified id equal to this string denotes
 /// [`Scope::Project`] (REQ-01).
@@ -351,11 +370,15 @@ pub enum ItemError {
         /// The unrecognized scope string.
         scope: String,
     },
-    /// A `scope = "project"` kind declares no `source` file to read its items
-    /// from, so it cannot be indexed at project scope.
+    /// A `scope = "project"` kind declares no `source` for the substrate its
+    /// `source-of-truth` reads from, so it cannot be indexed at project scope: a
+    /// markdown-first kind needs a markdown `source` path, a registry-first kind
+    /// needs a structured toml `source` descriptor. Either way an absent source
+    /// declaration is a typed error rather than a silent empty result.
     #[error(
-        "project-scope item kind '{kind}' declares no 'source' file; \
-         a project-scope kind must name a repository-local markdown source"
+        "project-scope item kind '{kind}' declares no 'source'; \
+         a project-scope kind must name a repository-local source \
+         (a markdown file for markdown-first, or a toml descriptor for registry-first)"
     )]
     MissingProjectSource {
         /// The offending kind name.
@@ -370,35 +393,6 @@ pub enum ItemError {
     )]
     UnknownKind {
         /// The undeclared kind name that was referenced.
-        kind: String,
-    },
-    /// A config declares the reserved `invariant` kind name with a non-registry-first
-    /// A config declares the reserved `invariant` kind name without BOTH
-    /// `scope = "project"` and `source-of-truth = "registry-first"`. The `invariant`
-    /// kind is reserved as a project-scoped, registry-first kind (projected from
-    /// `.jit/invariants.toml`); it must NEVER be sourced from a markdown file NOR
-    /// parsed from issue descriptions, so any other declaration is rejected rather
-    /// than silently producing a markdown index for invariants. Requiring
-    /// project-scope closes the `registry-first` + `scope = "issue"` path that would
-    /// otherwise run the invariant kind through the issue-description parser.
-    #[error(
-        "item kind '{INVARIANT_KIND_NAME}' must be project-scoped and registry-first \
-         (scope = \"project\", source-of-truth = \"registry-first\"); it is reserved \
-         as the registry-backed invariant kind and cannot be sourced from markdown \
-         nor parsed from issue descriptions"
-    )]
-    InvariantMustBeProjectRegistryFirst,
-    /// A registry-first project kind names no known registry source. The only
-    /// registered registry source is the invariant registry, bound to the
-    /// `invariant` kind; any OTHER registry-first project kind has nothing to
-    /// project from and is rejected rather than silently borrowing the invariant
-    /// registry under the wrong kind name.
-    #[error(
-        "registry-first item kind '{kind}' has no registered registry source; \
-         only '{INVARIANT_KIND_NAME}' is backed by a registry"
-    )]
-    UnknownRegistrySource {
-        /// The registry-first kind name with no bound registry.
         kind: String,
     },
     /// The `.toml` file backing a registry-first kind's source descriptor is not
@@ -540,27 +534,19 @@ impl ItemKind {
             Some(ItemKindSource::Toml(descriptor)) => (None, Some(descriptor.clone())),
             None => (None, None),
         };
-        // The `invariant` kind name is RESERVED as a project-scoped, registry-first
-        // kind: its items come only from the invariant registry, never a markdown
-        // source NOR an issue description. Reject any declaration of `invariant`
-        // that is not BOTH `scope = "project"` AND registry-first, so a markdown
-        // index for invariants is impossible (REQ-02). Requiring project scope
-        // closes the `registry-first` + `scope = "issue"` path that would otherwise
-        // pass through `issue_item_kinds()` and parse invariants from descriptions.
-        if name == INVARIANT_KIND_NAME
-            && !(kind_scope.is_project() && source_of_truth == SourceOfTruth::RegistryFirst)
-        {
-            return Err(ItemError::InvariantMustBeProjectRegistryFirst);
-        }
-        // A MARKDOWN-FIRST project-scope kind without a source cannot be indexed;
-        // reject at resolution so a misconfigured kind surfaces a typed error, not a
-        // silent empty result. A REGISTRY-FIRST project kind (e.g. `invariant`)
-        // derives its items from the loaded registry, not a markdown source file, so
-        // it is exempt from this requirement.
-        if kind_scope.is_project()
-            && source_of_truth == SourceOfTruth::MarkdownFirst
-            && source_path.is_none()
-        {
+        // A project-scope kind must declare the `source` its `source-of-truth`
+        // reads from, or it cannot be indexed at project scope: a markdown-first
+        // kind needs a markdown `source` PATH, a registry-first kind needs a
+        // structured toml `source` DESCRIPTOR. Reject a missing declaration at
+        // resolution so a misconfigured kind surfaces a typed error, not a silent
+        // empty result. The check is symmetric across both directions and branches
+        // only on `source-of-truth`, never on any kind NAME, so the engine
+        // hardcodes no domain concept (REQ-03).
+        let has_source = match source_of_truth {
+            SourceOfTruth::MarkdownFirst => source_path.is_some(),
+            SourceOfTruth::RegistryFirst => toml_source.is_some(),
+        };
+        if kind_scope.is_project() && !has_source {
             return Err(ItemError::MissingProjectSource {
                 kind: name.to_string(),
             });
@@ -700,20 +686,20 @@ impl ItemKind {
     ///
     /// A *registry-first*, project-scoped kind: unlike `requirement`, `decision`,
     /// and `risk` (markdown-first), an invariant is NOT parsed from a markdown
-    /// section. Its items are derived directly from the loaded invariant registry
-    /// (`.jit/invariants.toml`, surfaced as
-    /// [`JitConfig::invariants`](crate::config::JitConfig)), which is the
-    /// authoritative source. Each entry's `id` is its self-id, so its qualified id
-    /// is `@/<id>` (REQ-01); the registry is authoritative and no markdown index is
-    /// produced for invariants (REQ-02).
+    /// section. Its items are projected from a toml `source` descriptor naming the
+    /// invariant registry (`.jit/invariants.toml`), read through the storage
+    /// boundary by the GENERIC registry-first path. Each `[[invariants]]` entry's
+    /// `id` is its self-id, so its qualified id is `@/<id>` (REQ-01); the registry
+    /// is authoritative and no markdown index is produced for invariants (REQ-02).
     ///
     /// Because a registry-first kind does not use the triple parse path, the
     /// `section` / `id-pattern` / `marker` fields are NOT consulted for projecting
-    /// items — they are set to sensible inert defaults purely to satisfy the shared
+    /// items; they are set to sensible inert defaults purely to satisfy the shared
     /// tuple shape. The caller (`commands/item.rs::project_items`) routes on
-    /// [`source_of_truth`](Self::source_of_truth) and derives invariant items from
-    /// the registry, bypassing the markdown scanner entirely. Consequently the
-    /// invariant kind declares NO `source` file.
+    /// [`source_of_truth`](Self::source_of_truth) and projects invariant items from
+    /// the kind's toml `source` descriptor, bypassing the markdown scanner entirely.
+    /// Consequently the invariant kind declares NO markdown `source` file, only the
+    /// toml descriptor exposed by [`toml_source`](Self::toml_source).
     ///
     /// Its link namespace is `enforces`: an `enforces:@/INV-01` label on a node
     /// points at the addressed invariant.
@@ -731,11 +717,19 @@ impl ItemKind {
     ///
     /// let inv = ItemKind::invariant_default().unwrap();
     /// assert_eq!(inv.name(), "invariant");
-    /// // Project-scoped and registry-first: items come from the registry, not a
-    /// // markdown source file.
+    /// // Project-scoped and registry-first: items come from the toml registry, not
+    /// // a markdown source file.
     /// assert_eq!(inv.kind_scope(), KindScope::Project);
     /// assert_eq!(inv.source_of_truth(), SourceOfTruth::RegistryFirst);
+    /// // No markdown `source` path; the registry is named by a toml descriptor.
     /// assert_eq!(inv.source(), None);
+    /// let descriptor = inv.toml_source().unwrap();
+    /// assert_eq!(descriptor.toml, ".jit/invariants.toml");
+    /// assert_eq!(descriptor.table, "invariants");
+    /// assert_eq!(descriptor.id_field, "id");
+    /// assert_eq!(descriptor.text_field, "statement");
+    /// // No link-fields: an invariant's `enforced-by` is not an item link.
+    /// assert!(descriptor.link_fields.is_empty());
     /// assert_eq!(inv.link_namespaces(), &["enforces".to_string()]);
     /// ```
     pub fn invariant_default() -> Result<Self, ItemError> {
@@ -743,15 +737,28 @@ impl ItemKind {
             INVARIANT_KIND_NAME,
             &ItemKindConfig {
                 // Registry-first: the section / id-pattern / markers below are inert
-                // (the registry, not a markdown section, is the source), kept only
-                // to fill the shared tuple shape. They are never used to parse
+                // (the toml registry, not a markdown section, is the source), kept
+                // only to fill the shared tuple shape. They are never used to parse
                 // invariant items.
                 section: Some(DEFAULT_ITEM_SECTION.to_string()),
                 id_pattern: Some(DEFAULT_ITEM_ID_PATTERN.to_string()),
                 markers: Some(vec![]),
                 link_namespaces: Some(vec![INVARIANT_KIND_LINK_NAMESPACE.to_string()]),
                 scope: Some(KindScopeConfig::Project),
-                source: None,
+                // The toml `source` descriptor routes the invariant kind through the
+                // GENERIC registry-first path (no reserved-name branch): each
+                // `[[invariants]]` entry of `.jit/invariants.toml` projects to an
+                // item whose self-id is its `id` and text its `statement`. No
+                // link-fields are mapped, so each item's links stay empty: an
+                // invariant's `enforced-by` is consumed by drift analysis, not
+                // surfaced as an addressable-item link.
+                source: Some(ItemKindSource::Toml(TomlSourceDescriptor {
+                    toml: INVARIANT_REGISTRY_PATH.to_string(),
+                    table: INVARIANT_REGISTRY_TABLE.to_string(),
+                    id_field: INVARIANT_REGISTRY_ID_FIELD.to_string(),
+                    text_field: INVARIANT_REGISTRY_TEXT_FIELD.to_string(),
+                    link_fields: std::collections::BTreeMap::new(),
+                })),
                 source_of_truth: Some(SourceOfTruth::RegistryFirst),
             },
         )
@@ -1806,110 +1813,105 @@ mod tests {
     }
 
     #[test]
-    fn test_registry_first_project_kind_needs_no_source() {
-        // A registry-first project kind is exempt from the MissingProjectSource
-        // guard (its items come from the registry, not a markdown source file).
-        let cfg = ItemKindConfig {
+    fn test_registry_first_project_kind_requires_toml_descriptor() {
+        // Symmetric to the markdown-first source requirement (REQ-03): a
+        // registry-first project kind must declare a toml `source` descriptor, or it
+        // is rejected at resolution with a typed MissingProjectSource — never a
+        // silent empty result.
+        let base = |source: Option<ItemKindSource>| ItemKindConfig {
             section: Some(DEFAULT_ITEM_SECTION.to_string()),
             id_pattern: Some(DEFAULT_ITEM_ID_PATTERN.to_string()),
             markers: Some(vec![]),
             link_namespaces: Some(vec!["enforces".to_string()]),
             scope: Some(KindScopeConfig::Project),
-            source: None,
+            source,
             source_of_truth: Some(SourceOfTruth::RegistryFirst),
         };
-        let kind = ItemKind::from_config("invariant", &cfg).unwrap();
+
+        // No descriptor → rejected (the registry-first analogue of a missing
+        // markdown source).
+        let err = ItemKind::from_config("policy", &base(None)).unwrap_err();
+        assert!(matches!(err, ItemError::MissingProjectSource { .. }));
+
+        // With a toml descriptor → accepted; the descriptor is exposed by
+        // `toml_source`, and no markdown `source` path is set.
+        let descriptor = TomlSourceDescriptor {
+            toml: "policies.toml".to_string(),
+            table: "policies".to_string(),
+            id_field: "id".to_string(),
+            text_field: "statement".to_string(),
+            link_fields: std::collections::BTreeMap::new(),
+        };
+        let kind =
+            ItemKind::from_config("policy", &base(Some(ItemKindSource::Toml(descriptor)))).unwrap();
         assert_eq!(kind.source_of_truth(), SourceOfTruth::RegistryFirst);
         assert_eq!(kind.source(), None);
+        assert_eq!(kind.toml_source().unwrap().table, "policies");
     }
 
     #[test]
-    fn test_invariant_kind_name_reserved_as_project_registry_first() {
-        // The `invariant` name is reserved as a project-scoped, registry-first kind:
-        // it must NEVER be sourced from markdown nor parsed from issue descriptions,
-        // so any declaration that is not BOTH project + registry-first is rejected
-        // (REQ-02). Helper builds a config with the given scope/source-of-truth.
-        let cfg = |scope: KindScopeConfig, sot: Option<SourceOfTruth>, source: Option<&str>| {
+    fn test_invariant_default_routes_through_toml_descriptor() {
+        // REQ-03: the built-in `invariant` kind carries a toml `source` descriptor
+        // naming `.jit/invariants.toml`, so it routes through the GENERIC
+        // registry-first path with no reserved-name branch. The descriptor maps
+        // `id`/`statement` and NO link-fields (so each item's links stay empty,
+        // matching the prior typed projection byte-for-byte).
+        let inv = ItemKind::invariant_default().unwrap();
+        assert_eq!(inv.name(), "invariant");
+        assert_eq!(inv.kind_scope(), KindScope::Project);
+        assert_eq!(inv.source_of_truth(), SourceOfTruth::RegistryFirst);
+        assert_eq!(inv.source(), None);
+        let descriptor = inv
+            .toml_source()
+            .expect("invariant carries a toml descriptor");
+        assert_eq!(descriptor.toml, ".jit/invariants.toml");
+        assert_eq!(descriptor.table, "invariants");
+        assert_eq!(descriptor.id_field, "id");
+        assert_eq!(descriptor.text_field, "statement");
+        assert!(descriptor.link_fields.is_empty());
+    }
+
+    #[test]
+    fn test_invariant_name_is_no_longer_reserved() {
+        // REQ-03: the `invariant` NAME no longer carries any special routing. A
+        // config-declared `invariant` kind resolves as ordinary config like any
+        // other name — declarations the old reserved-name branch rejected are now
+        // accepted because the engine hardcodes no domain concept.
+        let cfg = |scope: KindScopeConfig, sot: SourceOfTruth, source: Option<ItemKindSource>| {
             ItemKindConfig {
                 section: Some(DEFAULT_ITEM_SECTION.to_string()),
                 id_pattern: Some("INV-[0-9]+".to_string()),
                 markers: Some(vec![]),
                 link_namespaces: Some(vec!["enforces".to_string()]),
                 scope: Some(scope),
-                source: source.map(|s| ItemKindSource::Path(s.to_string())),
-                source_of_truth: sot,
+                source,
+                source_of_truth: Some(sot),
             }
         };
 
-        // 1. project + markdown-first → rejected.
-        let err = ItemKind::from_config(
+        // Markdown-first project `invariant` with a source: once a reserved-name
+        // rejection, now an ordinary markdown-first project kind.
+        let md = ItemKind::from_config(
             INVARIANT_KIND_NAME,
             &cfg(
                 KindScopeConfig::Project,
-                Some(SourceOfTruth::MarkdownFirst),
-                Some("project-items.md"),
-            ),
-        )
-        .unwrap_err();
-        assert!(matches!(
-            err,
-            ItemError::InvariantMustBeProjectRegistryFirst
-        ));
-        // The message names BOTH requirements.
-        let msg = err.to_string();
-        assert!(msg.contains("project-scoped") && msg.contains("registry-first"));
-
-        // 2. project + UNSET source-of-truth (defaults to markdown-first) → rejected.
-        assert!(matches!(
-            ItemKind::from_config(
-                INVARIANT_KIND_NAME,
-                &cfg(KindScopeConfig::Project, None, Some("project-items.md")),
-            )
-            .unwrap_err(),
-            ItemError::InvariantMustBeProjectRegistryFirst
-        ));
-
-        // 3. registry-first BUT issue-scoped → rejected (closes the markdown-parse
-        //    path through `issue_item_kinds()`).
-        assert!(matches!(
-            ItemKind::from_config(
-                INVARIANT_KIND_NAME,
-                &cfg(
-                    KindScopeConfig::Issue,
-                    Some(SourceOfTruth::RegistryFirst),
-                    None
-                ),
-            )
-            .unwrap_err(),
-            ItemError::InvariantMustBeProjectRegistryFirst
-        ));
-
-        // 4. issue + markdown-first → rejected.
-        assert!(matches!(
-            ItemKind::from_config(
-                INVARIANT_KIND_NAME,
-                &cfg(
-                    KindScopeConfig::Issue,
-                    Some(SourceOfTruth::MarkdownFirst),
-                    None
-                ),
-            )
-            .unwrap_err(),
-            ItemError::InvariantMustBeProjectRegistryFirst
-        ));
-
-        // 5. project + registry-first → ACCEPTED (regression: the valid form works).
-        let ok = ItemKind::from_config(
-            INVARIANT_KIND_NAME,
-            &cfg(
-                KindScopeConfig::Project,
-                Some(SourceOfTruth::RegistryFirst),
-                None,
+                SourceOfTruth::MarkdownFirst,
+                Some(ItemKindSource::Path("project-items.md".to_string())),
             ),
         )
         .unwrap();
-        assert_eq!(ok.kind_scope(), KindScope::Project);
-        assert_eq!(ok.source_of_truth(), SourceOfTruth::RegistryFirst);
+        assert_eq!(md.source_of_truth(), SourceOfTruth::MarkdownFirst);
+        assert_eq!(md.source(), Some("project-items.md"));
+
+        // Registry-first issue-scoped `invariant`: once rejected to keep invariants
+        // out of the issue-description parser, now an ordinary issue-scope kind (the
+        // project-source requirement does not apply to issue scope).
+        let issue = ItemKind::from_config(
+            INVARIANT_KIND_NAME,
+            &cfg(KindScopeConfig::Issue, SourceOfTruth::RegistryFirst, None),
+        )
+        .unwrap();
+        assert_eq!(issue.kind_scope(), KindScope::Issue);
     }
 
     #[test]

@@ -305,8 +305,8 @@ fn test_item_command_failure_emits_json() {
 /// sourced from `project-items.md` (preserving any config `jit init` wrote), and
 /// optionally write that source file.
 ///
-/// Uses the non-reserved name `glossary` (not `invariant`, which is reserved as a
-/// registry-first kind) to exercise generic markdown-first project-scope sourcing.
+/// Uses the name `glossary` to exercise generic markdown-first project-scope
+/// sourcing through a kind distinct from the registry-first `invariant` default.
 fn configure_project_scope_kind(repo: &std::path::Path, source_md: Option<&str>) {
     let config_path = repo.join(".jit").join("config.toml");
     let mut config = std::fs::read_to_string(&config_path).unwrap_or_default();
@@ -492,9 +492,11 @@ fn test_item_list_kind_invariant_registry_first_through_real_cli() {
 }
 
 #[test]
-fn test_markdown_first_invariant_config_rejected_through_real_cli() {
-    // Finding 1 (rework): the SHIPPED CLI rejects a markdown-first
-    // `[item_kinds.invariant]` declaration — invariant is reserved as registry-first.
+fn test_invariant_name_is_no_longer_reserved_through_real_cli() {
+    // REQ-03: the SHIPPED CLI no longer reserves the `invariant` name. A
+    // config-declared markdown-first `[item_kinds.invariant]` (once rejected) now
+    // resolves as ORDINARY config, indexing project items from its declared markdown
+    // source like any other markdown-first project kind.
     let temp = setup_test_repo();
     let config_path = temp.path().join(".jit").join("config.toml");
     let mut config = std::fs::read_to_string(&config_path).unwrap_or_default();
@@ -509,6 +511,11 @@ fn test_markdown_first_invariant_config_rejected_through_real_cli() {
          source-of-truth = \"markdown-first\"\n",
     );
     std::fs::write(&config_path, config).unwrap();
+    std::fs::write(
+        temp.path().join("project-items.md"),
+        "## Success Criteria\n\n- INV-01: a markdown-sourced invariant item\n",
+    )
+    .unwrap();
 
     let output = Command::new(jit_binary())
         .args(["item", "list", "--kind", "invariant", "--json"])
@@ -516,53 +523,15 @@ fn test_markdown_first_invariant_config_rejected_through_real_cli() {
         .output()
         .unwrap();
     assert!(
-        !output.status.success(),
-        "markdown-first invariant must be rejected"
+        output.status.success(),
+        "markdown-first invariant is now ordinary config: {}",
+        String::from_utf8_lossy(&output.stderr)
     );
-    let json: Value = serde_json::from_slice(&output.stdout)
-        .expect("--json failure must emit valid JSON on stdout");
-    let msg = json["error"]["message"].as_str().unwrap_or_default();
-    assert!(
-        msg.contains("project-scoped") && msg.contains("registry-first"),
-        "error must name both reserved requirements, got: {json}"
-    );
-}
-
-#[test]
-fn test_registry_first_issue_scoped_invariant_rejected_through_real_cli() {
-    // REQ-02 (final hole): the SHIPPED CLI rejects an `[item_kinds.invariant]`
-    // declared registry-first BUT issue-scoped — invariant is reserved as project +
-    // registry-first, so it can never be parsed from issue descriptions.
-    let temp = setup_test_repo();
-    let config_path = temp.path().join(".jit").join("config.toml");
-    let mut config = std::fs::read_to_string(&config_path).unwrap_or_default();
-    config.push_str(
-        "\n[item_kinds.invariant]\n\
-         section = \"success_criteria\"\n\
-         id-pattern = \"INV-[0-9]+\"\n\
-         markers = []\n\
-         link-namespaces = [\"enforces\"]\n\
-         scope = \"issue\"\n\
-         source-of-truth = \"registry-first\"\n",
-    );
-    std::fs::write(&config_path, config).unwrap();
-
-    let output = Command::new(jit_binary())
-        .args(["item", "list", "--kind", "invariant", "--json"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-    assert!(
-        !output.status.success(),
-        "registry-first issue-scoped invariant must be rejected"
-    );
-    let json: Value = serde_json::from_slice(&output.stdout)
-        .expect("--json failure must emit valid JSON on stdout");
-    let msg = json["error"]["message"].as_str().unwrap_or_default();
-    assert!(
-        msg.contains("project-scoped") && msg.contains("registry-first"),
-        "error must name both reserved requirements, got: {json}"
-    );
+    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["count"].as_u64().unwrap(), 1);
+    let items = json["items"].as_array().unwrap();
+    assert_eq!(items[0]["qualified_id"].as_str().unwrap(), "@/INV-01");
+    assert_eq!(items[0]["kind"].as_str().unwrap(), "invariant");
 }
 
 /// Append a `config.toml` namespace registration so a link-namespace label

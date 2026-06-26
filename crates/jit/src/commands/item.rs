@@ -11,8 +11,7 @@ use super::*;
 use crate::config::SourceOfTruth;
 use crate::domain::item::{
     index_items, index_project_sources, load_toml_scope_items, resolve_item_kinds,
-    split_qualified_id, AddressableItem, ItemError, ItemKind, ProjectSource, RawScopeItem, Scope,
-    INVARIANT_KIND_NAME,
+    split_qualified_id, AddressableItem, ItemKind, ProjectSource, Scope,
 };
 
 /// Result of a `jit item list` / `search` query.
@@ -172,30 +171,26 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///   reading both live in storage. An absent source file contributes no items
     ///   (storage returns `Ok(None)`), never an error; a source that is present but
     ///   unreadable, or a path that escapes the repo, IS reported.
-    /// - **registry-first**: items are projected directly from a structured
-    ///   registry, NOT a markdown source — the registry is the AUTHORITATIVE source
-    ///   and NO markdown index is read or produced for them (REQ-02). Two registry
-    ///   bindings are recognised, in order:
-    ///   1. The reserved [`invariant`](crate::domain::item::INVARIANT_KIND_NAME)
-    ///      kind is bound to the typed invariant registry
-    ///      ([`JitConfig::invariants`](crate::config::JitConfig)); each entry's `id`
-    ///      is its self-id, so its qualified id is `@/<id>` (REQ-01).
-    ///   2. ANY OTHER registry-first kind that declares a structured toml `source`
-    ///      descriptor ([`ItemKind::toml_source`]) is backed by that custom `.toml`:
-    ///      its file is read through the storage boundary and each entry projected
-    ///      through the descriptor's field mapping by
-    ///      [`load_toml_scope_items`] (REQ-02). An absent file contributes no items.
-    ///
-    ///   A registry-first kind that is neither the reserved invariant nor carries a
-    ///   toml descriptor has no bound source and is rejected with
-    ///   [`ItemError::UnknownRegistrySource`], never a silent projection of the
-    ///   invariant registry under the wrong kind name.
+    /// - **registry-first**: items are projected directly from a structured toml
+    ///   registry, NOT a markdown source. The registry is the AUTHORITATIVE source
+    ///   and NO markdown index is read or produced for them (REQ-02). The kind's
+    ///   toml `source` descriptor ([`ItemKind::toml_source`]) names the backing
+    ///   `.toml`: its file is read through the storage boundary and each entry
+    ///   projected through the descriptor's field mapping by
+    ///   [`load_toml_scope_items`] (REQ-02). An absent file contributes no items
+    ///   (graceful); a present-but-malformed file is a typed error. The built-in
+    ///   `invariant` kind is just such a descriptor-backed kind — it routes through
+    ///   this same generic path with no reserved-name branch (REQ-03). A
+    ///   registry-first project kind that declares no descriptor is rejected at kind
+    ///   resolution ([`ItemError::MissingProjectSource`]), so `toml_source` is
+    ///   `Some` here.
     ///
     /// Both substrates' candidates are deduped once through the single
     /// [`index_project_sources`] derivation, so per-scope uniqueness and
     /// qualified-id derivation are identical across them.
+    ///
+    /// [`ItemError::MissingProjectSource`]: crate::domain::item::ItemError::MissingProjectSource
     fn project_items(&self) -> Result<Vec<AddressableItem>> {
-        let config = self.cached_config()?;
         let mut sources = Vec::new();
         let mut registry_items = Vec::new();
         for kind in self.item_kinds()? {
@@ -203,24 +198,18 @@ impl<S: IssueStore> CommandExecutor<S> {
                 continue;
             }
             match kind.source_of_truth() {
-                // Registry-first: project items come ONLY from a structured
-                // registry, never from a markdown source file. Two bindings are
-                // recognised, in precedence order; the descriptor is bound by
-                // `if let` so there is no fallible re-fetch (REQ-02).
+                // Registry-first: project items come ONLY from the kind's structured
+                // toml `source` descriptor, never from a markdown source file. Kind
+                // resolution guarantees a registry-first project kind carries a
+                // descriptor (MissingProjectSource otherwise), so the `if let` binds;
+                // the defensive `else` keeps this non-panicking without a re-fetch.
                 SourceOfTruth::RegistryFirst => {
-                    if kind.name() == INVARIANT_KIND_NAME {
-                        // The reserved `invariant` kind is backed by the typed
-                        // invariant registry (unchanged; REQ-03 owns removing this
-                        // branch, not this task).
-                        registry_items.extend(invariant_raw_items(kind.name(), config));
-                    } else if let Some(descriptor) = kind.toml_source() {
-                        // A non-invariant registry-first kind backed by a
-                        // config-declared toml source descriptor: read the named
-                        // `.toml` through the storage boundary and project each entry
-                        // through the descriptor's field mapping. An absent file
-                        // contributes no items (graceful), mirroring the
-                        // markdown-first path; a present-but-malformed file is a typed
-                        // error.
+                    if let Some(descriptor) = kind.toml_source() {
+                        // Read the named `.toml` through the storage boundary and
+                        // project each entry through the descriptor's field mapping.
+                        // An absent file contributes no items (graceful), mirroring
+                        // the markdown-first path; a present-but-malformed file is a
+                        // typed error.
                         let toml =
                             self.storage
                                 .read_repo_file(&descriptor.toml)
@@ -242,15 +231,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                                 })?;
                             registry_items.extend(rows);
                         }
-                    } else {
-                        // A registry-first kind that is neither the reserved invariant
-                        // nor carries a toml descriptor has no bound source.
-                        return Err(anyhow!(ItemError::UnknownRegistrySource {
-                            kind: kind.name().to_string(),
-                        }))
-                        .with_context(|| {
-                            format!("cannot index registry-first project kind '{}'", kind.name())
-                        });
                     }
                 }
                 // Markdown-first: read and scan the config-declared source file.
@@ -429,32 +409,6 @@ impl<S: IssueStore> CommandExecutor<S> {
         })?;
         Ok(Some(resolved))
     }
-}
-
-/// Project the loaded invariant registry into raw project-scope candidates for the
-/// registry-first `invariant` kind.
-///
-/// A pure projection over [`JitConfig::invariants`](crate::config::JitConfig): each
-/// [`Invariant`](crate::validation::invariants::Invariant) becomes a
-/// [`RawScopeItem`] whose `self_id` is the entry's `id` (so its qualified id is
-/// `@/<id>`) and whose `text` is the entry's `statement`. The registry is the
-/// authoritative source — nothing is parsed from any markdown section (REQ-02).
-/// `kind_name` tags each candidate so the derived item reports the right kind.
-fn invariant_raw_items(kind_name: &str, config: &JitConfig) -> Vec<RawScopeItem> {
-    config
-        .invariants
-        .invariants
-        .iter()
-        .map(|inv| RawScopeItem {
-            kind: kind_name.to_string(),
-            self_id: inv.id.clone(),
-            text: inv.statement.clone(),
-            // The typed invariant projection carries no item-side link labels here;
-            // an invariant's `enforced-by` binding is consumed by drift analysis,
-            // not surfaced as an addressable-item link.
-            links: Vec::new(),
-        })
-        .collect()
 }
 
 #[cfg(test)]
@@ -799,18 +753,21 @@ statement = \"Every dependency edge stays acyclic.\"
         assert!(!msg.contains("resolve issue scope"), "got: {msg}");
     }
 
-    /// Build an executor whose synthetic `.jit` root carries an
-    /// `invariants.toml` with `invariants_toml` and NO `config.toml`, exercising
-    /// the default-repo, registry-first invariant path (the built-in `invariant`
-    /// kind is active because no `[item_kinds]` table replaces the defaults).
+    /// Build an executor whose synthetic repo carries `.jit/invariants.toml` with
+    /// `invariants_toml` and NO `config.toml`, exercising the default-repo,
+    /// registry-first invariant path (the built-in `invariant` kind is active
+    /// because no `[item_kinds]` table replaces the defaults).
+    ///
+    /// The registry is served through the storage boundary (the in-memory repo-file
+    /// map) at the `.jit/invariants.toml` path the invariant kind's toml descriptor
+    /// names, mirroring how the shipped CLI reads it through `read_repo_file`.
     fn registry_exec(
         invariants_toml: &str,
         issues: Vec<Issue>,
     ) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
         storage.init().unwrap();
-        std::fs::create_dir_all(storage.root()).unwrap();
-        std::fs::write(storage.root().join("invariants.toml"), invariants_toml).unwrap();
+        storage.add_repo_file(".jit/invariants.toml", invariants_toml);
         for issue in issues {
             storage.save_issue(issue).unwrap();
         }
@@ -913,9 +870,11 @@ kind = \"advisory\"
         assert_eq!(exec.list_items(Some("invariant")).unwrap().count, 0);
     }
 
-    /// Build an executor whose synthetic `.jit` root carries an explicit
-    /// `config.toml` (`config`) and an optional `invariants.toml`, for the
-    /// reserved-name and registry-binding rework tests.
+    /// Build an executor whose synthetic repo carries an explicit `config.toml`
+    /// (`config`, written to the real `.jit` root so `cached_config` parses the
+    /// `[item_kinds]` table) and an optional `.jit/invariants.toml` (served through
+    /// the storage boundary at the path the invariant descriptor names), for the
+    /// registry-binding rework tests.
     fn config_exec(
         config: &str,
         invariants_toml: Option<&str>,
@@ -926,7 +885,7 @@ kind = \"advisory\"
         std::fs::create_dir_all(storage.root()).unwrap();
         std::fs::write(storage.root().join("config.toml"), config).unwrap();
         if let Some(inv) = invariants_toml {
-            std::fs::write(storage.root().join("invariants.toml"), inv).unwrap();
+            storage.add_repo_file(".jit/invariants.toml", inv);
         }
         for issue in issues {
             storage.save_issue(issue).unwrap();
@@ -935,11 +894,12 @@ kind = \"advisory\"
     }
 
     #[test]
-    fn test_markdown_first_invariant_config_is_rejected() {
-        // Finding 1: declaring `[item_kinds.invariant]` as markdown-first is
-        // rejected — the invariant kind is reserved as registry-first, so no markdown
-        // index can ever be produced for invariants (REQ-02). The rejection surfaces
-        // through the kind-resolution path that `list_items` uses.
+    fn test_invariant_config_resolves_through_its_toml_descriptor() {
+        // REQ-03: the `invariant` name carries no special routing — a config-declared
+        // `[item_kinds.invariant]` with a toml `source` descriptor indexes its
+        // registry items exactly like any other registry-first kind. Here the
+        // descriptor names `.jit/invariants.toml`, so `item list --kind invariant`
+        // returns the registry entries through the GENERIC toml path.
         let exec = config_exec(
             "[item_kinds.invariant]\n\
              section = \"success_criteria\"\n\
@@ -947,30 +907,41 @@ kind = \"advisory\"
              markers = []\n\
              link-namespaces = [\"enforces\"]\n\
              scope = \"project\"\n\
-             source = \"project-items.md\"\n\
-             source-of-truth = \"markdown-first\"\n",
-            // Even with a registry present, the markdown-first declaration is invalid.
+             source = { toml = \".jit/invariants.toml\", table = \"invariants\", \
+             id-field = \"id\", text-field = \"statement\" }\n\
+             source-of-truth = \"registry-first\"\n",
             Some(TWO_INVARIANTS),
-            // An issue with an INV- line: it must NEVER become an invariant item.
+            // An issue with an INV- line: it must NEVER become a project invariant.
             vec![issue_with_criteria(
                 "A",
                 "## Success Criteria\n\n- [hard] INV-99: looks like an invariant\n",
             )],
         );
-        let err = exec.list_items(Some("invariant")).unwrap_err();
-        let msg = format!("{err:#}");
-        assert!(
-            msg.contains("project-scoped") && msg.contains("registry-first"),
-            "expected reserved-name rejection naming both requirements, got: {msg}"
-        );
+        let result = exec.list_items(Some("invariant")).unwrap();
+        let qids: Vec<&str> = result
+            .items
+            .iter()
+            .map(|i| i.qualified_id.as_str())
+            .collect();
+        assert_eq!(result.count, 2);
+        assert!(qids.contains(&"@/INV-01"));
+        assert!(qids.contains(&"@/INV-02"));
+        // The issue's INV-99 line is NOT a project invariant (registry-first reads
+        // only the toml, never a markdown section).
+        assert!(!qids.iter().any(|q| q.contains("INV-99")));
     }
 
     #[test]
-    fn test_registry_first_issue_scoped_invariant_config_is_rejected() {
-        // REQ-02 (final hole): `[item_kinds.invariant]` declared registry-first BUT
-        // issue-scoped is rejected. Otherwise the kind would pass through
-        // `issue_item_kinds()` and parse invariants from issue descriptions — a
-        // markdown index for invariants by another route.
+    fn test_issue_scoped_invariant_config_is_no_longer_reserved() {
+        // REQ-03: an `[item_kinds.invariant]` declared registry-first BUT issue-scoped
+        // was once rejected to keep invariants out of the issue-description parser.
+        // With the reserved-name branch gone it resolves as an ORDINARY issue-scope
+        // kind, indexing its items from issue descriptions like any other.
+        let issue = issue_with_criteria(
+            "A",
+            "## Success Criteria\n\n- INV-99: an issue-scoped invariant line\n",
+        );
+        let short = issue.short_id();
         let exec = config_exec(
             "[item_kinds.invariant]\n\
              section = \"success_criteria\"\n\
@@ -980,25 +951,20 @@ kind = \"advisory\"
              scope = \"issue\"\n\
              source-of-truth = \"registry-first\"\n",
             Some(TWO_INVARIANTS),
-            // An issue carrying an INV- line: it must NEVER become an invariant item.
-            vec![issue_with_criteria(
-                "A",
-                "## Success Criteria\n\n- INV-99: looks like an invariant\n",
-            )],
+            vec![issue],
         );
-        let err = exec.list_items(Some("invariant")).unwrap_err();
-        let msg = format!("{err:#}");
-        assert!(
-            msg.contains("project-scoped") && msg.contains("registry-first"),
-            "expected reserved-name rejection naming both requirements, got: {msg}"
-        );
+        // No rejection: the kind resolves and indexes from the issue description.
+        let result = exec.list_items(Some("invariant")).unwrap();
+        assert_eq!(result.count, 1);
+        assert_eq!(result.items[0].qualified_id, format!("{short}/INV-99"));
     }
 
     #[test]
-    fn test_registry_first_non_invariant_kind_is_typed_error() {
-        // Finding 2: a custom registry-first project kind that is NOT `invariant` has
-        // no bound registry source. It must produce a typed error rather than
-        // silently projecting the invariant registry under the wrong kind name.
+    fn test_registry_first_project_kind_without_descriptor_is_typed_error() {
+        // REQ-03: a registry-first project kind that declares no toml `source`
+        // descriptor has nothing to project from. It is rejected at kind resolution
+        // with a typed MissingProjectSource (symmetric to a markdown-first project
+        // kind missing its source) rather than silently producing no items.
         let exec = config_exec(
             "[item_kinds.foo]\n\
              section = \"success_criteria\"\n\
@@ -1007,18 +973,16 @@ kind = \"advisory\"
              link-namespaces = [\"foos\"]\n\
              scope = \"project\"\n\
              source-of-truth = \"registry-first\"\n",
-            // The invariant registry exists, but `foo` must NOT borrow its rows.
             Some(TWO_INVARIANTS),
             vec![],
         );
         let err = exec.list_items(None).unwrap_err();
         let msg = format!("{err:#}");
         assert!(
-            msg.contains("no registered registry source") && msg.contains("foo"),
-            "expected UnknownRegistrySource for 'foo', got: {msg}"
+            msg.contains("declares no 'source'") && msg.contains("foo"),
+            "expected MissingProjectSource for 'foo', got: {msg}"
         );
-        // No invariant rows leaked under the `foo` kind: the whole list errors out
-        // rather than returning mislabeled rows.
+        // The same typed rejection surfaces when the kind is filtered directly.
         assert!(exec.list_items(Some("foo")).is_err());
     }
 

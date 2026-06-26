@@ -2081,8 +2081,10 @@ kind = \"enforced\"
     fn dangling_exec(issues: Vec<Issue>) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
         storage.init().unwrap();
-        std::fs::create_dir_all(storage.root()).unwrap();
-        std::fs::write(storage.root().join("invariants.toml"), REGISTRY_TOML).unwrap();
+        // The registry-first `invariant` kind reads its toml through the storage
+        // boundary at the descriptor path, so seed the in-memory repo-file map (not
+        // the real fs) at `.jit/invariants.toml`.
+        storage.add_repo_file(".jit/invariants.toml", REGISTRY_TOML);
         for issue in issues {
             storage.save_issue(issue).unwrap();
         }
@@ -2097,7 +2099,9 @@ kind = \"enforced\"
         let storage = InMemoryStorage::new();
         storage.init().unwrap();
         std::fs::create_dir_all(storage.root()).unwrap();
-        std::fs::write(storage.root().join("invariants.toml"), REGISTRY_TOML).unwrap();
+        // Invariant registry through the storage boundary (descriptor path); the
+        // `config.toml` is parsed from the real `.jit` root by `cached_config`.
+        storage.add_repo_file(".jit/invariants.toml", REGISTRY_TOML);
         std::fs::write(
             storage.root().join("config.toml"),
             "[namespaces.type]\ndescription = \"issue type\"\nunique = true\n\
