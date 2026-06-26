@@ -1,9 +1,10 @@
 //! Per-document archival integrity (jit:f067678a).
 //!
-//! `archive_document` is reference-aware and transactional: archiving a file
-//! relocates it to the archive root AND re-links every issue doc-reference that
-//! points at it, in one operation; archiving a MISSING source is a typed no-op
-//! error that makes no filesystem or `.jit` change.
+//! `archive_document` is reference-aware and referentially consistent: archiving
+//! a file relocates it to the archive root AND re-links every issue doc-reference
+//! that points at it; under any single failure every reference still resolves to
+//! a file that exists. Archiving a MISSING source, or onto an already-OCCUPIED
+//! destination, is a typed no-op error that makes no filesystem or `.jit` change.
 //!
 //! These are in-process tests over a real `JsonFileStorage` rooted at
 //! `<tmp>/.jit`, with the document files at the REPO-ROOT-relative `dev/active/`
@@ -149,6 +150,53 @@ fn test_archive_missing_source_is_typed_noop() {
             .join("dev/archive/features/ghost.md")
             .exists(),
         "no archive file is created when the source is missing"
+    );
+}
+
+#[test]
+fn test_archive_destination_occupied_is_typed_noop() {
+    // Archiving onto an already-occupied destination must fail with the typed
+    // `ArchiveError::DestinationOccupied` and make NO change: the source survives,
+    // the reference stays on the source, and the pre-existing archived file is
+    // left byte-for-byte intact (never clobbered, never deleted by a rollback).
+    let (repo_root, executor) = executor();
+
+    let src = "dev/active/spec.md";
+    std::fs::create_dir_all(repo_root.path().join("dev/active")).unwrap();
+    std::fs::write(repo_root.path().join(src), "# New spec\n").unwrap();
+
+    // A different document already lives at the computed archive destination.
+    let dest = "dev/archive/features/spec.md";
+    std::fs::create_dir_all(repo_root.path().join("dev/archive/features")).unwrap();
+    let existing = "# Pre-existing archived spec, must not be lost\n";
+    std::fs::write(repo_root.path().join(dest), existing).unwrap();
+
+    let id = seed_issue_referencing(&executor, "alpha", src);
+
+    let err = executor
+        .archive_document(src, "design", false, false)
+        .expect_err("archiving onto an occupied destination must error");
+
+    match err.downcast_ref::<ArchiveError>() {
+        Some(ArchiveError::DestinationOccupied { path }) => assert_eq!(path, dest),
+        other => panic!("expected ArchiveError::DestinationOccupied, got {other:?}"),
+    }
+
+    // No-op: source intact, reference unchanged, and the pre-existing archived
+    // file is untouched (not overwritten, not deleted).
+    assert!(
+        repo_root.path().join(src).exists(),
+        "the source is left in place on a destination conflict"
+    );
+    assert_eq!(
+        referenced_path(&executor, &id),
+        src,
+        "the reference is left on the source"
+    );
+    assert_eq!(
+        std::fs::read_to_string(repo_root.path().join(dest)).unwrap(),
+        existing,
+        "the pre-existing archived file is neither overwritten nor deleted"
     );
 }
 

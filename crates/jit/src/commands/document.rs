@@ -1039,11 +1039,13 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///    references already resolve to the destination, so a leftover source is
     ///    reported as a warning rather than an error.
     ///
-    /// If the source file is missing the archive is a **no-op**: archivability is
-    /// checked up front, before any filesystem or `.jit` mutation, so a missing
-    /// source surfaces as [`ArchiveError::SourceMissing`] (a typed error) without
-    /// moving a file, touching an asset, or rewriting a reference, so it never
-    /// leaves or creates a dangling reference.
+    /// Two conflicts make the archive a **no-op**, both checked up front before
+    /// any filesystem or `.jit` mutation so neither moves a file, touches an
+    /// asset, or rewrites a reference: a missing source surfaces as
+    /// [`ArchiveError::SourceMissing`], and an already-occupied destination
+    /// surfaces as [`ArchiveError::DestinationOccupied`] (archiving onto it would
+    /// overwrite a file another reference may resolve to). Both are typed errors
+    /// that never leave or create a dangling reference.
     ///
     /// Returns (result, warnings) tuple where result contains archival details and
     /// warnings contains any non-fatal issues encountered.
@@ -1629,6 +1631,21 @@ impl<S: IssueStore> CommandExecutor<S> {
             let dest_asset = dest_dir.join(relative_to_source);
             let asset_temp = temp_dir.join(format!("asset-{}-{}", idx, temp_id));
             files_to_move.push((asset_path.clone(), dest_asset, asset_temp));
+        }
+
+        // Step 0: Refuse to clobber. If any destination is already occupied,
+        // moving onto it would overwrite a file that another reference may
+        // resolve to (and a later rollback would then delete it). Reject before
+        // creating anything, so the archive is a true no-op on conflict.
+        if let Some((_, dest_rel, _)) = files_to_move
+            .iter()
+            .find(|(_, dest_rel, _)| repo_root.join(dest_rel).exists())
+        {
+            cleanup_temp();
+            return Err(crate::commands::ArchiveError::DestinationOccupied {
+                path: dest_rel.to_string_lossy().into_owned(),
+            }
+            .into());
         }
 
         // Step 1: Copy all files to temp
