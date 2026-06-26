@@ -1,0 +1,25 @@
+{
+  "id": "8b293a0b-39ab-4cd2-9f7f-78c3376bd1ff",
+  "title": "Add a prose (id-anchor) render style for the CLAUDE.md invariant projection",
+  "description": "The invariant projection currently renders one hardcoded markdown format (`render_invariants_markdown`, crates/jit/src/validation/projection.rs:120): `- **{id}** [{kind}] (enforced-by: ...): {statement}`. For the human-facing CLAUDE.md region this carries too much machine metadata; the owner wants a prose-leaning style while keeping the id as a readable anchor.\n\nScope: add a render `style` field to `InvariantProjectionConfig` (config.rs), default `full` (the current structured form, preserving the separate-file/machine target and all existing render tests). Add an `id-anchor` style that renders each invariant heading-less as a bullet of the bold id, an em-dash separator, then the statement (no kind tag, no enforced-by). Thread the style through `project_invariants` into the renderer. Set this repo's `[invariant_projection]` to the `id-anchor` style and restore a hand-authored `### Domain Invariants` heading just above the begin-marker in CLAUDE.md so the markers wrap only the bullet list. New public/config surfaces carry `# Examples` and typed thiserror errors; all file IO stays at the storage boundary.\n\n## Success Criteria\n\n- [hard] REQ-08: `InvariantProjectionConfig` carries a render `style` whose default `full` reproduces the existing `- **id** [kind] (enforced-by): statement` output (existing render tests unchanged); an `id-anchor` style renders each invariant heading-less as `- **{id}** — {statement}` with no kind tag and no enforced-by, verified by a unit test; and with the repo set to `id-anchor`, `jit invariant render` projects the CLAUDE.md region as id-anchor bullets wrapped by the markers beneath a hand-authored heading.",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "96f0c39f-bd6f-44a0-9dac-5b366ada1999"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:item-sources",
+    "milestone:v1.0"
+  ],
+  "created_at": "2026-06-26T23:09:00.297174198Z",
+  "updated_at": "2026-06-26T23:09:27.197170244Z"
+}

@@ -65,9 +65,27 @@
           "status": "pending"
         }
       ]
+    },
+    {
+      "wave_number": 4,
+      "issues": [
+        {
+          "id": "8b293a0b-39ab-4cd2-9f7f-78c3376bd1ff",
+          "short_id": "8b293a0b",
+          "title": "Add a prose (id-anchor) render style for the CLAUDE.md invariant projection",
+          "classification": "implementation",
+          "satisfies": "REQ-08 (owner-added enhancement)",
+          "status": "pending"
+        }
+      ]
     }
   ],
-  "created_during_execution": [],
+  "created_during_execution": [
+    {
+      "short_id": "8b293a0b",
+      "reason": "owner requested prose (id-anchor) render style for CLAUDE.md invariant projection; scheduled wave 4 after REQ-04 (shares config.rs)"
+    }
+  ],
   "escalations": [],
   "rework_counts": {
     "5ff3a6ae": 1,
