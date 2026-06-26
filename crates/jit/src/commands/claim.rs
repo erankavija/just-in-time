@@ -3,9 +3,7 @@
 //! Provides CLI interface to the lease-based claim coordination system.
 
 use crate::config::ConfigLoader;
-use crate::storage::worktree_identity::{
-    load_or_create_worktree_identity, load_or_create_worktree_identity_with_warnings,
-};
+use crate::storage::worktree_identity::load_or_create_worktree_identity_with_warnings;
 use crate::storage::worktree_paths::WorktreePaths;
 use crate::storage::{ClaimCoordinator, FileLocker, IssueStore, Lease, StorageWarning};
 use anyhow::{Context, Result};
@@ -383,8 +381,33 @@ pub fn execute_claim_release_by_issue<S: IssueStore>(
 ///
 /// # Returns
 ///
-/// The renewed lease with updated expiry time
-pub fn execute_claim_renew<S: IssueStore>(lease_id: &str, extension_secs: u64) -> Result<Lease> {
+/// The renewed lease with updated expiry time, paired with any non-fatal
+/// [`StorageWarning`]s observed while loading the worktree identity (e.g. a
+/// relocation), for the caller's output layer to render. This function never
+/// writes to stderr itself.
+///
+/// # Errors
+///
+/// Returns an error if worktree context cannot be detected or the lease cannot
+/// be renewed (e.g. it does not exist).
+///
+/// # Examples
+///
+/// ```no_run
+/// use jit::commands::claim::execute_claim_renew;
+/// use jit::storage::JsonFileStorage;
+///
+/// let (lease, warnings) = execute_claim_renew::<JsonFileStorage>("lease-uuid", 600)?;
+/// for warning in &warnings {
+///     eprintln!("Warning: {}", warning); // rendering is the caller's choice
+/// }
+/// println!("renewed lease on {}", lease.issue_id);
+/// # Ok::<(), anyhow::Error>(())
+/// ```
+pub fn execute_claim_renew<S: IssueStore>(
+    lease_id: &str,
+    extension_secs: u64,
+) -> Result<(Lease, Vec<StorageWarning>)> {
     use crate::agent_config::resolve_agent_id;
 
     // Detect worktree context
@@ -394,9 +417,12 @@ pub fn execute_claim_renew<S: IssueStore>(lease_id: &str, extension_secs: u64) -
     // Get current branch
     let branch = get_current_branch()?;
 
-    // Load worktree identity
-    let identity =
-        load_or_create_worktree_identity(&paths.local_jit, &paths.worktree_root, &branch)?;
+    // Load worktree identity, surfacing relocation as a warning
+    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(
+        &paths.local_jit,
+        &paths.worktree_root,
+        &branch,
+    )?;
 
     // Resolve agent ID
     let agent = resolve_agent_id(None)?;
@@ -411,7 +437,8 @@ pub fn execute_claim_renew<S: IssueStore>(lease_id: &str, extension_secs: u64) -
     );
 
     // Renew the lease
-    coordinator.renew_lease(lease_id, extension_secs)
+    let lease = coordinator.renew_lease(lease_id, extension_secs)?;
+    Ok((lease, warnings))
 }
 
 /// Shows status of active leases.
@@ -423,11 +450,33 @@ pub fn execute_claim_renew<S: IssueStore>(lease_id: &str, extension_secs: u64) -
 ///
 /// # Returns
 ///
-/// Vector of active leases matching the filters
+/// Vector of active leases matching the filters, paired with any non-fatal
+/// [`StorageWarning`]s observed while loading the worktree identity (e.g. a
+/// relocation), for the caller's output layer to render. This function never
+/// writes to stderr itself.
+///
+/// # Errors
+///
+/// Returns an error if worktree context cannot be detected or the leases cannot
+/// be read.
+///
+/// # Examples
+///
+/// ```no_run
+/// use jit::commands::claim::execute_claim_status;
+/// use jit::storage::JsonFileStorage;
+///
+/// let (leases, warnings) = execute_claim_status::<JsonFileStorage>(None, None)?;
+/// for warning in &warnings {
+///     eprintln!("Warning: {}", warning); // rendering is the caller's choice
+/// }
+/// println!("{} active lease(s)", leases.len());
+/// # Ok::<(), anyhow::Error>(())
+/// ```
 pub fn execute_claim_status<S: IssueStore>(
     issue_id: Option<&str>,
     agent_id: Option<&str>,
-) -> Result<Vec<Lease>> {
+) -> Result<(Vec<Lease>, Vec<StorageWarning>)> {
     use crate::agent_config::resolve_agent_id;
 
     // Detect worktree context
@@ -437,9 +486,12 @@ pub fn execute_claim_status<S: IssueStore>(
     // Get current branch for identity
     let branch = get_current_branch()?;
 
-    // Load worktree identity
-    let identity =
-        load_or_create_worktree_identity(&paths.local_jit, &paths.worktree_root, &branch)?;
+    // Load worktree identity, surfacing relocation as a warning
+    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(
+        &paths.local_jit,
+        &paths.worktree_root,
+        &branch,
+    )?;
 
     // Resolve current agent ID using proper priority: JIT_AGENT_ID > ~/.config/jit/agent.toml > error
     let current_agent_id = resolve_agent_id(None)?;
@@ -461,7 +513,8 @@ pub fn execute_claim_status<S: IssueStore>(
         agent_id
     };
 
-    coordinator.get_active_leases(issue_id, filter_agent)
+    let leases = coordinator.get_active_leases(issue_id, filter_agent)?;
+    Ok((leases, warnings))
 }
 
 /// Lists all active leases across all agents and worktrees.
@@ -472,8 +525,28 @@ pub fn execute_claim_status<S: IssueStore>(
 ///
 /// # Returns
 ///
-/// Vector of all active leases
-pub fn execute_claim_list() -> Result<Vec<Lease>> {
+/// Vector of all active leases, paired with any non-fatal [`StorageWarning`]s
+/// observed while loading the worktree identity (e.g. a relocation), for the
+/// caller's output layer to render. This function never writes to stderr itself.
+///
+/// # Errors
+///
+/// Returns an error if worktree context cannot be detected or the leases cannot
+/// be read.
+///
+/// # Examples
+///
+/// ```no_run
+/// use jit::commands::claim::execute_claim_list;
+///
+/// let (leases, warnings) = execute_claim_list()?;
+/// for warning in &warnings {
+///     eprintln!("Warning: {}", warning); // rendering is the caller's choice
+/// }
+/// println!("{} active lease(s)", leases.len());
+/// # Ok::<(), anyhow::Error>(())
+/// ```
+pub fn execute_claim_list() -> Result<(Vec<Lease>, Vec<StorageWarning>)> {
     // Detect worktree context
     let paths = WorktreePaths::detect()
         .context("Failed to detect worktree paths - are you in a git repository?")?;
@@ -481,9 +554,12 @@ pub fn execute_claim_list() -> Result<Vec<Lease>> {
     // Get current branch for identity
     let branch = get_current_branch()?;
 
-    // Load worktree identity
-    let identity =
-        load_or_create_worktree_identity(&paths.local_jit, &paths.worktree_root, &branch)?;
+    // Load worktree identity, surfacing relocation as a warning
+    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(
+        &paths.local_jit,
+        &paths.worktree_root,
+        &branch,
+    )?;
 
     // We need an agent ID for coordinator, but it doesn't matter which one for listing
     let agent = "system:list".to_string();
@@ -494,33 +570,52 @@ pub fn execute_claim_list() -> Result<Vec<Lease>> {
     coordinator.init()?;
 
     // Get all active leases (no filters)
-    coordinator.get_active_leases(None, None)
+    let leases = coordinator.get_active_leases(None, None)?;
+    Ok((leases, warnings))
 }
 
 /// Check if an issue has an active lease held by another agent.
 ///
-/// Returns Ok(None) if no conflicting lease exists.
-/// Returns Ok(Some(lease)) if there's a lease held by a different agent.
-/// Returns Err if there's an error checking leases.
-pub fn check_issue_lease(issue_id: &str, current_agent: Option<&str>) -> Result<Option<Lease>> {
+/// This is an internal helper with no output of its own; it returns any
+/// non-fatal [`StorageWarning`]s (e.g. a worktree relocation observed while
+/// loading the identity) alongside the lease so the calling command can surface
+/// them at its own boundary.
+///
+/// # Returns
+///
+/// `(None, _)` if no conflicting lease exists, `(Some(lease), _)` if a lease is
+/// held by a different agent. Identity/branch detection failures degrade to
+/// `(None, _)` (no lease system active) rather than erroring.
+///
+/// # Errors
+///
+/// Returns an error only if active leases cannot be read once the coordinator
+/// is initialized.
+pub fn check_issue_lease(
+    issue_id: &str,
+    current_agent: Option<&str>,
+) -> Result<(Option<Lease>, Vec<StorageWarning>)> {
     // Try to detect worktree context - if not in a git repo, no leases are active
     let paths = match WorktreePaths::detect() {
         Ok(p) => p,
-        Err(_) => return Ok(None), // Not in a git repo, no lease system active
+        Err(_) => return Ok((None, Vec::new())), // Not in a git repo, no lease system active
     };
 
     // Get current branch for identity
     let branch = match get_current_branch() {
         Ok(b) => b,
-        Err(_) => return Ok(None), // Can't determine branch, skip lease check
+        Err(_) => return Ok((None, Vec::new())), // Can't determine branch, skip lease check
     };
 
-    // Load worktree identity
-    let identity =
-        match load_or_create_worktree_identity(&paths.local_jit, &paths.worktree_root, &branch) {
-            Ok(i) => i,
-            Err(_) => return Ok(None), // Can't load identity, skip lease check
-        };
+    // Load worktree identity, surfacing relocation as a warning
+    let (identity, warnings) = match load_or_create_worktree_identity_with_warnings(
+        &paths.local_jit,
+        &paths.worktree_root,
+        &branch,
+    ) {
+        Ok(loaded) => loaded,
+        Err(_) => return Ok((None, Vec::new())), // Can't load identity, skip lease check
+    };
 
     // Create coordinator to check leases
     let agent = current_agent.unwrap_or("system:check").to_string();
@@ -529,7 +624,7 @@ pub fn check_issue_lease(issue_id: &str, current_agent: Option<&str>) -> Result<
 
     // Don't fail if control plane doesn't exist yet
     if coordinator.init().is_err() {
-        return Ok(None);
+        return Ok((None, warnings));
     }
 
     // Get leases for this issue
@@ -538,11 +633,11 @@ pub fn check_issue_lease(issue_id: &str, current_agent: Option<&str>) -> Result<
     // Check if any lease is held by a different agent
     for lease in leases {
         if current_agent.is_none() || Some(lease.agent_id.as_str()) != current_agent {
-            return Ok(Some(lease));
+            return Ok((Some(lease), warnings));
         }
     }
 
-    Ok(None)
+    Ok((None, warnings))
 }
 
 /// Force-evicts a lease (admin operation).
@@ -554,8 +649,31 @@ pub fn check_issue_lease(issue_id: &str, current_agent: Option<&str>) -> Result<
 ///
 /// # Returns
 ///
-/// Ok(()) on success
-pub fn execute_claim_force_evict<S: IssueStore>(lease_id: &str, reason: &str) -> Result<()> {
+/// Any non-fatal [`StorageWarning`]s observed while loading the worktree
+/// identity (e.g. a relocation), for the caller's output layer to render. This
+/// function never writes to stderr itself.
+///
+/// # Errors
+///
+/// Returns an error if worktree context cannot be detected or the lease cannot
+/// be evicted.
+///
+/// # Examples
+///
+/// ```no_run
+/// use jit::commands::claim::execute_claim_force_evict;
+/// use jit::storage::JsonFileStorage;
+///
+/// let warnings = execute_claim_force_evict::<JsonFileStorage>("lease-uuid", "stale")?;
+/// for warning in &warnings {
+///     eprintln!("Warning: {}", warning); // rendering is the caller's choice
+/// }
+/// # Ok::<(), anyhow::Error>(())
+/// ```
+pub fn execute_claim_force_evict<S: IssueStore>(
+    lease_id: &str,
+    reason: &str,
+) -> Result<Vec<StorageWarning>> {
     // Detect worktree context
     let paths = WorktreePaths::detect()
         .context("Failed to detect worktree paths - are you in a git repository?")?;
@@ -563,9 +681,12 @@ pub fn execute_claim_force_evict<S: IssueStore>(lease_id: &str, reason: &str) ->
     // Get current branch for identity
     let branch = get_current_branch()?;
 
-    // Load worktree identity
-    let identity =
-        load_or_create_worktree_identity(&paths.local_jit, &paths.worktree_root, &branch)?;
+    // Load worktree identity, surfacing relocation as a warning
+    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(
+        &paths.local_jit,
+        &paths.worktree_root,
+        &branch,
+    )?;
 
     // For force-evict, we use a system agent (admin operation)
     let agent = "system:admin".to_string();
@@ -576,7 +697,8 @@ pub fn execute_claim_force_evict<S: IssueStore>(lease_id: &str, reason: &str) ->
     coordinator.init()?;
 
     // Force evict the lease
-    coordinator.force_evict_lease(lease_id, reason)
+    coordinator.force_evict_lease(lease_id, reason)?;
+    Ok(warnings)
 }
 
 /// Report of recovery actions taken.
@@ -696,6 +818,9 @@ mod tests {
     use super::*;
     use crate::domain::Issue;
     use crate::storage::claim_coordinator::Lease;
+    // Test helpers below load identity with explicit paths and don't surface
+    // warnings; the production paths use the `_with_warnings` variant instead.
+    use crate::storage::worktree_identity::load_or_create_worktree_identity;
 
     use crate::storage::{ClaimCoordinator, FileLocker, JsonFileStorage};
     use std::fs;

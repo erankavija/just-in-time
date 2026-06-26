@@ -786,9 +786,18 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     /// Initialize a new jit repository in the current directory.
-    /// Returns the worktree identity if in a git repository, None otherwise.
-    pub fn init(&self) -> Result<Option<WorktreeIdentity>> {
-        use crate::storage::worktree_identity::load_or_create_worktree_identity;
+    ///
+    /// Returns the worktree identity if in a git repository (`None` otherwise),
+    /// paired with any non-fatal [`StorageWarning`](crate::storage::StorageWarning)s
+    /// observed while loading the identity (e.g. a relocation). This method never
+    /// writes to stderr; the calling command surfaces the warnings.
+    pub fn init(
+        &self,
+    ) -> Result<(
+        Option<WorktreeIdentity>,
+        Vec<crate::storage::StorageWarning>,
+    )> {
+        use crate::storage::worktree_identity::load_or_create_worktree_identity_with_warnings;
         use crate::storage::worktree_paths::WorktreePaths;
 
         self.storage.init()?;
@@ -801,7 +810,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .unwrap_or(false);
 
         if !in_git_repo {
-            return Ok(None);
+            return Ok((None, Vec::new()));
         }
 
         // Create worktree identity
@@ -826,10 +835,13 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Create or update worktree identity
         // This handles copied files in git worktrees automatically
-        let identity =
-            load_or_create_worktree_identity(&paths.local_jit, &paths.worktree_root, &branch)?;
+        let (identity, warnings) = load_or_create_worktree_identity_with_warnings(
+            &paths.local_jit,
+            &paths.worktree_root,
+            &branch,
+        )?;
 
-        Ok(Some(identity))
+        Ok((Some(identity), warnings))
     }
 
     /// Scaffold the FIXED default `.jit/rules.toml` (+ `.jit/schemas/*.json`) for a

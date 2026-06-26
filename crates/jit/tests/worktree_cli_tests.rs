@@ -278,6 +278,44 @@ fn test_worktree_info_surfaces_relocation_warning() {
         .stderr(predicate::str::contains("Worktree relocated"));
 }
 
+/// Second command-path guard: `jit claim list` must also surface a relocation
+/// as a typed warning (storage previously printed it from every identity load).
+#[test]
+fn test_claim_list_surfaces_relocation_warning() {
+    let temp = setup_repo();
+
+    // First run creates worktree.json with root == this repo.
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["claim", "list"])
+        .assert()
+        .success();
+
+    // Point the recorded root at a non-existent path to force a relocation.
+    let wt_file = temp.path().join(".jit/worktree.json");
+    let mut identity: Value = serde_json::from_str(&fs::read_to_string(&wt_file).unwrap()).unwrap();
+    identity["root"] = Value::String("/nonexistent/old/worktree/path".to_string());
+    fs::write(&wt_file, serde_json::to_string_pretty(&identity).unwrap()).unwrap();
+
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["claim", "list", "--json"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    let warnings = json["warnings"].as_array().expect("warnings array present");
+    assert!(
+        warnings.iter().any(|w| w["kind"] == "worktree_relocated"),
+        "claim list --json must include the relocation warning, got {warnings:?}"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !stderr.contains("relocated"),
+        "relocation diagnostic must not leak to stderr under --json, got: {stderr}"
+    );
+}
+
 // === jit worktree list tests ===
 
 #[test]
