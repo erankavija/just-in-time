@@ -203,51 +203,55 @@ impl<S: IssueStore> CommandExecutor<S> {
                 continue;
             }
             match kind.source_of_truth() {
-                // Registry-first: project items come ONLY from a registered
-                // registry, never from a markdown source file. The binding is
-                // explicit by kind name — only `invariant` is backed by a registry
-                // (the invariant registry); any other registry-first project kind is
-                // a typed error rather than a mislabeled invariant projection (REQ-02).
-                SourceOfTruth::RegistryFirst if kind.name() == INVARIANT_KIND_NAME => {
-                    registry_items.extend(invariant_raw_items(kind.name(), config));
-                }
-                // A non-invariant registry-first kind backed by a config-declared
-                // toml source descriptor: read the named `.toml` through the storage
-                // boundary and project each entry through the descriptor's field
-                // mapping (REQ-02). An absent file contributes no items (graceful),
-                // mirroring the markdown-first path; a present-but-malformed file is
-                // a typed error.
-                SourceOfTruth::RegistryFirst if kind.toml_source().is_some() => {
-                    let descriptor = kind.toml_source().expect("guarded by match arm");
-                    let toml =
-                        self.storage
-                            .read_repo_file(&descriptor.toml)
-                            .with_context(|| {
-                                format!(
-                                    "cannot read toml source '{}' for item kind '{}'",
-                                    descriptor.toml,
-                                    kind.name()
-                                )
-                            })?;
-                    if let Some(toml) = toml {
-                        let rows = load_toml_scope_items(kind.name(), descriptor, &toml)
-                            .with_context(|| {
-                                format!(
-                                    "cannot project toml source '{}' for item kind '{}'",
-                                    descriptor.toml,
-                                    kind.name()
-                                )
-                            })?;
-                        registry_items.extend(rows);
-                    }
-                }
+                // Registry-first: project items come ONLY from a structured
+                // registry, never from a markdown source file. Two bindings are
+                // recognised, in precedence order; the descriptor is bound by
+                // `if let` so there is no fallible re-fetch (REQ-02).
                 SourceOfTruth::RegistryFirst => {
-                    return Err(anyhow!(ItemError::UnknownRegistrySource {
-                        kind: kind.name().to_string(),
-                    }))
-                    .with_context(|| {
-                        format!("cannot index registry-first project kind '{}'", kind.name())
-                    });
+                    if kind.name() == INVARIANT_KIND_NAME {
+                        // The reserved `invariant` kind is backed by the typed
+                        // invariant registry (unchanged; REQ-03 owns removing this
+                        // branch, not this task).
+                        registry_items.extend(invariant_raw_items(kind.name(), config));
+                    } else if let Some(descriptor) = kind.toml_source() {
+                        // A non-invariant registry-first kind backed by a
+                        // config-declared toml source descriptor: read the named
+                        // `.toml` through the storage boundary and project each entry
+                        // through the descriptor's field mapping. An absent file
+                        // contributes no items (graceful), mirroring the
+                        // markdown-first path; a present-but-malformed file is a typed
+                        // error.
+                        let toml =
+                            self.storage
+                                .read_repo_file(&descriptor.toml)
+                                .with_context(|| {
+                                    format!(
+                                        "cannot read toml source '{}' for item kind '{}'",
+                                        descriptor.toml,
+                                        kind.name()
+                                    )
+                                })?;
+                        if let Some(toml) = toml {
+                            let rows = load_toml_scope_items(kind.name(), descriptor, &toml)
+                                .with_context(|| {
+                                    format!(
+                                        "cannot project toml source '{}' for item kind '{}'",
+                                        descriptor.toml,
+                                        kind.name()
+                                    )
+                                })?;
+                            registry_items.extend(rows);
+                        }
+                    } else {
+                        // A registry-first kind that is neither the reserved invariant
+                        // nor carries a toml descriptor has no bound source.
+                        return Err(anyhow!(ItemError::UnknownRegistrySource {
+                            kind: kind.name().to_string(),
+                        }))
+                        .with_context(|| {
+                            format!("cannot index registry-first project kind '{}'", kind.name())
+                        });
+                    }
                 }
                 // Markdown-first: read and scan the config-declared source file.
                 SourceOfTruth::MarkdownFirst => {
