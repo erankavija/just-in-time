@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "d38e6af7-d2ef-4264-9a57-bb921be0ca3d",
+  "gate_key": "cargo-ci",
+  "stage": "postcheck",
+  "issue_id": "b22c041e-8281-45ea-8cab-88edf1c23fb8",
+  "commit": "5641850b42f46c68bb0e748b2532e3dac3ec59b2",
+  "branch": "worktree-agent-b22c041e",
+  "status": "failed",
+  "started_at": "2026-06-26T01:02:06.087401626Z",
+  "completed_at": "2026-06-26T01:04:01.152316876Z",
+  "duration_ms": 115064,
+  "exit_code": 1,
+  "stdout": "--- test failures ---\ntest storage::heartbeat::tests::test_background_thread_updates_heartbeat ... FAILED\ntest storage::claims_log::tests::test_concurrent_append_safety ... FAILED\ntest result: FAILED. 1217 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 16.97s\n---- storage::heartbeat::tests::test_background_thread_updates_heartbeat stdout ----\n\nthread 'storage::heartbeat::tests::test_background_thread_updates_heartbeat' (3202184) panicked at crates/jit/src/storage/heartbeat.rs:578:9:\nassertion failed: !heartbeat.is_stale()\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n---- storage::claims_log::tests::test_concurrent_append_safety stdout ----\n\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n\n",
+  "stderr": "",
+  "command": "./scripts/cargo-ci.sh",
+  "by": "auto:executor",
+  "message": null
+}
