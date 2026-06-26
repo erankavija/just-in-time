@@ -550,11 +550,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .as_ref()
             .and_then(|v| v.default_type.as_deref())
         {
-            let has_type = labels.iter().any(|l| {
-                label_utils::parse_label(l)
-                    .map(|(ns, _)| ns == "type")
-                    .unwrap_or(false)
-            });
+            let has_type = label_utils::type_label_value(&labels).is_some();
             if !has_type {
                 labels.push(format!("type:{default_type}"));
             }

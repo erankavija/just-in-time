@@ -119,6 +119,58 @@ fn suggest_label_fix(label: &str) -> Option<String> {
     None
 }
 
+/// The namespace used for the issue type label.
+///
+/// Type labels have the form `type:<value>` (e.g. `type:task`, `type:epic`).
+/// Use this const — not a raw `"type:"` string — anywhere the type namespace is
+/// referenced so the encoding is centralized in a single place.
+///
+/// # Examples
+///
+/// ```
+/// use jit::labels::TYPE_NAMESPACE;
+///
+/// let label = format!("{}:task", TYPE_NAMESPACE);
+/// assert_eq!(label, "type:task");
+/// ```
+pub const TYPE_NAMESPACE: &str = "type";
+
+/// Extract the value of the `type:` label from a label list, if present.
+///
+/// Returns a reference to the value part (after the colon) of the first
+/// `type:*` label found in `labels`, or `None` when no type label is present.
+///
+/// The per-issue invariant is a single `type:*` label; this function returns
+/// the first match. Presence checks become `.is_some()`.
+///
+/// # Examples
+///
+/// ```
+/// use jit::labels::type_label_value;
+///
+/// // Type present: returns the value
+/// let labels = vec!["type:task".to_string(), "priority:high".to_string()];
+/// assert_eq!(type_label_value(&labels), Some("task"));
+///
+/// // First type label wins when multiple are present
+/// let multi = vec!["epic:auth".to_string(), "type:story".to_string()];
+/// assert_eq!(type_label_value(&multi), Some("story"));
+///
+/// // No type label: returns None
+/// let no_type = vec!["priority:high".to_string()];
+/// assert_eq!(type_label_value(&no_type), None);
+///
+/// // Empty slice: returns None
+/// assert_eq!(type_label_value(&[]), None);
+/// ```
+pub fn type_label_value(labels: &[String]) -> Option<&str> {
+    labels.iter().find_map(|l| {
+        l.split_once(':')
+            .filter(|(ns, _)| *ns == TYPE_NAMESPACE)
+            .map(|(_, v)| v)
+    })
+}
+
 /// Check if a pattern matches any label in a collection
 ///
 /// Supports:
@@ -322,6 +374,44 @@ mod tests {
     fn test_validate_assignee_format_invalid_empty_parts() {
         assert!(validate_assignee_format(":identifier").is_err());
         assert!(validate_assignee_format("type:").is_err());
+    }
+
+    // Tests for TYPE_NAMESPACE and type_label_value
+    #[test]
+    fn test_type_label_value_type_present() {
+        let labels = vec!["type:task".to_string(), "priority:high".to_string()];
+        assert_eq!(type_label_value(&labels), Some("task"));
+    }
+
+    #[test]
+    fn test_type_label_value_type_absent() {
+        let labels = vec!["priority:high".to_string(), "epic:auth".to_string()];
+        assert_eq!(type_label_value(&labels), None);
+    }
+
+    #[test]
+    fn test_type_label_value_empty() {
+        assert_eq!(type_label_value(&[]), None);
+    }
+
+    #[test]
+    fn test_type_label_value_multiple_labels_returns_first_type() {
+        // First type: label in the list wins
+        let labels = vec![
+            "epic:auth".to_string(),
+            "type:story".to_string(),
+            "type:task".to_string(),
+        ];
+        assert_eq!(type_label_value(&labels), Some("story"));
+    }
+
+    #[test]
+    fn test_type_label_value_value_extraction() {
+        let labels = vec!["type:epic".to_string()];
+        assert_eq!(type_label_value(&labels), Some("epic"));
+
+        let labels = vec!["type:feature-request".to_string()];
+        assert_eq!(type_label_value(&labels), Some("feature-request"));
     }
 
     // Tests for matches_pattern function

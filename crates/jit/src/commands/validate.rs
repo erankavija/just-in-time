@@ -834,11 +834,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         let mut out = std::collections::HashMap::new();
         for issue in issues {
             // The issue's `type:` label selects its template.
-            let Some(issue_type) = issue
-                .labels
-                .iter()
-                .filter_map(|l| l.strip_prefix("type:"))
-                .find(|t| breakable.contains(*t))
+            let Some(issue_type) =
+                label_utils::type_label_value(&issue.labels).filter(|t| breakable.contains(*t))
             else {
                 continue;
             };
@@ -1102,11 +1099,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let container_type = all
             .iter()
             .find(|i| i.id == container_full_id)
-            .and_then(|c| {
-                c.labels
-                    .iter()
-                    .find_map(|l| l.strip_prefix("type:").map(str::to_string))
-            });
+            .and_then(|c| label_utils::type_label_value(&c.labels).map(str::to_string));
         let templates = &self.cached_config()?.templates;
         let breakdown_type = container_type
             .as_deref()

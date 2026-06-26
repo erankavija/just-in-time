@@ -171,7 +171,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // `applies_to`, mirroring how `jit apply plan` picks the template.
         let full_container_id = self.storage.resolve_issue_id(container_id)?;
         let container = self.storage.load_issue(&full_container_id)?;
-        let container_type = type_label_value(&container.labels).ok_or_else(|| {
+        let container_type = label_utils::type_label_value(&container.labels).ok_or_else(|| {
             anyhow!(
                 "container '{}' has no type: label; bracket breakdown requires a breakable type",
                 container.short_id()
@@ -182,7 +182,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let template = self
             .cached_config()?
             .templates
-            .template_for_container(&container_type)
+            .template_for_container(container_type)
             .cloned()
             .ok_or_else(|| {
                 anyhow!(
@@ -339,8 +339,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // 1. Validate the container is breakable: its type must be in the
         //    template's `applies_to` (the same gate `jit apply plan` enforces).
-        let container_type = type_label_value(&container.labels);
-        match container_type.as_deref() {
+        match label_utils::type_label_value(&container.labels) {
             Some(ty) if template.applies_to.iter().any(|b| b == ty) => {}
             Some(ty) => {
                 return Err(anyhow!(
@@ -511,7 +510,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let bracket_label = format!("brackets:{}", container.short_id());
         for dep_id in &container.dependencies {
             let dep = self.storage.load_issue(dep_id)?;
-            let has_type = type_label_value(&dep.labels).as_deref() == Some(breakdown_type);
+            let has_type = label_utils::type_label_value(&dep.labels) == Some(breakdown_type);
             let has_bracket = dep.labels.iter().any(|l| l == &bracket_label);
             if has_type && has_bracket {
                 return Ok(dep_id.clone());
@@ -531,7 +530,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     fn find_planning_node(&self, breakdown: &Issue, planning_type: &str) -> Result<String> {
         for dep_id in &breakdown.dependencies {
             let dep = self.storage.load_issue(dep_id)?;
-            if type_label_value(&dep.labels).as_deref() == Some(planning_type) {
+            if label_utils::type_label_value(&dep.labels) == Some(planning_type) {
                 return Ok(dep_id.clone());
             }
         }
@@ -599,26 +598,13 @@ fn first_child_cycle(children: &[BracketChild]) -> Option<Vec<usize>> {
     None
 }
 
-/// Extract the `type:*` value from a label list, if present (pure helper).
-fn type_label_value(labels: &[String]) -> Option<String> {
-    labels.iter().find_map(|l| {
-        label_utils::parse_label(l)
-            .ok()
-            .and_then(|(ns, v)| (ns == "type").then_some(v))
-    })
-}
-
 /// The container's labels minus its `type:*` label — the membership labels
 /// (epic/milestone grouping) that bracket children and the breakdown node
 /// inherit so they are grouped with their container (pure helper).
 fn membership_labels(labels: &[String]) -> Vec<String> {
     labels
         .iter()
-        .filter(|l| {
-            label_utils::parse_label(l)
-                .map(|(ns, _)| ns != "type")
-                .unwrap_or(true)
-        })
+        .filter(|l| label_utils::type_label_value(std::slice::from_ref(*l)).is_none())
         .cloned()
         .collect()
 }
@@ -662,7 +648,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Transform labels: replace type: with child_type
         let mut child_labels = parent.labels.clone();
-        child_labels.retain(|l| !l.starts_with("type:"));
+        child_labels.retain(|l| label_utils::type_label_value(std::slice::from_ref(l)).is_none());
         child_labels.push(format!("type:{}", child_type));
 
         // Create subtasks with transformed labels and no gates initially
