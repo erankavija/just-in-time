@@ -990,3 +990,98 @@ fn test_claim_ready_issue_transitions_to_in_progress() {
     assert_eq!(json["assignee"], "agent:test");
     assert_eq!(json["state"], "in_progress");
 }
+
+// The following lock exit codes (and the verbatim message) for error origins that
+// the typed-error refactor must preserve: a malformed `--label` filter and a
+// malformed `--scope` are argument errors (2), and building a gate preset from an
+// issue whose required gate is missing from the registry is a not-found error (3).
+// Each previously routed through the deleted substring classifier; these pin the
+// post-refactor downcast classification at the literal exit code AND message.
+
+#[test]
+fn test_exit_code_query_invalid_label_pattern() {
+    let temp_dir = setup_test_env();
+
+    // A `--label` pattern with no colon reaches `query_by_label`'s validation and
+    // is an argument error (exit 2) with the original phrasing preserved.
+    let output = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["query", "available", "--label", "badpattern"])
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("Invalid label pattern 'badpattern'"),
+        "stderr was: {stderr}"
+    );
+}
+
+#[test]
+fn test_exit_code_document_invalid_scope() {
+    let temp_dir = setup_test_env();
+
+    // A `--scope` that is neither `all` nor `issue:ID` is an argument error (2).
+    let output = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["doc", "check-links", "--scope", "badscope"])
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("Invalid scope 'badscope'. Use 'all' or 'issue:ID'"),
+        "stderr was: {stderr}"
+    );
+}
+
+#[test]
+fn test_exit_code_gate_preset_create_missing_registry_gate() {
+    let temp_dir = setup_test_env();
+
+    // Register a gate, attach it to an issue, then remove it from the registry so
+    // the issue references a gate that no longer exists.
+    assert!(Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["registry", "add", "--title", "My gate", "mygate"])
+        .status()
+        .unwrap()
+        .success());
+
+    let created = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["issue", "create", "--title", "Has gate", "--json"])
+        .output()
+        .unwrap();
+    let issue = json_issue_id(&created);
+
+    assert!(Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["gate", "add", &issue, "mygate"])
+        .status()
+        .unwrap()
+        .success());
+    assert!(Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["registry", "remove", "mygate"])
+        .status()
+        .unwrap()
+        .success());
+
+    // Building a preset now hits the missing-registry-gate path: not found (3),
+    // with the original "Gate not found in registry: <key>" phrasing.
+    let output = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["gate", "preset", "create", &issue, "mypreset"])
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(3));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("Gate not found in registry: mygate"),
+        "stderr was: {stderr}"
+    );
+}

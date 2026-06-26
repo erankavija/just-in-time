@@ -862,10 +862,16 @@ impl<S: IssueStore> CommandExecutor<S> {
         let mut gates = Vec::new();
 
         for gate_key in &issue.gates_required {
-            let gate = registry
-                .gates
-                .get(gate_key)
-                .ok_or_else(|| crate::storage::GateNotFoundError::single(gate_key))?;
+            // Message-carrying NotFoundError (exit 3) so the Display reproduces this
+            // site's original phrasing verbatim; the other two ::single origins
+            // (gate_check.rs, bulk_update.rs) used a different wording that the
+            // GateNotFoundError::single Display matches, so they keep using it.
+            let gate = registry.gates.get(gate_key).ok_or_else(|| {
+                crate::errors::NotFoundError::new(format!(
+                    "Gate not found in registry: {}",
+                    gate_key
+                ))
+            })?;
 
             gates.push(GateTemplate {
                 key: gate.key.clone(),

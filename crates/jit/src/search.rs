@@ -19,11 +19,48 @@
 //! This module requires `ripgrep` (command `rg`) to be installed on the system.
 //! If not found, search operations return a helpful error message with installation instructions.
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::process::{Command, Stdio};
+
+/// A failure from the full-text search backend (`ripgrep`).
+///
+/// Distinguishes "`ripgrep` is not installed" from a search-execution failure so
+/// the CLI can pick the JSON `error_code` (`RIPGREP_NOT_FOUND` vs `SEARCH_FAILED`)
+/// and its suggestion by downcasting to this type rather than scanning the
+/// message text. Each variant's `Display` reproduces the original message
+/// verbatim, so user-facing output is unchanged.
+///
+/// # Examples
+///
+/// ```
+/// use jit::search::SearchError;
+///
+/// let err = SearchError::RipgrepNotInstalled;
+/// assert!(err.to_string().starts_with("ripgrep (rg) is not installed"));
+///
+/// let any: anyhow::Error = err.into();
+/// assert!(any.downcast_ref::<SearchError>().is_some());
+/// ```
+#[derive(Debug, thiserror::Error)]
+pub enum SearchError {
+    /// `ripgrep` (`rg`) was not found on `PATH`.
+    #[error(
+        "ripgrep (rg) is not installed\n\n\
+         Ripgrep is required for search functionality.\n\n\
+         Install ripgrep:\n\
+         - Ubuntu/Debian: apt install ripgrep\n\
+         - macOS: brew install ripgrep\n\
+         - Windows: choco install ripgrep\n\
+         - Other: https://github.com/BurntSushi/ripgrep#installation"
+    )]
+    RipgrepNotInstalled,
+    /// `ripgrep` ran but exited with an error; carries its stderr.
+    #[error("ripgrep failed: {0}")]
+    Failed(String),
+}
 
 /// Search result from ripgrep
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -91,15 +128,7 @@ pub struct SearchOptions {
 pub fn search(data_dir: &Path, query: &str, options: SearchOptions) -> Result<Vec<SearchResult>> {
     // Check if ripgrep is available
     if which::which("rg").is_err() {
-        bail!(
-            "ripgrep (rg) is not installed\n\n\
-             Ripgrep is required for search functionality.\n\n\
-             Install ripgrep:\n\
-             - Ubuntu/Debian: apt install ripgrep\n\
-             - macOS: brew install ripgrep\n\
-             - Windows: choco install ripgrep\n\
-             - Other: https://github.com/BurntSushi/ripgrep#installation"
-        );
+        return Err(SearchError::RipgrepNotInstalled.into());
     }
 
     // Build ripgrep command
@@ -140,7 +169,7 @@ pub fn search(data_dir: &Path, query: &str, options: SearchOptions) -> Result<Ve
     // Exit code 1 means no matches (not an error)
     if !output.status.success() && output.status.code() != Some(1) {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        bail!("ripgrep failed: {}", stderr);
+        return Err(SearchError::Failed(stderr.into_owned()).into());
     }
 
     // Parse JSON output
@@ -352,5 +381,43 @@ mod tests {
         let json = serde_json::to_string(&search_match).unwrap();
         let deserialized: SearchMatch = serde_json::from_str(&json).unwrap();
         assert_eq!(search_match, deserialized);
+    }
+
+    // SearchError exists so the CLI can pick the JSON `error_code`
+    // (RIPGREP_NOT_FOUND vs SEARCH_FAILED) by downcast rather than by scanning the
+    // message. These tests pin both halves of that contract: each variant's
+    // `Display` reproduces the original `bail!` message verbatim, and the type
+    // survives an `anyhow::Error` round trip so the downcast in `main.rs` works.
+
+    #[test]
+    fn test_search_error_ripgrep_not_installed_display_is_verbatim() {
+        let expected = "ripgrep (rg) is not installed\n\n\
+             Ripgrep is required for search functionality.\n\n\
+             Install ripgrep:\n\
+             - Ubuntu/Debian: apt install ripgrep\n\
+             - macOS: brew install ripgrep\n\
+             - Windows: choco install ripgrep\n\
+             - Other: https://github.com/BurntSushi/ripgrep#installation";
+        assert_eq!(SearchError::RipgrepNotInstalled.to_string(), expected);
+
+        let any: anyhow::Error = SearchError::RipgrepNotInstalled.into();
+        assert_eq!(any.to_string(), expected);
+        assert!(matches!(
+            any.downcast_ref::<SearchError>(),
+            Some(SearchError::RipgrepNotInstalled)
+        ));
+    }
+
+    #[test]
+    fn test_search_error_failed_display_is_verbatim() {
+        let err = SearchError::Failed("regex parse error".to_string());
+        assert_eq!(err.to_string(), "ripgrep failed: regex parse error");
+
+        let any: anyhow::Error = err.into();
+        assert_eq!(any.to_string(), "ripgrep failed: regex parse error");
+        assert!(matches!(
+            any.downcast_ref::<SearchError>(),
+            Some(SearchError::Failed(_))
+        ));
     }
 }

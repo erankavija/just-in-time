@@ -766,7 +766,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Check document links and assets for validity
     pub fn check_document_links(&self, scope: &str) -> Result<crate::commands::LinkCheckResult> {
         use crate::document::{AssetType, LinkValidationResult, LinkValidator};
-        use anyhow::anyhow;
         use std::path::PathBuf;
 
         // Get repository root
@@ -784,10 +783,11 @@ impl<S: IssueStore> CommandExecutor<S> {
             let issue = self.storage.load_issue(&full_id)?;
             vec![issue]
         } else {
-            return Err(anyhow!(
+            return Err(crate::errors::InvalidArgumentError::new(format!(
                 "Invalid scope '{}'. Use 'all' or 'issue:ID'",
                 scope
-            ));
+            ))
+            .into());
         };
 
         // Collect all documents to check

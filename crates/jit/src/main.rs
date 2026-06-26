@@ -1427,6 +1427,11 @@ fn run() -> Result<()> {
                                 }
                             }
                             Err(e) => {
+                                // `error_msg` is display-payload only: the branch
+                                // selection below is driven entirely by `downcast_ref`
+                                // (typed TransitionBlockedError / IssueNotFoundError),
+                                // and the string is used solely as the GENERIC_ERROR
+                                // message body. No control flow branches on it.
                                 let error_msg = e.to_string();
                                 let json_error = if let Some(blocked) =
                                     e.downcast_ref::<jit::errors::TransitionBlockedError>()
@@ -4351,7 +4356,14 @@ fn run() -> Result<()> {
                     if json {
                         use jit::output::JsonError;
 
-                        let error_code = if e.to_string().contains("not installed") {
+                        // Classify by downcast against the typed SearchError, not by
+                        // scanning the message text. RipgrepNotInstalled -> the
+                        // not-found code; every other failure (rg ran and failed, an
+                        // io/spawn error, a parse error) -> the generic search code.
+                        let error_code = if matches!(
+                            e.downcast_ref::<jit::search::SearchError>(),
+                            Some(jit::search::SearchError::RipgrepNotInstalled)
+                        ) {
                             "RIPGREP_NOT_FOUND"
                         } else {
                             "SEARCH_FAILED"

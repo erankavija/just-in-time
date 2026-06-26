@@ -423,13 +423,17 @@ impl<S: IssueStore> CommandExecutor<S> {
         for node in &template.nodes {
             let node_context = context.with_doc(node);
             let projected = self.project_node_issue(node, container, &inherited, &node_context);
-            self.validate_for_write(&projected, false)
-                .with_context(|| {
-                    format!(
-                        "template '{}' node '{}' would create an invalid issue",
-                        template.name, node.role
-                    )
-                })?;
+            // Any validation failure for a projected node is reported as an
+            // argument error (exit 2) carrying this message verbatim, exactly as
+            // the previous `.with_context(...)` text was classified. Mapping
+            // (rather than wrapping) keeps the inner error's type from shifting the
+            // exit code via downcast, and the top-level Display is unchanged.
+            self.validate_for_write(&projected, false).map_err(|_| {
+                crate::errors::InvalidArgumentError::new(format!(
+                    "template '{}' node '{}' would create an invalid issue",
+                    template.name, node.role
+                ))
+            })?;
         }
         Ok(())
     }
