@@ -2,7 +2,7 @@
   "id": "f6318259-e3df-4d4e-b9bf-0d9bdaca06d1",
   "title": "Retire the reserved invariant name and route registry selection through the source descriptor",
   "description": "With a generic toml-source descriptor available, the `invariant`-name special cases become dead. Remove them so the item-kind engine hardcodes no domain concept.\n\nScope: delete the `name==INVARIANT_KIND_NAME` rejection in `from_config` (item.rs:496-500) and the `InvariantMustBeProjectRegistryFirst` variant (item.rs:382-388); remove the `name()==INVARIANT_KIND_NAME` routing guard and `UnknownRegistrySource` path (commands/item.rs:202,205-212). `invariant` resolves as ordinary config over its `.toml` source via the configured toml source descriptor. No `\"invariant\"` literal is relocated into pure/engine code. Update all reserved-name tests (item.rs:1554-1659,1533-1543; commands/item.rs:804-890; tests/item_cli_tests.rs:497-564,308). Keep item.rs:1661-1675 (MissingProjectSource).\n\n## Success Criteria\n- [hard] REQ-03: The reserved-name branch and the InvariantMustBeProjectRegistryFirst / UnknownRegistrySource routing are removed (a tree-wide grep including tests, fixtures, and docs finds no surviving reserved-name branch in the engine path), no `\"invariant\"` literal lives in pure or engine code, and existing invariant indexing still works through the descriptor.\n",
-  "state": "in_progress",
+  "state": "done",
   "priority": "normal",
   "assignee": "agent:claude",
   "dependencies": [
@@ -13,15 +13,15 @@
     "code-review"
   ],
   "gates_status": {
-    "cargo-ci": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-26T23:31:36.424230718Z"
-    },
     "code-review": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-06-26T23:34:18.405213352Z"
+    },
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-26T23:31:36.424230718Z"
     }
   },
   "context": {},
@@ -33,5 +33,5 @@
     "epic:item-sources"
   ],
   "created_at": "2026-06-26T20:50:48.352599004Z",
-  "updated_at": "2026-06-26T23:36:33.065417008Z"
+  "updated_at": "2026-06-26T23:37:08.359822106Z"
 }

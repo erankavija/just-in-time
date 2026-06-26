@@ -1,7 +1,7 @@
 {
   "epic_id": "90a2dbfd-be54-46f2-b84a-b19382c6b0f2",
   "epic_short_id": "90a2dbfd",
-  "current_wave": 2,
+  "current_wave": 3,
   "waves": [
     {
       "wave_number": 1,
@@ -49,7 +49,7 @@
           "title": "Retire the reserved invariant name and route registry selection through the source descriptor",
           "classification": "implementation",
           "satisfies": "REQ-03",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -89,7 +89,8 @@
   "escalations": [],
   "rework_counts": {
     "5ff3a6ae": 1,
-    "73d98a98": 1
+    "73d98a98": 1,
+    "f6318259": 1
   },
   "started_at": "2026-06-27T00:00:00Z"
 }
