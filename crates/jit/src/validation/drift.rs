@@ -1,4 +1,4 @@
-//! Bidirectional enforcement-drift check (declaration-consistency, NOT execution).
+//! Enforcement-drift check (declaration-consistency, NOT execution).
 //!
 //! An invariant MAY bind to the rule or gate that enforces it via its
 //! `enforced-by` field. That binding is a DECLARATION: `enforced-by` (and the
@@ -6,16 +6,20 @@
 //! `jit validate` — the local write path explicitly skips it
 //! ([`evaluate_local`](crate::validation::local::evaluate_local)) and validate has
 //! no execution site. Drift is therefore checked as DECLARATION CONSISTENCY
-//! between the invariant registry and the set of loadable rules/gates, in two
-//! directions:
+//! between the invariant registry and the set of loadable rules/gates, in a
+//! single direction:
 //!
 //! - **declared-but-unenforced** — an invariant whose `enforced-by` names a rule
 //!   or gate that is neither a loadable rule name nor a known gate key, because
 //!   the target is MISSING or because its enforcement SOURCE (the rule set or
 //!   gate registry) is UNLOADABLE (REQ-01 covers both). The unloadable case is
 //!   handled by [`enforcement_drift_tolerant`] / [`SourceState`].
-//! - **enforced-but-undeclared** — a loadable rule or gate that NO invariant
-//!   claims (no invariant's `enforced-by` references it).
+//!
+//! The reverse direction — a loadable rule or gate that NO invariant claims — is
+//! deliberately NOT reported (REQ-05). Unioning every rule name and gate key and
+//! treating each as something some invariant must claim produced indiscriminate
+//! nag (a seed repo flagged ~18 unclaimed rules/gates) with no value, so
+//! declared-but-unenforced is the SOLE drift direction.
 //!
 //! Recorded limitation (Decision D5): a binding that names a real-but-disabled
 //! rule still reads as "enforced" here — drift is consistency of declarations,
@@ -29,76 +33,20 @@
 use crate::validation::invariants::Invariant;
 use std::collections::BTreeSet;
 
-/// Which direction an enforcement-drift finding points.
+/// A single enforcement-drift finding: an invariant whose `enforced-by` binding
+/// resolves to no loadable rule or gate (the sole drift direction,
+/// declared-but-unenforced).
 ///
-/// The two directions are reported distinctly so a caller can tell a dangling
-/// invariant binding (declared-but-unenforced) from an unclaimed rule/gate
-/// (enforced-but-undeclared) without parsing the message text.
-///
-/// # Examples
-///
-/// ```
-/// use jit::validation::drift::DriftDirection;
-///
-/// // The two directions are distinct values, not parsed from a message.
-/// assert_ne!(
-///     DriftDirection::DeclaredButUnenforced,
-///     DriftDirection::EnforcedButUndeclared
-/// );
-/// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum DriftDirection {
-    /// An invariant's `enforced-by` names a rule/gate that does not exist (or is
-    /// unloadable). The invariant claims enforcement that is not present.
-    DeclaredButUnenforced,
-    /// A loadable rule or gate that no invariant's `enforced-by` references. The
-    /// enforcement exists but no invariant declares the property it protects.
-    EnforcedButUndeclared,
-}
-
-impl DriftDirection {
-    /// The kebab-case token used in human-readable messages and JSON.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::validation::drift::DriftDirection;
-    ///
-    /// assert_eq!(
-    ///     DriftDirection::DeclaredButUnenforced.as_token(),
-    ///     "declared-but-unenforced"
-    /// );
-    /// assert_eq!(
-    ///     DriftDirection::EnforcedButUndeclared.as_token(),
-    ///     "enforced-but-undeclared"
-    /// );
-    /// ```
-    pub fn as_token(self) -> &'static str {
-        match self {
-            DriftDirection::DeclaredButUnenforced => "declared-but-unenforced",
-            DriftDirection::EnforcedButUndeclared => "enforced-but-undeclared",
-        }
-    }
-}
-
-/// A single enforcement-drift finding in one of the two directions.
-///
-/// `subject` is the dangling binding for [`DriftDirection::DeclaredButUnenforced`]
-/// and the unclaimed rule/gate name for [`DriftDirection::EnforcedButUndeclared`].
-/// `invariant_id` is the offending invariant's self-id for the declared-but-
-/// unenforced direction (whose `@/<id>` qualified id addresses it), and `None`
-/// for the enforced-but-undeclared direction (which pertains to a rule/gate, not
-/// an invariant).
+/// `subject` is the dangling binding and `invariant_id` is the offending
+/// invariant's self-id (whose `@/<id>` qualified id addresses it).
 ///
 /// # Examples
 ///
 /// ```
-/// use jit::validation::drift::{DriftDirection, DriftFinding};
+/// use jit::validation::drift::DriftFinding;
 ///
 /// let f = DriftFinding {
-///     direction: DriftDirection::DeclaredButUnenforced,
-///     invariant_id: Some("INV-01".to_string()),
+///     invariant_id: "INV-01".to_string(),
 ///     subject: "dag-no-cycles".to_string(),
 ///     unloadable: false,
 /// };
@@ -109,90 +57,76 @@ impl DriftDirection {
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct DriftFinding {
-    /// Which direction the drift points.
-    pub direction: DriftDirection,
-    /// The offending invariant's self-id (declared-but-unenforced), else `None`.
-    pub invariant_id: Option<String>,
-    /// The dangling binding (declared-but-unenforced) or the unclaimed rule/gate
-    /// name (enforced-but-undeclared).
+    /// The offending invariant's self-id.
+    pub invariant_id: String,
+    /// The dangling binding: the `enforced-by` value that resolves to neither a
+    /// loadable rule nor a known gate.
     pub subject: String,
-    /// For [`DriftDirection::DeclaredButUnenforced`] only: `true` when the binding
-    /// could not be confirmed because its enforcement SOURCE (the rule set or gate
-    /// registry) failed to load — distinct from a binding that names a target
-    /// simply ABSENT from a source that loaded fine. Always `false` for the
-    /// enforced-but-undeclared direction. The distinction is surfaced in
-    /// [`message`](Self::message) so an unloadable source reads differently from a
-    /// missing target (REQ-01).
+    /// `true` when the binding could not be confirmed because its enforcement
+    /// SOURCE (the rule set or gate registry) failed to load — distinct from a
+    /// binding that names a target simply ABSENT from a source that loaded fine.
+    /// The distinction is surfaced in [`message`](Self::message) so an unloadable
+    /// source reads differently from a missing target (REQ-01).
     pub unloadable: bool,
 }
 
 impl DriftFinding {
-    /// Render a human-readable, direction-specific message for this finding.
+    /// Render a human-readable message for this finding.
     ///
-    /// The message names the offending invariant (when applicable) and the
-    /// subject (the dangling binding or the unclaimed rule/gate), so it stands
-    /// alone in CLI output and in a [`Finding`](crate::validation::engine::Finding).
+    /// The message names the offending invariant and the dangling binding, so it
+    /// stands alone in CLI output and in a
+    /// [`Finding`](crate::validation::engine::Finding). The unloadable case is
+    /// worded distinctly from a missing target (REQ-01).
     ///
     /// # Examples
     ///
     /// ```
-    /// use jit::validation::drift::{DriftDirection, DriftFinding};
+    /// use jit::validation::drift::DriftFinding;
     ///
-    /// let undeclared = DriftFinding {
-    ///     direction: DriftDirection::EnforcedButUndeclared,
-    ///     invariant_id: None,
-    ///     subject: "dag-no-cycles".to_string(),
+    /// let f = DriftFinding {
+    ///     invariant_id: "INV-01".to_string(),
+    ///     subject: "ghost-rule".to_string(),
     ///     unloadable: false,
     /// };
-    /// assert!(undeclared.message().contains("dag-no-cycles"));
-    /// assert!(undeclared.message().contains("no invariant"));
+    /// assert!(f.message().contains("INV-01"));
+    /// assert!(f.message().contains("ghost-rule"));
+    /// assert!(f.message().contains("declared-but-unenforced"));
     /// ```
     pub fn message(&self) -> String {
-        match self.direction {
-            DriftDirection::DeclaredButUnenforced if self.unloadable => format!(
+        if self.unloadable {
+            format!(
                 "enforcement drift (declared-but-unenforced): invariant '{}' is enforced-by \
                  '{}', whose enforcement source (rule set or gate registry) failed to load, so \
                  the binding cannot be satisfied",
-                self.invariant_id.as_deref().unwrap_or("<unknown>"),
-                self.subject
-            ),
-            DriftDirection::DeclaredButUnenforced => format!(
+                self.invariant_id, self.subject
+            )
+        } else {
+            format!(
                 "enforcement drift (declared-but-unenforced): invariant '{}' is enforced-by \
                  '{}', which is neither a loadable rule nor a known gate",
-                self.invariant_id.as_deref().unwrap_or("<unknown>"),
-                self.subject
-            ),
-            DriftDirection::EnforcedButUndeclared => format!(
-                "enforcement drift (enforced-but-undeclared): rule/gate '{}' is claimed by no \
-                 invariant's enforced-by",
-                self.subject
-            ),
+                self.invariant_id, self.subject
+            )
         }
     }
 }
 
-/// Compute bidirectional enforcement drift between the invariant registry and the
-/// declared rules/gates.
+/// Compute enforcement drift between the invariant registry and the declared
+/// rules/gates.
 ///
 /// `rule_names` and `gate_keys` are the names of every LOADABLE rule and every
 /// known gate key, respectively. A binding (an invariant's `enforced-by`) is
-/// "enforced" iff it appears in either set. Findings are produced in two
-/// directions:
+/// "enforced" iff it appears in either set. For each invariant with
+/// `enforced-by = X` where `X` is in neither set, a
+/// [declared-but-unenforced](DriftFinding) finding is produced. A loadable rule
+/// or gate that no invariant claims is NOT reported (REQ-05).
 ///
-/// - For each invariant with `enforced-by = X` where `X` is in neither set, a
-///   [`DriftDirection::DeclaredButUnenforced`] finding.
-/// - For each rule name or gate key that no invariant's `enforced-by` references,
-///   a [`DriftDirection::EnforcedButUndeclared`] finding.
-///
-/// Results are deterministic: declared-but-unenforced findings follow the
-/// invariants' authored order, and enforced-but-undeclared findings are sorted by
-/// subject name (the inputs are unordered sets). The function is pure — it reads
-/// only its arguments.
+/// Results are deterministic: findings follow the invariants' authored order.
+/// The function is pure — it reads only its arguments.
 ///
 /// # Examples
 ///
 /// ```
-/// use jit::validation::drift::{enforcement_drift, DriftDirection};
+/// use jit::validation::drift::enforcement_drift;
 /// use jit::validation::invariants::InvariantRegistry;
 /// use std::collections::BTreeSet;
 ///
@@ -206,15 +140,9 @@ impl DriftFinding {
 /// let gates: BTreeSet<&str> = BTreeSet::new();
 ///
 /// let findings = enforcement_drift(&reg.invariants, &rules, &gates);
-/// // Both directions fire: the binding dangles AND the real rule is unclaimed.
-/// assert!(findings
-///     .iter()
-///     .any(|f| f.direction == DriftDirection::DeclaredButUnenforced
-///         && f.subject == "missing-rule"));
-/// assert!(findings
-///     .iter()
-///     .any(|f| f.direction == DriftDirection::EnforcedButUndeclared
-///         && f.subject == "dag-no-cycles"));
+/// // The dangling binding is reported; the unclaimed real rule is NOT drift.
+/// assert_eq!(findings.len(), 1);
+/// assert_eq!(findings[0].subject, "missing-rule");
 /// ```
 pub fn enforcement_drift(
     invariants: &[Invariant],
@@ -235,8 +163,7 @@ pub fn enforcement_drift(
 /// [`SourceState::Unloadable`]: its entries cannot be enumerated, so a binding
 /// that is not satisfied by the OTHER (loaded) source is reported as
 /// declared-but-unenforced with the `unloadable` flag set (REQ-01 covers a
-/// binding naming a missing OR unloadable target), and the unloadable source
-/// contributes nothing to the enforced-but-undeclared direction.
+/// binding naming a missing OR unloadable target).
 ///
 /// # Examples
 ///
@@ -278,18 +205,15 @@ impl SourceState<'_> {
     }
 }
 
-/// Compute bidirectional enforcement drift, tolerating an UNLOADABLE rule set or
-/// gate registry rather than erroring (REQ-01 "missing OR unloadable").
+/// Compute enforcement drift, tolerating an UNLOADABLE rule set or gate registry
+/// rather than erroring (REQ-01 "missing OR unloadable").
 ///
-/// Semantics extend [`enforcement_drift`]:
-///
-/// - **declared-but-unenforced** — a binding is reported when it is satisfied by
-///   NEITHER source. When neither source loaded, or the binding's only candidate
-///   source is unloadable, the finding's [`DriftFinding::unloadable`] flag is set
-///   (worded as "source failed to load"); when both candidate sources loaded but
-///   lack the target, the flag is clear (worded as "missing").
-/// - **enforced-but-undeclared** — only LOADED sources contribute entries; an
-///   unloadable source is skipped (its entries cannot be enumerated).
+/// Semantics extend [`enforcement_drift`]: a binding is reported
+/// declared-but-unenforced when it is satisfied by NEITHER source. When neither
+/// source loaded, or the binding's only candidate source is unloadable, the
+/// finding's [`DriftFinding::unloadable`] flag is set (worded as "source failed
+/// to load"); when both candidate sources loaded but lack the target, the flag is
+/// clear (worded as "missing").
 ///
 /// A finding is flagged `unloadable` whenever at least one source is unloadable
 /// AND the binding is not satisfied by a LOADED source — because then the binding
@@ -298,7 +222,7 @@ impl SourceState<'_> {
 /// # Examples
 ///
 /// ```
-/// use jit::validation::drift::{enforcement_drift_tolerant, DriftDirection, SourceState};
+/// use jit::validation::drift::{enforcement_drift_tolerant, SourceState};
 /// use jit::validation::invariants::InvariantRegistry;
 /// use std::collections::BTreeSet;
 ///
@@ -315,7 +239,7 @@ impl SourceState<'_> {
 ///     SourceState::Loaded(&gates),
 /// );
 /// let f = &findings[0];
-/// assert_eq!(f.direction, DriftDirection::DeclaredButUnenforced);
+/// assert_eq!(f.subject, "bad-rule");
 /// assert!(f.unloadable, "binding into an unloadable source is flagged");
 /// assert!(f.message().contains("failed to load"));
 /// ```
@@ -330,44 +254,19 @@ pub fn enforcement_drift_tolerant(
     // declared-but-unenforced: a binding satisfied by neither source. When at
     // least one source is unloadable, an unsatisfied binding is flagged
     // `unloadable` (it might live in the source that failed to parse).
-    let declared = invariants.iter().filter_map(|inv| {
-        inv.enforced_by.as_deref().and_then(|binding| {
-            let enforced = rules.contains(binding) || gates.contains(binding);
-            (!enforced).then(|| DriftFinding {
-                direction: DriftDirection::DeclaredButUnenforced,
-                invariant_id: Some(inv.id.clone()),
-                subject: binding.to_string(),
-                unloadable: any_unloadable,
+    invariants
+        .iter()
+        .filter_map(|inv| {
+            inv.enforced_by.as_deref().and_then(|binding| {
+                let enforced = rules.contains(binding) || gates.contains(binding);
+                (!enforced).then(|| DriftFinding {
+                    invariant_id: inv.id.clone(),
+                    subject: binding.to_string(),
+                    unloadable: any_unloadable,
+                })
             })
         })
-    });
-
-    // enforced-but-undeclared: a rule/gate no invariant claims. Only LOADED
-    // sources contribute (an unloadable source cannot be enumerated). Union the
-    // loaded name spaces and sort for deterministic output.
-    let claimed: BTreeSet<&str> = invariants
-        .iter()
-        .filter_map(|inv| inv.enforced_by.as_deref())
-        .collect();
-    let loaded_names: BTreeSet<&str> = [rules, gates]
-        .into_iter()
-        .filter_map(|s| match s {
-            SourceState::Loaded(set) => Some(set.iter().copied()),
-            SourceState::Unloadable => None,
-        })
-        .flatten()
-        .collect();
-    let undeclared = loaded_names
-        .into_iter()
-        .filter(move |name| !claimed.contains(name))
-        .map(|name| DriftFinding {
-            direction: DriftDirection::EnforcedButUndeclared,
-            invariant_id: None,
-            subject: name.to_string(),
-            unloadable: false,
-        });
-
-    declared.chain(undeclared).collect()
+        .collect()
 }
 
 #[cfg(test)]
@@ -388,15 +287,11 @@ mod tests {
         let rules: BTreeSet<&str> = BTreeSet::new();
         let gates: BTreeSet<&str> = BTreeSet::new();
         let findings = enforcement_drift(&r.invariants, &rules, &gates);
-        let declared: Vec<_> = findings
-            .iter()
-            .filter(|f| f.direction == DriftDirection::DeclaredButUnenforced)
-            .collect();
-        assert_eq!(declared.len(), 1, "{findings:?}");
-        assert_eq!(declared[0].invariant_id.as_deref(), Some("INV-01"));
-        assert_eq!(declared[0].subject, "ghost-rule");
-        assert!(declared[0].message().contains("INV-01"));
-        assert!(declared[0].message().contains("ghost-rule"));
+        assert_eq!(findings.len(), 1, "{findings:?}");
+        assert_eq!(findings[0].invariant_id, "INV-01");
+        assert_eq!(findings[0].subject, "ghost-rule");
+        assert!(findings[0].message().contains("INV-01"));
+        assert!(findings[0].message().contains("ghost-rule"));
     }
 
     #[test]
@@ -408,8 +303,7 @@ mod tests {
         let rules: BTreeSet<&str> = ["dag-no-cycles"].into_iter().collect();
         let gates: BTreeSet<&str> = BTreeSet::new();
         let findings = enforcement_drift(&r.invariants, &rules, &gates);
-        // No declared-but-unenforced (binding resolves); the rule is claimed, so
-        // no enforced-but-undeclared either.
+        // The binding resolves, so no drift.
         assert!(findings.is_empty(), "{findings:?}");
     }
 
@@ -426,8 +320,9 @@ mod tests {
     }
 
     #[test]
-    fn test_enforced_but_undeclared_reports_unclaimed_rule() {
-        // One invariant claims rule-a; rule-b and gate-x are unclaimed.
+    fn test_unclaimed_rules_and_gates_are_not_drift() {
+        // A rule and a gate that NO invariant claims must NOT produce any finding:
+        // the enforced-but-undeclared direction is gone (REQ-05).
         let r = reg(
             "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
                      enforced-by = \"rule-a\"\n",
@@ -435,47 +330,25 @@ mod tests {
         let rules: BTreeSet<&str> = ["rule-a", "rule-b"].into_iter().collect();
         let gates: BTreeSet<&str> = ["gate-x"].into_iter().collect();
         let findings = enforcement_drift(&r.invariants, &rules, &gates);
-        let undeclared: Vec<_> = findings
-            .iter()
-            .filter(|f| f.direction == DriftDirection::EnforcedButUndeclared)
-            .map(|f| f.subject.as_str())
-            .collect();
-        // rule-b and gate-x are unclaimed; rule-a is claimed.
-        assert_eq!(
-            undeclared,
-            vec!["gate-x", "rule-b"],
-            "sorted, claimed excluded"
-        );
+        // rule-b and gate-x are unclaimed but reported nowhere; rule-a resolves.
+        assert!(findings.is_empty(), "{findings:?}");
     }
 
     #[test]
-    fn test_advisory_invariant_with_no_binding_does_not_claim() {
-        // An advisory invariant with no enforced-by claims nothing, so every
-        // rule/gate is undeclared.
+    fn test_advisory_invariant_with_no_binding_is_clean() {
+        // An advisory invariant with no enforced-by has no binding to dangle, and
+        // unclaimed rules are no longer drift, so the result is clean.
         let r = reg("[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"advisory\"\n");
         let rules: BTreeSet<&str> = ["only-rule"].into_iter().collect();
         let gates: BTreeSet<&str> = BTreeSet::new();
         let findings = enforcement_drift(&r.invariants, &rules, &gates);
-        assert_eq!(findings.len(), 1);
-        assert_eq!(findings[0].direction, DriftDirection::EnforcedButUndeclared);
-        assert_eq!(findings[0].subject, "only-rule");
+        assert!(findings.is_empty(), "{findings:?}");
     }
 
     #[test]
     fn test_no_invariants_no_rules_no_gates_is_clean() {
         let findings = enforcement_drift(&[], &BTreeSet::new(), &BTreeSet::new());
         assert!(findings.is_empty());
-    }
-
-    #[test]
-    fn test_rule_and_gate_sharing_a_name_reported_once() {
-        // A name present as BOTH a rule and a gate, claimed by no invariant, is
-        // one finding (the union dedups).
-        let rules: BTreeSet<&str> = ["shared"].into_iter().collect();
-        let gates: BTreeSet<&str> = ["shared"].into_iter().collect();
-        let findings = enforcement_drift(&[], &rules, &gates);
-        assert_eq!(findings.len(), 1);
-        assert_eq!(findings[0].subject, "shared");
     }
 
     // --- tolerant (unloadable source) -------------------------------------
@@ -494,14 +367,10 @@ mod tests {
             SourceState::Unloadable,
             SourceState::Loaded(&gates),
         );
-        let declared: Vec<_> = findings
-            .iter()
-            .filter(|f| f.direction == DriftDirection::DeclaredButUnenforced)
-            .collect();
-        assert_eq!(declared.len(), 1, "{findings:?}");
-        assert_eq!(declared[0].subject, "bad-rule");
-        assert!(declared[0].unloadable, "unloadable flag set");
-        assert!(declared[0].message().contains("failed to load"));
+        assert_eq!(findings.len(), 1, "{findings:?}");
+        assert_eq!(findings[0].subject, "bad-rule");
+        assert!(findings[0].unloadable, "unloadable flag set");
+        assert!(findings[0].message().contains("failed to load"));
     }
 
     #[test]
@@ -518,13 +387,9 @@ mod tests {
             SourceState::Loaded(&rules),
             SourceState::Unloadable,
         );
-        let declared: Vec<_> = findings
-            .iter()
-            .filter(|f| f.direction == DriftDirection::DeclaredButUnenforced)
-            .collect();
-        assert_eq!(declared.len(), 1, "{findings:?}");
-        assert_eq!(declared[0].subject, "some-gate");
-        assert!(declared[0].unloadable);
+        assert_eq!(findings.len(), 1, "{findings:?}");
+        assert_eq!(findings[0].subject, "some-gate");
+        assert!(findings[0].unloadable);
     }
 
     #[test]
@@ -541,26 +406,6 @@ mod tests {
             SourceState::Loaded(&rules),
             SourceState::Unloadable,
         );
-        assert!(
-            !findings
-                .iter()
-                .any(|f| f.direction == DriftDirection::DeclaredButUnenforced),
-            "{findings:?}"
-        );
-    }
-
-    #[test]
-    fn test_unloadable_source_skipped_in_enforced_but_undeclared() {
-        // An unloadable rule set contributes no enforced-but-undeclared findings
-        // (its entries cannot be enumerated); the loaded gate registry still does.
-        let gates: BTreeSet<&str> = ["lonely-gate"].into_iter().collect();
-        let findings =
-            enforcement_drift_tolerant(&[], SourceState::Unloadable, SourceState::Loaded(&gates));
-        let undeclared: Vec<&str> = findings
-            .iter()
-            .filter(|f| f.direction == DriftDirection::EnforcedButUndeclared)
-            .map(|f| f.subject.as_str())
-            .collect();
-        assert_eq!(undeclared, vec!["lonely-gate"], "{findings:?}");
+        assert!(findings.is_empty(), "{findings:?}");
     }
 }

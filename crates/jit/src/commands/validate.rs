@@ -338,8 +338,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(findings)
     }
 
-    /// Built-in validate pass: report bidirectional enforcement drift between the
-    /// invariant registry and the declared rules/gates (REQ-01/REQ-02).
+    /// Built-in validate pass: report enforcement drift between the invariant
+    /// registry and the declared rules/gates (REQ-01/REQ-02).
     ///
     /// This runs as part of every validate path — NOT behind an opt-in
     /// `.jit/rules.toml` rule — mirroring
@@ -349,19 +349,16 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// repository that declares no invariants — including the live repo — is
     /// totally unaffected and `jit validate` surfaces nothing new.
     ///
-    /// When invariants ARE declared, both directions are reported as unattributed
+    /// When invariants ARE declared, drift is reported as unattributed
     /// [`GraphFinding`]s (drift pertains to the project's declarations, not a
     /// single issue) via the pure
-    /// [`enforcement_drift`](crate::validation::drift::enforcement_drift) core:
-    ///
-    /// - **declared-but-unenforced** — an invariant whose `enforced-by` names a
-    ///   missing/unloadable rule or gate — is
-    ///   [`Severity::Error`](crate::validation::rules::Severity::Error), so it
-    ///   FAILS `jit validate` (the broken binding is a real defect).
-    /// - **enforced-but-undeclared** — a rule or gate no invariant claims — is
-    ///   [`Severity::Warn`](crate::validation::rules::Severity::Warn): reported as
-    ///   a finding (REQ-02) but advisory, so adopting invariants does not hard-fail
-    ///   a repo for every rule/gate it has not yet claimed.
+    /// [`enforcement_drift`](crate::validation::drift::enforcement_drift) core. The
+    /// sole direction is **declared-but-unenforced** — an invariant whose
+    /// `enforced-by` names a missing/unloadable rule or gate — emitted at
+    /// [`Severity::Error`](crate::validation::rules::Severity::Error), so it FAILS
+    /// `jit validate` (the broken binding is a real defect). An unclaimed rule or
+    /// gate is NOT drift (the enforced-but-undeclared direction was removed in
+    /// REQ-05).
     ///
     /// The rule name on every finding is [`ENFORCEMENT_DRIFT_RULE`]. The inputs
     /// (rule names, gate keys, invariants) are resolved at this boundary; the
@@ -381,7 +378,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     pub fn enforcement_drift_findings(
         &self,
     ) -> Result<Vec<crate::validation::graph::GraphFinding>> {
-        use crate::validation::drift::DriftDirection;
         use crate::validation::engine::Finding;
         use crate::validation::graph::GraphFinding;
         use crate::validation::rules::Severity;
@@ -390,15 +386,11 @@ impl<S: IssueStore> CommandExecutor<S> {
             .compute_drift_findings()?
             .into_iter()
             .map(|f| {
-                let severity = match f.direction {
-                    // A broken binding is a real defect -> fails validate.
-                    DriftDirection::DeclaredButUnenforced => Severity::Error,
-                    // An unclaimed rule/gate is advisory -> reported, not fatal.
-                    DriftDirection::EnforcedButUndeclared => Severity::Warn,
-                };
                 GraphFinding::unattributed(Finding {
                     rule: ENFORCEMENT_DRIFT_RULE.to_string(),
-                    severity,
+                    // A broken binding (declared-but-unenforced) is a real defect
+                    // -> fails validate. It is the only drift direction (REQ-05).
+                    severity: Severity::Error,
                     message: f.message(),
                 })
             })
@@ -406,8 +398,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(findings)
     }
 
-    /// Compute the bidirectional enforcement-drift findings, tolerating an
-    /// unloadable rule set / gate registry (REQ-01 "missing OR unloadable").
+    /// Compute the enforcement-drift findings, tolerating an unloadable rule set /
+    /// gate registry (REQ-01 "missing OR unloadable").
     ///
     /// This is the SINGLE drift computation shared by the built-in validate pass
     /// ([`enforcement_drift_findings`](Self::enforcement_drift_findings), which

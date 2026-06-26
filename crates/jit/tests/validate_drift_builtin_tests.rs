@@ -2,9 +2,10 @@
 //! pass — with NO opt-in `.jit/rules.toml` rule (REQ-01/REQ-02).
 //!
 //! These prove the reviewer's named gap is closed: a repository that simply
-//! declares `.jit/invariants.toml` gets both drift directions from a plain
-//! `jit validate`, while a repository with NO invariants registry sees zero new
-//! drift findings (the live repo stays clean — graceful degradation).
+//! declares `.jit/invariants.toml` gets the declared-but-unenforced drift finding
+//! from a plain `jit validate` (an unclaimed rule/gate is not drift, REQ-05),
+//! while a repository with NO invariants registry sees zero new drift findings
+//! (the live repo stays clean — graceful degradation).
 
 use serde_json::Value;
 use std::process::Command;
@@ -84,13 +85,13 @@ fn test_validate_reports_drift_without_opt_in_rule() {
             .any(|m| m.contains("declared-but-unenforced") && m.contains("ghost-rule")),
         "validate did not report declared-but-unenforced drift: {messages:?}"
     );
-    // enforced-but-undeclared: the built-in default rules exist but no invariant
-    // claims them, so at least one undeclared finding appears.
+    // The built-in default rules exist but no invariant claims them; that is NOT
+    // drift (REQ-05 removed the enforced-but-undeclared direction).
     assert!(
-        messages
+        !messages
             .iter()
             .any(|m| m.contains("enforced-but-undeclared")),
-        "validate did not report enforced-but-undeclared drift: {messages:?}"
+        "validate must not report enforced-but-undeclared drift: {messages:?}"
     );
 }
 
@@ -179,9 +180,9 @@ fn test_validate_clean_when_no_invariants_registry() {
 #[test]
 fn test_validate_clean_when_invariants_fully_consistent() {
     let temp = setup_test_repo();
-    // Author a rules.toml with exactly one rule, claimed by exactly one invariant;
-    // and a second invariant claiming the one gate. No rule/gate is unclaimed and
-    // no binding dangles -> no drift, validate clean.
+    // Author a rules.toml with one rule claimed by one invariant, and a second
+    // invariant claiming a defined gate. Every binding resolves -> no drift,
+    // validate clean.
     std::fs::write(
         temp.path().join(".jit/rules.toml"),
         "[[rules]]\nname = \"only-rule\"\nseverity = \"warn\"\n\

@@ -663,11 +663,9 @@ fn run_invariant_inner<S: IssueStore>(
                 output_ctx.print_data("✓ No enforcement drift".to_string())?;
             } else {
                 for finding in &result.findings {
-                    println!(
-                        "❌ [{}] {}",
-                        finding.direction.as_token(),
-                        finding.message()
-                    );
+                    // Every finding is declared-but-unenforced (the sole drift
+                    // direction); the message names that direction inline.
+                    println!("❌ {}", finding.message());
                 }
                 eprintln!("Enforcement drift: {} finding(s)", result.count);
             }

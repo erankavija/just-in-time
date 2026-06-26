@@ -2,7 +2,7 @@
 //!
 //! `render` projects the loaded `.jit/invariants.toml` registry into the
 //! documentation target declared by `[invariant_projection]` (default: a
-//! separate jit-owned file). `check` computes the bidirectional
+//! separate jit-owned file). `check` computes the
 //! enforcement-drift between the invariant registry and the declared
 //! rules/gates. Both are thin boundaries: they pull the cached config (registry +
 //! projection target) plus the effective ruleset and gate registry, and delegate
@@ -52,22 +52,21 @@ pub struct InvariantRenderResult {
 /// Result of a `jit invariant check` enforcement-drift run.
 ///
 /// Returned by [`CommandExecutor::check_invariants`] and serialized as the
-/// `--json` payload: the list of [`DriftFinding`]s (each carrying its
-/// direction, the offending invariant id, and the dangling/unclaimed subject)
-/// and the total `count`. An empty `findings` list means the registry and the
-/// declared rules/gates are consistent.
+/// `--json` payload: the list of [`DriftFinding`]s (each carrying the offending
+/// invariant id and the dangling subject) and the total `count`. An empty
+/// `findings` list means the registry and the declared rules/gates are
+/// consistent.
 ///
 /// # Examples
 ///
 /// ```
 /// use jit::commands::InvariantCheckResult;
-/// use jit::validation::drift::{DriftDirection, DriftFinding};
+/// use jit::validation::drift::DriftFinding;
 ///
 /// // The shape mirrors the computed drift (built by hand to show the JSON).
 /// let result = InvariantCheckResult {
 ///     findings: vec![DriftFinding {
-///         direction: DriftDirection::DeclaredButUnenforced,
-///         invariant_id: Some("INV-01".to_string()),
+///         invariant_id: "INV-01".to_string(),
 ///         subject: "ghost-rule".to_string(),
 ///         unloadable: false,
 ///     }],
@@ -76,12 +75,13 @@ pub struct InvariantRenderResult {
 /// assert!(result.has_drift());
 /// let json = serde_json::to_value(&result).unwrap();
 /// assert_eq!(json["count"], 1);
-/// assert_eq!(json["findings"][0]["direction"], "declared-but-unenforced");
+/// assert_eq!(json["findings"][0]["invariant_id"], "INV-01");
+/// assert_eq!(json["findings"][0]["subject"], "ghost-rule");
 /// ```
 #[derive(Debug, Serialize)]
 pub struct InvariantCheckResult {
-    /// Every drift finding, in both directions (declared-but-unenforced first in
-    /// authored order, then enforced-but-undeclared sorted by subject).
+    /// Every drift finding (declared-but-unenforced, in the invariants' authored
+    /// order).
     pub findings: Vec<DriftFinding>,
     /// The number of drift findings (mirrors `findings.len()`).
     pub count: usize,
@@ -145,8 +145,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         })
     }
 
-    /// Compute the bidirectional enforcement-drift between the invariant registry
-    /// and the declared rules/gates, returning every drift finding.
+    /// Compute the enforcement-drift between the invariant registry and the
+    /// declared rules/gates, returning every drift finding.
     ///
     /// Resolves the three inputs at this boundary — the invariant registry (from
     /// the cached config), the loadable rule names (from
@@ -155,10 +155,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// pure [`enforcement_drift`](crate::validation::drift::enforcement_drift)
     /// core. This computes the SAME drift the built-in `jit validate` pass
     /// ([`enforcement_drift_findings`](crate::commands::CommandExecutor::enforcement_drift_findings))
-    /// reports, but ALWAYS reports BOTH directions and exits non-zero on ANY drift
-    /// (whereas the validate pass treats enforced-but-undeclared as advisory). A
-    /// genuine `rules.toml` load failure surfaces as an `Err` rather than silently
-    /// reporting no drift.
+    /// reports — the sole declared-but-unenforced direction — and exits non-zero
+    /// on ANY drift. A genuine `rules.toml` load failure surfaces as an `Err`
+    /// rather than silently reporting no drift.
     ///
     /// # Examples
     ///
@@ -191,7 +190,6 @@ impl<S: IssueStore> CommandExecutor<S> {
 mod tests {
     use super::*;
     use crate::storage::{GateRegistry, InMemoryStorage, IssueStore};
-    use crate::validation::drift::DriftDirection;
 
     /// Build an executor over an in-memory `.jit` carrying the given
     /// `invariants.toml`, `rules.toml`, and a gate registry with `gate_keys`.
@@ -230,49 +228,32 @@ mod tests {
 
     #[test]
     fn test_check_reports_declared_but_unenforced() {
-        // INV-01 binds to a rule/gate that does not exist.
+        // INV-01 binds to a rule/gate that does not exist -> the sole drift.
         let inv = "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
                    enforced-by = \"ghost-rule\"\n";
-        // The only real rule is claimed, so the dangling binding is the sole drift.
         let rules = "[[rules]]\nname = \"real-rule\"\nseverity = \"warn\"\n\
                      assert = { require-section = { heading = \"Goal\" } }\n";
-        // Give INV a second invariant that claims real-rule so it is not undeclared.
-        let inv = format!(
-            "{inv}[[invariants]]\nid = \"INV-02\"\nstatement = \"s\"\nkind = \"enforced\"\n\
-             enforced-by = \"real-rule\"\n"
-        );
-        let executor = exec(&inv, rules, &[]);
+        let executor = exec(inv, rules, &[]);
         let result = executor.check_invariants().unwrap();
         assert!(result.has_drift());
-        let declared: Vec<_> = result
-            .findings
-            .iter()
-            .filter(|f| f.direction == DriftDirection::DeclaredButUnenforced)
-            .collect();
-        assert_eq!(declared.len(), 1, "{:?}", result.findings);
-        assert_eq!(declared[0].invariant_id.as_deref(), Some("INV-01"));
-        assert_eq!(declared[0].subject, "ghost-rule");
+        assert_eq!(result.findings.len(), 1, "{:?}", result.findings);
+        assert_eq!(result.findings[0].invariant_id, "INV-01");
+        assert_eq!(result.findings[0].subject, "ghost-rule");
     }
 
     #[test]
-    fn test_check_reports_enforced_but_undeclared() {
-        // No invariant claims `real-rule` or the `code-review` gate.
-        let inv = "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"advisory\"\n";
+    fn test_check_clean_with_unclaimed_rules_and_gates() {
+        // A rule and a gate that NO invariant claims no longer drift (REQ-05): the
+        // single resolving binding leaves the check clean despite the unclaimed
+        // `real-rule` and `code-review` gate.
+        let inv = "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
+                   enforced-by = \"real-rule\"\n";
         let rules = "[[rules]]\nname = \"real-rule\"\nseverity = \"warn\"\n\
                      assert = { require-section = { heading = \"Goal\" } }\n";
         let executor = exec(inv, rules, &["code-review"]);
         let result = executor.check_invariants().unwrap();
-        let undeclared: Vec<&str> = result
-            .findings
-            .iter()
-            .filter(|f| f.direction == DriftDirection::EnforcedButUndeclared)
-            .map(|f| f.subject.as_str())
-            .collect();
-        assert_eq!(
-            undeclared,
-            vec!["code-review", "real-rule"],
-            "{undeclared:?}"
-        );
+        assert!(!result.has_drift(), "{:?}", result.findings);
+        assert_eq!(result.count, 0);
     }
 
     #[test]
@@ -292,8 +273,8 @@ mod tests {
 
     #[test]
     fn test_check_result_serializes_to_json() {
-        // INV-01's `ghost` binding dangles, and the real rule `other` is unclaimed,
-        // so both directions appear in the JSON.
+        // INV-01's `ghost` binding dangles -> one declared-but-unenforced finding;
+        // the unclaimed real rule `other` is NOT drift (REQ-05).
         let inv = "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
                    enforced-by = \"ghost\"\n";
         let rules = "[[rules]]\nname = \"other\"\nseverity = \"warn\"\n\
@@ -302,17 +283,9 @@ mod tests {
         let result = executor.check_invariants().unwrap();
         let json = serde_json::to_value(&result).unwrap();
         assert_eq!(json["count"], result.count);
-        assert!(json["findings"].is_array());
-        // Both directions present (ghost dangles; `other` is unclaimed).
-        assert!(json["findings"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|f| f["direction"] == "declared-but-unenforced"));
-        assert!(json["findings"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|f| f["direction"] == "enforced-but-undeclared"));
+        let findings = json["findings"].as_array().unwrap();
+        assert_eq!(findings.len(), 1, "{json}");
+        assert_eq!(findings[0]["invariant_id"], "INV-01");
+        assert_eq!(findings[0]["subject"], "ghost");
     }
 }

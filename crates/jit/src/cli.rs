@@ -413,9 +413,8 @@ pub enum InvariantCommands {
     },
     /// Check enforcement drift between invariants and declared rules/gates
     ///
-    /// Reports two drift directions: an invariant whose `enforced-by` names a
-    /// missing/unloadable rule or gate (declared-but-unenforced), and a rule or
-    /// gate that no invariant claims (enforced-but-undeclared). This is a
+    /// Reports the declared-but-unenforced direction: an invariant whose
+    /// `enforced-by` names a missing/unloadable rule or gate. This is a
     /// declaration-consistency check (bindings are never executed). Exits
     /// non-zero when any drift is present.
     ///

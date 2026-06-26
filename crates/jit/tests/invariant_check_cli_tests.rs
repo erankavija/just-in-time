@@ -1,11 +1,12 @@
 //! Integration tests for `jit invariant check` (enforcement-drift).
 //!
-//! Exercises the bidirectional declaration-consistency drift check end-to-end
-//! through the real CLI binary: an invariant whose `enforced-by` names a missing
-//! rule/gate (declared-but-unenforced) and a rule/gate no invariant claims
-//! (enforced-but-undeclared). Asserts both drift directions are emitted, that the
-//! command exits non-zero on drift and zero when consistent, and that `--json`
-//! produces a valid machine-readable payload.
+//! Exercises the declaration-consistency drift check end-to-end through the real
+//! CLI binary. The sole drift direction is declared-but-unenforced: an invariant
+//! whose `enforced-by` names a missing/unloadable rule or gate. An unclaimed
+//! rule/gate is NOT drift (the enforced-but-undeclared direction was removed in
+//! REQ-05). Asserts the command exits non-zero on a dangling binding, exits zero
+//! when every binding resolves (even with unclaimed rules/gates present), and
+//! that `--json` produces a valid machine-readable payload.
 
 use serde_json::Value;
 use std::process::Command;
@@ -37,7 +38,7 @@ fn write_invariants(temp: &TempDir, toml: &str) {
 }
 
 #[test]
-fn test_check_reports_both_drift_directions_and_exits_nonzero() {
+fn test_check_reports_declared_but_unenforced_and_exits_nonzero() {
     let temp = setup_test_repo();
     // One rule named `real-rule`; INV-01 binds to a MISSING `ghost-rule`.
     write_rules(
@@ -62,22 +63,54 @@ fn test_check_reports_both_drift_directions_and_exits_nonzero() {
 
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
     let findings = json["findings"].as_array().unwrap();
-    // declared-but-unenforced: INV-01 -> ghost-rule.
+    // The dangling binding INV-01 -> ghost-rule is the sole finding.
+    assert_eq!(findings.len(), 1, "{json}");
     assert!(
         findings
             .iter()
-            .any(|f| f["direction"] == "declared-but-unenforced"
-                && f["invariant_id"] == "INV-01"
-                && f["subject"] == "ghost-rule"),
+            .any(|f| f["invariant_id"] == "INV-01" && f["subject"] == "ghost-rule"),
         "missing declared-but-unenforced finding: {json}"
     );
-    // enforced-but-undeclared: real-rule is claimed by no invariant.
+    // The unclaimed `real-rule` is NOT reported (no enforced-but-undeclared).
     assert!(
-        findings
-            .iter()
-            .any(|f| f["direction"] == "enforced-but-undeclared" && f["subject"] == "real-rule"),
-        "missing enforced-but-undeclared finding: {json}"
+        !findings.iter().any(|f| f["subject"] == "real-rule"),
+        "unclaimed rule must not be reported: {json}"
     );
+}
+
+#[test]
+fn test_check_exits_zero_with_unclaimed_rules_and_gates() {
+    let temp = setup_test_repo();
+    // A rule and a gate that NO invariant claims; the one invariant's binding
+    // resolves. REQ-05: unclaimed rules/gates are not drift, so check exits 0.
+    write_rules(
+        &temp,
+        "[[rules]]\nname = \"claimed-rule\"\nseverity = \"warn\"\n\
+         assert = { require-section = { heading = \"Goal\" } }\n\
+         [[rules]]\nname = \"unclaimed-rule\"\nseverity = \"warn\"\n\
+         assert = { require-section = { heading = \"Plan\" } }\n",
+    );
+    write_invariants(
+        &temp,
+        "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
+         enforced-by = \"claimed-rule\"\n",
+    );
+
+    let output = Command::new(jit_binary())
+        .args(["invariant", "check", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert!(
+        output.status.success(),
+        "expected exit 0 with unclaimed rules/gates, got {:?}: {}",
+        output.status.code(),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["count"].as_u64().unwrap(), 0, "{json}");
+    assert!(json["findings"].as_array().unwrap().is_empty(), "{json}");
 }
 
 #[test]
@@ -113,7 +146,7 @@ fn test_check_exits_zero_when_consistent() {
 }
 
 #[test]
-fn test_check_human_output_names_both_directions() {
+fn test_check_human_output_names_declared_direction() {
     let temp = setup_test_repo();
     write_rules(
         &temp,
@@ -138,9 +171,10 @@ fn test_check_human_output_names_both_directions() {
         stdout.contains("declared-but-unenforced") && stdout.contains("ghost-rule"),
         "human output missing declared direction: {stdout}"
     );
+    // The unclaimed `real-rule` is not surfaced (no enforced-but-undeclared).
     assert!(
-        stdout.contains("enforced-but-undeclared") && stdout.contains("real-rule"),
-        "human output missing enforced direction: {stdout}"
+        !stdout.contains("enforced-but-undeclared"),
+        "human output must not mention enforced-but-undeclared: {stdout}"
     );
 }
 
@@ -179,9 +213,7 @@ fn test_check_reports_unloadable_rule_source_not_a_parse_error() {
     assert!(
         findings
             .iter()
-            .any(|f| f["direction"] == "declared-but-unenforced"
-                && f["subject"] == "bad-rule"
-                && f["unloadable"] == true),
+            .any(|f| f["subject"] == "bad-rule" && f["unloadable"] == true),
         "missing unloadable declared-but-unenforced finding: {json}"
     );
 }
@@ -213,9 +245,7 @@ fn test_check_reports_unloadable_gate_registry() {
             .as_array()
             .unwrap()
             .iter()
-            .any(|f| f["direction"] == "declared-but-unenforced"
-                && f["subject"] == "some-gate"
-                && f["unloadable"] == true),
+            .any(|f| f["subject"] == "some-gate" && f["unloadable"] == true),
         "missing unloadable gate finding: {json}"
     );
 }
