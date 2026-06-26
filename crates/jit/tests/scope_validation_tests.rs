@@ -13,8 +13,52 @@
 //! deterministic); the exit-4 CLI contract is covered by a subprocess test.
 
 use jit::commands::CommandExecutor;
-use jit::domain::{Issue, State};
+use jit::domain::{DocumentReference, Issue, State};
 use jit::storage::{InMemoryStorage, IssueStore};
+
+/// Wire a `plan` bracket onto container `container_id`: a planning node `P`
+/// (`type:planning`, in `planning_state`) carrying a `plan`-labeled doc reference
+/// at `plan_path`, and a breakdown node `B` (`type:breakdown`,
+/// `brackets:<container-short-id>`) that depends on `P`. Returns the planning
+/// node id.
+///
+/// This is the bracket shape plan-doc resolution walks: the plan-doc location is
+/// read from `P`'s `plan` reference (the validation-time source of truth), NOT
+/// the template path. The container itself is not modified.
+fn wire_plan_bracket<S: IssueStore>(
+    executor: &CommandExecutor<S>,
+    container_id: &str,
+    plan_path: &str,
+    planning_state: State,
+) -> String {
+    let c_short = executor
+        .storage()
+        .load_issue(container_id)
+        .unwrap()
+        .short_id();
+
+    let mut p = Issue::new("planning".to_string(), String::new());
+    p.labels = vec!["type:planning".to_string()];
+    p.state = planning_state;
+    p.documents.push(DocumentReference {
+        path: plan_path.to_string(),
+        commit: None,
+        label: Some("plan".to_string()),
+        doc_type: None,
+        format: None,
+        assets: Vec::new(),
+    });
+    let p_id = p.id.clone();
+    executor.storage().save_issue(p).unwrap();
+
+    let mut b = Issue::new("breakdown".to_string(), String::new());
+    b.labels = vec!["type:breakdown".to_string(), format!("brackets:{c_short}")];
+    b.dependencies = vec![p_id.clone()];
+    b.state = State::Backlog;
+    executor.storage().save_issue(b).unwrap();
+
+    p_id
+}
 
 /// A `templates.toml` declaring the `plan` bracket with an INLINE plan: the
 /// breakdown node carries `type:breakdown` (the scope-walk boundary) and the
@@ -451,11 +495,15 @@ fn container_with_external_plan(
         .to_path_buf();
     let plan_dir = repo_root.join("dev/active");
     std::fs::create_dir_all(&plan_dir).unwrap();
+    let plan_path = format!("dev/active/{c}-plan.md");
     std::fs::write(
-        plan_dir.join(format!("{c}-plan.md")),
+        repo_root.join(&plan_path),
         "## Success Criteria\n\n- [hard] REQ-77: declared only in the external plan\n",
     )
     .unwrap();
+    // Doc-ref-canonical resolution: the plan location comes from the planning
+    // node's `plan` reference, so wire a (done) bracket pointing at the file.
+    wire_plan_bracket(executor, &c, &plan_path, State::Done);
     c
 }
 
@@ -500,9 +548,10 @@ fn test_scope_reads_criteria_from_external_plan_covered_clean() {
 
 #[test]
 fn test_scope_missing_external_plan_before_planning_done_is_not_an_error() {
-    // The container is breakable + the location is external, but the plan file is
-    // absent AND no bracket planning node has completed -> the plan is legitimately
-    // not authored yet, so the boundary skips it rather than erroring. This is the
+    // The container is breakable + the location is external, but the plan file the
+    // planning node's `plan` reference points at is absent AND the bracket's
+    // planning node has NOT completed -> the plan is legitimately not authored
+    // yet, so the boundary skips it rather than erroring. This is the
     // freshly-applied-bracket case: validate must stay clean before the plan exists.
     let executor = executor_with_rules_and_templates(COVERAGE_ON_EPIC, PLAN_TEMPLATE_EXTERNAL);
     let impl_id = seed(&executor, "impl", &["type:task"], "", &[]);
@@ -513,31 +562,30 @@ fn test_scope_missing_external_plan_before_planning_done_is_not_an_error() {
         "body without criteria",
         std::slice::from_ref(&impl_id),
     );
-    // No plan file written, no bracket planning node.
+    // A backlog planning node references a plan that has not been written yet.
+    wire_plan_bracket(
+        &executor,
+        &c,
+        &format!("dev/active/{c}-plan.md"),
+        State::Backlog,
+    );
     let report = executor
         .validate_scope(&c)
         .expect("a not-yet-authored plan must not surface as a hard error");
     assert!(
         !report.has_errors(),
-        "an un-bracketed container with no plan must validate clean: {:?}",
+        "a not-yet-authored plan must validate clean: {:?}",
         report.findings
     );
 }
 
 #[test]
 fn test_scope_missing_external_plan_after_planning_done_surfaces_error() {
-    // Once the bracket's planning node is `done`, the plan MUST exist (downstream
-    // coverage reads it). A still-missing external plan then surfaces as a
-    // contextual error rather than silently passing.
+    // Once the bracket's planning node is `done`, the plan it references MUST
+    // exist (downstream coverage reads it). A still-missing plan file then
+    // surfaces as a contextual error rather than silently passing.
     let executor = executor_with_rules_and_templates(COVERAGE_ON_EPIC, PLAN_TEMPLATE_EXTERNAL);
 
-    // Planning node P, completed.
-    let p = seed(&executor, "planning", &["type:planning"], "", &[]);
-    let mut p_issue = executor.storage().load_issue(&p).unwrap();
-    p_issue.state = State::Done;
-    executor.storage().save_issue(p_issue).unwrap();
-
-    // Container C (external plan location, no file).
     let c = seed(
         &executor,
         "container",
@@ -545,27 +593,106 @@ fn test_scope_missing_external_plan_after_planning_done_surfaces_error() {
         "body without criteria",
         &[],
     );
-    let c_short = executor.storage().load_issue(&c).unwrap().short_id();
-
-    // Breakdown node B brackets C and depends on the (done) planning node.
-    let bracket_label = format!("brackets:{c_short}");
-    let b = seed(
+    // The (done) planning node references a plan file that was never written.
+    wire_plan_bracket(
         &executor,
-        "breakdown",
-        &["type:breakdown", &bracket_label],
-        "",
-        std::slice::from_ref(&p),
+        &c,
+        &format!("dev/active/{c}-plan.md"),
+        State::Done,
     );
-    // Wire C -> B so the bracket is in C's validation scope.
-    let mut c_issue = executor.storage().load_issue(&c).unwrap();
-    c_issue.dependencies = vec![b];
-    executor.storage().save_issue(c_issue).unwrap();
 
     let err = executor.validate_scope(&c).unwrap_err();
     let message = err.to_string();
     assert!(
         message.contains("plan document") && message.contains(&c[..8]),
         "a plan missing after planning completed must surface as a contextual error: {message}"
+    );
+}
+
+#[test]
+fn test_scope_resolves_plan_from_relinked_nondefault_path() {
+    // Doc-ref-canonical resolution: the planning node's `plan` reference points at
+    // a NON-default (archive-style) path, and NO file exists at the template's
+    // `dev/active/{id}-plan.md` default. Validate must read the criteria from the
+    // re-linked path (proving the template path is not consulted at validation
+    // time). The criterion there is uncovered, so the scope must fail naming it.
+    let executor = executor_with_rules_and_templates(COVERAGE_ON_EPIC, PLAN_TEMPLATE_EXTERNAL);
+    let impl_id = seed(&executor, "impl", &["type:task"], "", &[]);
+    let c = seed(
+        &executor,
+        "container",
+        &["type:epic"],
+        "body without criteria",
+        std::slice::from_ref(&impl_id),
+    );
+
+    // Write the plan ONLY at the archived path; leave the template default absent.
+    let repo_root = executor
+        .storage()
+        .root()
+        .parent()
+        .expect("storage root has a parent")
+        .to_path_buf();
+    let archived = format!("dev/archive/features/{c}/plan.md");
+    std::fs::create_dir_all(repo_root.join(format!("dev/archive/features/{c}"))).unwrap();
+    std::fs::write(
+        repo_root.join(&archived),
+        "## Success Criteria\n\n- [hard] REQ-77: lives only at the archived path\n",
+    )
+    .unwrap();
+
+    // The (done) planning node's `plan` reference points at the archived path.
+    wire_plan_bracket(&executor, &c, &archived, State::Done);
+
+    let report = executor.validate_scope(&c).expect("scope validation runs");
+    assert!(
+        report.has_errors() && report.findings.iter().any(|f| f.message.contains("REQ-77")),
+        "the criterion read from the re-linked archived plan must drive coverage: {:?}",
+        report.findings
+    );
+}
+
+#[test]
+fn test_scope_relinked_nondefault_plan_covered_is_clean() {
+    // The same re-linked archived plan, now with its criterion satisfied by the
+    // child, leaves the scope clean — a moved/archived + re-linked plan keeps
+    // `jit validate` green with no leniency.
+    let executor = executor_with_rules_and_templates(COVERAGE_ON_EPIC, PLAN_TEMPLATE_EXTERNAL);
+    let impl_id = seed(
+        &executor,
+        "impl",
+        &["type:task", "satisfies:REQ-77"],
+        "",
+        &[],
+    );
+    let c = seed(
+        &executor,
+        "container",
+        &["type:epic"],
+        "body without criteria",
+        std::slice::from_ref(&impl_id),
+    );
+
+    let repo_root = executor
+        .storage()
+        .root()
+        .parent()
+        .expect("storage root has a parent")
+        .to_path_buf();
+    let archived = format!("dev/archive/features/{c}/plan.md");
+    std::fs::create_dir_all(repo_root.join(format!("dev/archive/features/{c}"))).unwrap();
+    std::fs::write(
+        repo_root.join(&archived),
+        "## Success Criteria\n\n- [hard] REQ-77: lives only at the archived path\n",
+    )
+    .unwrap();
+    wire_plan_bracket(&executor, &c, &archived, State::Done);
+
+    let report = executor.validate_scope(&c).expect("scope validation runs");
+    assert!(
+        !report.has_errors(),
+        "a covered criterion in the re-linked archived plan must leave the scope clean: {:?}",
+        report.findings
     );
 }
 
@@ -662,11 +789,15 @@ mod file_backed_external_plan {
         // Write the plan under the REPO ROOT, NOT under `.jit/`.
         let plan_dir = repo_root.path().join("dev/active");
         std::fs::create_dir_all(&plan_dir).unwrap();
+        let plan_path = format!("dev/active/{c}-plan.md");
         std::fs::write(
-            plan_dir.join(format!("{c}-plan.md")),
+            repo_root.path().join(&plan_path),
             "## Success Criteria\n\n- [hard] REQ-77: declared only in the external plan\n",
         )
         .unwrap();
+        // Doc-ref-canonical: wire a (done) bracket whose `plan` reference points at
+        // the repo-root-relative plan file.
+        super::wire_plan_bracket(executor, &c, &plan_path, State::Done);
         c
     }
 
