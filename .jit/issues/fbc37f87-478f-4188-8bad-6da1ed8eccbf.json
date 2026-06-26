@@ -2,7 +2,7 @@
   "id": "fbc37f87-478f-4188-8bad-6da1ed8eccbf",
   "title": "planning: Generalize addressable items to declarative kinds over markdown/toml sources",
   "description": "Planning node for Generalize addressable items to declarative kinds over markdown/toml sources (90a2dbfd). Produce the plan that decomposes this container before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Author the plan at dev/active/90a2dbfd-be54-46f2-b84a-b19382c6b0f2-plan.md and link it to this node once written.",
-  "state": "ready",
+  "state": "done",
   "priority": "normal",
   "assignee": null,
   "dependencies": [],
@@ -32,5 +32,5 @@
     "type:planning"
   ],
   "created_at": "2026-06-26T20:06:57.412389396Z",
-  "updated_at": "2026-06-26T20:30:37.889563348Z"
+  "updated_at": "2026-06-26T20:31:00.903669662Z"
 }
