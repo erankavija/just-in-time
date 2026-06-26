@@ -135,6 +135,29 @@ fn suggest_label_fix(label: &str) -> Option<String> {
 /// ```
 pub const TYPE_NAMESPACE: &str = "type";
 
+/// Build the `type:*` label for a type value.
+///
+/// This is the ONE constructor that owns the `type:` label encoding on the
+/// write side — the inverse of [`type_value_of`]. Build type labels with this
+/// helper rather than a raw `format!("type:{value}")` so the encoding lives in
+/// a single place. The round-trip `type_value_of(&type_label(v)) == Some(v)`
+/// holds for any non-empty `v`.
+///
+/// # Examples
+///
+/// ```
+/// use jit::labels::{type_label, type_value_of};
+///
+/// assert_eq!(type_label("task"), "type:task");
+/// assert_eq!(type_label("epic"), "type:epic");
+///
+/// // Round-trips with the extraction primitive.
+/// assert_eq!(type_value_of(&type_label("story")), Some("story"));
+/// ```
+pub fn type_label(value: &str) -> String {
+    format!("{TYPE_NAMESPACE}:{value}")
+}
+
 /// Extract the value of a single `type:*` label, borrowing from the original string.
 ///
 /// This is the ONE primitive that owns the `type:` label encoding. All other

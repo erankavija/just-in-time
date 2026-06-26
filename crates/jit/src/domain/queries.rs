@@ -207,7 +207,7 @@ pub fn query_strategic(issues: &[Issue], strategic_types: &[String]) -> Vec<Issu
         .iter()
         .filter(|issue| {
             strategic_types.iter().any(|type_value| {
-                labels::matches_pattern(&issue.labels, &format!("type:{}", type_value))
+                labels::matches_pattern(&issue.labels, &labels::type_label(type_value))
             })
         })
         .cloned()
@@ -299,7 +299,7 @@ pub fn bracket_scope_ids(
     // (e.g. `type:breakdown`). Absent when the container is not bracketed (no
     // applicable graph template), in which case nothing halts the walk and the
     // result is the full dependency closure.
-    let breakdown_label = breakdown_type.map(|t| format!("type:{t}"));
+    let breakdown_label = breakdown_type.map(crate::labels::type_label);
 
     let is_breakdown = |id: &str| match &breakdown_label {
         Some(label) => issues
@@ -388,7 +388,7 @@ mod tests {
     fn scope_issue(id: &str, type_: &str, deps: &[&str]) -> Issue {
         let mut issue = Issue::new(format!("issue {id}"), String::new());
         issue.id = id.to_string();
-        issue.labels = vec![format!("type:{type_}")];
+        issue.labels = vec![crate::labels::type_label(type_)];
         issue.dependencies = deps.iter().map(|s| s.to_string()).collect();
         issue
     }

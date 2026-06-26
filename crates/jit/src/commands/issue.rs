@@ -35,7 +35,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         {
             let has_type = label_utils::type_label_value(&labels).is_some();
             if !has_type {
-                labels.push(format!("type:{default_type}"));
+                labels.push(label_utils::type_label(default_type));
             }
         }
 

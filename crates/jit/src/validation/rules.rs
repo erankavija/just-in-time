@@ -325,8 +325,9 @@ impl Selector {
         let mut reasons: Vec<String> = Vec::new();
         if !self.matches_type(issue) {
             let want = self.type_.as_deref().unwrap_or("");
+            let want_label = label_utils::type_label(want);
             reasons.push(format!(
-                "type predicate did not match (issue is not 'type:{want}')"
+                "type predicate did not match (issue is not '{want_label}')"
             ));
         }
         if !self.matches_label(issue) {
@@ -363,10 +364,10 @@ impl Selector {
     fn matches_type(&self, issue: &Issue) -> bool {
         match &self.type_ {
             None => true,
-            Some(ty) => {
-                let needle = format!("type:{ty}");
-                issue.labels.iter().any(|l| l == &needle)
-            }
+            Some(ty) => issue
+                .labels
+                .iter()
+                .any(|l| label_utils::type_value_of(l) == Some(ty.as_str())),
         }
     }
 

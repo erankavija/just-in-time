@@ -649,7 +649,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Transform labels: replace type: with child_type
         let mut child_labels = parent.labels.clone();
         child_labels.retain(|l| label_utils::type_label_value(std::slice::from_ref(l)).is_none());
-        child_labels.push(format!("type:{}", child_type));
+        child_labels.push(label_utils::type_label(child_type));
 
         // Create subtasks with transformed labels and no gates initially
         let mut subtask_ids = Vec::new();

@@ -43,7 +43,7 @@
 //! assert!(!config.contains_type("unknown"));
 //! ```
 
-use crate::labels::is_type_label;
+use crate::labels::{is_type_label, type_label, type_value_of};
 use std::collections::HashMap;
 use thiserror::Error;
 
@@ -588,7 +588,7 @@ pub fn detect_membership_issues(
                     i.labels.contains(&label.clone())
                         && i.labels
                             .iter()
-                            .any(|l| expected_types.iter().any(|t| l == &format!("type:{}", t)))
+                            .any(|l| type_value_of(l).is_some_and(|v| expected_types.contains(&v)))
                 })
                 .collect();
 
@@ -610,7 +610,7 @@ pub fn detect_membership_issues(
                             label,
                             expected_types
                                 .iter()
-                                .map(|t| format!("type:{}", t))
+                                .map(|&t| type_label(t))
                                 .collect::<Vec<_>>()
                                 .join(" or ")
                         ),
@@ -634,7 +634,7 @@ pub fn detect_membership_issues(
                             found_types,
                             expected_types
                                 .iter()
-                                .map(|t| format!("type:{}", t))
+                                .map(|&t| type_label(t))
                                 .collect::<Vec<_>>()
                                 .join(" or ")
                         ),

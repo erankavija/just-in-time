@@ -957,7 +957,7 @@ fn node_labels(
     node_context: &InterpolationContext,
 ) -> Vec<String> {
     let mut labels = inherited.to_vec();
-    labels.push(format!("type:{}", node.type_name));
+    labels.push(label_utils::type_label(&node.type_name));
     labels.extend(node.labels.iter().map(|l| node_context.interpolate(l)));
     labels
 }

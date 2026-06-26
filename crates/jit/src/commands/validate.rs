@@ -187,8 +187,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         let mut issue = self.storage.load_issue(issue_id)?;
 
         // Replace the type label
-        let old_label = format!("type:{}", old_type);
-        let new_label = format!("type:{}", new_type);
+        let old_label = label_utils::type_label(old_type);
+        let new_label = label_utils::type_label(new_type);
 
         issue.labels.retain(|l| l != &old_label);
         issue.labels.push(new_label);
@@ -1779,7 +1779,7 @@ fn find_planning_node<'a>(
 ) -> Option<&'a Issue> {
     let planning_type = template.planning_type()?;
     let bracket_label = format!("brackets:{}", container.short_id());
-    let planning_type_label = format!("type:{planning_type}");
+    let planning_type_label = label_utils::type_label(planning_type);
 
     // The breakdown node carries the `brackets:<container>` label and depends on
     // the planning node; find it, then return that planning dependency.

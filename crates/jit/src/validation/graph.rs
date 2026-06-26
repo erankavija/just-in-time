@@ -1597,17 +1597,23 @@ fn warning_message(warning: &ValidationWarning) -> String {
             issue_id,
             type_name,
             expected_namespace,
-        } => format!(
-            "issue {issue_id} (type:{type_name}) is missing a {expected_namespace}:* \
-             identifying label"
-        ),
+        } => {
+            let type_label = crate::labels::type_label(type_name);
+            format!(
+                "issue {issue_id} ({type_label}) is missing a {expected_namespace}:* \
+                 identifying label"
+            )
+        }
         ValidationWarning::OrphanedLeaf {
             issue_id,
             type_name,
-        } => format!(
-            "issue {issue_id} (type:{type_name}) is an orphaned leaf with no parent \
-             association label"
-        ),
+        } => {
+            let type_label = crate::labels::type_label(type_name);
+            format!(
+                "issue {issue_id} ({type_label}) is an orphaned leaf with no parent \
+                 association label"
+            )
+        }
     }
 }
 
