@@ -130,7 +130,16 @@
     }
   ],
   "created_during_execution": [],
-  "escalations": [],
+  "escalations": [
+    {
+      "issue": "f067678a",
+      "triggers": ["5 (rework cap=2, 3rd code-review fail)", "5a (transactionality finding repeated 3x)", "3/4 (success-criteria change)"],
+      "question": "Archive 'atomic transaction' criterion is infeasible across doc file + N issue JSONs + append-only event log without a WAL; worker delivered referential consistency and documented it honestly; reviewer FAILs on literal wording.",
+      "decision": "User chose: amend criterion to referential consistency (no dangling ref, no data loss, no-clobber). Full journaled atomicity stays tracked in f16cfe8c.",
+      "resolution": "Amended f067678a success criterion (user-approved). Fixed finding 1 (data-loss clobber) with typed ArchiveError::DestinationOccupied + fail-fast pre-existence check + test. Commits b4168372 (code) + b8230dc8 (.jit) in worktree agent-f067678a.",
+      "resolved_at": "2026-06-26"
+    }
+  ],
   "rework_counts": {
     "397d98df": 1,
     "d0edc072": 2,
@@ -143,7 +152,7 @@
     "issue": "f067678a (critical) \u2014 archival doc-reference integrity",
     "why": "Epic 25064508 archival left dangling doc refs; jit validate hard-fails; code-review gate requires validate to pass, so ALL my code-review gates are blocked until this lands.",
     "decisions": "doc-ref-canonical plan resolution (validate reads planning-node plan ref, not the dev/active template); per-doc archive auto-relinks + integrity-checks; dangling refs stay hard-errors (no leniency). Future redesign tracked in f16cfe8c.",
-    "status": "rework-2 (cap): archive referential-consistency invariant + honest doc + event/partial-relink failure tests. jit-validate already fixed; installed binary refreshed to the fix (b75ef93e)."
+    "status": "ESCALATED + resolved: user amended criterion to referential consistency; clobber bug fixed (ArchiveError::DestinationOccupied). Re-gating after commits b4168372+b8230dc8. cargo-ci flake (heartbeat) tolerated via bounded retry; code-review expected to pass now that criterion and code agree."
   },
   "note_t1": "t1 (b22c041e) code verified correct + cargo-ci green; code-review blocked ONLY by the validate failure above. Re-gate after f067678a merges."
 }
