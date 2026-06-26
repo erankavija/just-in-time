@@ -151,3 +151,68 @@ fn test_archive_missing_source_is_typed_noop() {
         "no archive file is created when the source is missing"
     );
 }
+
+/// Consistency guarantee under a mid-operation failure: if re-linking the
+/// references fails after the document has been copied to the archive, the
+/// archive must roll back cleanly. We force the failure by making `.jit/issues`
+/// read-only so `save_issue` cannot persist the re-linked reference; the copy
+/// (to `dev/archive`) and the event lock (in `.jit/`) are unaffected, so the
+/// failure lands precisely on the relink step.
+///
+/// Asserts: (a) the operation errors, (b) the SOURCE file still exists, and
+/// (c) NO issue reference was changed — i.e. nothing dangles. The just-created
+/// destination copy is rolled back too.
+#[cfg(unix)]
+#[test]
+fn test_archive_relink_failure_leaves_consistent_state() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let (repo_root, executor) = executor();
+
+    let src = "dev/active/spec.md";
+    std::fs::create_dir_all(repo_root.path().join("dev/active")).unwrap();
+    std::fs::write(repo_root.path().join(src), "# Spec\n\nProse only.\n").unwrap();
+
+    let id = seed_issue_referencing(&executor, "alpha", src);
+
+    // Make issue persistence fail: a read-only `.jit/issues` directory blocks
+    // the temp-file write inside `save_issue`. (Reads still succeed because the
+    // issue's `.lock` file already exists from seeding.)
+    let issues_dir = repo_root.path().join(".jit/issues");
+    let original_perms = std::fs::metadata(&issues_dir).unwrap().permissions();
+    std::fs::set_permissions(&issues_dir, std::fs::Permissions::from_mode(0o555)).unwrap();
+
+    let result = executor.archive_document(src, "design", false, false);
+
+    // Restore write access before any further storage read or temp-dir cleanup.
+    std::fs::set_permissions(&issues_dir, original_perms).unwrap();
+
+    // (a) The operation errored.
+    assert!(
+        result.is_err(),
+        "a relink/persist failure during archive must surface as an error"
+    );
+
+    // (b) The source document is left in place — the move was never committed.
+    assert!(
+        repo_root.path().join(src).exists(),
+        "the source document is left in place on relink failure"
+    );
+
+    // (c) No reference was changed: the issue still points at the source, so
+    // there is no dangling reference.
+    assert_eq!(
+        referenced_path(&executor, &id),
+        src,
+        "no issue reference is changed when the relink fails"
+    );
+
+    // The just-created destination copy was rolled back.
+    assert!(
+        !repo_root
+            .path()
+            .join("dev/archive/features/spec.md")
+            .exists(),
+        "the destination copy is removed on rollback"
+    );
+}

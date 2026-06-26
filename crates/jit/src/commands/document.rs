@@ -1008,15 +1008,31 @@ fn check_asset_in_git(repo: &Option<git2::Repository>, path: &std::path::Path) -
 impl<S: IssueStore> CommandExecutor<S> {
     /// Archive a document and its per-doc assets to a configured archive directory.
     ///
-    /// Archival is **reference-aware and transactional**: it relocates the
-    /// document (and its per-doc assets) to the archive root AND re-links every
-    /// issue doc-reference that points at the old path to the new archive path, in
-    /// one operation (the relink is [`update_issue_metadata`](Self::update_issue_metadata)).
+    /// Archival is **reference-aware and consistency-preserving**: it relocates
+    /// the document (and its per-doc assets) to the archive root AND re-links
+    /// every issue doc-reference that points at the old path to the new archive
+    /// path (the relink is [`update_issue_metadata`](Self::update_issue_metadata)).
+    ///
+    /// The guarantee is that **no mid-operation failure leaves a dangling
+    /// reference**. The move is committed in two stages so that at every failure
+    /// point every reference resolves to a file that exists:
+    ///
+    /// 1. The document and per-doc assets are **copied** to the destination; the
+    ///    sources are left in place, so references still resolve to the source.
+    /// 2. References are re-linked and the archive event is appended. While this
+    ///    runs both source and destination exist, so no reference can dangle. If
+    ///    it fails, the re-linked references are restored to the source and the
+    ///    just-created destination copies are removed, returning to the
+    ///    pre-archive state.
+    /// 3. Only after the relink and event persist are the old sources removed,
+    ///    committing the move. A removal failure here is non-fatal: references
+    ///    already resolve to the destination, so a leftover source is reported as
+    ///    a warning rather than an error.
     ///
     /// If the source file is missing the archive is a **no-op**: archivability is
     /// checked up front, before any filesystem or `.jit` mutation, so a missing
     /// source surfaces as [`ArchiveError::SourceMissing`] (a typed error) without
-    /// moving a file, touching an asset, or rewriting a reference — it never
+    /// moving a file, touching an asset, or rewriting a reference, so it never
     /// leaves or creates a dangling reference.
     ///
     /// Returns (result, warnings) tuple where result contains archival details and
@@ -1113,25 +1129,55 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
-        // 7. Perform atomic move with temp directory pattern
-        let warnings =
-            self.atomic_archive_move(doc_path, &dest_path, &per_doc_assets, repo_root)?;
+        // 7. Copy the document and per-doc assets to the destination, leaving
+        //    the sources in place. References still resolve to the source, so a
+        //    failure here is consistent (the copy helper rolls back any partial
+        //    destination itself).
+        let moved = self.copy_to_archive(doc_path, &dest_path, &per_doc_assets, repo_root)?;
         let assets_moved = per_doc_assets.len();
+        let dest_str = dest_path.to_str().unwrap();
 
-        // 8. Verify links still work post-move
-        self.verify_post_archival_links(&dest_path, &per_doc_assets, repo_root)?;
+        // 8. Verify links resolve at the new location before committing. A
+        //    failure rolls back the destination copies, leaving the source and
+        //    every reference untouched.
+        if let Err(e) = self.verify_post_archival_links(&dest_path, &per_doc_assets, repo_root) {
+            self.remove_archive_copies(&moved);
+            return Err(e);
+        }
 
-        // 9. Update issue metadata
-        let updated_issues = self.update_issue_metadata(path, dest_path.to_str().unwrap())?;
+        // 9. Commit point: re-link references, then append the archive event.
+        //    Both source and destination exist throughout, so no failure here
+        //    can dangle a reference. On failure we roll back to the pre-archive
+        //    state (references restored to the source, destination copies
+        //    removed) before returning the error.
+        let updated_issues = match self.update_issue_metadata(path, dest_str) {
+            Err(e) => {
+                self.remove_archive_copies(&moved);
+                return Err(e);
+            }
+            Ok(updated) => {
+                let event = crate::domain::Event::new_document_archived(
+                    path.to_string(),
+                    dest_str.to_string(),
+                    category.to_string(),
+                    updated.len(),
+                );
+                if let Err(e) = self.storage.append_event(&event) {
+                    // Restore references to the still-present source, then drop
+                    // the destination copies so nothing dangles.
+                    let _ = self.update_issue_metadata(dest_str, path);
+                    self.remove_archive_copies(&moved);
+                    return Err(e);
+                }
+                updated
+            }
+        };
 
-        // 10. Log event
-        let event = crate::domain::Event::new_document_archived(
-            path.to_string(),
-            dest_path.to_str().unwrap().to_string(),
-            category.to_string(),
-            updated_issues.len(),
-        );
-        self.storage.append_event(&event)?;
+        // 10. The relink and event are persisted; remove the old sources to
+        //     complete the move. A removal failure is non-fatal: references
+        //     already resolve to the existing destination, so a leftover source
+        //     is only a warning.
+        let warnings = self.remove_archived_sources(&moved);
 
         // Return result with warnings (instead of printing)
         let result = ArchiveResult {
@@ -1257,26 +1303,48 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     /// Update issue metadata to reflect new document path
     fn update_issue_metadata(&self, old_path: &str, new_path: &str) -> Result<Vec<String>> {
-        let mut issues = self.storage.list_issues()?;
-        let mut updated = Vec::new();
+        use anyhow::Context;
 
-        for issue in &mut issues {
-            let mut changed = false;
-            for doc in &mut issue.documents {
-                if doc.path == old_path {
-                    doc.path = new_path.to_string();
-                    changed = true;
+        // Pair every issue that references `old_path` with the re-linked clone,
+        // keeping the original so a mid-batch failure can be undone.
+        let pending: Vec<(Issue, Issue)> = self
+            .storage
+            .list_issues()?
+            .into_iter()
+            .filter_map(|original| {
+                let mut relinked = original.clone();
+                let changed = relinked
+                    .documents
+                    .iter_mut()
+                    .filter(|doc| doc.path == old_path)
+                    .fold(false, |_, doc| {
+                        doc.path = new_path.to_string();
+                        true
+                    });
+                changed.then_some((original, relinked))
+            })
+            .collect();
+
+        // Save each re-linked issue. The relink is all-or-nothing: if a save
+        // fails, restore the references already moved (best effort) before
+        // returning, so callers never observe a partial relink.
+        let mut saved_originals: Vec<Issue> = Vec::new();
+        for (original, relinked) in &pending {
+            if let Err(e) = self.storage.save_issue(relinked.clone()) {
+                for restore in &saved_originals {
+                    let _ = self.storage.save_issue(restore.clone());
                 }
+                return Err(e).with_context(|| {
+                    format!("Failed to re-link issue {} during archive", relinked.id)
+                });
             }
-
-            if changed {
-                let issue_id = issue.id.clone();
-                self.storage.save_issue(issue.clone())?;
-                updated.push(issue_id);
-            }
+            saved_originals.push(original.clone());
         }
 
-        Ok(updated)
+        Ok(pending
+            .into_iter()
+            .map(|(original, _)| original.id)
+            .collect())
     }
 
     /// Scan document and classify assets as per-doc vs shared
@@ -1454,27 +1522,27 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(())
     }
 
-    /// Perform atomic archive move using temp directory pattern.
+    /// Copy the document and its per-doc assets to the archive destination,
+    /// leaving the sources in place.
     ///
-    /// All-or-nothing file moves with automatic rollback on error.
+    /// The copy is staged through a unique temp directory and finalized with
+    /// atomic renames, so a partial failure leaves no half-written destination:
+    /// any destination already created is removed before the error is returned.
     ///
-    /// # Implementation Steps
-    ///
-    /// 1. Copy all files (doc + assets) to temp directory
-    /// 2. Move from temp to final destinations (atomic renames)
-    /// 3. On error: rollback (delete any partial destinations)
-    /// 4. Delete sources only after all destinations verified
-    ///
-    /// Perform atomic move of document and assets using temp directory pattern.
-    ///
-    /// Returns warnings if any source files couldn't be removed (non-fatal).
-    fn atomic_archive_move(
+    /// The returned vector pairs, for every copied file, its `(source_full,
+    /// dest_full)` absolute paths. The caller commits the move with
+    /// [`remove_archived_sources`](Self::remove_archived_sources) (delete the
+    /// sources) only after the `.jit` relink and event have persisted, or rolls
+    /// it back with [`remove_archive_copies`](Self::remove_archive_copies)
+    /// (delete the destinations) if that step fails. Until one of those runs,
+    /// both copies exist, so no reference can dangle.
+    fn copy_to_archive(
         &self,
         source_doc: &std::path::Path,
         dest_doc: &std::path::Path,
         assets: &[std::path::PathBuf],
         repo_root: &std::path::Path,
-    ) -> Result<Vec<String>> {
+    ) -> Result<Vec<(std::path::PathBuf, std::path::PathBuf)>> {
         use anyhow::Context;
         use std::path::Path;
 
@@ -1527,12 +1595,13 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
-        // Step 2: Move from temp to final destinations
-        // Track destinations for rollback
-        let mut created_destinations = Vec::new();
+        // Step 2: Move from temp to final destinations, recording the
+        // (source_full, dest_full) pair for each created file so the caller can
+        // later commit (remove sources) or roll back (remove destinations).
+        let mut created: Vec<(std::path::PathBuf, std::path::PathBuf)> = Vec::new();
 
         let move_result: Result<()> = (|| {
-            for (_source_rel, dest_rel, temp_file) in &files_to_move {
+            for (source_rel, dest_rel, temp_file) in &files_to_move {
                 let dest_full = repo_root.join(dest_rel);
 
                 // Create parent directory
@@ -1554,7 +1623,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     )
                 })?;
 
-                created_destinations.push(dest_full);
+                created.push((repo_root.join(source_rel), dest_full));
             }
             Ok(())
         })();
@@ -1562,32 +1631,57 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Step 3: Handle errors with rollback
         if let Err(e) = move_result {
             // Rollback: delete any files we created in destination
-            for dest in created_destinations {
-                let _ = std::fs::remove_file(&dest);
+            for (_source, dest) in &created {
+                let _ = std::fs::remove_file(dest);
             }
             cleanup_temp();
             return Err(e);
         }
 
-        // Step 4: Delete sources only after all destinations verified
-        let mut warnings = Vec::new();
-        for (source_rel, _, _) in &files_to_move {
-            let source_full = repo_root.join(source_rel);
-            if let Err(e) = std::fs::remove_file(&source_full) {
-                // Critical: we've moved files but can't delete source
-                // Log warning but don't fail - destination is valid
-                warnings.push(format!(
-                    "Failed to remove source file {}: {}",
-                    source_full.display(),
-                    e
-                ));
-            }
-        }
-
-        // Cleanup temp directory
+        // The sources are intentionally left in place: removing them is the
+        // caller's commit step, run only after the `.jit` relink and event
+        // persist. Until then both copies exist, so no reference can dangle.
         cleanup_temp();
 
-        Ok(warnings)
+        Ok(created)
+    }
+
+    /// Commit an archive move by removing the old source files recorded by
+    /// [`copy_to_archive`](Self::copy_to_archive).
+    ///
+    /// Called only after the `.jit` relink and archive event have persisted, so
+    /// every reference already resolves to the destination. A removal failure is
+    /// therefore non-fatal: the destination is valid and a leftover source is
+    /// returned as a warning rather than an error.
+    fn remove_archived_sources(
+        &self,
+        moved: &[(std::path::PathBuf, std::path::PathBuf)],
+    ) -> Vec<String> {
+        moved
+            .iter()
+            .filter_map(|(source_full, _dest_full)| {
+                std::fs::remove_file(source_full).err().map(|e| {
+                    format!(
+                        "Failed to remove source file {}: {}",
+                        source_full.display(),
+                        e
+                    )
+                })
+            })
+            .collect()
+    }
+
+    /// Roll back an archive move by removing the destination copies recorded by
+    /// [`copy_to_archive`](Self::copy_to_archive), leaving the sources in place.
+    ///
+    /// Used when the relink/event step fails: deleting the just-created copies
+    /// restores the pre-archive state where every reference resolves to the
+    /// still-present source, so nothing dangles. Best effort; failures are
+    /// ignored because the sources remain valid regardless.
+    fn remove_archive_copies(&self, moved: &[(std::path::PathBuf, std::path::PathBuf)]) {
+        for (_source_full, dest_full) in moved {
+            let _ = std::fs::remove_file(dest_full);
+        }
     }
 
     /// Verify that links still work after archival.
@@ -1666,8 +1760,9 @@ impl<S: IssueStore> CommandExecutor<S> {
                 "❌ Post-archival verification failed: {} broken link(s)\n\n\
                 Document: {}\n\n\
                 Broken links:\n{}\n\n\
-                This indicates an error in the archival process. The document has been moved\n\
-                but some asset links are broken. Please report this as a bug.",
+                This indicates an error in the archival process. The archive has been\n\
+                rolled back (the source is unchanged); some asset links would not resolve\n\
+                at the new location. Please report this as a bug.",
                 broken_links.len(),
                 dest_doc.display(),
                 broken_links.join("\n")
