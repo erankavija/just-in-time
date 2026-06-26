@@ -120,8 +120,6 @@ New code should respect these boundaries. Prefer adding a domain function over e
 - **CLI commands must support `--json`** for machine-readable output.
 - **git is optional** — jit must work without git unless a feature strictly requires it.
 
-### Domain Invariants
-
 <!-- jit:invariants:begin -->
 ## Project invariants
 

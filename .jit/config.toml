@@ -97,7 +97,7 @@ examples = ["satisfies:REQ-01"]
 [invariant_projection]
 # Region mode: replace only the delimited region inside CLAUDE.md (REQ-06).
 # The markers <!-- jit:invariants:begin --> and <!-- jit:invariants:end --> wrap
-# the "### Domain Invariants" section; `jit invariant render` keeps everything
+# the "## Project invariants" section; `jit invariant render` keeps everything
 # outside those markers byte-exact and writes atomically through storage.
 mode = "region"
 target = "CLAUDE.md"
