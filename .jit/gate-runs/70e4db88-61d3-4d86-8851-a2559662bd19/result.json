@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "70e4db88-61d3-4d86-8851-a2559662bd19",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "241a0c03-7299-4ca0-a7f5-1f56cbdd02b2",
+  "commit": "a46e284b26375b9aec4ad8ff59fd919e61634d8e",
+  "branch": "worktree-agent-241a0c03",
+  "status": "passed",
+  "started_at": "2026-06-26T22:07:11.922025933Z",
+  "completed_at": "2026-06-26T22:08:36.849057271Z",
+  "duration_ms": 84927,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nPASS. REQ-01 is met by the new integration test in `crates/jit/tests/markdown_kind_source_path_tests.rs`. The test creates an isolated temp repo via `jit init` at lines 36-45, appends a custom `[item_kinds.policy]` config using `source = \"policies.md\"` at lines 53-66, writes the arbitrary markdown source at lines 71-79, and asserts qualified project IDs `@/POL-01` / `@/POL-02` through `jit item list --json` and `jit item show @/POL-01 --json` at lines 147-235.\n\nThe committed change only adds `crates/jit/tests/markdown_kind_source_path_tests.rs`; no production Rust or real `.jit/config.toml` change is included.\n\n**Architecture And Separation Of Concerns**\n\nPASS. The change is test-only. It exercises the CLI and repository-local config externally, without adding domain, storage, command, CLI, or output-layer code. No boundary violation found.\n\n**Functional Paradigm**\n\nPASS. No production implementation was introduced. The test helpers are straightforward integration-test setup and assertions.\n\n**Correctness And Invariants**\n\nPASS. No production file-write path was added, so atomic-write and event-log invariants are not affected. The test’s fixture writes are isolated temp-repo setup only. Gate semantics, assignee format, label format, and PID safety are unchanged.\n\n**Safety**\n\nPASS. No unsafe code was added. The workspace’s existing `#![deny(unsafe_code)]` posture is not changed.\n\n**Testing**\n\nPASS. I did not rerun cargo tests because the issue has a passed `cargo-ci` gate. The recorded gate `.jit/gate-runs/51a1c92f-c4aa-4951-b236-820eb5c00717/result.json` reports fmt ok, clippy ok, and `2729 passed, 0 failed, 12 ignored`.\n\nThe new test name `test_config_declared_markdown_kind_indexes_project_items` follows the required naming style at `crates/jit/tests/markdown_kind_source_path_tests.rs:139`.\n\n**Error Handling**\n\nPASS. No library fallible operations or error types were changed. `unwrap()` / `expect()` usage is confined to test code, which is allowed by the review rules.\n\n**CLI Contract**\n\nPASS. No new command was added. The test explicitly exercises existing machine-readable output with `--json` for `jit item list` at lines 82-97 and `jit item show` at lines 99-112.\n\n**Documentation**\n\nPASS. No new public API was introduced. The integration test contains enough inline contract documentation to explain the regression being pinned, especially lines 1-25 and 128-137.\n\n**Prior Review Feedback**\n\nPASS. `run_history` is empty, so there is no prior review feedback to verify.\n\n**Jit Issue Management**\n\nPASS. `./scripts/jit-validate.sh` passed; it reported only allowed enforcement-drift warnings. The dependency `10ce6962` is complete: `.jit/issues/10ce6962-8973-4357-b836-da8c0b3a6789.json:5` shows `state: done`, with required gates passed at lines 15-25.\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
