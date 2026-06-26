@@ -3788,3 +3788,4 @@
 {"type":"issue_updated","id":"ebb6ac56-2183-4147-b540-2c8ef0d081c8","issue_id":"7095769d-0487-417d-a807-233845433a76","timestamp":"2026-06-26T08:06:02.072858908Z","updated_by":"dependency-add","fields":["dependencies"]}
 {"type":"issue_state_changed","id":"fffa3590-bcb5-4ec1-8568-f9e7265b1438","issue_id":"f067678a-ff9c-454a-89d0-a410ec129f0b","timestamp":"2026-06-26T08:06:21.256240496Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"75f32574-e77d-4905-8612-e9a9c0391a93","issue_id":"f067678a-ff9c-454a-89d0-a410ec129f0b","timestamp":"2026-06-26T08:06:21.259241147Z","assignee":"agent:claude"}
+{"type":"issue_updated","id":"9257786d-ef6e-4661-9d90-d900162e01a5","issue_id":"0d753ba5-356a-4342-a1fb-f880a1b0341d","timestamp":"2026-06-26T08:24:07.117746321Z","updated_by":"issue-update","fields":["description"]}

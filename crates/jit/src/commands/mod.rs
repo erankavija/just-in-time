@@ -140,6 +140,39 @@ pub struct ArchiveResult {
     pub dry_run: bool,
 }
 
+/// Error raised by per-document archival
+/// ([`archive_document`](CommandExecutor::archive_document)).
+///
+/// Archival is reference-aware and transactional: it relocates the document to
+/// the archive root AND re-links every issue doc-reference that points at it, in
+/// one operation. When the source file is missing there is nothing to relocate,
+/// so archival is rejected with [`ArchiveError::SourceMissing`] BEFORE any
+/// filesystem or `.jit` mutation — the operation is a no-op that never leaves or
+/// creates a dangling reference.
+///
+/// # Examples
+///
+/// ```
+/// use jit::commands::ArchiveError;
+///
+/// let err = ArchiveError::SourceMissing {
+///     path: "dev/active/missing.md".to_string(),
+/// };
+/// // The message names the offending path.
+/// assert!(err.to_string().contains("dev/active/missing.md"));
+/// ```
+#[derive(Debug, thiserror::Error)]
+pub enum ArchiveError {
+    /// The source document does not exist on disk, so there is nothing to
+    /// archive. Raised before any filesystem or `.jit` change, so the archive is
+    /// a no-op when it fires.
+    #[error("cannot archive: source document not found at {path}")]
+    SourceMissing {
+        /// The repo-relative path that was requested for archival.
+        path: String,
+    },
+}
+
 /// Document content display result
 #[derive(Debug, Serialize)]
 pub struct DocumentContentResult {

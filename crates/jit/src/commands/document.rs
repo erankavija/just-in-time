@@ -1006,11 +1006,35 @@ fn check_asset_in_git(repo: &Option<git2::Repository>, path: &std::path::Path) -
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
-    /// Archive a document with its assets
     /// Archive a document and its per-doc assets to a configured archive directory.
+    ///
+    /// Archival is **reference-aware and transactional**: it relocates the
+    /// document (and its per-doc assets) to the archive root AND re-links every
+    /// issue doc-reference that points at the old path to the new archive path, in
+    /// one operation (the relink is [`update_issue_metadata`](Self::update_issue_metadata)).
+    ///
+    /// If the source file is missing the archive is a **no-op**: archivability is
+    /// checked up front, before any filesystem or `.jit` mutation, so a missing
+    /// source surfaces as [`ArchiveError::SourceMissing`] (a typed error) without
+    /// moving a file, touching an asset, or rewriting a reference — it never
+    /// leaves or creates a dangling reference.
     ///
     /// Returns (result, warnings) tuple where result contains archival details and
     /// warnings contains any non-fatal issues encountered.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use jit::commands::{ArchiveError, CommandExecutor};
+    /// use jit::storage::JsonFileStorage;
+    ///
+    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
+    /// // Archiving a missing source is a typed no-op error.
+    /// let err = executor
+    ///     .archive_document("dev/active/missing.md", "design", false, false)
+    ///     .unwrap_err();
+    /// assert!(err.downcast_ref::<ArchiveError>().is_some());
+    /// ```
     pub fn archive_document(
         &self,
         path: &str,
@@ -1157,10 +1181,16 @@ impl<S: IssueStore> CommandExecutor<S> {
             ));
         }
 
-        // Check if file exists
+        // Check if file exists. A missing source is the documented no-op case:
+        // this runs BEFORE any filesystem or `.jit` mutation, so surfacing the
+        // typed `ArchiveError::SourceMissing` here guarantees archival makes no
+        // changes and never leaves or creates a dangling reference.
         let full_path = repo_root.join(doc_path);
         if !full_path.exists() {
-            return Err(anyhow!("❌ Document not found: {}", path_str));
+            return Err(ArchiveError::SourceMissing {
+                path: path_str.to_string(),
+            }
+            .into());
         }
 
         Ok(())
